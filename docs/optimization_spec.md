@@ -10,6 +10,10 @@ The following are out of scope: data ingestion, projection models, transfers,
 multi-gameweek planning, uncertainty scenarios, risk objectives, vice-captain selection,
 bench ordering, Design of Experiments, and Bayesian Optimization.
 
+Provisional factors and evaluation requirements for future experimentation are documented in
+[the experiment parameter contract](experimentation_spec.md). That contract does not change
+the Sprint 0 optimizer or activate future-only parameters.
+
 ## Canonical data contract
 
 The input is a pandas `DataFrame` with at least these columns:

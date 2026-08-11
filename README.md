@@ -129,3 +129,5 @@ exception.
 
 See [the optimization specification](docs/optimization_spec.md) for the formulation,
 rounding rules, deterministic tie-breaking, assumptions, and current limitations.
+The [experiment parameter contract](docs/experimentation_spec.md) records provisional
+Sprint 1 factors and evaluation rules without implementing DoE or Bayesian Optimization.
