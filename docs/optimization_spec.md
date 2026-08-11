@@ -10,6 +10,10 @@ The following are out of scope: data ingestion, projection models, transfers,
 multi-gameweek planning, uncertainty scenarios, risk objectives, vice-captain selection,
 bench ordering, Design of Experiments, and Bayesian Optimization.
 
+Provisional factors and evaluation requirements for future experimentation are documented in
+[the experiment parameter contract](experimentation_spec.md). That contract does not change
+the Sprint 0 optimizer or activate future-only parameters.
+
 ## Canonical data contract
 
 The input is a pandas `DataFrame` with at least these columns:
@@ -205,6 +209,11 @@ Upstream data owners are responsible for stable identifiers, canonical positions
 conversion to tenths, and expected-points generation. The optimizer does not fetch,
 normalize, join, or overwrite source data. A future pipeline can supply additional columns;
 they are preserved but ignored by Sprint 0 decision logic.
+
+The top-level `optimize_squad_from_csv` adapter provides the Sprint 0 end-to-end path for a
+local UTF-8 CSV that already satisfies this contract. It performs no platform-specific
+transformation and delegates validation and optimization to `optimize_squad`. In particular,
+it does not convert decimal prices to `price_tenths`.
 
 ## Known limitations
 
