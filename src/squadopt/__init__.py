@@ -1,5 +1,6 @@
 """Public package interface for football squad optimization."""
 
+from squadopt.integration import optimize_squad_from_csv
 from squadopt.optimization import (
     InsufficientPlayerPoolError,
     InvalidConfigurationError,
@@ -24,4 +25,5 @@ __all__ = [
     "SolverStatus",
     "SquadOptimizationError",
     "optimize_squad",
+    "optimize_squad_from_csv",
 ]

@@ -93,6 +93,27 @@ else:
     print(result.solver_status)
 ```
 
+### Canonical CSV integration
+
+A local CSV that already follows the canonical schema can be passed through the thin
+integration adapter:
+
+```python
+from squadopt import OptimizationConfig, optimize_squad_from_csv
+
+result = optimize_squad_from_csv("predictions.csv", OptimizationConfig())
+
+if result.has_solution:
+    print(result.selected_squad)
+    print(result.starting_xi)
+    print(result.bench)
+    print(result.captain)
+```
+
+The adapter reads UTF-8 CSV data and delegates to `optimize_squad`. It does not fetch data,
+rename columns, normalize identifiers, convert decimal prices, or calculate projections.
+`price_tenths` must therefore contain whole-number tenths such as `55`, not `5.5`.
+
 Valid data that cannot satisfy the optimization constraints returns a structured
 `INFEASIBLE` result. Invalid schema or configuration raises a domain-specific validation
 exception.

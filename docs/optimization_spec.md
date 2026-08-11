@@ -206,6 +206,11 @@ conversion to tenths, and expected-points generation. The optimizer does not fet
 normalize, join, or overwrite source data. A future pipeline can supply additional columns;
 they are preserved but ignored by Sprint 0 decision logic.
 
+The top-level `optimize_squad_from_csv` adapter provides the Sprint 0 end-to-end path for a
+local UTF-8 CSV that already satisfies this contract. It performs no platform-specific
+transformation and delegates validation and optimization to `optimize_squad`. In particular,
+it does not convert decimal prices to `price_tenths`.
+
 ## Known limitations
 
 - Only one gameweek is modeled.
