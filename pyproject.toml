@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "football-squad-optimizer"
+version = "0.1.0"
+description = "Data-source-independent football squad optimization."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "SquadOpt" }]
+dependencies = [
+    "ortools>=9.15.6755,<9.16",
+    "pandas>=2.2.3,<3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy>=1.14,<3",
+    "pandas-stubs>=2.2.3,<3.1",
+    "pytest>=8.3,<10",
+    "ruff>=0.11,<1",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["squadopt*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+mypy_path = "src"
+files = ["src/squadopt"]

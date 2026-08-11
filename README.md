@@ -1,2 +1,110 @@
-# football-squad-optimizer
-Football squad optimization using predictive modeling,Design of Experiments and Bayesian Optimization.
+# Football Squad Optimizer
+
+A data-source-independent decision-support package for selecting a football squad from
+player projections. Sprint 0 implements a tested, single-gameweek baseline with Google
+OR-Tools CP-SAT.
+
+## Sprint 0 scope
+
+Given a canonical pandas `DataFrame`, the optimizer selects:
+
+- a 15-player squad;
+- an 11-player starting lineup;
+- an unordered bench;
+- exactly one captain from the starting lineup.
+
+The package does not fetch data or calculate player projections.
+
+## Requirements and installation
+
+Python 3.11 or newer is required. Create a repository-local environment on Windows:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python -m pip install --upgrade pip
+.venv\Scripts\python -m pip install -e ".[dev]"
+```
+
+## Canonical player schema
+
+| Column | Contract |
+| --- | --- |
+| `player_id` | Unique, non-null; consistently integer or string |
+| `name` | Non-empty string |
+| `team_id` | Non-null; consistently integer or string |
+| `position` | One of `GK`, `DEF`, `MID`, `FWD` |
+| `price_tenths` | Non-negative integer, e.g. `55` means `5.5` |
+| `expected_points` | Finite, numeric, and non-negative |
+
+Additional columns are preserved in result tables. Input data is never modified in place.
+
+## Usage
+
+The following small configuration is intentionally smaller than the default 15-player squad
+so the complete synthetic example remains readable:
+
+```python
+import pandas as pd
+
+from squadopt import OptimizationConfig, optimize_squad
+
+players = pd.DataFrame(
+    [
+        ["GK_A", "Synthetic GK A", "T1", "GK", 50, 5.0],
+        ["GK_B", "Synthetic GK B", "T2", "GK", 50, 1.0],
+        ["DEF_A", "Synthetic DEF A", "T3", "DEF", 50, 4.0],
+        ["DEF_B", "Synthetic DEF B", "T4", "DEF", 50, 1.0],
+        ["MID_A", "Synthetic MID A", "T5", "MID", 50, 10.0],
+        ["MID_B", "Synthetic MID B", "T6", "MID", 50, 1.0],
+        ["FWD_A", "Synthetic FWD A", "T7", "FWD", 50, 6.0],
+        ["FWD_B", "Synthetic FWD B", "T8", "FWD", 50, 1.0],
+    ],
+    columns=[
+        "player_id",
+        "name",
+        "team_id",
+        "position",
+        "price_tenths",
+        "expected_points",
+    ],
+)
+
+config = OptimizationConfig(
+    budget_tenths=200,
+    squad_size=4,
+    squad_position_limits={"GK": 1, "DEF": 1, "MID": 1, "FWD": 1},
+    starting_size=3,
+    starting_position_min={"GK": 1, "DEF": 0, "MID": 0, "FWD": 1},
+    starting_position_max={"GK": 1, "DEF": 1, "MID": 1, "FWD": 1},
+    max_players_per_team=4,
+)
+
+result = optimize_squad(players, config)
+
+if result.has_solution:
+    print(result.selected_squad)
+    print(result.starting_xi)
+    print(result.bench)
+    print(result.captain)
+    print(result.total_cost_tenths)
+    print(result.projected_score)
+    print(result.objective_value)
+else:
+    print(result.solver_status)
+```
+
+Valid data that cannot satisfy the optimization constraints returns a structured
+`INFEASIBLE` result. Invalid schema or configuration raises a domain-specific validation
+exception.
+
+## Quality checks
+
+```powershell
+.venv\Scripts\python -m pytest
+.venv\Scripts\python -m ruff check .
+.venv\Scripts\python -m ruff format --check .
+.venv\Scripts\python -m mypy src\squadopt
+```
+
+See [the optimization specification](docs/optimization_spec.md) for the formulation,
+rounding rules, deterministic tie-breaking, assumptions, and current limitations.
