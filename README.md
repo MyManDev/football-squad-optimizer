@@ -118,6 +118,56 @@ Valid data that cannot satisfy the optimization constraints returns a structured
 `INFEASIBLE` result. Invalid schema or configuration raises a domain-specific validation
 exception.
 
+## Data pipeline
+
+The example above hand-writes its player table. The data layer produces that table
+from local player-gameweek records instead, without the optimizer knowing anything
+about source column names, cleaning rules, or feature windows.
+
+```text
+local CSV / Parquet
+  -> canonical player-gameweek dataset    (season, gameweek, player_id)
+  -> leakage-safe rolling features
+  -> baseline expected points
+  -> optimizer-ready projection table     (one target gameweek)
+```
+
+```python
+from squadopt import OptimizationConfig, optimize_squad
+from squadopt.data import build_canonical_dataset, load_csv
+from squadopt.features import build_feature_dataset
+from squadopt.prediction import build_projection_table
+
+canonical = build_canonical_dataset(load_csv(raw_path), adapter=adapter)
+features = build_feature_dataset(canonical)
+projections = build_projection_table(features, season="2025-26", gameweek=6)
+
+result = optimize_squad(projections, OptimizationConfig())
+```
+
+A runnable version against the committed synthetic sample:
+
+```powershell
+.venv\Scripts\python -m scripts.run_pipeline_demo
+```
+
+Two rules govern the layer. **Prices stay integer tenths** end to end, converted
+with decimal arithmetic rather than binary floats. **Features for gameweek `t` use
+only earlier gameweeks**: every rolling aggregation is grouped by season and player
+and shifted by one gameweek before its window is applied, and that property is
+proven by tests that mutate future results, truncate the future entirely, and check
+season boundaries — not merely asserted in a comment.
+
+| Document | Contents |
+| --- | --- |
+| [Data contract](docs/data_contract.md) | Canonical and projection schemas, time-of-knowledge rules, guarantees |
+| [Data dictionary](docs/data_dictionary.md) | Every column: type, meaning, missing-value policy, leakage risk |
+| [Data pipeline](docs/data_pipeline.md) | Stage responsibilities, leakage controls, determinism, testing |
+| [Follow-up work](docs/data_followups.md) | Deliberate Sprint 0 gaps and how to close them |
+
+The synthetic sample under `data/sample/` is generated from code and contains no
+third-party data; see [its notes](data/sample/README.md).
+
 ## Quality checks
 
 ```powershell

@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project data
+#   Small synthetic sample data under data/sample/ is committed on purpose and is
+#   reproducible from scripts/generate_sample_data.py. Everything else under data/
+#   stays local: third-party historical dumps have unverified licensing and the
+#   repository is not a data store.
+data/raw/
+data/external/
+data/interim/
+data/processed/
