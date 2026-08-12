@@ -1,0 +1,20 @@
+{
+  "repository": "vaastav/Fantasy-Premier-League",
+  "commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+  "note": "Checksums of third-party files this project reads. The data itself is not redistributed here; run scripts/fetch_historical_data.py to obtain it.",
+  "files": {
+    "data/2020-21/gws/merged_gw.csv": "fb2a2bc54b6cfbe835a39183b096b382f7961e3828e7845e9288671cccca3ad8",
+    "data/2020-21/players_raw.csv": "e3aff899fc2486bd96fe5d11d8c8e8c066dea36cc71de2bf8a85e8aa7245ed32",
+    "data/2021-22/gws/merged_gw.csv": "29770bbe305feee681f7122c0bd08451783366e0a3a9604194f528a0880f23de",
+    "data/2021-22/players_raw.csv": "78e185fb0b5c81f58c2b89f232358b1097bededc9852d4171edaea2e9d3bd887",
+    "data/2022-23/gws/merged_gw.csv": "b78a6d0456141f9033c32fc4122931baae780ac4a4938683451b1fce7a4fdd15",
+    "data/2022-23/players_raw.csv": "a874c12817bbf4d454e60a5765629742b528d4ad0c2f39f56e4fc89640605f7f",
+    "data/2023-24/gws/merged_gw.csv": "e9c09c8856f1c86b4f920f46ddd5033af83409439dfda53be925df2a3e7c8a9e",
+    "data/2023-24/players_raw.csv": "43d8cf5efb3d901f2499558c40b392b7f0ee22afe28030f36266ad29024c63d9",
+    "data/2024-25/gws/merged_gw.csv": "5bbbcba6353b4c72ad273adcc8e3aa451946a826564679788f45b1cb3325b84e",
+    "data/2024-25/players_raw.csv": "75686051b265cbe7755ac71213ecaad21b26ee1cc46a8bafbba19c39ce894b05",
+    "data/2025-26/gws/merged_gw.csv": "0d09f1f1cb1b5520ec8e2f25238aa652efe2a263d8ca7cb2b6538b27bf86727d",
+    "data/2025-26/players_raw.csv": "412ce0172016f8f98f25177dc6de9f3cd2a8ec7a6135f9aa638d7fdee784d67b",
+    "data/2026-27/players_raw.csv": "c52ae3b3e0dcbbe0d6c5e2ecdcf4498b9ed0b5dbb3ab021f0a96daa6a85092e2"
+  }
+}
