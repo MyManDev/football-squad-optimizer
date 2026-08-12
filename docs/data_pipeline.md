@@ -157,7 +157,7 @@ stage rather than surfacing as a puzzling rejection one module later.
 | | Prediction-ready historical dataset | Optimizer-ready projection table |
 | --- | --- | --- |
 | Rows | All players, all gameweeks | All candidate players, one target gameweek |
-| Contains | Canonical columns, rolling features, `target_next_gw_points` | Exactly the six contract columns, plus optional diagnostics |
+| Contains | Canonical columns and rolling features; same-row `total_points` is the label | Exactly the six contract columns, plus optional diagnostics |
 | Purpose | Model development and walk-forward backtesting | Optimizer input |
 
 Conflating them is how a training label reaches the optimizer, so they are built

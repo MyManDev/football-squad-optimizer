@@ -13,7 +13,9 @@ Given a canonical pandas `DataFrame`, the optimizer selects:
 - an unordered bench;
 - exactly one captain from the starting lineup.
 
-The package does not fetch data or calculate player projections.
+The optimization module does not fetch data or calculate projections. Separate data,
+feature, and baseline-prediction modules prepare the canonical projection table consumed by
+the optimizer.
 
 ## Requirements and installation
 
@@ -110,9 +112,10 @@ if result.has_solution:
     print(result.captain)
 ```
 
-The adapter reads UTF-8 CSV data and delegates to `optimize_squad`. It does not fetch data,
-rename columns, normalize identifiers, convert decimal prices, or calculate projections.
-`price_tenths` must therefore contain whole-number tenths such as `55`, not `5.5`.
+The adapter reads UTF-8 CSV data, preserves identifiers as text, parses the numeric contract
+columns, and delegates to `optimize_squad`. It does not fetch data, rename columns, normalize
+positions, convert decimal prices, or calculate projections. `price_tenths` must therefore
+contain whole-number tenths such as `55`, not `5.5`.
 
 Valid data that cannot satisfy the optimization constraints returns a structured
 `INFEASIBLE` result. Invalid schema or configuration raises a domain-specific validation
