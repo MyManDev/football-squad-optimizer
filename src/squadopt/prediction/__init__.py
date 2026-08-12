@@ -14,15 +14,21 @@ from squadopt.prediction.config import (
     PredictionError,
     required_feature_columns,
 )
+from squadopt.prediction.opening import (
+    ROSTER_COLUMN_MAP,
+    build_opening_projection_table,
+)
 from squadopt.prediction.projection import build_projection_table
 
 __all__ = [
     "DEFAULT_OPENING_EXPECTED_POINTS",
     "DEFAULT_PROJECTION_CONFIG",
+    "ROSTER_COLUMN_MAP",
     "BaselineProjectionConfig",
     "PredictionConfigurationError",
     "PredictionError",
     "baseline_expected_points",
+    "build_opening_projection_table",
     "build_projection_table",
     "required_feature_columns",
 ]

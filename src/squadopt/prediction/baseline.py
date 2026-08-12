@@ -12,6 +12,7 @@ import pandas as pd
 
 from squadopt.data.schema import POSITIONS
 from squadopt.features.config import MINUTES_PER_FULL_MATCH
+from squadopt.features.cross_season import PRIOR_MINUTES_COLUMN, PRIOR_RATE_COLUMN
 from squadopt.prediction.config import (
     DEFAULT_PROJECTION_CONFIG,
     BaselineProjectionConfig,
@@ -35,6 +36,26 @@ def _opening_fallback(features: pd.DataFrame, config: BaselineProjectionConfig) 
     return pd.Series(values, index=features.index, dtype="float64")
 
 
+def _carried_projection(features: pd.DataFrame) -> pd.Series:
+    """Project from a player's earlier seasons, where that record exists.
+
+    Used only when the current season offers no history at all — its opening
+    gameweek. The same rate-times-minutes shape as the within-season formula, so a
+    player carried over is scored on the same scale as one with recent form.
+
+    Returns all-missing when the feature dataset does not carry the cross-season
+    columns, which keeps a caller that never attached them behaving exactly as
+    before rather than failing.
+    """
+
+    if PRIOR_RATE_COLUMN not in features.columns or PRIOR_MINUTES_COLUMN not in features.columns:
+        return pd.Series(float("nan"), index=features.index, dtype="float64")
+
+    rate = features[PRIOR_RATE_COLUMN].astype("float64")
+    minutes = features[PRIOR_MINUTES_COLUMN].astype("float64")
+    return rate.mul(minutes).div(MINUTES_PER_FULL_MATCH)
+
+
 def baseline_expected_points(
     features: pd.DataFrame,
     *,
@@ -45,15 +66,19 @@ def baseline_expected_points(
     Computed as ``points_per_90 * expected_minutes / 90`` from shifted rolling
     features, so a row's projection uses only gameweeks before its own.
 
-    Three cases, in order of precedence:
+    Four cases, in order of precedence:
 
-    - **No history at all** (a player's opening gameweek): the declared
-      per-position fallback. There is genuinely no signal, so the constant is
-      explicit rather than a silent zero.
+    - **Within-season history exists**: the formula, clamped at zero.
     - **History exists but no minutes were played in the window**: zero. This is
       not missing information — the player demonstrably did not feature, and the
       expected minutes are zero, so the projection is zero regardless of rate.
-    - **Otherwise**: the formula, clamped at zero.
+    - **No within-season history, but earlier seasons are carried**: the same
+      formula applied to the carry-over, so the opening gameweek can rank players
+      instead of treating everyone alike. Requires the feature dataset to carry the
+      cross-season columns; a caller that never attached them is unaffected.
+    - **No record anywhere** (a genuine debut, a new signing from abroad, a
+      promoted-team player): the declared per-position fallback. There is truly no
+      signal, so the constant is explicit rather than a silent zero.
 
     The result is always finite and non-negative, because the optimizer rejects
     negative or non-finite projections. Realized points may be negative from cards
@@ -81,11 +106,14 @@ def baseline_expected_points(
     rate = features[rate_column].astype("float64")
 
     projected = rate.mul(expected_minutes).div(MINUTES_PER_FULL_MATCH)
-    # A known-but-idle history means zero, while no history at all means fallback.
-    # Applying the rate rule first lets the minutes rule override it, and missing
-    # minutes always imply a missing rate, so the two cases cannot be confused.
+    # A known-but-idle history means zero, while no history at all means the player
+    # falls through to their earlier seasons. Applying the rate rule first lets the
+    # minutes rule override it, and missing minutes always imply a missing rate, so
+    # the two cases cannot be confused.
     projected = projected.where(rate.notna(), 0.0)
-    projected = projected.where(expected_minutes.notna(), _opening_fallback(features, settings))
+    projected = projected.where(expected_minutes.notna(), _carried_projection(features))
+    # Whatever is still missing has no record anywhere: a genuine debut.
+    projected = projected.where(projected.notna(), _opening_fallback(features, settings))
     projected = projected.clip(lower=0.0).astype("float64")
 
     if not bool(projected.notna().all()):

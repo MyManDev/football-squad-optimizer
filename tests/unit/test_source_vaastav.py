@@ -352,7 +352,41 @@ def test_the_upcoming_roster_exposes_the_pool_and_opening_prices(tmp_path: Path)
 
     roster = load_upcoming_roster(root, SEASON)
 
-    assert list(roster.columns) == ["code", "web_name", "team", "element_type", "now_cost"]
+    assert list(roster.columns) == ["code", "web_name", "team", "now_cost", "position"]
+    assert len(roster) == 2
+
+
+def test_the_upcoming_roster_translates_numeric_position_codes(tmp_path: Path) -> None:
+    """A platform's encoding is source knowledge, so it is resolved here."""
+
+    root = _archive(tmp_path, [_gameweek_row()])
+
+    # The loader reads text by design, so codes arrive as strings; canonical typing
+    # happens later, in the projection layer.
+    roster = load_upcoming_roster(root, SEASON).set_index("code")
+
+    assert roster.loc["900001", "position"] == "GK"
+    assert roster.loc["900002", "position"] == "MID"
+
+
+def test_the_upcoming_roster_drops_non_player_entries(tmp_path: Path) -> None:
+    """Element type 5 is a manager, not a squad-eligible player."""
+
+    root = _archive(
+        tmp_path,
+        [_gameweek_row()],
+        roster_rows=[
+            [1, 900001, 1, 10, 45, "Keeper"],
+            [2, 900002, 3, 11, 80, "Mid"],
+            [3, 900003, 5, 12, 15, "Boss"],
+        ],
+    )
+
+    roster = load_upcoming_roster(root, SEASON)
+
+    # Compared as text, because an integer would never match and the assertion
+    # would pass without testing anything.
+    assert set(roster["code"]) == {"900001", "900002"}
     assert len(roster) == 2
 
 

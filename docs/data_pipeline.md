@@ -133,18 +133,31 @@ driver of fantasy scoring — whether a player is on the pitch at all — which 
 points average misses: it would rate a substitute who scored once in ten minutes
 as highly as a regular starter.
 
-Three cases, in precedence order:
+Four cases, in precedence order:
 
 | Situation | Result | Why |
 | --- | --- | --- |
-| No history at all (opening gameweek) | Declared per-position fallback | Genuinely no signal; an explicit constant beats a silent zero |
+| Within-season history exists | Formula, clamped at `0.0` | Realized points may be negative; a projection may not be |
 | History exists, no minutes in the window | `0.0` | Not a gap — the player demonstrably did not feature |
-| Otherwise | Formula, clamped at `0.0` | Realized points may be negative; a projection may not be |
+| No within-season history, earlier seasons carried | Same formula on the carry-over | The opening gameweek can rank players instead of treating everyone alike |
+| No record anywhere | Declared per-position fallback | A genuine debut has no signal; an explicit constant beats a silent zero |
+
+The third case needs the feature dataset to carry the cross-season columns, which
+`build_feature_dataset(..., cross_season=...)` attaches. It is off by default: it only
+means anything for a panel spanning several seasons, and a caller working within one
+season should not silently gain two always-missing columns.
+
+Measured on six real seasons, the carry-over covers **57% to 67%** of opening-gameweek
+players, which turns gameweek 1 from a single constant into hundreds of distinct
+projections. The remainder — new signings from abroad, promoted-team players, debutants
+— still fall to the constant, and that residual is the population a price-based prior
+would genuinely serve.
 
 The default fallback is deliberately **uniform** across positions. A differentiated
 prior would imply a fitted claim this project has not earned; the per-position shape
-exists so a later sprint can refine it without touching any call site. The
-consequence is honest and tested: gameweek 1 projections are uniform, so the
+exists so a later sprint can refine it without touching any call site. Without the
+carry-over attached, the consequence is honest and tested: gameweek 1 projections are
+uniform, so the
 optimizer returns a legal but undiscriminating squad. The skeleton never breaks —
 it simply cannot rank players before any history exists.
 

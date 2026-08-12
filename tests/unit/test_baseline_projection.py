@@ -7,7 +7,12 @@ import pytest
 from pandas.testing import assert_series_equal
 from tests.fixtures.synthetic_gameweeks import SEASON, make_canonical_gameweeks
 
-from squadopt.features import FeatureConfig, build_feature_dataset
+from squadopt.features import (
+    CROSS_SEASON_COLUMNS,
+    CrossSeasonConfig,
+    FeatureConfig,
+    build_feature_dataset,
+)
 from squadopt.prediction import (
     DEFAULT_OPENING_EXPECTED_POINTS,
     BaselineProjectionConfig,
@@ -235,3 +240,174 @@ def test_default_fallback_is_uniform_across_positions() -> None:
 def test_non_dataframe_input_is_rejected() -> None:
     with pytest.raises(PredictionConfigurationError, match="expects a pandas DataFrame"):
         baseline_expected_points([{"position": "MID"}])  # type: ignore[arg-type]
+
+
+# --- the opening gameweek, once earlier seasons are carried ------------------
+
+
+def _two_season_history() -> pd.DataFrame:
+    """One player with a full earlier season, then the opening gameweek of the next."""
+
+    rows = [("2023-24", gameweek, 90, 6) for gameweek in (1, 2)]
+    rows.append(("2024-25", 1, 90, 0))
+    length = len(rows)
+    return pd.DataFrame(
+        {
+            "season": pd.Series([row[0] for row in rows], dtype="string"),
+            "gameweek": pd.Series([row[1] for row in rows], dtype="int64"),
+            "player_id": pd.Series([1] * length, dtype="int64"),
+            "name": pd.Series(["Solo"] * length, dtype="string"),
+            "team_id": pd.Series([1] * length, dtype="int64"),
+            "position": pd.Series(["MID"] * length, dtype="string"),
+            "price_tenths": pd.Series([50] * length, dtype="int64"),
+            "minutes": pd.Series([row[2] for row in rows], dtype="int64"),
+            "total_points": pd.Series([row[3] for row in rows], dtype="int64"),
+        }
+    )
+
+
+def _features_with_carry_over() -> pd.DataFrame:
+    return build_feature_dataset(
+        _two_season_history(),
+        config=FeatureConfig(
+            minutes_windows=(WINDOW,), points_windows=(WINDOW,), per_90_window=WINDOW
+        ),
+        cross_season=CrossSeasonConfig(min_minutes=0),
+    )
+
+
+def test_the_opening_gameweek_uses_the_earlier_season_when_it_is_carried() -> None:
+    """12 points over 180 minutes is 6.0 per 90, at 90 expected minutes: 6.0."""
+
+    features = _features_with_carry_over()
+
+    result = baseline_expected_points(features, config=CONFIG)
+    opening = features["gameweek"] == 1
+    later_season = features["season"] == "2024-25"
+
+    assert result.loc[opening & later_season].tolist() == [6.0]
+
+
+def test_the_opening_gameweek_still_falls_back_without_a_carried_record() -> None:
+    """A caller that never attached the carry-over keeps the previous behaviour."""
+
+    features = build_feature_dataset(
+        _two_season_history(),
+        config=FeatureConfig(
+            minutes_windows=(WINDOW,), points_windows=(WINDOW,), per_90_window=WINDOW
+        ),
+    )
+
+    result = baseline_expected_points(features, config=CONFIG)
+    opening = (features["gameweek"] == 1) & (features["season"] == "2024-25")
+
+    assert result.loc[opening].tolist() == [DEFAULT_OPENING_EXPECTED_POINTS]
+
+
+def test_a_player_with_no_earlier_record_still_gets_the_fallback() -> None:
+    """A genuine debut has no signal anywhere, so the declared constant remains."""
+
+    history = _two_season_history()
+    newcomer = history.loc[history["season"] == "2024-25"].copy(deep=True)
+    newcomer["player_id"] = 2
+    newcomer["name"] = "Newcomer"
+    combined = pd.concat([history, newcomer], ignore_index=True)
+
+    features = build_feature_dataset(
+        combined,
+        config=FeatureConfig(
+            minutes_windows=(WINDOW,), points_windows=(WINDOW,), per_90_window=WINDOW
+        ),
+        cross_season=CrossSeasonConfig(min_minutes=0),
+    )
+    result = baseline_expected_points(features, config=CONFIG)
+    debut = (features["player_id"] == 2) & (features["gameweek"] == 1)
+
+    assert result.loc[debut].tolist() == [DEFAULT_OPENING_EXPECTED_POINTS]
+
+
+def test_within_season_history_still_takes_precedence() -> None:
+    """The carry-over fills a gap; it must not override recent form."""
+
+    rows = _two_season_history()
+    extended = pd.concat(
+        [
+            rows,
+            rows.loc[rows["season"] == "2024-25"].assign(gameweek=2, minutes=90, total_points=0),
+        ],
+        ignore_index=True,
+    )
+
+    features = build_feature_dataset(
+        extended,
+        config=FeatureConfig(
+            minutes_windows=(WINDOW,), points_windows=(WINDOW,), per_90_window=WINDOW
+        ),
+        cross_season=CrossSeasonConfig(min_minutes=0),
+    )
+    result = baseline_expected_points(features, config=CONFIG)
+    second = (features["season"] == "2024-25") & (features["gameweek"] == 2)
+
+    # Gameweek 1 of the new season scored nothing, so within-season form says 0.0 —
+    # not the 6.0 the earlier season would have suggested.
+    assert result.loc[second].tolist() == [0.0]
+
+
+def test_a_carried_projection_is_still_clamped_and_finite() -> None:
+    history = _two_season_history()
+    history.loc[history["season"] == "2023-24", "total_points"] = -6
+
+    features = build_feature_dataset(
+        history,
+        config=FeatureConfig(
+            minutes_windows=(WINDOW,), points_windows=(WINDOW,), per_90_window=WINDOW
+        ),
+        cross_season=CrossSeasonConfig(min_minutes=0),
+    )
+    result = baseline_expected_points(features, config=CONFIG)
+
+    assert result.notna().all()
+    assert (result >= 0).all()
+
+
+def test_the_builder_attaches_the_carry_over_only_when_asked() -> None:
+    history = _two_season_history()
+    settings = FeatureConfig(
+        minutes_windows=(WINDOW,), points_windows=(WINDOW,), per_90_window=WINDOW
+    )
+
+    without = build_feature_dataset(history, config=settings)
+    with_carry = build_feature_dataset(
+        history, config=settings, cross_season=CrossSeasonConfig(min_minutes=0)
+    )
+
+    assert not [column for column in CROSS_SEASON_COLUMNS if column in without.columns]
+    assert list(with_carry.columns)[-2:] == list(CROSS_SEASON_COLUMNS)
+
+
+def test_a_carried_opening_projection_ignores_later_gameweeks() -> None:
+    """The leakage rule holds across the new path too."""
+
+    history = _two_season_history()
+    baseline = baseline_expected_points(_features_with_carry_over(), config=CONFIG)
+
+    mutated = pd.concat(
+        [
+            history,
+            history.loc[history["season"] == "2024-25"].assign(
+                gameweek=2, minutes=90, total_points=999
+            ),
+        ],
+        ignore_index=True,
+    )
+    features = build_feature_dataset(
+        mutated,
+        config=FeatureConfig(
+            minutes_windows=(WINDOW,), points_windows=(WINDOW,), per_90_window=WINDOW
+        ),
+        cross_season=CrossSeasonConfig(min_minutes=0),
+    )
+    rebuilt = baseline_expected_points(features, config=CONFIG)
+    opening = (features["season"] == "2024-25") & (features["gameweek"] == 1)
+
+    assert rebuilt.loc[opening].tolist() == baseline.iloc[[2]].tolist()

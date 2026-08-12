@@ -94,6 +94,126 @@ def _season_totals(panel: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _weighted_history(
+    history: list[tuple[int, float, float, float]],
+    target_rank: int,
+    decay: float,
+) -> tuple[float, float, float]:
+    """Combine a player's earlier seasons into weighted minutes, points, and gameweeks.
+
+    ``history`` holds ``(rank, minutes, points, gameweeks)`` for seasons already
+    completed. Only entries before ``target_rank`` contribute, which is the single
+    place the backwards-only direction of the crossing is enforced.
+    """
+
+    weighted_minutes = 0.0
+    weighted_points = 0.0
+    weighted_gameweeks = 0.0
+    for prior_rank, minutes, points, gameweeks in history:
+        if prior_rank >= target_rank:
+            continue
+        weight = decay ** (target_rank - prior_rank - 1)
+        weighted_minutes += weight * minutes
+        weighted_points += weight * points
+        weighted_gameweeks += weight * gameweeks
+    return weighted_minutes, weighted_points, weighted_gameweeks
+
+
+def _resolve(
+    weighted: tuple[float, float, float],
+    min_minutes: int,
+) -> tuple[float, float]:
+    """Turn weighted totals into a rate and a minutes expectation, or missing values."""
+
+    weighted_minutes, weighted_points, weighted_gameweeks = weighted
+    if weighted_minutes < min_minutes or weighted_gameweeks <= 0:
+        return float("nan"), float("nan")
+    return (
+        weighted_minutes / weighted_gameweeks,
+        weighted_points / weighted_minutes * MINUTES_PER_FULL_MATCH,
+    )
+
+
+def _player_history(totals: pd.DataFrame) -> dict[object, list[tuple[int, float, float, float]]]:
+    """Index each player's season totals by player, ordered chronologically."""
+
+    histories: dict[object, list[tuple[int, float, float, float]]] = {}
+    for player_id, group in totals.groupby("player_id", sort=True):
+        ordered = group.sort_values("rank", kind="stable")
+        histories[player_id] = [
+            (int(rank), float(minutes), float(points), float(gameweeks))
+            for rank, minutes, points, gameweeks in zip(
+                ordered["rank"].tolist(),
+                ordered["season_minutes"].tolist(),
+                ordered["season_points"].tolist(),
+                ordered["season_gameweeks"].tolist(),
+                strict=True,
+            )
+        ]
+    return histories
+
+
+def carry_over_as_of(
+    panel: pd.DataFrame,
+    *,
+    target_season: str,
+    config: CrossSeasonConfig | None = None,
+    season_order: Sequence[str] | None = None,
+) -> pd.DataFrame:
+    """Return each player's carried record as it stands entering ``target_season``.
+
+    Unlike :func:`cross_season_features`, the target season need not appear in the
+    panel — which is the point. A season that has not started has no gameweek rows
+    at all, only a roster, yet an opening-gameweek decision still needs to know what
+    each player did before. A target season absent from the panel is ranked one step
+    after its last season; a target season present in it uses its own rank, so both
+    calls agree wherever they overlap.
+
+    Returns one row per player with ``player_id`` and the two carried columns.
+    """
+
+    if not isinstance(panel, pd.DataFrame):
+        raise FeatureConfigurationError("carry_over_as_of expects a pandas DataFrame.")
+    missing = [column for column in REQUIRED_COLUMNS if column not in panel.columns]
+    if missing:
+        raise FeatureConfigurationError(f"panel is missing required columns: {missing!r}.")
+    if panel.empty:
+        raise FeatureConfigurationError("panel must contain at least one row.")
+    if not isinstance(target_season, str) or not target_season.strip():
+        raise FeatureConfigurationError(
+            f"target_season must be a non-empty string, got {target_season!r}."
+        )
+
+    settings = DEFAULT_CROSS_SEASON_CONFIG if config is None else config
+    label = target_season.strip()
+
+    known = [str(season) for season in panel["season"].tolist()]
+    ranks = season_rank_map([*known, label], season_order=season_order)
+    target_rank = ranks[label]
+
+    totals = _season_totals(panel)
+    totals["rank"] = [ranks[str(season)] for season in totals["season"]]
+    histories = _player_history(totals)
+
+    records: list[dict[str, object]] = []
+    for player_id, history in histories.items():
+        minutes, rate = _resolve(
+            _weighted_history(history, target_rank, settings.decay), settings.min_minutes
+        )
+        records.append(
+            {
+                "player_id": player_id,
+                PRIOR_MINUTES_COLUMN: minutes,
+                PRIOR_RATE_COLUMN: rate,
+            }
+        )
+
+    frame = pd.DataFrame.from_records(
+        records, columns=["player_id", PRIOR_MINUTES_COLUMN, PRIOR_RATE_COLUMN]
+    )
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
 def cross_season_features(
     panel: pd.DataFrame,
     *,
@@ -129,51 +249,24 @@ def cross_season_features(
     # season may use. Done per player over ranked seasons rather than vectorized,
     # because the weight depends on the distance between two seasons and clarity
     # matters more than speed at this size.
-    carried: dict[tuple[str, object], tuple[float, float, float]] = {}
-    for player_id, group in totals.groupby("player_id", sort=True):
-        history = group.sort_values("rank", kind="stable")
-        season_labels = [str(value) for value in history["season"].tolist()]
-        season_ranks = [int(value) for value in history["rank"].tolist()]
-        minutes_totals = [float(value) for value in history["season_minutes"].tolist()]
-        points_totals = [float(value) for value in history["season_points"].tolist()]
-        gameweek_totals = [float(value) for value in history["season_gameweeks"].tolist()]
+    histories = _player_history(totals)
 
-        seen: list[tuple[int, float, float, float]] = []
-        for position, target_rank in enumerate(season_ranks):
-            weighted_minutes = 0.0
-            weighted_points = 0.0
-            weighted_gameweeks = 0.0
-            for prior_rank, minutes, points, gameweeks in seen:
-                weight = settings.decay ** (target_rank - prior_rank - 1)
-                weighted_minutes += weight * minutes
-                weighted_points += weight * points
-                weighted_gameweeks += weight * gameweeks
-            carried[(season_labels[position], player_id)] = (
-                weighted_minutes,
-                weighted_points,
-                weighted_gameweeks,
-            )
-            seen.append(
-                (
-                    target_rank,
-                    minutes_totals[position],
-                    points_totals[position],
-                    gameweek_totals[position],
-                )
+    # One entry per (season, player) so every row of that season reads the same
+    # carried value — it summarises what was known before the season began.
+    resolved: dict[tuple[str, object], tuple[float, float]] = {}
+    for player_id, history in histories.items():
+        for target_rank, *_ in history:
+            season_label = next(label for label, rank in ranks.items() if rank == target_rank)
+            resolved[(season_label, player_id)] = _resolve(
+                _weighted_history(history, target_rank, settings.decay), settings.min_minutes
             )
 
     rates: list[float] = []
     minutes_per_gameweek: list[float] = []
     for season, player_id in zip(panel["season"], panel["player_id"], strict=True):
-        weighted_minutes, weighted_points, weighted_gameweeks = carried.get(
-            (str(season), player_id), (0.0, 0.0, 0.0)
-        )
-        if weighted_minutes < settings.min_minutes or weighted_gameweeks <= 0:
-            rates.append(float("nan"))
-            minutes_per_gameweek.append(float("nan"))
-            continue
-        rates.append(weighted_points / weighted_minutes * MINUTES_PER_FULL_MATCH)
-        minutes_per_gameweek.append(weighted_minutes / weighted_gameweeks)
+        minutes, rate = resolved.get((str(season), player_id), (float("nan"), float("nan")))
+        minutes_per_gameweek.append(minutes)
+        rates.append(rate)
 
     return pd.DataFrame(
         {
