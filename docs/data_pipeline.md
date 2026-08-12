@@ -38,6 +38,8 @@ none of it: not source names, not cleaning rules, not the loader.
 | `prediction/config.py` | `BaselineProjectionConfig`: windows, opening fallback | **implemented** |
 | `prediction/baseline.py` | Deterministic `expected_points` | **implemented** |
 | `prediction/projection.py` | `build_projection_table(season=…, gameweek=t)` | **implemented** |
+| `backtest/splits.py` | `DecisionPoint`, season ranking, the time-ordered split | **implemented** |
+| `backtest/folds.py` | `build_walk_forward_folds()` producing `EvaluationFold` objects | **implemented** |
 
 Design rules that keep the layer refactorable: all constants live in `schema.py`
 and are imported, never restated; I/O is confined to `loaders.py` so every
@@ -151,6 +153,62 @@ it simply cannot rank players before any history exists.
 that gameweek's deadline. It then rechecks the contract itself — unique ids,
 integral prices, finite non-negative points — so a violation names the projection
 stage rather than surfacing as a puzzling rejection one module later.
+
+## Walk-forward backtesting
+
+`squadopt.backtest` sits above the data, feature, prediction, and evaluation layers
+and owns the time axis. What counts as "before" a decision is decided in one module
+and nowhere else, so no consumer re-derives it and no consumer can bypass it.
+
+A `DecisionPoint` is a season and gameweek: the boundary between what is known and
+what is not. Two views exist around it, deliberately separate:
+
+| View | Contents | Used for |
+| --- | --- | --- |
+| `rows_before` | Strictly earlier rows | Fitting a model, which must never see the outcome it predicts |
+| `rows_through` | Earlier rows **and** the decision gameweek | Building the projection |
+| `realized_points_at` | Only the decision gameweek's `player_id` and `total_points` | Scoring, read only after the decision is frozen |
+
+`rows_through` includes the decision gameweek on purpose rather than by oversight.
+Building features for gameweek `t` needs row `t` for its pre-match columns — price,
+club, and position are fixed at that deadline — while every rolling aggregation is
+shifted, so the row's own outcome cannot reach its own features. Later gameweeks are
+absent entirely, which makes "the future does not exist" structurally true rather
+than merely tested.
+
+Season order is ranked from sorted labels by default. That works for the
+conventional `YYYY-YY` label, but it is a property of the naming convention rather
+than a guarantee, so `season_order` lets a caller state the order instead of hoping
+the default is right. A test proves the explicit order genuinely changes which rows
+count as history.
+
+`min_prior_gameweeks_in_season` defaults to 1, skipping each season's opener. A
+season-scoped rolling feature has no history there, so the projection falls back to
+a constant and the fold would measure the fallback rather than the model. History is
+counted from rows that actually exist, not from gameweek numbers: a panel starting
+at gameweek 5 has no history at gameweek 5.
+
+`seasons` restricts which seasons produce decisions while leaving earlier seasons
+available as history. That is how a holdout season stays unscored without being
+deleted from the panel.
+
+**Random splits are not expressible.** No function accepts a seed, shuffle, fraction,
+or `random_state`, and a test asserts the public surface never grows one.
+
+The projection step is injected rather than hard-coded, so a later sprint can pass a
+fitted model without touching the splitting logic — the part that must not be
+re-derived. A test confirms the injected builder never receives rows after its
+decision gameweek.
+
+`build_walk_forward_folds` emits `EvaluationFold` objects in chronological order,
+which matters because the evaluator measures squad turnover between adjacent folds;
+a non-chronological sequence would report turnover between unrelated gameweeks.
+
+Leakage is tested at fold level too, not just feature level: a fold built from the
+full panel equals one built from a panel truncated after its decision gameweek, and
+rewriting later outcomes cannot move a projection. The complementary assertion
+matters as much — rewriting the decision gameweek's outcome *must* move the realized
+points, or nothing is actually being scored.
 
 ## Two outputs, deliberately distinct
 
