@@ -2,12 +2,13 @@
 
 ## Status and scope
 
-This document is the Sprint 0 contract for future Design of Experiments (DoE) and
+This document began as the Sprint 0 contract for future Design of Experiments (DoE) and
 Bayesian Optimization work. It defines candidate factors, response metrics, ownership,
-and reproducibility requirements. It does not activate new optimizer behavior or implement
-an experiment runner.
+and reproducibility requirements. Sprint 1 now implements the prepared-fold evaluation
+subset documented in [the evaluation specification](evaluation_spec.md); temporal splitting,
+parameter tuning, DoE, and Bayesian Optimization remain outside that runner.
 
-Contract version: `0.1-draft`.
+Contract version: `0.2-draft`.
 
 Only `bench_weight` is implemented in Sprint 0. Every other parameter in this document is
 future-only and must not be accepted by the current optimizer. Future components must fail
@@ -159,6 +160,12 @@ The initial experiment objective should be the mean out-of-sample
 reported. `projected_objective_value` must not be the sole DoE or Bayesian Optimization
 target because it measures the model's own projections rather than unseen outcomes.
 
+The implemented `realized_squad_points_v1` policy sums the frozen starting XI and adds the
+captain's realized points a second time. Bench points and automatic substitutions are
+excluded. Missing selected-player outcomes fail validation instead of being imputed or
+converted to zero. Full semantics and aggregate definitions are in
+[the evaluation specification](evaluation_spec.md).
+
 Configurations with a feasibility rate below `1.0` are invalid for comparison unless an
 experiment specification explicitly studies infeasibility. Runtime and turnover remain
 separate responses until a reviewed multi-objective or constrained-optimization policy is
@@ -174,6 +181,9 @@ attempted and observed fold counts.
 
 Experiments must use rolling-origin or expanding-window evaluation. Random row-level splits
 are not valid for football time-series evaluation.
+
+The prepared-fold evaluator assumes this ordering but does not construct or certify it.
+Issue #6 owns the split helper that will satisfy this requirement.
 
 For every evaluation decision timestamp:
 
@@ -268,7 +278,7 @@ Sprint 0 optimizer defaults must not be changed as a side effect of this documen
 
 The following decisions remain intentionally unresolved:
 
-- the authoritative realized-points scoring policy;
+- automatic-substitution, bench-order, and alternative scoring-policy semantics;
 - the exact form features governed by `form_window`;
 - normalization of fixture and non-fixture projection components;
 - the uncertainty measure used by `risk_penalty`;
