@@ -20,6 +20,7 @@ from squadopt.features import (
     attach_cross_season_features,
     cross_season_features,
 )
+from squadopt.features.cross_season import carry_over_as_of
 
 # min_minutes=0 keeps the threshold out of the way of the arithmetic tests.
 OPEN_CONFIG = CrossSeasonConfig(decay=0.5, min_minutes=0)
@@ -338,6 +339,52 @@ def test_distance_counts_seasons_present_not_calendar_years() -> None:
 
     assert near.iloc[1][PRIOR_MINUTES_COLUMN] == far.iloc[1][PRIOR_MINUTES_COLUMN]
     assert near.iloc[1][PRIOR_RATE_COLUMN] == far.iloc[1][PRIOR_RATE_COLUMN]
+
+
+# --- carry-over for a season that has not started ---------------------------
+
+
+def test_a_target_season_absent_from_the_panel_is_ranked_after_it() -> None:
+    """A season with no played gameweeks still needs to know what came before."""
+
+    carried = carry_over_as_of(TWO_SEASONS, target_season="2025-26", config=OPEN_CONFIG)
+
+    assert carried["player_id"].tolist() == [1]
+    # Both seasons contribute: 2024-25 at full weight, 2023-24 discounted once.
+    # 1.0x(90min, 3pts) + 0.5x(180min, 10pts) = 180min, 8pts -> 4.0 per 90.
+    assert carried[PRIOR_RATE_COLUMN].tolist() == [4.0]
+
+
+def test_the_two_carry_over_calls_agree_where_they_overlap() -> None:
+    """One weighting rule, two entry points; a disagreement would be a real defect."""
+
+    per_row = cross_season_features(TWO_SEASONS, config=OPEN_CONFIG)
+    as_of = carry_over_as_of(TWO_SEASONS, target_season="2024-25", config=OPEN_CONFIG)
+
+    later = TWO_SEASONS["season"] == "2024-25"
+    assert per_row.loc[later, PRIOR_RATE_COLUMN].tolist() == as_of[PRIOR_RATE_COLUMN].tolist()
+    assert per_row.loc[later, PRIOR_MINUTES_COLUMN].tolist() == as_of[PRIOR_MINUTES_COLUMN].tolist()
+
+
+def test_a_player_absent_from_the_panel_is_absent_from_the_carry_over() -> None:
+    carried = carry_over_as_of(TWO_SEASONS, target_season="2025-26", config=OPEN_CONFIG)
+
+    assert 2 not in set(carried["player_id"])
+
+
+def test_the_carry_over_ignores_the_target_season_even_when_present() -> None:
+    panel = pd.concat([TWO_SEASONS, _panel([("2025-26", 1, 1, 90, 999)])], ignore_index=True)
+
+    with_target = carry_over_as_of(panel, target_season="2025-26", config=OPEN_CONFIG)
+    without_target = carry_over_as_of(TWO_SEASONS, target_season="2025-26", config=OPEN_CONFIG)
+
+    assert with_target[PRIOR_RATE_COLUMN].tolist() == without_target[PRIOR_RATE_COLUMN].tolist()
+
+
+@pytest.mark.parametrize("target", ["", "   ", 2026])
+def test_an_unusable_target_season_is_refused(target: object) -> None:
+    with pytest.raises(FeatureConfigurationError, match="target_season"):
+        carry_over_as_of(TWO_SEASONS, target_season=target)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize("decay", [0.2, 0.5, 1.0])
