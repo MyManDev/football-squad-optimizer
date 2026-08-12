@@ -116,9 +116,12 @@ boundaries, environment versions, and seeds. The evaluator does not read Git sta
 timestamps implicitly because hidden environmental state would make identical inputs
 produce different records.
 
+The real-data baseline command records this provenance, the complete fixed optimizer
+controls, environment versions, aggregate distributions, and one result row per fold.
+
 ## Current limitations
 
-- Folds are prepared externally; Issue #6 will supply the walk-forward split contract.
+- Walk-forward folds are available, but projection training and calibration remain external.
 - Projection training and calibration are external.
 - The price-based opening prior from Issue #7 is not implemented here.
 - There is no automatic-substitution or bench-order scoring.
