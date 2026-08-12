@@ -6,11 +6,14 @@ from pandas.testing import assert_frame_equal
 from tests.fixtures.synthetic_gameweeks import GAMEWEEK_COUNT, make_canonical_gameweeks
 
 from squadopt.data import (
+    COLUMN_KINDS,
     DuplicateRecordsError,
     InvalidValueError,
     MissingColumnsError,
     validate_canonical_dataset,
 )
+
+FLOAT_COLUMNS = tuple(column for column, kind in COLUMN_KINDS.items() if kind == "float")
 
 
 def test_accepts_the_synthetic_canonical_panel() -> None:
@@ -94,6 +97,21 @@ def test_negative_realized_points_are_accepted() -> None:
     validated = validate_canonical_dataset(canonical)
 
     assert validated.loc[0, "total_points"] == -3
+
+
+@pytest.mark.parametrize("column", FLOAT_COLUMNS)
+@pytest.mark.parametrize(
+    "value",
+    [float("nan"), float("inf"), float("-inf")],
+    ids=["nan", "positive-infinity", "negative-infinity"],
+)
+def test_non_finite_canonical_float_is_rejected(column: str, value: float) -> None:
+    canonical = make_canonical_gameweeks()
+    canonical[column] = 0.5
+    canonical.loc[0, column] = value
+
+    with pytest.raises(InvalidValueError, match=f"{column}.*finite|finite.*{column}"):
+        validate_canonical_dataset(canonical)
 
 
 def test_fractional_price_is_rejected() -> None:

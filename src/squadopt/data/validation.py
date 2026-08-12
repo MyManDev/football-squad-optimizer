@@ -9,6 +9,7 @@ Every rejection names the offending column, key, or values. A message like
 error reports the exact season, gameweek, and player.
 """
 
+import math
 from numbers import Integral, Real
 
 import pandas as pd
@@ -155,7 +156,11 @@ def _require_finite_numeric(frame: pd.DataFrame, column: str) -> None:
     invalid = [
         value
         for value in frame[column].tolist()
-        if isinstance(value, bool) or not isinstance(value, Real)
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, Real)
+            or not math.isfinite(float(value))
+        )
     ]
     if invalid:
         raise InvalidValueError(
