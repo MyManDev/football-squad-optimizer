@@ -11,7 +11,7 @@ software architecture layer; moving it there later is a mechanical change
 because every data-layer reference points at this module.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import Literal, TypeAlias
 
@@ -43,6 +43,7 @@ __all__ = [
     "canonical_column_order",
     "is_outcome_column",
     "normalize_position",
+    "season_rank_map",
 ]
 
 # Identity of one canonical record. A player may appear once per season/gameweek.
@@ -252,6 +253,43 @@ def normalize_position(value: object) -> Position:
         f"Unsupported position value {value!r}; expected one of "
         f"{sorted(POSITION_ALIASES)!r} (case-insensitive)."
     )
+
+
+def season_rank_map(
+    seasons: Iterable[str],
+    *,
+    season_order: Sequence[str] | None = None,
+) -> Mapping[str, int]:
+    """Return a chronological rank per season label.
+
+    Season labels are ordered by sorting unless an explicit order is given. Sorting
+    is correct for the conventional ``YYYY-YY`` form — ``2016-17`` precedes
+    ``2017-18`` — but that is a property of the naming convention rather than a
+    guarantee, so a caller with unconventional labels states the order instead.
+
+    This lives at schema level because two layers need it — walk-forward splitting
+    and cross-season features — and the higher of the two must not become a
+    dependency of the lower.
+    """
+
+    present = sorted({str(season).strip() for season in seasons})
+    if not present:
+        raise InvalidValueError("At least one season label is required to rank seasons.")
+
+    if season_order is None:
+        return MappingProxyType({season: rank for rank, season in enumerate(present)})
+
+    if isinstance(season_order, str) or not isinstance(season_order, Sequence):
+        raise InvalidValueError("season_order must be a sequence of season labels.")
+    declared = [str(season).strip() for season in season_order]
+    if len(declared) != len(set(declared)):
+        raise InvalidValueError(f"season_order contains duplicates: {declared!r}.")
+    unranked = [season for season in present if season not in declared]
+    if unranked:
+        raise InvalidValueError(
+            f"season_order does not cover seasons present in the data: {unranked!r}."
+        )
+    return MappingProxyType({season: rank for rank, season in enumerate(declared)})
 
 
 def canonical_column_order(columns: Iterable[str]) -> list[str]:

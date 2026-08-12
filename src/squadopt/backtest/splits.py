@@ -12,12 +12,15 @@ property of the data's time axis, not of what a consumer later does with it.
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Integral
-from types import MappingProxyType
 
 import pandas as pd
 
-from squadopt.data.errors import DataError
-from squadopt.data.schema import CANONICAL_SORT_COLUMNS, REQUIRED_COLUMNS
+from squadopt.data.errors import DataError, InvalidValueError
+from squadopt.data.schema import (
+    CANONICAL_SORT_COLUMNS,
+    REQUIRED_COLUMNS,
+    season_rank_map,
+)
 
 
 class BacktestError(DataError):
@@ -87,22 +90,12 @@ def season_ranks(
     """
 
     frame = _require_panel(panel)
-    present = sorted({str(value) for value in frame["season"].tolist()})
-
-    if season_order is None:
-        return MappingProxyType({season: rank for rank, season in enumerate(present)})
-
-    if isinstance(season_order, str) or not isinstance(season_order, Sequence):
-        raise BacktestConfigurationError("season_order must be a sequence of season labels.")
-    declared = [str(season).strip() for season in season_order]
-    if len(declared) != len(set(declared)):
-        raise BacktestConfigurationError(f"season_order contains duplicates: {declared!r}.")
-    unranked = [season for season in present if season not in declared]
-    if unranked:
-        raise BacktestConfigurationError(
-            f"season_order does not cover seasons present in the panel: {unranked!r}."
-        )
-    return MappingProxyType({season: rank for rank, season in enumerate(declared)})
+    try:
+        return season_rank_map(frame["season"].tolist(), season_order=season_order)
+    except InvalidValueError as error:
+        # Re-raised in this package's own type so callers can guard the backtest
+        # surface with one exception, while the ranking rule stays in one place.
+        raise BacktestConfigurationError(str(error)) from error
 
 
 def _timeline(frame: pd.DataFrame, ranks: Mapping[str, int]) -> pd.Series:
