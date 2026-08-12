@@ -155,6 +155,27 @@ A runnable version against the committed synthetic sample:
 .venv\Scripts\python -m scripts.run_pipeline_demo
 ```
 
+### Real historical data
+
+Six seasons of real player-gameweek data, 2020-21 through 2025-26, come from the
+[vaastav archive](https://github.com/vaastav/Fantasy-Premier-League). The data is **not
+committed** — its licensing does not permit redistribution — so it is fetched from a
+pinned commit and verified against a committed checksum manifest, which is what keeps
+every machine on identical bytes:
+
+```powershell
+.venv\Scripts\python -m scripts.fetch_historical_data
+.venv\Scripts\python -m scripts.recommend_opening_squad
+```
+
+The second command produces an opening-gameweek squad: 15 players, a starting eleven, a
+bench, and a captain, with the pinned archive commit printed alongside so the result can
+be reproduced. It also reports how much of the squad rests on real history rather than a
+fallback constant.
+
+The test suite never needs this data. Every test is synthetic and offline, including the
+tests for the archive adapter, so continuous integration stays independent of it.
+
 Two rules govern the layer. **Prices stay integer tenths** end to end, converted
 with decimal arithmetic rather than binary floats. **Features for gameweek `t` use
 only earlier gameweeks**: every rolling aggregation is grouped by season and player
