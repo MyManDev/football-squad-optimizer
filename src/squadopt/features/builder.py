@@ -17,6 +17,7 @@ from squadopt.features.config import (
     per_90_feature_name,
     rolling_feature_name,
 )
+from squadopt.features.cross_season import CrossSeasonConfig, attach_cross_season_features
 from squadopt.features.rolling import shifted_rolling_mean, shifted_rolling_sum
 
 
@@ -43,6 +44,7 @@ def build_feature_dataset(
     canonical: pd.DataFrame,
     *,
     config: FeatureConfig | None = None,
+    cross_season: CrossSeasonConfig | None = None,
 ) -> pd.DataFrame:
     """Attach leakage-safe rolling features to a canonical player-gameweek dataset.
 
@@ -54,6 +56,12 @@ def build_feature_dataset(
     same row is a valid prediction label, and no separate target column is
     produced. A second time shift in the same table would be one more thing to get
     wrong, and it would make the leakage rules harder to audit rather than easier.
+
+    Passing ``cross_season`` also attaches a player's earlier-season carry-over,
+    which is what lets an opening gameweek rank players instead of falling back to a
+    constant for everyone. It is off by default because it only means anything for a
+    panel spanning several seasons, and a caller working within one season should not
+    silently gain two always-missing columns.
 
     Returns an independent copy in canonical row order with a reset index. The
     input frame is never modified, and the result does not depend on the input's
@@ -107,4 +115,8 @@ def build_feature_dataset(
     canonical_columns = canonical_column_order(
         [column for column in result.columns if column not in features]
     )
-    return result.loc[:, [*canonical_columns, *feature_column_names(settings)]]
+    ordered_result = result.loc[:, [*canonical_columns, *feature_column_names(settings)]]
+
+    if cross_season is None:
+        return ordered_result
+    return attach_cross_season_features(ordered_result, config=cross_season)
