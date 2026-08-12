@@ -35,9 +35,12 @@ none of it: not source names, not cleaning rules, not the loader.
 | `features/config.py` | `FeatureConfig`: windows, `min_periods`, feature naming | **implemented** |
 | `features/rolling.py` | The single shifted-rolling primitive | **implemented** |
 | `features/builder.py` | `build_feature_dataset()` | **implemented** |
+| `features/cross_season.py` | Carry-over from completed earlier seasons | **implemented** |
+| `data/sources/vaastav.py` | The real historical archive: layout, identity, corrections | **implemented** |
 | `prediction/config.py` | `BaselineProjectionConfig`: windows, opening fallback | **implemented** |
 | `prediction/baseline.py` | Deterministic `expected_points` | **implemented** |
 | `prediction/projection.py` | `build_projection_table(season=…, gameweek=t)` | **implemented** |
+| `prediction/opening.py` | `build_opening_projection_table()` for a season with no played matches | **implemented** |
 | `backtest/splits.py` | `DecisionPoint`, season ranking, the time-ordered split | **implemented** |
 | `backtest/folds.py` | `build_walk_forward_folds()` producing `EvaluationFold` objects | **implemented** |
 
@@ -322,3 +325,56 @@ column that must be dropped.
 Real third-party historical dumps live in git-ignored directories under `data/`
 and are never committed: licensing is unverified and the repository is not a data
 store.
+
+## Real historical data
+
+Six seasons, 2020-21 through 2025-26, from the
+[vaastav archive](https://github.com/vaastav/Fantasy-Premier-League): 155,995
+player-gameweek rows and 1,960 players, of whom 1,133 appear in more than one season.
+
+```bash
+python -m scripts.fetch_historical_data      # download and verify
+python -m scripts.recommend_opening_squad    # opening-gameweek squad from that data
+```
+
+The data is not committed — see [data/sources/README.md](../data/sources/README.md) for
+the licensing reasoning and how a pinned commit plus checksums keeps every machine on
+identical bytes.
+
+Four source facts were established by inspecting the archive, and each one shaped the
+adapter:
+
+| Finding | Consequence |
+| --- | --- |
+| `code` is stable across seasons; `id` is not — 479 of 479 shared players keep `code`, 1 keeps `id` | Player identity is `code`, recovered by joining gameweek rows to `players_raw.csv` |
+| 2016-17 and 2018-19 omit `position` and `team` | The supported range starts at 2020-21 |
+| Duplicate rows arise from two unlike causes | Repeated fixture records are dropped; genuine double gameweeks are summed |
+| `value` timing is undocumented and differs from `now_cost` for 537 of 692 players in 2025-26 | Prices are shifted back one gameweek by default |
+
+The price shift deserves its reasoning stated plainly. If `value` is recorded after a
+gameweek, using it directly would let that gameweek's own result reach its own
+decision: a player who scored well rises in price, so the price would quietly encode
+the outcome. A stale price costs accuracy; a leaky one costs correctness. The opening
+gameweek keeps its own value, and that residual approximation sits in exactly the
+gameweek walk-forward folds already exclude.
+
+`xP` is never used as a feature. The archive documents it as scraped after the gameweek
+and possibly carrying post-match information — a leakage trap wearing the name of a
+prediction.
+
+Manager entries — `AM` rows from 2024-25, twenty per season — are excluded, because a
+manager is not a squad-eligible player under the canonical contract.
+
+## Projecting a season that has not started
+
+A season about to begin has no `merged_gw.csv` at all: its players arrive as a roster.
+`build_opening_projection_table` joins the two halves — the roster supplies identity,
+club, position, and the opening price, all fixed at the deadline; the carried record
+supplies the expectation.
+
+That roster price is unambiguous in a way no in-season price is: the season has not
+begun, so nothing can have moved it.
+
+The table carries a `has_prior_record` flag beyond the six contract columns, so a caller
+can see how much of the pool rests on real history rather than on a constant. For
+2026-27 that is 384 of 567 players.

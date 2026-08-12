@@ -66,23 +66,7 @@ Note that the experiment contract requires all candidate configurations in a
 comparison to share an identical missing-data policy, so this policy has to be part
 of the recorded configuration rather than an implicit default.
 
-### 3. Cross-season history
-
-**Now.** `PLAYER_GROUP_COLUMNS` includes `season`, so every rolling window resets
-at a season boundary. This is correct and tested — it is what stops one season's
-final gameweeks leaking into the next season's opener — but it is also strict:
-genuine information about a player is discarded every August.
-
-**Proposal.** An explicitly decayed cross-season carry-over, computed only from
-completed prior seasons, added as a **separate feature** rather than as a change to
-the group key. The group key stays strict; the carry-over is opt-in and separately
-tested for leakage, because it is the one feature that deliberately crosses the
-boundary the rest of the layer defends.
-
-This also offers a second option for the opening-gameweek prior, alongside the
-price-based approach filed as an issue.
-
-### 4. Columns with unverified timing
+### 3. Columns with unverified timing
 
 **Now.** `selected_by_percent` and `availability_status` sit in
 `AMBIGUOUS_TIMING_COLUMNS` and are excluded from features. Both change
@@ -98,7 +82,7 @@ captured, and move each column into `PRE_MATCH_COLUMNS` or `OUTCOME_COLUMNS`
 accordingly. Until that inspection happens, excluding them is the only defensible
 choice.
 
-### 5. Fixture context features
+### 4. Fixture context features
 
 **Now.** `opponent_team_id`, `is_home`, and `fixture_difficulty` are classified as
 pre-match and carried through when present, but no feature uses them and the
@@ -113,22 +97,35 @@ The experiment contract adds a requirement beyond mere availability: fixture
 information must be versioned as it was known at each decision timestamp. A single
 current-value fixture table is not sufficient for backtesting.
 
-### 6. A real source adapter
+### 5. Resolving the archive's price timing
 
-**Now.** The only adapter is `SAMPLE_ADAPTER`, which lives in test fixtures and
-describes a fictional layout.
+**Now.** Prices are shifted back one gameweek because the archive does not document
+whether `value` is the deadline price or one recorded afterwards, and the evidence is
+suggestive rather than conclusive: in 2025-26 gameweek 1 it differs from `players_raw`
+`now_cost` for 537 of 692 players, systematically higher.
 
-**Proposal.** A production adapter under `src/`, written against a real file whose
-licensing and terms have been checked. Two constraints carry over from the contract:
+Shifting is the conservative choice — a stale price costs accuracy, a leaky one costs
+correctness — but it does cost up to one price change of precision on every row.
 
-1. `price_tenths` means the price payable at that gameweek's deadline. A source
-   reporting post-gameweek prices must be shifted at adapter level and the
-   deviation documented, or the projection silently uses a future price.
-2. Platform-specific encodings, including numeric position codes, belong in the
-   adapter's `position_codes`, never in the canonical schema.
+**Proposal.** Settle the question rather than hedging it. The official API's
+`element-summary` endpoint records per-gameweek `value` for the current season, so once
+2026-27 has a few gameweeks played, comparing its live values against the archive's
+recorded ones for the same gameweeks answers it directly. If `value` turns out to be
+the deadline price, `shift_price=False` becomes the correct default and the accuracy
+comes back.
 
-Large third-party dumps must not be committed; `data/raw/` is git-ignored for this
-reason.
+### 6. Additional source columns and older seasons
+
+**Now.** Only columns present in every supported season are mapped, so expected goals,
+expected assists, and `starts` are unused even where the archive has them. Seasons
+before 2020-21 are excluded entirely because their gameweek files omit `position` and
+`team`.
+
+**Proposal.** Either handle per-season column availability explicitly — a panel with a
+column missing for one season currently fails canonical validation — or restrict the
+range when a richer feature set is needed. Older seasons could be recovered by joining
+`position` and `team` from `players_raw.csv`, which is the same join the adapter already
+performs for player identity.
 
 ### 7. Vectorized coercion
 
@@ -175,18 +172,24 @@ as the single window used by the projection while leaving the wider set for mode
 development, or collapsing the configuration to one window for experiment runs.
 This should be settled with the optimization owner, who owns the factor definition.
 
-### 10. Doubled and blank gameweeks
+### 10. Fixture-level grain
 
-**Now.** The canonical key `(season, gameweek, player_id)` rejects duplicates, so a
-player appearing twice in one gameweek cannot be represented at all. A blank
-gameweek is simply an absent row, which works but is implicit.
+**Now.** Double gameweeks are handled: the archive adapter sums minutes and points
+across a player's fixtures within a gameweek, and takes price once. What is *not*
+handled is fixture-level context. `opponent_team` and `was_home` are deliberately
+unmapped, because a player with two fixtures in one gameweek has two opponents and
+possibly both a home and an away match, so at player-gameweek grain neither column has
+a single correct value.
+
+That is why fixture and opponent-strength features are absent, and it is a hard
+blocker for them rather than an oversight.
 
 **Proposal.** Fixture-level records beneath the player-gameweek grain, with the
 player-gameweek view derived from them.
 
-This is a schema change affecting the canonical contract that the optimization and
-software owners depend on, so it needs agreement across all three owners rather
-than a unilateral edit.
+This changes the canonical contract that the optimization and software owners depend
+on, so it needs agreement across all three owners rather than a unilateral edit. It is
+the largest single item on this list.
 
 ### 11. A shared contracts module
 
@@ -203,25 +206,7 @@ shared vocabulary, with both `data` and `optimization` importing from it. Every
 data-layer reference already points at a single module, so the move itself is
 mechanical once the location is agreed.
 
-### 12. Type inference in `optimize_squad_from_csv`
-
-**Now.** The integration adapter reads its CSV with `pd.read_csv(path)`, relying on
-default type inference. Its docstring correctly states that it does not normalize
-anything, and that `price_tenths` must already contain whole tenths.
-
-The residual hazard is that inference fails *quietly* in two specific ways. A single
-blank `price_tenths` cell promotes the column to `float64`, and because the optimizer
-checks that column element-wise against `numbers.Integral`, the entire table is then
-rejected with no indication that one empty cell caused it. Separately, an identifier
-written `007` is silently read as `7`, which can collide with a genuinely different
-player.
-
-**Proposal.** Either route the adapter through `squadopt.data.load_csv`, which reads
-as text and coerces explicitly with actionable errors, or read the contract columns
-with explicit dtypes. This is the integration module's owner's call, not ours; it is
-recorded here because the failure mode belongs to the data contract.
-
-### 13. Import-order inconsistency in tests
+### 12. Import-order inconsistency in tests
 
 **Now.** `tests/unit/` is not a package, so ruff's isort resolver treats `tests.*`
 imports as third-party there while treating them as first-party in
