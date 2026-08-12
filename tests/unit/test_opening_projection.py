@@ -234,7 +234,7 @@ def test_a_non_dataframe_roster_is_refused() -> None:
 def test_an_unknown_roster_position_is_refused() -> None:
     broken = _roster([(101, "Known", 3, "WING", 75)])
 
-    with pytest.raises(Exception, match="Unsupported position value"):
+    with pytest.raises(PredictionConfigurationError, match="Unsupported position value"):
         build_opening_projection_table(broken.pipe(lambda f: f), broken, season=UPCOMING)
 
 
@@ -245,4 +245,42 @@ def test_a_fractional_price_is_refused() -> None:
     broken.loc[0, "now_cost"] = "7.5"
 
     with pytest.raises(PredictionConfigurationError, match="must be integral"):
+        build_opening_projection_table(HISTORY, broken, season=UPCOMING)
+
+
+@pytest.mark.parametrize("column", ["code", "web_name", "team", "position", "now_cost"])
+def test_missing_required_roster_values_are_domain_errors(column: str) -> None:
+    broken = ROSTER.copy(deep=True)
+    broken.loc[0, column] = None
+
+    with pytest.raises(PredictionConfigurationError, match=column):
+        build_opening_projection_table(HISTORY, broken, season=UPCOMING)
+
+
+def test_a_non_numeric_team_is_a_domain_error() -> None:
+    broken = ROSTER.astype({"team": "object"}).copy(deep=True)
+    broken.loc[0, "team"] = "unknown"
+
+    with pytest.raises(PredictionConfigurationError, match="team_id"):
+        build_opening_projection_table(HISTORY, broken, season=UPCOMING)
+
+
+def test_non_finite_carried_history_is_refused() -> None:
+    broken = HISTORY.astype({"total_points": "float64"}).copy(deep=True)
+    broken.loc[0, "total_points"] = float("inf")
+
+    with pytest.raises(PredictionConfigurationError, match="non-finite"):
+        build_opening_projection_table(
+            broken,
+            ROSTER,
+            season=UPCOMING,
+            cross_season=OPEN_CARRY,
+        )
+
+
+def test_an_identifier_outside_int64_is_a_domain_error() -> None:
+    broken = ROSTER.astype({"code": "object"}).copy(deep=True)
+    broken.loc[0, "code"] = 10**30
+
+    with pytest.raises(PredictionConfigurationError, match="integer contract"):
         build_opening_projection_table(HISTORY, broken, season=UPCOMING)

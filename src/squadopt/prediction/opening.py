@@ -13,11 +13,12 @@ The join is safe because player identity is the stable cross-season code rather 
 a per-season element id — established by inspecting the archive, not assumed.
 """
 
+import math
 from collections.abc import Mapping
 
 import pandas as pd
 
-from squadopt.data.errors import format_examples
+from squadopt.data.errors import InvalidValueError, format_examples
 from squadopt.data.schema import (
     POSITIONS,
     PROJECTION_REQUIRED_COLUMNS,
@@ -66,34 +67,65 @@ def _canonical_roster(roster: pd.DataFrame) -> pd.DataFrame:
     in-season price is: the season has not begun, so nothing can have moved it.
     """
 
-    selected = roster.loc[:, list(ROSTER_COLUMN_MAP)].rename(columns=dict(ROSTER_COLUMN_MAP))
+    selected_source = roster.loc[:, list(ROSTER_COLUMN_MAP)]
+    for column in ROSTER_COLUMN_MAP:
+        missing = selected_source[column].isna()
+        if bool(missing.any()):
+            raise PredictionConfigurationError(f"roster column {column!r} contains missing values.")
+
+    selected = selected_source.rename(columns=dict(ROSTER_COLUMN_MAP))
     frame = selected.copy(deep=True)
 
-    for column in ("player_id", "price_tenths"):
+    for column in ("player_id", "team_id", "price_tenths"):
+        raw_values = frame[column].tolist()
+        if any(isinstance(value, bool) for value in raw_values):
+            raise PredictionConfigurationError(
+                f"roster column {column!r} must contain integers, not booleans."
+            )
         try:
             numeric = pd.to_numeric(frame[column], errors="raise")
-        except (TypeError, ValueError) as error:
+            invalid = [
+                value
+                for value in numeric.tolist()
+                if not math.isfinite(float(value)) or float(value) != int(float(value))
+            ]
+        except (OverflowError, TypeError, ValueError) as error:
             raise PredictionConfigurationError(
                 f"roster column {column!r} must be numeric: {error}"
             ) from error
         # Casting straight to int64 would truncate rather than complain, turning a
         # price of 7.5 into 7 — a tenfold error delivered silently. The check is
         # explicit for that reason.
-        fractional = [value for value in numeric.tolist() if float(value) != int(float(value))]
-        if fractional:
+        if invalid:
             raise PredictionConfigurationError(
                 f"roster column {column!r} must be integral; got "
-                f"{format_examples(fractional)}. Prices are integer tenths: 7.5 is 75."
+                f"{format_examples(invalid)}. Prices are integer tenths: 7.5 is 75."
             )
-        frame[column] = numeric.astype("int64")
+        try:
+            frame[column] = numeric.astype("int64")
+        except (OverflowError, TypeError, ValueError) as error:
+            raise PredictionConfigurationError(
+                f"roster column {column!r} does not fit the integer contract: {error}"
+            ) from error
 
-    frame["team_id"] = pd.to_numeric(frame["team_id"], errors="coerce").astype("int64")
+    negative_prices = frame.loc[frame["price_tenths"] < 0, "price_tenths"].tolist()
+    if negative_prices:
+        raise PredictionConfigurationError(
+            f"roster column 'price_tenths' must be non-negative; got "
+            f"{format_examples(negative_prices)}."
+        )
+
     frame["name"] = frame["name"].astype("string")
-    frame["position"] = pd.Series(
-        [normalize_position(value) for value in frame["position"].tolist()],
-        index=frame.index,
-        dtype="string",
-    )
+    blank_names = frame["name"].str.strip().eq("")
+    if bool(blank_names.any()):
+        raise PredictionConfigurationError("roster column 'web_name' contains blank values.")
+    try:
+        normalized_positions = [normalize_position(value) for value in frame["position"].tolist()]
+    except InvalidValueError as error:
+        raise PredictionConfigurationError(
+            f"roster column 'position' is invalid: {error}"
+        ) from error
+    frame["position"] = pd.Series(normalized_positions, index=frame.index, dtype="string")
 
     duplicated = frame.loc[frame["player_id"].duplicated(), "player_id"].tolist()
     if duplicated:
@@ -154,6 +186,11 @@ def build_opening_projection_table(
         dtype="float64",
     )
     expected = projected.where(projected.notna(), fallback).clip(lower=0.0).astype("float64")
+    non_finite = [value for value in expected.tolist() if not math.isfinite(float(value))]
+    if non_finite:
+        raise PredictionConfigurationError(
+            f"Opening projections contain non-finite values: {format_examples(non_finite)}."
+        )
 
     table = merged.loc[:, ["player_id", "name", "team_id", "position", "price_tenths"]].copy(
         deep=True

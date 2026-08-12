@@ -2,8 +2,9 @@
 
 A data-source-independent decision-support package for selecting a football squad from
 player projections. Sprint 0 implements a tested, single-gameweek baseline with Google
-OR-Tools CP-SAT. Sprint 1 adds evaluation of caller-prepared gameweek folds without yet
-implementing temporal splitting, model calibration, DoE, or Bayesian Optimization.
+OR-Tools CP-SAT. Sprint 1 adds leakage-safe walk-forward evaluation, a pinned real-data
+adapter, cross-season carry-over, and opening-gameweek projections. Model calibration,
+Design of Experiments, and Bayesian Optimization remain future work.
 
 ## Sprint 0 scope
 
@@ -166,12 +167,24 @@ every machine on identical bytes:
 ```powershell
 .venv\Scripts\python -m scripts.fetch_historical_data
 .venv\Scripts\python -m scripts.recommend_opening_squad
+.venv\Scripts\python -m scripts.run_baseline_benchmark
 ```
 
 The second command produces an opening-gameweek squad: 15 players, a starting eleven, a
 bench, and a captain, with the pinned archive commit printed alongside so the result can
 be reproduced. It also reports how much of the squad rests on real history rather than a
 fallback constant.
+
+The third command uses 2020-21 through 2024-25 as historical context and evaluates the
+baseline out of sample on 2025-26. It deliberately excludes GW1, which has a different
+information set and remains covered by the opening-projection workflow. Repeat `--season`
+to evaluate additional seasons. To persist the complete provenance and per-fold results:
+
+```powershell
+.venv\Scripts\python -m scripts.run_baseline_benchmark `
+  --json-output docs\baseline_benchmark.json `
+  --markdown-output docs\baseline_benchmark.md
+```
 
 The test suite never needs this data. Every test is synthetic and offline, including the
 tests for the archive adapter, so continuous integration stays independent of it.
@@ -196,7 +209,7 @@ third-party data; see [its notes](data/sample/README.md).
 
 ## Prepared-fold evaluation
 
-The evaluator accepts already-prepared, chronologically ordered gameweek folds. Each fold
+The evaluator accepts chronologically ordered gameweek folds. Each fold
 contains the projection table available when the decision was made and the matching
 `player_id`/`total_points` outcomes observed later:
 
@@ -221,8 +234,10 @@ print(evaluation.summary.feasibility_rate)
 
 The versioned `realized_squad_points_v1` policy sums the starting XI and adds the captain's
 score a second time. It excludes bench points and automatic substitutions. The evaluator
-does not create walk-forward splits or train projections; callers must prepare folds using
-only information available before each decision timestamp.
+does not train projections. `squadopt.backtest.build_walk_forward_folds` prepares folds
+using only information available at each decision, while
+`squadopt.backtest.run_baseline_benchmark` composes preparation and evaluation under a
+versioned baseline contract.
 
 ## Quality checks
 

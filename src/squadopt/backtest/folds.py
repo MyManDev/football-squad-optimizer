@@ -22,13 +22,69 @@ from squadopt.backtest.splits import (
     walk_forward_decision_points,
 )
 from squadopt.evaluation import EvaluationFold
-from squadopt.features import build_feature_dataset
-from squadopt.prediction import build_projection_table
+from squadopt.features import (
+    PRIOR_MINUTES_COLUMN,
+    PRIOR_RATE_COLUMN,
+    CrossSeasonConfig,
+    build_feature_dataset,
+)
+from squadopt.features.cross_season import carry_over_as_of
+from squadopt.prediction import (
+    BASELINE_FORM_WINDOW,
+    FormWindowMapping,
+    build_projection_table,
+)
 
 # Given the rows visible at a decision point and the decision itself, return an
 # optimizer-ready projection table. The callable never receives later rows, so it
 # cannot look ahead even if it tried.
 ProjectionBuilder: TypeAlias = Callable[[pd.DataFrame, DecisionPoint], pd.DataFrame]
+
+
+def make_baseline_projection_builder(
+    *,
+    form_window: int = BASELINE_FORM_WINDOW,
+    cross_season: CrossSeasonConfig | None = None,
+) -> ProjectionBuilder:
+    """Return a baseline builder for one ordered evaluation run.
+
+    Within-season rolling features need only the target season. Earlier seasons are
+    reduced to a carry-over once per target season and cached inside this builder.
+    The cache is scoped to the returned callable, so separate runs cannot share it.
+    """
+
+    mapping = FormWindowMapping(form_window=form_window)
+    carry_settings = CrossSeasonConfig() if cross_season is None else cross_season
+    carry_cache: dict[str, pd.DataFrame] = {}
+
+    def build(visible: pd.DataFrame, decision: DecisionPoint) -> pd.DataFrame:
+        current_season = visible.loc[visible["season"] == decision.season].copy(deep=True)
+        features = build_feature_dataset(
+            current_season,
+            config=mapping.feature_config,
+        )
+        if decision.season not in carry_cache:
+            carry_cache[decision.season] = carry_over_as_of(
+                visible,
+                target_season=decision.season,
+                config=carry_settings,
+            )
+        features = features.merge(
+            carry_cache[decision.season],
+            on="player_id",
+            how="left",
+            validate="many_to_one",
+        )
+        for column in (PRIOR_MINUTES_COLUMN, PRIOR_RATE_COLUMN):
+            features[column] = features[column].astype("float64")
+        return build_projection_table(
+            features,
+            season=decision.season,
+            gameweek=decision.gameweek,
+            config=mapping.projection_config,
+        )
+
+    return build
 
 
 def baseline_projection_builder(
@@ -37,12 +93,7 @@ def baseline_projection_builder(
 ) -> pd.DataFrame:
     """Build a projection table for the decision using the deterministic baseline."""
 
-    features = build_feature_dataset(visible)
-    return build_projection_table(
-        features,
-        season=decision.season,
-        gameweek=decision.gameweek,
-    )
+    return make_baseline_projection_builder()(visible, decision)
 
 
 def build_walk_forward_fold(

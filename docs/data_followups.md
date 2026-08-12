@@ -156,7 +156,7 @@ reproducibility the contract is asking for.
 
 These are not data-layer decisions. Each needs agreement before implementation.
 
-### 9. Aligning `form_window` with the feature configuration
+### 9. Aligning `form_window` with the feature configuration (resolved)
 
 The experiment contract defines `form_window` as a single scalar: "the number of
 completed historical matches used to construct form-related features at a decision
@@ -166,11 +166,13 @@ timestamp".
 `points_windows` are tuples, and `per_90_window` is separate — because several
 windows are genuinely useful at once for model development.
 
-For Design of Experiments to tune `form_window`, an agreed mapping between the one
-factor and the several parameters is needed. Options include treating `form_window`
-as the single window used by the projection while leaving the wider set for model
-development, or collapsing the configuration to one window for experiment runs.
-This should be settled with the optimization owner, who owns the factor definition.
+Sprint 1 settled this as feature contract `form_window_v1`. A trial value `w` maps to
+`minutes_windows=(w,)`, `points_windows=(w,)`, `per_90_window=w`,
+`minutes_window=w`, and projection `per_90_window=w`. `min_periods=1` stays fixed.
+`FormWindowMapping` implements the mapping and the baseline benchmark records its
+contract version. Wider multi-window feature banks remain possible for later fitted
+models, but they must use a different versioned factor contract rather than silently
+changing this one.
 
 ### 10. Fixture-level grain
 

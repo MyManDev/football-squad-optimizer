@@ -1,17 +1,17 @@
-"""Walk-forward splitting and fold preparation for historical backtests.
+"""Leakage-safe walk-forward preparation and baseline benchmarking."""
 
-Sits above the data, feature, prediction, and evaluation layers and composes them.
-It owns the time axis: what counts as "before" a decision is decided here and
-nowhere else, so no consumer needs to re-derive it and no consumer can bypass it.
-
-Random row-level splits are not expressible through this API. That is the point.
-"""
-
+from squadopt.backtest.benchmark import (
+    BASELINE_BENCHMARK_CONTRACT_VERSION,
+    DEFAULT_BENCHMARK_SEASONS,
+    BaselineBenchmarkConfig,
+    run_baseline_benchmark,
+)
 from squadopt.backtest.folds import (
     ProjectionBuilder,
     baseline_projection_builder,
     build_walk_forward_fold,
     build_walk_forward_folds,
+    make_baseline_projection_builder,
 )
 from squadopt.backtest.splits import (
     BacktestConfigurationError,
@@ -25,16 +25,21 @@ from squadopt.backtest.splits import (
 )
 
 __all__ = [
+    "BASELINE_BENCHMARK_CONTRACT_VERSION",
+    "DEFAULT_BENCHMARK_SEASONS",
     "BacktestConfigurationError",
     "BacktestError",
+    "BaselineBenchmarkConfig",
     "DecisionPoint",
     "ProjectionBuilder",
     "baseline_projection_builder",
     "build_walk_forward_fold",
     "build_walk_forward_folds",
+    "make_baseline_projection_builder",
     "realized_points_at",
     "rows_before",
     "rows_through",
+    "run_baseline_benchmark",
     "season_ranks",
     "walk_forward_decision_points",
 ]
