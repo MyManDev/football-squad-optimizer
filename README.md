@@ -2,7 +2,8 @@
 
 A data-source-independent decision-support package for selecting a football squad from
 player projections. Sprint 0 implements a tested, single-gameweek baseline with Google
-OR-Tools CP-SAT.
+OR-Tools CP-SAT. Sprint 1 adds evaluation of caller-prepared gameweek folds without yet
+implementing temporal splitting, model calibration, DoE, or Bayesian Optimization.
 
 ## Sprint 0 scope
 
@@ -167,9 +168,40 @@ season boundaries — not merely asserted in a comment.
 | [Data dictionary](docs/data_dictionary.md) | Every column: type, meaning, missing-value policy, leakage risk |
 | [Data pipeline](docs/data_pipeline.md) | Stage responsibilities, leakage controls, determinism, testing |
 | [Follow-up work](docs/data_followups.md) | Deliberate Sprint 0 gaps and how to close them |
+| [Evaluation specification](docs/evaluation_spec.md) | Prepared folds, realized scoring, aggregation, limitations |
 
 The synthetic sample under `data/sample/` is generated from code and contains no
 third-party data; see [its notes](data/sample/README.md).
+
+## Prepared-fold evaluation
+
+The evaluator accepts already-prepared, chronologically ordered gameweek folds. Each fold
+contains the projection table available when the decision was made and the matching
+`player_id`/`total_points` outcomes observed later:
+
+```python
+from squadopt import EvaluationConfig, EvaluationFold, evaluate_prepared_folds
+
+fold = EvaluationFold(
+    fold_id="2025-26-GW06",
+    projections=projections,
+    realized_points=realized_points,
+    metadata={"season": "2025-26", "gameweek": 6},
+)
+
+evaluation = evaluate_prepared_folds(
+    [fold],
+    EvaluationConfig(run_metadata={"dataset_version": "synthetic-v1"}),
+)
+
+print(evaluation.folds[0].realized_squad_points)
+print(evaluation.summary.feasibility_rate)
+```
+
+The versioned `realized_squad_points_v1` policy sums the starting XI and adds the captain's
+score a second time. It excludes bench points and automatic substitutions. The evaluator
+does not create walk-forward splits or train projections; callers must prepare folds using
+only information available before each decision timestamp.
 
 ## Quality checks
 
