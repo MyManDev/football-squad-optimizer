@@ -227,5 +227,11 @@ data/external/
 data/interim/
 data/processed/
 
+# Captured pre-deadline snapshots of the live season. These hold real third-party
+# data, so they stay local for the same reason data/raw/ does: the source permits
+# private use and forbids redistribution. Reproducibility comes from the snapshot
+# being immutable and checksummed on disk, not from committing it.
+data/snapshots/
+
 # Reproducible local experiment outputs (reports are generated, not source data)
 artifacts/

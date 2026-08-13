@@ -1,0 +1,318 @@
+"""Adapter for a captured pre-deadline snapshot of the live Fantasy endpoints.
+
+This module reads snapshot payloads that are already on disk. It never fetches,
+which is what lets every test here run offline: capture is a deliberate step in a
+script, and what arrives in this module is bytes.
+
+What it produces is a *player snapshot*, not a canonical panel row. A canonical row
+requires ``minutes`` and ``total_points``, and a roster read before kick-off has
+neither. Inventing them to satisfy the canonical shape is exactly what the adapter
+layer refuses to do, so the target here is the five deadline-known fields the
+optimizer projection is assembled from: ``player_id``, ``name``, ``team_id``,
+``position`` and ``price_tenths``.
+
+The source publishes no contract and no documentation, so its shape is treated as an
+observation rather than a promise. Every field this module depends on is checked and
+named in the failure, because a renamed field must stop the run rather than quietly
+produce a column of nulls.
+"""
+
+import json
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from types import MappingProxyType
+from typing import Final
+
+import pandas as pd
+
+from squadopt.data.cleaning import normalize_positions, to_price_tenths
+from squadopt.data.errors import (
+    DataSourceError,
+    DuplicateRecordsError,
+    InvalidValueError,
+    format_examples,
+)
+from squadopt.data.schema import MIN_GAMEWEEK
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
+
+# Recorded in a snapshot's metadata as the source of its payloads.
+FPL_LIVE_SOURCE: Final = "fpl-live"
+
+# Payload names inside a snapshot. They name the endpoint each document came from so
+# a snapshot stays readable without this module.
+BOOTSTRAP_PAYLOAD: Final = "bootstrap-static.json"
+FIXTURES_PAYLOAD: Final = "fixtures.json"
+
+# The platform encodes position numerically. This is the same encoding the archive's
+# `players_raw.csv` carries, but it is declared here rather than shared with the
+# archive adapter: each source module is meant to know exactly one source, and
+# importing another adapter's constant would couple two of them for four lines.
+#
+# Codes outside this mapping are not players. From the 2024-25 season the platform
+# added manager entries, which are excluded for the same reason the archive adapter
+# excludes them: a manager is not a squad-eligible player under the canonical
+# contract, not because they are inconvenient.
+POSITION_CODES: Mapping[int, str] = MappingProxyType({1: "GK", 2: "DEF", 3: "MID", 4: "FWD"})
+
+# The five deadline-known fields a projection is assembled from, in canonical order.
+SNAPSHOT_COLUMNS: Final = ("player_id", "name", "team_id", "position", "price_tenths")
+
+# Element fields this module reads. `code` is the persistent identifier and `id` is
+# the per-season one; the canonical contract keys on the former, so `id` is read only
+# so a failure can be reported in the source's own terms.
+_ELEMENT_FIELDS: Final = (
+    "code",
+    "id",
+    "first_name",
+    "second_name",
+    "team",
+    "element_type",
+    "now_cost",
+)
+_TEAM_FIELDS: Final = ("id", "name")
+_EVENT_FIELDS: Final = ("id", "deadline_time", "finished")
+
+
+@dataclass(frozen=True, slots=True)
+class GameweekDeadline:
+    """One gameweek's published deadline, as the captured payload stated it."""
+
+    gameweek: int
+    deadline_utc: str
+    finished: bool
+
+
+def _document(payload: bytes, label: str) -> Mapping[str, object]:
+    if not isinstance(payload, bytes):
+        raise DataSourceError(f"{label} payload must be raw bytes, got {type(payload).__name__}.")
+    try:
+        parsed = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise DataSourceError(f"{label} payload is not valid UTF-8 JSON: {error}") from error
+    if not isinstance(parsed, dict):
+        raise DataSourceError(
+            f"{label} payload must be a JSON object, got {type(parsed).__name__}."
+        )
+    return parsed
+
+
+def _records(
+    document: Mapping[str, object], key: str, label: str
+) -> tuple[Mapping[str, object], ...]:
+    value = document.get(key)
+    if not isinstance(value, list) or not value:
+        raise DataSourceError(
+            f"{label} payload must carry a non-empty {key!r} array, got "
+            f"{type(value).__name__}. The source publishes no contract, so a missing "
+            "section is treated as a changed payload rather than as an empty league."
+        )
+    non_objects = [index for index, record in enumerate(value) if not isinstance(record, dict)]
+    if non_objects:
+        raise DataSourceError(
+            f"{label} payload has non-object entries in {key!r} at indexes "
+            f"{format_examples(non_objects)}."
+        )
+    return tuple(record for record in value if isinstance(record, dict))
+
+
+def _require_fields(
+    records: Sequence[Mapping[str, object]], fields: Sequence[str], label: str
+) -> None:
+    """Reject a payload that no longer carries the fields this module reads."""
+
+    missing = sorted({field for record in records for field in fields if field not in record})
+    if missing:
+        raise DataSourceError(
+            f"{label} records are missing fields {missing!r} that this adapter reads. "
+            "The source is undocumented and may have renamed them; the adapter has to "
+            "be updated rather than allowed to emit nulls."
+        )
+
+
+def _integer(record: Mapping[str, object], key: str, label: str) -> int:
+    value = record.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise InvalidValueError(
+            f"{label} field {key!r} must be an integer, got {value!r} ({type(value).__name__})."
+        )
+    return value
+
+
+def _text(record: Mapping[str, object], key: str, label: str) -> str:
+    value = record.get(key)
+    if not isinstance(value, str):
+        raise InvalidValueError(
+            f"{label} field {key!r} must be text, got {value!r} ({type(value).__name__})."
+        )
+    return value.strip()
+
+
+def team_names(bootstrap: bytes) -> Mapping[int, str]:
+    """Return the per-season team id to display-name mapping the payload declares.
+
+    The canonical panel identifies a team by the platform's display name, while the
+    live payload identifies it by a small integer. Resolving the integer here keeps
+    the live snapshot joinable to the existing panel without redefining what
+    ``team_id`` means, which is a canonical change and not this module's to make.
+
+    Note that the integer is per-season and shifts with promotion and relegation, so
+    it is resolved through the same payload it came from and never cached across
+    seasons.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "teams", "Team")
+    _require_fields(records, _TEAM_FIELDS, "Team")
+
+    mapping: dict[int, str] = {}
+    for record in records:
+        identifier = _integer(record, "id", "Team")
+        name = _text(record, "name", "Team")
+        if not name:
+            raise InvalidValueError(f"Team {identifier} declares an empty name.")
+        if identifier in mapping:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload declares team id {identifier} more than once."
+            )
+        mapping[identifier] = name
+    return MappingProxyType(mapping)
+
+
+def _boolean(record: Mapping[str, object], key: str, label: str) -> bool:
+    value = record.get(key)
+    if not isinstance(value, bool):
+        raise InvalidValueError(
+            f"{label} field {key!r} must be a boolean, got {value!r} ({type(value).__name__})."
+        )
+    return value
+
+
+def gameweek_deadlines(bootstrap: bytes) -> tuple[GameweekDeadline, ...]:
+    """Return every gameweek deadline the payload publishes, in gameweek order."""
+
+    records = _records(_document(bootstrap, "Bootstrap"), "events", "Event")
+    _require_fields(records, _EVENT_FIELDS, "Event")
+
+    deadlines: dict[int, GameweekDeadline] = {}
+    for record in records:
+        gameweek = _integer(record, "id", "Event")
+        if gameweek < MIN_GAMEWEEK:
+            raise InvalidValueError(
+                f"Event declares gameweek {gameweek}, below the minimum {MIN_GAMEWEEK}."
+            )
+        if gameweek in deadlines:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload declares gameweek {gameweek} more than once."
+            )
+        deadlines[gameweek] = GameweekDeadline(
+            gameweek=gameweek,
+            deadline_utc=normalize_utc_timestamp(
+                record.get("deadline_time"), label=f"Event {gameweek} deadline_time"
+            ),
+            finished=_boolean(record, "finished", "Event"),
+        )
+    return tuple(deadlines[gameweek] for gameweek in sorted(deadlines))
+
+
+def next_open_deadline(
+    deadlines: Sequence[GameweekDeadline], *, as_of_utc: str
+) -> GameweekDeadline:
+    """Return the earliest gameweek whose deadline has not passed at ``as_of_utc``.
+
+    The payload also carries its own ``is_next`` flag, and this deliberately ignores
+    it. That flag is state the source maintains on its own schedule, and we cannot
+    establish when it was last updated; comparing a published deadline against the
+    instant we captured the payload is something we can show. Replay depends on that
+    distinction, because the whole claim being replayed is "this was still open when
+    we looked".
+
+    A deadline exactly equal to ``as_of_utc`` counts as closed. The boundary has to
+    fall one way, and treating the instant of the deadline as still open would let a
+    capture taken at the moment of closing produce a squad that could not be entered.
+    """
+
+    if not deadlines:
+        raise DataSourceError("No gameweek deadlines were parsed from the payload.")
+    moment = as_instant(normalize_utc_timestamp(as_of_utc, label="as_of_utc"))
+    for deadline in sorted(deadlines, key=lambda entry: entry.gameweek):
+        if as_instant(deadline.deadline_utc) > moment:
+            return deadline
+    latest = max(deadlines, key=lambda entry: entry.gameweek)
+    raise DataSourceError(
+        f"Every published deadline had closed by {moment.isoformat()}; the last one was "
+        f"gameweek {latest.gameweek} at {latest.deadline_utc}. The season is over, or the "
+        "capture is older than the payload it claims to describe."
+    )
+
+
+def player_snapshot(bootstrap: bytes) -> pd.DataFrame:
+    """Build the deadline-known player table from a captured bootstrap payload.
+
+    Rows are the squad-eligible players the platform is currently offering. Managers
+    and any other non-player entry are excluded. The result is sorted by
+    ``player_id`` so the output does not depend on the order the source happened to
+    serialise, and prices pass through the same integer-tenths conversion the
+    canonical layer uses, so a fractional or missing price is rejected here rather
+    than turning the column to float further downstream.
+
+    Availability is deliberately absent. ``status`` and the chance-of-playing fields
+    are in the captured payload and stay there: they are applied later as an explicit
+    inference rule, never as a column of this table.
+    """
+
+    names = team_names(bootstrap)
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _ELEMENT_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    unknown_teams: list[int] = []
+    for record in records:
+        element_type = _integer(record, "element_type", "Element")
+        if element_type not in POSITION_CODES:
+            continue
+        team = _integer(record, "team", "Element")
+        if team not in names:
+            unknown_teams.append(team)
+            continue
+        first = _text(record, "first_name", "Element")
+        second = _text(record, "second_name", "Element")
+        full_name = f"{first} {second}".strip()
+        if not full_name:
+            raise InvalidValueError(
+                f"Element with code {_integer(record, 'code', 'Element')} has no name."
+            )
+        rows.append(
+            {
+                "player_id": _integer(record, "code", "Element"),
+                "name": full_name,
+                "team_id": names[team],
+                "position": POSITION_CODES[element_type],
+                "price_tenths": _integer(record, "now_cost", "Element"),
+            }
+        )
+
+    if unknown_teams:
+        raise InvalidValueError(
+            "Bootstrap payload has players on teams it does not declare: "
+            f"{format_examples(sorted(set(unknown_teams)))}. A player whose club is "
+            "unknown cannot be placed in a squad or joined to a fixture."
+        )
+    if not rows:
+        raise DataSourceError(
+            "Bootstrap payload declares no squad-eligible players. Position codes "
+            f"{sorted(POSITION_CODES)} produced no rows, which means the platform's "
+            "position encoding has changed."
+        )
+
+    frame = pd.DataFrame(rows, columns=list(SNAPSHOT_COLUMNS))
+    duplicated = frame.loc[frame["player_id"].duplicated(), "player_id"].tolist()
+    if duplicated:
+        raise DuplicateRecordsError(
+            "Bootstrap payload declares the same persistent player code more than "
+            f"once: {format_examples(duplicated)}."
+        )
+
+    frame["position"] = normalize_positions(frame["position"])
+    frame["price_tenths"] = to_price_tenths(frame["price_tenths"], unit="tenths")
+    frame["name"] = frame["name"].astype("string")
+    frame["team_id"] = frame["team_id"].astype("string")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)

@@ -352,8 +352,17 @@ store.
 ## Real historical data
 
 Six seasons, 2020-21 through 2025-26, from the
-[vaastav archive](https://github.com/vaastav/Fantasy-Premier-League): 155,995
+[vaastav archive](https://github.com/vaastav/Fantasy-Premier-League): 156,075
 player-gameweek rows and 1,960 players, of whom 1,133 appear in more than one season.
+
+The row count includes 101 rows restored by accepting `GKP` alongside `GK`. The archive
+spells goalkeeper as `GKP` in 2021-22 gameweek 37 and as `GK` everywhere else, so the
+original position filter silently dropped every goalkeeper in that gameweek — 80
+players, all in one round, and no other season affected. The consequence was confined
+to those goalkeepers' shifted rolling features in gameweek 38, which read one gameweek
+less history than they should have. No benchmark needed re-running: the baseline
+benchmark is measured on 2025-26, which contains no `GKP` rows, and every other real-data
+run postdates the fix.
 
 ```bash
 python -m scripts.fetch_historical_data      # download and verify
@@ -387,6 +396,64 @@ prediction.
 
 Manager entries — `AM` rows from 2024-25, twenty per season — are excluded, because a
 manager is not a squad-eligible player under the canonical contract.
+
+## Capturing a live season before a deadline
+
+The archive publishes a gameweek after it has been played, so it cannot answer what the
+roster looked like before a deadline. A live season needs its own capture.
+
+```bash
+python -m scripts.capture_deadline_snapshot --dry-run   # read and report, write nothing
+python -m scripts.capture_deadline_snapshot             # capture
+python -m scripts.capture_deadline_snapshot --list      # what is held locally
+```
+
+The source and the reasoning behind choosing it are in
+[live_data_source_options.md](live_data_source_options.md). Three properties of the
+capture matter more than the mechanics:
+
+**Capture time is data, not metadata.** Prices move daily and availability hourly near
+a deadline, so a capture taken three days early describes a squad nobody can still
+enter. The instant is stamped once after both endpoint reads complete, so the pair
+cannot straddle a deadline, and it must state a UTC offset — a naive timestamp is
+rejected rather than assumed.
+
+**The target gameweek is derived, not declared.** The payload publishes an `is_next`
+flag and the resolver ignores it. That flag is state the source maintains on its own
+schedule and we cannot establish when it was last updated; comparing a published
+deadline against our own capture instant is something we can show. The deadline instant
+itself counts as closed, because a squad decided at the moment of closing cannot be
+entered.
+
+**A snapshot is never rewritten.** Payloads are checksummed individually, the
+provenance is fingerprinted, and the identifier is rebuilt from the metadata on every
+read. The three checks fail differently on purpose: edited bytes, edited provenance, and
+a snapshot moved into another's directory. Backdating a capture would make a leaky
+decision look timely, so provenance is protected as carefully as content.
+
+What the capture produces is a **player snapshot**, not a canonical panel row. A
+canonical row requires `minutes` and `total_points`, and a roster read before kick-off
+has neither, so it carries only the five deadline-known fields a projection is assembled
+from. Availability is captured in the payload and deliberately absent from that table:
+it is applied later as an explicit inference rule, and a column would invite it to
+become a feature.
+
+Captured identities are reconciled against the archive on every capture. A new player
+is expected and reported; no overlap at all is rejected, because a roster of complete
+unknowns means the two sides are keyed on different identifier spaces rather than that
+the league has been replaced.
+
+Verified against the live endpoints on 2026-08-13: 38 published gameweeks, the next open
+deadline resolving to gameweek 1 at `2026-08-21T17:30:00Z`, 584 players across 20 teams,
+and 501 of them already carrying history. The remaining 83 are cold starts, and that
+count is a floor rather than a final figure — clubs register more players before the
+opening deadline.
+
+Snapshots stay in a git-ignored directory. The source permits private use and forbids
+redistribution, and unlike the archive a capture cannot be re-fetched later anyway, so
+committing a checksum would not let anyone reproduce it. The audit trail runs the other
+way: a decision report names the snapshot it was made from and repeats its fingerprint,
+and that report is what gets committed.
 
 ## Projecting a season that has not started
 

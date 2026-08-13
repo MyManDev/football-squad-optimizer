@@ -48,3 +48,23 @@ class DuplicateRecordsError(DataValidationError):
 
 class InvalidValueError(DataValidationError):
     """Raised when a column contains values the canonical schema forbids."""
+
+
+class SnapshotError(DataError):
+    """Base exception for the captured-snapshot store."""
+
+
+class SnapshotExistsError(SnapshotError):
+    """Raised when a write would overwrite an already-captured snapshot.
+
+    Separate from a generic source error because it is not a failure to read the
+    world: it is the store refusing to let recorded history be rewritten.
+    """
+
+
+class SnapshotIntegrityError(SnapshotError):
+    """Raised when a snapshot on disk does not match its own recorded digests.
+
+    A replayed decision is only evidence if the bytes it replays are provably the
+    bytes that were captured, so a mismatch is an error rather than a warning.
+    """
