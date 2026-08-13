@@ -1,7 +1,8 @@
 """Tests for portable Sprint 4 artifact rendering helpers."""
 
 import numpy as np
-from scripts.run_risk_screening import _json_identifier, _markdown
+import pytest
+from scripts.run_risk_screening import _json_document, _json_identifier, _markdown
 
 
 def _report() -> dict[str, object]:
@@ -61,3 +62,32 @@ def test_numpy_integer_identifier_is_json_safe() -> None:
 
     assert value == 7
     assert isinstance(value, int)
+
+
+def test_complete_report_serializes_numpy_counters_to_strict_json() -> None:
+    report = _report()
+    candidates = report["candidates"]
+    assert isinstance(candidates, list)
+    candidate = candidates[0]
+    assert isinstance(candidate, dict)
+    comparison = candidate["comparison"]
+    assert isinstance(comparison, dict)
+    comparison["captain_changed_folds"] = np.int64(1)
+
+    document = _json_document(report)
+
+    assert '"captain_changed_folds": 1' in document
+
+
+def test_report_rejects_non_finite_json_numbers() -> None:
+    report = _report()
+    candidates = report["candidates"]
+    assert isinstance(candidates, list)
+    candidate = candidates[0]
+    assert isinstance(candidate, dict)
+    metrics = candidate["metrics"]
+    assert isinstance(metrics, dict)
+    metrics["feasibility_rate"] = float("nan")
+
+    with pytest.raises(ValueError, match="Out of range float values"):
+        _json_document(report)

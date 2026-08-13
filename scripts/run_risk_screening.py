@@ -16,7 +16,7 @@ import sys
 from dataclasses import asdict
 from datetime import UTC, datetime
 from importlib.metadata import version
-from numbers import Integral
+from numbers import Integral, Real
 from pathlib import Path
 
 import pandas as pd
@@ -100,6 +100,31 @@ def _json_identifier(value: object) -> int | str:
     if isinstance(value, Integral) and not isinstance(value, bool):
         return int(value)
     return str(value)
+
+
+def _json_default(value: object) -> int | float:
+    """Convert supported numeric scalar implementations to JSON-native values."""
+
+    if isinstance(value, Integral) and not isinstance(value, bool):
+        return int(value)
+    if isinstance(value, Real) and not isinstance(value, bool):
+        return float(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
+def _json_document(report: dict[str, object]) -> str:
+    """Serialize one report as strict, deterministic JSON."""
+
+    return (
+        json.dumps(
+            report,
+            indent=2,
+            sort_keys=True,
+            allow_nan=False,
+            default=_json_default,
+        )
+        + "\n"
+    )
 
 
 def _build_report(
@@ -306,7 +331,7 @@ def main() -> int:
         created_utc=datetime.now(UTC).isoformat(timespec="seconds"),
     )
     markdown = _markdown(report)
-    _write(arguments.json_output, json.dumps(report, indent=2, sort_keys=True) + "\n")
+    _write(arguments.json_output, _json_document(report))
     _write(arguments.markdown_output, markdown)
     print(markdown)
     print(f"JSON: {arguments.json_output}")

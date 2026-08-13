@@ -184,15 +184,17 @@ def _comparison(
             comparable_decisions += 1
             candidate_decision = fold.result.optimization_result
             control_decision = control.result.optimization_result
-            squad_changes += set(candidate_decision.selected_squad["player_id"].tolist()) != set(
-                control_decision.selected_squad["player_id"].tolist()
+            squad_changes += int(
+                set(candidate_decision.selected_squad["player_id"].tolist())
+                != set(control_decision.selected_squad["player_id"].tolist())
             )
-            starting_changes += set(candidate_decision.starting_xi["player_id"].tolist()) != set(
-                control_decision.starting_xi["player_id"].tolist()
+            starting_changes += int(
+                set(candidate_decision.starting_xi["player_id"].tolist())
+                != set(control_decision.starting_xi["player_id"].tolist())
             )
             if candidate_decision.captain is None or control_decision.captain is None:
                 raise RiskValidationError("Comparable feasible decisions must contain captains.")
-            captain_changes += (
+            captain_changes += int(
                 candidate_decision.captain["player_id"] != control_decision.captain["player_id"]
             )
     return RiskPairedComparison(
