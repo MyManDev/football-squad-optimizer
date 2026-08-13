@@ -19,6 +19,13 @@ from squadopt.prediction.factors import (
     FEATURE_GENERATION_CONTRACT_VERSION,
     FormWindowMapping,
 )
+from squadopt.prediction.integration import (
+    PREDICTION_TO_OPTIMIZATION_CONTRACT_VERSION,
+    PREDICTION_VALUE_COLUMNS,
+    PredictionProvenance,
+    PredictionSnapshot,
+    prepare_optimizer_projection,
+)
 from squadopt.prediction.opening import (
     ROSTER_COLUMN_MAP,
     build_opening_projection_table,
@@ -31,13 +38,18 @@ __all__ = [
     "DEFAULT_PROJECTION_CONFIG",
     "FEATURE_GENERATION_CONTRACT_VERSION",
     "FITTED_OPENING_PRICE_COEFFICIENT",
+    "PREDICTION_TO_OPTIMIZATION_CONTRACT_VERSION",
+    "PREDICTION_VALUE_COLUMNS",
     "ROSTER_COLUMN_MAP",
     "BaselineProjectionConfig",
     "FormWindowMapping",
     "PredictionConfigurationError",
     "PredictionError",
+    "PredictionProvenance",
+    "PredictionSnapshot",
     "baseline_expected_points",
     "build_opening_projection_table",
     "build_projection_table",
+    "prepare_optimizer_projection",
     "required_feature_columns",
 ]

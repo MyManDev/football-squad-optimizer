@@ -11,7 +11,11 @@ from squadopt.evaluation import (
     EvaluationValidationError,
     score_realized_squad_points,
 )
-from squadopt.risk.config import RiskOptimizationConfig, RiskScreeningConfig
+from squadopt.risk.config import (
+    PlayerRiskScreeningConfig,
+    RiskOptimizationConfig,
+    RiskScreeningConfig,
+)
 from squadopt.risk.errors import RiskConfigurationError, RiskValidationError
 from squadopt.risk.models import (
     RiskAwareOptimizationResult,
@@ -23,10 +27,14 @@ from squadopt.risk.models import (
 )
 from squadopt.risk.optimizer import optimize_risk_aware_squad
 from squadopt.uncertainty import (
+    PLAYER_ADAPTIVE_UNCERTAINTY_CONTRACT_VERSION,
     UncertaintyConfig,
     UncertaintyValidationError,
+    apply_player_adaptive_uncertainty,
     apply_projection_uncertainty,
+    evaluate_player_adaptive_uncertainty,
     evaluate_projection_uncertainty,
+    fit_player_adaptive_uncertainty,
     fit_projection_uncertainty,
 )
 
@@ -334,6 +342,136 @@ def run_risk_screening(
             "evaluation_seasons": config.season_order[1:],
             "evaluation_fold_ids": evaluation_fold_ids,
             "control_candidate_id": control_config.candidate_id,
+            "holdout_accessed": False,
+            "promotion_performed": False,
+            "downside_quantile_method": "nearest-rank",
+            "mean_worst_fraction_method": "ceil(q*n)-lowest-observations",
+        },
+    )
+
+
+def run_player_risk_screening(
+    folds: Iterable[EvaluationFold],
+    config: PlayerRiskScreeningConfig,
+) -> RiskScreeningResult:
+    """Screen risk levels using expanding seasons and player-adaptive intervals."""
+
+    if not isinstance(config, PlayerRiskScreeningConfig):
+        raise RiskConfigurationError("config must be a PlayerRiskScreeningConfig instance.")
+    prepared = _prepared_folds(folds, config)
+    by_season = {
+        season: tuple(fold for fold in prepared if fold.metadata["season"] == season)
+        for season in config.season_order
+    }
+    results_by_candidate: dict[str, list[RiskScreeningFoldResult]] = {
+        candidate.candidate_id: [] for candidate in config.candidates
+    }
+
+    for target_index in range(1, len(config.season_order)):
+        target_season = config.season_order[target_index]
+        calibration_seasons = config.season_order[:target_index]
+        calibration_folds = tuple(
+            fold for season in calibration_seasons for fold in by_season[season]
+        )
+        uncertainty_config = config.uncertainty_config_for(
+            calibration_seasons,
+            target_season,
+        )
+        try:
+            calibration = fit_player_adaptive_uncertainty(
+                calibration_folds,
+                uncertainty_config,
+            )
+        except UncertaintyValidationError as error:
+            raise RiskValidationError(str(error)) from error
+
+        pending: list[
+            tuple[EvaluationFold, RiskOptimizationConfig, RiskAwareOptimizationResult]
+        ] = []
+        for fold in by_season[target_season]:
+            try:
+                calibrated = apply_player_adaptive_uncertainty(
+                    fold.projections,
+                    calibration,
+                )
+            except UncertaintyValidationError as error:
+                raise RiskValidationError(str(error)) from error
+            for candidate in config.candidates:
+                result = optimize_risk_aware_squad(
+                    calibrated,
+                    config.optimization_config,
+                    candidate,
+                )
+                pending.append((fold, candidate, result))
+
+        try:
+            evaluate_player_adaptive_uncertainty(
+                by_season[target_season],
+                calibration,
+            )
+        except UncertaintyValidationError as error:
+            raise RiskValidationError(str(error)) from error
+
+        for fold, candidate, result in pending:
+            gameweek_value = fold.metadata["gameweek"]
+            if isinstance(gameweek_value, bool) or not isinstance(gameweek_value, Integral):
+                raise RiskValidationError(
+                    f"Fold {fold.fold_id!r} gameweek metadata changed after validation."
+                )
+            realized_score = None
+            if result.has_solution:
+                try:
+                    realized_score = score_realized_squad_points(
+                        result.optimization_result,
+                        fold.realized_points,
+                    )
+                except EvaluationValidationError as error:
+                    raise RiskValidationError(str(error)) from error
+            results_by_candidate[candidate.candidate_id].append(
+                RiskScreeningFoldResult(
+                    fold_id=fold.fold_id,
+                    season=target_season,
+                    gameweek=int(gameweek_value),
+                    calibration_seasons=calibration_seasons,
+                    result=result,
+                    realized_squad_points=realized_score,
+                )
+            )
+
+    control_config = config.candidates[0]
+    control_folds = tuple(results_by_candidate[control_config.candidate_id])
+    candidate_results: list[RiskCandidateResult] = []
+    for candidate in config.candidates:
+        candidate_folds = tuple(results_by_candidate[candidate.candidate_id])
+        candidate_results.append(
+            RiskCandidateResult(
+                risk_config=candidate,
+                folds=candidate_folds,
+                metrics=_metrics(candidate_folds, config.downside_quantile),
+                comparison=_comparison(
+                    candidate.candidate_id,
+                    candidate_folds,
+                    control_config.candidate_id,
+                    control_folds,
+                    config.downside_quantile,
+                ),
+            )
+        )
+
+    return RiskScreeningResult(
+        config=config,
+        candidates=tuple(candidate_results),
+        diagnostics={
+            "contract_version": config.contract_version,
+            "configuration_fingerprint": config.configuration_fingerprint,
+            "uncertainty_contract_version": PLAYER_ADAPTIVE_UNCERTAINTY_CONTRACT_VERSION,
+            "calibration_policy": "expanding-completed-seasons",
+            "calibration_split": "chronological-disjoint-folds",
+            "seed_season": config.season_order[0],
+            "evaluation_seasons": config.season_order[1:],
+            "evaluation_fold_ids": tuple(fold.fold_id for fold in control_folds),
+            "control_candidate_id": control_config.candidate_id,
+            "player_specific_uncertainty": True,
             "holdout_accessed": False,
             "promotion_performed": False,
             "downside_quantile_method": "nearest-rank",

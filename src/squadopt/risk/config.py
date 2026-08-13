@@ -10,9 +10,11 @@ from typing import Final
 
 from squadopt.optimization import OptimizationConfig
 from squadopt.risk.errors import RiskConfigurationError
+from squadopt.uncertainty.config import PlayerAdaptiveUncertaintyConfig
 
 RISK_OPTIMIZATION_CONTRACT_VERSION: Final = "conformal_lcb_objective_v1"
 RISK_SCREENING_CONTRACT_VERSION: Final = "rolling_risk_screening_v1"
+PLAYER_RISK_SCREENING_CONTRACT_VERSION: Final = "player_risk_screening_v1"
 DEFAULT_RISK_AVERSION_LEVELS: Final = (0.0, 0.25, 0.5, 1.0)
 DEFAULT_RISK_SCREENING_SEASONS: Final = (
     "2021-22",
@@ -47,6 +49,18 @@ def _minimum(value: object, name: str, minimum: int) -> int:
 
 def _risk_token(value: float) -> str:
     return format(Decimal(str(value)).normalize(), "f").replace("-", "m").replace(".", "p")
+
+
+def _positive_number(value: object, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (Real, Decimal)):
+        raise RiskConfigurationError(f"{name} must be a finite positive number.")
+    try:
+        normalized = float(value)
+    except (OverflowError, TypeError, ValueError) as error:
+        raise RiskConfigurationError(f"{name} must be a finite positive number.") from error
+    if not math.isfinite(normalized) or normalized <= 0.0:
+        raise RiskConfigurationError(f"{name} must be a finite positive number.")
+    return normalized
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,6 +218,113 @@ class RiskScreeningConfig:
                 "solver_time_limit_seconds": optimization.solver_time_limit_seconds,
                 "deterministic_seed": optimization.deterministic_seed,
             },
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class PlayerRiskScreeningConfig(RiskScreeningConfig):
+    """Controls expanding-season screening with player-adaptive uncertainty."""
+
+    scale_training_fraction: float = 0.50
+    min_player_observations: int = 5
+    shrinkage_observations: float = 10.0
+    minimum_scale: float = 0.25
+    contract_version: str = PLAYER_RISK_SCREENING_CONTRACT_VERSION
+
+    def __post_init__(self) -> None:
+        if self.contract_version != PLAYER_RISK_SCREENING_CONTRACT_VERSION:
+            raise RiskConfigurationError(
+                "contract_version must match the implemented player risk screening contract."
+            )
+        common = RiskScreeningConfig(
+            season_order=self.season_order,
+            risk_aversion_levels=self.risk_aversion_levels,
+            downside_quantile=self.downside_quantile,
+            uncertainty_confidence_level=self.uncertainty_confidence_level,
+            min_pooled_observations=self.min_pooled_observations,
+            min_group_observations=self.min_group_observations,
+            min_prior_gameweeks_in_season=self.min_prior_gameweeks_in_season,
+            optimization_config=self.optimization_config,
+        )
+        for name in (
+            "season_order",
+            "risk_aversion_levels",
+            "downside_quantile",
+            "uncertainty_confidence_level",
+            "min_pooled_observations",
+            "min_group_observations",
+            "min_prior_gameweeks_in_season",
+            "optimization_config",
+        ):
+            object.__setattr__(self, name, getattr(common, name))
+        split = _probability(
+            self.scale_training_fraction,
+            "scale_training_fraction",
+            include_zero=False,
+        )
+        if split >= 1.0:
+            raise RiskConfigurationError(
+                "scale_training_fraction must be strictly between 0 and 1."
+            )
+        object.__setattr__(self, "scale_training_fraction", split)
+        object.__setattr__(
+            self,
+            "min_player_observations",
+            _minimum(self.min_player_observations, "min_player_observations", 2),
+        )
+        object.__setattr__(
+            self,
+            "shrinkage_observations",
+            _positive_number(self.shrinkage_observations, "shrinkage_observations"),
+        )
+        object.__setattr__(
+            self,
+            "minimum_scale",
+            _positive_number(self.minimum_scale, "minimum_scale"),
+        )
+
+    def uncertainty_config_for(
+        self,
+        calibration_seasons: tuple[str, ...],
+        target_season: str,
+    ) -> PlayerAdaptiveUncertaintyConfig:
+        """Build the pre-registered adaptive calibration for one target season."""
+
+        return PlayerAdaptiveUncertaintyConfig(
+            confidence_level=self.uncertainty_confidence_level,
+            development_seasons=calibration_seasons,
+            holdout_season=target_season,
+            scale_training_fraction=self.scale_training_fraction,
+            min_pooled_observations=self.min_pooled_observations,
+            min_position_observations=self.min_group_observations,
+            min_player_observations=self.min_player_observations,
+            shrinkage_observations=self.shrinkage_observations,
+            minimum_scale=self.minimum_scale,
+        )
+
+    @property
+    def configuration_fingerprint(self) -> str:
+        """Return a stable digest of common and player-adaptive controls."""
+
+        common = RiskScreeningConfig(
+            season_order=self.season_order,
+            risk_aversion_levels=self.risk_aversion_levels,
+            downside_quantile=self.downside_quantile,
+            uncertainty_confidence_level=self.uncertainty_confidence_level,
+            min_pooled_observations=self.min_pooled_observations,
+            min_group_observations=self.min_group_observations,
+            min_prior_gameweeks_in_season=self.min_prior_gameweeks_in_season,
+            optimization_config=self.optimization_config,
+        )
+        payload = {
+            "common_screening_fingerprint": common.configuration_fingerprint,
+            "contract_version": self.contract_version,
+            "min_player_observations": self.min_player_observations,
+            "minimum_scale": _risk_token(self.minimum_scale),
+            "scale_training_fraction": _risk_token(self.scale_training_fraction),
+            "shrinkage_observations": _risk_token(self.shrinkage_observations),
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()

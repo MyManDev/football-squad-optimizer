@@ -169,6 +169,11 @@ This limitation is why Sprint 4 does not claim portfolio uncertainty and does no
 Monte Carlo draws from the interval. A conformal interval does not define a probability
 distribution, and the current contract contains no cross-player dependence model.
 
+Sprint 5 addresses only the first limitation through a separate versioned player-adaptive
+uncertainty contract. It can reorder players within a position because historical local
+scales differ. It still does not define a joint distribution or model cross-player
+dependence, so the portfolio-risk and Monte Carlo limitations remain.
+
 ## Reproduction
 
 ```powershell

@@ -221,8 +221,8 @@ def test_the_builder_never_sees_rows_after_the_decision() -> None:
     assert highest == sorted(highest)
 
 
-def test_a_builder_returning_something_other_than_a_frame_is_rejected() -> None:
-    with pytest.raises(BacktestConfigurationError, match="must return a DataFrame"):
+def test_a_builder_returning_something_other_than_a_projection_result_is_rejected() -> None:
+    with pytest.raises(BacktestConfigurationError, match="DataFrame or PredictionSnapshot"):
         build_walk_forward_fold(
             make_canonical_gameweeks(),
             DECISION,

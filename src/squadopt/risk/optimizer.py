@@ -28,6 +28,12 @@ from squadopt.uncertainty import (
 )
 
 RISK_ADJUSTED_POINTS_COLUMN = "risk_adjusted_points"
+_ALLOWED_UNCERTAINTY_SOURCES = {
+    "player_shrunk",
+    "pooled_fallback",
+    "position",
+    "position_fallback",
+}
 _UNCERTAINTY_COLUMNS = (
     INTERVAL_LOWER_COLUMN,
     INTERVAL_UPPER_COLUMN,
@@ -126,8 +132,8 @@ def _risk_adjusted_table(
             raise RiskValidationError("expected_points_stddev must be non-negative.")
         if group != position:
             raise RiskValidationError("uncertainty_group must match the canonical position.")
-        if source not in {"position", "pooled_fallback"}:
-            raise RiskValidationError("uncertainty_source must be 'position' or 'pooled_fallback'.")
+        if source not in _ALLOWED_UNCERTAINTY_SOURCES:
+            raise RiskValidationError("uncertainty_source must be a supported calibrated source.")
         if (
             isinstance(observations, bool)
             or not isinstance(observations, Integral)
@@ -247,6 +253,7 @@ def optimize_risk_aware_squad(
             "contract_version": risk_config.contract_version,
             "configuration_fingerprint": risk_config.configuration_fingerprint,
             "calibration_fingerprint": calibrated.calibration_fingerprint,
+            "uncertainty_contract_version": calibrated.diagnostics.get("contract_version"),
             "risk_aversion": risk_config.risk_aversion,
             "adjustment_formula": "mu-lambda*(mu-lower)",
             "point_projection_changed": False,
