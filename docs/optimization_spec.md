@@ -220,7 +220,8 @@ it does not convert decimal prices to `price_tenths`.
 - Only one gameweek is modeled.
 - Bench slots are not ordered.
 - There is no vice captain.
-- Projection uncertainty and correlation are ignored.
+- The Sprint 3 package can attach calibrated marginal projection intervals, but this
+  one-gameweek objective still ignores uncertainty and player correlation.
 - The objective is subject to the documented integer scaling approximation.
 - Feasible time-limited solutions are not guaranteed to match across different machines.
 - Solver performance has only been designed and tested for Sprint 0-sized pools.

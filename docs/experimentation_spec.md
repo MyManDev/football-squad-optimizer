@@ -267,5 +267,6 @@ every player selected in a scored fold.
 - The current optimizer makes independent one-gameweek decisions and has no transfer state.
 
 Future factors such as fixture weight, planning horizon, and risk penalty remain inactive.
-Bayesian Optimization should begin only after the prediction and uncertainty contracts are
-stable and the Sprint 2 screening evidence justifies a narrower search space.
+Sprint 3 supplies the first versioned player-level uncertainty contract. Bayesian
+Optimization should still begin only after that contract is reviewed as stable and a
+continuous search space with worthwhile expensive evaluations is explicitly defined.

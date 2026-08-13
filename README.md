@@ -5,8 +5,9 @@ player projections. Sprint 0 implements a tested, single-gameweek baseline with 
 OR-Tools CP-SAT. Sprint 1 adds leakage-safe walk-forward evaluation, a pinned real-data
 adapter, cross-season carry-over, and opening-gameweek projections. Sprint 2 adds a
 development-only `4 x 3` screening experiment for `form_window` and `bench_weight`, plus a
-separately guarded frozen-candidate holdout. Model calibration and Bayesian Optimization
-remain future work.
+separately guarded frozen-candidate holdout. Sprint 3 adds leakage-safe split-conformal
+player-level prediction intervals and a locked-holdout calibration benchmark. A learned
+point-prediction model and Bayesian Optimization remain future work.
 
 ## Sprint 0 scope
 
@@ -275,6 +276,25 @@ parallel, while every CP-SAT solve itself remains single-worker and deterministi
 [screening experiment specification](docs/experimentation_spec.md) for the design,
 bootstrap, promotion policy, holdout guard, and limitations.
 
+## Sprint 3 projection uncertainty
+
+Sprint 3 fits position-conditional split-conformal intervals on development-season player
+residuals and applies the frozen calibration to the locked `2025-26` benchmark season
+without refitting. Point projections are not changed. Groups with too little history use a
+deterministic pooled
+fallback, and negative lower bounds remain valid because realized fantasy points can be
+negative.
+
+```powershell
+.venv\Scripts\python -m scripts.run_uncertainty_benchmark
+```
+
+The command writes reproducible JSON and Markdown reports under ignored
+`artifacts/sprint3/`. The pinned benchmark uses `101,447` development residuals and obtains
+`0.908301` empirical coverage for a `0.90` target over `28,648` holdout player-gameweeks.
+See the [uncertainty specification](docs/uncertainty_spec.md) for the finite-sample quantile,
+public contracts, validation, metrics, and limitations.
+
 ## Quality checks
 
 ```powershell
@@ -288,3 +308,5 @@ See [the optimization specification](docs/optimization_spec.md) for the formulat
 rounding rules, deterministic tie-breaking, assumptions, and current limitations.
 The [screening experiment specification](docs/experimentation_spec.md) records the
 implemented Sprint 2 DoE, frozen holdout protocol, and deferred Bayesian Optimization work.
+The [uncertainty specification](docs/uncertainty_spec.md) records the implemented Sprint 3
+calibration contract that later scenario and risk-aware optimization work can consume.
