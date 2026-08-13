@@ -9,8 +9,9 @@ separately guarded frozen-candidate holdout. Sprint 3 adds leakage-safe split-co
 player-level prediction intervals and a locked-holdout calibration benchmark. Sprint 4 adds
 conformal lower-bound risk-aware optimization and expanding-season development screening.
 Sprint 5 adds a model-neutral prediction hand-off with provenance and player-adaptive
-uncertainty from chronologically split residual history. A learned point-prediction model,
-joint squad scenarios, and Bayesian Optimization remain future work.
+uncertainty from chronologically split residual history. Sprint 6 adds an open-source,
+deterministic Ridge reference model and a paired baseline-versus-learned development
+benchmark. Joint squad scenarios and Bayesian Optimization remain future work.
 
 ## Sprint 0 scope
 
@@ -343,6 +344,33 @@ the declared mean and downside diagnostics; no candidate was promoted.
 See the [Sprint 5 specification](docs/player_uncertainty_spec.md) for the contracts,
 formulation, leakage boundary, fallback policy, and limitations.
 
+## Sprint 6 learned prediction reference
+
+Sprint 6 fits a standardized Ridge model at each walk-forward decision using only rows
+strictly before that gameweek. The model consumes deadline-safe shifted form, prior-season
+carry-over, price, and fixed position indicators. Missing features use training-only medians
+(or zero when a whole training column is missing), and negative predictions are floored at
+zero before entering the optimizer contract.
+
+```powershell
+.venv\Scripts\python -m scripts.run_learned_benchmark
+```
+
+The command compares baseline and Ridge predictions on identical folds over `2021-22`
+through `2024-25`, writes ignored JSON and Markdown artifacts under `artifacts/sprint6/`,
+and exposes the Ridge out-of-sample residual history for later scenario generation. It does
+not access the locked `2025-26` holdout and never promotes the reference model automatically.
+Ibrahim's production model can later replace Ridge through the unchanged
+`PredictionSnapshot` boundary. See the
+[learned prediction specification](docs/learned_prediction_spec.md).
+
+The verified `2024-25` smoke benchmark produced 37/37 feasible paired folds and 26,303
+out-of-sample player residuals. Ridge reduced RMSE from `2.1172` to `1.9861`, increased MAE
+slightly from `1.0610` to `1.0705`, and improved the mean realized squad score by `4.8108`
+points per gameweek in that development season. The run took about ten minutes on the
+development machine; this is an offline evidence run, not a live-deadline latency target.
+No promotion decision follows from this single-season result.
+
 ## Quality checks
 
 ```powershell
@@ -362,3 +390,6 @@ The [risk optimization specification](docs/risk_optimization_spec.md) records th
 conformal lower-bound objective and development-only expanding-season screening protocol.
 The [Sprint 5 specification](docs/player_uncertainty_spec.md) records the model-neutral
 prediction provenance boundary and player-adaptive standardized conformal calibration.
+The [Sprint 6 specification](docs/learned_prediction_spec.md) records the deterministic
+Ridge reference, expanding-window fit, paired benchmark, and production-model integration
+boundary.

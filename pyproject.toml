@@ -11,8 +11,10 @@ requires-python = ">=3.11"
 license = "MIT"
 authors = [{ name = "SquadOpt" }]
 dependencies = [
+    "numpy>=2.0.2,<3",
     "ortools>=9.15.6755,<9.16",
     "pandas>=2.2.3,<3.1",
+    "scikit-learn>=1.6,<2",
 ]
 
 [project.optional-dependencies]
