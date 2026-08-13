@@ -19,6 +19,7 @@ produce a column of nulls.
 
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Final
 
@@ -31,6 +32,8 @@ from squadopt.data.errors import (
     InvalidValueError,
     format_examples,
 )
+from squadopt.data.schema import MIN_GAMEWEEK
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 
 # Recorded in a snapshot's metadata as the source of its payloads.
 FPL_LIVE_SOURCE: Final = "fpl-live"
@@ -67,6 +70,16 @@ _ELEMENT_FIELDS: Final = (
     "now_cost",
 )
 _TEAM_FIELDS: Final = ("id", "name")
+_EVENT_FIELDS: Final = ("id", "deadline_time", "finished")
+
+
+@dataclass(frozen=True, slots=True)
+class GameweekDeadline:
+    """One gameweek's published deadline, as the captured payload stated it."""
+
+    gameweek: int
+    deadline_utc: str
+    finished: bool
 
 
 def _document(payload: bytes, label: str) -> Mapping[str, object]:
@@ -162,6 +175,73 @@ def team_names(bootstrap: bytes) -> Mapping[int, str]:
             )
         mapping[identifier] = name
     return MappingProxyType(mapping)
+
+
+def _boolean(record: Mapping[str, object], key: str, label: str) -> bool:
+    value = record.get(key)
+    if not isinstance(value, bool):
+        raise InvalidValueError(
+            f"{label} field {key!r} must be a boolean, got {value!r} ({type(value).__name__})."
+        )
+    return value
+
+
+def gameweek_deadlines(bootstrap: bytes) -> tuple[GameweekDeadline, ...]:
+    """Return every gameweek deadline the payload publishes, in gameweek order."""
+
+    records = _records(_document(bootstrap, "Bootstrap"), "events", "Event")
+    _require_fields(records, _EVENT_FIELDS, "Event")
+
+    deadlines: dict[int, GameweekDeadline] = {}
+    for record in records:
+        gameweek = _integer(record, "id", "Event")
+        if gameweek < MIN_GAMEWEEK:
+            raise InvalidValueError(
+                f"Event declares gameweek {gameweek}, below the minimum {MIN_GAMEWEEK}."
+            )
+        if gameweek in deadlines:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload declares gameweek {gameweek} more than once."
+            )
+        deadlines[gameweek] = GameweekDeadline(
+            gameweek=gameweek,
+            deadline_utc=normalize_utc_timestamp(
+                record.get("deadline_time"), label=f"Event {gameweek} deadline_time"
+            ),
+            finished=_boolean(record, "finished", "Event"),
+        )
+    return tuple(deadlines[gameweek] for gameweek in sorted(deadlines))
+
+
+def next_open_deadline(
+    deadlines: Sequence[GameweekDeadline], *, as_of_utc: str
+) -> GameweekDeadline:
+    """Return the earliest gameweek whose deadline has not passed at ``as_of_utc``.
+
+    The payload also carries its own ``is_next`` flag, and this deliberately ignores
+    it. That flag is state the source maintains on its own schedule, and we cannot
+    establish when it was last updated; comparing a published deadline against the
+    instant we captured the payload is something we can show. Replay depends on that
+    distinction, because the whole claim being replayed is "this was still open when
+    we looked".
+
+    A deadline exactly equal to ``as_of_utc`` counts as closed. The boundary has to
+    fall one way, and treating the instant of the deadline as still open would let a
+    capture taken at the moment of closing produce a squad that could not be entered.
+    """
+
+    if not deadlines:
+        raise DataSourceError("No gameweek deadlines were parsed from the payload.")
+    moment = as_instant(normalize_utc_timestamp(as_of_utc, label="as_of_utc"))
+    for deadline in sorted(deadlines, key=lambda entry: entry.gameweek):
+        if as_instant(deadline.deadline_utc) > moment:
+            return deadline
+    latest = max(deadlines, key=lambda entry: entry.gameweek)
+    raise DataSourceError(
+        f"Every published deadline had closed by {moment.isoformat()}; the last one was "
+        f"gameweek {latest.gameweek} at {latest.deadline_utc}. The season is over, or the "
+        "capture is older than the payload it claims to describe."
+    )
 
 
 def player_snapshot(bootstrap: bytes) -> pd.DataFrame:

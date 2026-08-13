@@ -17,9 +17,18 @@ from squadopt.data.errors import (
 from squadopt.data.sources.fpl_live import (
     POSITION_CODES,
     SNAPSHOT_COLUMNS,
+    GameweekDeadline,
+    gameweek_deadlines,
+    next_open_deadline,
     player_snapshot,
     team_names,
 )
+
+EVENTS: list[dict[str, Any]] = [
+    {"id": 1, "deadline_time": "2026-08-21T17:30:00Z", "finished": False, "is_next": True},
+    {"id": 2, "deadline_time": "2026-08-28T17:30:00Z", "finished": False, "is_next": False},
+    {"id": 3, "deadline_time": "2026-09-11T17:30:00Z", "finished": False, "is_next": False},
+]
 
 TEAMS: list[dict[str, Any]] = [
     {"id": 1, "name": "Arsenal", "short_name": "ARS"},
@@ -51,11 +60,13 @@ def _element(**overrides: Any) -> dict[str, Any]:
 def _payload(
     elements: list[dict[str, Any]] | None = None,
     teams: list[dict[str, Any]] | None = None,
+    events: list[dict[str, Any]] | None = None,
     **overrides: Any,
 ) -> bytes:
     document: dict[str, Any] = {
         "teams": TEAMS if teams is None else teams,
         "elements": [_element()] if elements is None else elements,
+        "events": EVENTS if events is None else events,
     }
     document.update(overrides)
     return json.dumps(document).encode("utf-8")
@@ -257,3 +268,126 @@ def test_the_team_mapping_is_read_only() -> None:
 
     with pytest.raises(TypeError):
         mapping[2] = "Aston Villa"  # type: ignore[index]
+
+
+# --- deadlines --------------------------------------------------------------
+
+
+def test_deadlines_are_returned_in_gameweek_order() -> None:
+    parsed = gameweek_deadlines(_payload(events=list(reversed(EVENTS))))
+
+    assert [entry.gameweek for entry in parsed] == [1, 2, 3]
+    assert parsed[0].deadline_utc == "2026-08-21T17:30:00Z"
+
+
+def test_the_next_open_deadline_is_the_earliest_one_still_ahead() -> None:
+    parsed = gameweek_deadlines(_payload())
+
+    resolved = next_open_deadline(parsed, as_of_utc="2026-08-21T16:00:00Z")
+
+    assert resolved.gameweek == 1
+
+
+def test_a_closed_deadline_is_skipped() -> None:
+    parsed = gameweek_deadlines(_payload())
+
+    resolved = next_open_deadline(parsed, as_of_utc="2026-08-22T09:00:00Z")
+
+    assert resolved.gameweek == 2
+
+
+def test_the_deadline_instant_itself_counts_as_closed() -> None:
+    """A squad decided at the moment of closing could not actually be entered."""
+
+    parsed = gameweek_deadlines(_payload())
+
+    resolved = next_open_deadline(parsed, as_of_utc="2026-08-21T17:30:00Z")
+
+    assert resolved.gameweek == 2
+
+
+def test_the_sources_own_next_flag_is_not_trusted() -> None:
+    """We cannot establish when the source last updated that flag; a deadline we can."""
+
+    events = [
+        {"id": 1, "deadline_time": "2026-08-21T17:30:00Z", "finished": True, "is_next": True},
+        {"id": 2, "deadline_time": "2026-08-28T17:30:00Z", "finished": False, "is_next": False},
+    ]
+    parsed = gameweek_deadlines(_payload(events=events))
+
+    resolved = next_open_deadline(parsed, as_of_utc="2026-08-25T12:00:00Z")
+
+    assert resolved.gameweek == 2
+
+
+def test_a_capture_after_every_deadline_is_an_error() -> None:
+    parsed = gameweek_deadlines(_payload())
+
+    with pytest.raises(DataSourceError, match="Every published deadline had closed"):
+        next_open_deadline(parsed, as_of_utc="2027-06-01T00:00:00Z")
+
+
+def test_an_empty_deadline_sequence_is_an_error() -> None:
+    with pytest.raises(DataSourceError, match="No gameweek deadlines"):
+        next_open_deadline((), as_of_utc="2026-08-21T16:00:00Z")
+
+
+def test_a_local_time_as_of_is_rejected() -> None:
+    parsed = gameweek_deadlines(_payload())
+
+    with pytest.raises(DataSourceError, match="as_of_utc must be expressed in UTC"):
+        next_open_deadline(parsed, as_of_utc="2026-08-21T19:00:00+03:00")
+
+
+def test_a_deadline_without_a_timezone_is_rejected() -> None:
+    events = [{"id": 1, "deadline_time": "2026-08-21T17:30:00", "finished": False}]
+
+    with pytest.raises(DataSourceError, match="Event 1 deadline_time must state a timezone"):
+        gameweek_deadlines(_payload(events=events))
+
+
+def test_a_repeated_gameweek_is_rejected() -> None:
+    events = [
+        {"id": 1, "deadline_time": "2026-08-21T17:30:00Z", "finished": False},
+        {"id": 1, "deadline_time": "2026-08-22T17:30:00Z", "finished": False},
+    ]
+
+    with pytest.raises(DuplicateRecordsError, match="gameweek 1 more than once"):
+        gameweek_deadlines(_payload(events=events))
+
+
+def test_a_non_positive_gameweek_is_rejected() -> None:
+    events = [{"id": 0, "deadline_time": "2026-08-21T17:30:00Z", "finished": False}]
+
+    with pytest.raises(InvalidValueError, match="below the minimum"):
+        gameweek_deadlines(_payload(events=events))
+
+
+def test_a_non_boolean_finished_flag_is_rejected() -> None:
+    events = [{"id": 1, "deadline_time": "2026-08-21T17:30:00Z", "finished": "no"}]
+
+    with pytest.raises(InvalidValueError, match="must be a boolean"):
+        gameweek_deadlines(_payload(events=events))
+
+
+def test_a_missing_events_section_is_treated_as_a_changed_payload() -> None:
+    document = json.loads(_payload())
+    del document["events"]
+
+    with pytest.raises(DataSourceError, match="non-empty"):
+        gameweek_deadlines(json.dumps(document).encode("utf-8"))
+
+
+def test_a_deadline_record_is_immutable() -> None:
+    entry = gameweek_deadlines(_payload())[0]
+
+    with pytest.raises(AttributeError):
+        entry.gameweek = 5  # type: ignore[misc]
+
+
+def test_the_parsed_deadline_reports_whether_the_gameweek_finished() -> None:
+    events = [{"id": 1, "deadline_time": "2026-08-21T17:30:00Z", "finished": True}]
+
+    assert gameweek_deadlines(_payload(events=events)) == (
+        GameweekDeadline(gameweek=1, deadline_utc="2026-08-21T17:30:00Z", finished=True),
+    )

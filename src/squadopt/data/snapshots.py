@@ -21,7 +21,6 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
 from typing import Final
@@ -32,6 +31,7 @@ from squadopt.data.errors import (
     SnapshotIntegrityError,
     format_examples,
 )
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 
 # Bumped only when the on-disk layout changes in a way an existing reader cannot
 # interpret. It is part of the fingerprint, so a layout change can never silently
@@ -105,26 +105,7 @@ def normalize_captured_at(value: str) -> str:
     would silently merge two distinct captures.
     """
 
-    if not isinstance(value, str) or not value.strip():
-        raise DataSourceError(
-            f"captured_at_utc must be a non-empty ISO-8601 timestamp string, got {value!r}."
-        )
-    try:
-        parsed = datetime.fromisoformat(value.strip())
-    except ValueError as error:
-        raise DataSourceError(
-            f"captured_at_utc must be an ISO-8601 timestamp, got {value!r}: {error}"
-        ) from error
-    if parsed.tzinfo is None:
-        raise DataSourceError(
-            f"captured_at_utc must state a timezone so it cannot be misread, got {value!r}."
-        )
-    offset = parsed.utcoffset()
-    if offset is None or offset.total_seconds() != 0.0:
-        raise DataSourceError(
-            f"captured_at_utc must be expressed in UTC, got {value!r} with offset {offset!r}."
-        )
-    return parsed.isoformat().replace("+00:00", "Z")
+    return normalize_utc_timestamp(value, label="captured_at_utc")
 
 
 def snapshot_fingerprint(
@@ -156,9 +137,7 @@ def snapshot_fingerprint(
 def build_snapshot_id(*, source: str, captured_at_utc: str, fingerprint: str) -> str:
     """Return the directory-safe identifier for a capture."""
 
-    stamp = datetime.fromisoformat(captured_at_utc.replace("Z", "+00:00")).strftime(
-        _ID_TIMESTAMP_FORMAT
-    )
+    stamp = as_instant(captured_at_utc).strftime(_ID_TIMESTAMP_FORMAT)
     return f"{source}-{stamp}-{fingerprint[:_ID_DIGEST_CHARACTERS]}"
 
 
