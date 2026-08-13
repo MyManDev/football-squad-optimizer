@@ -15,6 +15,7 @@ from squadopt.features import (
 )
 from squadopt.prediction import (
     DEFAULT_OPENING_EXPECTED_POINTS,
+    FITTED_OPENING_PRICE_COEFFICIENT,
     BaselineProjectionConfig,
     PredictionConfigurationError,
     baseline_expected_points,
@@ -65,7 +66,10 @@ def test_projection_matches_hand_computation() -> None:
 
     assert_series_equal(
         result,
-        pd.Series([3.0, 2.0, 3.0, 4.0, 5.0], name="expected_points"),
+        pd.Series(
+            [FITTED_OPENING_PRICE_COEFFICIENT * 5.0, 2.0, 3.0, 4.0, 5.0],
+            name="expected_points",
+        ),
     )
 
 
@@ -89,15 +93,16 @@ def test_a_high_rate_with_low_minutes_is_not_over_projected() -> None:
 # --- the three precedence cases --------------------------------------------
 
 
-def test_opening_gameweek_uses_the_declared_fallback() -> None:
+def test_opening_gameweek_uses_the_fitted_price_prior() -> None:
     result = _project([5, 5], [90, 90])
 
-    assert result.iloc[0] == DEFAULT_OPENING_EXPECTED_POINTS
+    assert result.iloc[0] == pytest.approx(FITTED_OPENING_PRICE_COEFFICIENT * 5.0)
 
 
 def test_fallback_is_per_position() -> None:
     config = dataclasses.replace(
         CONFIG,
+        opening_price_coefficient=None,
         opening_expected_points={"GK": 1.0, "DEF": 2.0, "MID": 3.5, "FWD": 4.0},
     )
     frame = _solo_history([5, 5], [90, 90], position="FWD")
@@ -118,7 +123,7 @@ def test_known_but_idle_history_projects_zero_not_the_fallback() -> None:
 
     result = _project([0, 0, 0], [0, 0, 0])
 
-    assert result.iloc[0] == DEFAULT_OPENING_EXPECTED_POINTS
+    assert result.iloc[0] == pytest.approx(FITTED_OPENING_PRICE_COEFFICIENT * 5.0)
     assert result.iloc[1] == 0.0
     assert result.iloc[2] == 0.0
 
@@ -230,11 +235,17 @@ def test_unusable_fallback_values_are_rejected(value: object) -> None:
 
 
 def test_default_fallback_is_uniform_across_positions() -> None:
-    """A differentiated prior would imply a fitted claim this project has not earned."""
+    """The opt-out fallback remains explicit and position-complete."""
 
     values = set(BaselineProjectionConfig().opening_expected_points.values())
 
     assert values == {DEFAULT_OPENING_EXPECTED_POINTS}
+
+
+@pytest.mark.parametrize("value", [-1.0, float("nan"), float("inf"), "0.3", True])
+def test_unusable_opening_price_coefficients_are_rejected(value: object) -> None:
+    with pytest.raises(PredictionConfigurationError, match="opening_price_coefficient"):
+        BaselineProjectionConfig(opening_price_coefficient=value)  # type: ignore[arg-type]
 
 
 def test_non_dataframe_input_is_rejected() -> None:
@@ -288,8 +299,7 @@ def test_the_opening_gameweek_uses_the_earlier_season_when_it_is_carried() -> No
     assert result.loc[opening & later_season].tolist() == [6.0]
 
 
-def test_the_opening_gameweek_still_falls_back_without_a_carried_record() -> None:
-    """A caller that never attached the carry-over keeps the previous behaviour."""
+def test_the_opening_gameweek_uses_price_without_a_carried_record() -> None:
 
     features = build_feature_dataset(
         _two_season_history(),
@@ -301,11 +311,10 @@ def test_the_opening_gameweek_still_falls_back_without_a_carried_record() -> Non
     result = baseline_expected_points(features, config=CONFIG)
     opening = (features["gameweek"] == 1) & (features["season"] == "2024-25")
 
-    assert result.loc[opening].tolist() == [DEFAULT_OPENING_EXPECTED_POINTS]
+    assert result.loc[opening].tolist() == pytest.approx([FITTED_OPENING_PRICE_COEFFICIENT * 5.0])
 
 
-def test_a_player_with_no_earlier_record_still_gets_the_fallback() -> None:
-    """A genuine debut has no signal anywhere, so the declared constant remains."""
+def test_a_player_with_no_earlier_record_gets_the_price_prior() -> None:
 
     history = _two_season_history()
     newcomer = history.loc[history["season"] == "2024-25"].copy(deep=True)
@@ -323,7 +332,7 @@ def test_a_player_with_no_earlier_record_still_gets_the_fallback() -> None:
     result = baseline_expected_points(features, config=CONFIG)
     debut = (features["player_id"] == 2) & (features["gameweek"] == 1)
 
-    assert result.loc[debut].tolist() == [DEFAULT_OPENING_EXPECTED_POINTS]
+    assert result.loc[debut].tolist() == pytest.approx([FITTED_OPENING_PRICE_COEFFICIENT * 5.0])
 
 
 def test_within_season_history_still_takes_precedence() -> None:

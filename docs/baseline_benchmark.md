@@ -96,4 +96,3 @@ GW1 is intentionally evaluated by the separate opening-projection workflow.
 - Opening gameweeks are evaluated separately and are not included in these aggregates.
 - The baseline is leakage-safe and explainable, not a predictive-accuracy claim.
 - Automatic substitutions, vice-captain fallback, and bench points are excluded.
-- Players without usable history retain the declared constant fallback.

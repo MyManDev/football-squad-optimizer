@@ -169,15 +169,21 @@ every machine on identical bytes:
 ```powershell
 .venv\Scripts\python -m scripts.fetch_historical_data
 .venv\Scripts\python -m scripts.recommend_opening_squad
+.venv\Scripts\python -m scripts.run_opening_prior_backtest
 .venv\Scripts\python -m scripts.run_baseline_benchmark
 ```
 
 The second command produces an opening-gameweek squad: 15 players, a starting eleven, a
 bench, and a captain, with the pinned archive commit printed alongside so the result can
-be reproduced. It also reports how much of the squad rests on real history rather than a
-fallback constant.
+be reproduced. Players with usable earlier-season history use a decayed carry-over;
+newcomers use the fitted deadline-price prior
+`0.29940564635958394 * price_tenths / 10`.
 
-The third command uses 2020-21 through 2024-25 as historical context and evaluates the
+The third command reproduces that coefficient on 2020-21 through 2024-25 and compares
+price-only, carry-over-plus-constant, and carry-over-plus-price rules on the untouched
+2025-26 opening gameweek. Reports are written under ignored `artifacts/opening_prior/`.
+
+The fourth command uses 2020-21 through 2024-25 as historical context and evaluates the
 baseline out of sample on 2025-26. It deliberately excludes GW1, which has a different
 information set and remains covered by the opening-projection workflow. Repeat `--season`
 to evaluate additional seasons. To persist the complete provenance and per-fold results:

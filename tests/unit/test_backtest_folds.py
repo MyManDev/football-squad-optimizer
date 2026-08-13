@@ -241,8 +241,8 @@ def test_a_panel_too_short_for_any_decision_is_reported() -> None:
         build_walk_forward_folds(one_gameweek)
 
 
-def test_the_opening_gameweek_fold_can_be_requested_and_is_uninformative() -> None:
+def test_the_opening_gameweek_fold_can_be_requested_and_uses_the_price_prior() -> None:
     folds = build_walk_forward_folds(make_canonical_gameweeks(), min_prior_gameweeks_in_season=0)
     opening = next(fold for fold in folds if fold.metadata["gameweek"] == 1)
 
-    assert opening.projections["expected_points"].nunique() == 1
+    assert opening.projections["expected_points"].nunique() > 1

@@ -121,9 +121,9 @@ def walk_forward_decision_points(
 
     ``min_prior_gameweeks_in_season`` skips the opening gameweeks of each season.
     It defaults to 1 because a season-scoped rolling feature has no history at all
-    in gameweek 1, so the projection there falls back to a constant and the fold
-    measures the fallback rather than the model. Pass 0 to include those gameweeks
-    deliberately.
+    in gameweek 1. Opening decisions use their own carry-over and fitted-price-prior
+    workflow instead of being mixed into the within-season model response. Pass 0
+    to include those gameweeks deliberately.
 
     ``seasons`` restricts which seasons produce decision points, which is how a
     holdout season is kept out of a tuning run. History from earlier seasons is

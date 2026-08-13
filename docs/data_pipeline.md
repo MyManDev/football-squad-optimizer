@@ -37,7 +37,7 @@ none of it: not source names, not cleaning rules, not the loader.
 | `features/builder.py` | `build_feature_dataset()` | **implemented** |
 | `features/cross_season.py` | Carry-over from completed earlier seasons | **implemented** |
 | `data/sources/vaastav.py` | The real historical archive: layout, identity, corrections | **implemented** |
-| `prediction/config.py` | `BaselineProjectionConfig`: windows, opening fallback | **implemented** |
+| `prediction/config.py` | `BaselineProjectionConfig`: windows, fitted opening-price prior | **implemented** |
 | `prediction/baseline.py` | Deterministic `expected_points` | **implemented** |
 | `prediction/projection.py` | `build_projection_table(season=…, gameweek=t)` | **implemented** |
 | `prediction/opening.py` | `build_opening_projection_table()` for a season with no played matches | **implemented** |
@@ -113,8 +113,8 @@ so "we do not know yet" and "the value is zero" stay distinguishable.
 prior observation. Early values are noisier than a full window, but one real
 observation beats none, and every gameweek after the first stays projectable —
 which matters because a squad has to be picked for those gameweeks too. Only the
-opening gameweek of a player's season has no history at all, and that single gap is
-filled by an explicit per-position fallback in the prediction layer.
+opening gameweek of a player's season has no history at all. Earlier-season carry-over
+fills that gap where available; otherwise the fitted deadline-price prior ranks players.
 
 ## Determinism
 
@@ -143,7 +143,7 @@ Four cases, in precedence order:
 | Within-season history exists | Formula, clamped at `0.0` | Realized points may be negative; a projection may not be |
 | History exists, no minutes in the window | `0.0` | Not a gap — the player demonstrably did not feature |
 | No within-season history, earlier seasons carried | Same formula on the carry-over | The opening gameweek can rank players instead of treating everyone alike |
-| No record anywhere | Declared per-position fallback | A genuine debut has no signal; an explicit constant beats a silent zero |
+| No record anywhere | `opening_price_coefficient * price_tenths / 10` | Deadline price is a leakage-safe weak prior for a genuine debut |
 
 The third case needs the feature dataset to carry the cross-season columns, which
 `build_feature_dataset(..., cross_season=...)` attaches. It is off by default: it only
@@ -151,24 +151,47 @@ means anything for a panel spanning several seasons, and a caller working within
 season should not silently gain two always-missing columns.
 
 Measured on six real seasons, the carry-over covers **57% to 67%** of opening-gameweek
-players, which turns gameweek 1 from a single constant into hundreds of distinct
-projections. The remainder — new signings from abroad, promoted-team players, debutants
-— still fall to the constant, and that residual is the population a price-based prior
-would genuinely serve.
-
-The default fallback is deliberately **uniform** across positions. A differentiated
-prior would imply a fitted claim this project has not earned; the per-position shape
-exists so a later sprint can refine it without touching any call site. Without the
-carry-over attached, the consequence is honest and tested: gameweek 1 projections are
-uniform, so the
-optimizer returns a legal but undiscriminating squad. The skeleton never breaks —
-it simply cannot rank players before any history exists.
+players. The remainder — new signings from abroad, promoted-team players, and debutants —
+uses the fitted price rule. The coefficient lives in `BaselineProjectionConfig`, not at a
+call site. Setting it to `None` explicitly restores the uniform per-position fallback.
 
 `build_projection_table` copies `player_id`, `name`, `team_id`, `position`, and
 `price_tenths` from the target gameweek's own row, because all five are fixed at
 that gameweek's deadline. It then rechecks the contract itself — unique ids,
 integral prices, finite non-negative points — so a violation names the projection
 stage rather than surfacing as a puzzling rejection one module later.
+
+## Opening-price prior backtest
+
+Contract `opening_price_prior_v1` fits a non-negative, zero-intercept least-squares rule:
+
+```text
+expected_points(opening) = coefficient * price_tenths / 10
+```
+
+The fit uses 2,826 opening-gameweek player rows from 2020-21 through 2024-25 in the
+pinned vaastav archive. It yields `0.29940564635958394`. The 690 rows in 2025-26 GW1 are
+an untouched holdout; changing their outcomes cannot change the coefficient, which is
+covered by a synthetic leakage test.
+
+| Holdout rule | MAE | RMSE | Mean error |
+| --- | ---: | ---: | ---: |
+| Price only | 1.729360 | 2.453682 | 0.120833 |
+| Decayed carry-over + constant | 2.321033 | 2.815709 | 1.011354 |
+| Decayed carry-over + price | 1.738257 | 2.405757 | 0.301912 |
+
+Carry-over covers 390 of 690 holdout players (56.52%). The production precedence is
+the hybrid rule: keep the player-specific carry-over when available, and use price only
+for the 300 players without a usable earlier record. Reproduce the fit and report with:
+
+```powershell
+.venv\Scripts\python -m scripts.run_opening_prior_backtest
+```
+
+The archive does not formally document the timestamp of historical GW1 `value`. The
+backtest therefore inherits the adapter's existing conservative GW1 treatment and records
+the pinned source revision. For a genuinely upcoming season, `players_raw.now_cost` is
+unambiguous because no match or price change has occurred yet.
 
 ## Walk-forward backtesting
 
@@ -199,10 +222,10 @@ the default is right. A test proves the explicit order genuinely changes which r
 count as history.
 
 `min_prior_gameweeks_in_season` defaults to 1, skipping each season's opener. A
-season-scoped rolling feature has no history there, so the projection falls back to
-a constant and the fold would measure the fallback rather than the model. History is
-counted from rows that actually exist, not from gameweek numbers: a panel starting
-at gameweek 5 has no history at gameweek 5.
+season-scoped rolling feature has no history there, and opening decisions use a separate
+carry-over and fitted-price-prior workflow. History is counted from rows that actually
+exist, not from gameweek numbers: a panel starting at gameweek 5 has no history at
+gameweek 5.
 
 `seasons` restricts which seasons produce decisions while leaving earlier seasons
 available as history. That is how a holdout season stays unscored without being
@@ -376,5 +399,5 @@ That roster price is unambiguous in a way no in-season price is: the season has 
 begun, so nothing can have moved it.
 
 The table carries a `has_prior_record` flag beyond the six contract columns, so a caller
-can see how much of the pool rests on real history rather than on a constant. For
+can see how much of the pool rests on real history rather than on the price prior. For
 2026-27 that is 384 of 567 players.
