@@ -192,6 +192,72 @@ This changes the canonical contract that the optimization and software owners de
 on, so it needs agreement across all three owners rather than a unilateral edit. It is
 the largest single item on this list.
 
+**Status.** The optimization owner has approved a `fixture_snapshot_v1` table keyed on
+`(snapshot_id, season, fixture_id, team_id)`, one row per team per fixture, with the
+player-gameweek view derived by controlled aggregation. Two things still block the
+freeze, and both are now backed by measurement rather than expectation.
+
+### 10a. Team identity across seasons
+
+Measured against the pinned archive, and the result mirrors the player-identity finding
+almost exactly.
+
+| Consecutive seasons | Shared clubs | Kept `code` | Kept `id` |
+| --- | ---: | ---: | ---: |
+| 2020-21 → 2021-22 | 17 | 17 | 12 |
+| 2021-22 → 2022-23 | 17 | 17 | 7 |
+| 2022-23 → 2023-24 | 17 | 17 | 12 |
+| 2023-24 → 2024-25 | 17 | 17 | 12 |
+| 2024-25 → 2025-26 | 17 | 17 | 10 |
+
+`code` survives every season boundary, 85 of 85. The integer `id` survives 53 of 85,
+because it is assigned alphabetically within each season and shifts whenever a promoted
+club sorts ahead of an existing one. The clearest case: `id` 14 is Newcastle in 2020-21
+and 2021-22, then Man Utd from 2022-23 onward. The same number is a different club.
+
+This matters because three identifier spaces are currently in play. The canonical panel
+names a club by display name; the archive's `opponent_team` column is a per-season
+integer; the live payload also uses a per-season integer. All six seasons reconcile
+through `teams.csv` — the gameweek file's team names match its `name` column exactly, and
+every `opponent_team` value falls inside its `id` column — so the bridge exists and is
+verified. The live adapter already resolves its integer through the payload it came from,
+which keeps the captured snapshot joinable without redefining anything.
+
+**Proposal.** Adopt the persistent team `code` as `team_id` in the fixture table and,
+eventually, in the canonical panel. It is the only one of the three that means the same
+thing in two different seasons, and the argument for it is identical to the argument
+already accepted for players.
+
+This is not a unilateral change: it redefines an existing canonical column, and the
+scenario generator groups team-level shocks on `team_id`. Deferring it is also viable —
+the fixture table can key on the per-season integer plus the season — but then every
+cross-season team feature has to carry the season as part of the join, and a mistake
+there is silent rather than loud.
+
+### 10b. Provenance for archive-backfilled fixture rows
+
+`fixture_snapshot_v1` assumes a live capture. Four of its fields have no archive
+equivalent, and this is now verified rather than assumed: the archive's `fixtures.csv`
+carries `code`, `event`, `id`, `team_h`, `team_a`, both difficulty columns,
+`kickoff_time`, `finished`, `finished_provisional`, `started`, `minutes`, `stats` and
+`pulse_id` — and no deadline and no capture time.
+
+| Field | Archive equivalent | Proposal |
+| --- | --- | --- |
+| `snapshot_id` | none | A reserved identifier naming the pin, e.g. `vaastav@8c97b2a` |
+| `captured_at_utc` | none | Nullable for backfilled rows; fabricating a capture time would forge the one field leakage arguments rest on |
+| `deadline_timestamp_utc` | none — deadlines live in the platform's event list, which the archive does not ship | Nullable for backfilled rows |
+| `status` | `finished`, `finished_provisional`, `started` | Derived, and `final` for completed seasons |
+
+One consequence deserves stating rather than discovering later: postponement history is
+unrecoverable. The archive files a rescheduled fixture under the gameweek it was
+eventually played in, so no "this fixture was postponed" signal can be learned from
+history. Live capture can observe it; a model cannot be trained on it.
+
+The archive and live fixture payloads carry the same columns, so one adapter shape reads
+both. The identifier spaces and the missing provenance fields are the only real
+differences.
+
 ### 11. A shared contracts module
 
 **Now.** `squadopt.data.schema` imports `Position`, `POSITIONS`, and

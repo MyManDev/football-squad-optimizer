@@ -63,6 +63,13 @@ SUPPORTED_SEASONS: tuple[str, ...] = (
 GAMEWEEK_FILE = "gws/merged_gw.csv"
 ROSTER_FILE = "players_raw.csv"
 
+# Fixture-level files. The gameweek file cannot answer who a team played, because a
+# gameweek can hold more than one fixture for the same player and the archive's own
+# two team references disagree: `team` there is a display name while `opponent_team`
+# is a per-season integer. Both files below are needed to reconcile them.
+FIXTURES_FILE = "fixtures.csv"
+TEAMS_FILE = "teams.csv"
+
 # Only columns present in every supported season are mapped. Advanced metrics such
 # as expected goals and `starts` appear in some seasons and not others, and a panel
 # with a column missing for one season would fail canonical validation. Adding them

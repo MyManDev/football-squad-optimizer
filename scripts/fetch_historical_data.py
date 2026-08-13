@@ -29,30 +29,36 @@ from pathlib import Path
 from squadopt.data.sources.vaastav import (
     ARCHIVE_COMMIT,
     ARCHIVE_REPOSITORY,
+    FIXTURES_FILE,
     GAMEWEEK_FILE,
     ROSTER_FILE,
     SUPPORTED_SEASONS,
+    TEAMS_FILE,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
 MANIFEST_PATH = REPOSITORY_ROOT / "data" / "sources" / "vaastav_fpl_manifest.json"
 
-# The upcoming season has no completed gameweeks, so only its roster is fetched.
-# That roster is the opening player pool and its prices.
+# The upcoming season has no completed gameweeks, so its gameweek file does not exist
+# yet. Its roster is the opening player pool and its prices, and its fixture list is
+# published before the season starts.
 UPCOMING_SEASON = "2026-27"
 READ_CHUNK = 1 << 20
+
+# Every completed season needs all four. The fixture and team files are what make the
+# archive's two disagreeing team references reconcilable: `team` in the gameweek file
+# is a display name, `opponent_team` is a per-season integer, and `teams.csv` is the
+# only thing that maps between them.
+SEASON_FILES = (GAMEWEEK_FILE, ROSTER_FILE, FIXTURES_FILE, TEAMS_FILE)
+UPCOMING_FILES = (ROSTER_FILE, FIXTURES_FILE, TEAMS_FILE)
 
 
 def relative_paths() -> list[str]:
     """Return every archive path this project reads, relative to the data directory."""
 
-    paths = [
-        f"data/{season}/{name}"
-        for season in SUPPORTED_SEASONS
-        for name in (GAMEWEEK_FILE, ROSTER_FILE)
-    ]
-    paths.append(f"data/{UPCOMING_SEASON}/{ROSTER_FILE}")
+    paths = [f"data/{season}/{name}" for season in SUPPORTED_SEASONS for name in SEASON_FILES]
+    paths.extend(f"data/{UPCOMING_SEASON}/{name}" for name in UPCOMING_FILES)
     return paths
 
 
