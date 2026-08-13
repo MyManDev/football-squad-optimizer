@@ -310,7 +310,15 @@ def make_ridge_projection_builder(
     return build
 
 
-def _residual_table(folds: tuple[EvaluationFold, ...]) -> pd.DataFrame:
+def build_residual_history(folds: tuple[EvaluationFold, ...]) -> pd.DataFrame:
+    """Build the canonical OOS residual table from chronological prepared folds."""
+
+    if not isinstance(folds, tuple) or not folds:
+        raise BacktestConfigurationError(
+            "folds must be a non-empty tuple of EvaluationFold values."
+        )
+    if any(not isinstance(fold, EvaluationFold) for fold in folds):
+        raise BacktestConfigurationError("folds must contain only EvaluationFold values.")
     records: list[pd.DataFrame] = []
     for fold in folds:
         projections = fold.projections.loc[
@@ -450,8 +458,8 @@ def run_learned_benchmark(
     )
     baseline = evaluate_prepared_folds(baseline_folds, evaluation_config)
     learned = evaluate_prepared_folds(learned_folds, evaluation_config)
-    baseline_residuals = _residual_table(baseline_folds)
-    learned_residuals = _residual_table(learned_folds)
+    baseline_residuals = build_residual_history(baseline_folds)
+    learned_residuals = build_residual_history(learned_folds)
     return LearnedBenchmarkResult(
         config=settings,
         baseline=baseline,
