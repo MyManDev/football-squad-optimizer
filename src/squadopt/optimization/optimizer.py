@@ -1,8 +1,10 @@
 """OR-Tools CP-SAT implementation of the baseline squad optimizer."""
 
 from collections import Counter, defaultdict
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from numbers import Real
 from time import perf_counter
 
 import pandas as pd
@@ -50,18 +52,23 @@ class _ModelArtifacts:
     bench_coefficients: list[int]
 
 
-def _build_model(players: pd.DataFrame, config: OptimizationConfig) -> _ModelArtifacts:
+def _build_model(
+    players: pd.DataFrame,
+    config: OptimizationConfig,
+    objective_points: Sequence[object],
+) -> _ModelArtifacts:
     model = cp_model.CpModel()
     player_count = len(players)
     squad_vars = [model.new_bool_var(f"squad_{index}") for index in range(player_count)]
     starter_vars = [model.new_bool_var(f"starter_{index}") for index in range(player_count)]
     captain_vars = [model.new_bool_var(f"captain_{index}") for index in range(player_count)]
 
-    coefficients = objective_coefficients(players["expected_points"].tolist(), config)
+    coefficients = objective_coefficients(objective_points, config)
     bench_coefficients = [coefficient[0] for coefficient in coefficients]
     scaled_points = [coefficient[2] for coefficient in coefficients]
     conservative_objective_bound = sum(
-        2 * points + bench for points, bench in zip(scaled_points, bench_coefficients, strict=True)
+        2 * abs(points) + abs(bench)
+        for points, bench in zip(scaled_points, bench_coefficients, strict=True)
     )
     if conservative_objective_bound > CP_SAT_SAFE_INTEGER_MAX:
         raise SolverExecutionError(
@@ -297,18 +304,66 @@ def _empty_result(
     )
 
 
-def optimize_squad(
+def _validated_objective_points(
+    players: pd.DataFrame,
+    objective_points: Mapping[object, object] | None,
+) -> list[object]:
+    if objective_points is None:
+        return players["expected_points"].tolist()
+    if not isinstance(objective_points, Mapping):
+        raise InvalidConfigurationError("objective_points must be a player_id-to-number mapping.")
+
+    expected_ids = set(players["player_id"].tolist())
+    observed_ids = set(objective_points)
+    if observed_ids != expected_ids:
+        missing = sorted(expected_ids - observed_ids, key=str)
+        extra = sorted(observed_ids - expected_ids, key=str)
+        raise InvalidConfigurationError(
+            "objective_points must align exactly with validated player_id values; "
+            f"missing={missing[:10]!r}, extra={extra[:10]!r}."
+        )
+
+    validated: list[object] = []
+    invalid: list[object] = []
+    for player_id in players["player_id"].tolist():
+        value = objective_points[player_id]
+        if isinstance(value, bool) or not isinstance(value, (Real, Decimal)):
+            invalid.append(value)
+            continue
+        try:
+            decimal_value = Decimal(str(value))
+        except (InvalidOperation, OverflowError, ValueError):
+            invalid.append(value)
+            continue
+        if not decimal_value.is_finite():
+            invalid.append(value)
+            continue
+        validated.append(decimal_value)
+    if invalid:
+        raise InvalidConfigurationError(
+            f"objective_points values must be finite numbers; invalid examples: {invalid[:10]!r}."
+        )
+    return validated
+
+
+def _optimize_squad_with_objective_points(
     players: pd.DataFrame,
     config: OptimizationConfig,
+    *,
+    objective_points: Mapping[object, object] | None,
+    objective_contract: str,
 ) -> OptimizationResult:
-    """Select a squad, starting XI, bench, and captain for one gameweek."""
+    """Solve the shared squad model with a validated private objective override."""
 
     if not isinstance(config, OptimizationConfig):
         raise InvalidConfigurationError("config must be an OptimizationConfig instance.")
+    if not isinstance(objective_contract, str) or not objective_contract.strip():
+        raise InvalidConfigurationError("objective_contract must be a non-empty string.")
 
     validated = validate_players(players, config)
     ordered_players = sort_players_by_id(validated)
-    artifacts = _build_model(ordered_players, config)
+    ordered_objective_points = _validated_objective_points(ordered_players, objective_points)
+    artifacts = _build_model(ordered_players, config, ordered_objective_points)
     started_at = perf_counter()
     deadline = started_at + config.solver_time_limit_seconds
 
@@ -331,6 +386,7 @@ def optimize_squad(
         "deterministic_seed": config.deterministic_seed,
         "num_search_workers": 1,
         "rounding_mode": "ROUND_HALF_UP",
+        "objective_contract": objective_contract.strip(),
         "tiebreak_attempted": False,
         "tiebreak_status": None,
         "tiebreak_completed": False,
@@ -414,4 +470,18 @@ def optimize_squad(
         projected_score=float(projected_score_decimal),
         objective_value=objective_value,
         diagnostics=base_diagnostics,
+    )
+
+
+def optimize_squad(
+    players: pd.DataFrame,
+    config: OptimizationConfig,
+) -> OptimizationResult:
+    """Select a squad, starting XI, bench, and captain for one gameweek."""
+
+    return _optimize_squad_with_objective_points(
+        players,
+        config,
+        objective_points=None,
+        objective_contract="expected_points_v1",
     )

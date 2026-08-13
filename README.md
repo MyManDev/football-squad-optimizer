@@ -6,8 +6,9 @@ OR-Tools CP-SAT. Sprint 1 adds leakage-safe walk-forward evaluation, a pinned re
 adapter, cross-season carry-over, and opening-gameweek projections. Sprint 2 adds a
 development-only `4 x 3` screening experiment for `form_window` and `bench_weight`, plus a
 separately guarded frozen-candidate holdout. Sprint 3 adds leakage-safe split-conformal
-player-level prediction intervals and a locked-holdout calibration benchmark. A learned
-point-prediction model and Bayesian Optimization remain future work.
+player-level prediction intervals and a locked-holdout calibration benchmark. Sprint 4 adds
+conformal lower-bound risk-aware optimization and expanding-season development screening. A
+learned point-prediction model and Bayesian Optimization remain future work.
 
 ## Sprint 0 scope
 
@@ -295,6 +296,24 @@ The command writes reproducible JSON and Markdown reports under ignored
 See the [uncertainty specification](docs/uncertainty_spec.md) for the finite-sample quantile,
 public contracts, validation, metrics, and limitations.
 
+## Sprint 4 risk-aware optimization
+
+Sprint 4 blends each unchanged point projection with its calibrated conformal lower bound.
+`risk_aversion=0` reproduces the Sprint 0 objective exactly; `risk_aversion=1` uses the full
+lower bound. The feasible set and CP-SAT implementation remain shared with the baseline.
+
+```powershell
+.venv\Scripts\python -m scripts.run_risk_screening
+```
+
+The screening uses expanding completed-season calibration over `2021-22` through `2024-25`,
+does not access the reused `2025-26` benchmark, and performs no automatic promotion. Reports
+are written under ignored `artifacts/sprint4/`. On 110 development folds, none of the three
+risk-averse candidates improved mean or declared downside score over the `risk_aversion=0`
+control, so the control remains the operational default. See the
+[risk optimization specification](docs/risk_optimization_spec.md) for the objective,
+leakage boundary, metrics, and limitations.
+
 ## Quality checks
 
 ```powershell
@@ -310,3 +329,5 @@ The [screening experiment specification](docs/experimentation_spec.md) records t
 implemented Sprint 2 DoE, frozen holdout protocol, and deferred Bayesian Optimization work.
 The [uncertainty specification](docs/uncertainty_spec.md) records the implemented Sprint 3
 calibration contract that later scenario and risk-aware optimization work can consume.
+The [risk optimization specification](docs/risk_optimization_spec.md) records the Sprint 4
+conformal lower-bound objective and development-only expanding-season screening protocol.
