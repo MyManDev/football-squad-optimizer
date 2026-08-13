@@ -121,9 +121,11 @@ controls, environment versions, aggregate distributions, and one result row per 
 
 ## Current limitations
 
-- Walk-forward folds are available, but projection training and calibration remain external.
-- Projection training and calibration are external.
-- The price-based opening prior from Issue #7 is not implemented here.
+- Walk-forward folds are available, but point-projection model training and calibration
+  remain external.
+- Player-level uncertainty calibration is implemented by the separate
+  `squadopt.uncertainty` package; this evaluator still scores frozen squad decisions only.
 - There is no automatic-substitution or bench-order scoring.
-- There is no DoE design, Bayesian Optimization loop, or experiment storage backend.
+- The Sprint 2 DoE is implemented separately; there is no Bayesian Optimization loop or
+  experiment storage backend.
 - Runtime comparisons still require callers to control and record the execution environment.
