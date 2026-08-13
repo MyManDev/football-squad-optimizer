@@ -14,7 +14,11 @@ from squadopt.data.errors import (
     InvalidValueError,
     MissingColumnsError,
 )
-from squadopt.data.fixtures import validate_fixture_snapshot
+from squadopt.data.fixtures import (
+    aggregate_team_gameweek,
+    blank_gameweek_defaults,
+    validate_fixture_snapshot,
+)
 from squadopt.data.schema import FIXTURE_COLUMNS, FIXTURE_SORT_COLUMNS
 
 SNAPSHOT = "vaastav-8c97b2a"
@@ -141,12 +145,35 @@ def test_a_missing_difficulty_is_accepted_as_source_specific() -> None:
     assert validated["fixture_difficulty"].isna().all()
 
 
-@pytest.mark.parametrize("column", ["season", "kickoff_time_utc", "status", "snapshot_id"])
+@pytest.mark.parametrize("column", ["season", "status", "snapshot_id"])
 def test_a_non_nullable_column_may_not_be_empty(column: str) -> None:
     rows = _pair()
     rows[0][column] = pd.NA
 
     with pytest.raises(InvalidValueError, match=f"{column!r} may not be empty"):
+        validate_fixture_snapshot(_frame(rows))
+
+
+def test_a_fixture_awaiting_a_kickoff_time_is_accepted() -> None:
+    """A gameweek can be assigned before the time is confirmed, and no feature reads it."""
+
+    rows = _pair()
+    for row in rows:
+        row["kickoff_time_utc"] = pd.NA
+
+    validated = validate_fixture_snapshot(_frame(rows))
+
+    assert validated["kickoff_time_utc"].isna().all()
+    assert len(validated) == 2
+
+
+def test_a_kickoff_time_present_on_only_one_side_is_rejected() -> None:
+    """The two sides describe one match, so one cannot know the time and the other not."""
+
+    rows = _pair()
+    rows[0]["kickoff_time_utc"] = pd.NA
+
+    with pytest.raises(InvalidValueError, match="disagrees on 'kickoff_time_utc'"):
         validate_fixture_snapshot(_frame(rows))
 
 
@@ -279,3 +306,113 @@ def test_an_empty_table_is_rejected() -> None:
 def test_a_non_frame_is_rejected() -> None:
     with pytest.raises(InvalidValueError, match="must be a pandas DataFrame"):
         validate_fixture_snapshot([1, 2])  # type: ignore[arg-type]
+
+
+# --- aggregation to team-gameweek grain -------------------------------------
+
+
+def test_a_single_fixture_aggregates_to_one_home_and_one_away_club() -> None:
+    aggregated = aggregate_team_gameweek(_frame(_pair(home=3, away=14)))
+
+    home = aggregated.loc[aggregated["team_id"] == 3].iloc[0]
+    away = aggregated.loc[aggregated["team_id"] == 14].iloc[0]
+    assert (home["fixture_count"], home["home_fixture_count"], home["away_fixture_count"]) == (
+        1,
+        1,
+        0,
+    )
+    assert (away["fixture_count"], away["home_fixture_count"], away["away_fixture_count"]) == (
+        1,
+        0,
+        1,
+    )
+
+
+def test_a_double_gameweek_counts_two_fixtures_for_one_club() -> None:
+    """This is the quantity the player-gameweek panel cannot express."""
+
+    rows = _pair(1, gameweek=9, home=3, away=14) + _pair(2, gameweek=9, home=8, away=3)
+
+    aggregated = aggregate_team_gameweek(_frame(rows))
+
+    arsenal = aggregated.loc[(aggregated["team_id"] == 3) & (aggregated["gameweek"] == 9)].iloc[0]
+    assert arsenal["fixture_count"] == 2
+    assert arsenal["home_fixture_count"] == 1
+    assert arsenal["away_fixture_count"] == 1
+
+
+def test_difficulty_is_averaged_and_minimised_across_a_double_gameweek() -> None:
+    rows = _pair(1, gameweek=9, home=3, away=14) + _pair(2, gameweek=9, home=3, away=8)
+    rows[0]["fixture_difficulty"] = 2
+    rows[2]["fixture_difficulty"] = 5
+
+    aggregated = aggregate_team_gameweek(_frame(rows))
+
+    arsenal = aggregated.loc[aggregated["team_id"] == 3].iloc[0]
+    assert arsenal["mean_fixture_difficulty"] == pytest.approx(3.5)
+    assert arsenal["minimum_fixture_difficulty"] == 2
+
+
+def test_aggregation_reads_only_the_gameweek_it_summarises() -> None:
+    """A same-gameweek aggregation must not become a window over other gameweeks."""
+
+    rows = _pair(1, gameweek=1, home=3, away=14) + _pair(2, gameweek=2, home=3, away=8)
+    baseline = aggregate_team_gameweek(_frame(rows))
+
+    altered = _pair(1, gameweek=1, home=3, away=14) + _pair(2, gameweek=2, home=3, away=8)
+    altered[2]["fixture_difficulty"] = 5
+    altered[3]["fixture_difficulty"] = 1
+    changed = aggregate_team_gameweek(_frame(altered))
+
+    first = baseline.loc[baseline["gameweek"] == 1].reset_index(drop=True)
+    still_first = changed.loc[changed["gameweek"] == 1].reset_index(drop=True)
+    assert first.equals(still_first)
+
+
+def test_two_snapshots_are_summarised_separately() -> None:
+    """Summing across captures would silently double every count."""
+
+    rows = _pair() + _pair(snapshot_id="fpl-live-20260101T000000Z-abcabcabcabc")
+
+    aggregated = aggregate_team_gameweek(_frame(rows))
+
+    assert aggregated["fixture_count"].tolist() == [1, 1, 1, 1]
+    assert aggregated["snapshot_id"].nunique() == 2
+
+
+def test_a_missing_difficulty_leaves_the_summary_empty_rather_than_zero() -> None:
+    rows = _pair()
+    for row in rows:
+        row["fixture_difficulty"] = pd.NA
+
+    aggregated = aggregate_team_gameweek(_frame(rows))
+
+    assert aggregated["mean_fixture_difficulty"].isna().all()
+    assert aggregated["minimum_fixture_difficulty"].isna().all()
+    assert aggregated["fixture_count"].tolist() == [1, 1]
+
+
+def test_counts_are_non_nullable_integers() -> None:
+    aggregated = aggregate_team_gameweek(_frame(_pair()))
+
+    for column in ("fixture_count", "home_fixture_count", "away_fixture_count"):
+        assert aggregated[column].dtype == "int64"
+
+
+def test_a_blank_gameweek_defaults_to_zero_fixtures_and_no_difficulty() -> None:
+    """Zero difficulty would describe the easiest possible tie, not the absence of one."""
+
+    defaults = blank_gameweek_defaults()
+
+    assert defaults["fixture_count"] == 0
+    assert defaults["home_fixture_count"] == 0
+    assert defaults["away_fixture_count"] == 0
+    assert pd.isna(defaults["mean_fixture_difficulty"])
+    assert pd.isna(defaults["minimum_fixture_difficulty"])
+
+
+def test_the_blank_gameweek_defaults_are_read_only() -> None:
+    defaults = blank_gameweek_defaults()
+
+    with pytest.raises(TypeError):
+        defaults["fixture_count"] = 1  # type: ignore[index]

@@ -18,7 +18,9 @@ silently contradict the same feature computed from the other, so agreement is ve
 rather than assumed.
 """
 
-from collections.abc import Sequence
+import math
+from collections.abc import Mapping, Sequence
+from types import MappingProxyType
 
 import pandas as pd
 
@@ -129,6 +131,32 @@ def _require_unique_key(frame: pd.DataFrame) -> None:
         )
 
 
+def _is_missing(value: object) -> bool:
+    """Report whether one cell value is empty.
+
+    Spelled out rather than delegated, because the columns compared here hold three
+    different spellings of absence: ``None``, ``pd.NA`` from the nullable string and
+    integer dtypes, and ``float('nan')`` from a float column.
+    """
+
+    return value is None or value is pd.NA or (isinstance(value, float) and math.isnan(value))
+
+
+def _same_value(left: object, right: object) -> bool:
+    """Compare two cell values treating two empties as equal.
+
+    A nullable column has to be comparable across a fixture's two sides, and
+    ``pd.NA != pd.NA`` is itself ``pd.NA`` rather than a boolean, so a direct
+    comparison would raise instead of answering.
+    """
+
+    left_missing = _is_missing(left)
+    right_missing = _is_missing(right)
+    if left_missing or right_missing:
+        return left_missing and right_missing
+    return bool(left == right)
+
+
 def _require_consistent_pairs(frame: pd.DataFrame) -> None:
     """Check that both sides of every fixture tell the same story."""
 
@@ -157,7 +185,7 @@ def _require_consistent_pairs(frame: pd.DataFrame) -> None:
                 f"{away_row['team_id']} vs {away_row['opponent_team_id']}."
             )
         for column in ("gameweek", "kickoff_time_utc", "status"):
-            if home_row[column] != away_row[column]:
+            if not _same_value(home_row[column], away_row[column]):
                 raise InvalidValueError(
                     f"Fixture {key!r} disagrees on {column!r} between its two sides: "
                     f"{home_row[column]!r} and {away_row[column]!r}."
@@ -200,3 +228,73 @@ def fixture_pair_columns() -> Sequence[str]:
     """Columns identifying one match, both of whose sides must agree."""
 
     return _FIXTURE_PAIR_COLUMNS
+
+
+def aggregate_team_gameweek(fixtures: pd.DataFrame) -> pd.DataFrame:
+    """Summarise a club's fixtures within each gameweek.
+
+    This is the controlled step from fixture grain to something a player-gameweek
+    feature can consume. It is deliberately narrow: it reads only the rows belonging
+    to the gameweek being summarised, and every quantity it produces is a pre-match
+    fact — who is being played, at home or away, and how the source rates the tie.
+    None of them require an outcome, so nothing here needs shifting.
+
+    A club playing twice in a gameweek yields ``fixture_count`` 2, which is precisely
+    the information the player-gameweek panel cannot express and the reason this table
+    exists.
+
+    ``snapshot_id`` stays in the key rather than being collapsed. Two captures of one
+    season describe the same gameweek at different times, and summing across them would
+    silently double every count.
+    """
+
+    validated = validate_fixture_snapshot(fixtures)
+    grouped = validated.groupby(
+        ["snapshot_id", "season", "gameweek", "team_id"], sort=True, dropna=False
+    )
+
+    home = validated["is_home"].astype("boolean").fillna(False)
+    counted = validated.assign(
+        _home=home.astype("int64"),
+        _away=(~home).astype("int64"),
+    ).groupby(["snapshot_id", "season", "gameweek", "team_id"], sort=True, dropna=False)
+
+    aggregated = pd.DataFrame(
+        {
+            "fixture_count": grouped["fixture_id"].size(),
+            "home_fixture_count": counted["_home"].sum(),
+            "away_fixture_count": counted["_away"].sum(),
+            "mean_fixture_difficulty": grouped["fixture_difficulty"].mean(),
+            "minimum_fixture_difficulty": grouped["fixture_difficulty"].min(),
+        }
+    ).reset_index()
+
+    for column in ("fixture_count", "home_fixture_count", "away_fixture_count"):
+        aggregated[column] = aggregated[column].astype("int64")
+    aggregated["mean_fixture_difficulty"] = aggregated["mean_fixture_difficulty"].astype("Float64")
+    aggregated["minimum_fixture_difficulty"] = aggregated["minimum_fixture_difficulty"].astype(
+        "Int64"
+    )
+    return aggregated.sort_values(
+        ["snapshot_id", "season", "gameweek", "team_id"], kind="stable"
+    ).reset_index(drop=True)
+
+
+def blank_gameweek_defaults() -> Mapping[str, object]:
+    """Values for a club with no fixture in a gameweek.
+
+    Counts are zero, because "plays no matches" is a fact and zero states it. The
+    difficulty columns stay empty on purpose: a club with no fixture has no difficulty,
+    and filling zero would describe it as facing the easiest possible tie — which is
+    the opposite of the truth for a points projection.
+    """
+
+    return MappingProxyType(
+        {
+            "fixture_count": 0,
+            "home_fixture_count": 0,
+            "away_fixture_count": 0,
+            "mean_fixture_difficulty": pd.NA,
+            "minimum_fixture_difficulty": pd.NA,
+        }
+    )

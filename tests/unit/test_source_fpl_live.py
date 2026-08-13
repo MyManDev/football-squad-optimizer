@@ -18,9 +18,11 @@ from squadopt.data.sources.fpl_live import (
     POSITION_CODES,
     SNAPSHOT_COLUMNS,
     GameweekDeadline,
+    fixture_snapshot,
     gameweek_deadlines,
     next_open_deadline,
     player_snapshot,
+    team_codes,
     team_names,
 )
 
@@ -31,8 +33,8 @@ EVENTS: list[dict[str, Any]] = [
 ]
 
 TEAMS: list[dict[str, Any]] = [
-    {"id": 1, "name": "Arsenal", "short_name": "ARS"},
-    {"id": 14, "name": "Man Utd", "short_name": "MUN"},
+    {"id": 1, "code": 3, "name": "Arsenal", "short_name": "ARS"},
+    {"id": 14, "code": 14, "name": "Man Utd", "short_name": "MUN"},
 ]
 
 
@@ -391,3 +393,169 @@ def test_the_parsed_deadline_reports_whether_the_gameweek_finished() -> None:
     assert gameweek_deadlines(_payload(events=events)) == (
         GameweekDeadline(gameweek=1, deadline_utc="2026-08-21T17:30:00Z", finished=True),
     )
+
+
+# --- live fixtures ----------------------------------------------------------
+
+SNAPSHOT_ID = "fpl-live-20260813T201143Z-55789a780186"
+CAPTURED_AT = "2026-08-13T20:11:43Z"
+
+
+def _fixture(**overrides: Any) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "id": 1,
+        "event": 1,
+        "team_h": 1,
+        "team_a": 14,
+        "team_h_difficulty": 2,
+        "team_a_difficulty": 5,
+        "kickoff_time": "2026-08-21T19:00:00Z",
+        "finished": False,
+        "provisional_start_time": False,
+    }
+    record.update(overrides)
+    return record
+
+
+def _fixtures_payload(records: list[dict[str, Any]] | None = None) -> bytes:
+    return json.dumps([_fixture()] if records is None else records).encode("utf-8")
+
+
+def _build(
+    fixtures: list[dict[str, Any]] | None = None,
+    *,
+    bootstrap: bytes | None = None,
+    season: str = "2026-27",
+) -> Any:
+    return fixture_snapshot(
+        _fixtures_payload(fixtures),
+        _payload() if bootstrap is None else bootstrap,
+        season=season,
+        snapshot_id=SNAPSHOT_ID,
+        captured_at_utc=CAPTURED_AT,
+    )
+
+
+def test_a_live_fixture_becomes_one_row_per_team_keyed_on_the_code() -> None:
+    """Team 1 has code 3 and team 14 has code 14, so ids cannot pass as codes."""
+
+    frame = _build()
+
+    assert len(frame) == 2
+    assert sorted(frame["team_id"].tolist()) == [3, 14]
+
+
+def test_a_live_capture_fills_both_provenance_fields() -> None:
+    """This is what a live row has and an archive backfill cannot."""
+
+    frame = _build()
+
+    assert frame["captured_at_utc"].unique().tolist() == [CAPTURED_AT]
+    assert frame["deadline_timestamp_utc"].unique().tolist() == ["2026-08-21T17:30:00Z"]
+    assert frame["snapshot_id"].unique().tolist() == [SNAPSHOT_ID]
+
+
+def test_the_deadline_comes_from_the_fixtures_own_gameweek() -> None:
+    frame = _build([_fixture(event=2)])
+
+    assert frame["deadline_timestamp_utc"].unique().tolist() == ["2026-08-28T17:30:00Z"]
+
+
+@pytest.mark.parametrize(
+    ("finished", "provisional", "expected"),
+    [(True, False, "final"), (False, True, "provisional"), (False, False, "scheduled")],
+)
+def test_live_status_is_derived_from_the_published_flags(
+    finished: bool, provisional: bool, expected: str
+) -> None:
+    frame = _build([_fixture(finished=finished, provisional_start_time=provisional)])
+
+    assert frame["status"].unique().tolist() == [expected]
+
+
+def test_a_fixture_without_a_gameweek_is_excluded() -> None:
+    frame = _build([_fixture(id=1, event=1), _fixture(id=2, event=None)])
+
+    assert frame["fixture_id"].unique().tolist() == [1]
+
+
+def test_a_fixture_awaiting_a_kickoff_time_is_kept_with_an_empty_one() -> None:
+    """No feature reads the kickoff time, so the row is worth more than the field."""
+
+    frame = _build([_fixture(kickoff_time=None)])
+
+    assert len(frame) == 2
+    assert frame["kickoff_time_utc"].isna().all()
+
+
+def test_every_fixture_lacking_a_gameweek_is_an_error() -> None:
+    with pytest.raises(DataSourceError, match="every fixture lacked a gameweek"):
+        _build([_fixture(event=None)])
+
+
+def test_a_fixture_on_an_undeclared_team_is_rejected() -> None:
+    with pytest.raises(InvalidValueError, match="does not declare"):
+        _build([_fixture(team_a=99)])
+
+
+def test_a_fixture_in_an_unpublished_gameweek_is_rejected() -> None:
+    with pytest.raises(InvalidValueError, match="does not publish"):
+        _build([_fixture(event=38)])
+
+
+def test_a_malformed_season_is_rejected() -> None:
+    with pytest.raises(InvalidValueError, match="spelled like"):
+        _build(season="2026/27")
+
+
+def test_a_season_that_contradicts_the_payload_is_rejected() -> None:
+    """A typo would otherwise file a capture under the wrong season."""
+
+    with pytest.raises(InvalidValueError, match="earliest deadline falls in 2026"):
+        _build(season="2025-26")
+
+
+def test_a_fixtures_payload_that_is_not_an_array_is_rejected() -> None:
+    with pytest.raises(DataSourceError, match="must be a non-empty JSON array"):
+        fixture_snapshot(
+            b"{}",
+            _payload(),
+            season="2026-27",
+            snapshot_id=SNAPSHOT_ID,
+            captured_at_utc=CAPTURED_AT,
+        )
+
+
+def test_a_non_object_fixture_entry_is_rejected() -> None:
+    with pytest.raises(DataSourceError, match="non-object entries"):
+        fixture_snapshot(
+            json.dumps([_fixture(), 7]).encode("utf-8"),
+            _payload(),
+            season="2026-27",
+            snapshot_id=SNAPSHOT_ID,
+            captured_at_utc=CAPTURED_AT,
+        )
+
+
+@pytest.mark.parametrize("field", ["id", "team_h", "team_h_difficulty", "kickoff_time"])
+def test_a_renamed_fixture_field_stops_the_run(field: str) -> None:
+    record = _fixture()
+    del record[field]
+
+    with pytest.raises(DataSourceError, match=field):
+        _build([record])
+
+
+def test_a_local_time_capture_instant_is_rejected() -> None:
+    with pytest.raises(DataSourceError, match="captured_at_utc must be expressed in UTC"):
+        fixture_snapshot(
+            _fixtures_payload(),
+            _payload(),
+            season="2026-27",
+            snapshot_id=SNAPSHOT_ID,
+            captured_at_utc="2026-08-13T23:11:43+03:00",
+        )
+
+
+def test_team_codes_map_the_per_season_integer_to_the_persistent_code() -> None:
+    assert dict(team_codes(_payload())) == {1: 3, 14: 14}

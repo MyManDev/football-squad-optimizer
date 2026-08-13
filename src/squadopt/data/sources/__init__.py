@@ -14,7 +14,9 @@ from squadopt.data.sources.fpl_live import (
     FIXTURES_PAYLOAD,
     FPL_LIVE_SOURCE,
     SNAPSHOT_COLUMNS,
+    fixture_snapshot,
     player_snapshot,
+    team_codes,
     team_names,
 )
 from squadopt.data.sources.vaastav import (
@@ -50,11 +52,13 @@ __all__ = [
     "attach_player_code",
     "build_fixture_panel",
     "build_panel",
+    "fixture_snapshot",
     "load_fixture_snapshot",
     "load_season",
     "load_team_codes",
     "load_upcoming_roster",
     "player_snapshot",
     "shift_price_to_deadline",
+    "team_codes",
     "team_names",
 ]

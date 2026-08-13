@@ -28,7 +28,11 @@ from squadopt.data.errors import (
     SnapshotExistsError,
     SnapshotIntegrityError,
 )
-from squadopt.data.fixtures import validate_fixture_snapshot
+from squadopt.data.fixtures import (
+    aggregate_team_gameweek,
+    blank_gameweek_defaults,
+    validate_fixture_snapshot,
+)
 from squadopt.data.loaders import (
     CSV_SUFFIXES,
     PARQUET_SUFFIXES,
@@ -131,7 +135,9 @@ __all__ = [
     "SnapshotIntegrityError",
     "SnapshotMetadata",
     "SourceAdapter",
+    "aggregate_team_gameweek",
     "apply_adapter",
+    "blank_gameweek_defaults",
     "build_canonical_dataset",
     "build_snapshot_id",
     "canonical_column_order",

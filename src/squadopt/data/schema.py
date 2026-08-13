@@ -274,15 +274,23 @@ FIXTURE_SORT_COLUMNS: tuple[str, ...] = (
 )
 
 # Columns a row may leave empty. Nothing else in this table is nullable.
+#
 # `captured_at_utc` and `deadline_timestamp_utc` are empty for archive-backfilled
 # rows: fabricating a capture time would forge the single field every leakage
 # argument rests on, and a deadline the archive never published cannot be
 # recovered from a kickoff time. `fixture_difficulty` is source-specific and a
 # source is allowed not to publish one.
+#
+# `kickoff_time_utc` is nullable because a fixture can have a gameweek assigned
+# before its time is confirmed. No feature reads the kickoff time — fixture counts
+# and difficulty do not need it — so keeping such a row costs nothing and keeps a
+# club's fixture count correct. Refusing it would abort a capture at a deadline
+# over a field nothing consumes, which is the worse of the two failures.
 FIXTURE_NULLABLE_COLUMNS: tuple[str, ...] = (
     "captured_at_utc",
     "deadline_timestamp_utc",
     "fixture_difficulty",
+    "kickoff_time_utc",
 )
 
 # `final` is a played fixture, `scheduled` has a confirmed slot, and `provisional`
