@@ -11,7 +11,9 @@ conformal lower-bound risk-aware optimization and expanding-season development s
 Sprint 5 adds a model-neutral prediction hand-off with provenance and player-adaptive
 uncertainty from chronologically split residual history. Sprint 6 adds an open-source,
 deterministic Ridge reference model and a paired baseline-versus-learned development
-benchmark. Joint squad scenarios and Bayesian Optimization remain future work.
+benchmark. Sprint 7 adds deterministic hierarchical empirical Monte Carlo scenarios and
+fixed-decision score-distribution summaries. Scenario-aware optimization and Bayesian
+Optimization remain future work.
 
 ## Sprint 0 scope
 
@@ -371,6 +373,24 @@ points per gameweek in that development season. The run took about ten minutes o
 development machine; this is an offline evidence run, not a live-deadline latency target.
 No promotion decision follows from this single-season result.
 
+## Sprint 7 Monte Carlo scenarios
+
+Sprint 7 turns historical out-of-sample residuals into joint player-point scenarios. Each
+draw combines a shared gameweek component, a shared team-within-gameweek component, and a
+player-adaptive empirical idiosyncratic component with position and pooled fallbacks. The
+point-projection table is unchanged, while scenario values may be negative.
+
+```powershell
+.venv\Scripts\python -m scripts.run_scenario_benchmark
+```
+
+The real-data smoke command uses learned residuals from `2024-25` GW2 through GW9 to
+simulate 2,000 outcomes for GW10. It then evaluates the already-fixed squad, starting XI,
+and captain; it does not run one optimizer per scenario. The verified run produced a mean
+score of `57.2937`, population standard deviation `11.8587`, lower 10% quantile `42.6896`,
+and mean worst-10% score `37.1641`. The locked `2025-26` holdout was not accessed. See the
+[scenario specification](docs/scenario_spec.md).
+
 ## Quality checks
 
 ```powershell
@@ -393,3 +413,5 @@ prediction provenance boundary and player-adaptive standardized conformal calibr
 The [Sprint 6 specification](docs/learned_prediction_spec.md) records the deterministic
 Ridge reference, expanding-window fit, paired benchmark, and production-model integration
 boundary.
+The [Sprint 7 specification](docs/scenario_spec.md) records the empirical hierarchical
+bootstrap, player-scale fallback, scenario fingerprint, and fixed-decision risk summaries.
