@@ -80,6 +80,9 @@ def test_screening_uses_only_completed_seasons_for_each_calibration() -> None:
     assert risk_averse.comparison.comparable_folds == 2
     assert risk_averse.comparison.starting_xi_changed_folds == 2
     assert risk_averse.comparison.captain_changed_folds == 2
+    assert isinstance(risk_averse.comparison.squad_changed_folds, int)
+    assert isinstance(risk_averse.comparison.starting_xi_changed_folds, int)
+    assert isinstance(risk_averse.comparison.captain_changed_folds, int)
     assert risk_averse.metrics.feasibility_rate == 1.0
 
 
