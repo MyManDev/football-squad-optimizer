@@ -2,13 +2,18 @@
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
-from numbers import Integral
+from decimal import Decimal
 from time import perf_counter
 
 import pandas as pd
 from ortools.sat.python import cp_model
 
+from squadopt.optimization.coefficients import (
+    objective_coefficients,
+    scale_bench_coefficient,
+    scale_expected_points,
+    sort_players_by_id,
+)
 from squadopt.optimization.config import POSITIONS, OptimizationConfig
 from squadopt.optimization.models import (
     InvalidConfigurationError,
@@ -22,6 +27,18 @@ CP_SAT_SAFE_INTEGER_MAX = (1 << 62) - 1
 MIN_TIEBREAK_TIME_SECONDS = 0.001
 
 
+def _scale_expected_points(value: object, scale: int) -> int:
+    """Backward-compatible private alias for the shared scaling contract."""
+
+    return scale_expected_points(value, scale)
+
+
+def _scale_bench_coefficient(scaled_points: int, bench_weight: float) -> int:
+    """Backward-compatible private alias for the shared scaling contract."""
+
+    return scale_bench_coefficient(scaled_points, bench_weight)
+
+
 @dataclass(frozen=True, slots=True)
 class _ModelArtifacts:
     model: cp_model.CpModel
@@ -33,29 +50,6 @@ class _ModelArtifacts:
     bench_coefficients: list[int]
 
 
-def _round_half_up(value: Decimal) -> int:
-    return int(value.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-
-
-def _scale_expected_points(value: object, scale: int) -> int:
-    """Scale a validated projection using decimal ROUND_HALF_UP."""
-
-    return _round_half_up(Decimal(str(value)) * scale)
-
-
-def _scale_bench_coefficient(scaled_points: int, bench_weight: float) -> int:
-    return _round_half_up(Decimal(scaled_points) * Decimal(str(bench_weight)))
-
-
-def _sort_players(players: pd.DataFrame) -> pd.DataFrame:
-    player_ids = players["player_id"].tolist()
-    if player_ids and isinstance(player_ids[0], Integral):
-        order = sorted(range(len(players)), key=lambda index: int(player_ids[index]))
-    else:
-        order = sorted(range(len(players)), key=lambda index: str(player_ids[index]))
-    return players.iloc[order].reset_index(drop=True).copy(deep=True)
-
-
 def _build_model(players: pd.DataFrame, config: OptimizationConfig) -> _ModelArtifacts:
     model = cp_model.CpModel()
     player_count = len(players)
@@ -63,13 +57,9 @@ def _build_model(players: pd.DataFrame, config: OptimizationConfig) -> _ModelArt
     starter_vars = [model.new_bool_var(f"starter_{index}") for index in range(player_count)]
     captain_vars = [model.new_bool_var(f"captain_{index}") for index in range(player_count)]
 
-    scaled_points = [
-        _scale_expected_points(value, config.expected_points_scale)
-        for value in players["expected_points"].tolist()
-    ]
-    bench_coefficients = [
-        _scale_bench_coefficient(value, config.bench_weight) for value in scaled_points
-    ]
+    coefficients = objective_coefficients(players["expected_points"].tolist(), config)
+    bench_coefficients = [coefficient[0] for coefficient in coefficients]
+    scaled_points = [coefficient[2] for coefficient in coefficients]
     conservative_objective_bound = sum(
         2 * points + bench for points, bench in zip(scaled_points, bench_coefficients, strict=True)
     )
@@ -317,7 +307,7 @@ def optimize_squad(
         raise InvalidConfigurationError("config must be an OptimizationConfig instance.")
 
     validated = validate_players(players, config)
-    ordered_players = _sort_players(validated)
+    ordered_players = sort_players_by_id(validated)
     artifacts = _build_model(ordered_players, config)
     started_at = perf_counter()
     deadline = started_at + config.solver_time_limit_seconds

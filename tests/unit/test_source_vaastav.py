@@ -208,13 +208,26 @@ def test_manager_rows_are_excluded(tmp_path: Path) -> None:
     assert 900001 not in set(frame["player_id"])
 
 
-@pytest.mark.parametrize("position", ["GK", "DEF", "MID", "FWD"])
+@pytest.mark.parametrize("position", ["GK", "GKP", "DEF", "MID", "FWD"])
 def test_every_squad_eligible_position_is_kept(position: str) -> None:
     import pandas as pd
 
     frame = pd.DataFrame({"position": [position, "AM"]})
 
     assert drop_non_player_rows(frame)["position"].tolist() == [position]
+
+
+def test_archive_goalkeeper_alias_is_normalized_after_filtering(tmp_path: Path) -> None:
+    """The 2021-22 GW37 `GKP` spelling must not remove every goalkeeper."""
+
+    root = _archive(
+        tmp_path,
+        [_gameweek_row(element=1, position="GKP", value=45)],
+    )
+
+    frame = load_season(root, SEASON, shift_price=False)
+
+    assert frame["position"].tolist() == ["GK"]
 
 
 # --- cross-season identity --------------------------------------------------

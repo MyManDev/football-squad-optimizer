@@ -1,83 +1,74 @@
-# Sprint 1 Experiment Parameter Contract
+# Sprint 2 Screening Experiment Specification
 
 ## Status and scope
 
-This document began as the Sprint 0 contract for future Design of Experiments (DoE) and
-Bayesian Optimization work. It defines candidate factors, response metrics, ownership,
-and reproducibility requirements. Sprint 1 now implements the prepared-fold evaluation
-subset documented in [the evaluation specification](evaluation_spec.md); temporal splitting,
-parameter tuning, DoE, and Bayesian Optimization remain outside that runner.
+This document defines the implemented Sprint 2 Design of Experiments contract.
 
-Contract version: `0.3-draft`.
+Experiment contract version: `screening_doe_v1`.
 
-`bench_weight` is implemented by the optimizer and `form_window` is implemented by the
-Sprint 1 baseline benchmark pipeline. Other parameters remain future-only. The optimizer
-must not accept prediction-owned factors; each active factor is validated by its owning
-component rather than being silently ignored elsewhere.
+Sprint 2 screens two already implemented factors against the deterministic baseline:
 
-## Separation of concerns
+- prediction-owned `form_window`;
+- optimizer-owned `bench_weight`.
 
-The candidate vector is partitioned by the component that gives each value meaning:
+It does not implement Bayesian Optimization, Gaussian Processes, uncertainty models,
+Monte Carlo simulation, Markov models, reinforcement learning, fixture features, a learned
+prediction model, or a multi-gameweek optimizer. Those capabilities require later contracts
+and must not be inferred from this experiment runner.
 
-```text
-theta_prediction = (form_window, fixture_weight)
-theta_planning   = (horizon)
-theta_risk       = (risk_penalty)
-theta_optimizer  = (bench_weight)
+## Public interface
+
+The versioned interface lives under `squadopt.experiments`:
+
+```python
+from squadopt.experiments import (
+    ScreeningExperimentConfig,
+    freeze_screening_candidate,
+    run_frozen_holdout,
+    run_screening_experiment,
+)
+
+screening = run_screening_experiment(panel, ScreeningExperimentConfig())
+frozen = freeze_screening_candidate(screening)
+holdout = run_frozen_holdout(panel, frozen, screening.config)
 ```
 
-Prediction factors control how projections are produced. Optimizer factors control how a
-fixed projection table is converted into a decision. System-level experiment records must
-store both groups, but a component must not reinterpret parameters owned by another
-component.
+`run_screening_experiment` reads only the development seasons. The locked holdout can be
+read only through the separate `run_frozen_holdout` call, which requires a
+`FrozenCandidate`. A frozen candidate records both the screening-result fingerprint and the
+configuration fingerprint. Changing a comparison-affecting control invalidates it.
 
-## Parameter metadata contract
+All public configuration and result records are frozen dataclasses. Caller-owned metadata
+and projection tables are copied before use.
 
-Every factor exposed to a future experiment runner must have these fields:
+## Pre-registered factorial design
 
-| Field | Meaning |
-| --- | --- |
-| `name` | Stable snake_case identifier |
-| `owner` | Component responsible for its semantics and validation |
-| `dtype` | Integer or floating-point representation |
-| `unit` | Domain unit, or dimensionless when applicable |
-| `baseline` | Control value used for comparison |
-| `search_domain` | Values the experiment may propose |
-| `hard_domain` | Values the owning component can validate safely |
-| `domain_kind` | `discrete` or `continuous` search-space semantics |
-| `status` | `active` or `future_only` |
-| `activation_dependency` | Capability required before the factor can be activated |
+The screening design is a balanced `4 x 3` full factorial:
 
-The search domain may be narrower than the hard validation domain. Search-domain changes
-are experiment-design decisions and must be versioned. Hard-domain changes are public
-component contract changes and require tests.
+| Factor | Owner | Levels | Control level |
+| --- | --- | --- | ---: |
+| `form_window` | Prediction | `{3, 5, 7, 10}` completed matches | `5` |
+| `bench_weight` | Optimization | `{0.0, 0.1, 0.25}` | `0.1` |
 
-## Candidate parameters
+Every combination is evaluated, giving 12 candidate cells. The named control is
+`form_window=5, bench_weight=0.1`.
 
-The following domains are provisional starting points. Data and prediction owners must
-review them before the first experiment; unresolved semantics block activation but do not
-block Sprint 0 completion.
+The default time split is:
 
-| Name | Owner | Type | Unit | Baseline | Provisional search domain | Hard domain | Domain kind | Status |
-| --- | --- | --- | --- | ---: | --- | --- | --- | --- |
-| `form_window` | Prediction pipeline | Integer | Completed matches | 5 | `{3, 4, ..., 10}` | Positive integer | `discrete` | `active` |
-| `fixture_weight` | Projection model | Float | Dimensionless blend | 0.5 | `[0.0, 1.0]` | `[0.0, 1.0]` | `continuous` | `future_only` |
-| `horizon` | Planning optimizer | Integer | Gameweeks | 1 | `{1, 2, ..., 6}` | Positive integer | `discrete` | `future_only` |
-| `risk_penalty` | Risk-aware optimizer | Float | Dimensionless coefficient | 0.0 | `[0.0, 2.0]` | Finite and non-negative | `continuous` | `future_only` |
-| `bench_weight` | Baseline optimizer | Float | Objective weight | 0.1 | `[0.0, 0.25]` | `[0.0, 1.0]` | `continuous` | `active` |
+| Role | Seasons | Opening gameweek |
+| --- | --- | --- |
+| Development screening | `2021-22` through `2024-25` | Excluded |
+| Locked holdout | `2025-26` | Excluded |
+
+Gameweek 1 remains part of the separate opening-squad workflow because it has a different
+information set. The screening configuration requires at least one earlier gameweek in the
+same season.
+
+## Executable factor mappings
 
 ### `form_window`
 
-`form_window` is the number of completed historical matches used to construct form-related
-features at a decision timestamp. The window must contain only information available before
-that timestamp. The prediction pipeline owns minimum-history behavior, missing matches, and
-whether team and player windows are aligned.
-
-Activation dependency: a versioned feature-generation contract and time-aware historical
-data pipeline.
-
-Sprint 1 satisfies that dependency under feature contract `form_window_v1`. For one trial
-value `w`, the executable mapping is:
+For one trial value `w`, `FormWindowMapping` produces:
 
 ```text
 FeatureConfig(
@@ -89,229 +80,192 @@ FeatureConfig(
 BaselineProjectionConfig(minutes_window=w, per_90_window=w)
 ```
 
-Thus one scalar controls every recent-form lookback used or generated by the deterministic
-baseline. `min_periods=1` remains a fixed missing-history control, not a second factor. The
-mapping is exposed as `FormWindowMapping`; benchmark records store both `w` and the feature
-contract version.
-
-### `fixture_weight`
-
-`fixture_weight` is a convex blending weight for a normalized fixture component and a
-normalized non-fixture component:
-
-```text
-combined_projection_component
-    = (1 - fixture_weight) * non_fixture_component
-    + fixture_weight * fixture_component
-```
-
-Both components must be defined on compatible scales before this factor is activated. This
-convex-blend interpretation and its domain remain provisional until the prediction owner
-reviews them. They may be revised while the contract is a draft. After activation under a
-stable contract version, a materially different mathematical meaning requires a new name or
-an explicit versioned migration rather than a silent semantic change.
-
-Activation dependency: versioned projection components with compatible scaling.
-
-### `horizon`
-
-`horizon` is the number of future gameweeks represented by a planning model. A value of one
-matches the temporal scope of Sprint 0, but the current optimizer does not expose this
-parameter because it always solves exactly one gameweek. Values greater than one require a
-new multi-gameweek formulation and must not be emulated by summing projections inside the
-Sprint 0 interface.
-
-Activation dependency: an explicitly reviewed multi-gameweek optimization specification.
-
-### `risk_penalty`
-
-`risk_penalty` is the coefficient `lambda` in a future risk-adjusted objective of the form:
-
-```text
-expected decision value - lambda * decision risk
-```
-
-The provisional contract assumes that `decision risk` is reported in points, for example a
-standard-deviation measure, so `lambda` is dimensionless. The exact risk measure, covariance
-treatment, and coefficient domain remain unresolved until an uncertainty contract exists.
-The baseline value of zero represents risk-neutral optimization.
-
-Activation dependency: calibrated uncertainty estimates and a reviewed risk formulation.
+The fixed `min_periods=1` rule is not an additional factor. Projection folds are constructed
+once for each of the four `form_window` levels and cached in memory. The three
+`bench_weight` cells at a window reuse those exact fold objects, ensuring identical
+decision timestamps and avoiding repeated feature generation.
 
 ### `bench_weight`
 
-`bench_weight` is already implemented by `OptimizationConfig`. It multiplies the projected
-points of selected non-starters in the CP-SAT objective. The hard domain is the existing
-validated interval `[0.0, 1.0]`; the narrower provisional search interval avoids assigning
-the bench influence comparable to the starting lineup without explicit justification.
-
-The public search domain is continuous, but the CP-SAT objective is quantized. For player
-`i`, the effective integer bench coefficient is:
+`bench_weight` affects only the current one-gameweek CP-SAT objective:
 
 ```text
-ROUND_HALF_UP(bench_weight * scaled_points_i)
+starter points
++ captain points
++ bench_weight * selected non-starter points
 ```
 
-Consequently, distinct weights can produce identical coefficient vectors for a given
-projection table and `expected_points_scale`. A future experiment runner must record the
-scale and effective coefficient fingerprint for each evaluation fold. It should avoid
-repeating candidates that are coefficient-equivalent across the compared folds. There is no
-universal decimal step size because effective breakpoints depend on the projections and
-scale.
-
-Activation dependency: none. This is the only active factor in Sprint 0.
-
-## Response metrics
-
-Experiment responses evaluate a parameter configuration on unseen time periods. They are
-not interchangeable with the objective optimized inside a single squad solve.
-
-| Metric | Role | Direction | Aggregation | Definition |
-| --- | --- | --- | --- | --- |
-| `realized_squad_points` | Primary evaluation response | Maximize | Mean across rolling folds; also report dispersion | Realized decision score under a versioned scoring policy, using only decisions made before the evaluation gameweek |
-| `projected_objective_value` | Diagnostic | None | Report distribution across successful folds | `OptimizationResult.objective_value` produced from pre-decision projections |
-| `feasibility_rate` | Hard comparison constraint | Require `1.0` | Successful folds divided by attempted folds | Fraction of evaluation solves returning `OPTIMAL` or `FEASIBLE` |
-| `solver_runtime_seconds` | Operational diagnostic | Minimize if promoted to a target | Median and 95th percentile across attempted folds | Wall-clock solve time for the full solve, including deterministic tie-breaking |
-| `squad_turnover` | Optional stability diagnostic | None until a stability policy is approved | Mean across consecutive fold transitions | For fixed-size squads, `|S_t \ S_(t-1)|`: the number of player IDs entering the squad at time `t` |
-
-The initial experiment objective should be the mean out-of-sample
-`realized_squad_points` across rolling evaluation folds. Dispersion across folds must also be
-reported. `projected_objective_value` must not be the sole DoE or Bayesian Optimization
-target because it measures the model's own projections rather than unseen outcomes.
-
-The implemented `realized_squad_points_v1` policy sums the frozen starting XI and adds the
-captain's realized points a second time. Bench points and automatic substitutions are
-excluded. Missing selected-player outcomes fail validation instead of being imputed or
-converted to zero. Full semantics and aggregate definitions are in
-[the evaluation specification](evaluation_spec.md).
-
-Configurations with a feasibility rate below `1.0` are invalid for comparison unless an
-experiment specification explicitly studies infeasibility. Runtime and turnover remain
-separate responses until a reviewed multi-objective or constrained-optimization policy is
-defined; they must not be combined through undocumented weights.
-
-Exceptions and invalid configurations mark a trial as failed; they must not be converted to
-zero-valued responses. `INFEASIBLE` and solution-free `UNKNOWN` outcomes count as feasibility
-failures, and no projected or realized score may be fabricated for those folds. Missing
-realized outcomes require a versioned exclusion policy, and every aggregate must record its
-attempted and observed fold counts.
-
-## Time-based evaluation and leakage control
-
-Experiments must use rolling-origin or expanding-window evaluation. Random row-level splits
-are not valid for football time-series evaluation.
-
-The prepared-fold evaluator assumes this ordering but does not construct or certify it.
-Issue #6 owns the split helper that will satisfy this requirement.
-
-For every evaluation decision timestamp:
-
-1. Feature construction may use only observations available before the timestamp.
-2. Projection training and calibration may use only earlier periods.
-3. Fixture information must be versioned as it was known at the timestamp.
-4. The squad decision must be frozen before realized outcomes enter the dataset.
-5. Metrics must be calculated from the frozen decision and later outcomes.
-
-All candidate configurations in a comparison must use identical evaluation timestamps,
-data snapshots, scoring rules, and missing-data policy.
-
-## Fixed controls and nuisance variables
-
-Parameters not selected as experimental factors must remain fixed across every candidate in
-a comparison. The run record must still contain their values so a result is not attributed
-to the wrong factor vector.
-
-For the Sprint 0 optimizer, the fixed control vector includes:
-
-- `budget_tenths`;
-- `squad_size` and `squad_position_limits`;
-- `starting_size`, `starting_position_min`, and `starting_position_max`;
-- `max_players_per_team`;
-- `expected_points_scale`;
-- `solver_time_limit_seconds`;
-- `deterministic_seed`;
-- CP-SAT worker count, fixed to one by the baseline optimizer.
-
-Dataset version, evaluation folds, scoring policy, missing-data policy, and projection-table
-schema are also controlled inputs. If an experiment intentionally varies one of these
-values, it must be promoted to an explicit factor or blocking variable under a versioned
-experiment specification.
-
-Runtime comparisons additionally require the same execution environment. At minimum, the
-operating system, CPU model, logical-core count, Python version, solver version, worker
-count, and solver time limit must be recorded. Runtime results from materially different
-environments must be stratified rather than pooled without qualification.
-
-## Baseline comparison
-
-Every future experiment must include a named control configuration. The initial control is:
+CP-SAT receives integer coefficients. Expected points use decimal `ROUND_HALF_UP`:
 
 ```text
-form_window   = 5              # active in the baseline benchmark pipeline
-fixture_weight = 0.5           # future-only, provisional
-horizon       = 1              # future-only, implicit in Sprint 0
-risk_penalty  = 0.0            # future-only, risk-neutral
-bench_weight  = 0.1            # active Sprint 0 default
+scaled_points_i = ROUND_HALF_UP(expected_points_i * expected_points_scale)
+bench_i = ROUND_HALF_UP(scaled_points_i * bench_weight)
 ```
 
-The executable baseline combines `FormWindowMapping(form_window=5)` with the current
-`OptimizationConfig`, including `bench_weight=0.1`. Prediction factors are not accepted by
-the Sprint 0 optimizer interface; the benchmark layer passes each value to its owner.
+The optimizer and experiment runner import the same coefficient functions; the rounding
+rule is not reimplemented by the experiment layer.
 
-## Reproducibility record
+For every fold, a SHA-256 fingerprint covers the stable player ordering, integer objective
+coefficients, player team/position/price inputs, and fixed feasible-set controls. If two
+weights at the same `form_window` produce the same fingerprints over all folds, the later
+cell reuses the mathematically identical solve results. The artifact records both the
+fingerprint and the source candidate. Raw float equality is never used as a substitute for
+coefficient equality.
 
-Each future experimental run must record at least:
+## Walk-forward evaluation
 
-- a unique `experiment_id` and UTC creation time;
-- repository commit SHA and experiment-contract version;
-- dataset snapshot or immutable dataset version;
-- training and evaluation timestamp boundaries;
-- scoring-policy version;
-- complete prediction and optimization parameter values;
-- the complete fixed control vector, including the full `OptimizationConfig`;
-- random seeds for data, model, experiment design, and solver components;
-- operating system, CPU model, logical-core count, and solver worker count;
-- Python, solver, and relevant dependency versions;
-- one result row per evaluation fold, including solver status;
-- aggregated response metrics and failed-run diagnostics.
+Each candidate uses the existing leakage-safe fold builder and prepared-fold evaluator:
 
-An experiment configuration must be serializable without relying on mutable notebook state.
-The same record should be sufficient to reconstruct the run in a clean environment, subject
-to documented solver and hardware limitations.
+1. A decision point is created for each eligible gameweek in chronological order.
+2. Only rows visible at that decision point reach feature generation.
+3. Rolling features are shifted, so the target gameweek's outcome cannot enter its own
+   projection.
+4. The squad, starting XI, bench, and captain are frozen by the optimizer.
+5. The later realized outcome table scores the frozen starting XI and captain.
 
-## Ownership and change control
+Every candidate in a comparison must have the same ordered `fold_id` sequence. Any mismatch
+is an experiment execution error rather than a silently unpaired comparison.
 
-| Area | Responsible component | Review required from |
-| --- | --- | --- |
-| Historical windows and feature availability | Data and prediction pipeline | Data, optimization |
-| Projection-component semantics | Prediction model | Data, optimization |
-| Planning horizon and risk objective | Optimization | Data, software integration |
-| Experiment record and configuration transport | Software integration | Data, optimization |
-| Response computation and scoring policy | Evaluation pipeline | All owners |
+The primary response is mean realized squad points under
+`realized_squad_points_v1`. Projected objective value is diagnostic only and is never the
+promotion target.
 
-Changing a parameter's meaning requires a new parameter name or a versioned contract change.
-Changing a baseline or search domain requires an experiment-specification revision. Current
-Sprint 0 optimizer defaults must not be changed as a side effect of this document.
+## Paired inference
 
-## Deferred decisions
+Candidate responses are paired by exact `fold_id` against the control:
 
-The following decisions remain intentionally unresolved:
+```text
+d_t = realized_points(candidate, t) - realized_points(control, t)
+```
 
-- automatic-substitution, bench-order, and alternative scoring-policy semantics;
-- normalization of fixture and non-fixture projection components;
-- the uncertainty measure used by `risk_penalty`;
-- multi-gameweek state, transfer, and discounting rules for `horizon > 1`;
-- the final DoE design, Bayesian Optimization surrogate, and acquisition function;
-- production experiment storage and orchestration.
+The reported point estimate is the mean of `d_t`. Per-season paired means are also stored.
 
-These items require separate issues and reviewed contracts before implementation.
+Serial dependence between adjacent gameweeks makes an independent-row bootstrap
+inappropriate. The default uncertainty calculation is a deterministic, season-aware moving
+block bootstrap:
 
-## Non-goals for Sprint 0
+- confidence level: `90%`;
+- resamples: `5,000`;
+- block length: `4` consecutive gameweeks;
+- random seed: `0`, combined with a stable candidate-ID digest;
+- blocks never cross season boundaries;
+- each season is resampled to its original fold count before all seasons are pooled;
+- percentile endpoints use linear interpolation.
 
-- running or tuning experiments;
-- adding experiment-tracking dependencies;
-- training projection models;
-- implementing uncertainty or covariance estimates;
-- implementing multi-gameweek optimization;
-- adding DoE or Bayesian Optimization code;
-- changing `optimize_squad` or `OptimizationConfig`.
+The bootstrap is a screening uncertainty diagnostic, not a claim that the baseline residual
+process is stationary across all seasons.
+
+## Development promotion gates
+
+A challenger is eligible for the locked holdout only when all gates pass:
+
+1. candidate and control feasibility rates are exactly `1.0`;
+2. every attempted fold has a paired realized response;
+3. paired mean improvement is at least `+0.5` points per gameweek;
+4. the 90% bootstrap confidence-interval lower bound is non-negative.
+
+Among eligible challengers, the largest paired mean improvement is selected. Exact ties use:
+
+1. lower mean squad turnover;
+2. lower median solver runtime;
+3. lexicographically smaller stable candidate ID.
+
+If no challenger passes, the frozen decision retains the control. Runtime is only a tie-break
+diagnostic; it is not blended into football points through an undocumented weight.
+
+## Locked holdout gate
+
+The holdout command evaluates only the frozen development choice and the named control on
+`2025-26`. It applies the same feasibility, `+0.5` paired mean, and non-negative 90% lower
+bound gates. A challenger is finally promoted only if it passes all holdout gates.
+
+The holdout result cannot change which candidate was selected from development. It can only
+accept or reject that one frozen challenger. Trying additional candidates after observing
+holdout outcomes would invalidate the holdout and requires a new future season or a newly
+declared evaluation protocol.
+
+## Factorial summaries
+
+For each factor level, the report calculates the balanced marginal mean over the other
+factor and its difference from the control level's marginal mean.
+
+For cell `(a, b)`, the two-factor interaction residual is:
+
+```text
+cell_mean(a, b)
+- form_window_marginal(a)
+- bench_weight_marginal(b)
++ grand_mean
+```
+
+These are descriptive screening effects. With only one configured cell per factor
+combination, the gameweek folds provide repeated responses; there is no separate replicated
+factorial randomization experiment.
+
+## Artifacts and reproducibility
+
+The development command writes:
+
+- `artifacts/sprint2/screening.json`;
+- `artifacts/sprint2/screening.md`;
+- `artifacts/sprint2/frozen_candidate.json`.
+
+The separate holdout command writes:
+
+- `artifacts/sprint2/holdout.json`;
+- `artifacts/sprint2/holdout.md`.
+
+`artifacts/` is intentionally ignored by Git. Reports are reproducible run outputs, not
+source files. A project decision may later copy an approved report into `docs/`.
+
+The JSON records include:
+
+- repository revision and dirty-tree flag;
+- pinned archive repository, commit, and manifest checksum;
+- experiment and feature-generation contract versions;
+- full design, promotion policy, fixed optimizer controls, and seeds;
+- platform, processor, logical CPU count, Python, pandas, and OR-Tools versions;
+- one result row per candidate and fold, including solver status and runtime;
+- coefficient signatures and reuse diagnostics;
+- paired differences, confidence intervals, main effects, interactions, and decision reason.
+
+Run the two stages explicitly:
+
+```powershell
+.venv\Scripts\python -m scripts.run_screening_doe
+.venv\Scripts\python -m scripts.run_frozen_holdout
+```
+
+Do not run the second command until the development artifact has been reviewed and accepted
+as frozen.
+
+## Fixed controls and assumptions
+
+The following are fixed across candidate cells:
+
+- the canonical historical panel and pinned archive snapshot;
+- chronological folds, scoring policy, and missing-history rules;
+- cross-season decay and minimum-minutes settings;
+- budget, squad and lineup sizes, position limits, team limit, and prices;
+- expected-points scale, CP-SAT time limit, solver seed, and one solver worker;
+- at most three independent candidate jobs; every individual CP-SAT solve still uses one
+  worker and the declared deterministic seed;
+- integer `ROUND_HALF_UP` coefficient construction and deterministic tie-breaking.
+
+The design assumes that the historical panel exposes the configured development and holdout
+seasons, projections remain comparable across factor cells, and realized outcomes exist for
+every player selected in a scored fold.
+
+## Known limitations and later work
+
+- The deterministic projection baseline is not a learned predictive model.
+- Fixture strength, availability news, transfers, chips, vice-captain fallback, automatic
+  substitutions, and bench realized points are excluded.
+- Runtime comparisons are hardware-sensitive even though provenance is recorded.
+- A four-gameweek block is a declared screening choice, not a universally optimal dependence
+  model.
+- The current optimizer makes independent one-gameweek decisions and has no transfer state.
+
+Future factors such as fixture weight, planning horizon, and risk penalty remain inactive.
+Bayesian Optimization should begin only after the prediction and uncertainty contracts are
+stable and the Sprint 2 screening evidence justifies a narrower search space.
