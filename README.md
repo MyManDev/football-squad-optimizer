@@ -3,8 +3,10 @@
 A data-source-independent decision-support package for selecting a football squad from
 player projections. Sprint 0 implements a tested, single-gameweek baseline with Google
 OR-Tools CP-SAT. Sprint 1 adds leakage-safe walk-forward evaluation, a pinned real-data
-adapter, cross-season carry-over, and opening-gameweek projections. Model calibration,
-Design of Experiments, and Bayesian Optimization remain future work.
+adapter, cross-season carry-over, and opening-gameweek projections. Sprint 2 adds a
+development-only `4 x 3` screening experiment for `form_window` and `bench_weight`, plus a
+separately guarded frozen-candidate holdout. Model calibration and Bayesian Optimization
+remain future work.
 
 ## Sprint 0 scope
 
@@ -239,6 +241,34 @@ using only information available at each decision, while
 `squadopt.backtest.run_baseline_benchmark` composes preparation and evaluation under a
 versioned baseline contract.
 
+## Sprint 2 screening experiment
+
+The screening runner evaluates the full factorial
+`form_window={3,5,7,10} x bench_weight={0.0,0.1,0.25}` on development seasons
+`2021-22` through `2024-25`. It excludes opening gameweeks and does not read the locked
+`2025-26` holdout. It reports paired improvements against the `(5, 0.1)` control,
+season-aware moving-block bootstrap intervals, marginal effects, interactions, and the
+pre-registered promotion gates.
+
+```powershell
+.venv\Scripts\python -m scripts.run_screening_doe
+```
+
+That command writes local JSON/Markdown reports and a small frozen-candidate artifact under
+`artifacts/sprint2/`. Review the development result first. The holdout is an explicit second
+operation and accepts only that frozen artifact:
+
+```powershell
+.venv\Scripts\python -m scripts.run_frozen_holdout
+```
+
+Distinct float weights are treated as equivalent only when the optimizer's exact
+`ROUND_HALF_UP` integer coefficient fingerprints match over every compared fold. Projection
+folds are cached once per `form_window`. Up to three independent candidate cells run in
+parallel, while every CP-SAT solve itself remains single-worker and deterministic. See the
+[screening experiment specification](docs/experimentation_spec.md) for the design,
+bootstrap, promotion policy, holdout guard, and limitations.
+
 ## Quality checks
 
 ```powershell
@@ -250,5 +280,5 @@ versioned baseline contract.
 
 See [the optimization specification](docs/optimization_spec.md) for the formulation,
 rounding rules, deterministic tie-breaking, assumptions, and current limitations.
-The [experiment parameter contract](docs/experimentation_spec.md) records provisional
-Sprint 1 factors and evaluation rules without implementing DoE or Bayesian Optimization.
+The [screening experiment specification](docs/experimentation_spec.md) records the
+implemented Sprint 2 DoE, frozen holdout protocol, and deferred Bayesian Optimization work.

@@ -226,3 +226,6 @@ data/raw/
 data/external/
 data/interim/
 data/processed/
+
+# Reproducible local experiment outputs (reports are generated, not source data)
+artifacts/

@@ -36,7 +36,11 @@ from squadopt.data.adapters import SourceAdapter, apply_adapter
 from squadopt.data.cleaning import clean_canonical_dataset
 from squadopt.data.errors import DataSourceError, MissingColumnsError
 from squadopt.data.loaders import load_csv
-from squadopt.data.schema import CANONICAL_SORT_COLUMNS, PLAYER_TIME_SORT_COLUMNS
+from squadopt.data.schema import (
+    CANONICAL_SORT_COLUMNS,
+    PLAYER_TIME_SORT_COLUMNS,
+    POSITION_ALIASES,
+)
 from squadopt.data.validation import validate_canonical_dataset
 
 # The archive is still updated, so an unpinned read would give two people different
@@ -82,11 +86,13 @@ COLUMN_MAP: Mapping[str, str] = MappingProxyType(
     }
 )
 
-# Positions the optimizer can select. From 2024-25 the archive also carries `AM`
+# Canonical player-position labels and aliases. The archive spells goalkeeper as
+# `GKP` in 2021-22 GW37 and `GK` elsewhere, so both must survive this filter.
+# From 2024-25 the archive also carries `AM`
 # rows — twenty per season, one per club — which are managers rather than players.
 # They are excluded because a manager is not a squad-eligible player under the
 # canonical contract, not because they are inconvenient.
-PLAYER_POSITIONS: frozenset[str] = frozenset({"GK", "DEF", "MID", "FWD"})
+PLAYER_POSITIONS: frozenset[str] = frozenset(POSITION_ALIASES)
 
 # Summed when a player appears in more than one fixture within a gameweek. Price is
 # not summed: it is identical across a player's fixtures in every supported season,
@@ -171,7 +177,10 @@ def attach_player_code(gameweeks: pd.DataFrame, roster: pd.DataFrame) -> pd.Data
 def drop_non_player_rows(gameweeks: pd.DataFrame) -> pd.DataFrame:
     """Remove rows whose position is not a squad-eligible player position."""
 
-    keep = gameweeks["position"].isin(PLAYER_POSITIONS)
+    normalized_labels = gameweeks["position"].map(
+        lambda value: str(value).strip().upper() if not pd.isna(value) else ""
+    )
+    keep = normalized_labels.isin(PLAYER_POSITIONS)
     return gameweeks.loc[keep].copy(deep=True)
 
 

@@ -1,5 +1,6 @@
 """Public optimization interface."""
 
+from squadopt.optimization.coefficients import objective_coefficient_fingerprint
 from squadopt.optimization.config import OptimizationConfig, Position
 from squadopt.optimization.models import (
     InsufficientPlayerPoolError,
@@ -24,5 +25,6 @@ __all__ = [
     "SolverExecutionError",
     "SolverStatus",
     "SquadOptimizationError",
+    "objective_coefficient_fingerprint",
     "optimize_squad",
 ]
