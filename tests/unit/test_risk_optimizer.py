@@ -210,7 +210,7 @@ def test_inputs_are_not_mutated_and_results_are_deterministic(
         ),
         (
             lambda frame: frame.assign(**{UNCERTAINTY_SOURCE_COLUMN: "invented"}),
-            "must be 'position'",
+            "supported calibrated source",
         ),
         (
             lambda frame: frame.assign(**{UNCERTAINTY_OBSERVATIONS_COLUMN: 2.5}),

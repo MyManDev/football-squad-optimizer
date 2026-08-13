@@ -7,7 +7,7 @@ from types import MappingProxyType
 import pandas as pd
 
 from squadopt.data.schema import Position
-from squadopt.uncertainty.config import UncertaintyConfig
+from squadopt.uncertainty.config import PlayerAdaptiveUncertaintyConfig, UncertaintyConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +85,64 @@ class UncertaintyEvaluationResult:
     """Complete locked-holdout uncertainty evaluation."""
 
     calibration: ProjectionUncertaintyCalibration
+    folds: tuple[UncertaintyFoldResult, ...]
+    metrics: UncertaintyMetrics
+    group_metrics: Mapping[Position, UncertaintyMetrics]
+    diagnostics: Mapping[str, object]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "group_metrics", MappingProxyType(dict(self.group_metrics)))
+        object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
+
+
+@dataclass(frozen=True, slots=True)
+class ResidualScaleSummary:
+    """Historical residual spread available for one pool or player."""
+
+    observations: int
+    residual_mean: float
+    residual_stddev: float
+
+
+@dataclass(frozen=True, slots=True)
+class AdaptiveGroupCalibration:
+    """Position fallback scale and standardized conformal multiplier."""
+
+    position: Position
+    scale_source: str
+    scale_observations: int
+    position_scale: float
+    conformal_source: str
+    group_calibration_observations: int
+    calibration_observations: int
+    conformal_multiplier: float
+    conformal_rank: int
+
+
+@dataclass(frozen=True, slots=True)
+class PlayerAdaptiveUncertaintyCalibration:
+    """Frozen local-scale and conformal state learned before a target season."""
+
+    config: PlayerAdaptiveUncertaintyConfig
+    scale_training_fold_ids: tuple[str, ...]
+    conformal_calibration_fold_ids: tuple[str, ...]
+    pooled_scale: ResidualScaleSummary
+    groups: Mapping[Position, AdaptiveGroupCalibration]
+    players: Mapping[object, ResidualScaleSummary]
+    calibration_fingerprint: str
+    diagnostics: Mapping[str, object]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "groups", MappingProxyType(dict(self.groups)))
+        object.__setattr__(self, "players", MappingProxyType(dict(self.players)))
+        object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
+
+
+@dataclass(frozen=True, slots=True)
+class PlayerAdaptiveUncertaintyEvaluationResult:
+    """Locked-holdout evaluation of player-adaptive uncertainty intervals."""
+
+    calibration: PlayerAdaptiveUncertaintyCalibration
     folds: tuple[UncertaintyFoldResult, ...]
     metrics: UncertaintyMetrics
     group_metrics: Mapping[Position, UncertaintyMetrics]

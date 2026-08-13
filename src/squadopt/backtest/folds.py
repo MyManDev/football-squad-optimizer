@@ -32,20 +32,23 @@ from squadopt.features.cross_season import carry_over_as_of
 from squadopt.prediction import (
     BASELINE_FORM_WINDOW,
     FormWindowMapping,
+    PredictionSnapshot,
     build_projection_table,
 )
 
 # Given the rows visible at a decision point and the decision itself, return an
 # optimizer-ready projection table. The callable never receives later rows, so it
 # cannot look ahead even if it tried.
-ProjectionBuilder: TypeAlias = Callable[[pd.DataFrame, DecisionPoint], pd.DataFrame]
+ProjectionBuilder: TypeAlias = Callable[
+    [pd.DataFrame, DecisionPoint], pd.DataFrame | PredictionSnapshot
+]
 
 
 def make_baseline_projection_builder(
     *,
     form_window: int = BASELINE_FORM_WINDOW,
     cross_season: CrossSeasonConfig | None = None,
-) -> ProjectionBuilder:
+) -> Callable[[pd.DataFrame, DecisionPoint], pd.DataFrame]:
     """Return a baseline builder for one ordered evaluation run.
 
     Within-season rolling features need only the target season. Earlier seasons are
@@ -114,11 +117,29 @@ def build_walk_forward_fold(
 
     build = baseline_projection_builder if projection_builder is None else projection_builder
     visible = rows_through(panel, decision, season_order=season_order)
-    projections = build(visible, decision)
+    built = build(visible, decision)
 
-    if not isinstance(projections, pd.DataFrame):
+    prediction_metadata: dict[str, object] = {}
+    if isinstance(built, PredictionSnapshot):
+        verified = built.validated_copy()
+        projections = verified.table
+        provenance = verified.provenance
+        prediction_metadata = {
+            "prediction_contract_version": provenance.contract_version,
+            "prediction_fingerprint": verified.prediction_fingerprint,
+            "prediction_provenance_fingerprint": provenance.provenance_fingerprint,
+            "prediction_model_name": provenance.model_name,
+            "prediction_model_version": provenance.model_version,
+            "prediction_feature_contract_version": provenance.feature_contract_version,
+            "prediction_training_cutoff": provenance.training_cutoff,
+            "prediction_training_data_fingerprint": provenance.training_data_fingerprint,
+        }
+    elif isinstance(built, pd.DataFrame):
+        projections = built
+    else:
         raise BacktestConfigurationError(
-            f"projection_builder must return a DataFrame for {decision.fold_id}."
+            "projection_builder must return a DataFrame or PredictionSnapshot "
+            f"for {decision.fold_id}."
         )
 
     return EvaluationFold(
@@ -129,6 +150,7 @@ def build_walk_forward_fold(
             "season": decision.season,
             "gameweek": decision.gameweek,
             "visible_rows": len(visible),
+            **prediction_metadata,
         },
     )
 

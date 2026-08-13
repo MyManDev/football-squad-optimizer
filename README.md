@@ -7,8 +7,10 @@ adapter, cross-season carry-over, and opening-gameweek projections. Sprint 2 add
 development-only `4 x 3` screening experiment for `form_window` and `bench_weight`, plus a
 separately guarded frozen-candidate holdout. Sprint 3 adds leakage-safe split-conformal
 player-level prediction intervals and a locked-holdout calibration benchmark. Sprint 4 adds
-conformal lower-bound risk-aware optimization and expanding-season development screening. A
-learned point-prediction model and Bayesian Optimization remain future work.
+conformal lower-bound risk-aware optimization and expanding-season development screening.
+Sprint 5 adds a model-neutral prediction hand-off with provenance and player-adaptive
+uncertainty from chronologically split residual history. A learned point-prediction model,
+joint squad scenarios, and Bayesian Optimization remain future work.
 
 ## Sprint 0 scope
 
@@ -314,6 +316,33 @@ control, so the control remains the operational default. See the
 [risk optimization specification](docs/risk_optimization_spec.md) for the objective,
 leakage boundary, metrics, and limitations.
 
+## Sprint 5 prediction integration and player-adaptive uncertainty
+
+External prediction models now hand off only `player_id` and `expected_points`. The
+`prepare_optimizer_projection` boundary exact-aligns those values with deadline-known player
+fields and returns a fingerprinted `PredictionSnapshot`; walk-forward folds preserve its
+model, feature, training-cutoff, and data provenance.
+
+The adaptive uncertainty contract learns player residual standard deviations on the earlier
+part of completed historical folds, shrinks supported player estimates toward their position
+scale, and learns standardized conformal multipliers on a later, disjoint calibration part.
+Thin or unseen players use deterministic position or pooled fallback. Point projections and
+the Sprint 0 feasible set remain unchanged.
+
+```powershell
+.venv\Scripts\python -m scripts.run_player_risk_screening
+```
+
+The command screens fixed risk levels only over `2021-22` through `2024-25`, writes ignored
+reports under `artifacts/sprint5/`, does not access `2025-26`, and performs no automatic
+promotion. The current real-data command uses the deterministic baseline through the same
+model-neutral boundary; a learned model can replace it without changing the optimizer.
+On 110 development folds, player-adaptive risk changed 89 to 110 squads depending on the
+risk level, but every risk-averse candidate underperformed the point-objective control on
+the declared mean and downside diagnostics; no candidate was promoted.
+See the [Sprint 5 specification](docs/player_uncertainty_spec.md) for the contracts,
+formulation, leakage boundary, fallback policy, and limitations.
+
 ## Quality checks
 
 ```powershell
@@ -331,3 +360,5 @@ The [uncertainty specification](docs/uncertainty_spec.md) records the implemente
 calibration contract that later scenario and risk-aware optimization work can consume.
 The [risk optimization specification](docs/risk_optimization_spec.md) records the Sprint 4
 conformal lower-bound objective and development-only expanding-season screening protocol.
+The [Sprint 5 specification](docs/player_uncertainty_spec.md) records the model-neutral
+prediction provenance boundary and player-adaptive standardized conformal calibration.
