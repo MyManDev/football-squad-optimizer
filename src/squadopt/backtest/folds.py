@@ -134,6 +134,12 @@ def build_walk_forward_fold(
             "prediction_training_cutoff": provenance.training_cutoff,
             "prediction_training_data_fingerprint": provenance.training_data_fingerprint,
         }
+        for metadata_name, diagnostic_name in (
+            ("prediction_model_fingerprint", "model_fingerprint"),
+            ("prediction_training_rows", "training_rows"),
+        ):
+            if diagnostic_name in verified.diagnostics:
+                prediction_metadata[metadata_name] = verified.diagnostics[diagnostic_name]
     elif isinstance(built, pd.DataFrame):
         projections = built
     else:
