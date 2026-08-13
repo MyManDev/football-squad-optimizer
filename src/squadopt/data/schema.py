@@ -25,6 +25,12 @@ __all__ = [
     "CANONICAL_SORT_COLUMNS",
     "COLUMN_KINDS",
     "EXTERNALLY_SUPPLIED_COLUMNS",
+    "FIXTURE_COLUMNS",
+    "FIXTURE_KEY_COLUMNS",
+    "FIXTURE_NULLABLE_COLUMNS",
+    "FIXTURE_SCHEMA_VERSION",
+    "FIXTURE_SORT_COLUMNS",
+    "FIXTURE_STATUSES",
     "KEY_COLUMNS",
     "MIN_GAMEWEEK",
     "NON_NEGATIVE_COLUMNS",
@@ -222,6 +228,74 @@ MIN_GAMEWEEK = 1
 
 # Canonical prices are integer tenths of a currency unit: 5.5 -> 55, 10.0 -> 100.
 PRICE_TENTHS_PER_UNIT = 10
+
+# --- fixture contract -------------------------------------------------------
+#
+# Fixtures get their own grain rather than columns on the player-gameweek panel.
+# A gameweek can hold more than one fixture for the same player — up to three in
+# the rescheduled 2020-21 season — so at player-gameweek grain "the opponent" and
+# "was it home" have no single correct value. One row per team per fixture does,
+# and the player-gameweek view is derived from it by explicit aggregation.
+#
+# `team_id` here is the platform's persistent team code, not its per-season
+# integer. Measured across the pinned archive, the code survives every season
+# boundary for all 85 shared clubs while the integer survives 53: it is assigned
+# alphabetically within a season and shifts whenever a promoted club sorts ahead
+# of an existing one, so the same integer denotes different clubs in different
+# seasons. This mirrors the player-identity decision one level up.
+FIXTURE_SCHEMA_VERSION = "fixture_snapshot_v1"
+
+FIXTURE_COLUMNS: tuple[str, ...] = (
+    "snapshot_id",
+    "captured_at_utc",
+    "season",
+    "gameweek",
+    "fixture_id",
+    "team_id",
+    "opponent_team_id",
+    "is_home",
+    "kickoff_time_utc",
+    "deadline_timestamp_utc",
+    "status",
+    "fixture_difficulty",
+)
+
+# Unique per row. The snapshot participates because two captures of the same
+# season describe the same fixture at different times, and a rescheduled fixture
+# legitimately differs between them.
+FIXTURE_KEY_COLUMNS: tuple[str, ...] = ("snapshot_id", "season", "fixture_id", "team_id")
+
+FIXTURE_SORT_COLUMNS: tuple[str, ...] = (
+    "snapshot_id",
+    "season",
+    "gameweek",
+    "fixture_id",
+    "team_id",
+)
+
+# Columns a row may leave empty. Nothing else in this table is nullable.
+# `captured_at_utc` and `deadline_timestamp_utc` are empty for archive-backfilled
+# rows: fabricating a capture time would forge the single field every leakage
+# argument rests on, and a deadline the archive never published cannot be
+# recovered from a kickoff time. `fixture_difficulty` is source-specific and a
+# source is allowed not to publish one.
+FIXTURE_NULLABLE_COLUMNS: tuple[str, ...] = (
+    "captured_at_utc",
+    "deadline_timestamp_utc",
+    "fixture_difficulty",
+)
+
+# `final` is a played fixture, `scheduled` has a confirmed slot, and `provisional`
+# has a placeholder kickoff the platform may still move.
+#
+# There is deliberately no status for a fixture awaiting refixturing. A postponed
+# match loses its gameweek assignment at the source, and a row with no gameweek is
+# one no aggregation can consume — carrying it would make `gameweek` nullable for
+# every reader to satisfy a row none of them can use. Such fixtures are excluded
+# and counted instead. That also produces the right answer downstream: a team whose
+# match was postponed genuinely has no fixture in that gameweek, and a later
+# capture will carry it under whichever gameweek it is eventually played in.
+FIXTURE_STATUSES: tuple[str, ...] = ("final", "scheduled", "provisional")
 
 # Conservative, extensible alias table. Platform-specific encodings (for example
 # numeric position codes) belong in source adapters, not in the canonical schema.

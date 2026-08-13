@@ -34,19 +34,28 @@ import pandas as pd
 
 from squadopt.data.adapters import SourceAdapter, apply_adapter
 from squadopt.data.cleaning import clean_canonical_dataset
-from squadopt.data.errors import DataSourceError, MissingColumnsError
+from squadopt.data.errors import DataSourceError, DuplicateRecordsError, MissingColumnsError
+from squadopt.data.fixtures import validate_fixture_snapshot
 from squadopt.data.loaders import load_csv
 from squadopt.data.schema import (
     CANONICAL_SORT_COLUMNS,
+    FIXTURE_COLUMNS,
     PLAYER_TIME_SORT_COLUMNS,
     POSITION_ALIASES,
 )
+from squadopt.data.timestamps import normalize_utc_timestamp
 from squadopt.data.validation import validate_canonical_dataset
 
 # The archive is still updated, so an unpinned read would give two people different
 # data. Every fetch and every manifest entry is tied to this commit.
 ARCHIVE_REPOSITORY = "vaastav/Fantasy-Premier-League"
 ARCHIVE_COMMIT = "8c97b2adb123863c3dd581e730f1360e89815ac2"
+
+# Provenance for rows backfilled from the archive. The fixture table's snapshot field
+# expects a live capture, and the archive is not one: it has no capture instant, so the
+# pin itself is what identifies these rows. Naming the commit keeps them reproducible
+# and keeps them visibly distinct from anything captured before a deadline.
+ARCHIVE_SNAPSHOT_ID = f"vaastav-{ARCHIVE_COMMIT[:7]}"
 
 # Seasons whose `merged_gw.csv` carries `position` and `team`. Earlier seasons omit
 # both, so canonicalizing them would need a further join; that is deliberately out
@@ -132,6 +141,18 @@ _REQUIRED_GAMEWEEK_COLUMNS: tuple[str, ...] = (
     "total_points",
 )
 _REQUIRED_ROSTER_COLUMNS: tuple[str, ...] = ("id", "code")
+_REQUIRED_TEAM_COLUMNS: tuple[str, ...] = ("id", "code", "name")
+_REQUIRED_FIXTURE_COLUMNS: tuple[str, ...] = (
+    "id",
+    "event",
+    "team_h",
+    "team_a",
+    "team_h_difficulty",
+    "team_a_difficulty",
+    "kickoff_time",
+    "finished",
+    "provisional_start_time",
+)
 
 
 def season_directory(root: Path | str, season: str) -> Path:
@@ -313,6 +334,192 @@ def build_panel(
     frames = [load_season(root, season, shift_price=shift_price) for season in requested]
     panel = pd.concat(frames, ignore_index=True)
     return panel.sort_values(list(CANONICAL_SORT_COLUMNS), kind="stable").reset_index(drop=True)
+
+
+def load_team_codes(root: Path | str, season: str) -> pd.DataFrame:
+    """Return one season's team table: per-season id, persistent code, display name.
+
+    All three are needed because the archive uses two of them in the same breath. Its
+    gameweek file names a club by display name while its fixture file names the same
+    club by the per-season integer, and this table is the only bridge between them.
+    Verified across all six supported seasons: the gameweek names match this file's
+    ``name`` column exactly, and every ``opponent_team`` value appears in its ``id``.
+    """
+
+    path = season_directory(root, season) / TEAMS_FILE
+    teams = _read_required(path, _REQUIRED_TEAM_COLUMNS, f"{season} teams")
+
+    selected = teams.loc[:, ["id", "code", "name"]].copy(deep=True)
+    for column in ("id", "code"):
+        values = pd.to_numeric(selected[column], errors="coerce")
+        if bool(values.isna().any()):
+            raise DataSourceError(f"{season} teams file has non-numeric {column!r} values.")
+        selected[column] = values.astype("int64")
+    duplicated = selected.loc[selected["id"].duplicated(), "id"].tolist()
+    if duplicated:
+        raise DuplicateRecordsError(f"{season} teams file repeats team id(s) {duplicated!r}.")
+    selected["name"] = selected["name"].astype("string").str.strip()
+    return selected.sort_values("id", kind="stable").reset_index(drop=True)
+
+
+_TRUE_FLAGS: frozenset[str] = frozenset({"true", "1"})
+_FALSE_FLAGS: frozenset[str] = frozenset({"false", "0"})
+
+
+def _archive_flag(value: object, label: str) -> bool:
+    """Read one of the archive's boolean columns without trusting ``bool()``.
+
+    CSV booleans arrive as native ``bool`` only while a column happens to be
+    uniformly true or false. One blank value turns the whole column to text, and
+    ``bool("False")`` is ``True`` — which would silently classify an unplayed fixture
+    as final. An unrecognised flag therefore stops the run instead.
+    """
+
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in _TRUE_FLAGS:
+        return True
+    if text in _FALSE_FLAGS:
+        return False
+    raise DataSourceError(
+        f"{label} must be a boolean flag, got {value!r}. Guessing would risk reporting "
+        "an unplayed fixture as finished."
+    )
+
+
+def _fixture_status(finished: object, provisional: object, label: str) -> str:
+    """Classify a fixture from the two flags the archive publishes about it."""
+
+    if _archive_flag(finished, f"{label} 'finished'"):
+        return "final"
+    if _archive_flag(provisional, f"{label} 'provisional_start_time'"):
+        return "provisional"
+    return "scheduled"
+
+
+def load_fixture_snapshot(root: Path | str, season: str) -> pd.DataFrame:
+    """Build the fixture table for one archive season.
+
+    Each fixture becomes two rows describing it from either side, because that is the
+    only grain at which "who is the opponent" has an answer when a gameweek holds more
+    than one fixture for the same club.
+
+    Two provenance fields stay empty and cannot be otherwise. The archive is published
+    after the fact and records neither when it was scraped nor the deadline that
+    preceded each gameweek — deadlines live in the platform's event list, which the
+    archive does not ship. A capture time invented here would forge the one field every
+    leakage argument depends on, and a deadline cannot be recovered from a kickoff time.
+
+    Fixtures with no gameweek assigned are excluded rather than stored with an empty
+    one. That is how the source represents a postponement awaiting refixturing, and it
+    is also the right answer: a club whose match was postponed has no fixture in that
+    gameweek, and a later read carries it under whichever gameweek it is played in.
+    """
+
+    codes = load_team_codes(root, season).set_index("id")["code"]
+    path = season_directory(root, season) / FIXTURES_FILE
+    fixtures = _read_required(path, _REQUIRED_FIXTURE_COLUMNS, f"{season} fixtures")
+
+    scheduled = fixtures.loc[fixtures["event"].notna()].copy(deep=True)
+    unscheduled = len(fixtures) - len(scheduled)
+
+    rows: list[dict[str, object]] = []
+    unknown_teams: list[int] = []
+    for record in scheduled.to_dict("records"):
+        home_id = int(record["team_h"])
+        away_id = int(record["team_a"])
+        if home_id not in codes.index or away_id not in codes.index:
+            unknown_teams.extend(
+                identifier for identifier in (home_id, away_id) if identifier not in codes.index
+            )
+            continue
+        status = _fixture_status(
+            record["finished"],
+            record["provisional_start_time"],
+            f"{season} fixture {record['id']}",
+        )
+        kickoff = normalize_utc_timestamp(
+            record["kickoff_time"], label=f"{season} fixture {record['id']} kickoff_time"
+        )
+        shared = {
+            "snapshot_id": ARCHIVE_SNAPSHOT_ID,
+            "captured_at_utc": pd.NA,
+            "season": season,
+            "gameweek": int(record["event"]),
+            "fixture_id": int(record["id"]),
+            "kickoff_time_utc": kickoff,
+            "deadline_timestamp_utc": pd.NA,
+            "status": status,
+        }
+        rows.append(
+            {
+                **shared,
+                "team_id": int(codes.loc[home_id]),
+                "opponent_team_id": int(codes.loc[away_id]),
+                "is_home": True,
+                "fixture_difficulty": record["team_h_difficulty"],
+            }
+        )
+        rows.append(
+            {
+                **shared,
+                "team_id": int(codes.loc[away_id]),
+                "opponent_team_id": int(codes.loc[home_id]),
+                "is_home": False,
+                "fixture_difficulty": record["team_a_difficulty"],
+            }
+        )
+
+    if unknown_teams:
+        raise DataSourceError(
+            f"{season} fixtures reference team ids the season's teams file does not "
+            f"declare: {sorted(set(unknown_teams))!r}."
+        )
+    if not rows:
+        raise DataSourceError(
+            f"{season} produced no fixture rows; {unscheduled} fixture(s) had no gameweek."
+        )
+
+    frame = pd.DataFrame(rows, columns=list(FIXTURE_COLUMNS))
+    for column in ("gameweek", "fixture_id", "team_id", "opponent_team_id"):
+        frame[column] = frame[column].astype("int64")
+    frame["is_home"] = frame["is_home"].astype("boolean")
+    frame["fixture_difficulty"] = pd.to_numeric(
+        frame["fixture_difficulty"], errors="coerce"
+    ).astype("Int64")
+    # The two archive-empty columns are typed explicitly rather than left as all-NA
+    # object columns, so concatenating seasons cannot silently change their dtype.
+    for column in (
+        "snapshot_id",
+        "season",
+        "kickoff_time_utc",
+        "status",
+        "captured_at_utc",
+        "deadline_timestamp_utc",
+    ):
+        frame[column] = frame[column].astype("string")
+    return validate_fixture_snapshot(frame)
+
+
+def build_fixture_panel(root: Path | str, *, seasons: Sequence[str] | None = None) -> pd.DataFrame:
+    """Load several seasons' fixtures into one table.
+
+    Seasons are validated individually and then concatenated, so a fault names the
+    season that caused it.
+    """
+
+    requested = tuple(SUPPORTED_SEASONS if seasons is None else seasons)
+    if not requested:
+        raise DataSourceError("At least one season is required.")
+    unsupported = [season for season in requested if season not in SUPPORTED_SEASONS]
+    if unsupported:
+        raise DataSourceError(
+            f"Seasons {unsupported!r} are outside the supported range {list(SUPPORTED_SEASONS)!r}."
+        )
+
+    frames = [load_fixture_snapshot(root, season) for season in requested]
+    return validate_fixture_snapshot(pd.concat(frames, ignore_index=True))
 
 
 def load_upcoming_roster(root: Path | str, season: str) -> pd.DataFrame:

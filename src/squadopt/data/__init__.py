@@ -28,6 +28,7 @@ from squadopt.data.errors import (
     SnapshotExistsError,
     SnapshotIntegrityError,
 )
+from squadopt.data.fixtures import validate_fixture_snapshot
 from squadopt.data.loaders import (
     CSV_SUFFIXES,
     PARQUET_SUFFIXES,
@@ -42,6 +43,12 @@ from squadopt.data.schema import (
     CANONICAL_SORT_COLUMNS,
     COLUMN_KINDS,
     EXTERNALLY_SUPPLIED_COLUMNS,
+    FIXTURE_COLUMNS,
+    FIXTURE_KEY_COLUMNS,
+    FIXTURE_NULLABLE_COLUMNS,
+    FIXTURE_SCHEMA_VERSION,
+    FIXTURE_SORT_COLUMNS,
+    FIXTURE_STATUSES,
     KEY_COLUMNS,
     MIN_GAMEWEEK,
     NON_NEGATIVE_COLUMNS,
@@ -84,6 +91,12 @@ __all__ = [
     "COLUMN_KINDS",
     "CSV_SUFFIXES",
     "EXTERNALLY_SUPPLIED_COLUMNS",
+    "FIXTURE_COLUMNS",
+    "FIXTURE_KEY_COLUMNS",
+    "FIXTURE_NULLABLE_COLUMNS",
+    "FIXTURE_SCHEMA_VERSION",
+    "FIXTURE_SORT_COLUMNS",
+    "FIXTURE_STATUSES",
     "IDENTITY_ADAPTER",
     "KEY_COLUMNS",
     "METADATA_FILENAME",
@@ -136,5 +149,6 @@ __all__ = [
     "snapshot_fingerprint",
     "to_price_tenths",
     "validate_canonical_dataset",
+    "validate_fixture_snapshot",
     "write_snapshot",
 ]
