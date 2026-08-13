@@ -175,5 +175,6 @@ baseline `form_window=5` used to produce `expected_points`.
   be treated as a pristine final test set.
 - Fold preparation is correct but currently expensive because full walk-forward projections
   are rebuilt before calibration; reusable persisted fold artifacts are future software work.
-- Monte Carlo scenarios, risk penalties, risk-aware CP-SAT, Gaussian Processes, Bayesian
-  Optimization, Markov models, and multi-gameweek planning remain out of scope.
+- Sprint 4 consumes the lower interval bound through a separate deterministic risk objective.
+  Monte Carlo scenarios, correlation-aware stochastic optimization, Gaussian Processes,
+  Bayesian Optimization, Markov models, and multi-gameweek planning remain out of scope.

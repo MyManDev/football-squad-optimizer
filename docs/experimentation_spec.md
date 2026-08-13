@@ -266,7 +266,8 @@ every player selected in a scored fold.
   model.
 - The current optimizer makes independent one-gameweek decisions and has no transfer state.
 
-Future factors such as fixture weight, planning horizon, and risk penalty remain inactive.
-Sprint 3 supplies the first versioned player-level uncertainty contract. Bayesian
+Future factors such as fixture weight and planning horizon remain inactive. Sprint 4
+implements a separate pre-registered risk-aversion screening contract without modifying this
+Sprint 2 factorial design. Sprint 3 supplies the player-level uncertainty contract. Bayesian
 Optimization should still begin only after that contract is reviewed as stable and a
 continuous search space with worthwhile expensive evaluations is explicitly defined.
