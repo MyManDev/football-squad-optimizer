@@ -397,6 +397,93 @@ prediction.
 Manager entries — `AM` rows from 2024-25, twenty per season — are excluded, because a
 manager is not a squad-eligible player under the canonical contract.
 
+## Fixtures at their own grain
+
+A gameweek can hold more than one fixture for the same club. Across the six supported
+seasons **189 team-gameweeks** do, 61 of them in 2021-22 alone. At player-gameweek grain
+those rows have no single opponent and no single home-or-away answer, which is why
+fixture context was absent from the panel: a grain problem, not a missing column.
+
+The fixture table stores **one row per team per fixture**, keyed on
+`(snapshot_id, season, fixture_id, team_id)`. The player-gameweek view is derived from it
+by explicit aggregation.
+
+```bash
+python -m scripts.fetch_historical_data    # now also pulls fixtures.csv and teams.csv
+```
+
+### Team identity is the persistent code
+
+Three identifier spaces were in play: the panel names a club by display name, the
+archive's `opponent_team` column uses a per-season integer, and the live payload uses a
+per-season integer too. Measured across the pinned archive:
+
+| Consecutive seasons | Shared clubs | Kept `code` | Kept `id` |
+| --- | ---: | ---: | ---: |
+| 2020-21 → 2021-22 | 17 | 17 | 12 |
+| 2021-22 → 2022-23 | 17 | 17 | 7 |
+| 2022-23 → 2023-24 | 17 | 17 | 12 |
+| 2023-24 → 2024-25 | 17 | 17 | 12 |
+| 2024-25 → 2025-26 | 17 | 17 | 10 |
+
+`code` survives every season boundary, 85 of 85. The integer survives 53 of 85, because
+it is assigned alphabetically within a season and shifts whenever a promoted club sorts
+ahead of an existing one — `id` 14 is Newcastle in 2020-21 and Man Utd from 2022-23. The
+table therefore keys on `code`, for the same reason player identity does.
+
+That choice is verified across the source boundary, not just inside the archive: for the
+17 clubs present in both the 2025-26 archive and the 2026-27 live payload, the code agrees
+17 of 17. `teams.csv` is the bridge from the panel's display names, and all six seasons
+reconcile through it — the gameweek names match its `name` column exactly and every
+`opponent_team` value appears in its `id`.
+
+### Provenance differs by source, per row
+
+| Field | Archive backfill | Live capture |
+| --- | --- | --- |
+| `snapshot_id` | `vaastav-8c97b2a`, naming the pin | the capture's own identifier |
+| `captured_at_utc` | empty — the archive records no scrape time | the instant we read the endpoints |
+| `deadline_timestamp_utc` | empty — deadlines live in the platform's event list, which the archive does not ship | read from that event list |
+
+Inventing an archive capture time would forge the single field every leakage argument
+rests on, so those columns are nullable rather than filled.
+
+### Two exclusions and one nullable field, each for a reason
+
+**Fixtures with no gameweek are excluded and counted.** That is how the source represents
+a postponement awaiting refixturing. A row with no gameweek is one no aggregation can
+consume, so carrying it would make `gameweek` nullable for every reader in order to store
+a row none of them can use. It also gives the right answer: a club whose match was
+postponed genuinely has no fixture that gameweek, and a later capture carries it under
+whichever gameweek it is eventually played in. The cost is that postponement history is
+unrecoverable — a model cannot learn from it, only observe it live.
+
+**`kickoff_time_utc` is nullable.** A fixture can have a gameweek before its time is
+confirmed, and no feature reads the kickoff time. Keeping the row preserves the club's
+fixture count, which does matter; refusing it would abort a capture at a deadline over a
+field nothing consumes.
+
+**Both sides of a fixture must agree.** Nothing in the storage format forces the two rows
+describing one match to mirror each other, and if they diverge a team-level feature
+computed from one side would silently contradict the same feature computed from the other.
+
+### Aggregating to team-gameweek
+
+`aggregate_team_gameweek` produces `fixture_count`, `home_fixture_count`,
+`away_fixture_count`, `mean_fixture_difficulty` and `minimum_fixture_difficulty`. It reads
+only the gameweek it summarises, and every input is a pre-match fact, so nothing here is
+shifted. `snapshot_id` stays in the key: summing across two captures of one season would
+silently double every count.
+
+Counts and difficulty behave differently on a blank gameweek, deliberately. Counts are
+zero, because playing no matches is a fact and zero states it. The difficulty columns stay
+empty, because a club with no fixture has no difficulty and a zero would describe it as
+facing the easiest possible tie — the opposite of the truth for a points projection.
+
+Source-published `fixture_difficulty` is carried for provenance and is **not** consumed as
+a feature: it is opaque and its within-season stability is unverified. Team strength used
+as a feature is computed from shifted historical results instead.
+
 ## Capturing a live season before a deadline
 
 The archive publishes a gameweek after it has been played, so it cannot answer what the

@@ -192,10 +192,16 @@ This changes the canonical contract that the optimization and software owners de
 on, so it needs agreement across all three owners rather than a unilateral edit. It is
 the largest single item on this list.
 
-**Status.** The optimization owner has approved a `fixture_snapshot_v1` table keyed on
-`(snapshot_id, season, fixture_id, team_id)`, one row per team per fixture, with the
-player-gameweek view derived by controlled aggregation. Two things still block the
-freeze, and both are now backed by measurement rather than expectation.
+**Status: resolved.** `fixture_snapshot_v1` is agreed across all three owners and
+implemented: one row per team per fixture, keyed on
+`(snapshot_id, season, fixture_id, team_id)`, with the player-gameweek view derived by
+controlled aggregation. Six seasons are backfilled from the archive and the live path
+writes into the same table. See the fixture section of
+[data_pipeline.md](data_pipeline.md).
+
+The two questions that had blocked the freeze are recorded below with the measurements
+that settled them, because the reasoning matters more than the outcome if either is ever
+revisited.
 
 ### 10a. Team identity across seasons
 
@@ -223,16 +229,19 @@ every `opponent_team` value falls inside its `id` column — so the bridge exist
 verified. The live adapter already resolves its integer through the payload it came from,
 which keeps the captured snapshot joinable without redefining anything.
 
-**Proposal.** Adopt the persistent team `code` as `team_id` in the fixture table and,
-eventually, in the canonical panel. It is the only one of the three that means the same
-thing in two different seasons, and the argument for it is identical to the argument
-already accepted for players.
+**Resolved.** The fixture table keys on the persistent team `code`. It is the only one
+of the three identifiers that means the same thing in two different seasons, and the
+argument is identical to the one already accepted for players.
 
-This is not a unilateral change: it redefines an existing canonical column, and the
-scenario generator groups team-level shocks on `team_id`. Deferring it is also viable —
-the fixture table can key on the per-season integer plus the season — but then every
-cross-season team feature has to carry the season as part of the join, and a mistake
-there is silent rather than loud.
+Confirmed across the source boundary as well: for the 17 clubs present in both the
+2025-26 archive and the 2026-27 live payload, the code agrees 17 of 17, so the table
+joins archive rows to live rows without a per-season translation.
+
+The canonical panel still names a club by display name and was deliberately left alone —
+that is a separate change to an existing canonical column, and the scenario generator
+groups team-level shocks on it. `teams.csv` bridges the two, and all six seasons
+reconcile through it. Converting the panel remains open and is now the only part of this
+item still outstanding.
 
 ### 10b. Provenance for archive-backfilled fixture rows
 
@@ -249,6 +258,8 @@ carries `code`, `event`, `id`, `team_h`, `team_a`, both difficulty columns,
 | `deadline_timestamp_utc` | none — deadlines live in the platform's event list, which the archive does not ship | Nullable for backfilled rows |
 | `status` | `finished`, `finished_provisional`, `started` | Derived, and `final` for completed seasons |
 
+**Resolved** as proposed: the archive's `snapshot_id` names the pin, `captured_at_utc`
+and `deadline_timestamp_utc` are nullable for backfilled rows, and `status` is derived.
 One consequence deserves stating rather than discovering later: postponement history is
 unrecoverable. The archive files a rescheduled fixture under the gameweek it was
 eventually played in, so no "this fixture was postponed" signal can be learned from
