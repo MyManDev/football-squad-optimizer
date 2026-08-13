@@ -83,7 +83,7 @@ def main() -> int:
     _heading("Pool")
     print(f"players            {len(projections)}")
     print(f"with prior record  {carried} ({carried / len(projections):.0%})")
-    print(f"on the constant    {len(projections) - carried}")
+    print(f"on the price prior {len(projections) - carried}")
     print(f"distinct estimates {projections['expected_points'].nunique()}")
 
     config = OptimizationConfig(budget_tenths=arguments.budget)
@@ -117,8 +117,8 @@ def main() -> int:
     _heading("How much of this rests on real history")
     print(f"{squad_carried} of {len(result.selected_squad)} selected players")
     print(
-        "The remainder sit on the declared opening constant, which cannot rank players.\n"
-        "They are the population a price-based prior would serve."
+        "The remainder use the fitted opening-price prior because no usable\n"
+        "earlier-season record exists for them."
     )
 
     _heading("Read this before acting on it")

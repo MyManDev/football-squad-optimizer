@@ -22,7 +22,29 @@ from squadopt.prediction.config import (
 
 
 def _opening_fallback(features: pd.DataFrame, config: BaselineProjectionConfig) -> pd.Series:
-    """Per-position projection for rows with no prior history at all."""
+    """Price prior, or the explicitly requested constant, for no-history rows."""
+
+    coefficient = config.opening_price_coefficient
+    if coefficient is not None:
+        if "price_tenths" not in features.columns:
+            raise PredictionConfigurationError(
+                "Feature dataset is missing column 'price_tenths' needed by the opening "
+                "price prior."
+            )
+        try:
+            prices = pd.to_numeric(features["price_tenths"], errors="raise").astype("float64")
+        except (TypeError, ValueError) as error:
+            raise PredictionConfigurationError(
+                f"price_tenths must be numeric for the opening price prior: {error}"
+            ) from error
+        invalid = (~prices.map(math.isfinite)) | prices.lt(0)
+        if bool(invalid.any()):
+            invalid_prices = features.loc[invalid, "price_tenths"].tolist()
+            raise PredictionConfigurationError(
+                f"price_tenths must be finite and non-negative for the opening price prior; "
+                f"got {invalid_prices[:10]!r}."
+            )
+        return prices.mul(coefficient).div(10.0).astype("float64")
 
     values: list[float] = []
     for position in features["position"].tolist():
@@ -77,8 +99,9 @@ def baseline_expected_points(
       instead of treating everyone alike. Requires the feature dataset to carry the
       cross-season columns; a caller that never attached them is unaffected.
     - **No record anywhere** (a genuine debut, a new signing from abroad, a
-      promoted-team player): the declared per-position fallback. There is truly no
-      signal, so the constant is explicit rather than a silent zero.
+      promoted-team player): the fitted opening-price prior. Price is fixed at the
+      deadline and provides a weak ranking signal without reading an outcome. A
+      caller may explicitly disable it and retain the declared constant fallback.
 
     The result is always finite and non-negative, because the optimizer rejects
     negative or non-finite projections. Realized points may be negative from cards

@@ -15,10 +15,16 @@ from squadopt.data.errors import DataError
 from squadopt.data.schema import POSITIONS, Position
 from squadopt.features.config import per_90_feature_name, rolling_feature_name
 
-# Deliberately uniform across positions. A differentiated prior would imply a
-# fitted claim this project has not earned yet; the per-position shape exists so
-# a later sprint can refine it without changing any call site.
+# Used only when the fitted price prior is explicitly disabled. Keeping the
+# position mapping preserves a conservative fallback for callers that want no
+# fitted coefficient at all.
 DEFAULT_OPENING_EXPECTED_POINTS = 3.0
+
+# Fitted through the origin on opening-gameweek rows from 2020-21 through
+# 2024-25 in vaastav/Fantasy-Premier-League@8c97b2a. The 2025-26 opening
+# gameweek was held out. The reproducible fit and comparison live in
+# squadopt.backtest.opening_prior and scripts.run_opening_prior_backtest.
+FITTED_OPENING_PRICE_COEFFICIENT = 0.29940564635958394
 
 
 class PredictionError(DataError):
@@ -53,14 +59,15 @@ class BaselineProjectionConfig:
     Both inputs are shifted rolling features, so the value for gameweek ``t`` uses
     only gameweeks before ``t``.
 
-    ``opening_expected_points`` covers the one case with no history at all: a
-    player's first gameweek of a season. Because a rolling-only baseline has no
-    signal there, the projection is uninformative for that gameweek by design, and
-    the value is an explicit declared constant rather than a silent zero.
+    ``opening_price_coefficient`` covers the one case with no history at all: a
+    player's first gameweek of a season. It applies the leakage-safe rule
+    ``coefficient * price_tenths / 10``. Set it to ``None`` to use the declared
+    per-position ``opening_expected_points`` constants instead.
     """
 
     minutes_window: int = 5
     per_90_window: int = 5
+    opening_price_coefficient: float | None = FITTED_OPENING_PRICE_COEFFICIENT
     opening_expected_points: Mapping[Position, float] = field(
         default_factory=_default_opening_expected_points
     )
@@ -68,6 +75,20 @@ class BaselineProjectionConfig:
     def __post_init__(self) -> None:
         minutes_window = _require_window(self.minutes_window, "minutes_window")
         per_90_window = _require_window(self.per_90_window, "per_90_window")
+
+        coefficient = self.opening_price_coefficient
+        if coefficient is not None:
+            if isinstance(coefficient, bool) or not isinstance(coefficient, Real):
+                raise PredictionConfigurationError(
+                    "opening_price_coefficient must be a non-negative finite number or None, "
+                    f"got {coefficient!r}."
+                )
+            coefficient = float(coefficient)
+            if not math.isfinite(coefficient) or coefficient < 0:
+                raise PredictionConfigurationError(
+                    "opening_price_coefficient must be a non-negative finite number or None, "
+                    f"got {coefficient!r}."
+                )
 
         if not isinstance(self.opening_expected_points, Mapping):
             raise PredictionConfigurationError(
@@ -100,6 +121,7 @@ class BaselineProjectionConfig:
 
         object.__setattr__(self, "minutes_window", minutes_window)
         object.__setattr__(self, "per_90_window", per_90_window)
+        object.__setattr__(self, "opening_price_coefficient", coefficient)
         object.__setattr__(self, "opening_expected_points", MappingProxyType(opening))
 
 

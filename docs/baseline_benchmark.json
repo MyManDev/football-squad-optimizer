@@ -421,8 +421,7 @@
   "limitations": [
     "Opening gameweeks are evaluated separately and are not included in these aggregates.",
     "The baseline is leakage-safe and explainable, not a predictive-accuracy claim.",
-    "Automatic substitutions, vice-captain fallback, and bench points are excluded.",
-    "Players without usable history retain the declared constant fallback."
+    "Automatic substitutions, vice-captain fallback, and bench points are excluded."
   ],
   "provenance": {
     "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",

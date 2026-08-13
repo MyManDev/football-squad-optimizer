@@ -9,7 +9,7 @@ from squadopt.data import PROJECTION_REQUIRED_COLUMNS
 from squadopt.features import CrossSeasonConfig
 from squadopt.optimization.validation import validate_players
 from squadopt.prediction import (
-    DEFAULT_OPENING_EXPECTED_POINTS,
+    FITTED_OPENING_PRICE_COEFFICIENT,
     PredictionConfigurationError,
     build_opening_projection_table,
 )
@@ -124,19 +124,36 @@ def test_a_player_with_history_is_projected_from_it() -> None:
     assert bool(table.loc[101, "has_prior_record"]) is True
 
 
-def test_a_player_with_no_history_gets_the_declared_constant() -> None:
+def test_a_player_with_no_history_gets_the_fitted_price_prior() -> None:
     table = _table().set_index("player_id")
 
-    assert table.loc[202, "expected_points"] == DEFAULT_OPENING_EXPECTED_POINTS
+    assert table.loc[202, "expected_points"] == pytest.approx(
+        FITTED_OPENING_PRICE_COEFFICIENT * 4.5
+    )
     assert bool(table.loc[202, "has_prior_record"]) is False
 
 
 def test_the_provenance_flag_separates_the_two_populations() -> None:
-    """It exists so a caller can see how much of the pool rests on a constant."""
+    """It shows which players use history and which use the price prior."""
 
     table = _table()
 
     assert table["has_prior_record"].tolist() == [True, False]
+
+
+def test_newcomers_with_different_prices_get_non_uniform_projections() -> None:
+    newcomers = _roster([(202, "Budget", 4, "FWD", 45), (303, "Premium", 5, "FWD", 90)])
+
+    table = build_opening_projection_table(
+        HISTORY,
+        newcomers,
+        season=UPCOMING,
+        cross_season=OPEN_CARRY,
+    )
+
+    assert table["has_prior_record"].tolist() == [False, False]
+    assert table["expected_points"].nunique() == 2
+    assert table.loc[1, "expected_points"] > table.loc[0, "expected_points"]
 
 
 def test_price_comes_from_the_roster_not_from_history() -> None:
@@ -202,7 +219,9 @@ def test_a_thin_history_falls_back_rather_than_reporting_noise() -> None:
         thin, ROSTER, season=UPCOMING, cross_season=CrossSeasonConfig(min_minutes=270)
     ).set_index("player_id")
 
-    assert table.loc[101, "expected_points"] == DEFAULT_OPENING_EXPECTED_POINTS
+    assert table.loc[101, "expected_points"] == pytest.approx(
+        FITTED_OPENING_PRICE_COEFFICIENT * 7.5
+    )
     assert bool(table.loc[101, "has_prior_record"]) is False
 
 

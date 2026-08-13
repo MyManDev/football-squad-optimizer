@@ -101,14 +101,10 @@ def test_every_gameweek_with_history_is_solvable(gameweek: int) -> None:
     assert result.has_solution
 
 
-def test_the_opening_gameweek_is_solvable_but_uninformative() -> None:
-    """A rolling-only baseline has no signal in gameweek 1; the fallback is uniform.
-
-    The optimizer still returns a legal squad, which is the point: the skeleton
-    never breaks, it just cannot discriminate before any history exists.
-    """
+def test_the_opening_gameweek_is_solvable_and_price_informative() -> None:
+    """The fitted deadline-price prior ranks players before form exists."""
 
     projections, result = _run(1)
 
     assert result.has_solution
-    assert projections["expected_points"].nunique() == 1
+    assert projections["expected_points"].nunique() > 1

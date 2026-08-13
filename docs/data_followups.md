@@ -11,18 +11,17 @@ software owner before anyone starts.
 
 ## Tracked as GitHub issues
 
-Two items are filed rather than described here, because they are the immediate
-Sprint 1 work and one blocks the other:
+The two immediate Sprint 1 items are now resolved:
 
 - **A walk-forward backtest split.** The requirement is already specified in
   [the experiment parameter contract](experimentation_spec.md) under "Time-based
   evaluation and leakage control"; the issue is about implementing a helper that
   satisfies it, not re-deciding it.
-- **A price-based prior for a player's opening gameweek.** The baseline currently
-  fills the one row with no history using a uniform per-position constant, so
-  gameweek 1 projections cannot rank players. Price is fixed at the deadline, so
-  using it is leakage-safe under this project's own timing rule. Blocked by the
-  split above: any coefficient chosen without backtesting is invented precision.
+- **A price-based prior for a player's opening gameweek.** Contract
+  `opening_price_prior_v1` fits the coefficient on 2020-21 through 2024-25 opening
+  rows and evaluates it on the untouched 2025-26 opening gameweek. Decayed
+  carry-over remains first choice; price replaces the constant only where no usable
+  earlier-season record exists.
 
 When one of the items below becomes real work, open an issue for it and delete it
 from this file, so there is only ever a single record of it.

@@ -6,8 +6,7 @@ prices — and everything known about how they perform sits in earlier seasons.
 
 So this module joins the two. The roster supplies what is fixed at the opening
 deadline; the carried record supplies the expectation. Players with no earlier record
-fall to the declared constant, and they are the population a price-based prior would
-serve.
+fall to the fitted deadline-price prior.
 
 The join is safe because player identity is the stable cross-season code rather than
 a per-season element id — established by inspecting the archive, not assumed.
@@ -135,7 +134,13 @@ def _canonical_roster(roster: pd.DataFrame) -> pd.DataFrame:
     return frame
 
 
-def _fallback_for(positions: list[str], config: BaselineProjectionConfig) -> list[float]:
+def _fallback_for(
+    positions: list[str], prices_tenths: list[int], config: BaselineProjectionConfig
+) -> list[float]:
+    coefficient = config.opening_price_coefficient
+    if coefficient is not None:
+        return [coefficient * price / 10.0 for price in prices_tenths]
+
     values: list[float] = []
     for position in positions:
         if position not in POSITIONS:
@@ -162,7 +167,7 @@ def build_opening_projection_table(
 
     Returns exactly the six agreed columns, ordered by ``player_id`` with a reset
     index, and carries a ``has_prior_record`` column so a caller can see how much of
-    the pool is projected from real history rather than from the constant.
+    the pool is projected from real history rather than from the price prior.
 
     Every projection is finite and non-negative, and no value depends on a gameweek
     that has not been played — the carried record reads completed seasons only.
@@ -181,7 +186,11 @@ def build_opening_projection_table(
     projected = rate.mul(minutes).div(MINUTES_PER_FULL_MATCH)
 
     fallback = pd.Series(
-        _fallback_for([str(value) for value in merged["position"].tolist()], settings),
+        _fallback_for(
+            [str(value) for value in merged["position"].tolist()],
+            [int(value) for value in merged["price_tenths"].tolist()],
+            settings,
+        ),
         index=merged.index,
         dtype="float64",
     )

@@ -95,7 +95,7 @@ def test_decision_points_are_chronological_across_seasons() -> None:
 
 
 def test_the_opening_gameweek_is_skipped_by_default() -> None:
-    """Gameweek 1 has no season-scoped history, so a fold there measures the fallback."""
+    """Gameweek 1 has no season-scoped history and uses a separate opening workflow."""
 
     points = walk_forward_decision_points(make_canonical_gameweeks())
 

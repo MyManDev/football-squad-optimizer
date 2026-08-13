@@ -8,6 +8,7 @@ from squadopt.prediction.baseline import baseline_expected_points
 from squadopt.prediction.config import (
     DEFAULT_OPENING_EXPECTED_POINTS,
     DEFAULT_PROJECTION_CONFIG,
+    FITTED_OPENING_PRICE_COEFFICIENT,
     BaselineProjectionConfig,
     PredictionConfigurationError,
     PredictionError,
@@ -29,6 +30,7 @@ __all__ = [
     "DEFAULT_OPENING_EXPECTED_POINTS",
     "DEFAULT_PROJECTION_CONFIG",
     "FEATURE_GENERATION_CONTRACT_VERSION",
+    "FITTED_OPENING_PRICE_COEFFICIENT",
     "ROSTER_COLUMN_MAP",
     "BaselineProjectionConfig",
     "FormWindowMapping",
