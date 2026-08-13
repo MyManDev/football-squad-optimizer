@@ -18,6 +18,7 @@ produce a column of nulls.
 """
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -32,7 +33,8 @@ from squadopt.data.errors import (
     InvalidValueError,
     format_examples,
 )
-from squadopt.data.schema import MIN_GAMEWEEK
+from squadopt.data.fixtures import validate_fixture_snapshot
+from squadopt.data.schema import FIXTURE_COLUMNS, MIN_GAMEWEEK
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 
 # Recorded in a snapshot's metadata as the source of its payloads.
@@ -71,6 +73,20 @@ _ELEMENT_FIELDS: Final = (
 )
 _TEAM_FIELDS: Final = ("id", "name")
 _EVENT_FIELDS: Final = ("id", "deadline_time", "finished")
+_FIXTURE_FIELDS: Final = (
+    "id",
+    "event",
+    "team_h",
+    "team_a",
+    "team_h_difficulty",
+    "team_a_difficulty",
+    "kickoff_time",
+    "finished",
+    "provisional_start_time",
+)
+
+# Seasons are spelled as the starting year and the two-digit finishing year.
+_SEASON_PATTERN: Final = re.compile(r"^\d{4}-\d{2}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +193,27 @@ def team_names(bootstrap: bytes) -> Mapping[int, str]:
     return MappingProxyType(mapping)
 
 
+def _array_records(payload: bytes, label: str) -> tuple[Mapping[str, object], ...]:
+    """Read a payload whose top level is an array rather than an object."""
+
+    if not isinstance(payload, bytes):
+        raise DataSourceError(f"{label} payload must be raw bytes, got {type(payload).__name__}.")
+    try:
+        parsed = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise DataSourceError(f"{label} payload is not valid UTF-8 JSON: {error}") from error
+    if not isinstance(parsed, list) or not parsed:
+        raise DataSourceError(
+            f"{label} payload must be a non-empty JSON array, got {type(parsed).__name__}."
+        )
+    non_objects = [index for index, record in enumerate(parsed) if not isinstance(record, dict)]
+    if non_objects:
+        raise DataSourceError(
+            f"{label} payload has non-object entries at indexes {format_examples(non_objects)}."
+        )
+    return tuple(record for record in parsed if isinstance(record, dict))
+
+
 def _boolean(record: Mapping[str, object], key: str, label: str) -> bool:
     value = record.get(key)
     if not isinstance(value, bool):
@@ -242,6 +279,165 @@ def next_open_deadline(
         f"gameweek {latest.gameweek} at {latest.deadline_utc}. The season is over, or the "
         "capture is older than the payload it claims to describe."
     )
+
+
+def team_codes(bootstrap: bytes) -> Mapping[int, int]:
+    """Return the per-season team id to persistent team code mapping.
+
+    The fixture table identifies a club by its persistent code, because the integer
+    the payload uses is assigned per season and denotes different clubs in different
+    seasons.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "teams", "Team")
+    _require_fields(records, ("id", "code"), "Team")
+
+    mapping: dict[int, int] = {}
+    for record in records:
+        identifier = _integer(record, "id", "Team")
+        if identifier in mapping:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload declares team id {identifier} more than once."
+            )
+        mapping[identifier] = _integer(record, "code", "Team")
+    return MappingProxyType(mapping)
+
+
+def _require_season(season: object) -> str:
+    if not isinstance(season, str) or not _SEASON_PATTERN.match(season):
+        raise InvalidValueError(f"season must be spelled like '2026-27', got {season!r}.")
+    return season
+
+
+def _fixture_status(record: Mapping[str, object], label: str) -> str:
+    if _boolean(record, "finished", label):
+        return "final"
+    return "provisional" if _boolean(record, "provisional_start_time", label) else "scheduled"
+
+
+def fixture_snapshot(
+    fixtures: bytes,
+    bootstrap: bytes,
+    *,
+    season: str,
+    snapshot_id: str,
+    captured_at_utc: str,
+) -> pd.DataFrame:
+    """Build the fixture table from a captured pair of payloads.
+
+    Unlike an archive backfill, a live capture can fill both provenance fields: the
+    capture instant is ours, and the deadline comes from the payload's own event list.
+    That is the difference the fixture table's nullable columns exist to record, and it
+    is visible per row rather than inferred from which source a table came from.
+
+    ``season`` is supplied rather than guessed. The payload does not state it in a
+    field this adapter is willing to depend on, so the caller declares it and the
+    declaration is checked against the first gameweek's deadline year — a typo that
+    would file a capture under the wrong season is caught rather than stored.
+
+    Fixtures with no gameweek are excluded, exactly as in the archive path: that is how
+    a postponement awaiting refixturing appears, and a club whose match was postponed
+    genuinely has no fixture that gameweek.
+    """
+
+    declared_season = _require_season(season)
+    codes = team_codes(bootstrap)
+    deadlines = {entry.gameweek: entry.deadline_utc for entry in gameweek_deadlines(bootstrap)}
+    captured_at = normalize_utc_timestamp(captured_at_utc, label="captured_at_utc")
+
+    first_gameweek = min(deadlines)
+    deadline_year = as_instant(deadlines[first_gameweek]).year
+    if str(deadline_year) != declared_season[:4]:
+        raise InvalidValueError(
+            f"season {declared_season!r} does not match the payload, whose earliest "
+            f"deadline falls in {deadline_year}."
+        )
+
+    records = _array_records(fixtures, "Fixture")
+    _require_fields(records, _FIXTURE_FIELDS, "Fixture")
+
+    rows: list[dict[str, object]] = []
+    unknown_teams: list[int] = []
+    unknown_gameweeks: list[int] = []
+    for record in records:
+        event = record.get("event")
+        if event is None:
+            continue
+        gameweek = _integer(record, "event", "Fixture")
+        if gameweek not in deadlines:
+            unknown_gameweeks.append(gameweek)
+            continue
+        home = _integer(record, "team_h", "Fixture")
+        away = _integer(record, "team_a", "Fixture")
+        missing_teams = [side for side in (home, away) if side not in codes]
+        if missing_teams:
+            unknown_teams.extend(missing_teams)
+            continue
+        label = f"Fixture {_integer(record, 'id', 'Fixture')}"
+        kickoff = record.get("kickoff_time")
+        shared: dict[str, object] = {
+            "snapshot_id": snapshot_id,
+            "captured_at_utc": captured_at,
+            "season": declared_season,
+            "gameweek": gameweek,
+            "fixture_id": _integer(record, "id", "Fixture"),
+            "kickoff_time_utc": (
+                pd.NA
+                if kickoff is None
+                else normalize_utc_timestamp(kickoff, label=f"{label} kickoff_time")
+            ),
+            "deadline_timestamp_utc": deadlines[gameweek],
+            "status": _fixture_status(record, label),
+        }
+        rows.append(
+            {
+                **shared,
+                "team_id": codes[home],
+                "opponent_team_id": codes[away],
+                "is_home": True,
+                "fixture_difficulty": record.get("team_h_difficulty"),
+            }
+        )
+        rows.append(
+            {
+                **shared,
+                "team_id": codes[away],
+                "opponent_team_id": codes[home],
+                "is_home": False,
+                "fixture_difficulty": record.get("team_a_difficulty"),
+            }
+        )
+
+    if unknown_teams:
+        raise InvalidValueError(
+            "Fixture payload references teams the bootstrap payload does not declare: "
+            f"{format_examples(sorted(set(unknown_teams)))}."
+        )
+    if unknown_gameweeks:
+        raise InvalidValueError(
+            "Fixture payload references gameweeks the bootstrap payload does not "
+            f"publish: {format_examples(sorted(set(unknown_gameweeks)))}."
+        )
+    if not rows:
+        raise DataSourceError("Fixture payload produced no rows; every fixture lacked a gameweek.")
+
+    frame = pd.DataFrame(rows, columns=list(FIXTURE_COLUMNS))
+    for column in ("gameweek", "fixture_id", "team_id", "opponent_team_id"):
+        frame[column] = frame[column].astype("int64")
+    frame["is_home"] = frame["is_home"].astype("boolean")
+    frame["fixture_difficulty"] = pd.to_numeric(
+        frame["fixture_difficulty"], errors="coerce"
+    ).astype("Int64")
+    for column in (
+        "snapshot_id",
+        "season",
+        "kickoff_time_utc",
+        "status",
+        "captured_at_utc",
+        "deadline_timestamp_utc",
+    ):
+        frame[column] = frame[column].astype("string")
+    return validate_fixture_snapshot(frame)
 
 
 def player_snapshot(bootstrap: bytes) -> pd.DataFrame:

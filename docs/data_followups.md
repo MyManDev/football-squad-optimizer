@@ -192,6 +192,83 @@ This changes the canonical contract that the optimization and software owners de
 on, so it needs agreement across all three owners rather than a unilateral edit. It is
 the largest single item on this list.
 
+**Status: resolved.** `fixture_snapshot_v1` is agreed across all three owners and
+implemented: one row per team per fixture, keyed on
+`(snapshot_id, season, fixture_id, team_id)`, with the player-gameweek view derived by
+controlled aggregation. Six seasons are backfilled from the archive and the live path
+writes into the same table. See the fixture section of
+[data_pipeline.md](data_pipeline.md).
+
+The two questions that had blocked the freeze are recorded below with the measurements
+that settled them, because the reasoning matters more than the outcome if either is ever
+revisited.
+
+### 10a. Team identity across seasons
+
+Measured against the pinned archive, and the result mirrors the player-identity finding
+almost exactly.
+
+| Consecutive seasons | Shared clubs | Kept `code` | Kept `id` |
+| --- | ---: | ---: | ---: |
+| 2020-21 → 2021-22 | 17 | 17 | 12 |
+| 2021-22 → 2022-23 | 17 | 17 | 7 |
+| 2022-23 → 2023-24 | 17 | 17 | 12 |
+| 2023-24 → 2024-25 | 17 | 17 | 12 |
+| 2024-25 → 2025-26 | 17 | 17 | 10 |
+
+`code` survives every season boundary, 85 of 85. The integer `id` survives 53 of 85,
+because it is assigned alphabetically within each season and shifts whenever a promoted
+club sorts ahead of an existing one. The clearest case: `id` 14 is Newcastle in 2020-21
+and 2021-22, then Man Utd from 2022-23 onward. The same number is a different club.
+
+This matters because three identifier spaces are currently in play. The canonical panel
+names a club by display name; the archive's `opponent_team` column is a per-season
+integer; the live payload also uses a per-season integer. All six seasons reconcile
+through `teams.csv` — the gameweek file's team names match its `name` column exactly, and
+every `opponent_team` value falls inside its `id` column — so the bridge exists and is
+verified. The live adapter already resolves its integer through the payload it came from,
+which keeps the captured snapshot joinable without redefining anything.
+
+**Resolved.** The fixture table keys on the persistent team `code`. It is the only one
+of the three identifiers that means the same thing in two different seasons, and the
+argument is identical to the one already accepted for players.
+
+Confirmed across the source boundary as well: for the 17 clubs present in both the
+2025-26 archive and the 2026-27 live payload, the code agrees 17 of 17, so the table
+joins archive rows to live rows without a per-season translation.
+
+The canonical panel still names a club by display name and was deliberately left alone —
+that is a separate change to an existing canonical column, and the scenario generator
+groups team-level shocks on it. `teams.csv` bridges the two, and all six seasons
+reconcile through it. Converting the panel remains open and is now the only part of this
+item still outstanding.
+
+### 10b. Provenance for archive-backfilled fixture rows
+
+`fixture_snapshot_v1` assumes a live capture. Four of its fields have no archive
+equivalent, and this is now verified rather than assumed: the archive's `fixtures.csv`
+carries `code`, `event`, `id`, `team_h`, `team_a`, both difficulty columns,
+`kickoff_time`, `finished`, `finished_provisional`, `started`, `minutes`, `stats` and
+`pulse_id` — and no deadline and no capture time.
+
+| Field | Archive equivalent | Proposal |
+| --- | --- | --- |
+| `snapshot_id` | none | A reserved identifier naming the pin, e.g. `vaastav@8c97b2a` |
+| `captured_at_utc` | none | Nullable for backfilled rows; fabricating a capture time would forge the one field leakage arguments rest on |
+| `deadline_timestamp_utc` | none — deadlines live in the platform's event list, which the archive does not ship | Nullable for backfilled rows |
+| `status` | `finished`, `finished_provisional`, `started` | Derived, and `final` for completed seasons |
+
+**Resolved** as proposed: the archive's `snapshot_id` names the pin, `captured_at_utc`
+and `deadline_timestamp_utc` are nullable for backfilled rows, and `status` is derived.
+One consequence deserves stating rather than discovering later: postponement history is
+unrecoverable. The archive files a rescheduled fixture under the gameweek it was
+eventually played in, so no "this fixture was postponed" signal can be learned from
+history. Live capture can observe it; a model cannot be trained on it.
+
+The archive and live fixture payloads carry the same columns, so one adapter shape reads
+both. The identifier spaces and the missing provenance fields are the only real
+differences.
+
 ### 11. A shared contracts module
 
 **Now.** `squadopt.data.schema` imports `Position`, `POSITIONS`, and
