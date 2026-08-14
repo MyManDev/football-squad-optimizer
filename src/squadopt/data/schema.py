@@ -156,7 +156,18 @@ AMBIGUOUS_TIMING_COLUMNS: tuple[str, ...] = (
 # `appeared` is one when a player recorded any minutes and zero otherwise. Rolled,
 # it answers how often a player features at all, which a minutes average cannot
 # separate from a player who plays rarely but fully when he does.
-DERIVED_OUTCOME_COLUMNS: tuple[str, ...] = ("appeared",)
+#
+# The two team columns sum a club's fantasy points within a gameweek, split by the
+# unit that earned them: attackers and midfielders on one side, goalkeepers and
+# defenders on the other. They stand in for attacking and defensive quality because
+# the panel carries no goals — a strong defence keeps clean sheets, and clean sheets
+# are what its defenders are paid in. Being sums of an outcome, they carry outcome
+# timing and are shifted like everything else.
+DERIVED_OUTCOME_COLUMNS: tuple[str, ...] = (
+    "appeared",
+    "team_attacking_points",
+    "team_defensive_points",
+)
 
 # Canonical columns a caller may legitimately supply as metadata, because a
 # single-season extract does not carry them in the file itself. Adapters are not
@@ -232,6 +243,13 @@ PLAYER_TIME_SORT_COLUMNS: tuple[str, ...] = ("season", "player_id", "gameweek")
 # on purpose: it prevents one season's final gameweeks from leaking into the next
 # season's opening gameweeks.
 PLAYER_GROUP_COLUMNS: tuple[str, ...] = ("season", "player_id")
+
+# The same guarantee one grain up, for aggregates that describe a club rather than a
+# player — opponent strength being the reason it exists. It is a second frozen key
+# rather than a parameter on the first: letting a caller choose the grouping is
+# precisely what these constants prevent, because a key without `season` would let one
+# season's form leak into the next. Both keys carry `season` for that reason.
+TEAM_GROUP_COLUMNS: tuple[str, ...] = ("season", "team_id")
 
 # Gameweeks are 1-based. No upper bound is defined here, because the maximum
 # gameweek count is competition-specific and is supplied by validation config.
