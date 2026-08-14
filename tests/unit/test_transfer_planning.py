@@ -192,9 +192,7 @@ def test_every_week_satisfies_squad_lineup_and_state_invariants(
         outgoing_ids = set(week.transfers_out["player_id"])
 
         assert len(squad_ids) == small_config.squad_size
-        assert Counter(week.selected_squad["position"]) == dict(
-            small_config.squad_position_limits
-        )
+        assert Counter(week.selected_squad["position"]) == dict(small_config.squad_position_limits)
         assert week.selected_squad["buy_price_tenths"].sum() <= small_config.budget_tenths
         assert week.selected_squad.groupby("team_id").size().max() <= (
             small_config.max_players_per_team

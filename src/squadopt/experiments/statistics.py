@@ -29,12 +29,25 @@ def _bootstrap_seed(base_seed: int, candidate_id: str) -> int:
     return base_seed + int(digest[:8], 16)
 
 
-def _season_aware_moving_block_interval(
+def season_aware_moving_block_interval(
     differences: list[tuple[str, float]],
     *,
     policy: PromotionPolicy,
     candidate_id: str,
 ) -> tuple[float, float]:
+    """Interval on paired per-fold differences, resampling blocks within a season.
+
+    Public because a second caller outside the screening design needs it.
+    ``compare_to_control`` below describes a candidate as a ``form_window`` and a
+    ``bench_weight``, which is right for the design it was written for and wrong for a
+    candidate not described by those two factors. Such a caller still owes a confidence
+    claim, and a second implementation would leave the project with two definitions of
+    the same one.
+
+    ``differences`` pairs each fold's season with that fold's paired difference, so a
+    resampled block never spans the boundary between two seasons.
+    """
+
     grouped: dict[str, list[float]] = defaultdict(list)
     for season, value in differences:
         grouped[season].append(value)
@@ -93,7 +106,7 @@ def compare_to_control(
     lower: float | None = None
     upper: float | None = None
     if differences:
-        lower, upper = _season_aware_moving_block_interval(
+        lower, upper = season_aware_moving_block_interval(
             differences,
             policy=policy,
             candidate_id=candidate.candidate_id,

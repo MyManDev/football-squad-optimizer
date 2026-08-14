@@ -57,7 +57,7 @@ def _fixture_rows(gameweeks: int = 4, *, doubles: tuple[int, ...] = ()) -> pd.Da
     rows: list[dict[str, Any]] = []
     for gameweek in range(1, gameweeks + 1):
         repeats = 2 if gameweek in doubles else 1
-        for index in range(repeats):
+        for _repeat in range(repeats):
             rows.append(
                 {
                     "season": SEASON,

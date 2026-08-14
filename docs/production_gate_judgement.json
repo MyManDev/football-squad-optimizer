@@ -1,0 +1,309 @@
+{
+  "artifact_type": "production_gate_judgement",
+  "benchmark_contract_version": "production_vs_baseline_and_ridge_v1",
+  "comparisons": [
+    {
+      "candidate": "production",
+      "candidate_losses": 52,
+      "candidate_wins": 73,
+      "comparable_folds": 147,
+      "confidence_interval_lower": 1.7547619047619043,
+      "confidence_interval_upper": 5.809523809523809,
+      "difference_stdev": 14.805564290103025,
+      "mean_difference": 3.639455782312925,
+      "median_difference": 0.0,
+      "reference": "baseline",
+      "season_mean_differences": {
+        "2021-22": 4.162162162162162,
+        "2022-23": 5.361111111111111,
+        "2023-24": 0.8648648648648649,
+        "2024-25": 4.216216216216216
+      },
+      "ties": 22
+    },
+    {
+      "candidate": "production",
+      "candidate_losses": 73,
+      "candidate_wins": 69,
+      "comparable_folds": 147,
+      "confidence_interval_lower": -2.13639455782313,
+      "confidence_interval_upper": 2.238095238095238,
+      "difference_stdev": 16.539175036108514,
+      "mean_difference": 0.10204081632653061,
+      "median_difference": 0.0,
+      "reference": "ridge",
+      "season_mean_differences": {
+        "2021-22": 1.5945945945945945,
+        "2022-23": 0.4722222222222222,
+        "2023-24": -0.35135135135135137,
+        "2024-25": -1.2972972972972974
+      },
+      "ties": 5
+    },
+    {
+      "candidate": "ridge",
+      "candidate_losses": 56,
+      "candidate_wins": 81,
+      "comparable_folds": 147,
+      "confidence_interval_lower": 1.9727891156462585,
+      "confidence_interval_upper": 5.381632653061227,
+      "difference_stdev": 12.883180129848785,
+      "mean_difference": 3.5374149659863945,
+      "median_difference": 2.0,
+      "reference": "baseline",
+      "season_mean_differences": {
+        "2021-22": 2.5675675675675675,
+        "2022-23": 4.888888888888889,
+        "2023-24": 1.2162162162162162,
+        "2024-25": 5.513513513513513
+      },
+      "ties": 10
+    }
+  ],
+  "configuration": {
+    "appearance_window": 6,
+    "carry_over_minutes_weight": 0.75,
+    "carry_over_rate_weight": 0.75,
+    "min_prior_gameweeks_in_season": 1,
+    "opening_price_coefficient": 0.29940564635958394,
+    "policy": {
+      "bootstrap_resamples": 5000,
+      "confidence_level": 0.9,
+      "deterministic_seed": 0,
+      "min_mean_improvement": 0.5,
+      "moving_block_length": 4
+    },
+    "rate_window": 6,
+    "ridge_alpha": 10.0,
+    "ridge_form_window": 5,
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ]
+  },
+  "environment": {
+    "numpy": "2.4.6",
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
+    "python": "3.11.0",
+    "scikit_learn": "1.9.0"
+  },
+  "feasible_folds": {
+    "baseline": 147,
+    "production": 147,
+    "ridge": 147
+  },
+  "folds": 147,
+  "gates": [
+    {
+      "measured": 3.639455782312925,
+      "name": "baseline_mean_improvement",
+      "passed": true,
+      "requirement": ">= +0.5000"
+    },
+    {
+      "measured": 1.7547619047619043,
+      "name": "baseline_lower_bound",
+      "passed": true,
+      "requirement": ">= +0.0000"
+    },
+    {
+      "measured": 0.10204081632653061,
+      "name": "ridge_mean_difference",
+      "passed": true,
+      "requirement": ">= +0.0000"
+    },
+    {
+      "measured": -2.13639455782313,
+      "name": "ridge_lower_bound",
+      "passed": false,
+      "requirement": ">= -0.5000"
+    },
+    {
+      "measured": -0.006258722015204803,
+      "name": "prediction_metric_improved_against_ridge",
+      "passed": true,
+      "requirement": "MAE or RMSE improves"
+    },
+    {
+      "measured": 0.050672156542918595,
+      "name": "other_prediction_metric_tolerance",
+      "passed": false,
+      "requirement": "<= +0.0500 relative degradation"
+    },
+    {
+      "measured": 147.0,
+      "name": "every_fold_feasible",
+      "passed": true,
+      "requirement": "= 147 folds"
+    }
+  ],
+  "gates_all_passed": false,
+  "limitations": [
+    "A development gate verdict is not an operational promotion; clearing these gates makes a candidate eligible for the locked holdout protocol and nothing more.",
+    "The 2025-26 holdout is not read by this run.",
+    "A candidate listed under truncated_candidates had at least one fold the solver did not prove optimal. Its realized points are depressed by the search rather than by its projection, and the run is not reproducible for that candidate, because a wall-clock limit makes the answer depend on how much work the machine completed.",
+    "Ridge is measured in this run rather than read from an earlier artifact, because its figure moves with the numerical environment while the deterministic baseline does not.",
+    "Per-fold squad scores are not published; the aggregates are the claim and fold-level scores are a derived product of third-party data."
+  ],
+  "mean_realized_points": {
+    "baseline": 53.775510204081634,
+    "production": 57.414965986394556,
+    "ridge": 57.31292517006803
+  },
+  "metadata": {
+    "benchmark_contract_version": "production_vs_baseline_and_ridge_v1",
+    "evaluation_seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "holdout_untouched": true
+  },
+  "prediction_metrics": {
+    "baseline": {
+      "by_position": [
+        {
+          "mean_absolute_error": 0.7794374055098041,
+          "mean_error": 0.010358171467837188,
+          "observations": 11145,
+          "position": "GK",
+          "root_mean_squared_error": 1.7962190260195423
+        },
+        {
+          "mean_absolute_error": 1.1929897780796257,
+          "mean_error": 0.008480703514178083,
+          "observations": 34039,
+          "position": "DEF",
+          "root_mean_squared_error": 2.2603252485772454
+        },
+        {
+          "mean_absolute_error": 1.12089428007312,
+          "mean_error": -0.0003523270241417037,
+          "observations": 43826,
+          "position": "MID",
+          "root_mean_squared_error": 2.2356469151892724
+        },
+        {
+          "mean_absolute_error": 1.252648538914851,
+          "mean_error": 0.013782012913772984,
+          "observations": 12437,
+          "position": "FWD",
+          "root_mean_squared_error": 2.4907298974971614
+        }
+      ],
+      "mean_absolute_error": 1.1237248172684031,
+      "mean_error": 0.005520935053542374,
+      "observations": 101447,
+      "root_mean_squared_error": 2.2334969606758097
+    },
+    "production": {
+      "by_position": [
+        {
+          "mean_absolute_error": 0.7725892377613767,
+          "mean_error": 0.02971499234622632,
+          "observations": 11145,
+          "position": "GK",
+          "root_mean_squared_error": 1.7631191388843197
+        },
+        {
+          "mean_absolute_error": 1.1962968711267006,
+          "mean_error": 0.04953010267887586,
+          "observations": 34039,
+          "position": "DEF",
+          "root_mean_squared_error": 2.2367741445287375
+        },
+        {
+          "mean_absolute_error": 1.1184948673865733,
+          "mean_error": 0.04882456872480291,
+          "observations": 43826,
+          "position": "MID",
+          "root_mean_squared_error": 2.2068239571525132
+        },
+        {
+          "mean_absolute_error": 1.2520136725054951,
+          "mean_error": 0.07383408851199523,
+          "observations": 12437,
+          "position": "FWD",
+          "root_mean_squared_error": 2.4563699853823167
+        }
+      ],
+      "mean_absolute_error": 1.1229677206242383,
+      "mean_error": 0.0500279837012612,
+      "observations": 101447,
+      "root_mean_squared_error": 2.205418969363636
+    },
+    "ridge": {
+      "by_position": [
+        {
+          "mean_absolute_error": 0.8267299929738992,
+          "mean_error": 0.040715607024997366,
+          "observations": 11145,
+          "position": "GK",
+          "root_mean_squared_error": 1.6731560639820522
+        },
+        {
+          "mean_absolute_error": 1.1945707739318256,
+          "mean_error": 0.035451483062075836,
+          "observations": 34039,
+          "position": "DEF",
+          "root_mean_squared_error": 2.109044652604794
+        },
+        {
+          "mean_absolute_error": 1.11854511968647,
+          "mean_error": -0.014246313175133113,
+          "observations": 43826,
+          "position": "MID",
+          "root_mean_squared_error": 2.109515037376154
+        },
+        {
+          "mean_absolute_error": 1.2657347017670895,
+          "mean_error": -0.017729123402165425,
+          "observations": 12437,
+          "position": "FWD",
+          "root_mean_squared_error": 2.361259656490597
+        }
+      ],
+      "mean_absolute_error": 1.1300403289088494,
+      "mean_error": 0.008040182984982108,
+      "observations": 101447,
+      "root_mean_squared_error": 2.0990553100981004
+    }
+  },
+  "residual_history": {
+    "columns": [
+      "fold_id",
+      "season",
+      "gameweek",
+      "player_id",
+      "team_id",
+      "position",
+      "predicted_points",
+      "realized_points",
+      "residual"
+    ],
+    "definition": "realized_points_minus_predicted_points",
+    "rows": 101447
+  },
+  "solver_statuses": {
+    "baseline": {
+      "OPTIMAL": 147
+    },
+    "production": {
+      "OPTIMAL": 147
+    },
+    "ridge": {
+      "FEASIBLE": 33,
+      "OPTIMAL": 114
+    }
+  },
+  "truncated_candidates": [
+    "ridge"
+  ],
+  "verdict": "no_promotion_control_retained"
+}

@@ -312,6 +312,49 @@ two models disagree with each other more than either disagrees with the baseline
 they are betting on different things — production sees the calendar, Ridge has a learned
 functional form, and neither has both.
 
+### How reproducible the comparison is
+
+Measured, because the first attempt at this comparison was not reproducible and it took a
+while to work out why.
+
+The deterministic baseline and the production candidate solve all 147 folds to proven
+optimality and reproduce to the digit across every run. The Ridge reference does neither.
+
+Four measurements of the same configuration, on the same machine, with the same code:
+
+| Run | Solver limit | Ridge mean realized | Optimal / feasible |
+| --- | --- | ---: | --- |
+| First benchmark | 10s | 56.8912 | not recorded |
+| Second | 10s | 56.9456 | 119 / 28 |
+| Third | 120s | 56.9592 | 144 / 3 |
+| Fourth | 10s | 57.3129 | 114 / 33 |
+
+At the configured limit Ridge's mean spans `0.42` points, and the count of unproven folds
+moves between 28 and 33. The cause is that the limit is wall-clock: with one worker and a
+fixed seed the solver is deterministic given the same amount of work, but a wall-clock budget
+makes the amount of work depend on machine load.
+
+The consequence for the gate is the serious part. The production candidate's measured
+advantage over Ridge ranged from `+0.5238` to `+0.1020` across these runs — the same `0.42`
+spread. The condition requiring that advantage to be non-negative passed in both, but by a
+margin smaller than the noise, so **it could change sign on another run**. A gate whose
+verdict depends on which run it was measured in is not yet a gate.
+
+Two earlier readings recorded here were wrong and are corrected rather than removed. The
+first claimed the truncation made the comparison unfair to Ridge; it does not, because raising
+the limit twelve-fold lifts Ridge by only `+0.0136`, so the truncation adds noise rather than
+bias — a suboptimal squad can score better or worse in *realized* points, which are not the
+objective the solver maximises. The second put the run-to-run spread at about `0.054`, an
+order of magnitude too small; the fourth run showed `0.42`.
+
+Raising the limit is the wrong fix on its own: twelve times the budget buys `0.0136` points
+and still leaves three folds unproven. A deterministic time limit keeps the current budget
+while making two runs of identical code agree, which is what the gate actually needs.
+
+The judging artifact records solver outcomes per candidate and names any candidate whose
+search was truncated, so a run that cannot be reproduced says so rather than looking like
+one that can.
+
 ### What may and may not follow
 
 The gate result is now known, which constrains what honest iteration looks like. Tuning this
