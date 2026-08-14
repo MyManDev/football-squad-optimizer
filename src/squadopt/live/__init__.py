@@ -11,6 +11,7 @@ from squadopt.live.recommendation import (
     SUPPORTED_TARGET_GAMEWEEK,
     Projection,
     RecommendationInputs,
+    infer_season,
     project,
     read_inputs,
 )
@@ -33,6 +34,7 @@ __all__ = [
     "Recommendation",
     "RecommendationInputs",
     "build_recommendation",
+    "infer_season",
     "project",
     "projection_fingerprint",
     "read_inputs",

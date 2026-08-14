@@ -32,6 +32,7 @@ from squadopt.data.sources.fpl_live import (
     next_open_deadline,
     player_snapshot,
 )
+from squadopt.data.timestamps import as_instant
 from squadopt.features.cross_season import CrossSeasonConfig
 from squadopt.prediction.availability import (
     AvailabilityRuleConfig,
@@ -48,6 +49,27 @@ CONTROL_MODEL_VERSION: Final = "opening-carry-over-v1"
 # season with no played gameweeks; a later gameweek needs the current season's own history,
 # which no live source in this project captures yet.
 SUPPORTED_TARGET_GAMEWEEK: Final = 1
+
+
+def infer_season(snapshot: CapturedSnapshot) -> str:
+    """Name the season a capture describes, from its own published deadlines.
+
+    A season is named for the calendar year it starts in, and its first deadline falls in
+    that year, so the earliest published deadline settles it. Deriving it beats asking the
+    caller: a season passed by hand can be wrong, and a capture filed under the wrong
+    season would join the wrong history.
+    """
+
+    bootstrap = snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
+    if bootstrap is None:
+        raise DataSourceError(
+            f"Snapshot {snapshot.metadata.snapshot_id!r} carries no {BOOTSTRAP_PAYLOAD!r} "
+            "payload, so its season cannot be determined."
+        )
+    deadlines = gameweek_deadlines(bootstrap)
+    earliest = min(deadlines, key=lambda entry: entry.gameweek)
+    start = as_instant(earliest.deadline_utc).year
+    return f"{start}-{(start + 1) % 100:02d}"
 
 
 @dataclass(frozen=True, slots=True)
