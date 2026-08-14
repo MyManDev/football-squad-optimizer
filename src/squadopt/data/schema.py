@@ -24,6 +24,7 @@ __all__ = [
     "CANONICAL_COLUMNS",
     "CANONICAL_SORT_COLUMNS",
     "COLUMN_KINDS",
+    "DERIVED_OUTCOME_COLUMNS",
     "EXTERNALLY_SUPPLIED_COLUMNS",
     "FIXTURE_COLUMNS",
     "FIXTURE_KEY_COLUMNS",
@@ -146,6 +147,16 @@ AMBIGUOUS_TIMING_COLUMNS: tuple[str, ...] = (
     "selected_by_percent",
     "availability_status",
 )
+
+# Columns no source provides, computed by the feature layer from an outcome column
+# and therefore carrying that column's timing. They are classified here rather
+# than at the point of use so the rule stays the same for every column: nothing
+# acquires a rolling feature until its time of knowledge is declared in one place.
+#
+# `appeared` is one when a player recorded any minutes and zero otherwise. Rolled,
+# it answers how often a player features at all, which a minutes average cannot
+# separate from a player who plays rarely but fully when he does.
+DERIVED_OUTCOME_COLUMNS: tuple[str, ...] = ("appeared",)
 
 # Canonical columns a caller may legitimately supply as metadata, because a
 # single-season extract does not carry them in the file itself. Adapters are not
@@ -399,9 +410,14 @@ def is_outcome_column(column: str) -> bool:
 
     if column in PRE_MATCH_COLUMNS:
         return False
-    if column in OUTCOME_COLUMNS or column in AMBIGUOUS_TIMING_COLUMNS:
+    if (
+        column in OUTCOME_COLUMNS
+        or column in AMBIGUOUS_TIMING_COLUMNS
+        or column in DERIVED_OUTCOME_COLUMNS
+    ):
         return True
     raise InvalidValueError(
         f"Column {column!r} has no time-of-knowledge classification; add it to "
-        "PRE_MATCH_COLUMNS, OUTCOME_COLUMNS, or AMBIGUOUS_TIMING_COLUMNS."
+        "PRE_MATCH_COLUMNS, OUTCOME_COLUMNS, AMBIGUOUS_TIMING_COLUMNS, or "
+        "DERIVED_OUTCOME_COLUMNS."
     )

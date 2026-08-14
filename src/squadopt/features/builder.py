@@ -9,11 +9,13 @@ from squadopt.data.schema import (
     canonical_column_order,
 )
 from squadopt.features.config import (
+    APPEARANCE_SOURCE_COLUMN,
     DEFAULT_FEATURE_CONFIG,
     MINUTES_PER_FULL_MATCH,
     FeatureConfig,
     FeatureConfigurationError,
     feature_column_names,
+    minutes_per_appearance_feature_name,
     per_90_feature_name,
     rolling_feature_name,
 )
@@ -38,6 +40,29 @@ def _points_per_90(frame: pd.DataFrame, window: int, min_periods: int) -> pd.Ser
     minutes = shifted_rolling_sum(frame, "minutes", window, min_periods=min_periods)
     rate = points.div(minutes).mul(MINUTES_PER_FULL_MATCH)
     return rate.where(minutes > 0)
+
+
+def _minutes_per_appearance(frame: pd.DataFrame, window: int, min_periods: int) -> pd.Series:
+    """Minutes played per gameweek featured, over the previous gameweeks.
+
+    A ratio of shifted sums for the same reason the scoring rate is one: dividing
+    total minutes by the number of gameweeks actually featured answers "how long
+    when he plays", which a mean over all gameweeks cannot, because it mixes that
+    question with "how often does he play".
+
+    Separating the two is the point of the minutes stage. A fringe player who
+    completes ninety minutes whenever selected and a starter who is regularly
+    substituted can share a minutes average while being different selections.
+
+    Undefined, not zero, when a player featured in no gameweek across the window.
+    There is no answer to how long he plays, and zero would assert one.
+    """
+
+    minutes = shifted_rolling_sum(frame, "minutes", window, min_periods=min_periods)
+    appearances = shifted_rolling_sum(
+        frame, APPEARANCE_SOURCE_COLUMN, window, min_periods=min_periods
+    )
+    return minutes.div(appearances).where(appearances > 0)
 
 
 def build_feature_dataset(
@@ -106,6 +131,24 @@ def build_feature_dataset(
     features[per_90_feature_name(settings.per_90_window)] = _points_per_90(
         ordered, settings.per_90_window, settings.min_periods
     )
+    if settings.appearance_windows:
+        # Derived from an outcome column, so it carries outcome timing and goes
+        # through the same shifted primitive as everything else. The indicator is
+        # attached to the sorted frame first because the primitive reads its source
+        # column from the frame it is given.
+        with_indicator = ordered.assign(
+            **{APPEARANCE_SOURCE_COLUMN: (ordered["minutes"] > 0).astype("int64")}
+        )
+        for window in settings.appearance_windows:
+            features[rolling_feature_name(APPEARANCE_SOURCE_COLUMN, window)] = shifted_rolling_mean(
+                with_indicator,
+                APPEARANCE_SOURCE_COLUMN,
+                window,
+                min_periods=settings.min_periods,
+            )
+            features[minutes_per_appearance_feature_name(window)] = _minutes_per_appearance(
+                with_indicator, window, settings.min_periods
+            )
 
     combined = ordered.assign(**features)
     result = combined.sort_values(list(CANONICAL_SORT_COLUMNS), kind="stable").reset_index(
