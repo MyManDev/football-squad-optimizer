@@ -242,9 +242,10 @@ across the full development fold set, and the `+0.5` baseline gate will not bind
 Ridge underperforms there. This is intended, and it is why Ridge is measured across all
 development folds before the production model is built rather than after.
 
-Ridge's figure is now measured and recorded in
-[learned_benchmark_development.md](learned_benchmark_development.md): `+3.1156` over 147
-development folds, with a 90% moving-block interval of `[+1.5306, +4.9524]`. That is the bar.
+The earlier standalone Ridge benchmark recorded `+3.1156` over 147 development folds. It is
+historical evidence, not a fixed threshold: the production gate re-measures Ridge in the same
+process and under the same solver contract as the candidate. In the reproducible gate run
+below Ridge is `+3.8435` over baseline; that paired same-run comparison is the operative bar.
 
 ## Measured so far
 
@@ -278,82 +279,55 @@ stands rather than as it is hoped to end up.
 ### The decision metric, and the gate verdict
 
 Realized squad points across the 147 development folds, same folds and same optimizer for
-every candidate. Both runs agree with the recorded Ridge benchmark on the baseline fold for
-fold, so this is one comparison rather than three.
+every candidate. The benchmark evaluates baseline, Ridge and production in one process, so
+the paired differences share the same data, solver contract and numerical environment.
 
 | Candidate | Mean realized | Paired difference over baseline | 90% interval |
 | --- | ---: | ---: | --- |
-| Baseline | 53.7755 | — | — |
-| Ridge | 56.8912 | +3.1156 | `[+1.5442, +5.0000]` |
-| Production | 57.4150 | +3.6395 | `[+1.7959, +5.7551]` |
+| Baseline | 53.2585 | — | — |
+| Ridge | 57.1020 | +3.8435 | `[+2.2313, +5.6735]` |
+| Production | 57.7483 | +4.4898 | `[+2.5643, +6.6939]` |
 
-Against the two pre-registered gates:
+Against the pre-registered decision, prediction and feasibility gates:
 
 | Condition | Required | Measured | Verdict |
 | --- | --- | ---: | --- |
-| Mean over baseline | `>= +0.5` | +3.6395 | pass |
-| 90% lower bound over baseline | `>= 0` | +1.7755 | pass |
-| Mean over Ridge | `>= 0` | +0.5238 | pass |
-| 90% lower bound over Ridge | `>= -0.5` | **-1.6466** | **fail** |
+| Mean over baseline | `>= +0.5` | +4.4898 | pass |
+| 90% lower bound over baseline | `>= 0` | +2.5643 | pass |
+| Mean over Ridge | `>= 0` | +0.6463 | pass |
+| 90% lower bound over Ridge | `>= -0.5` | **-1.6194** | **fail** |
+| MAE or RMSE improves over Ridge | improve | -0.0063 MAE | pass |
+| Other prediction metric relative degradation | `<= +0.05` | **+0.0507** | **fail** |
+| Every fold feasible | `= 147` | 147 | pass |
 
 **Verdict: no promotion. The deterministic baseline remains the operational control.**
 
 The candidate is robustly better than the baseline and only nominally better than Ridge. Its
-paired difference against Ridge has a standard deviation of 16.3311 across a win/tie/loss
-record of 70/5/72 — fold by fold it is a coin flip — and the per-season means tell the same
-story: `+1.5946`, `+1.4722`, `-0.3514`, `-0.5946`. It wins the first two development seasons
-and loses the last two.
-
-One prediction made before this was measured turned out to be wrong and is recorded rather
-than quietly dropped. The paired difference against Ridge was expected to have *lower*
-variance than either candidate's difference against the baseline, on the reasoning that two
-models are correlated with each other. It is higher: 16.3311 against 14.8056 and 12.8145. The
-two models disagree with each other more than either disagrees with the baseline, because
-they are betting on different things — production sees the calendar, Ridge has a learned
-functional form, and neither has both.
+paired difference against Ridge has a standard deviation of 16.9592 across a win/tie/loss
+record of 71/5/71 — fold by fold it is a coin flip — and the per-season means are `+2.7568`,
+`+0.2500`, `+1.0811`, and `-1.5135`. A positive mean is not enough to clear the frozen lower
+bound, and the prediction-metric tolerance also fails independently.
 
 ### How reproducible the comparison is
 
-Measured, because the first attempt at this comparison was not reproducible and it took a
-while to work out why.
+The production gate now stops CP-SAT on deterministic work rather than elapsed time. Primary
+and tie-break solves share a budget of `0.5` deterministic units; one worker and seed zero are
+fixed. A `120s` per-fold wall-clock limit remains only as a safety cap, and the run raises an
+error if that cap binds before the deterministic budget.
 
-The deterministic baseline and the production candidate solve all 147 folds to proven
-optimality and reproduce to the digit across every run. The Ridge reference does neither.
+Two independent four-season runs produced byte-identical reports:
 
-Four measurements of the same configuration, on the same machine, with the same code:
+| Artifact | Run 1 SHA-256 | Run 2 SHA-256 |
+| --- | --- | --- |
+| JSON | `4D730964...A6A6FD` | `4D730964...A6A6FD` |
+| Markdown | `A399F86A...C5001` | `A399F86A...C5001` |
 
-| Run | Solver limit | Ridge mean realized | Optimal / feasible |
-| --- | --- | ---: | --- |
-| First benchmark | 10s | 56.8912 | not recorded |
-| Second | 10s | 56.9456 | 119 / 28 |
-| Third | 120s | 56.9592 | 144 / 3 |
-| Fourth | 10s | 57.3129 | 114 / 33 |
-
-At the configured limit Ridge's mean spans `0.42` points, and the count of unproven folds
-moves between 28 and 33. The cause is that the limit is wall-clock: with one worker and a
-fixed seed the solver is deterministic given the same amount of work, but a wall-clock budget
-makes the amount of work depend on machine load.
-
-The consequence for the gate is the serious part. The production candidate's measured
-advantage over Ridge ranged from `+0.5238` to `+0.1020` across these runs — the same `0.42`
-spread. The condition requiring that advantage to be non-negative passed in both, but by a
-margin smaller than the noise, so **it could change sign on another run**. A gate whose
-verdict depends on which run it was measured in is not yet a gate.
-
-Two earlier readings recorded here were wrong and are corrected rather than removed. The
-first claimed the truncation made the comparison unfair to Ridge; it does not, because raising
-the limit twelve-fold lifts Ridge by only `+0.0136`, so the truncation adds noise rather than
-bias — a suboptimal squad can score better or worse in *realized* points, which are not the
-objective the solver maximises. The second put the run-to-run spread at about `0.054`, an
-order of magnitude too small; the fourth run showed `0.42`.
-
-Raising the limit is the wrong fix on its own: twelve times the budget buys `0.0136` points
-and still leaves three folds unproven. A deterministic time limit keeps the current budget
-while making two runs of identical code agree, which is what the gate actually needs.
-
-The judging artifact records solver outcomes per candidate and names any candidate whose
-search was truncated, so a run that cannot be reproduced says so rather than looking like
-one that can.
+Both runs produced the same fold counts, means, confidence intervals, gate conditions and
+verdict. Baseline and production proved the primary objective optimal on all 147 folds. Ridge
+proved 29 optimal and returned 118 feasible incumbents after the declared deterministic work.
+Those incumbents are reproducible, but their realized points still contain solver-search
+noise of unknown direction because realized points are not CP-SAT's objective. The artifact
+therefore keeps Ridge under `truncated_candidates` rather than hiding that limitation.
 
 ### What may and may not follow
 

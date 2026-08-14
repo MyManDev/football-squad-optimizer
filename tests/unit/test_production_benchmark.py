@@ -6,6 +6,7 @@ and nothing downstream would catch it.
 """
 
 import json
+from types import SimpleNamespace
 from typing import Any
 
 import pandas as pd
@@ -26,12 +27,14 @@ from squadopt.backtest.production_benchmark import (
     ProductionBenchmarkConfig,
     ProductionBenchmarkResult,
     _evaluate_gates,
+    _non_deterministic_truncations,
     _relative_change,
     candidate_labels,
 )
 from squadopt.backtest.production_reporting import judgement_to_dict, judgement_to_markdown
 from squadopt.backtest.splits import BacktestConfigurationError
 from squadopt.experiments.config import PromotionPolicy
+from squadopt.optimization import SolverStatus
 
 POLICY = PromotionPolicy()
 FOLDS = 147
@@ -269,6 +272,15 @@ def test_the_document_records_every_condition_and_the_verdict() -> None:
     assert document["verdict"] == VERDICT_RETAIN_CONTROL
 
 
+def test_the_document_records_the_deterministic_solver_budget() -> None:
+    document = judgement_to_dict(_result(_gates()))
+
+    optimization = document["configuration"]["optimization"]  # type: ignore[index]
+    assert optimization["solver_deterministic_time_limit"] == 0.5
+    assert optimization["solver_time_limit_seconds"] == 120.0
+    assert optimization["stopping_rule"] == ("deterministic_work_with_wall_clock_safety_cap")
+
+
 def test_the_report_names_the_distinction_it_rests_on() -> None:
     markdown = judgement_to_markdown(_result(_gates()))
 
@@ -300,6 +312,13 @@ def test_the_candidates_are_named_in_report_order() -> None:
 
 def test_the_default_seasons_exclude_the_holdout() -> None:
     assert "2025-26" not in ProductionBenchmarkConfig().seasons
+
+
+def test_the_default_benchmark_uses_deterministic_work_with_a_wall_safety_cap() -> None:
+    optimization = ProductionBenchmarkConfig().evaluation_config.optimization_config
+
+    assert optimization.solver_deterministic_time_limit == 0.5
+    assert optimization.solver_time_limit_seconds == 120.0
 
 
 @pytest.mark.parametrize("seasons", [(), "2024-25", ("",)])
@@ -344,6 +363,8 @@ def test_the_report_warns_when_a_candidate_was_truncated() -> None:
 
     assert "Solver truncation" in markdown
     assert "did not solve every fold to optimality" in markdown
+    assert "unknown direction" in markdown
+    assert "depressed" not in markdown
 
 
 def test_the_document_records_solver_outcomes_per_candidate() -> None:
@@ -351,3 +372,53 @@ def test_the_document_records_solver_outcomes_per_candidate() -> None:
 
     assert document["solver_statuses"]["ridge"] == {"OPTIMAL": 116, "FEASIBLE": 31}
     assert document["truncated_candidates"] == ["ridge"]
+
+
+def test_wall_limited_incomplete_fold_is_rejected_as_non_deterministic() -> None:
+    fold = SimpleNamespace(
+        fold_id="2024-25-gw1",
+        optimization_result=SimpleNamespace(
+            solver_status=SolverStatus.FEASIBLE,
+            diagnostics={"deterministic_time_budget_exhausted": False},
+        ),
+    )
+
+    assert _non_deterministic_truncations(SimpleNamespace(folds=(fold,))) == ("2024-25-gw1",)
+
+
+def test_deterministic_budget_truncation_is_reproducible() -> None:
+    fold = SimpleNamespace(
+        fold_id="2024-25-gw1",
+        optimization_result=SimpleNamespace(
+            solver_status=SolverStatus.FEASIBLE,
+            diagnostics={"deterministic_time_budget_exhausted": True},
+        ),
+    )
+
+    assert _non_deterministic_truncations(SimpleNamespace(folds=(fold,))) == ()
+
+
+@pytest.mark.parametrize(
+    ("budget_exhausted", "expected"),
+    [
+        (False, ("2024-25-gw1",)),
+        (True, ()),
+    ],
+)
+def test_incomplete_tiebreak_must_stop_on_deterministic_work(
+    budget_exhausted: bool,
+    expected: tuple[str, ...],
+) -> None:
+    fold = SimpleNamespace(
+        fold_id="2024-25-gw1",
+        optimization_result=SimpleNamespace(
+            solver_status=SolverStatus.OPTIMAL,
+            diagnostics={
+                "tiebreak_attempted": True,
+                "tiebreak_completed": False,
+                "deterministic_time_budget_exhausted": budget_exhausted,
+            },
+        ),
+    )
+
+    assert _non_deterministic_truncations(SimpleNamespace(folds=(fold,))) == expected

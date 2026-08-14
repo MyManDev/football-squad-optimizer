@@ -4,60 +4,60 @@
   "comparisons": [
     {
       "candidate": "production",
-      "candidate_losses": 52,
-      "candidate_wins": 73,
+      "candidate_losses": 46,
+      "candidate_wins": 81,
       "comparable_folds": 147,
-      "confidence_interval_lower": 1.7547619047619043,
-      "confidence_interval_upper": 5.809523809523809,
-      "difference_stdev": 14.805564290103025,
-      "mean_difference": 3.639455782312925,
-      "median_difference": 0.0,
+      "confidence_interval_lower": 2.5642857142857136,
+      "confidence_interval_upper": 6.6938775510204085,
+      "difference_stdev": 15.483250935998761,
+      "mean_difference": 4.489795918367347,
+      "median_difference": 2.0,
       "reference": "baseline",
       "season_mean_differences": {
-        "2021-22": 4.162162162162162,
-        "2022-23": 5.361111111111111,
-        "2023-24": 0.8648648648648649,
-        "2024-25": 4.216216216216216
+        "2021-22": 5.0,
+        "2022-23": 6.138888888888889,
+        "2023-24": 3.027027027027027,
+        "2024-25": 3.8378378378378377
       },
-      "ties": 22
+      "ties": 20
     },
     {
       "candidate": "production",
-      "candidate_losses": 73,
-      "candidate_wins": 69,
+      "candidate_losses": 71,
+      "candidate_wins": 71,
       "comparable_folds": 147,
-      "confidence_interval_lower": -2.13639455782313,
-      "confidence_interval_upper": 2.238095238095238,
-      "difference_stdev": 16.539175036108514,
-      "mean_difference": 0.10204081632653061,
+      "confidence_interval_lower": -1.6193877551020412,
+      "confidence_interval_upper": 2.9523809523809526,
+      "difference_stdev": 16.959178515049633,
+      "mean_difference": 0.6462585034013606,
       "median_difference": 0.0,
       "reference": "ridge",
       "season_mean_differences": {
-        "2021-22": 1.5945945945945945,
-        "2022-23": 0.4722222222222222,
-        "2023-24": -0.35135135135135137,
-        "2024-25": -1.2972972972972974
+        "2021-22": 2.7567567567567566,
+        "2022-23": 0.25,
+        "2023-24": 1.0810810810810811,
+        "2024-25": -1.5135135135135136
       },
       "ties": 5
     },
     {
       "candidate": "ridge",
-      "candidate_losses": 56,
-      "candidate_wins": 81,
+      "candidate_losses": 57,
+      "candidate_wins": 83,
       "comparable_folds": 147,
-      "confidence_interval_lower": 1.9727891156462585,
-      "confidence_interval_upper": 5.381632653061227,
-      "difference_stdev": 12.883180129848785,
-      "mean_difference": 3.5374149659863945,
+      "confidence_interval_lower": 2.2312925170068025,
+      "confidence_interval_upper": 5.673469387755102,
+      "difference_stdev": 13.09276736461782,
+      "mean_difference": 3.8435374149659864,
       "median_difference": 2.0,
       "reference": "baseline",
       "season_mean_differences": {
-        "2021-22": 2.5675675675675675,
-        "2022-23": 4.888888888888889,
-        "2023-24": 1.2162162162162162,
-        "2024-25": 5.513513513513513
+        "2021-22": 2.2432432432432434,
+        "2022-23": 5.888888888888889,
+        "2023-24": 1.945945945945946,
+        "2024-25": 5.351351351351352
       },
-      "ties": 10
+      "ties": 7
     }
   ],
   "configuration": {
@@ -66,6 +66,13 @@
     "carry_over_rate_weight": 0.75,
     "min_prior_gameweeks_in_season": 1,
     "opening_price_coefficient": 0.29940564635958394,
+    "optimization": {
+      "deterministic_seed": 0,
+      "solver_deterministic_time_limit": 0.5,
+      "solver_time_limit_seconds": 120.0,
+      "solver_workers": 1,
+      "stopping_rule": "deterministic_work_with_wall_clock_safety_cap"
+    },
     "policy": {
       "bootstrap_resamples": 5000,
       "confidence_level": 0.9,
@@ -84,12 +91,12 @@
     ]
   },
   "environment": {
-    "numpy": "2.4.6",
+    "numpy": "2.5.2",
     "ortools": "9.15.6755",
     "pandas": "3.0.5",
-    "platform": "Windows-10-10.0.26200-SP0",
-    "processor": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
-    "python": "3.11.0",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5",
     "scikit_learn": "1.9.0"
   },
   "feasible_folds": {
@@ -100,25 +107,25 @@
   "folds": 147,
   "gates": [
     {
-      "measured": 3.639455782312925,
+      "measured": 4.489795918367347,
       "name": "baseline_mean_improvement",
       "passed": true,
       "requirement": ">= +0.5000"
     },
     {
-      "measured": 1.7547619047619043,
+      "measured": 2.5642857142857136,
       "name": "baseline_lower_bound",
       "passed": true,
       "requirement": ">= +0.0000"
     },
     {
-      "measured": 0.10204081632653061,
+      "measured": 0.6462585034013606,
       "name": "ridge_mean_difference",
       "passed": true,
       "requirement": ">= +0.0000"
     },
     {
-      "measured": -2.13639455782313,
+      "measured": -1.6193877551020412,
       "name": "ridge_lower_bound",
       "passed": false,
       "requirement": ">= -0.5000"
@@ -146,14 +153,14 @@
   "limitations": [
     "A development gate verdict is not an operational promotion; clearing these gates makes a candidate eligible for the locked holdout protocol and nothing more.",
     "The 2025-26 holdout is not read by this run.",
-    "A candidate listed under truncated_candidates had at least one fold the solver did not prove optimal. Its realized points are depressed by the search rather than by its projection, and the run is not reproducible for that candidate, because a wall-clock limit makes the answer depend on how much work the machine completed.",
+    "A candidate listed under truncated_candidates had at least one fold the solver did not prove optimal. This adds search noise of unknown direction to realized points, because realized points are not the solver objective. The deterministic work budget makes the selected incumbent reproducible; the wall-clock limit is only a safety cap.",
     "Ridge is measured in this run rather than read from an earlier artifact, because its figure moves with the numerical environment while the deterministic baseline does not.",
     "Per-fold squad scores are not published; the aggregates are the claim and fold-level scores are a derived product of third-party data."
   ],
   "mean_realized_points": {
-    "baseline": 53.775510204081634,
-    "production": 57.414965986394556,
-    "ridge": 57.31292517006803
+    "baseline": 53.25850340136054,
+    "production": 57.74829931972789,
+    "ridge": 57.10204081632653
   },
   "metadata": {
     "benchmark_contract_version": "production_vs_baseline_and_ridge_v1",
@@ -241,36 +248,36 @@
     "ridge": {
       "by_position": [
         {
-          "mean_absolute_error": 0.8267299929738992,
-          "mean_error": 0.040715607024997366,
+          "mean_absolute_error": 0.8267299929738988,
+          "mean_error": 0.04071560702499733,
           "observations": 11145,
           "position": "GK",
           "root_mean_squared_error": 1.6731560639820522
         },
         {
           "mean_absolute_error": 1.1945707739318256,
-          "mean_error": 0.035451483062075836,
+          "mean_error": 0.035451483062075885,
           "observations": 34039,
           "position": "DEF",
           "root_mean_squared_error": 2.109044652604794
         },
         {
-          "mean_absolute_error": 1.11854511968647,
-          "mean_error": -0.014246313175133113,
+          "mean_absolute_error": 1.1185451196864697,
+          "mean_error": -0.014246313175133212,
           "observations": 43826,
           "position": "MID",
           "root_mean_squared_error": 2.109515037376154
         },
         {
           "mean_absolute_error": 1.2657347017670895,
-          "mean_error": -0.017729123402165425,
+          "mean_error": -0.017729123402165085,
           "observations": 12437,
           "position": "FWD",
           "root_mean_squared_error": 2.361259656490597
         }
       ],
       "mean_absolute_error": 1.1300403289088494,
-      "mean_error": 0.008040182984982108,
+      "mean_error": 0.00804018298498212,
       "observations": 101447,
       "root_mean_squared_error": 2.0990553100981004
     }
@@ -298,8 +305,8 @@
       "OPTIMAL": 147
     },
     "ridge": {
-      "FEASIBLE": 33,
-      "OPTIMAL": 114
+      "FEASIBLE": 118,
+      "OPTIMAL": 29
     }
   },
   "truncated_candidates": [

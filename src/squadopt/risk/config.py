@@ -216,6 +216,15 @@ class RiskScreeningConfig:
                 "bench_weight": optimization.bench_weight,
                 "expected_points_scale": optimization.expected_points_scale,
                 "solver_time_limit_seconds": optimization.solver_time_limit_seconds,
+                **(
+                    {
+                        "solver_deterministic_time_limit": (
+                            optimization.solver_deterministic_time_limit
+                        )
+                    }
+                    if optimization.solver_deterministic_time_limit is not None
+                    else {}
+                ),
                 "deterministic_seed": optimization.deterministic_seed,
             },
         }

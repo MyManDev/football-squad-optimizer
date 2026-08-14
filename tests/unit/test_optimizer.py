@@ -1,5 +1,7 @@
 """Tests for the baseline CP-SAT optimizer."""
 
+from dataclasses import replace
+
 import pandas as pd
 import pytest
 from ortools.sat.python import cp_model
@@ -161,6 +163,34 @@ def test_tie_breaking_is_deterministic(
     second = optimize_squad(tied_players.sample(frac=1, random_state=42), small_config)
 
     assert first.diagnostics["tiebreak_completed"] is True
+    assert _ids(first.selected_squad) == _ids(second.selected_squad)
+    assert _ids(first.starting_xi) == _ids(second.starting_xi)
+    assert first.captain is not None and second.captain is not None
+    assert first.captain["player_id"] == second.captain["player_id"]
+
+
+def test_deterministic_work_budget_is_shared_by_primary_and_tiebreak(
+    tied_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    config = replace(
+        small_config,
+        solver_time_limit_seconds=5.0,
+        solver_deterministic_time_limit=0.1,
+    )
+
+    first = optimize_squad(tied_players.sample(frac=1, random_state=11), config)
+    second = optimize_squad(tied_players.sample(frac=1, random_state=42), config)
+
+    assert first.solver_status is SolverStatus.OPTIMAL
+    assert first.diagnostics["solver_deterministic_time_limit"] == 0.1
+    primary = float(first.diagnostics["primary_deterministic_time"])
+    tiebreak_limit = float(first.diagnostics["tiebreak_deterministic_time_limit"])
+    tiebreak = float(first.diagnostics["tiebreak_deterministic_time"])
+    total = float(first.diagnostics["deterministic_time_used"])
+    assert tiebreak_limit == pytest.approx(max(0.0, 0.1 - primary))
+    assert total == pytest.approx(primary + tiebreak)
+    assert total > 0.0
     assert _ids(first.selected_squad) == _ids(second.selected_squad)
     assert _ids(first.starting_xi) == _ids(second.starting_xi)
     assert first.captain is not None and second.captain is not None

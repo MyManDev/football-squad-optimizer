@@ -27,6 +27,7 @@ from squadopt.optimization.validation import validate_players
 
 CP_SAT_SAFE_INTEGER_MAX = (1 << 62) - 1
 MIN_TIEBREAK_TIME_SECONDS = 0.001
+MIN_TIEBREAK_DETERMINISTIC_TIME = 1e-9
 
 
 def _scale_expected_points(value: object, scale: int) -> int:
@@ -186,10 +187,39 @@ def _configure_solver(
     solver: cp_model.CpSolver,
     config: OptimizationConfig,
     time_limit_seconds: float,
+    deterministic_time_limit: float | None,
 ) -> None:
     solver.parameters.max_time_in_seconds = time_limit_seconds
+    if deterministic_time_limit is not None:
+        solver.parameters.max_deterministic_time = deterministic_time_limit
     solver.parameters.num_search_workers = 1
     solver.parameters.random_seed = config.deterministic_seed
+
+
+def _deterministic_time_used(solver: cp_model.CpSolver, raw_status: int) -> float:
+    """Return CP-SAT deterministic work consumed by a completed solve."""
+
+    try:
+        return float(solver.response_proto.deterministic_time)
+    except RuntimeError as error:
+        # An UNKNOWN result can be injected by a solver boundary test before a response
+        # exists. Real CP-SAT calls always attach a response, including UNKNOWN ones.
+        if raw_status == cp_model.UNKNOWN:
+            return 0.0
+        raise SolverExecutionError(
+            "CP-SAT returned a status without response diagnostics."
+        ) from error
+
+
+def _remaining_deterministic_time(
+    configured_limit: float | None,
+    consumed: float,
+) -> float | None:
+    """Return the deterministic budget left for a secondary solve."""
+
+    if configured_limit is None:
+        return None
+    return max(0.0, configured_limit - consumed)
 
 
 def _solve(model: cp_model.CpModel, solver: cp_model.CpSolver) -> int:
@@ -402,10 +432,16 @@ def _optimize_squad_with_objective_points(
     deadline = started_at + config.solver_time_limit_seconds
 
     primary_solver = cp_model.CpSolver()
-    _configure_solver(primary_solver, config, config.solver_time_limit_seconds)
+    _configure_solver(
+        primary_solver,
+        config,
+        config.solver_time_limit_seconds,
+        config.solver_deterministic_time_limit,
+    )
     raw_primary_status = _solve(artifacts.model, primary_solver)
     primary_status = _map_solver_status(raw_primary_status)
     elapsed_after_primary = perf_counter() - started_at
+    primary_deterministic_time = _deterministic_time_used(primary_solver, raw_primary_status)
 
     base_diagnostics: dict[str, object] = {
         "solver_backend": "ortools-cp-sat",
@@ -419,6 +455,18 @@ def _optimize_squad_with_objective_points(
         "input_player_count": len(ordered_players),
         "deterministic_seed": config.deterministic_seed,
         "num_search_workers": 1,
+        "solver_time_limit_seconds": config.solver_time_limit_seconds,
+        "solver_deterministic_time_limit": config.solver_deterministic_time_limit,
+        "primary_deterministic_time": primary_deterministic_time,
+        "tiebreak_deterministic_time_limit": None,
+        "tiebreak_deterministic_time": None,
+        "deterministic_time_used": primary_deterministic_time,
+        "deterministic_time_budget_exhausted": (
+            config.solver_deterministic_time_limit is not None
+            and primary_status is not SolverStatus.OPTIMAL
+            and primary_deterministic_time
+            >= config.solver_deterministic_time_limit - MIN_TIEBREAK_DETERMINISTIC_TIME
+        ),
         "rounding_mode": "ROUND_HALF_UP",
         "objective_contract": objective_contract.strip(),
         "tiebreak_attempted": False,
@@ -442,7 +490,19 @@ def _optimize_squad_with_objective_points(
 
     result_solver = primary_solver
     remaining_time = deadline - perf_counter()
-    if primary_status is SolverStatus.OPTIMAL and remaining_time > MIN_TIEBREAK_TIME_SECONDS:
+    remaining_deterministic_time = _remaining_deterministic_time(
+        config.solver_deterministic_time_limit,
+        primary_deterministic_time,
+    )
+    deterministic_budget_available = (
+        remaining_deterministic_time is None
+        or remaining_deterministic_time > MIN_TIEBREAK_DETERMINISTIC_TIME
+    )
+    if (
+        primary_status is SolverStatus.OPTIMAL
+        and remaining_time > MIN_TIEBREAK_TIME_SECONDS
+        and deterministic_budget_available
+    ):
         base_diagnostics["tiebreak_attempted"] = True
         _add_tiebreak_objective(
             artifacts.model,
@@ -454,10 +514,30 @@ def _optimize_squad_with_objective_points(
             primary_value,
         )
         tiebreak_solver = cp_model.CpSolver()
-        _configure_solver(tiebreak_solver, config, remaining_time)
+        base_diagnostics["tiebreak_deterministic_time_limit"] = remaining_deterministic_time
+        _configure_solver(
+            tiebreak_solver,
+            config,
+            remaining_time,
+            remaining_deterministic_time,
+        )
         raw_tiebreak_status = _solve(artifacts.model, tiebreak_solver)
         tiebreak_status = _map_solver_status(raw_tiebreak_status)
+        tiebreak_deterministic_time = _deterministic_time_used(
+            tiebreak_solver,
+            raw_tiebreak_status,
+        )
         base_diagnostics["tiebreak_status"] = _raw_status_name(raw_tiebreak_status)
+        base_diagnostics["tiebreak_deterministic_time"] = tiebreak_deterministic_time
+        base_diagnostics["deterministic_time_used"] = (
+            primary_deterministic_time + tiebreak_deterministic_time
+        )
+        base_diagnostics["deterministic_time_budget_exhausted"] = (
+            remaining_deterministic_time is not None
+            and tiebreak_status is not SolverStatus.OPTIMAL
+            and tiebreak_deterministic_time
+            >= remaining_deterministic_time - MIN_TIEBREAK_DETERMINISTIC_TIME
+        )
         if tiebreak_status in {SolverStatus.OPTIMAL, SolverStatus.FEASIBLE}:
             result_solver = tiebreak_solver
             base_diagnostics["tiebreak_completed"] = tiebreak_status is SolverStatus.OPTIMAL

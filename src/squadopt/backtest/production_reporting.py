@@ -76,6 +76,19 @@ def judgement_to_dict(result: ProductionBenchmarkResult) -> dict[str, object]:
             ),
             "ridge_form_window": result.config.ridge_config.form_window,
             "ridge_alpha": result.config.ridge_config.alpha,
+            "optimization": {
+                "solver_time_limit_seconds": (
+                    result.config.evaluation_config.optimization_config.solver_time_limit_seconds
+                ),
+                "solver_deterministic_time_limit": (
+                    result.config.evaluation_config.optimization_config.solver_deterministic_time_limit
+                ),
+                "deterministic_seed": (
+                    result.config.evaluation_config.optimization_config.deterministic_seed
+                ),
+                "solver_workers": 1,
+                "stopping_rule": "deterministic_work_with_wall_clock_safety_cap",
+            },
             "policy": {
                 field: getattr(result.config.policy, field)
                 for field in result.config.policy.__dataclass_fields__
@@ -146,10 +159,10 @@ def judgement_to_dict(result: ProductionBenchmarkResult) -> dict[str, object]:
             "more.",
             "The 2025-26 holdout is not read by this run.",
             "A candidate listed under truncated_candidates had at least one fold the "
-            "solver did not prove optimal. Its realized points are depressed by the "
-            "search rather than by its projection, and the run is not reproducible for "
-            "that candidate, because a wall-clock limit makes the answer depend on how "
-            "much work the machine completed.",
+            "solver did not prove optimal. This adds search noise of unknown direction to "
+            "realized points, because realized points are not the solver objective. The "
+            "deterministic work budget makes the selected incumbent reproducible; the "
+            "wall-clock limit is only a safety cap.",
             "Ridge is measured in this run rather than read from an earlier artifact, "
             "because its figure moves with the numerical environment while the "
             "deterministic baseline does not.",
@@ -194,6 +207,10 @@ def judgement_to_markdown(result: ProductionBenchmarkResult) -> str:
         "- Feasible folds: "
         + ", ".join(f"{label} `{count}`" for label, count in sorted(result.feasible_folds.items())),
         "- The 2025-26 holdout is untouched.",
+        "- Solver stopping rule: deterministic work budget "
+        f"`{result.config.evaluation_config.optimization_config.solver_deterministic_time_limit}` "
+        "with wall-clock safety cap "
+        f"`{result.config.evaluation_config.optimization_config.solver_time_limit_seconds}s`.",
         "",
         "## Mean realized squad points",
         "",
@@ -257,11 +274,10 @@ def judgement_to_markdown(result: ProductionBenchmarkResult) -> str:
             "## Solver truncation",
             "",
             f"**{listed} did not solve every fold to optimality.** Those folds returned "
-            "the best squad found before the time limit, not the best squad for that "
-            "candidate's own projection, so its realized points are depressed by the "
-            "search rather than by its prediction. The run is also not reproducible for "
-            "that candidate: a wall-clock limit makes the answer depend on how much work "
-            "the machine completed.",
+            "the incumbent selected after the same deterministic amount of CP-SAT work. "
+            "Their realized points therefore contain search noise of unknown direction, "
+            "not a known downward bias. The wall-clock limit is only a safety cap; the run "
+            "is rejected if that cap binds first.",
             "",
             "| Candidate | Solver outcomes |",
             "| --- | --- |",
