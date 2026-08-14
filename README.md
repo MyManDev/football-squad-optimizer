@@ -12,8 +12,8 @@ Sprint 5 adds a model-neutral prediction hand-off with provenance and player-ada
 uncertainty from chronologically split residual history. Sprint 6 adds an open-source,
 deterministic Ridge reference model and a paired baseline-versus-learned development
 benchmark. Sprint 7 adds deterministic hierarchical empirical Monte Carlo scenarios and
-fixed-decision score-distribution summaries. Scenario-aware optimization and Bayesian
-Optimization remain future work.
+fixed-decision score-distribution summaries. Sprint 13 adds a joint-scenario expected-score
+and empirical lower-tail CVaR optimizer. Bayesian Optimization remains future work.
 
 ## Sprint 0 scope
 
@@ -391,6 +391,32 @@ score of `57.2937`, population standard deviation `11.8587`, lower 10% quantile 
 and mean worst-10% score `37.1641`. The locked `2025-26` holdout was not accessed. See the
 [scenario specification](docs/scenario_spec.md).
 
+## Sprint 13 scenario-aware optimization
+
+Sprint 13 optimizes one shared squad, starting XI, bench, and captain directly against a
+validated `ScenarioSet`. The objective is a convex blend of mean starting score and empirical
+lower-tail CVaR, plus the existing expected bench-quality term. It does not choose a different
+squad per scenario.
+
+```python
+from squadopt import OptimizationConfig
+from squadopt.scenarios import ScenarioOptimizationConfig, optimize_scenario_aware_squad
+
+result = optimize_scenario_aware_squad(
+    scenarios,
+    OptimizationConfig(),
+    ScenarioOptimizationConfig(risk_aversion=0.25, tail_fraction=0.10),
+)
+
+if result.optimization_result.has_solution:
+    print(result.optimization_result.selected_squad)
+    print(result.mean_scenario_score, result.cvar_score)
+```
+
+The feasible set, integer point scaling, deterministic seed, one-worker solver policy, and
+secondary tie-break are shared with the baseline. See the
+[scenario-aware optimization specification](docs/scenario_optimization_spec.md).
+
 ## Quality checks
 
 ```powershell
@@ -415,3 +441,5 @@ Ridge reference, expanding-window fit, paired benchmark, and production-model in
 boundary.
 The [Sprint 7 specification](docs/scenario_spec.md) records the empirical hierarchical
 bootstrap, player-scale fallback, scenario fingerprint, and fixed-decision risk summaries.
+The [Sprint 13 specification](docs/scenario_optimization_spec.md) records the joint-scenario
+mean/CVaR objective, integer reformulation, deterministic tie-break, and limitations.

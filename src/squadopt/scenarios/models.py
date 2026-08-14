@@ -5,6 +5,7 @@ import json
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from decimal import ROUND_HALF_UP, Decimal
 from numbers import Integral, Real
 from types import MappingProxyType
 from typing import Final
@@ -12,10 +13,12 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
+from squadopt.optimization import OptimizationResult, SolverStatus
 from squadopt.prediction import PredictionSnapshot
 
 SCENARIO_CONTRACT_VERSION: Final = "hierarchical_residual_scenarios_v1"
 SCENARIO_EVALUATION_CONTRACT_VERSION: Final = "fixed_decision_scenario_evaluation_v1"
+SCENARIO_OPTIMIZATION_CONTRACT_VERSION: Final = "scenario_cvar_objective_v1"
 RESIDUAL_HISTORY_COLUMNS: Final = (
     "fold_id",
     "season",
@@ -174,6 +177,55 @@ class ScenarioEvaluationConfig:
         if not math.isfinite(threshold):
             raise ScenarioConfigurationError("points_threshold must be a finite number.")
         object.__setattr__(self, "points_threshold", threshold)
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioOptimizationConfig:
+    """Controls a convex expected-score and lower-tail CVaR objective."""
+
+    risk_aversion: float = 0.25
+    tail_fraction: float = 0.10
+    objective_weight_scale: int = 1_000
+    contract_version: str = SCENARIO_OPTIMIZATION_CONTRACT_VERSION
+
+    def __post_init__(self) -> None:
+        if self.contract_version != SCENARIO_OPTIMIZATION_CONTRACT_VERSION:
+            raise ScenarioConfigurationError(
+                "contract_version does not match the implemented scenario objective."
+            )
+        weight_scale = _integer(
+            self.objective_weight_scale,
+            "objective_weight_scale",
+            1,
+        )
+        value = self.risk_aversion
+        if isinstance(value, bool) or not isinstance(value, Real):
+            raise ScenarioConfigurationError("risk_aversion must be a finite number in [0, 1].")
+        normalized = float(value)
+        if not math.isfinite(normalized) or not 0.0 <= normalized <= 1.0:
+            raise ScenarioConfigurationError("risk_aversion must be a finite number in [0, 1].")
+        scaled = int(
+            (Decimal(str(normalized)) * weight_scale).quantize(
+                Decimal("1"),
+                rounding=ROUND_HALF_UP,
+            )
+        )
+        object.__setattr__(self, "objective_weight_scale", weight_scale)
+        object.__setattr__(self, "risk_aversion", scaled / weight_scale)
+        object.__setattr__(self, "tail_fraction", _probability(self.tail_fraction, "tail_fraction"))
+
+    @property
+    def configuration_fingerprint(self) -> str:
+        """Return a stable digest of every comparison-affecting control."""
+
+        payload = {
+            "contract_version": self.contract_version,
+            "risk_aversion": float(self.risk_aversion).hex(),
+            "tail_fraction": float(self.tail_fraction).hex(),
+            "objective_weight_scale": self.objective_weight_scale,
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
 
 
 def _typed_identifier(value: object) -> dict[str, object]:
@@ -379,3 +431,64 @@ class ScenarioEvaluationResult:
         if any(not math.isfinite(value) for value in self.scenario_scores):
             raise ScenarioValidationError("scenario_scores must be finite.")
         object.__setattr__(self, "diagnostics", _freeze_mapping(self.diagnostics, "diagnostics"))
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioOptimizationResult:
+    """Structured scenario-aware decision and its lower-tail diagnostics."""
+
+    optimization_result: OptimizationResult
+    scenario_config: ScenarioOptimizationConfig
+    scenario_fingerprint: str
+    scenario_evaluation: ScenarioEvaluationResult | None
+    mean_scenario_score: float | None
+    cvar_score: float | None
+    mean_bench_score: float | None
+    scenario_objective_value: float | None
+    risk_penalty_value: float | None
+    diagnostics: Mapping[str, object]
+    contract_version: str = SCENARIO_OPTIMIZATION_CONTRACT_VERSION
+
+    def __post_init__(self) -> None:
+        if self.contract_version != SCENARIO_OPTIMIZATION_CONTRACT_VERSION:
+            raise ScenarioValidationError("optimization contract_version is unsupported.")
+        if not isinstance(self.optimization_result, OptimizationResult):
+            raise ScenarioValidationError("optimization_result must be an OptimizationResult.")
+        if not isinstance(self.scenario_config, ScenarioOptimizationConfig):
+            raise ScenarioValidationError("scenario_config must be a ScenarioOptimizationConfig.")
+        _digest(self.scenario_fingerprint, "scenario_fingerprint")
+
+        values = (
+            self.mean_scenario_score,
+            self.cvar_score,
+            self.mean_bench_score,
+            self.scenario_objective_value,
+            self.risk_penalty_value,
+        )
+        if self.optimization_result.has_solution:
+            if not isinstance(self.scenario_evaluation, ScenarioEvaluationResult):
+                raise ScenarioValidationError(
+                    "A feasible scenario optimization must carry scenario_evaluation."
+                )
+            if self.scenario_evaluation.scenario_fingerprint != self.scenario_fingerprint:
+                raise ScenarioValidationError(
+                    "scenario_evaluation must describe the optimized scenario_fingerprint."
+                )
+            if any(value is None or not math.isfinite(value) for value in values):
+                raise ScenarioValidationError(
+                    "A feasible scenario optimization must carry finite objective metrics."
+                )
+            assert self.risk_penalty_value is not None
+            if self.risk_penalty_value < -1e-9:
+                raise ScenarioValidationError("risk_penalty_value must be non-negative.")
+        elif self.scenario_evaluation is not None or any(value is not None for value in values):
+            raise ScenarioValidationError(
+                "An optimization without a solution may not carry scenario metrics."
+            )
+        object.__setattr__(self, "diagnostics", _freeze_mapping(self.diagnostics, "diagnostics"))
+
+    @property
+    def solver_status(self) -> SolverStatus:
+        """Expose the shared solver-independent status directly."""
+
+        return self.optimization_result.solver_status

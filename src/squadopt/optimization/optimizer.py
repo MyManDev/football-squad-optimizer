@@ -63,6 +63,15 @@ def _build_model(
     starter_vars = [model.new_bool_var(f"starter_{index}") for index in range(player_count)]
     captain_vars = [model.new_bool_var(f"captain_{index}") for index in range(player_count)]
 
+    _add_decision_constraints(
+        model,
+        players,
+        config,
+        squad_vars,
+        starter_vars,
+        captain_vars,
+    )
+
     coefficients = objective_coefficients(objective_points, config)
     bench_coefficients = [coefficient[0] for coefficient in coefficients]
     scaled_points = [coefficient[2] for coefficient in coefficients]
@@ -75,6 +84,43 @@ def _build_model(
             "Scaled expected-points coefficients exceed the safe CP-SAT integer range; "
             "reduce expected_points_scale or inspect projection magnitudes."
         )
+
+    primary_terms: list[cp_model.LinearExpr] = []
+    for index, (points, bench) in enumerate(zip(scaled_points, bench_coefficients, strict=True)):
+        primary_terms.extend(
+            (
+                bench * squad_vars[index],
+                (points - bench) * starter_vars[index],
+                points * captain_vars[index],
+            )
+        )
+    primary_objective = cp_model.LinearExpr.sum(primary_terms)
+    model.maximize(primary_objective)
+
+    return _ModelArtifacts(
+        model=model,
+        squad_vars=squad_vars,
+        starter_vars=starter_vars,
+        captain_vars=captain_vars,
+        primary_objective=primary_objective,
+        scaled_points=scaled_points,
+        bench_coefficients=bench_coefficients,
+    )
+
+
+def _add_decision_constraints(
+    model: cp_model.CpModel,
+    players: pd.DataFrame,
+    config: OptimizationConfig,
+    squad_vars: list[cp_model.IntVar],
+    starter_vars: list[cp_model.IntVar],
+    captain_vars: list[cp_model.IntVar],
+) -> None:
+    """Add the shared squad, formation, budget, and captain constraints."""
+
+    player_count = len(players)
+    if not (len(squad_vars) == len(starter_vars) == len(captain_vars) == player_count):
+        raise SolverExecutionError("Decision variables must align with validated players.")
 
     model.add(cp_model.LinearExpr.sum(squad_vars) == config.squad_size)
     model.add(cp_model.LinearExpr.sum(starter_vars) == config.starting_size)
@@ -104,28 +150,6 @@ def _build_model(
 
     prices = [int(value) for value in players["price_tenths"].tolist()]
     model.add(cp_model.LinearExpr.weighted_sum(squad_vars, prices) <= config.budget_tenths)
-
-    primary_terms: list[cp_model.LinearExpr] = []
-    for index, (points, bench) in enumerate(zip(scaled_points, bench_coefficients, strict=True)):
-        primary_terms.extend(
-            (
-                bench * squad_vars[index],
-                (points - bench) * starter_vars[index],
-                points * captain_vars[index],
-            )
-        )
-    primary_objective = cp_model.LinearExpr.sum(primary_terms)
-    model.maximize(primary_objective)
-
-    return _ModelArtifacts(
-        model=model,
-        squad_vars=squad_vars,
-        starter_vars=starter_vars,
-        captain_vars=captain_vars,
-        primary_objective=primary_objective,
-        scaled_points=scaled_points,
-        bench_coefficients=bench_coefficients,
-    )
 
 
 def _raw_status_name(raw_status: int) -> str:
@@ -194,11 +218,15 @@ def _evaluate_primary(
 
 
 def _add_tiebreak_objective(
-    artifacts: _ModelArtifacts,
+    model: cp_model.CpModel,
+    squad_vars: list[cp_model.IntVar],
+    starter_vars: list[cp_model.IntVar],
+    captain_vars: list[cp_model.IntVar],
+    primary_objective: cp_model.LinearExpr,
     config: OptimizationConfig,
     primary_value: int,
 ) -> None:
-    player_count = len(artifacts.squad_vars)
+    player_count = len(squad_vars)
     largest_rank = max(0, player_count - 1)
     max_squad_rank_sum = config.squad_size * largest_rank
     max_starter_rank_sum = config.starting_size * largest_rank
@@ -212,17 +240,17 @@ def _add_tiebreak_objective(
             "Deterministic tie-break coefficients exceed the safe CP-SAT integer range."
         )
 
-    artifacts.model.add(artifacts.primary_objective == primary_value)
+    model.add(primary_objective == primary_value)
     tiebreak_terms: list[cp_model.LinearExpr] = []
     for rank in range(player_count):
         tiebreak_terms.extend(
             (
-                rank * artifacts.squad_vars[rank],
-                starter_weight * rank * artifacts.starter_vars[rank],
-                captain_weight * rank * artifacts.captain_vars[rank],
+                rank * squad_vars[rank],
+                starter_weight * rank * starter_vars[rank],
+                captain_weight * rank * captain_vars[rank],
             )
         )
-    artifacts.model.minimize(cp_model.LinearExpr.sum(tiebreak_terms))
+    model.minimize(cp_model.LinearExpr.sum(tiebreak_terms))
 
 
 def _selected_indices(
@@ -410,7 +438,15 @@ def _optimize_squad_with_objective_points(
     remaining_time = deadline - perf_counter()
     if primary_status is SolverStatus.OPTIMAL and remaining_time > MIN_TIEBREAK_TIME_SECONDS:
         base_diagnostics["tiebreak_attempted"] = True
-        _add_tiebreak_objective(artifacts, config, primary_value)
+        _add_tiebreak_objective(
+            artifacts.model,
+            artifacts.squad_vars,
+            artifacts.starter_vars,
+            artifacts.captain_vars,
+            artifacts.primary_objective,
+            config,
+            primary_value,
+        )
         tiebreak_solver = cp_model.CpSolver()
         _configure_solver(tiebreak_solver, config, remaining_time)
         raw_tiebreak_status = _solve(artifacts.model, tiebreak_solver)
