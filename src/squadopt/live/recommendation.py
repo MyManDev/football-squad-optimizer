@@ -44,6 +44,7 @@ from squadopt.prediction.opening import build_opening_projection_from_snapshot
 # Named so a report cannot describe itself as coming from a model that was never promoted.
 CONTROL_MODEL_NAME: Final = "squadopt-deterministic-baseline"
 CONTROL_MODEL_VERSION: Final = "opening-carry-over-v1"
+OPENING_FEATURE_CONTRACT_VERSION: Final = "opening-carry-over-features-v1"
 
 # What the projection can answer today. The opening path carries a completed season into a
 # season with no played gameweeks; a later gameweek needs the current season's own history,
@@ -182,6 +183,7 @@ def project(
             "players_priced_from_prior": len(projected) - carried,
             "model_name": CONTROL_MODEL_NAME,
             "model_version": CONTROL_MODEL_VERSION,
+            "feature_contract_version": OPENING_FEATURE_CONTRACT_VERSION,
             "projection_source": "operational_control",
         },
     )
