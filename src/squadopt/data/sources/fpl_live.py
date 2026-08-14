@@ -72,6 +72,13 @@ _ELEMENT_FIELDS: Final = (
     "now_cost",
 )
 _TEAM_FIELDS: Final = ("id", "name")
+_AVAILABILITY_FIELDS: Final = (
+    "code",
+    "element_type",
+    "status",
+    "chance_of_playing_next_round",
+    "news_added",
+)
 _EVENT_FIELDS: Final = ("id", "deadline_time", "finished")
 _FIXTURE_FIELDS: Final = (
     "id",
@@ -279,6 +286,61 @@ def next_open_deadline(
         f"gameweek {latest.gameweek} at {latest.deadline_utc}. The season is over, or the "
         "capture is older than the payload it claims to describe."
     )
+
+
+def availability_snapshot(bootstrap: bytes) -> pd.DataFrame:
+    """Read what the source says about each player's availability, as captured.
+
+    Deliberately a separate table from the player snapshot. These fields never enter a
+    model matrix: the archive records them after the fact and their as-of time cannot be
+    recovered, so a coefficient fitted on them would rest on information nobody held at
+    the deadline. What makes them usable at all is that *we* captured them, at an instant
+    we stamped ourselves, before the deadline they apply to.
+
+    Observed in the 2026-27 pre-season capture: 584 players carry statuses `a` (514),
+    `i` (35), `u` (18), `d` (14) and `s` (3), and the chance-of-playing field is quantised
+    to 0, 75 and 100 or absent. The vocabulary is not documented anywhere, so a status
+    this adapter has not seen is surfaced rather than mapped to a guess.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _AVAILABILITY_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        chance = record.get("chance_of_playing_next_round")
+        if chance is not None and (isinstance(chance, bool) or not isinstance(chance, int)):
+            raise InvalidValueError(
+                f"chance_of_playing_next_round must be an integer or absent, got {chance!r}."
+            )
+        rows.append(
+            {
+                "player_id": _integer(record, "code", "Element"),
+                "status": _text(record, "status", "Element"),
+                "chance_of_playing": pd.NA if chance is None else int(chance),
+                "news_added_utc": (
+                    pd.NA
+                    if record.get("news_added") is None
+                    else normalize_utc_timestamp(
+                        record.get("news_added"), label="Element news_added"
+                    )
+                ),
+            }
+        )
+
+    if not rows:
+        raise DataSourceError("Bootstrap payload declares no squad-eligible players.")
+
+    frame = pd.DataFrame(
+        rows, columns=["player_id", "status", "chance_of_playing", "news_added_utc"]
+    )
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["status"] = frame["status"].astype("string")
+    frame["chance_of_playing"] = frame["chance_of_playing"].astype("Int64")
+    frame["news_added_utc"] = frame["news_added_utc"].astype("string")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
 
 
 def team_codes(bootstrap: bytes) -> Mapping[int, int]:
