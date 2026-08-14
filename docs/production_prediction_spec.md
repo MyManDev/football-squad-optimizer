@@ -87,22 +87,62 @@ Deliberately excluded, with the reason rather than an omission:
 
 ## Cold-start precedence
 
-A player with no in-season history is not a single case. The order below is explicit because
-each step means something different, and collapsing them would hide which one fired.
+A player with no in-season history is not a single case, and the two stages do not run out
+of signal at the same moment. Each stage therefore has its own ladder, and the point where
+the two-stage product stops applying is stated rather than left implicit.
 
-1. In-season shifted history, when it exists.
-2. A genuine zero-minute record: the player has history and it says they did not play. This
-   is a real observation and projects to zero, not to a fallback.
-3. Cross-season carry-over from completed earlier seasons.
-4. The fitted opening price prior, for a player with no record anywhere.
+### The minutes stage
 
-The prior is refitted per fold on an expanding window rather than applied as one global
-constant. A constant fitted across all seasons and then used inside earlier folds would have
-seen those folds' own opening outcomes. The effect is confined to opening gameweeks, because
-walk-forward folds skip them by default, but the fold story should be uniform regardless.
+1. **Current-season appearance history.** How often a player features, multiplied by how
+   long when he does.
+2. **An observed absence.** History exists and says he featured in none of the recent
+   gameweeks, which projects to zero. This is a measurement, not a gap; folding it into the
+   fallback would discard a real observation.
+3. **Cross-season carry-over**, shrunk toward zero. He has a record, just not this season,
+   and last season may no longer describe him — a transfer, a new manager, a different depth
+   chart. Shrinking states that uncertainty instead of projecting last season forward
+   unchanged.
+4. **Nothing.** The estimate is left missing.
 
-No step may produce `NaN`. A player who reaches the end of this list without a projection is
-an error, not a zero.
+### The points stage
+
+1. **Current-season scoring rate** from shifted history.
+2. **Cross-season carry-over rate** for a player with a record but not this season.
+3. **The fitted opening price prior**, for a player with no record anywhere.
+
+### Where the product stops applying
+
+The two-stage form is `expected_minutes / 90 * expected_points_per_90`, and it is used
+wherever both stages have signal.
+
+It does **not** apply at the bottom rung, and that is a correctness point rather than a
+convenience. The price prior estimates *expected points* directly — `coefficient *
+price_tenths / 10` — not a per-90 rate. Multiplying it by `expected_minutes / 90` would
+scale a quantity that already accounts for playing time by playing time a second time,
+which double-counts the prior and pushes every genuinely new player toward zero. So for a
+player whose minutes stage produced nothing, the price prior supplies `expected_points`
+directly and the product is bypassed.
+
+This is why the minutes stage leaves its last rung missing instead of taking a constant.
+A fabricated minutes figure would satisfy the formula and silently corrupt the one case the
+formula cannot describe. Leaving it missing keeps the two claims separable: "we do not know
+how long he will play" and "we estimate his points from price alone" are different
+statements, and only the second is one we can defend.
+
+### Guarantees
+
+The final `expected_points` is never missing and never negative. A player who reaches the
+end of both ladders without a projection is an error, not a zero.
+
+Which rung fired is recorded per player in the snapshot diagnostics, for both stages.
+"We measured this" and "we fell back" are different claims, and a squad built mostly from
+fallbacks should be visibly that rather than indistinguishable from a measured one.
+
+The price prior is refitted per fold on an expanding window rather than applied as one
+global constant. A constant fitted across all seasons and then used inside earlier folds
+would have seen those folds' own opening outcomes. The effect is confined to opening
+gameweeks, because walk-forward folds skip them by default, but the fold story should be
+uniform regardless.
 
 ## Pre-registered evaluation gates
 
