@@ -35,9 +35,20 @@ from squadopt.prediction.learned import (
     fit_ridge_predictor,
     predict_ridge_expected_points,
 )
+from squadopt.prediction.minutes import (
+    ExpectedMinutesConfig,
+    MinutesProjection,
+    expected_minutes,
+)
 from squadopt.prediction.opening import (
     ROSTER_COLUMN_MAP,
     build_opening_projection_table,
+)
+from squadopt.prediction.production import (
+    ProductionProjection,
+    ProductionProjectionConfig,
+    expected_points_per_90,
+    production_projection,
 )
 from squadopt.prediction.projection import build_projection_table
 
@@ -54,18 +65,25 @@ __all__ = [
     "RIDGE_MODEL_VERSION",
     "ROSTER_COLUMN_MAP",
     "BaselineProjectionConfig",
+    "ExpectedMinutesConfig",
     "FittedRidgePredictor",
     "FormWindowMapping",
+    "MinutesProjection",
     "PredictionConfigurationError",
     "PredictionError",
     "PredictionProvenance",
     "PredictionSnapshot",
+    "ProductionProjection",
+    "ProductionProjectionConfig",
     "RidgeProjectionConfig",
     "baseline_expected_points",
     "build_opening_projection_table",
     "build_projection_table",
+    "expected_minutes",
+    "expected_points_per_90",
     "fit_ridge_predictor",
     "predict_ridge_expected_points",
     "prepare_optimizer_projection",
+    "production_projection",
     "required_feature_columns",
 ]

@@ -18,6 +18,7 @@ from squadopt.data.sources.fpl_live import (
     POSITION_CODES,
     SNAPSHOT_COLUMNS,
     GameweekDeadline,
+    availability_snapshot,
     fixture_snapshot,
     gameweek_deadlines,
     next_open_deadline,
@@ -53,6 +54,7 @@ def _element(**overrides: Any) -> dict[str, Any]:
         "status": "a",
         "chance_of_playing_next_round": 100,
         "news": "",
+        "news_added": None,
         "selected_by_percent": "41.2",
     }
     record.update(overrides)
@@ -559,3 +561,75 @@ def test_a_local_time_capture_instant_is_rejected() -> None:
 
 def test_team_codes_map_the_per_season_integer_to_the_persistent_code() -> None:
     assert dict(team_codes(_payload())) == {1: 3, 14: 14}
+
+
+# --- availability -----------------------------------------------------------
+
+
+def test_availability_is_a_separate_table_from_the_player_snapshot() -> None:
+    """These fields never enter a model matrix, so they never become snapshot columns."""
+
+    availability = availability_snapshot(_payload())
+
+    assert tuple(availability.columns) == (
+        "player_id",
+        "status",
+        "chance_of_playing",
+        "news_added_utc",
+    )
+
+
+def test_availability_keys_on_the_persistent_code() -> None:
+    availability = availability_snapshot(_payload([_element(code=118748)]))
+
+    assert availability["player_id"].tolist() == [118748]
+
+
+def test_an_absent_chance_of_playing_stays_absent() -> None:
+    """Most of a roster carries no chance at all, and that is not a zero."""
+
+    availability = availability_snapshot(_payload([_element(chance_of_playing_next_round=None)]))
+
+    assert availability["chance_of_playing"].isna().all()
+
+
+def test_a_stated_chance_is_kept_as_an_integer() -> None:
+    availability = availability_snapshot(_payload([_element(chance_of_playing_next_round=75)]))
+
+    assert availability["chance_of_playing"].tolist() == [75]
+
+
+def test_news_timestamps_are_normalised_to_utc() -> None:
+    availability = availability_snapshot(
+        _payload([_element(news_added="2026-08-09T09:30:07.136250Z")])
+    )
+
+    assert availability["news_added_utc"].tolist() == ["2026-08-09T09:30:07.136250Z"]
+
+
+def test_a_missing_news_timestamp_stays_absent() -> None:
+    availability = availability_snapshot(_payload([_element(news_added=None)]))
+
+    assert availability["news_added_utc"].isna().all()
+
+
+def test_non_players_are_excluded_from_availability_too() -> None:
+    availability = availability_snapshot(
+        _payload([_element(code=1, element_type=3), _element(code=2, element_type=5)])
+    )
+
+    assert availability["player_id"].tolist() == [1]
+
+
+def test_a_non_integer_chance_is_rejected() -> None:
+    with pytest.raises(InvalidValueError, match="chance_of_playing_next_round"):
+        availability_snapshot(_payload([_element(chance_of_playing_next_round="75")]))
+
+
+@pytest.mark.parametrize("field", ["status", "chance_of_playing_next_round", "news_added"])
+def test_a_renamed_availability_field_stops_the_run(field: str) -> None:
+    record = _element()
+    record.pop(field, None)
+
+    with pytest.raises(DataSourceError, match=field):
+        availability_snapshot(_payload([record]))

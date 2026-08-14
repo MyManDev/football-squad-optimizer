@@ -24,6 +24,7 @@ __all__ = [
     "CANONICAL_COLUMNS",
     "CANONICAL_SORT_COLUMNS",
     "COLUMN_KINDS",
+    "DERIVED_OUTCOME_COLUMNS",
     "EXTERNALLY_SUPPLIED_COLUMNS",
     "FIXTURE_COLUMNS",
     "FIXTURE_KEY_COLUMNS",
@@ -147,6 +148,27 @@ AMBIGUOUS_TIMING_COLUMNS: tuple[str, ...] = (
     "availability_status",
 )
 
+# Columns no source provides, computed by the feature layer from an outcome column
+# and therefore carrying that column's timing. They are classified here rather
+# than at the point of use so the rule stays the same for every column: nothing
+# acquires a rolling feature until its time of knowledge is declared in one place.
+#
+# `appeared` is one when a player recorded any minutes and zero otherwise. Rolled,
+# it answers how often a player features at all, which a minutes average cannot
+# separate from a player who plays rarely but fully when he does.
+#
+# The two team columns sum a club's fantasy points within a gameweek, split by the
+# unit that earned them: attackers and midfielders on one side, goalkeepers and
+# defenders on the other. They stand in for attacking and defensive quality because
+# the panel carries no goals — a strong defence keeps clean sheets, and clean sheets
+# are what its defenders are paid in. Being sums of an outcome, they carry outcome
+# timing and are shifted like everything else.
+DERIVED_OUTCOME_COLUMNS: tuple[str, ...] = (
+    "appeared",
+    "team_attacking_points",
+    "team_defensive_points",
+)
+
 # Canonical columns a caller may legitimately supply as metadata, because a
 # single-season extract does not carry them in the file itself. Adapters are not
 # required to map these; the pipeline can declare them instead.
@@ -221,6 +243,13 @@ PLAYER_TIME_SORT_COLUMNS: tuple[str, ...] = ("season", "player_id", "gameweek")
 # on purpose: it prevents one season's final gameweeks from leaking into the next
 # season's opening gameweeks.
 PLAYER_GROUP_COLUMNS: tuple[str, ...] = ("season", "player_id")
+
+# The same guarantee one grain up, for aggregates that describe a club rather than a
+# player — opponent strength being the reason it exists. It is a second frozen key
+# rather than a parameter on the first: letting a caller choose the grouping is
+# precisely what these constants prevent, because a key without `season` would let one
+# season's form leak into the next. Both keys carry `season` for that reason.
+TEAM_GROUP_COLUMNS: tuple[str, ...] = ("season", "team_id")
 
 # Gameweeks are 1-based. No upper bound is defined here, because the maximum
 # gameweek count is competition-specific and is supplied by validation config.
@@ -399,9 +428,14 @@ def is_outcome_column(column: str) -> bool:
 
     if column in PRE_MATCH_COLUMNS:
         return False
-    if column in OUTCOME_COLUMNS or column in AMBIGUOUS_TIMING_COLUMNS:
+    if (
+        column in OUTCOME_COLUMNS
+        or column in AMBIGUOUS_TIMING_COLUMNS
+        or column in DERIVED_OUTCOME_COLUMNS
+    ):
         return True
     raise InvalidValueError(
         f"Column {column!r} has no time-of-knowledge classification; add it to "
-        "PRE_MATCH_COLUMNS, OUTCOME_COLUMNS, or AMBIGUOUS_TIMING_COLUMNS."
+        "PRE_MATCH_COLUMNS, OUTCOME_COLUMNS, AMBIGUOUS_TIMING_COLUMNS, or "
+        "DERIVED_OUTCOME_COLUMNS."
     )

@@ -35,8 +35,16 @@ FEATURE_STEMS: Mapping[str, str] = MappingProxyType(
     {
         "minutes": "minutes",
         "total_points": "points",
+        "appeared": "appearance_rate",
     }
 )
+
+# The derived indicator behind the appearance rate: one when a player recorded any
+# minutes in a gameweek, zero otherwise. Rolled, it separates a player who features
+# rarely from one who features often but briefly — a distinction a minutes average
+# cannot make, and the one that matters most for projecting whether a player will
+# be on the pitch at all.
+APPEARANCE_SOURCE_COLUMN = "appeared"
 
 
 def rolling_feature_name(column: str, window: int) -> str:
@@ -55,6 +63,12 @@ def per_90_feature_name(window: int) -> str:
     """Return the canonical name of the rolling points-per-90 feature."""
 
     return f"points_per_90_last_{window}"
+
+
+def minutes_per_appearance_feature_name(window: int) -> str:
+    """Return the canonical name of the rolling minutes-when-featuring feature."""
+
+    return f"minutes_per_appearance_last_{window}"
 
 
 def _require_window(value: object, name: str) -> int:
@@ -96,14 +110,20 @@ class FeatureConfig:
     points_windows: tuple[int, ...] = (3, 5)
     per_90_window: int = 5
     min_periods: int = 1
+    appearance_windows: tuple[int, ...] = ()
 
     def __post_init__(self) -> None:
         minutes_windows = _normalize_windows(self.minutes_windows, "minutes_windows")
         points_windows = _normalize_windows(self.points_windows, "points_windows")
         per_90_window = _require_window(self.per_90_window, "per_90_window")
         min_periods = _require_window(self.min_periods, "min_periods")
+        appearance_windows = (
+            ()
+            if not self.appearance_windows
+            else _normalize_windows(self.appearance_windows, "appearance_windows")
+        )
 
-        smallest = min(*minutes_windows, *points_windows, per_90_window)
+        smallest = min(*minutes_windows, *points_windows, *appearance_windows, per_90_window)
         if min_periods > smallest:
             raise FeatureConfigurationError(
                 f"min_periods ({min_periods}) cannot exceed the smallest window ({smallest}), "
@@ -114,6 +134,7 @@ class FeatureConfig:
         object.__setattr__(self, "points_windows", points_windows)
         object.__setattr__(self, "per_90_window", per_90_window)
         object.__setattr__(self, "min_periods", min_periods)
+        object.__setattr__(self, "appearance_windows", appearance_windows)
 
 
 DEFAULT_FEATURE_CONFIG = FeatureConfig()
@@ -125,4 +146,12 @@ def feature_column_names(config: FeatureConfig) -> tuple[str, ...]:
     names = [rolling_feature_name("minutes", window) for window in config.minutes_windows]
     names.extend(rolling_feature_name("total_points", window) for window in config.points_windows)
     names.append(per_90_feature_name(config.per_90_window))
+    # Appended last and empty by default, so every configuration that predates the
+    # appearance decomposition produces exactly the columns it produced before.
+    #
+    # Each window yields both halves of that decomposition, because neither is
+    # useful alone: how often a player features, and how long when he does.
+    for window in config.appearance_windows:
+        names.append(rolling_feature_name(APPEARANCE_SOURCE_COLUMN, window))
+        names.append(minutes_per_appearance_feature_name(window))
     return tuple(names)
