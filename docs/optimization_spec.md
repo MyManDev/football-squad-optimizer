@@ -52,6 +52,7 @@ infeasible because of budget, team, or interacting model constraints returns a s
 | Bench weight | 0.1 |
 | Expected-points scale | 1000 |
 | Solver time limit | 10 seconds |
+| Solver deterministic-time limit | disabled (`None`) |
 | Deterministic seed | 0 |
 
 Configuration mappings are copied into immutable mappings. The configuration is validated
@@ -178,13 +179,22 @@ its proven optimum. A secondary objective then prefers lower stable ranks in thi
 3. selected squad.
 
 The weights are derived from pool and squad sizes and checked against safe integer bounds.
-Both solves share one wall-clock deadline. If the second solve cannot produce a solution in
-the remaining time, the proven primary solution is retained.
+Both solves share one wall-clock deadline. They also share
+`solver_deterministic_time_limit` when that optional limit is configured. CP-SAT
+deterministic time measures solver work rather than elapsed seconds; using it as the binding
+benchmark limit makes an incumbent reproducible under the pinned solver version, one-worker
+policy, fixed seed, and identical model. The value is a solver stopping target, not a hard
+counter: CP-SAT can report a small overshoot when it finishes a unit of work. The secondary
+target subtracts the primary solve's reported work instead of granting a fresh full target.
+The wall-clock limit remains a safety cap. If the second solve cannot produce a solution in
+the remaining target, the proven primary solution is retained.
 
 When the primary result is only `FEASIBLE`, tie-breaking is skipped because the optimum is
-not known. Stable ordering, a single worker, and a fixed seed improve repeatability, but a
-wall-clock cutoff cannot guarantee the same feasible incumbent across machines or solver
-versions.
+not known. Stable ordering, a single worker, and a fixed seed improve repeatability. A
+wall-clock cutoff alone cannot guarantee the same feasible incumbent across machines. The
+production benchmark therefore configures a deterministic work limit and rejects a run if
+its wall-clock safety cap binds first. Reproducibility across a different OR-Tools version is
+not claimed.
 
 ## Result and termination semantics
 

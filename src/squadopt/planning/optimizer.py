@@ -23,11 +23,14 @@ from squadopt.optimization.coefficients import (
 from squadopt.optimization.config import POSITIONS
 from squadopt.optimization.optimizer import (
     CP_SAT_SAFE_INTEGER_MAX,
+    MIN_TIEBREAK_DETERMINISTIC_TIME,
     MIN_TIEBREAK_TIME_SECONDS,
     _add_decision_constraints,
     _configure_solver,
+    _deterministic_time_used,
     _map_solver_status,
     _raw_status_name,
+    _remaining_deterministic_time,
     _selected_indices,
     _solve,
     _verify_solution,
@@ -576,9 +579,11 @@ def optimize_transfer_plan(
         primary_solver,
         optimization_config,
         optimization_config.solver_time_limit_seconds,
+        optimization_config.solver_deterministic_time_limit,
     )
     raw_primary_status = _solve(artifacts.model, primary_solver)
     primary_status = _map_solver_status(raw_primary_status)
+    primary_deterministic_time = _deterministic_time_used(primary_solver, raw_primary_status)
     divisor = settings.objective_weight_scale * optimization_config.expected_points_scale
     diagnostics: dict[str, object] = {
         "solver_backend": "ortools-cp-sat",
@@ -605,6 +610,21 @@ def optimize_transfer_plan(
         "rounding_mode": "ROUND_HALF_UP",
         "deterministic_seed": optimization_config.deterministic_seed,
         "num_search_workers": 1,
+        "solver_time_limit_seconds": optimization_config.solver_time_limit_seconds,
+        "solver_deterministic_time_limit": (optimization_config.solver_deterministic_time_limit),
+        "primary_deterministic_time": primary_deterministic_time,
+        "tiebreak_deterministic_time_limit": None,
+        "tiebreak_deterministic_time": None,
+        "deterministic_time_used": primary_deterministic_time,
+        "deterministic_time_budget_exhausted": (
+            optimization_config.solver_deterministic_time_limit is not None
+            and primary_status is not SolverStatus.OPTIMAL
+            and primary_deterministic_time
+            >= (
+                optimization_config.solver_deterministic_time_limit
+                - MIN_TIEBREAK_DETERMINISTIC_TIME
+            )
+        ),
         "tiebreak_attempted": False,
         "tiebreak_status": None,
         "tiebreak_completed": False,
@@ -624,14 +644,46 @@ def optimize_transfer_plan(
 
     result_solver = primary_solver
     remaining_time = deadline - perf_counter()
-    if primary_status is SolverStatus.OPTIMAL and remaining_time > MIN_TIEBREAK_TIME_SECONDS:
+    remaining_deterministic_time = _remaining_deterministic_time(
+        optimization_config.solver_deterministic_time_limit,
+        primary_deterministic_time,
+    )
+    deterministic_budget_available = (
+        remaining_deterministic_time is None
+        or remaining_deterministic_time > MIN_TIEBREAK_DETERMINISTIC_TIME
+    )
+    if (
+        primary_status is SolverStatus.OPTIMAL
+        and remaining_time > MIN_TIEBREAK_TIME_SECONDS
+        and deterministic_budget_available
+    ):
         diagnostics["tiebreak_attempted"] = True
         _add_tiebreak(artifacts, optimization_config, primary_value)
         tiebreak_solver = cp_model.CpSolver()
-        _configure_solver(tiebreak_solver, optimization_config, remaining_time)
+        diagnostics["tiebreak_deterministic_time_limit"] = remaining_deterministic_time
+        _configure_solver(
+            tiebreak_solver,
+            optimization_config,
+            remaining_time,
+            remaining_deterministic_time,
+        )
         raw_tiebreak_status = _solve(artifacts.model, tiebreak_solver)
         tiebreak_status = _map_solver_status(raw_tiebreak_status)
+        tiebreak_deterministic_time = _deterministic_time_used(
+            tiebreak_solver,
+            raw_tiebreak_status,
+        )
         diagnostics["tiebreak_status"] = _raw_status_name(raw_tiebreak_status)
+        diagnostics["tiebreak_deterministic_time"] = tiebreak_deterministic_time
+        diagnostics["deterministic_time_used"] = (
+            primary_deterministic_time + tiebreak_deterministic_time
+        )
+        diagnostics["deterministic_time_budget_exhausted"] = (
+            remaining_deterministic_time is not None
+            and tiebreak_status is not SolverStatus.OPTIMAL
+            and tiebreak_deterministic_time
+            >= remaining_deterministic_time - MIN_TIEBREAK_DETERMINISTIC_TIME
+        )
         if tiebreak_status in {SolverStatus.OPTIMAL, SolverStatus.FEASIBLE}:
             result_solver = tiebreak_solver
             diagnostics["tiebreak_completed"] = tiebreak_status is SolverStatus.OPTIMAL

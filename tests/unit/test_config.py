@@ -18,6 +18,7 @@ def test_default_configuration_matches_sprint_zero_rules() -> None:
     assert config.starting_position_max["GK"] == 1
     assert config.bench_weight == 0.1
     assert config.expected_points_scale == 1000
+    assert config.solver_deterministic_time_limit is None
 
 
 def test_configuration_is_frozen_and_copies_mapping_inputs() -> None:
@@ -40,6 +41,9 @@ def test_configuration_is_frozen_and_copies_mapping_inputs() -> None:
         {"bench_weight": 1.1},
         {"expected_points_scale": 0},
         {"solver_time_limit_seconds": 0.0},
+        {"solver_deterministic_time_limit": 0.0},
+        {"solver_deterministic_time_limit": float("inf")},
+        {"solver_deterministic_time_limit": True},
         {"deterministic_seed": -1},
     ],
 )

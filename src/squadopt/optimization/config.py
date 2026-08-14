@@ -86,6 +86,7 @@ class OptimizationConfig:
     bench_weight: float = 0.1
     expected_points_scale: int = 1000
     solver_time_limit_seconds: float = 10.0
+    solver_deterministic_time_limit: float | None = None
     deterministic_seed: int = 0
 
     def __post_init__(self) -> None:
@@ -127,6 +128,20 @@ class OptimizationConfig:
             raise InvalidConfigurationError(
                 "solver_time_limit_seconds must be a finite positive real number."
             )
+
+        deterministic_time_limit = self.solver_deterministic_time_limit
+        if deterministic_time_limit is not None:
+            if isinstance(deterministic_time_limit, bool) or not isinstance(
+                deterministic_time_limit, Real
+            ):
+                raise InvalidConfigurationError(
+                    "solver_deterministic_time_limit must be None or a finite positive real number."
+                )
+            deterministic_time_limit = float(deterministic_time_limit)
+            if not math.isfinite(deterministic_time_limit) or deterministic_time_limit <= 0.0:
+                raise InvalidConfigurationError(
+                    "solver_deterministic_time_limit must be None or a finite positive real number."
+                )
 
         squad_limits = _freeze_position_limits(
             self.squad_position_limits,
@@ -180,4 +195,9 @@ class OptimizationConfig:
         object.__setattr__(self, "bench_weight", bench_weight)
         object.__setattr__(self, "expected_points_scale", points_scale)
         object.__setattr__(self, "solver_time_limit_seconds", time_limit)
+        object.__setattr__(
+            self,
+            "solver_deterministic_time_limit",
+            deterministic_time_limit,
+        )
         object.__setattr__(self, "deterministic_seed", seed)

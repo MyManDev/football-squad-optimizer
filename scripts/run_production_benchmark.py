@@ -24,6 +24,8 @@ from pathlib import Path
 import pandas as pd
 
 from squadopt.backtest.production_benchmark import (
+    DEFAULT_BENCHMARK_DETERMINISTIC_TIME_LIMIT,
+    DEFAULT_BENCHMARK_WALL_TIME_LIMIT_SECONDS,
     DEFAULT_DEVELOPMENT_SEASONS,
     ProductionBenchmarkConfig,
     run_production_benchmark,
@@ -36,6 +38,8 @@ from squadopt.data.sources.vaastav import (
     build_panel,
     load_team_codes,
 )
+from squadopt.evaluation import EvaluationConfig
+from squadopt.optimization import OptimizationConfig
 from squadopt.prediction.minutes import ExpectedMinutesConfig
 from squadopt.prediction.production import ProductionProjectionConfig
 
@@ -66,6 +70,18 @@ def main() -> int:
     )
     parser.add_argument("--window", type=int, default=DEFAULT_WINDOW)
     parser.add_argument("--archive-root", default=str(ARCHIVE_ROOT))
+    parser.add_argument(
+        "--deterministic-time-limit",
+        type=float,
+        default=DEFAULT_BENCHMARK_DETERMINISTIC_TIME_LIMIT,
+        help="binding CP-SAT deterministic-work budget shared by primary and tie-break",
+    )
+    parser.add_argument(
+        "--wall-time-limit-seconds",
+        type=float,
+        default=DEFAULT_BENCHMARK_WALL_TIME_LIMIT_SECONDS,
+        help="per-fold wall-clock safety cap; the run fails if this binds first",
+    )
     parser.add_argument("--json-output")
     parser.add_argument("--markdown-output")
     arguments = parser.parse_args()
@@ -97,6 +113,12 @@ def main() -> int:
         production_config=ProductionProjectionConfig(
             rate_window=arguments.window,
             minutes=ExpectedMinutesConfig(window=arguments.window),
+        ),
+        evaluation_config=EvaluationConfig(
+            optimization_config=OptimizationConfig(
+                solver_time_limit_seconds=arguments.wall_time_limit_seconds,
+                solver_deterministic_time_limit=arguments.deterministic_time_limit,
+            )
         ),
     )
 

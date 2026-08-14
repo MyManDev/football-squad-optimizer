@@ -92,6 +92,7 @@ def _optimization_config(config: RiskScreeningConfig) -> dict[str, object]:
         "bench_weight": optimization.bench_weight,
         "expected_points_scale": optimization.expected_points_scale,
         "solver_time_limit_seconds": optimization.solver_time_limit_seconds,
+        "solver_deterministic_time_limit": optimization.solver_deterministic_time_limit,
         "deterministic_seed": optimization.deterministic_seed,
     }
 

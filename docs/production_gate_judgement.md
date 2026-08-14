@@ -10,22 +10,23 @@ Verdict: **no_promotion_control_retained**
 - Folds: `147`
 - Feasible folds: baseline `147`, production `147`, ridge `147`
 - The 2025-26 holdout is untouched.
+- Solver stopping rule: deterministic work budget `0.5` with wall-clock safety cap `120.0s`.
 
 ## Mean realized squad points
 
 | Candidate | Mean realized |
 | --- | ---: |
-| baseline | 53.7755 |
-| production | 57.4150 |
-| ridge | 57.3129 |
+| baseline | 53.2585 |
+| production | 57.7483 |
+| ridge | 57.1020 |
 
 ## Paired comparisons
 
 | Candidate | Reference | Mean | 90% interval | Stdev | W/T/L |
 | --- | --- | ---: | --- | ---: | --- |
-| production | baseline | +3.6395 | `[+1.7548, +5.8095]` | 14.8056 | 73/22/52 |
-| production | ridge | +0.1020 | `[-2.1364, +2.2381]` | 16.5392 | 69/5/73 |
-| ridge | baseline | +3.5374 | `[+1.9728, +5.3816]` | 12.8832 | 81/10/56 |
+| production | baseline | +4.4898 | `[+2.5643, +6.6939]` | 15.4833 | 81/20/46 |
+| production | ridge | +0.6463 | `[-1.6194, +2.9524]` | 16.9592 | 71/5/71 |
+| ridge | baseline | +3.8435 | `[+2.2313, +5.6735]` | 13.0928 | 83/7/57 |
 
 ## Prediction metrics
 
@@ -50,32 +51,32 @@ Reported per position rather than pooled, because pooling is what hides a system
 
 | Condition | Required | Measured | Verdict |
 | --- | --- | ---: | --- |
-| `baseline_mean_improvement` | >= +0.5000 | +3.6395 | pass |
-| `baseline_lower_bound` | >= +0.0000 | +1.7548 | pass |
-| `ridge_mean_difference` | >= +0.0000 | +0.1020 | pass |
-| `ridge_lower_bound` | >= -0.5000 | -2.1364 | **fail** |
+| `baseline_mean_improvement` | >= +0.5000 | +4.4898 | pass |
+| `baseline_lower_bound` | >= +0.0000 | +2.5643 | pass |
+| `ridge_mean_difference` | >= +0.0000 | +0.6463 | pass |
+| `ridge_lower_bound` | >= -0.5000 | -1.6194 | **fail** |
 | `prediction_metric_improved_against_ridge` | MAE or RMSE improves | -0.0063 | pass |
 | `other_prediction_metric_tolerance` | <= +0.0500 relative degradation | +0.0507 | **fail** |
 | `every_fold_feasible` | = 147 folds | +147.0000 | pass |
 
 ## Solver truncation
 
-**ridge did not solve every fold to optimality.** Those folds returned the best squad found before the time limit, not the best squad for that candidate's own projection, so its realized points are depressed by the search rather than by its prediction. The run is also not reproducible for that candidate: a wall-clock limit makes the answer depend on how much work the machine completed.
+**ridge did not solve every fold to optimality.** Those folds returned the incumbent selected after the same deterministic amount of CP-SAT work. Their realized points therefore contain search noise of unknown direction, not a known downward bias. The wall-clock limit is only a safety cap; the run is rejected if that cap binds first.
 
 | Candidate | Solver outcomes |
 | --- | --- |
 | baseline | OPTIMAL 147 |
 | production | OPTIMAL 147 |
-| ridge | FEASIBLE 33, OPTIMAL 114 |
+| ridge | FEASIBLE 118, OPTIMAL 29 |
 
 ## Environment
 
 Recorded because a numerical solve is sensitive to the libraries underneath it. The Ridge reference is measured in this run rather than read from an earlier artifact, since comparing against a figure recorded on another machine would measure the machines as much as the models.
 
-- numpy: `2.4.6`
+- numpy: `2.5.2`
 - ortools: `9.15.6755`
 - pandas: `3.0.5`
-- platform: `Windows-10-10.0.26200-SP0`
-- processor: `Intel64 Family 6 Model 141 Stepping 1, GenuineIntel`
-- python: `3.11.0`
+- platform: `Windows-11-10.0.26200-SP0`
+- processor: `Intel64 Family 6 Model 183 Stepping 1, GenuineIntel`
+- python: `3.13.5`
 - scikit_learn: `1.9.0`

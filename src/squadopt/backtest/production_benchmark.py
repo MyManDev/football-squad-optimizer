@@ -44,10 +44,13 @@ from squadopt.evaluation import (
 from squadopt.experiments import season_aware_moving_block_interval
 from squadopt.experiments.config import PromotionPolicy
 from squadopt.features import CrossSeasonConfig
+from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.prediction.learned import RidgeProjectionConfig
 from squadopt.prediction.production import ProductionProjectionConfig
 
 PRODUCTION_BENCHMARK_CONTRACT_VERSION: Final = "production_vs_baseline_and_ridge_v1"
+DEFAULT_BENCHMARK_WALL_TIME_LIMIT_SECONDS: Final = 120.0
+DEFAULT_BENCHMARK_DETERMINISTIC_TIME_LIMIT: Final = 0.5
 
 BASELINE_LABEL: Final = "baseline"
 RIDGE_LABEL: Final = "ridge"
@@ -68,6 +71,22 @@ VERDICT_PROMOTABLE: Final = "eligible_for_holdout_evaluation"
 VERDICT_RETAIN_CONTROL: Final = "no_promotion_control_retained"
 
 
+def _default_benchmark_evaluation_config() -> EvaluationConfig:
+    """Use deterministic CP-SAT work as the benchmark stopping rule.
+
+    The wall-clock limit remains a generous safety cap. A benchmark run is rejected if
+    that cap binds before the deterministic budget, because such a result depends on
+    machine load and cannot support a reproducible comparison.
+    """
+
+    return EvaluationConfig(
+        optimization_config=OptimizationConfig(
+            solver_time_limit_seconds=DEFAULT_BENCHMARK_WALL_TIME_LIMIT_SECONDS,
+            solver_deterministic_time_limit=DEFAULT_BENCHMARK_DETERMINISTIC_TIME_LIMIT,
+        )
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ProductionBenchmarkConfig:
     """Fixed inputs for one judging run."""
@@ -79,7 +98,9 @@ class ProductionBenchmarkConfig:
     )
     ridge_config: RidgeProjectionConfig = field(default_factory=RidgeProjectionConfig)
     cross_season_config: CrossSeasonConfig = field(default_factory=CrossSeasonConfig)
-    evaluation_config: EvaluationConfig = field(default_factory=EvaluationConfig)
+    evaluation_config: EvaluationConfig = field(
+        default_factory=_default_benchmark_evaluation_config
+    )
     policy: PromotionPolicy = field(default_factory=PromotionPolicy)
     run_metadata: Mapping[str, object] = field(default_factory=dict)
 
@@ -141,11 +162,12 @@ class ProductionBenchmarkResult:
 
     @property
     def truncated_candidates(self) -> tuple[str, ...]:
-        """Candidates with a fold the solver did not prove optimal.
+        """Candidates with a fold whose primary objective was not proved optimal.
 
-        Surfaced rather than buried: such a run is not reproducible, because a
-        wall-clock limit makes the answer depend on machine load, and the candidate's
-        realized points are depressed by the search rather than by its projection.
+        Under the benchmark's deterministic-work stopping rule these incumbents are
+        reproducible, but they still add solver-search noise to the realized-score
+        comparison. That noise has unknown direction because realized points are not
+        the objective CP-SAT maximizes.
         """
 
         return tuple(
@@ -314,14 +336,9 @@ def _feasible_folds(result: EvaluationResult) -> int:
 def _solver_statuses(result: EvaluationResult) -> Mapping[str, int]:
     """Count how each candidate's folds terminated.
 
-    Recorded because a fold that stopped at the time limit did not return the best squad
-    for its own projection — it returned the best one found before the clock ran out.
-    That is a property of the search, not of the model, and a comparison that hides it
-    credits or blames the wrong thing.
-
-    It is also the difference between a reproducible run and an irreproducible one: a
-    wall-clock limit makes the answer depend on how much work the machine got done, so
-    two runs of identical code can disagree.
+    A non-optimal fold returns the incumbent selected after the declared deterministic
+    amount of CP-SAT work. That incumbent is reproducible, but it is still a property of
+    search as well as projection, so hiding it would credit or blame the wrong layer.
     """
 
     counts: dict[str, int] = {}
@@ -329,6 +346,27 @@ def _solver_statuses(result: EvaluationResult) -> Mapping[str, int]:
         status = str(getattr(fold.optimization_result, "solver_status", "unknown"))
         counts[status] = counts.get(status, 0) + 1
     return counts
+
+
+def _non_deterministic_truncations(result: EvaluationResult) -> tuple[str, ...]:
+    """Return folds where the wall cap bound before deterministic work was exhausted."""
+
+    violations: list[str] = []
+    for fold in result.folds:
+        optimization = fold.optimization_result
+        tiebreak_incomplete = (
+            optimization.diagnostics.get("tiebreak_attempted") is True
+            and optimization.diagnostics.get("tiebreak_completed") is not True
+        )
+        primary_incomplete = optimization.solver_status in {
+            SolverStatus.FEASIBLE,
+            SolverStatus.UNKNOWN,
+        }
+        if (primary_incomplete or tiebreak_incomplete) and (
+            optimization.diagnostics.get("deterministic_time_budget_exhausted") is not True
+        ):
+            violations.append(fold.fold_id)
+    return tuple(violations)
 
 
 def _prepare(
@@ -378,6 +416,17 @@ def run_production_benchmark(
         label: _prepare(panel, builder, settings) for label, builder in builders.items()
     }
     results = {label: result for label, (_, result) in prepared.items()}
+    wall_limited = {
+        label: _non_deterministic_truncations(result) for label, result in results.items()
+    }
+    invalid = {label: folds for label, folds in wall_limited.items() if folds}
+    if invalid:
+        examples = {label: folds[:5] for label, folds in invalid.items()}
+        raise BacktestConfigurationError(
+            "The wall-clock safety cap bound before the deterministic solver budget; "
+            f"affected fold examples: {examples!r}. Increase only the safety cap, not the "
+            "deterministic comparison budget."
+        )
     residuals = {label: build_residual_history(folds) for label, (folds, _) in prepared.items()}
     metrics = {label: prediction_metrics(frame) for label, frame in residuals.items()}
 
