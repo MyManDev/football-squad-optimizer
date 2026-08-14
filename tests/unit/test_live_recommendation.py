@@ -20,8 +20,13 @@ from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import (
     CONTROL_MODEL_NAME,
+    CONTROL_MODEL_VERSION,
     OPENING_FEATURE_CONTRACT_VERSION,
     REPORT_CONTRACT_VERSION,
+    LiveResidualHistory,
+    LiveRiskBlocker,
+    LiveRiskStatus,
+    LiveRiskValidationError,
     build_recommendation,
     infer_season,
     project,
@@ -30,6 +35,7 @@ from squadopt.live import (
     render,
 )
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
+from squadopt.scenarios import ScenarioConfig, ScenarioEvaluationConfig
 
 SEASON = "2026-27"
 HISTORY_SEASON = "2025-26"
@@ -412,3 +418,172 @@ def test_the_report_states_how_much_rests_on_the_prior(tmp_path: Path) -> None:
 
     assert "priced from the prior" in report
     assert "projected from history" in report
+
+
+# --- live risk evidence -----------------------------------------------------
+
+
+def _risk_history(
+    projection: Any,
+    *,
+    seasons: tuple[str, ...] = ("2024-25", "2025-26"),
+    gameweek: int = 1,
+    model_name: str = CONTROL_MODEL_NAME,
+    post_processing_contract_version: str = "captured_availability_rule_v1",
+) -> LiveResidualHistory:
+    rows: list[dict[str, object]] = []
+    for season_index, season in enumerate(seasons):
+        for row in projection.table.itertuples(index=False):
+            residual = float(((int(row.player_id) + season_index) % 5) - 2) / 2.0
+            rows.append(
+                {
+                    "fold_id": f"{season}-gw{gameweek:02d}",
+                    "season": season,
+                    "gameweek": gameweek,
+                    "player_id": row.player_id,
+                    "team_id": row.team_id,
+                    "position": row.position,
+                    "predicted_points": float(row.expected_points),
+                    "realized_points": float(row.expected_points) + residual,
+                    "residual": residual,
+                }
+            )
+    return LiveResidualHistory(
+        pd.DataFrame(rows),
+        model_name=model_name,
+        model_version=CONTROL_MODEL_VERSION,
+        feature_contract_version=OPENING_FEATURE_CONTRACT_VERSION,
+        post_processing_contract_version=post_processing_contract_version,
+        source_id="synthetic-control-oos-v1",
+    )
+
+
+def _recommend_with_risk(
+    tmp_path: Path,
+    *,
+    history_gameweek: int = 1,
+    seasons: tuple[str, ...] = ("2024-25", "2025-26"),
+    model_name: str = CONTROL_MODEL_NAME,
+    post_processing_contract_version: str = "captured_availability_rule_v1",
+) -> Any:
+    inputs = read_inputs(_capture(tmp_path), season=SEASON)
+    projection = project(inputs, _panel(players=(1001, 1004, 1012)))
+    history = _risk_history(
+        projection,
+        seasons=seasons,
+        gameweek=history_gameweek,
+        model_name=model_name,
+        post_processing_contract_version=post_processing_contract_version,
+    )
+    return build_recommendation(
+        inputs,
+        projection,
+        risk_history=history,
+        risk_scenario_config=ScenarioConfig(
+            scenario_count=64,
+            min_history_folds=2,
+            min_player_observations=2,
+        ),
+        risk_evaluation_config=ScenarioEvaluationConfig(points_threshold=40.0),
+    )
+
+
+def test_no_residual_input_returns_structured_not_requested_risk(tmp_path: Path) -> None:
+    recommendation = _recommend(tmp_path)
+
+    assert recommendation.risk.status is LiveRiskStatus.NOT_REQUESTED
+    assert recommendation.risk.metrics is None
+    assert "No lower-tail number is printed" in render(recommendation)
+
+
+def test_midseason_residuals_do_not_support_opening_gameweek_risk(
+    tmp_path: Path,
+) -> None:
+    recommendation = _recommend_with_risk(tmp_path, history_gameweek=2)
+
+    assert recommendation.risk.status is LiveRiskStatus.UNAVAILABLE
+    assert LiveRiskBlocker.UNSUPPORTED_OPENING_GAMEWEEK in recommendation.risk.blockers
+    assert LiveRiskBlocker.INSUFFICIENT_HISTORY in recommendation.risk.blockers
+    assert recommendation.risk.metrics is None
+    assert "Midseason residuals do not support opening-gameweek risk" in render(recommendation)
+
+
+def test_model_mismatch_is_reported_alongside_the_opening_blocker(
+    tmp_path: Path,
+) -> None:
+    recommendation = _recommend_with_risk(
+        tmp_path,
+        history_gameweek=2,
+        model_name="unpromoted-candidate",
+    )
+
+    assert recommendation.risk.blockers == (
+        LiveRiskBlocker.MODEL_MISMATCH,
+        LiveRiskBlocker.UNSUPPORTED_OPENING_GAMEWEEK,
+        LiveRiskBlocker.INSUFFICIENT_HISTORY,
+    )
+
+
+def test_too_few_matching_opening_folds_are_reported_not_fabricated(
+    tmp_path: Path,
+) -> None:
+    recommendation = _recommend_with_risk(tmp_path, seasons=("2025-26",))
+
+    assert recommendation.risk.status is LiveRiskStatus.UNAVAILABLE
+    assert recommendation.risk.blockers == (LiveRiskBlocker.INSUFFICIENT_HISTORY,)
+    assert recommendation.risk.metrics is None
+
+
+def test_availability_post_processing_must_match_the_residual_history(
+    tmp_path: Path,
+) -> None:
+    recommendation = _recommend_with_risk(
+        tmp_path,
+        post_processing_contract_version="no-availability-v1",
+    )
+
+    assert recommendation.risk.status is LiveRiskStatus.UNAVAILABLE
+    assert recommendation.risk.blockers == (LiveRiskBlocker.MODEL_MISMATCH,)
+
+
+def test_matching_opening_residuals_produce_all_requested_risk_metrics(
+    tmp_path: Path,
+) -> None:
+    recommendation = _recommend_with_risk(tmp_path)
+    risk = recommendation.risk
+
+    assert risk.status is LiveRiskStatus.AVAILABLE
+    assert risk.blockers == ()
+    assert risk.metrics is not None
+    assert risk.metrics.scenario_count == 64
+    assert 0.0 <= risk.metrics.probability_below_threshold <= 1.0
+    report = render(recommendation)
+    assert "lower 10% quantile" in report
+    assert "mean worst 10%" in report
+    assert "P(score < 40)" in report
+
+
+def test_available_risk_names_and_fingerprints_its_residual_input(
+    tmp_path: Path,
+) -> None:
+    first = _recommend_with_risk(tmp_path / "first")
+    second = _recommend_with_risk(tmp_path / "second")
+
+    assert first.risk.residual_provenance["source_id"] == "synthetic-control-oos-v1"
+    assert len(str(first.risk.residual_provenance["residual_fingerprint"])) == 64
+    assert first.risk.scenario_fingerprint == second.risk.scenario_fingerprint
+    assert first.risk.metrics == second.risk.metrics
+
+
+def test_live_residual_history_copies_input_and_rejects_missing_columns() -> None:
+    table = pd.DataFrame({"fold_id": ["2025-26-gw01"]})
+
+    with pytest.raises(LiveRiskValidationError, match="missing columns"):
+        LiveResidualHistory(
+            table,
+            model_name=CONTROL_MODEL_NAME,
+            model_version=CONTROL_MODEL_VERSION,
+            feature_contract_version=OPENING_FEATURE_CONTRACT_VERSION,
+            post_processing_contract_version="captured_availability_rule_v1",
+            source_id="broken",
+        )

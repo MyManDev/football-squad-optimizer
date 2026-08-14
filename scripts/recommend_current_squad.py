@@ -20,26 +20,46 @@ that reason.
 The squad is projected by the operational control, the deterministic baseline. The two-stage
 production candidate was measured against the pre-registered gates and did not clear them, so
 it does not decide a real squad.
+
+Optional lower-tail diagnostics require an explicitly identified out-of-sample residual
+file from that same operational control. Midseason residuals are not reused for GW1.
 """
 
 import argparse
 import sys
 from pathlib import Path
 
+import pandas as pd
+
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
+    LiveResidualHistory,
     build_recommendation,
     infer_season,
     project,
     read_inputs,
     render,
 )
+from squadopt.scenarios import ScenarioConfig, ScenarioError, ScenarioEvaluationConfig
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
 ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
+
+
+def _read_residuals(path: Path) -> pd.DataFrame:
+    if not path.is_file():
+        raise DataError(f"Risk residual file does not exist: {path}.")
+    try:
+        if path.suffix.lower() == ".csv":
+            return pd.read_csv(path)
+        if path.suffix.lower() in {".parquet", ".pq"}:
+            return pd.read_parquet(path)
+    except (OSError, ValueError, ImportError) as error:
+        raise DataError(f"Could not read risk residual file {path}: {error}") from error
+    raise DataError("Risk residual file must be CSV or Parquet.")
 
 
 def resolve_snapshot_id(requested: str | None) -> str:
@@ -82,6 +102,18 @@ def main() -> int:
         help="override the season; omitted, it is derived from the capture's own deadlines",
     )
     parser.add_argument("--archive-root", default=str(ARCHIVE_ROOT))
+    parser.add_argument("--risk-residuals", help="CSV/Parquet OOS residual history")
+    parser.add_argument("--risk-model-name")
+    parser.add_argument("--risk-model-version")
+    parser.add_argument("--risk-feature-contract-version")
+    parser.add_argument("--risk-post-processing-contract-version")
+    parser.add_argument("--risk-source-id")
+    parser.add_argument("--risk-scenario-count", type=int, default=1_000)
+    parser.add_argument("--risk-seed", type=int, default=0)
+    parser.add_argument("--risk-min-history-folds", type=int, default=8)
+    parser.add_argument("--risk-lower-quantile", type=float, default=0.10)
+    parser.add_argument("--risk-worst-fraction", type=float, default=0.10)
+    parser.add_argument("--risk-points-threshold", type=float, default=40.0)
     parser.add_argument("--output", help="write the report here as well as printing it")
     arguments = parser.parse_args()
 
@@ -98,8 +130,53 @@ def main() -> int:
         )
 
         panel = build_panel(arguments.archive_root)
-        recommendation = build_recommendation(inputs, project(inputs, panel))
-    except DataError as error:
+        projection = project(inputs, panel)
+        risk_history = None
+        risk_scenario_config = None
+        risk_evaluation_config = None
+        if arguments.risk_residuals:
+            metadata = {
+                "--risk-model-name": arguments.risk_model_name,
+                "--risk-model-version": arguments.risk_model_version,
+                "--risk-feature-contract-version": (arguments.risk_feature_contract_version),
+                "--risk-post-processing-contract-version": (
+                    arguments.risk_post_processing_contract_version
+                ),
+                "--risk-source-id": arguments.risk_source_id,
+            }
+            missing = [name for name, value in metadata.items() if not value]
+            if missing:
+                raise DataError(
+                    "Risk residuals require explicit provenance arguments: "
+                    + ", ".join(missing)
+                    + "."
+                )
+            risk_history = LiveResidualHistory(
+                _read_residuals(Path(arguments.risk_residuals)),
+                model_name=arguments.risk_model_name,
+                model_version=arguments.risk_model_version,
+                feature_contract_version=arguments.risk_feature_contract_version,
+                post_processing_contract_version=(arguments.risk_post_processing_contract_version),
+                source_id=arguments.risk_source_id,
+            )
+            risk_scenario_config = ScenarioConfig(
+                scenario_count=arguments.risk_scenario_count,
+                deterministic_seed=arguments.risk_seed,
+                min_history_folds=arguments.risk_min_history_folds,
+            )
+            risk_evaluation_config = ScenarioEvaluationConfig(
+                lower_quantile=arguments.risk_lower_quantile,
+                worst_fraction=arguments.risk_worst_fraction,
+                points_threshold=arguments.risk_points_threshold,
+            )
+        recommendation = build_recommendation(
+            inputs,
+            projection,
+            risk_history=risk_history,
+            risk_scenario_config=risk_scenario_config,
+            risk_evaluation_config=risk_evaluation_config,
+        )
+    except (DataError, ScenarioError) as error:
         print(f"\nCould not produce a recommendation:\n  {error}")
         return 1
 
