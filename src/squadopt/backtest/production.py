@@ -115,15 +115,25 @@ def _season_features(
     season: str,
     feature_config: FeatureConfig,
     carry_over: pd.DataFrame,
+    fixtures: pd.DataFrame,
+    team_codes: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Build one season's features plus the carry-over known entering that season."""
+    """Build one season's features, its carry-over, and its fixture context.
+
+    The fixture join happens per season rather than once over the concatenated panel so
+    that a completed season can be cached with it already attached. Re-joining the whole
+    panel on every fold cost about 1.6 seconds each, which across 147 folds is minutes
+    spent recomputing rows that cannot change.
+    """
 
     season_rows = visible.loc[visible["season"] == season].copy(deep=True)
     features = build_feature_dataset(season_rows, config=feature_config)
     features = features.merge(carry_over, on="player_id", how="left", validate="many_to_one")
     for column in (PRIOR_MINUTES_COLUMN, PRIOR_RATE_COLUMN):
         features[column] = features[column].astype("float64")
-    return features
+    season_fixtures = fixtures.loc[fixtures["season"].astype("string") == season]
+    season_codes = team_codes.loc[team_codes["season"].astype("string") == season]
+    return attach_fixture_features(features, season_fixtures, season_codes)
 
 
 def build_production_prediction_snapshot(
@@ -152,11 +162,12 @@ def build_production_prediction_snapshot(
             season,
             feature_config,
             carry_over_as_of(visible, target_season=season, config=carry),
+            fixtures,
+            team_codes,
         )
         for season in seasons
     ]
     features = pd.concat(frames, ignore_index=True)
-    features = attach_fixture_features(features, fixtures, team_codes)
 
     return _snapshot_from_features(features, visible, decision, settings)
 
@@ -263,15 +274,16 @@ def make_production_projection_builder(
             if season < decision.season:
                 if season not in completed_cache:
                     completed_cache[season] = _season_features(
-                        visible, season, feature_config, carry_cache[season]
+                        visible, season, feature_config, carry_cache[season], fixtures, team_codes
                     )
                 frames.append(completed_cache[season])
             else:
                 frames.append(
-                    _season_features(visible, season, feature_config, carry_cache[season])
+                    _season_features(
+                        visible, season, feature_config, carry_cache[season], fixtures, team_codes
+                    )
                 )
         features = pd.concat(frames, ignore_index=True)
-        features = attach_fixture_features(features, fixtures, team_codes)
         return _snapshot_from_features(features, visible, decision, settings)
 
     return build
