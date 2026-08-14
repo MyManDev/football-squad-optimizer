@@ -36,9 +36,19 @@ from squadopt.prediction.config import (
     PredictionConfigurationError,
 )
 
-# The roster columns this module needs, in canonical terms. A roster already carries
-# canonical position labels: translating a platform's numeric encoding is source
-# knowledge, so it happens in the source module rather than here.
+# What a live capture already produces: the five deadline-known fields in canonical
+# terms, needing no renaming.
+_CANONICAL_PLAYER_COLUMNS: tuple[str, ...] = (
+    "player_id",
+    "name",
+    "team_id",
+    "position",
+    "price_tenths",
+)
+
+# The same five as the archive's roster spells them. A roster already carries canonical
+# position labels: translating a platform's numeric encoding is source knowledge, so it
+# happens in the source module rather than here.
 ROSTER_COLUMN_MAP: Mapping[str, str] = {
     "code": "player_id",
     "web_name": "name",
@@ -152,6 +162,36 @@ def _fallback_for(
     return values
 
 
+def build_opening_projection_from_snapshot(
+    panel: pd.DataFrame,
+    players: pd.DataFrame,
+    *,
+    season: str,
+    config: BaselineProjectionConfig | None = None,
+    cross_season: CrossSeasonConfig | None = None,
+) -> pd.DataFrame:
+    """Project an opening gameweek from an already-canonical player table.
+
+    The archive publishes a roster in its own raw column names, and a live capture
+    produces the canonical five deadline-known fields directly. Both describe the same
+    thing, so both reach the same arithmetic here rather than through two copies of it.
+
+    The difference worth naming is the club identifier. The archive's roster carries the
+    platform's per-season integer; a live capture resolves it to the display name so the
+    result joins the historical panel. Either is a valid grouping key for the optimizer's
+    per-club limit, which is the only thing that reads it, so this path does not coerce
+    it to a number the way the raw path must.
+    """
+
+    return _project_opening(
+        panel,
+        _require_canonical_players(players),
+        season=season,
+        config=config,
+        cross_season=cross_season,
+    )
+
+
 def build_opening_projection_table(
     panel: pd.DataFrame,
     roster: pd.DataFrame,
@@ -173,10 +213,52 @@ def build_opening_projection_table(
     that has not been played — the carried record reads completed seasons only.
     """
 
+    return _project_opening(
+        panel,
+        _canonical_roster(_require_roster(roster)),
+        season=season,
+        config=config,
+        cross_season=cross_season,
+    )
+
+
+def _require_canonical_players(players: object) -> pd.DataFrame:
+    """Accept a player table that already speaks the canonical vocabulary."""
+
+    if not isinstance(players, pd.DataFrame):
+        raise PredictionConfigurationError("players must be a pandas DataFrame.")
+    missing = [column for column in _CANONICAL_PLAYER_COLUMNS if column not in players.columns]
+    if missing:
+        raise PredictionConfigurationError(
+            f"Player table is missing canonical columns {missing!r}; it carries "
+            f"{sorted(map(str, players.columns))!r}."
+        )
+    frame = players.loc[:, list(_CANONICAL_PLAYER_COLUMNS)].copy(deep=True)
+    for column in _CANONICAL_PLAYER_COLUMNS:
+        if bool(frame[column].isna().any()):
+            raise PredictionConfigurationError(
+                f"Player table column {column!r} contains missing values."
+            )
+    duplicated = frame.loc[frame["player_id"].duplicated(), "player_id"].tolist()
+    if duplicated:
+        raise PredictionConfigurationError(
+            f"Player table repeats player_id {format_examples(duplicated)}."
+        )
+    return frame
+
+
+def _project_opening(
+    panel: pd.DataFrame,
+    players: pd.DataFrame,
+    *,
+    season: str,
+    config: BaselineProjectionConfig | None,
+    cross_season: CrossSeasonConfig | None,
+) -> pd.DataFrame:
+    """Carry each player's completed-season record into an opening projection."""
+
     settings = DEFAULT_PROJECTION_CONFIG if config is None else config
     carry_settings = CrossSeasonConfig() if cross_season is None else cross_season
-
-    players = _canonical_roster(_require_roster(roster))
     carried = carry_over_as_of(panel, target_season=season, config=carry_settings)
 
     merged = players.merge(carried, on="player_id", how="left", validate="one_to_one")
