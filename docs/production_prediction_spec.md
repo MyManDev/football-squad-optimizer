@@ -1,8 +1,11 @@
 # Production prediction specification
 
-Status: **draft**. The evaluation gates in this document are pre-registered and frozen: they
-were written before the production model existed and must not be edited once a comparison
-has been run. Everything else is open to revision until the first production PR merges.
+Status: **implemented**, first candidate. The evaluation gates in this document are
+pre-registered and frozen: they were written before the production model existed and must
+not be edited once a comparison has been run.
+
+Every number below is measured on the pinned archive, and each one names the rows it was
+measured on. Where a claim has not been measured yet it says so rather than being asserted.
 
 This document is the contract between the production prediction pipeline and the rest of the
 system. The optimizer, the uncertainty layer and the scenario generator do not read it —
@@ -28,6 +31,49 @@ different object from one whose variance comes from finishing.
 Both stages are fitted on the same leakage-safe feature table and on the same chronological
 slice. Neither stage may read the target gameweek's outcome.
 
+### The rate is deliberately plain, for now
+
+The first candidate's rate is the current-season scoring rate with a shrunk carry-over
+fallback — close to what the baseline already uses. That is a measurement strategy, not
+modesty. Any difference from the baseline then comes from two identifiable sources, the
+appearance decomposition and the calendar, and can be attributed before anything more
+elaborate is layered on. Adding model capacity first would leave the improvement
+unattributable, which is the position the two-stage split exists to avoid.
+
+### The calendar
+
+The panel sums a player's minutes and points across every fixture inside a gameweek, so the
+number of fixtures a club plays is part of the projection rather than a refinement to it.
+Measured across the six supported seasons:
+
+| Fixtures | Rows | Mean points | Mean minutes |
+| ---: | ---: | ---: | ---: |
+| 1 | 149,117 | 1.175 | 27.6 |
+| 2 | 6,919 | 2.339 | 53.6 |
+| 3 | 39 | 2.923 | 75.9 |
+
+A double gameweek is worth 1.990 times a single one. The deterministic baseline predicts
+0.917 times as much for one, because it cannot see the fixture list at all, and 1,937 rows in
+the panel exceed ninety minutes with a maximum of 204.
+
+Expected minutes therefore scale with the fixture count and cap at that many full matches,
+and a club with no fixture projects to zero whatever its players' history says — history
+cannot override an empty calendar.
+
+### Appearance decomposition
+
+Expected minutes is the product of how often a player features and how long when he does,
+each over the same window, rather than a single minutes average. The two are different
+questions and one number conflates them: a fringe player who completes ninety minutes
+whenever selected and a starter regularly substituted on the hour can log identical minutes
+averages while being different selections. Only one of them is a rotation risk.
+
+The rate is minutes per gameweek *featured*, not per fixture, because the panel stores a
+gameweek total and cannot say whether a player featured in one of two fixtures or both. That
+leaves a slightly inflated base rate for histories containing double gameweeks — 6,919 of
+156,075 rows — and removing it needs player data at fixture grain the archive does not
+publish.
+
 ## Availability is a rule, not a feature
 
 The archive records `status`, `chance_of_playing_next_round` and `news` after the fact. Their
@@ -37,14 +83,32 @@ model matrix, and the exclusion is mechanical: they never enter the feature buil
 
 Live capture changes what is knowable, not what is trained. Once we stamp `captured_at_utc`
 ourselves and can prove capture preceded the deadline, availability becomes usable at
-inference as a documented rule:
+inference as an explicit multiplier applied *after* the projection:
 
-- A player the source marks unavailable is removed from the selectable pool.
-- A player carrying a reduced chance of playing has expected minutes scaled by that stated
-  chance, and the scaling is recorded in the diagnostics rather than folded silently into
-  the projection.
-- A player with no availability information is treated as available, because absence of news
-  is the normal state and treating it as doubt would penalise every unremarkable player.
+- A stated chance of playing sets the multiplier to that fraction. It takes precedence over
+  the status, because the source publishes it exactly when it has something quantitative to
+  say.
+- Where no chance is stated the status decides: available is 1, injured, suspended,
+  unavailable and not-in-squad are 0, and doubtful without a stated chance is a half, which
+  is the only neutral reading of unquantified uncertainty.
+- A player with no availability record at all is treated as available, because silence is the
+  normal state for most of a roster and reading it as doubt would penalise every unremarkable
+  player.
+- An unrecognised status stops the run. The field is undocumented, and a wrong guess about
+  the meaning of the most common status would misprice the whole roster at once. A capture is
+  normally inspected with a dry run before a deadline, which is where such a change surfaces.
+
+The vocabulary is measured, not assumed. The 2026-27 pre-season capture publishes, across 584
+squad-eligible players: `a` 514, `i` 35, `u` 18, `d` 14, `s` 3. A chance of playing is stated
+for exactly 83 of them — the same 83 that carry a news timestamp — quantised to 0, 75 and
+100. Applied to a flat projection the rule zeroes 56 players, reduces 14 to three quarters
+and leaves 514 untouched.
+
+Players reduced to zero are **reported, not removed**. Pool membership belongs to the
+decision layer, and dropping rows inside the projection could make a squad problem infeasible
+for reasons that layer never sees. Every multiplier the rule applies is reported alongside the
+projection, because a quietly halved projection is indistinguishable from a model that
+predicted half as much and those are different claims.
 
 This asymmetry is deliberate. The rule uses live availability; the model does not learn from
 historical availability. Revisiting it requires a source whose historical snapshot timing is
@@ -178,6 +242,45 @@ across the full development fold set, and the `+0.5` baseline gate will not bind
 Ridge underperforms there. This is intended, and it is why Ridge is measured across all
 development folds before the production model is built rather than after.
 
+Ridge's figure is now measured and recorded in
+[learned_benchmark_development.md](learned_benchmark_development.md): `+3.1156` over 147
+development folds, with a 90% moving-block interval of `[+1.5306, +4.9524]`. That is the bar.
+
+## Measured so far
+
+Prediction error against the deterministic baseline, on the 101,447 development rows outside
+opening gameweeks:
+
+| Slice | Rows | Baseline MAE | Production MAE | Baseline RMSE | Production RMSE |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Overall | 101,447 | 1.1237 | 1.1224 | 2.2335 | 2.2051 |
+| Single fixture | 96,335 | 1.0956 | 1.0862 | 2.1526 | 2.1261 |
+| Double gameweek | 5,112 | 1.6541 | 1.8041 | 3.4173 | 3.3636 |
+| Players who featured | 41,930 | 2.2246 | 2.1855 | 3.2870 | 3.2228 |
+
+Bias, as mean predicted minus realized:
+
+| Fixtures | Baseline | Production |
+| ---: | ---: | ---: |
+| 1 | +0.0588 | +0.0428 |
+| 2 | -0.9987 | +0.1724 |
+
+The bias row is the substantive result. The baseline under-projects a double-gameweek player
+by a full point because it cannot see the calendar, and that systematic error is essentially
+gone. Double-gameweek MAE rises while its RMSE falls, which is the expected shape: predictions
+for those players move up, so the many who still do not play cost more absolute error while
+the large misses shrink.
+
+Against Ridge on the same rows — MAE 1.1300, RMSE 2.0991 — production is ahead on MAE and
+behind on RMSE by 5.05%, which sits on the edge of the 5% tolerance above. Stated as it
+stands rather than as it is hoped to end up.
+
+**Not yet measured:** the decision metric the gates are actually written against, which is
+realized squad points on the same folds. One season is measured — 2024-25, 37 folds, baseline
+53.8108 against production 58.0270 for a paired difference of `+4.2162` — and one season is
+not the comparison. Sprint 6 reported `+4.8108` for Ridge on that same season and `+3.1156`
+across four, which is exactly why a single season is not treated as the answer.
+
 ## Determinism and provenance
 
 - Input frames are never mutated in place.
@@ -196,5 +299,12 @@ development folds before the production model is built rather than after.
   trained. Live capture can observe it; the model cannot learn from it.
 - Historical availability is unusable, as set out above. The rule applies from the first live
   capture onward and cannot be validated against past seasons.
-- Team strength is estimated from shifted results only, so a promoted team begins each season
-  with a pooled prior and is mispriced until it accumulates a record.
+- Opponent strength is not yet a feature. The fixture table carries opponent identity and
+  home or away for every gameweek, and the aggregation exposes difficulty summaries, but the
+  first candidate uses only fixture counts. Source-published difficulty stays out of the model
+  because it is opaque and its within-season stability is unverified; a strength estimate
+  computed from shifted results is the intended replacement and has not been built.
+- The rate stage is deliberately plain, so the model currently has no way to distinguish two
+  players with the same recent rate facing very different opponents.
+- Minutes per gameweek featured is not minutes per fixture, which leaves a small inflation for
+  histories containing double gameweeks, as set out above.
