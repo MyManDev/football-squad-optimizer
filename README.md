@@ -14,8 +14,9 @@ deterministic Ridge reference model and a paired baseline-versus-learned develop
 benchmark. Sprint 7 adds deterministic hierarchical empirical Monte Carlo scenarios and
 fixed-decision score-distribution summaries. Sprint 13 adds a joint-scenario expected-score
 and empirical lower-tail CVaR optimizer. Sprint 14 adds deterministic multi-gameweek squad and
-transfer planning with explicit bank and free-transfer state. Bayesian Optimization remains
-future work.
+transfer planning with explicit bank and free-transfer state. Sprint 15 adds deterministic
+Gaussian-process Bayesian Optimization for development-only policy search. Automatic promotion
+remains out of scope.
 
 ## Sprint 0 scope
 
@@ -448,6 +449,39 @@ if result.has_solution:
 
 See the [transfer-planning specification](docs/transfer_planning_spec.md).
 
+## Sprint 15 Bayesian Optimization
+
+Sprint 15 searches a finite, versioned policy grid with a seeded maximin initial design, a fixed
+Matern Gaussian-process surrogate, and Expected Improvement. The evaluator receives only the
+declared chronological development fold IDs; locked-holdout IDs are recorded but never passed to
+it.
+
+```python
+from squadopt.bayesopt import BayesianOptimizationConfig, run_bayesian_optimization
+
+
+development_fold_ids = ("2023-24-gw10", "2023-24-gw11", "2024-25-gw10")
+locked_holdout_fold_ids = ("2025-26-gw10",)
+
+
+def development_objective(candidate, development_fold_ids):
+    # Adapt the existing chronological development-fold evaluation here.
+    return evaluate_policy(candidate.values, development_fold_ids)
+
+
+result = run_bayesian_optimization(
+    development_objective,
+    development_fold_ids,
+    BayesianOptimizationConfig(evaluation_budget=30, deterministic_seed=0),
+    locked_holdout_fold_ids=locked_holdout_fold_ids,
+)
+
+print(result.recommended_candidate.values)
+```
+
+The result is a recommendation only. See the
+[Bayesian Optimization specification](docs/bayesian_optimization_spec.md).
+
 ## Quality checks
 
 ```powershell
@@ -476,3 +510,6 @@ The [Sprint 13 specification](docs/scenario_optimization_spec.md) records the jo
 mean/CVaR objective, integer reformulation, deterministic tie-break, and limitations.
 The [Sprint 14 specification](docs/transfer_planning_spec.md) records squad continuity, bank
 accounting, free-transfer carry, horizon weighting, and current limitations.
+The [Sprint 15 specification](docs/bayesian_optimization_spec.md) records the finite policy
+space, maximin design, Matern surrogate, Expected Improvement, holdout boundary, and stopping
+rules.
