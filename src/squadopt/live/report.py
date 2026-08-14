@@ -24,7 +24,7 @@ from squadopt.live.recommendation import Projection, RecommendationInputs
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
 from squadopt.optimization.models import OptimizationResult
 
-REPORT_CONTRACT_VERSION: Final = "live_recommendation_v1"
+REPORT_CONTRACT_VERSION: Final = "live_recommendation_v2"
 
 # Columns a reader needs to act on a recommendation, in reading order.
 SQUAD_COLUMNS: Final = ("name", "team_id", "position", "price_tenths", "expected_points")
@@ -47,6 +47,7 @@ class Recommendation:
     deadline_utc: str
     model_name: str
     model_version: str
+    feature_contract_version: str
     prediction_fingerprint: str
     solver_status: str
     squad: pd.DataFrame
@@ -109,6 +110,12 @@ def build_recommendation(
             f"{inputs.season} gameweek {inputs.deadline.gameweek}. The pool, the budget and "
             "the squad constraints do not admit a solution."
         )
+    if result.solver_status not in PROVEN_STATUSES:
+        raise DataSourceError(
+            f"The solver returned {result.solver_status.name} for {inputs.season} "
+            f"gameweek {inputs.deadline.gameweek} but did not prove the squad optimal. "
+            "A live recommendation requires an OPTIMAL result."
+        )
 
     return Recommendation(
         contract_version=REPORT_CONTRACT_VERSION,
@@ -119,6 +126,7 @@ def build_recommendation(
         deadline_utc=inputs.deadline.deadline_utc,
         model_name=str(projection.diagnostics["model_name"]),
         model_version=str(projection.diagnostics["model_version"]),
+        feature_contract_version=str(projection.diagnostics["feature_contract_version"]),
         prediction_fingerprint=projection_fingerprint(projection.table),
         solver_status=result.solver_status.name,
         squad=result.selected_squad,
@@ -156,7 +164,9 @@ def render(recommendation: Recommendation) -> str:
         f"  deadline            {recommendation.deadline_utc}",
         f"  snapshot            {recommendation.snapshot_id}",
         f"  captured at         {recommendation.captured_at_utc}",
+        f"  report contract     {recommendation.contract_version}",
         f"  model               {recommendation.model_name}@{recommendation.model_version}",
+        f"  feature contract    {recommendation.feature_contract_version}",
         f"  projection digest   {recommendation.prediction_fingerprint[:16]}…",
         f"  solver              {recommendation.solver_status}",
         f"  squad cost          {recommendation.total_cost_tenths / 10:.1f}",

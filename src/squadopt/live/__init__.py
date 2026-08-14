@@ -8,6 +8,7 @@ is what lets a past recommendation be rebuilt exactly, and what keeps every test
 from squadopt.live.recommendation import (
     CONTROL_MODEL_NAME,
     CONTROL_MODEL_VERSION,
+    OPENING_FEATURE_CONTRACT_VERSION,
     SUPPORTED_TARGET_GAMEWEEK,
     Projection,
     RecommendationInputs,
@@ -27,6 +28,7 @@ from squadopt.live.report import (
 __all__ = [
     "CONTROL_MODEL_NAME",
     "CONTROL_MODEL_VERSION",
+    "OPENING_FEATURE_CONTRACT_VERSION",
     "REPORT_CONTRACT_VERSION",
     "SQUAD_COLUMNS",
     "SUPPORTED_TARGET_GAMEWEEK",

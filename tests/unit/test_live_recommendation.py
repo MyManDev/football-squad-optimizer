@@ -7,17 +7,21 @@ players the source has ruled out.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import pytest
 
+import squadopt.live.report as live_report
 from squadopt.data.errors import DataError, DataSourceError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import (
     CONTROL_MODEL_NAME,
+    OPENING_FEATURE_CONTRACT_VERSION,
+    REPORT_CONTRACT_VERSION,
     build_recommendation,
     infer_season,
     project,
@@ -25,7 +29,7 @@ from squadopt.live import (
     read_inputs,
     render,
 )
-from squadopt.optimization import OptimizationConfig
+from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
 
 SEASON = "2026-27"
 HISTORY_SEASON = "2025-26"
@@ -302,7 +306,9 @@ def test_the_recommendation_carries_its_whole_provenance_chain(tmp_path: Path) -
     assert recommendation.snapshot_id
     assert recommendation.captured_at_utc == CAPTURED_AT
     assert recommendation.deadline_utc == "2026-08-21T17:30:00Z"
+    assert recommendation.contract_version == REPORT_CONTRACT_VERSION
     assert recommendation.model_name == CONTROL_MODEL_NAME
+    assert recommendation.feature_contract_version == OPENING_FEATURE_CONTRACT_VERSION
     assert len(recommendation.prediction_fingerprint) == 64
     assert recommendation.solver_status
     assert recommendation.solver_proved_optimal
@@ -313,6 +319,26 @@ def test_an_infeasible_pool_is_refused_rather_than_reported_empty(tmp_path: Path
 
     with pytest.raises(DataError, match="do not admit a solution"):
         _recommend(tmp_path, optimization=OptimizationConfig(budget_tenths=1))
+
+
+def test_a_feasible_but_unproven_squad_is_not_a_live_recommendation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A partial solve is useful telemetry, but not a proved recommendation."""
+
+    snapshot = _capture(tmp_path)
+    inputs = read_inputs(snapshot, season=SEASON)
+    projection = project(inputs, _panel(players=(1001, 1004, 1012)))
+    pool = projection.table.loc[
+        :, ["player_id", "name", "team_id", "position", "price_tenths", "expected_points"]
+    ]
+    solved = optimize_squad(pool, OptimizationConfig())
+    partial = replace(solved, solver_status=SolverStatus.FEASIBLE)
+    monkeypatch.setattr(live_report, "optimize_squad", lambda *_args, **_kwargs: partial)
+
+    with pytest.raises(DataSourceError, match="did not prove the squad optimal"):
+        build_recommendation(inputs, projection)
 
 
 # --- replay -----------------------------------------------------------------
@@ -370,6 +396,8 @@ def test_the_report_leads_with_provenance(tmp_path: Path) -> None:
 
     assert "snapshot" in report.split("Starting XI")[0]
     assert "captured at" in report.split("Starting XI")[0]
+    assert "report contract" in report.split("Starting XI")[0]
+    assert "feature contract" in report.split("Starting XI")[0]
 
 
 def test_the_report_says_which_model_decided_the_squad(tmp_path: Path) -> None:
