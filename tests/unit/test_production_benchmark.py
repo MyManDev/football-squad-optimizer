@@ -18,10 +18,12 @@ from squadopt.backtest.learned import (
     PredictionMetrics,
 )
 from squadopt.backtest.production_benchmark import (
+    CANDIDATE_DECLARATION_CONTRACT_VERSION,
     PREDICTION_METRIC_TOLERANCE,
     RIDGE_LOWER_BOUND_TOLERANCE,
     VERDICT_PROMOTABLE,
     VERDICT_RETAIN_CONTROL,
+    CandidateDeclaration,
     GateCondition,
     PairedComparison,
     ProductionBenchmarkConfig,
@@ -29,6 +31,7 @@ from squadopt.backtest.production_benchmark import (
     _evaluate_gates,
     _non_deterministic_truncations,
     _relative_change,
+    _validate_candidate_provenance,
     candidate_labels,
 )
 from squadopt.backtest.production_reporting import judgement_to_dict, judgement_to_markdown
@@ -281,6 +284,22 @@ def test_the_document_records_the_deterministic_solver_budget() -> None:
     assert optimization["stopping_rule"] == ("deterministic_work_with_wall_clock_safety_cap")
 
 
+def test_the_document_binds_the_result_to_the_pre_run_declaration() -> None:
+    result = _result(_gates())
+    document = judgement_to_dict(result)
+    declaration = document["candidate_declaration"]
+
+    assert declaration["candidate_id"] == result.candidate_declaration.candidate_id
+    assert (
+        declaration["declaration_fingerprint"]
+        == result.candidate_declaration.declaration_fingerprint
+    )
+    assert (
+        declaration["benchmark_configuration_fingerprint"]
+        == result.config.configuration_fingerprint
+    )
+
+
 def test_the_report_names_the_distinction_it_rests_on() -> None:
     markdown = judgement_to_markdown(_result(_gates()))
 
@@ -303,6 +322,13 @@ def test_the_report_states_the_holdout_is_untouched() -> None:
     assert "2025-26" in markdown
 
 
+def test_the_report_makes_the_frozen_candidate_change_visible() -> None:
+    markdown = judgement_to_markdown(_result(_gates()))
+
+    assert "Frozen candidate declaration" in markdown
+    assert "Declaration fingerprint" in markdown
+
+
 # --- configuration ----------------------------------------------------------
 
 
@@ -319,6 +345,97 @@ def test_the_default_benchmark_uses_deterministic_work_with_a_wall_safety_cap() 
 
     assert optimization.solver_deterministic_time_limit == 0.5
     assert optimization.solver_time_limit_seconds == 120.0
+
+
+def test_the_default_candidate_declaration_matches_the_production_snapshot() -> None:
+    declaration = ProductionBenchmarkConfig().candidate_declaration
+
+    assert declaration.contract_version == CANDIDATE_DECLARATION_CONTRACT_VERSION
+    assert declaration.model_name == "squadopt-two-stage"
+    assert declaration.model_version == "two-stage-v1"
+    assert declaration.feature_contract_version == "two-stage-appearance-calendar-v1"
+
+
+def test_declaration_and_benchmark_fingerprints_are_stable_and_sensitive() -> None:
+    first = ProductionBenchmarkConfig()
+    same = ProductionBenchmarkConfig()
+    changed = ProductionBenchmarkConfig(
+        candidate_declaration=CandidateDeclaration(
+            candidate_id="learned-rate-calendar-v1",
+            model_name="squadopt-two-stage",
+            model_version="learned-rate-v1",
+            feature_contract_version="learned-rate-calendar-v1",
+            changed_component="expected_points_rate",
+            change_summary="Fit the scoring rate on the expanding training slice.",
+            frozen_components=("minutes_stage", "cold_start_ladder", "availability_rule"),
+            source_reference="https://github.com/SquadOpt/football-squad-optimizer/issues/43",
+        )
+    )
+
+    assert first.candidate_declaration.declaration_fingerprint == (
+        same.candidate_declaration.declaration_fingerprint
+    )
+    assert first.configuration_fingerprint == same.configuration_fingerprint
+    assert first.configuration_fingerprint != changed.configuration_fingerprint
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"candidate_id": ""}, "candidate_id"),
+        ({"frozen_components": ()}, "frozen_components"),
+        (
+            {
+                "changed_component": "minutes_stage",
+                "frozen_components": ("minutes_stage",),
+            },
+            "cannot also be listed",
+        ),
+    ],
+)
+def test_invalid_candidate_declarations_are_rejected(
+    overrides: dict[str, object], message: str
+) -> None:
+    values: dict[str, object] = {
+        "candidate_id": "candidate-v1",
+        "model_name": "model",
+        "model_version": "v1",
+        "feature_contract_version": "features-v1",
+        "changed_component": "rate_stage",
+        "change_summary": "One declared rate change.",
+        "frozen_components": ("minutes_stage",),
+    }
+    values.update(overrides)
+
+    with pytest.raises(BacktestConfigurationError, match=message):
+        CandidateDeclaration(**values)  # type: ignore[arg-type]
+
+
+def test_candidate_snapshot_provenance_must_match_the_declaration() -> None:
+    declaration = ProductionBenchmarkConfig().candidate_declaration
+    fold = SimpleNamespace(
+        fold_id="2024-25-gw02",
+        metadata={
+            "prediction_model_name": declaration.model_name,
+            "prediction_model_version": declaration.model_version,
+            "prediction_feature_contract_version": declaration.feature_contract_version,
+        },
+    )
+
+    _validate_candidate_provenance((fold,), declaration)  # type: ignore[arg-type]
+
+    fold.metadata["prediction_model_version"] = "undeclared-v2"
+    with pytest.raises(BacktestConfigurationError, match="does not match"):
+        _validate_candidate_provenance((fold,), declaration)  # type: ignore[arg-type]
+
+
+def test_dataframe_only_candidate_output_cannot_supply_gate_evidence() -> None:
+    fold = SimpleNamespace(fold_id="2024-25-gw02", metadata={})
+
+    with pytest.raises(BacktestConfigurationError, match="PredictionSnapshot"):
+        _validate_candidate_provenance(  # type: ignore[arg-type]
+            (fold,), ProductionBenchmarkConfig().candidate_declaration
+        )
 
 
 @pytest.mark.parametrize("seasons", [(), "2024-25", ("",)])
