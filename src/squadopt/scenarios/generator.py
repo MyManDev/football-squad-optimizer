@@ -8,6 +8,7 @@ import pandas as pd
 
 from squadopt.data.schema import POSITIONS, season_rank_map
 from squadopt.prediction import PredictionSnapshot
+from squadopt.scenarios.decomposition import decompose_residual_components
 from squadopt.scenarios.models import (
     RESIDUAL_HISTORY_COLUMNS,
     ScenarioConfig,
@@ -185,17 +186,7 @@ def _standardized(values: np.ndarray) -> tuple[np.ndarray, float]:
 def _decompose(
     frame: pd.DataFrame,
 ) -> tuple[pd.DataFrame, tuple[str, ...], np.ndarray, dict[str, np.ndarray]]:
-    decomposed = frame.copy(deep=True)
-    decomposed["common_component"] = decomposed.groupby("fold_id", sort=False)[
-        "residual"
-    ].transform("mean")
-    after_common = decomposed["residual"] - decomposed["common_component"]
-    decomposed["team_component"] = after_common.groupby(
-        [decomposed["fold_id"], decomposed["team_id"]], sort=False
-    ).transform("mean")
-    decomposed["idiosyncratic_component"] = (
-        decomposed["residual"] - decomposed["common_component"] - decomposed["team_component"]
-    )
+    decomposed = decompose_residual_components(frame)
     fold_ids = tuple(decomposed["fold_id"].drop_duplicates().tolist())
     common = np.asarray(
         [
