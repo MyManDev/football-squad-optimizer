@@ -18,13 +18,21 @@ eligible for the locked holdout protocol; it does not by itself put anything int
 production, and the wording throughout says so.
 """
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from enum import Enum
+from numbers import Integral, Real
 from typing import Final
 
 import pandas as pd
 
-from squadopt.backtest.folds import build_walk_forward_folds, make_baseline_projection_builder
+from squadopt.backtest.folds import (
+    ProjectionBuilder,
+    build_walk_forward_folds,
+    make_baseline_projection_builder,
+)
 from squadopt.backtest.learned import (
     PairedDecisionMetrics,
     PredictionMetrics,
@@ -33,7 +41,12 @@ from squadopt.backtest.learned import (
     paired_decision_metrics,
     prediction_metrics,
 )
-from squadopt.backtest.production import make_production_projection_builder
+from squadopt.backtest.production import (
+    PRODUCTION_FEATURE_CONTRACT_VERSION,
+    PRODUCTION_MODEL_NAME,
+    PRODUCTION_MODEL_VERSION,
+    make_production_projection_builder,
+)
 from squadopt.backtest.splits import BacktestConfigurationError
 from squadopt.evaluation import (
     EvaluationConfig,
@@ -49,6 +62,7 @@ from squadopt.prediction.learned import RidgeProjectionConfig
 from squadopt.prediction.production import ProductionProjectionConfig
 
 PRODUCTION_BENCHMARK_CONTRACT_VERSION: Final = "production_vs_baseline_and_ridge_v1"
+CANDIDATE_DECLARATION_CONTRACT_VERSION: Final = "candidate_change_declaration_v1"
 DEFAULT_BENCHMARK_WALL_TIME_LIMIT_SECONDS: Final = 120.0
 DEFAULT_BENCHMARK_DETERMINISTIC_TIME_LIMIT: Final = 0.5
 
@@ -69,6 +83,114 @@ PREDICTION_METRIC_TOLERANCE: Final = 0.05
 
 VERDICT_PROMOTABLE: Final = "eligible_for_holdout_evaluation"
 VERDICT_RETAIN_CONTROL: Final = "no_promotion_control_retained"
+
+
+def _canonical_value(value: object) -> object:
+    """Return a stable JSON-compatible representation for a frozen contract."""
+
+    if value is None or isinstance(value, str | bool):
+        return value
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, Real):
+        return float(value)
+    if isinstance(value, Enum):
+        return str(value.value)
+    if isinstance(value, Mapping):
+        return {str(key): _canonical_value(item) for key, item in sorted(value.items())}
+    if isinstance(value, tuple | list):
+        return [_canonical_value(item) for item in value]
+    if hasattr(value, "__dataclass_fields__"):
+        fields = value.__dataclass_fields__
+        return {name: _canonical_value(getattr(value, name)) for name in sorted(fields)}
+    raise BacktestConfigurationError(
+        f"Cannot fingerprint contract value of type {type(value).__name__}."
+    )
+
+
+def _fingerprint(value: object) -> str:
+    encoded = json.dumps(_canonical_value(value), sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(encoded).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class CandidateDeclaration:
+    """The single model change frozen before a development gate is run."""
+
+    candidate_id: str
+    model_name: str
+    model_version: str
+    feature_contract_version: str
+    changed_component: str
+    change_summary: str
+    frozen_components: tuple[str, ...]
+    evaluation_objective: str = "single_gameweek_realized_squad_points_v1"
+    source_reference: str = ""
+    contract_version: str = CANDIDATE_DECLARATION_CONTRACT_VERSION
+
+    def __post_init__(self) -> None:
+        text_fields = (
+            "candidate_id",
+            "model_name",
+            "model_version",
+            "feature_contract_version",
+            "changed_component",
+            "change_summary",
+            "evaluation_objective",
+            "contract_version",
+        )
+        for name in text_fields:
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise BacktestConfigurationError(f"{name} must be non-empty text.")
+            object.__setattr__(self, name, value.strip())
+        if not isinstance(self.source_reference, str):
+            raise BacktestConfigurationError("source_reference must be text.")
+        object.__setattr__(self, "source_reference", self.source_reference.strip())
+        if not isinstance(self.frozen_components, tuple) or not self.frozen_components:
+            raise BacktestConfigurationError("frozen_components must be a non-empty tuple.")
+        normalized = tuple(
+            item.strip() if isinstance(item, str) else "" for item in self.frozen_components
+        )
+        if any(not item for item in normalized):
+            raise BacktestConfigurationError("frozen_components entries must be non-empty text.")
+        if len(set(normalized)) != len(normalized):
+            raise BacktestConfigurationError("frozen_components entries must be unique.")
+        if self.changed_component in normalized:
+            raise BacktestConfigurationError(
+                "changed_component cannot also be listed as a frozen component."
+            )
+        object.__setattr__(self, "frozen_components", normalized)
+
+    @property
+    def declaration_fingerprint(self) -> str:
+        """Bind reports to the exact declaration reviewed before execution."""
+
+        return _fingerprint(self)
+
+
+def _default_candidate_declaration() -> CandidateDeclaration:
+    return CandidateDeclaration(
+        candidate_id="two_stage_calendar_candidate_v1",
+        model_name=PRODUCTION_MODEL_NAME,
+        model_version=PRODUCTION_MODEL_VERSION,
+        feature_contract_version=PRODUCTION_FEATURE_CONTRACT_VERSION,
+        changed_component="two_stage_calendar_projection",
+        change_summary=(
+            "Current scoring rate combined with the frozen appearance, calendar, "
+            "cold-start, and availability contracts."
+        ),
+        frozen_components=(
+            "development_fold_set",
+            "baseline_control",
+            "ridge_reference",
+            "optimization_contract",
+            "promotion_gates",
+        ),
+        source_reference="docs/production_prediction_spec.md",
+    )
 
 
 def _default_benchmark_evaluation_config() -> EvaluationConfig:
@@ -102,6 +224,9 @@ class ProductionBenchmarkConfig:
         default_factory=_default_benchmark_evaluation_config
     )
     policy: PromotionPolicy = field(default_factory=PromotionPolicy)
+    candidate_declaration: CandidateDeclaration = field(
+        default_factory=_default_candidate_declaration
+    )
     run_metadata: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -109,6 +234,35 @@ class ProductionBenchmarkConfig:
             raise BacktestConfigurationError("seasons must be a non-empty tuple.")
         if any(not isinstance(season, str) or not season.strip() for season in self.seasons):
             raise BacktestConfigurationError("seasons entries must be non-empty strings.")
+        seasons = tuple(season.strip() for season in self.seasons)
+        if len(set(seasons)) != len(seasons):
+            raise BacktestConfigurationError("seasons entries must be unique.")
+        for value, expected, name in (
+            (self.production_config, ProductionProjectionConfig, "production_config"),
+            (self.ridge_config, RidgeProjectionConfig, "ridge_config"),
+            (self.cross_season_config, CrossSeasonConfig, "cross_season_config"),
+            (self.evaluation_config, EvaluationConfig, "evaluation_config"),
+            (self.policy, PromotionPolicy, "policy"),
+        ):
+            if not isinstance(value, expected):
+                raise BacktestConfigurationError(f"{name} must be a {expected.__name__}.")
+        if not isinstance(self.candidate_declaration, CandidateDeclaration):
+            raise BacktestConfigurationError(
+                "candidate_declaration must be a CandidateDeclaration."
+            )
+        frozen_metadata = EvaluationConfig(
+            optimization_config=self.evaluation_config.optimization_config,
+            scoring_policy=self.evaluation_config.scoring_policy,
+            run_metadata=self.run_metadata,
+        ).run_metadata
+        object.__setattr__(self, "seasons", seasons)
+        object.__setattr__(self, "run_metadata", frozen_metadata)
+
+    @property
+    def configuration_fingerprint(self) -> str:
+        """Fingerprint every declared input that can change the gate response."""
+
+        return _fingerprint(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +309,9 @@ class ProductionBenchmarkResult:
     gates: tuple[GateCondition, ...]
     verdict: str
     residuals: pd.DataFrame
+    candidate_declaration: CandidateDeclaration = field(
+        default_factory=_default_candidate_declaration
+    )
 
     @property
     def all_gates_passed(self) -> bool:
@@ -371,50 +528,89 @@ def _non_deterministic_truncations(result: EvaluationResult) -> tuple[str, ...]:
 
 def _prepare(
     panel: pd.DataFrame,
-    builder: object,
+    builder: ProjectionBuilder,
     settings: ProductionBenchmarkConfig,
 ) -> tuple[tuple[EvaluationFold, ...], EvaluationResult]:
     folds = build_walk_forward_folds(
         panel,
         seasons=settings.seasons,
         min_prior_gameweeks_in_season=settings.min_prior_gameweeks_in_season,
-        projection_builder=builder,  # type: ignore[arg-type]
+        projection_builder=builder,
     )
     return folds, evaluate_prepared_folds(folds, settings.evaluation_config)
 
 
-def run_production_benchmark(
+def _validate_candidate_provenance(
+    folds: Sequence[EvaluationFold], declaration: CandidateDeclaration
+) -> None:
+    """Reject a builder whose snapshots do not match the pre-run declaration."""
+
+    expected = {
+        "prediction_model_name": declaration.model_name,
+        "prediction_model_version": declaration.model_version,
+        "prediction_feature_contract_version": declaration.feature_contract_version,
+    }
+    for fold in folds:
+        missing = [name for name in expected if name not in fold.metadata]
+        if missing:
+            raise BacktestConfigurationError(
+                "A declared candidate must return PredictionSnapshot values with model "
+                f"provenance; {fold.fold_id} is missing {missing!r}."
+            )
+        mismatches = {
+            name: {"declared": expected_value, "observed": fold.metadata[name]}
+            for name, expected_value in expected.items()
+            if fold.metadata[name] != expected_value
+        }
+        if mismatches:
+            raise BacktestConfigurationError(
+                f"Candidate provenance does not match its declaration in {fold.fold_id}: "
+                f"{mismatches!r}."
+            )
+
+
+def run_declared_candidate_benchmark(
     panel: pd.DataFrame,
-    fixtures: pd.DataFrame,
-    team_codes: pd.DataFrame,
-    config: ProductionBenchmarkConfig | None = None,
+    candidate_builder: ProjectionBuilder,
+    config: ProductionBenchmarkConfig,
 ) -> ProductionBenchmarkResult:
-    """Run all three candidates over one fold set and evaluate the frozen gates."""
+    """Judge one pre-declared candidate against the frozen control and Ridge reference.
 
-    settings = ProductionBenchmarkConfig() if config is None else config
-    if not isinstance(settings, ProductionBenchmarkConfig):
+    The challenger occupies the historical ``production`` report slot for backward
+    compatibility. Its real identity is carried by ``candidate_declaration`` and checked
+    against every prediction snapshot before any gate evidence is returned.
+    """
+
+    if not isinstance(config, ProductionBenchmarkConfig):
         raise BacktestConfigurationError("config must be a ProductionBenchmarkConfig.")
+    if not callable(candidate_builder):
+        raise BacktestConfigurationError("candidate_builder must be callable.")
 
-    builders = {
+    builders: Mapping[str, ProjectionBuilder] = {
         BASELINE_LABEL: make_baseline_projection_builder(
-            form_window=settings.ridge_config.form_window,
-            cross_season=settings.cross_season_config,
+            form_window=config.ridge_config.form_window,
+            cross_season=config.cross_season_config,
         ),
         RIDGE_LABEL: make_ridge_projection_builder(
-            config=settings.ridge_config,
-            cross_season=settings.cross_season_config,
+            config=config.ridge_config,
+            cross_season=config.cross_season_config,
         ),
-        PRODUCTION_LABEL: make_production_projection_builder(
-            fixtures=fixtures,
-            team_codes=team_codes,
-            config=settings.production_config,
-            cross_season=settings.cross_season_config,
-        ),
+        PRODUCTION_LABEL: candidate_builder,
     }
 
     prepared: dict[str, tuple[tuple[EvaluationFold, ...], EvaluationResult]] = {
-        label: _prepare(panel, builder, settings) for label, builder in builders.items()
+        label: _prepare(panel, builder, config) for label, builder in builders.items()
     }
+    _validate_candidate_provenance(prepared[PRODUCTION_LABEL][0], config.candidate_declaration)
+    return _judge_prepared_candidates(prepared, config)
+
+
+def _judge_prepared_candidates(
+    prepared: Mapping[str, tuple[tuple[EvaluationFold, ...], EvaluationResult]],
+    settings: ProductionBenchmarkConfig,
+) -> ProductionBenchmarkResult:
+    """Evaluate already-prepared control, reference, and challenger results."""
+
     results = {label: result for label, (_, result) in prepared.items()}
     wall_limited = {
         label: _non_deterministic_truncations(result) for label, result in results.items()
@@ -469,6 +665,10 @@ def run_production_benchmark(
         metadata={
             **dict(settings.run_metadata),
             "benchmark_contract_version": PRODUCTION_BENCHMARK_CONTRACT_VERSION,
+            "benchmark_configuration_fingerprint": settings.configuration_fingerprint,
+            "candidate_declaration_fingerprint": (
+                settings.candidate_declaration.declaration_fingerprint
+            ),
             "evaluation_seasons": settings.seasons,
             "holdout_untouched": True,
         },
@@ -492,7 +692,28 @@ def run_production_benchmark(
             VERDICT_PROMOTABLE if all(gate.passed for gate in gates) else VERDICT_RETAIN_CONTROL
         ),
         residuals=residuals[PRODUCTION_LABEL],
+        candidate_declaration=settings.candidate_declaration,
     )
+
+
+def run_production_benchmark(
+    panel: pd.DataFrame,
+    fixtures: pd.DataFrame,
+    team_codes: pd.DataFrame,
+    config: ProductionBenchmarkConfig | None = None,
+) -> ProductionBenchmarkResult:
+    """Run the current production candidate over the frozen development gate."""
+
+    settings = ProductionBenchmarkConfig() if config is None else config
+    if not isinstance(settings, ProductionBenchmarkConfig):
+        raise BacktestConfigurationError("config must be a ProductionBenchmarkConfig.")
+    candidate_builder = make_production_projection_builder(
+        fixtures=fixtures,
+        team_codes=team_codes,
+        config=settings.production_config,
+        cross_season=settings.cross_season_config,
+    )
+    return run_declared_candidate_benchmark(panel, candidate_builder, settings)
 
 
 def candidate_labels() -> Sequence[str]:
