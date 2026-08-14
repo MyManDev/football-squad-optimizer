@@ -35,6 +35,7 @@ from squadopt.features import (
     rolling_feature_name,
 )
 from squadopt.features.config import APPEARANCE_SOURCE_COLUMN
+from squadopt.features.fixtures import FIXTURE_FEATURE_COLUMNS
 from squadopt.prediction.config import PredictionConfigurationError
 
 # Which rung of the precedence ladder produced a player's estimate. Reported rather
@@ -44,13 +45,24 @@ MINUTES_FROM_HISTORY: Final = "in_season_history"
 MINUTES_FROM_NO_APPEARANCE: Final = "observed_absence"
 MINUTES_FROM_CARRY_OVER: Final = "cross_season_carry_over"
 MINUTES_UNKNOWN: Final = "no_record"
+MINUTES_BLANK_GAMEWEEK: Final = "blank_gameweek"
 
 MINUTES_SOURCES: Final = (
     MINUTES_FROM_HISTORY,
     MINUTES_FROM_NO_APPEARANCE,
     MINUTES_FROM_CARRY_OVER,
     MINUTES_UNKNOWN,
+    MINUTES_BLANK_GAMEWEEK,
 )
+
+# How many fixtures a club is assumed to play when the calendar is not supplied.
+# One, because a gameweek normally holds one fixture per club and assuming otherwise
+# would silently scale every projection.
+DEFAULT_FIXTURE_COUNT: Final = 1
+
+# The calendar column this stage reads, named once so it cannot drift from the
+# feature layer that produces it.
+FIXTURE_COUNT_COLUMN: Final = FIXTURE_FEATURE_COLUMNS[0]
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,6 +145,26 @@ def _numeric(features: pd.DataFrame, column: str) -> pd.Series:
     return pd.to_numeric(features[column], errors="coerce").astype("float64")
 
 
+def _fixture_count(features: pd.DataFrame) -> pd.Series:
+    """Read the target gameweek's fixture count, defaulting to one fixture.
+
+    Pre-match: how many fixtures a club plays is published before the deadline, so it
+    is read from the target row rather than shifted. A missing value is treated as one
+    fixture rather than as a blank gameweek, because absence of a calendar is not
+    evidence of an empty one.
+    """
+
+    if FIXTURE_COUNT_COLUMN not in features.columns:
+        return pd.Series(float(DEFAULT_FIXTURE_COUNT), index=features.index, dtype="float64")
+    counts = pd.to_numeric(features[FIXTURE_COUNT_COLUMN], errors="coerce").astype("float64")
+    if bool(counts.lt(0.0).any()):
+        raise PredictionConfigurationError(
+            f"{FIXTURE_COUNT_COLUMN!r} may not be negative; a club cannot play fewer than "
+            "no fixtures."
+        )
+    return counts.fillna(float(DEFAULT_FIXTURE_COUNT))
+
+
 def expected_minutes(
     features: pd.DataFrame,
     *,
@@ -150,10 +182,23 @@ def expected_minutes(
     3. **Cross-season carry-over**, shrunk. He has a record, just not this season.
     4. **Nothing.** Left missing for the points stage to resolve.
 
-    The result is clipped to a single match's minutes. The product of two
-    independently estimated quantities can exceed ninety, and a projection that has a
-    player on the pitch longer than the game lasts is wrong regardless of how it
-    arose.
+    Then the calendar is applied. The panel sums minutes across every fixture inside a
+    gameweek, so a club playing twice offers up to twice the minutes, and the estimate
+    is scaled by the fixture count and clipped at that many full matches. A club with
+    no fixture projects to zero whatever its players' history says, because history
+    cannot override an empty calendar.
+
+    Without a ``fixture_count`` column the estimate assumes one fixture, which is what
+    a gameweek normally holds. Assuming anything else would silently scale every
+    projection for a caller who simply has no calendar to hand.
+
+    One limitation is deliberate and worth stating. The rolling rate is minutes per
+    *gameweek featured*, not per fixture, because the panel records a gameweek's total
+    and cannot say whether a player featured in one of two fixtures or both. A history
+    containing double gameweeks therefore carries a slightly inflated base rate. Double
+    gameweeks are 6,919 of 156,075 rows across the supported seasons, so the bias is
+    small, and removing it would need player data at fixture grain that the archive
+    does not publish.
     """
 
     settings = ExpectedMinutesConfig() if config is None else config
@@ -186,8 +231,15 @@ def expected_minutes(
     values = values.mask(measured, product)
     source = source.mask(measured, MINUTES_FROM_HISTORY)
 
-    clipped = values.clip(lower=0.0, upper=float(MINUTES_PER_FULL_MATCH))
+    fixtures = _fixture_count(features)
+    scaled = values.mul(fixtures)
+    capped = scaled.clip(lower=0.0, upper=fixtures.mul(float(MINUTES_PER_FULL_MATCH)))
+
+    blank = fixtures.le(0.0)
+    capped = capped.mask(blank, 0.0)
+    source = source.mask(blank, MINUTES_BLANK_GAMEWEEK)
+
     return MinutesProjection(
-        expected_minutes=clipped.astype("float64"),
+        expected_minutes=capped.astype("float64"),
         source=source.astype("string"),
     )

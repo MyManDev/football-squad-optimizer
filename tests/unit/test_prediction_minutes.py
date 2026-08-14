@@ -10,6 +10,8 @@ import pytest
 from squadopt.features import MINUTES_PER_FULL_MATCH, PRIOR_MINUTES_COLUMN
 from squadopt.prediction.config import PredictionConfigurationError
 from squadopt.prediction.minutes import (
+    FIXTURE_COUNT_COLUMN,
+    MINUTES_BLANK_GAMEWEEK,
     MINUTES_FROM_CARRY_OVER,
     MINUTES_FROM_HISTORY,
     MINUTES_FROM_NO_APPEARANCE,
@@ -235,3 +237,76 @@ def test_the_config_is_immutable() -> None:
 
     with pytest.raises(AttributeError):
         config.window = 3  # type: ignore[misc]
+
+
+# --- the calendar -----------------------------------------------------------
+
+
+def _with_fixtures(rows: list[dict[str, object]], counts: list[object]) -> pd.DataFrame:
+    frame = _features(rows)
+    frame[FIXTURE_COUNT_COLUMN] = counts
+    return frame
+
+
+def test_a_double_gameweek_offers_twice_the_minutes() -> None:
+    """The panel sums minutes across a gameweek's fixtures, so the cap doubles too."""
+
+    projection = expected_minutes(
+        _with_fixtures([_row(1.0, 90.0), _row(1.0, 90.0)], [1, 2]), config=CONFIG
+    )
+
+    assert projection.expected_minutes.tolist() == [90.0, 180.0]
+
+
+def test_the_cap_scales_with_the_fixture_count() -> None:
+    projection = expected_minutes(
+        _with_fixtures([_row(1.0, 200.0), _row(1.0, 200.0)], [1, 2]), config=CONFIG
+    )
+
+    assert projection.expected_minutes.tolist() == [
+        float(MINUTES_PER_FULL_MATCH),
+        2 * float(MINUTES_PER_FULL_MATCH),
+    ]
+
+
+def test_a_blank_gameweek_projects_to_zero_whatever_the_history_says() -> None:
+    """History cannot override an empty calendar."""
+
+    projection = expected_minutes(_with_fixtures([_row(1.0, 90.0)], [0]), config=CONFIG)
+
+    assert projection.expected_minutes.tolist() == [0.0]
+    assert projection.source.tolist() == [MINUTES_BLANK_GAMEWEEK]
+
+
+def test_a_blank_gameweek_overrides_even_a_missing_record() -> None:
+    projection = expected_minutes(_with_fixtures([_row()], [0]), config=CONFIG)
+
+    assert projection.expected_minutes.tolist() == [0.0]
+    assert projection.source.tolist() == [MINUTES_BLANK_GAMEWEEK]
+
+
+def test_carry_over_is_scaled_by_the_calendar_too() -> None:
+    projection = expected_minutes(_with_fixtures([_row(prior=40.0)], [2]), config=CONFIG)
+
+    assert projection.expected_minutes.tolist() == [pytest.approx(60.0)]
+
+
+def test_a_missing_calendar_assumes_one_fixture() -> None:
+    """Absence of a calendar is not evidence of an empty one."""
+
+    without = expected_minutes(_features([_row(1.0, 90.0)]), config=CONFIG)
+    single = expected_minutes(_with_fixtures([_row(1.0, 90.0)], [1]), config=CONFIG)
+
+    assert without.expected_minutes.tolist() == single.expected_minutes.tolist()
+
+
+def test_a_missing_fixture_count_value_assumes_one_fixture() -> None:
+    projection = expected_minutes(_with_fixtures([_row(1.0, 90.0)], [pd.NA]), config=CONFIG)
+
+    assert projection.expected_minutes.tolist() == [90.0]
+    assert projection.source.tolist() == [MINUTES_FROM_HISTORY]
+
+
+def test_a_negative_fixture_count_is_rejected() -> None:
+    with pytest.raises(PredictionConfigurationError, match="may not be negative"):
+        expected_minutes(_with_fixtures([_row(1.0, 90.0)], [-1]), config=CONFIG)

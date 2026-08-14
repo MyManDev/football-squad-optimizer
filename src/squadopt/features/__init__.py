@@ -28,6 +28,7 @@ from squadopt.features.cross_season import (
     attach_cross_season_features,
     cross_season_features,
 )
+from squadopt.features.fixtures import FIXTURE_FEATURE_COLUMNS, attach_fixture_features
 from squadopt.features.rolling import shifted_rolling_mean, shifted_rolling_sum
 
 __all__ = [
@@ -36,6 +37,7 @@ __all__ = [
     "DEFAULT_CROSS_SEASON_CONFIG",
     "DEFAULT_FEATURE_CONFIG",
     "FEATURE_STEMS",
+    "FIXTURE_FEATURE_COLUMNS",
     "MINUTES_PER_FULL_MATCH",
     "PRIOR_MINUTES_COLUMN",
     "PRIOR_RATE_COLUMN",
@@ -44,6 +46,7 @@ __all__ = [
     "FeatureConfigurationError",
     "FeatureError",
     "attach_cross_season_features",
+    "attach_fixture_features",
     "build_feature_dataset",
     "cross_season_features",
     "feature_column_names",
