@@ -13,7 +13,9 @@ uncertainty from chronologically split residual history. Sprint 6 adds an open-s
 deterministic Ridge reference model and a paired baseline-versus-learned development
 benchmark. Sprint 7 adds deterministic hierarchical empirical Monte Carlo scenarios and
 fixed-decision score-distribution summaries. Sprint 13 adds a joint-scenario expected-score
-and empirical lower-tail CVaR optimizer. Bayesian Optimization remains future work.
+and empirical lower-tail CVaR optimizer. Sprint 14 adds deterministic multi-gameweek squad and
+transfer planning with explicit bank and free-transfer state. Bayesian Optimization remains
+future work.
 
 ## Sprint 0 scope
 
@@ -417,6 +419,35 @@ The feasible set, integer point scaling, deterministic seed, one-worker solver p
 secondary tie-break are shared with the baseline. See the
 [scenario-aware optimization specification](docs/scenario_optimization_spec.md).
 
+## Sprint 14 transfer planning
+
+Sprint 14 extends the legal squad decision across consecutive gameweeks. The input horizon
+supplies projections and integer buy/sell prices; the optimizer maintains squad continuity,
+bank, free-transfer carry, transfer hits, XI, bench, and captain decisions.
+
+```python
+from squadopt import OptimizationConfig
+from squadopt.planning import (
+    InitialSquadState,
+    PlanningHorizon,
+    TransferPlanningConfig,
+    optimize_transfer_plan,
+)
+
+result = optimize_transfer_plan(
+    PlanningHorizon(horizon_table),
+    InitialSquadState(initial_player_ids, bank_tenths=5, free_transfers=1),
+    OptimizationConfig(),
+    TransferPlanningConfig(horizon_discount_factor=0.98),
+)
+
+if result.has_solution:
+    for week in result.weeks:
+        print(week.gameweek, week.transfers_in, week.transfers_out)
+```
+
+See the [transfer-planning specification](docs/transfer_planning_spec.md).
+
 ## Quality checks
 
 ```powershell
@@ -443,3 +474,5 @@ The [Sprint 7 specification](docs/scenario_spec.md) records the empirical hierar
 bootstrap, player-scale fallback, scenario fingerprint, and fixed-decision risk summaries.
 The [Sprint 13 specification](docs/scenario_optimization_spec.md) records the joint-scenario
 mean/CVaR objective, integer reformulation, deterministic tie-break, and limitations.
+The [Sprint 14 specification](docs/transfer_planning_spec.md) records squad continuity, bank
+accounting, free-transfer carry, horizon weighting, and current limitations.

@@ -115,8 +115,10 @@ def _add_decision_constraints(
     squad_vars: list[cp_model.IntVar],
     starter_vars: list[cp_model.IntVar],
     captain_vars: list[cp_model.IntVar],
+    *,
+    enforce_budget: bool = True,
 ) -> None:
-    """Add the shared squad, formation, budget, and captain constraints."""
+    """Add shared squad constraints, optionally leaving affordability to state accounting."""
 
     player_count = len(players)
     if not (len(squad_vars) == len(starter_vars) == len(captain_vars) == player_count):
@@ -148,8 +150,9 @@ def _add_decision_constraints(
             <= config.max_players_per_team
         )
 
-    prices = [int(value) for value in players["price_tenths"].tolist()]
-    model.add(cp_model.LinearExpr.weighted_sum(squad_vars, prices) <= config.budget_tenths)
+    if enforce_budget:
+        prices = [int(value) for value in players["price_tenths"].tolist()]
+        model.add(cp_model.LinearExpr.weighted_sum(squad_vars, prices) <= config.budget_tenths)
 
 
 def _raw_status_name(raw_status: int) -> str:
@@ -266,6 +269,8 @@ def _verify_solution(
     squad_indices: list[int],
     starter_indices: list[int],
     captain_indices: list[int],
+    *,
+    enforce_budget: bool = True,
 ) -> None:
     squad_set = set(squad_indices)
     starter_set = set(starter_indices)
@@ -297,9 +302,10 @@ def _verify_solution(
         ):
             failures.append(f"{position} starting bounds")
 
-    total_cost = sum(int(players.iloc[index]["price_tenths"]) for index in squad_indices)
-    if total_cost > config.budget_tenths:
-        failures.append("budget")
+    if enforce_budget:
+        total_cost = sum(int(players.iloc[index]["price_tenths"]) for index in squad_indices)
+        if total_cost > config.budget_tenths:
+            failures.append("budget")
 
     team_counts = Counter(players.iloc[index]["team_id"] for index in squad_indices)
     if any(count > config.max_players_per_team for count in team_counts.values()):
