@@ -14,17 +14,24 @@ capture rather than that two runs happened to coincide.
 
 import hashlib
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Final
 
 import pandas as pd
 
 from squadopt.data.errors import DataSourceError
 from squadopt.live.recommendation import Projection, RecommendationInputs
+from squadopt.live.risk import (
+    LiveResidualHistory,
+    LiveRiskDiagnostics,
+    evaluate_live_risk,
+    risk_not_requested,
+)
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
 from squadopt.optimization.models import OptimizationResult
+from squadopt.scenarios import ScenarioConfig, ScenarioEvaluationConfig
 
-REPORT_CONTRACT_VERSION: Final = "live_recommendation_v2"
+REPORT_CONTRACT_VERSION: Final = "live_recommendation_v3"
 
 # Columns a reader needs to act on a recommendation, in reading order.
 SQUAD_COLUMNS: Final = ("name", "team_id", "position", "price_tenths", "expected_points")
@@ -57,6 +64,7 @@ class Recommendation:
     total_cost_tenths: int
     projected_score: float
     diagnostics: Mapping[str, object]
+    risk: LiveRiskDiagnostics = field(default_factory=risk_not_requested)
 
     @property
     def solver_proved_optimal(self) -> bool:
@@ -82,6 +90,9 @@ def build_recommendation(
     projection: Projection,
     *,
     optimization: OptimizationConfig | None = None,
+    risk_history: LiveResidualHistory | None = None,
+    risk_scenario_config: ScenarioConfig | None = None,
+    risk_evaluation_config: ScenarioEvaluationConfig | None = None,
 ) -> Recommendation:
     """Optimise the projected pool and return the recommendation with its provenance.
 
@@ -117,6 +128,19 @@ def build_recommendation(
             "A live recommendation requires an OPTIMAL result."
         )
 
+    risk = (
+        risk_not_requested()
+        if risk_history is None
+        else evaluate_live_risk(
+            inputs,
+            projection,
+            result,
+            risk_history,
+            scenario_config=risk_scenario_config,
+            evaluation_config=risk_evaluation_config,
+        )
+    )
+
     return Recommendation(
         contract_version=REPORT_CONTRACT_VERSION,
         snapshot_id=inputs.snapshot_id,
@@ -142,6 +166,7 @@ def build_recommendation(
             "budget_tenths": settings.budget_tenths,
             "bench_weight": settings.bench_weight,
         },
+        risk=risk,
     )
 
 
@@ -178,6 +203,38 @@ def render(recommendation: Recommendation) -> str:
             "",
             "  WARNING: the solver did not prove this squad optimal, so it is the best one",
             "  found before the limit rather than the best one for this projection.",
+        ]
+
+    risk = recommendation.risk
+    lines += [
+        "",
+        "Distributional risk",
+        "-" * 19,
+        f"  status              {risk.status.value}",
+    ]
+    if risk.is_available:
+        assert risk.metrics is not None
+        assert risk.scenario_fingerprint is not None
+        metrics = risk.metrics
+        lines += [
+            f"  lower {metrics.lower_quantile_probability:.0%} quantile  "
+            f"{metrics.lower_quantile_score:.4f}",
+            f"  mean worst {metrics.worst_fraction:.0%}       "
+            f"{metrics.mean_worst_fraction_score:.4f}",
+            f"  P(score < {metrics.points_threshold:g})    "
+            f"{metrics.probability_below_threshold:.4f}",
+            f"  scenarios           {metrics.scenario_count}",
+            f"  scenario digest     {risk.scenario_fingerprint[:16]}…",
+            f"  residual source     {risk.residual_provenance.get('source_id')}",
+            "  residual digest     "
+            f"{str(risk.residual_provenance.get('residual_fingerprint'))[:16]}…",
+        ]
+    else:
+        blockers = ", ".join(blocker.value for blocker in risk.blockers) or "none"
+        lines += [
+            f"  reason              {risk.reason}",
+            f"  blockers            {blockers}",
+            "  No lower-tail number is printed without supporting residual evidence.",
         ]
 
     lines += _frame_lines(recommendation.starting_xi, "Starting XI")

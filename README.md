@@ -482,6 +482,21 @@ print(result.recommended_candidate.values)
 The result is a recommendation only. See the
 [Bayesian Optimization specification](docs/bayesian_optimization_spec.md).
 
+## Live deadline recommendation
+
+The live command reads an immutable deadline capture and uses the operational control. Risk
+diagnostics are optional and require an explicitly identified, matching out-of-sample
+residual export:
+
+```powershell
+.venv\Scripts\python -m scripts.recommend_current_squad
+```
+
+Without residual evidence the structured risk state is `not_requested`. A requested risk
+calculation returns `unavailable` when the model identity, opening-gameweek evidence, or
+minimum history is missing; it never prints fabricated lower-tail metrics. See the
+[live risk diagnostics specification](docs/live_risk_diagnostics_spec.md).
+
 ## Calendar-aware residual measurement
 
 Before uncertainty and scenarios are recalibrated, compare the calendar-blind and

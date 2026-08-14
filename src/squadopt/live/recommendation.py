@@ -16,6 +16,7 @@ input, because a live capture can prove it preceded the deadline and the archive
 Every adjustment it makes is reported.
 """
 
+import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final
@@ -50,6 +51,30 @@ OPENING_FEATURE_CONTRACT_VERSION: Final = "opening-carry-over-features-v1"
 # season with no played gameweeks; a later gameweek needs the current season's own history,
 # which no live source in this project captures yet.
 SUPPORTED_TARGET_GAMEWEEK: Final = 1
+
+
+def _training_identity(panel: pd.DataFrame) -> tuple[str, str]:
+    """Fingerprint the completed history supplied to the opening control."""
+
+    columns = [
+        column
+        for column in (
+            "season",
+            "gameweek",
+            "player_id",
+            "team_id",
+            "position",
+            "price_tenths",
+            "minutes",
+            "total_points",
+        )
+        if column in panel.columns
+    ]
+    ordered = panel.loc[:, columns].sort_values(["season", "gameweek", "player_id"], kind="stable")
+    fingerprint = hashlib.sha256(ordered.to_csv(index=False).encode("utf-8")).hexdigest()
+    last = ordered.iloc[-1]
+    cutoff = f"{last['season']}:GW{int(last['gameweek']):02d}"
+    return cutoff, fingerprint
 
 
 def infer_season(snapshot: CapturedSnapshot) -> str:
@@ -170,6 +195,7 @@ def project(
         cross_season=cross_season,
     )
     adjusted = apply_availability(table, inputs.availability, config=availability_config)
+    training_cutoff, training_fingerprint = _training_identity(panel)
 
     projected = adjusted.table
     carried = int(projected["has_prior_record"].sum())
@@ -184,6 +210,8 @@ def project(
             "model_name": CONTROL_MODEL_NAME,
             "model_version": CONTROL_MODEL_VERSION,
             "feature_contract_version": OPENING_FEATURE_CONTRACT_VERSION,
+            "training_cutoff": training_cutoff,
+            "training_data_fingerprint": training_fingerprint,
             "projection_source": "operational_control",
         },
     )

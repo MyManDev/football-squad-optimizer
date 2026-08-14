@@ -44,6 +44,7 @@ KNOWN_STATUSES: Final = (STATUS_AVAILABLE, STATUS_DOUBTFUL, *UNAVAILABLE_STATUSE
 # The source states a chance of playing as a whole percentage, quantised in practice to
 # 0, 25, 50, 75 and 100.
 FULL_CHANCE: Final = 100
+AVAILABILITY_RULE_CONTRACT_VERSION: Final = "captured_availability_rule_v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +206,7 @@ def apply_availability(
                 "availability_reduced": reduced,
                 "availability_unknown_is_available": settings.unknown_is_available,
                 "availability_multiplier_floor": settings.doubtful_multiplier_floor,
+                "availability_contract_version": AVAILABILITY_RULE_CONTRACT_VERSION,
             }
         ),
     )
