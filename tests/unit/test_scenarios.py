@@ -21,10 +21,12 @@ from squadopt.scenarios import (
     ScenarioConfig,
     ScenarioConfigurationError,
     ScenarioEvaluationConfig,
+    ScenarioOptimizationConfig,
     ScenarioTarget,
     ScenarioValidationError,
     evaluate_fixed_decision,
     generate_scenarios,
+    optimize_scenario_aware_squad,
     scenario_result_to_dict,
     scenario_result_to_markdown,
 )
@@ -293,6 +295,28 @@ def test_fixed_decision_score_matches_manual_starting_xi_and_double_captain() ->
     assert result.metrics.minimum_score == min(result.scenario_scores)
     assert result.diagnostics["decision_reoptimized_per_scenario"] is False
     assert result.diagnostics["bench_points_included"] is False
+
+
+def test_generated_scenarios_feed_the_scenario_aware_optimizer() -> None:
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(
+        snapshot,
+        _residual_history(snapshot),
+        TARGET,
+        replace(SMALL_CONFIG, scenario_count=100),
+    )
+
+    result = optimize_scenario_aware_squad(
+        scenarios,
+        OptimizationConfig(),
+        ScenarioOptimizationConfig(risk_aversion=0.25, tail_fraction=0.10),
+    )
+
+    assert result.solver_status.value == "OPTIMAL"
+    assert result.scenario_fingerprint == scenarios.scenario_fingerprint
+    assert result.scenario_evaluation is not None
+    assert result.scenario_evaluation.metrics.scenario_count == 100
+    assert result.diagnostics["decision_reoptimized_per_scenario"] is False
 
 
 def test_fixed_decision_metrics_follow_declared_quantile_worst_and_threshold_rules() -> None:
