@@ -482,6 +482,24 @@ print(result.recommended_candidate.values)
 The result is a recommendation only. See the
 [Bayesian Optimization specification](docs/bayesian_optimization_spec.md).
 
+## Calendar-aware residual measurement
+
+Before uncertainty and scenarios are recalibrated, compare the calendar-blind and
+calendar-aware residual regimes on identical player/fold rows and split the result by blank,
+single, and double-plus fixture counts:
+
+```powershell
+.venv\Scripts\python -m scripts.run_calendar_recalibration `
+  --reference-residuals artifacts/calendar_blind.csv `
+  --candidate-residuals artifacts/calendar_aware.csv `
+  --json-output artifacts/calendar_recalibration.json `
+  --markdown-output artifacts/calendar_recalibration.md
+```
+
+This command produces a measurement artifact only. It does not claim conformal coverage,
+player-adaptive scale recalibration, scenario recalibration, or opening-gameweek uncertainty.
+See the [calendar recalibration specification](docs/calendar_recalibration_spec.md).
+
 ## Quality checks
 
 ```powershell
