@@ -275,11 +275,53 @@ Against Ridge on the same rows — MAE 1.1300, RMSE 2.0991 — production is ahe
 behind on RMSE by 5.05%, which sits on the edge of the 5% tolerance above. Stated as it
 stands rather than as it is hoped to end up.
 
-**Not yet measured:** the decision metric the gates are actually written against, which is
-realized squad points on the same folds. One season is measured — 2024-25, 37 folds, baseline
-53.8108 against production 58.0270 for a paired difference of `+4.2162` — and one season is
-not the comparison. Sprint 6 reported `+4.8108` for Ridge on that same season and `+3.1156`
-across four, which is exactly why a single season is not treated as the answer.
+### The decision metric, and the gate verdict
+
+Realized squad points across the 147 development folds, same folds and same optimizer for
+every candidate. Both runs agree with the recorded Ridge benchmark on the baseline fold for
+fold, so this is one comparison rather than three.
+
+| Candidate | Mean realized | Paired difference over baseline | 90% interval |
+| --- | ---: | ---: | --- |
+| Baseline | 53.7755 | — | — |
+| Ridge | 56.8912 | +3.1156 | `[+1.5442, +5.0000]` |
+| Production | 57.4150 | +3.6395 | `[+1.7959, +5.7551]` |
+
+Against the two pre-registered gates:
+
+| Condition | Required | Measured | Verdict |
+| --- | --- | ---: | --- |
+| Mean over baseline | `>= +0.5` | +3.6395 | pass |
+| 90% lower bound over baseline | `>= 0` | +1.7755 | pass |
+| Mean over Ridge | `>= 0` | +0.5238 | pass |
+| 90% lower bound over Ridge | `>= -0.5` | **-1.6466** | **fail** |
+
+**Verdict: no promotion. The deterministic baseline remains the operational control.**
+
+The candidate is robustly better than the baseline and only nominally better than Ridge. Its
+paired difference against Ridge has a standard deviation of 16.3311 across a win/tie/loss
+record of 70/5/72 — fold by fold it is a coin flip — and the per-season means tell the same
+story: `+1.5946`, `+1.4722`, `-0.3514`, `-0.5946`. It wins the first two development seasons
+and loses the last two.
+
+One prediction made before this was measured turned out to be wrong and is recorded rather
+than quietly dropped. The paired difference against Ridge was expected to have *lower*
+variance than either candidate's difference against the baseline, on the reasoning that two
+models are correlated with each other. It is higher: 16.3311 against 14.8056 and 12.8145. The
+two models disagree with each other more than either disagrees with the baseline, because
+they are betting on different things — production sees the calendar, Ridge has a learned
+functional form, and neither has both.
+
+### What may and may not follow
+
+The gate result is now known, which constrains what honest iteration looks like. Tuning this
+candidate until it clears a threshold it has already been measured against is fitting to the
+gate, and the governing issue forbids it in as many words.
+
+A further candidate is legitimate on one condition: the change is declared before it is
+measured, and it is measured once. The direction the numbers point at is a learned rate stage
+that also sees the calendar, since that is the one combination neither current candidate has —
+but writing that here is a hypothesis, not a licence to iterate until something passes.
 
 ## Determinism and provenance
 
