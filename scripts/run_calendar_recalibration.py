@@ -6,9 +6,9 @@
         --json-output artifacts/calendar_recalibration.json \
         --markdown-output artifacts/calendar_recalibration.md
 
-This command deliberately stops at measurement. It does not present conformal coverage,
-player-adaptive scales, scenario decomposition, or opening-gameweek uncertainty until those
-analyses have their own time-aware calibration evidence.
+The default mode preserves the residual-measurement artifact. ``--time-aware`` adds a
+chronological scale/conformal/evaluation split, held-out interval coverage, player-adaptive
+scales, and scenario-component comparisons. Neither mode infers opening-gameweek uncertainty.
 """
 
 import argparse
@@ -22,9 +22,13 @@ from squadopt.data.errors import DataError
 from squadopt.data.sources.vaastav import build_fixture_panel, load_team_codes
 from squadopt.recalibration import (
     RecalibrationConfig,
+    TimeAwareRecalibrationConfig,
     measure_calendar_recalibration,
     recalibration_to_dict,
     recalibration_to_markdown,
+    run_time_aware_recalibration,
+    time_aware_recalibration_to_dict,
+    time_aware_recalibration_to_markdown,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -57,8 +61,8 @@ def _seasons(frame: pd.DataFrame) -> tuple[str, ...]:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Measure matched calendar-blind and calendar-aware residual regimes by "
-            "fixture-count group."
+            "Measure matched calendar-blind and calendar-aware residual regimes, with "
+            "an optional chronological recalibration study."
         )
     )
     parser.add_argument("--reference-residuals", required=True)
@@ -66,6 +70,14 @@ def main() -> int:
     parser.add_argument("--reference-label", default="calendar_blind_baseline")
     parser.add_argument("--candidate-label", default="calendar_aware_production")
     parser.add_argument("--archive-root", default=str(ARCHIVE_ROOT))
+    parser.add_argument("--time-aware", action="store_true")
+    parser.add_argument("--confidence-level", type=float, default=0.90)
+    parser.add_argument("--scale-training-fraction", type=float, default=0.40)
+    parser.add_argument("--conformal-calibration-fraction", type=float, default=0.30)
+    parser.add_argument("--min-position-observations", type=int, default=30)
+    parser.add_argument("--min-player-observations", type=int, default=5)
+    parser.add_argument("--shrinkage-observations", type=float, default=10.0)
+    parser.add_argument("--minimum-scale", type=float, default=0.25)
     parser.add_argument("--json-output")
     parser.add_argument("--markdown-output")
     arguments = parser.parse_args()
@@ -91,24 +103,44 @@ def main() -> int:
             ],
             ignore_index=True,
         )
-        result = measure_calendar_recalibration(
-            residuals,
-            fixtures,
-            team_codes,
-            settings,
-        )
+        if arguments.time_aware:
+            study_config = TimeAwareRecalibrationConfig(
+                residual_config=settings,
+                confidence_level=arguments.confidence_level,
+                scale_training_fraction=arguments.scale_training_fraction,
+                conformal_calibration_fraction=(arguments.conformal_calibration_fraction),
+                min_position_observations=arguments.min_position_observations,
+                min_player_observations=arguments.min_player_observations,
+                shrinkage_observations=arguments.shrinkage_observations,
+                minimum_scale=arguments.minimum_scale,
+            )
+            study = run_time_aware_recalibration(
+                residuals,
+                fixtures,
+                team_codes,
+                study_config,
+            )
+            document = time_aware_recalibration_to_dict(study)
+            markdown = time_aware_recalibration_to_markdown(study)
+        else:
+            measurement = measure_calendar_recalibration(
+                residuals,
+                fixtures,
+                team_codes,
+                settings,
+            )
+            document = recalibration_to_dict(measurement)
+            markdown = recalibration_to_markdown(measurement)
     except DataError as error:
         print(f"Could not measure calendar recalibration:\n  {error}")
         return 1
 
-    markdown = recalibration_to_markdown(result)
     print(markdown)
     if arguments.json_output:
         destination = Path(arguments.json_output)
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            json.dumps(recalibration_to_dict(result), indent=2, sort_keys=True, allow_nan=False)
-            + "\n",
+            json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n",
             encoding="utf-8",
         )
         print(f"Wrote {destination}")

@@ -496,9 +496,15 @@ single, and double-plus fixture counts:
   --markdown-output artifacts/calendar_recalibration.md
 ```
 
-This command produces a measurement artifact only. It does not claim conformal coverage,
-player-adaptive scale recalibration, scenario recalibration, or opening-gameweek uncertainty.
+Without extra flags this command produces a measurement artifact only. Add `--time-aware`
+to use disjoint chronological scale-training, conformal-calibration, and evaluation slices;
+that report compares held-out coverage/width by fixture count, double-gameweek player scales,
+and common/team/idiosyncratic scenario-component spread. Neither mode infers
+opening-gameweek uncertainty from GW2+ residuals.
 See the [calendar recalibration specification](docs/calendar_recalibration_spec.md).
+The [residual export contract](docs/residual_export_contract.md) and
+[recalibration runbook](docs/recalibration_runbook.md) define the cross-owner handoff and
+execution sequence.
 
 ## Quality checks
 

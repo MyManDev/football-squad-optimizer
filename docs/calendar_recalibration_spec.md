@@ -44,8 +44,8 @@ For the complete matched population and every observed fixture group, the artifa
 - calendar-aware minus calendar-blind deltas.
 
 Negative MAE or RMSE deltas mean the calendar-aware candidate reduced error. A smaller
-standard deviation is not automatically better unless coverage is preserved; coverage is a
-later time-aware recalibration measurement rather than an inference made here.
+standard deviation is not automatically better unless coverage is preserved; coverage is
+measured by the separate time-aware study below rather than inferred from these same rows.
 
 ## Reproducibility
 
@@ -77,7 +77,48 @@ deviation, MAE, and RMSE. JSON serialization rejects non-finite values.
 - Scenario variance decomposition is not declared refitted by this artifact.
 - Gameweek-two-and-later residuals are not used to claim opening-gameweek uncertainty.
 
-Those states remain explicit `false` diagnostics until their time-aware runs are implemented.
+Those states remain explicit `false` diagnostics in the measurement-only artifact. They are
+not retroactively changed when a separate time-aware study is run.
+
+## Time-aware recalibration study
+
+The second contract, `time_aware_calendar_recalibration_v1`, consumes the same matched and
+fixture-enriched residual table. It orders unique folds chronologically and divides them into
+three disjoint slices:
+
+1. an early scale-training slice;
+2. a later standardized-conformal calibration slice;
+3. a final held-out evaluation slice.
+
+The default fractions are 40%, 30%, and the remaining 30%. Rounding never permits an empty
+slice; at least three folds are required. Both residual regimes use exactly the same fold and
+player rows in every slice. No quantity is refitted on the evaluation slice.
+
+For each regime, the scale slice estimates pooled, position, and player residual standard
+deviations. Supported player scales are variance-shrunk toward their position fallback; thin
+players use the position or pooled fallback. The conformal slice standardizes absolute
+residuals by those frozen local scales and fits the finite-sample order-statistic multiplier.
+The evaluation slice reports empirical coverage and mean interval width overall and for
+blank, single, and double-plus fixture groups.
+
+Players with at least one double-plus row in the scale slice receive an explicit
+calendar-blind versus calendar-aware effective-scale comparison. This shows whether the
+new residual regime changes shrinkage for precisely the player histories most affected by
+the calendar; it does not imply that every such scale is more accurate.
+
+The pre-evaluation history is also decomposed using the existing scenario definition:
+
+```text
+residual = common_gameweek + team_gameweek + player_idiosyncratic
+```
+
+The report compares component standard deviations and variance shares. It re-estimates the
+scenario inputs but does not claim a parametric joint distribution or promote a stochastic
+objective.
+
+The versioned JSON report is `time_aware_calendar_recalibration_report_v1`. Its fingerprint
+binds the residual measurement, configuration, exact fold split, interval comparisons,
+double-gameweek player scales, and scenario-component comparison.
 
 ## Command
 
@@ -89,3 +130,20 @@ python -m scripts.run_calendar_recalibration `
   --json-output artifacts/calendar_recalibration.json `
   --markdown-output artifacts/calendar_recalibration.md
 ```
+
+Add `--time-aware` to produce the full chronological study. Calibration controls are
+explicit CLI options; for example:
+
+```powershell
+python -m scripts.run_calendar_recalibration `
+  --reference-residuals artifacts/calendar_blind.csv `
+  --candidate-residuals artifacts/calendar_aware.csv `
+  --time-aware `
+  --scale-training-fraction 0.40 `
+  --conformal-calibration-fraction 0.30 `
+  --json-output artifacts/time_aware_recalibration.json `
+  --markdown-output artifacts/time_aware_recalibration.md
+```
+
+Opening-gameweek uncertainty remains a separate evidence regime. A successful time-aware
+study on gameweek-two-and-later residuals must not be presented as GW1 calibration.
