@@ -337,7 +337,14 @@ def build_residual_history(folds: tuple[EvaluationFold, ...]) -> pd.DataFrame:
     return pd.concat(records, ignore_index=True)
 
 
-def _prediction_metrics(residuals: pd.DataFrame) -> PredictionMetrics:
+def prediction_metrics(residuals: pd.DataFrame) -> PredictionMetrics:
+    """Summarise prediction error overall and per position from a residual table.
+
+    Public so a second candidate is measured by this code rather than by a copy of it.
+    Two implementations of an error metric drift, and then two candidates' numbers are
+    comparable only by coincidence.
+    """
+
     def summarize(frame: pd.DataFrame) -> tuple[int, float, float, float]:
         errors = frame["predicted_points"] - frame["realized_points"]
         mae = float(errors.abs().mean())
@@ -354,7 +361,7 @@ def _prediction_metrics(residuals: pd.DataFrame) -> PredictionMetrics:
     return PredictionMetrics(count, mae, rmse, bias, tuple(position_metrics))
 
 
-def _decision_metrics(
+def paired_decision_metrics(
     baseline: EvaluationResult,
     learned: EvaluationResult,
 ) -> PairedDecisionMetrics:
@@ -464,9 +471,9 @@ def run_learned_benchmark(
         config=settings,
         baseline=baseline,
         learned=learned,
-        baseline_prediction_metrics=_prediction_metrics(baseline_residuals),
-        learned_prediction_metrics=_prediction_metrics(learned_residuals),
-        decision_metrics=_decision_metrics(baseline, learned),
+        baseline_prediction_metrics=prediction_metrics(baseline_residuals),
+        learned_prediction_metrics=prediction_metrics(learned_residuals),
+        decision_metrics=paired_decision_metrics(baseline, learned),
         residuals=learned_residuals,
         diagnostics={
             "benchmark_contract_version": LEARNED_BENCHMARK_CONTRACT_VERSION,

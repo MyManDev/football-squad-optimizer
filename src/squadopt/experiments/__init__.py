@@ -36,6 +36,7 @@ from squadopt.experiments.runner import (
     run_frozen_holdout,
     run_screening_experiment,
 )
+from squadopt.experiments.statistics import season_aware_moving_block_interval
 
 __all__ = [
     "DEFAULT_BENCH_WEIGHTS",
@@ -66,4 +67,5 @@ __all__ = [
     "run_screening_experiment",
     "screening_result_to_dict",
     "screening_result_to_markdown",
+    "season_aware_moving_block_interval",
 ]
