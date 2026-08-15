@@ -136,14 +136,22 @@ def control_residual_manifest(
     dataset_snapshot_id: str,
     table_sha256: str,
     created_at_utc: str,
+    candidate_label: str = CONTROL_CANDIDATE_LABEL,
 ) -> Mapping[str, object]:
-    """Return the manifest describing one control residual export."""
+    """Return the manifest describing one control residual export.
+
+    ``candidate_label`` names the regime for pairing; a second export produced with a
+    different form window must carry a different label, because the pairing rule
+    refuses two exports claiming the same regime.
+    """
 
     if not isinstance(table, pd.DataFrame) or table.empty:
         raise ExperimentExecutionError("table must be a non-empty pandas DataFrame.")
+    if not isinstance(candidate_label, str) or not candidate_label.strip():
+        raise ExperimentExecutionError("candidate_label must be non-empty text.")
     return {
         "contract_version": RESIDUAL_EXPORT_CONTRACT_VERSION,
-        "candidate_label": CONTROL_CANDIDATE_LABEL,
+        "candidate_label": candidate_label.strip(),
         "model_name": CONTROL_MODEL_NAME,
         "model_version": control_model_version(form_window),
         "feature_contract_version": FEATURE_GENERATION_CONTRACT_VERSION,
