@@ -43,6 +43,12 @@ from squadopt.experiments.runner import (
     run_frozen_holdout,
     run_screening_experiment,
 )
+from squadopt.experiments.scenario_policy_objective import (
+    SCENARIO_POLICY_FACTOR_NAMES,
+    SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION,
+    ScenarioPolicyObjective,
+    ScenarioPolicyObjectiveConfig,
+)
 from squadopt.experiments.statistics import season_aware_moving_block_interval
 
 __all__ = [
@@ -53,6 +59,8 @@ __all__ = [
     "PINNED_RISK_AVERSION",
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
     "POLICY_SEARCH_FACTOR_NAMES",
+    "SCENARIO_POLICY_FACTOR_NAMES",
+    "SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
     "BaselinePolicyObjective",
     "CandidateAssessment",
@@ -68,6 +76,8 @@ __all__ = [
     "PairedComparison",
     "PolicyObjectiveConfig",
     "PromotionPolicy",
+    "ScenarioPolicyObjective",
+    "ScenarioPolicyObjectiveConfig",
     "ScreeningExperimentConfig",
     "ScreeningExperimentResult",
     "freeze_screening_candidate",
