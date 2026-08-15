@@ -1,0 +1,133 @@
+{
+  "calibration_fold_count": 110,
+  "calibration_seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24"
+  ],
+  "confidence_level": 0.9,
+  "created_utc": "2026-08-15T10:28:00+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "evaluation_fold_count": 37,
+  "evaluation_season": "2024-25",
+  "form_window": 5,
+  "locked_holdout_accessed": false,
+  "note": "Development-internal evaluation: both calibrations are fit on the early development seasons and scored frozen on the last development season. The 2025-26 locked holdout was not read.",
+  "player_adaptive": {
+    "calibration_fingerprint": "cc3f737c57011115b1ca3060b90ba278aacb405ab633a823b9f953f82a2d06ff",
+    "configuration_fingerprint": "7d5963b0a8e3e41610f1549a17d56aa9804c25541ac548dcbd3bcb96c97ff90e",
+    "group_metrics": {
+      "DEF": {
+        "empirical_coverage": 0.905226164833919,
+        "mean_absolute_error": 1.0598748721781996,
+        "mean_error": -0.006516747719586044,
+        "mean_interval_width": 6.687773786060389,
+        "observations": 8821,
+        "root_mean_squared_error": 2.0226042864392815
+      },
+      "FWD": {
+        "empirical_coverage": 0.8692070030895983,
+        "mean_absolute_error": 1.234859352797922,
+        "mean_error": -0.031366802536901835,
+        "mean_interval_width": 6.81398737658695,
+        "observations": 2913,
+        "root_mean_squared_error": 2.4415525842441794
+      },
+      "GK": {
+        "empirical_coverage": 0.9036580948931546,
+        "mean_absolute_error": 0.7803048780159654,
+        "mean_error": -0.015312472474907444,
+        "mean_interval_width": 4.539519408836228,
+        "observations": 2761,
+        "root_mean_squared_error": 1.770686926767957
+      },
+      "MID": {
+        "empirical_coverage": 0.8956639566395664,
+        "mean_absolute_error": 1.084578063596361,
+        "mean_error": -0.005473860684203405,
+        "mean_interval_width": 5.7696447313043855,
+        "observations": 11808,
+        "root_mean_squared_error": 2.1737680899606366
+      }
+    },
+    "metrics": {
+      "empirical_coverage": 0.89677983499981,
+      "mean_absolute_error": 1.060997646098626,
+      "mean_error": -0.009723940648852101,
+      "mean_interval_width": 6.064083027406588,
+      "observations": 26303,
+      "root_mean_squared_error": 2.1171951906471134
+    }
+  },
+  "position_level": {
+    "calibration_fingerprint": "f2d365b02586785c7773772240c77f160c29424465fbed4c5839c9eea1afae75",
+    "configuration_fingerprint": "238734260c0e7926469c0c1f9f670746386a4b3837c8409653c71703147d4b74",
+    "group_metrics": {
+      "DEF": {
+        "empirical_coverage": 0.9206439179231379,
+        "mean_absolute_error": 1.0598748721781996,
+        "mean_error": -0.006516747719586044,
+        "mean_interval_width": 7.599999999999999,
+        "observations": 8821,
+        "root_mean_squared_error": 2.0226042864392815
+      },
+      "FWD": {
+        "empirical_coverage": 0.8880878819086852,
+        "mean_absolute_error": 1.234859352797922,
+        "mean_error": -0.031366802536901835,
+        "mean_interval_width": 7.6,
+        "observations": 2913,
+        "root_mean_squared_error": 2.4415525842441794
+      },
+      "GK": {
+        "empirical_coverage": 0.9094530967040927,
+        "mean_absolute_error": 0.7803048780159654,
+        "mean_error": -0.015312472474907444,
+        "mean_interval_width": 5.600000000000001,
+        "observations": 2761,
+        "root_mean_squared_error": 1.770686926767957
+      },
+      "MID": {
+        "empirical_coverage": 0.9065887533875339,
+        "mean_absolute_error": 1.084578063596361,
+        "mean_error": -0.005473860684203405,
+        "mean_interval_width": 6.400000000000002,
+        "observations": 11808,
+        "root_mean_squared_error": 2.1737680899606366
+      }
+    },
+    "metrics": {
+      "empirical_coverage": 0.9095540432650268,
+      "mean_absolute_error": 1.060997646098626,
+      "mean_error": -0.009723940648852101,
+      "mean_interval_width": 6.851355358704331,
+      "observations": 26303,
+      "root_mean_squared_error": 2.1171951906471134
+    }
+  },
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "e5df28b68b7108541f9c52e3449556fdfb308e72",
+    "working_tree_dirty": false
+  }
+}
