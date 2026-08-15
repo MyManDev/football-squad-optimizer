@@ -14,6 +14,14 @@ from squadopt.experiments.config import (
     PromotionPolicy,
     ScreeningExperimentConfig,
 )
+from squadopt.experiments.control_residuals import (
+    CONTROL_CANDIDATE_LABEL,
+    CONTROL_MODEL_NAME,
+    CONTROL_TRAINING_CONTRACT_VERSION,
+    build_control_residual_table,
+    control_model_version,
+    control_residual_manifest,
+)
 from squadopt.experiments.models import (
     CandidateAssessment,
     FrozenCandidate,
@@ -46,6 +54,9 @@ from squadopt.experiments.runner import (
 from squadopt.experiments.statistics import season_aware_moving_block_interval
 
 __all__ = [
+    "CONTROL_CANDIDATE_LABEL",
+    "CONTROL_MODEL_NAME",
+    "CONTROL_TRAINING_CONTRACT_VERSION",
     "DEFAULT_BENCH_WEIGHTS",
     "DEFAULT_DEVELOPMENT_SEASONS",
     "DEFAULT_FORM_WINDOWS",
@@ -70,6 +81,9 @@ __all__ = [
     "PromotionPolicy",
     "ScreeningExperimentConfig",
     "ScreeningExperimentResult",
+    "build_control_residual_table",
+    "control_model_version",
+    "control_residual_manifest",
     "freeze_screening_candidate",
     "frozen_candidate_from_dict",
     "frozen_candidate_to_dict",
