@@ -411,5 +411,7 @@ class ScenarioPolicyObjective:
             "scenario_count": self._settings.scenario_count,
             "tail_fraction": self._settings.tail_fraction,
             "mean_candidate_pool_size": sum(pool_sizes) / len(pool_sizes),
+            "fold_ids": self._fold_ids,
+            "fold_scores": tuple(scores),
         }
         return mean_points

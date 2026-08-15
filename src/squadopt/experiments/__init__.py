@@ -53,6 +53,12 @@ from squadopt.experiments.reporting import (
     screening_result_to_dict,
     screening_result_to_markdown,
 )
+from squadopt.experiments.risk_frontier import (
+    RISK_FRONTIER_CONTRACT_VERSION,
+    RiskFrontierPoint,
+    RiskFrontierResult,
+    measure_risk_frontier,
+)
 from squadopt.experiments.runner import (
     freeze_screening_candidate,
     run_frozen_holdout,
@@ -78,6 +84,7 @@ __all__ = [
     "POLICY_GRID_CONTRACT_VERSION",
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
     "POLICY_SEARCH_FACTOR_NAMES",
+    "RISK_FRONTIER_CONTRACT_VERSION",
     "SCENARIO_POLICY_FACTOR_NAMES",
     "SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
@@ -97,6 +104,8 @@ __all__ = [
     "PolicyGridResult",
     "PolicyObjectiveConfig",
     "PromotionPolicy",
+    "RiskFrontierPoint",
+    "RiskFrontierResult",
     "ScenarioPolicyObjective",
     "ScenarioPolicyObjectiveConfig",
     "ScreeningExperimentConfig",
@@ -110,6 +119,7 @@ __all__ = [
     "frozen_candidate_to_dict",
     "holdout_result_to_dict",
     "holdout_result_to_markdown",
+    "measure_risk_frontier",
     "run_frozen_holdout",
     "run_screening_experiment",
     "screening_result_to_dict",
