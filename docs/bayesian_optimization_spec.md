@@ -26,6 +26,47 @@ The caller adapts the existing chronological experiment objective to this small 
 keeps the surrogate independent of prediction, optimization, and scenario implementation while
 preserving the existing fold and objective contracts.
 
+## Objective evaluator contract
+
+Contract version: `deterministic_policy_evaluation_v1` (`squadopt.bayesopt.evaluation`).
+
+The narrow callback above stays the optimizer's only dependency. The typed seam fixes what
+that callback means, so the prediction-side builder and the search implement against the same
+contract:
+
+```python
+DeterministicPolicyFactors(form_window: int, bench_weight: float, risk_aversion: float)
+
+class DevelopmentFoldPolicyEvaluator(Protocol):
+    def __call__(
+        self,
+        factors: DeterministicPolicyFactors,
+        development_fold_ids: tuple[str, ...],
+    ) -> DevelopmentFoldEvaluation: ...
+
+bind_policy_evaluator(evaluator) -> BoundPolicyEvaluator  # satisfies ObjectiveEvaluator
+```
+
+Rules enforced by the binding on every call:
+
+- A candidate must carry exactly the policy factors (`form_window`, `bench_weight`,
+  `risk_aversion`); a missing factor is refused rather than defaulted and an unknown factor is
+  refused rather than ignored, because a partially applied candidate would fake influence in
+  the search trace.
+- `form_window` is passed through unchanged; the prediction side must apply the frozen
+  `form_window_v1` mapping and may not reinterpret it.
+- The returned `DevelopmentFoldEvaluation` must name the folds that produced its
+  `objective_value`. The set must equal the requested development folds exactly — missing folds
+  invalidate coverage, extra folds may indicate locked-holdout access. Either stops the search.
+- The reported `objective_version` must equal the version the binding was constructed with
+  (default `single_gameweek_realized_squad_points_v1`).
+- `BoundPolicyEvaluator.records` keeps each typed evaluation by candidate ID so a finished
+  search can attach per-candidate provenance that the scalar-only callback would discard.
+
+The builder satisfying `DevelopmentFoldPolicyEvaluator` is owned by the data/prediction side
+and must be deterministic for identical inputs. Until it exists, the contract is exercised by
+synthetic evaluators in `tests/unit/test_bo_evaluation_contract.py`.
+
 ## Search-space contract
 
 `BayesianFactor` defines:
