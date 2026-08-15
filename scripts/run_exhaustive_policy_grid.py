@@ -184,6 +184,7 @@ def main() -> int:
             ),
         ),
         evaluation_budget=1,
+        initial_design_size=1,
     )
 
     try:
