@@ -14,6 +14,14 @@ from squadopt.experiments.config import (
     PromotionPolicy,
     ScreeningExperimentConfig,
 )
+from squadopt.experiments.control_residuals import (
+    CONTROL_CANDIDATE_LABEL,
+    CONTROL_MODEL_NAME,
+    CONTROL_TRAINING_CONTRACT_VERSION,
+    build_control_residual_table,
+    control_model_version,
+    control_residual_manifest,
+)
 from squadopt.experiments.models import (
     CandidateAssessment,
     FrozenCandidate,
@@ -50,9 +58,18 @@ from squadopt.experiments.runner import (
     run_frozen_holdout,
     run_screening_experiment,
 )
+from squadopt.experiments.scenario_policy_objective import (
+    SCENARIO_POLICY_FACTOR_NAMES,
+    SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION,
+    ScenarioPolicyObjective,
+    ScenarioPolicyObjectiveConfig,
+)
 from squadopt.experiments.statistics import season_aware_moving_block_interval
 
 __all__ = [
+    "CONTROL_CANDIDATE_LABEL",
+    "CONTROL_MODEL_NAME",
+    "CONTROL_TRAINING_CONTRACT_VERSION",
     "DEFAULT_BENCH_WEIGHTS",
     "DEFAULT_DEVELOPMENT_SEASONS",
     "DEFAULT_FORM_WINDOWS",
@@ -61,6 +78,8 @@ __all__ = [
     "POLICY_GRID_CONTRACT_VERSION",
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
     "POLICY_SEARCH_FACTOR_NAMES",
+    "SCENARIO_POLICY_FACTOR_NAMES",
+    "SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
     "BaselinePolicyObjective",
     "CandidateAssessment",
@@ -78,8 +97,13 @@ __all__ = [
     "PolicyGridResult",
     "PolicyObjectiveConfig",
     "PromotionPolicy",
+    "ScenarioPolicyObjective",
+    "ScenarioPolicyObjectiveConfig",
     "ScreeningExperimentConfig",
     "ScreeningExperimentResult",
+    "build_control_residual_table",
+    "control_model_version",
+    "control_residual_manifest",
     "evaluate_policy_grid",
     "freeze_screening_candidate",
     "frozen_candidate_from_dict",
