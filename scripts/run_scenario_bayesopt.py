@@ -54,7 +54,7 @@ from squadopt.preflight import (
 )
 
 LOGGER = logging.getLogger(__name__)
-DEFAULT_SEASONS = "2023-24,2024-25"
+DEFAULT_SEASONS = "2024-25"
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -67,8 +67,10 @@ def _parse_arguments() -> argparse.Namespace:
         default=DEFAULT_SEASONS,
         help="Comma-separated seasons whose folds are evaluated.",
     )
-    parser.add_argument("--scenario-count", type=int, default=200)
+    parser.add_argument("--scenario-count", type=int, default=100)
     parser.add_argument("--min-history-folds", type=int, default=8)
+    parser.add_argument("--candidate-pool-per-position", type=int, default=20)
+    parser.add_argument("--cheap-pool-per-position", type=int, default=8)
     parser.add_argument("--form-window-minimum", type=int, default=3)
     parser.add_argument("--form-window-maximum", type=int, default=10)
     parser.add_argument("--bench-weight-maximum", type=float, default=0.30)
@@ -112,6 +114,14 @@ def _result_document(
         "scenario_count": objective.config.scenario_count,
         "min_history_folds": objective.config.min_history_folds,
         "tail_fraction": objective.config.tail_fraction,
+        "candidate_pool_per_position": objective.config.candidate_pool_per_position,
+        "cheap_pool_per_position": objective.config.cheap_pool_per_position,
+        "solver_wall_cap_seconds": (objective.config.optimization_config.solver_time_limit_seconds),
+        "reproducibility_note": (
+            "Per-fold scenario solves stop at a wall-clock cap, not a deterministic "
+            "work budget; the trace is recommendation-quality measurement, not a "
+            "formal reproducible benchmark."
+        ),
         "residual_input": dict(residual_provenance),
         "search_space_size": result.config.search_space_size,
         "evaluation_count": len(result.evaluations),
@@ -152,6 +162,11 @@ def _result_markdown(
         f"(each fold's scenarios use only strictly earlier residual folds)",
         f"- Scenarios per fold: {objective.config.scenario_count}; "
         f"tail fraction {objective.config.tail_fraction}",
+        f"- Candidate pool per position: top {objective.config.candidate_pool_per_position} "
+        f"projected + {objective.config.cheap_pool_per_position} cheapest "
+        "(one rule for every candidate; pool sizes are fingerprinted)",
+        "- Per-fold solves stop at a wall-clock cap, not a deterministic work budget; "
+        "this trace is recommendation-quality measurement, not a formal benchmark",
         f"- Search space: {result.config.search_space_size} candidates; "
         f"evaluated {len(result.evaluations)}",
         f"- Stopped: {result.stopped_reason}",
@@ -224,6 +239,8 @@ def main() -> int:
         development_seasons=seasons,
         scenario_count=arguments.scenario_count,
         min_history_folds=arguments.min_history_folds,
+        candidate_pool_per_position=arguments.candidate_pool_per_position,
+        cheap_pool_per_position=arguments.cheap_pool_per_position,
     )
     search_config = BayesianOptimizationConfig(
         factors=(

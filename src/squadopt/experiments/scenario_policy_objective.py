@@ -148,6 +148,8 @@ class ScenarioPolicyObjectiveConfig:
                 "max_players_per_team": optimization.max_players_per_team,
                 "expected_points_scale": optimization.expected_points_scale,
                 "deterministic_seed": optimization.deterministic_seed,
+                "solver_time_limit_seconds": optimization.solver_time_limit_seconds,
+                "solver_deterministic_time_limit": (optimization.solver_deterministic_time_limit),
             },
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
