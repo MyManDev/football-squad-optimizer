@@ -23,6 +23,13 @@ from squadopt.experiments.models import (
     PairedComparison,
     ScreeningExperimentResult,
 )
+from squadopt.experiments.policy_objective import (
+    PINNED_RISK_AVERSION,
+    POLICY_OBJECTIVE_CONTRACT_VERSION,
+    POLICY_SEARCH_FACTOR_NAMES,
+    BaselinePolicyObjective,
+    PolicyObjectiveConfig,
+)
 from squadopt.experiments.reporting import (
     frozen_candidate_from_dict,
     frozen_candidate_to_dict,
@@ -43,7 +50,11 @@ __all__ = [
     "DEFAULT_DEVELOPMENT_SEASONS",
     "DEFAULT_FORM_WINDOWS",
     "DEFAULT_HOLDOUT_SEASONS",
+    "PINNED_RISK_AVERSION",
+    "POLICY_OBJECTIVE_CONTRACT_VERSION",
+    "POLICY_SEARCH_FACTOR_NAMES",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
+    "BaselinePolicyObjective",
     "CandidateAssessment",
     "ExperimentCandidate",
     "ExperimentConfigurationError",
@@ -55,6 +66,7 @@ __all__ = [
     "InteractionEffect",
     "MainEffect",
     "PairedComparison",
+    "PolicyObjectiveConfig",
     "PromotionPolicy",
     "ScreeningExperimentConfig",
     "ScreeningExperimentResult",
