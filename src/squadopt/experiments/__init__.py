@@ -23,6 +23,13 @@ from squadopt.experiments.models import (
     PairedComparison,
     ScreeningExperimentResult,
 )
+from squadopt.experiments.policy_grid import (
+    POLICY_GRID_CONTRACT_VERSION,
+    PolicyGridCell,
+    PolicyGridResult,
+    evaluate_policy_grid,
+    summarize_search_efficiency,
+)
 from squadopt.experiments.policy_objective import (
     PINNED_RISK_AVERSION,
     POLICY_OBJECTIVE_CONTRACT_VERSION,
@@ -51,6 +58,7 @@ __all__ = [
     "DEFAULT_FORM_WINDOWS",
     "DEFAULT_HOLDOUT_SEASONS",
     "PINNED_RISK_AVERSION",
+    "POLICY_GRID_CONTRACT_VERSION",
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
     "POLICY_SEARCH_FACTOR_NAMES",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
@@ -66,10 +74,13 @@ __all__ = [
     "InteractionEffect",
     "MainEffect",
     "PairedComparison",
+    "PolicyGridCell",
+    "PolicyGridResult",
     "PolicyObjectiveConfig",
     "PromotionPolicy",
     "ScreeningExperimentConfig",
     "ScreeningExperimentResult",
+    "evaluate_policy_grid",
     "freeze_screening_candidate",
     "frozen_candidate_from_dict",
     "frozen_candidate_to_dict",
@@ -80,4 +91,5 @@ __all__ = [
     "screening_result_to_dict",
     "screening_result_to_markdown",
     "season_aware_moving_block_interval",
+    "summarize_search_efficiency",
 ]
