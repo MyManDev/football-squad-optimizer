@@ -9,17 +9,30 @@
 The default mode preserves the residual-measurement artifact. ``--time-aware`` adds a
 chronological scale/conformal/evaluation split, held-out interval coverage, player-adaptive
 scales, and scenario-component comparisons. Neither mode infers opening-gameweek uncertainty.
+
+Passing ``--reference-manifest`` and ``--candidate-manifest`` runs the artifact preflight
+(``artifact_preflight_v1``) before anything is measured: both exports and their pairing are
+checked against ``oos_residual_export_v1``, and a single failed finding refuses the
+measurement instead of producing a report from an artifact that violates its contract.
 """
 
 import argparse
 import json
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 import pandas as pd
 
 from squadopt.data.errors import DataError
 from squadopt.data.sources.vaastav import build_fixture_panel, load_team_codes
+from squadopt.preflight import (
+    PreflightReport,
+    compute_table_sha256,
+    preflight_report_to_markdown,
+    run_export_pair_preflight,
+    run_residual_export_preflight,
+)
 from squadopt.recalibration import (
     RecalibrationConfig,
     TimeAwareRecalibrationConfig,
@@ -49,6 +62,54 @@ def _read_table(path: Path) -> pd.DataFrame:
     raise DataError(f"Residual file {path} must be CSV or Parquet.")
 
 
+def _read_manifest(path: Path) -> Mapping[str, object]:
+    if not path.is_file():
+        raise DataError(f"Manifest file does not exist: {path}.")
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise DataError(f"Could not read manifest {path}: {error}") from error
+    if not isinstance(document, dict):
+        raise DataError(f"Manifest {path} must contain a JSON object.")
+    return document
+
+
+def _preflight_gate(
+    reference_table: pd.DataFrame,
+    reference_path: Path,
+    reference_manifest: Mapping[str, object],
+    candidate_table: pd.DataFrame,
+    candidate_path: Path,
+    candidate_manifest: Mapping[str, object],
+) -> bool:
+    """Print every preflight report and return whether measurement may proceed."""
+
+    reports: tuple[PreflightReport, ...] = (
+        run_residual_export_preflight(
+            reference_table,
+            reference_manifest,
+            table_sha256=compute_table_sha256(reference_path),
+            artifact_label=reference_path.name,
+        ),
+        run_residual_export_preflight(
+            candidate_table,
+            candidate_manifest,
+            table_sha256=compute_table_sha256(candidate_path),
+            artifact_label=candidate_path.name,
+        ),
+        run_export_pair_preflight(
+            reference_table,
+            reference_manifest,
+            candidate_table,
+            candidate_manifest,
+            artifact_label=f"{reference_path.name} vs {candidate_path.name}",
+        ),
+    )
+    for report in reports:
+        print(preflight_report_to_markdown(report))
+    return all(report.passed for report in reports)
+
+
 def _seasons(frame: pd.DataFrame) -> tuple[str, ...]:
     if "season" not in frame.columns:
         raise DataError("Residual files must carry a 'season' column.")
@@ -67,6 +128,8 @@ def main() -> int:
     )
     parser.add_argument("--reference-residuals", required=True)
     parser.add_argument("--candidate-residuals", required=True)
+    parser.add_argument("--reference-manifest")
+    parser.add_argument("--candidate-manifest")
     parser.add_argument("--reference-label", default="calendar_blind_baseline")
     parser.add_argument("--candidate-label", default="calendar_aware_production")
     parser.add_argument("--archive-root", default=str(ARCHIVE_ROOT))
@@ -82,17 +145,37 @@ def main() -> int:
     parser.add_argument("--markdown-output")
     arguments = parser.parse_args()
 
+    manifest_inputs = (arguments.reference_manifest, arguments.candidate_manifest)
+    if any(manifest_inputs) and not all(manifest_inputs):
+        print("Provide both --reference-manifest and --candidate-manifest, or neither.")
+        return 2
+
     try:
         settings = RecalibrationConfig(
             reference_candidate=arguments.reference_label,
             candidate=arguments.candidate_label,
         )
-        reference = _read_table(Path(arguments.reference_residuals)).assign(
-            candidate=settings.reference_candidate
-        )
-        candidate = _read_table(Path(arguments.candidate_residuals)).assign(
-            candidate=settings.candidate
-        )
+        reference_path = Path(arguments.reference_residuals)
+        candidate_path = Path(arguments.candidate_residuals)
+        reference_table = _read_table(reference_path)
+        candidate_table = _read_table(candidate_path)
+        if all(manifest_inputs):
+            gate_passed = _preflight_gate(
+                reference_table,
+                reference_path,
+                _read_manifest(Path(arguments.reference_manifest)),
+                candidate_table,
+                candidate_path,
+                _read_manifest(Path(arguments.candidate_manifest)),
+            )
+            if not gate_passed:
+                print(
+                    "Artifact preflight failed; the residual exports were not measured. "
+                    "Fix the artifacts and rerun."
+                )
+                return 1
+        reference = reference_table.assign(candidate=settings.reference_candidate)
+        candidate = candidate_table.assign(candidate=settings.candidate)
         residuals = pd.concat([reference, candidate], ignore_index=True)
         seasons = _seasons(residuals)
         fixtures = build_fixture_panel(arguments.archive_root, seasons=seasons)

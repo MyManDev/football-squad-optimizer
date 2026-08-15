@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 import scripts.run_calendar_recalibration as recalibration_cli
 
+from squadopt.preflight import compute_table_sha256
 from squadopt.recalibration import (
     CALENDAR_RECALIBRATION_ARTIFACT_TYPE,
     CALENDAR_RECALIBRATION_CONTRACT_VERSION,
@@ -310,3 +311,150 @@ def test_cli_writes_deterministic_json_and_markdown_artifacts(
     assert markdown_path.read_text(encoding="utf-8").startswith(
         "# Calendar-aware residual measurement"
     )
+
+
+def _export_manifest(table: pd.DataFrame, path: Path, label: str) -> Path:
+    document: dict[str, object] = {
+        "contract_version": "oos_residual_export_v1",
+        "candidate_label": label,
+        "model_name": "control-model",
+        "model_version": "1.0.0",
+        "feature_contract_version": "form_window_v1",
+        "training_contract_version": "training_v1",
+        "evaluation_objective": "single_gameweek_realized_squad_points_v1",
+        "development_seasons": sorted({str(season) for season in table["season"]}),
+        "opening_gameweeks_included": bool((table["gameweek"] == 1).any()),
+        "fold_count": int(table["fold_id"].nunique()),
+        "row_count": len(table),
+        "repository_commit": "a" * 40,
+        "dataset_snapshot_id": SNAPSHOT,
+        "table_sha256": compute_table_sha256(path),
+        "created_at_utc": "2026-08-15T00:00:00Z",
+    }
+    manifest_path = path.with_suffix(".manifest.json")
+    manifest_path.write_text(json.dumps(document), encoding="utf-8")
+    return manifest_path
+
+
+def _write_regime_tables(tmp_path: Path, residuals: pd.DataFrame) -> tuple[Path, Path]:
+    reference_path = tmp_path / "reference.csv"
+    candidate_path = tmp_path / "candidate.csv"
+    residuals.loc[residuals["candidate"] == "calendar_blind_baseline"].drop(
+        columns="candidate"
+    ).to_csv(reference_path, index=False)
+    residuals.loc[residuals["candidate"] == "calendar_aware_production"].drop(
+        columns="candidate"
+    ).to_csv(candidate_path, index=False)
+    return reference_path, candidate_path
+
+
+def test_cli_preflight_gate_accepts_conforming_manifests_and_measures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    residuals: pd.DataFrame,
+    fixtures: pd.DataFrame,
+    team_codes: pd.DataFrame,
+) -> None:
+    reference_path, candidate_path = _write_regime_tables(tmp_path, residuals)
+    reference_manifest = _export_manifest(
+        pd.read_csv(reference_path), reference_path, "calendar_blind_baseline"
+    )
+    candidate_manifest = _export_manifest(
+        pd.read_csv(candidate_path), candidate_path, "calendar_aware_production"
+    )
+    json_path = tmp_path / "measurement.json"
+
+    monkeypatch.setattr(
+        recalibration_cli, "build_fixture_panel", lambda *_args, **_kwargs: fixtures
+    )
+    monkeypatch.setattr(
+        recalibration_cli,
+        "load_team_codes",
+        lambda *_args, **_kwargs: team_codes.drop(columns="season"),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_calendar_recalibration",
+            "--reference-residuals",
+            str(reference_path),
+            "--candidate-residuals",
+            str(candidate_path),
+            "--reference-manifest",
+            str(reference_manifest),
+            "--candidate-manifest",
+            str(candidate_manifest),
+            "--json-output",
+            str(json_path),
+        ],
+    )
+
+    assert recalibration_cli.main() == 0
+    assert json.loads(json_path.read_text(encoding="utf-8"))["measurement_fingerprint"]
+
+
+def test_cli_preflight_gate_refuses_a_tampered_export_without_measuring(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    residuals: pd.DataFrame,
+) -> None:
+    """A failed preflight must stop the run before any measurement artifact exists."""
+
+    reference_path, candidate_path = _write_regime_tables(tmp_path, residuals)
+    reference_manifest = _export_manifest(
+        pd.read_csv(reference_path), reference_path, "calendar_blind_baseline"
+    )
+    candidate_manifest = _export_manifest(
+        pd.read_csv(candidate_path), candidate_path, "calendar_aware_production"
+    )
+    candidate_path.write_bytes(candidate_path.read_bytes() + b"\n#tampered")
+    json_path = tmp_path / "measurement.json"
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_calendar_recalibration",
+            "--reference-residuals",
+            str(reference_path),
+            "--candidate-residuals",
+            str(candidate_path),
+            "--reference-manifest",
+            str(reference_manifest),
+            "--candidate-manifest",
+            str(candidate_manifest),
+            "--json-output",
+            str(json_path),
+        ],
+    )
+
+    assert recalibration_cli.main() == 1
+    assert not json_path.exists()
+
+
+def test_cli_refuses_half_a_manifest_pair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    residuals: pd.DataFrame,
+) -> None:
+    reference_path, candidate_path = _write_regime_tables(tmp_path, residuals)
+    reference_manifest = _export_manifest(
+        pd.read_csv(reference_path), reference_path, "calendar_blind_baseline"
+    )
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_calendar_recalibration",
+            "--reference-residuals",
+            str(reference_path),
+            "--candidate-residuals",
+            str(candidate_path),
+            "--reference-manifest",
+            str(reference_manifest),
+        ],
+    )
+
+    assert recalibration_cli.main() == 2

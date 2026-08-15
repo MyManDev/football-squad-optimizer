@@ -14,13 +14,25 @@ support the calendar recalibration study but not GW1 live-risk numbers.
 
 ## 1. Verify the handoff
 
-For both manifests:
+Run the artifact preflight (`artifact_preflight_spec.md`) against both exports and their
+pairing, asserting the agreed population:
 
-1. verify the file SHA-256;
-2. verify model/feature identities and repository commit;
-3. verify the same dataset snapshot, seasons, fold count, and objective;
-4. verify that neither artifact claims an untouched holdout it has already read;
-5. retain the manifests beside the reports.
+```powershell
+.venv\Scripts\python -m scripts.run_artifact_preflight `
+  --table artifacts/candidate_residuals.csv `
+  --manifest artifacts/candidate_residuals.manifest.json `
+  --reference-table artifacts/reference_residuals.csv `
+  --reference-manifest artifacts/reference_residuals.manifest.json `
+  --expect-fold-count 147 `
+  --expect-row-count 101447 `
+  --expect-seasons 2021-22,2022-23,2023-24,2024-25 `
+  --json-output artifacts/recalibration/preflight.json
+```
+
+The preflight covers the file SHA-256, model/feature identities, repository commit, dataset
+snapshot, seasons, fold/row populations, the opening-gameweek evidence flag, and the pairing
+rule (identical keys, identical realized points, no silent intersection). Retain the JSON
+record and the manifests beside the reports.
 
 Do not rename a Ridge or production-candidate residual file as the operational control.
 
@@ -30,12 +42,18 @@ Do not rename a Ridge or production-candidate residual file as the operational c
 .venv\Scripts\python -m scripts.run_calendar_recalibration `
   --reference-residuals artifacts/reference_residuals.csv `
   --candidate-residuals artifacts/candidate_residuals.csv `
+  --reference-manifest artifacts/reference_residuals.manifest.json `
+  --candidate-manifest artifacts/candidate_residuals.manifest.json `
   --reference-label calendar_blind_control `
   --candidate-label calendar_aware_candidate `
   --archive-root data/raw/vaastav-fpl `
   --json-output artifacts/recalibration/measurement.json `
   --markdown-output artifacts/recalibration/measurement.md
 ```
+
+With the manifest arguments present, the command re-runs the preflight itself and refuses to
+measure anything if a single finding fails, so a formal measurement cannot be produced from
+an artifact that violates its contract.
 
 Confirm identical paired rows, fixture-contract version, and non-empty fixture groups. The
 measurement artifact reports bias/spread/error only; it makes no coverage claim.
@@ -46,6 +64,8 @@ measurement artifact reports bias/spread/error only; it makes no coverage claim.
 .venv\Scripts\python -m scripts.run_calendar_recalibration `
   --reference-residuals artifacts/reference_residuals.csv `
   --candidate-residuals artifacts/candidate_residuals.csv `
+  --reference-manifest artifacts/reference_residuals.manifest.json `
+  --candidate-manifest artifacts/candidate_residuals.manifest.json `
   --reference-label calendar_blind_control `
   --candidate-label calendar_aware_candidate `
   --archive-root data/raw/vaastav-fpl `
