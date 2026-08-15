@@ -31,6 +31,13 @@ from squadopt.experiments.models import (
     PairedComparison,
     ScreeningExperimentResult,
 )
+from squadopt.experiments.multi_gw_rehearsal import (
+    MULTI_GW_REHEARSAL_CONTRACT_VERSION,
+    NAIVE_PROJECTION_RULE,
+    MultiGwRehearsal,
+    MultiGwRehearsalConfig,
+    RehearsalWindowResult,
+)
 from squadopt.experiments.policy_grid import (
     POLICY_GRID_CONTRACT_VERSION,
     PolicyGridCell,
@@ -80,6 +87,8 @@ __all__ = [
     "DEFAULT_DEVELOPMENT_SEASONS",
     "DEFAULT_FORM_WINDOWS",
     "DEFAULT_HOLDOUT_SEASONS",
+    "MULTI_GW_REHEARSAL_CONTRACT_VERSION",
+    "NAIVE_PROJECTION_RULE",
     "PINNED_RISK_AVERSION",
     "POLICY_GRID_CONTRACT_VERSION",
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
@@ -99,11 +108,14 @@ __all__ = [
     "HoldoutEvaluationResult",
     "InteractionEffect",
     "MainEffect",
+    "MultiGwRehearsal",
+    "MultiGwRehearsalConfig",
     "PairedComparison",
     "PolicyGridCell",
     "PolicyGridResult",
     "PolicyObjectiveConfig",
     "PromotionPolicy",
+    "RehearsalWindowResult",
     "RiskFrontierPoint",
     "RiskFrontierResult",
     "ScenarioPolicyObjective",

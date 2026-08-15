@@ -46,6 +46,8 @@ def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
     parser.add_argument("--form-window", type=int, default=5)
+    parser.add_argument("--candidate-label", default=None)
+    parser.add_argument("--table-name", default="control_residuals")
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -87,9 +89,15 @@ def main() -> int:
 
     output_dir: Path = arguments.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
-    table_path = output_dir / "control_residuals.csv"
+    table_name = str(arguments.table_name)
+    table_path = output_dir / f"{table_name}.csv"
     table.to_csv(table_path, index=False)
     table_sha256 = compute_table_sha256(table_path)
+    label_override: dict[str, str] = (
+        {"candidate_label": str(arguments.candidate_label)}
+        if arguments.candidate_label is not None
+        else {}
+    )
     manifest = control_residual_manifest(
         table,
         form_window=arguments.form_window,
@@ -97,8 +105,9 @@ def main() -> int:
         dataset_snapshot_id=f"vaastav-fpl@{ARCHIVE_COMMIT}",
         table_sha256=table_sha256,
         created_at_utc=created_utc,
+        **label_override,
     )
-    manifest_path = output_dir / "control_residuals.manifest.json"
+    manifest_path = output_dir / f"{table_name}.manifest.json"
     write_json(manifest_path, dict(manifest))
 
     report = run_residual_export_preflight(
