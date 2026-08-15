@@ -1,0 +1,274 @@
+{
+  "automatic_promotion": false,
+  "best_mean_realized_squad_points": 57.108108108108105,
+  "candidate_pool_per_position": 20,
+  "candidate_records": {
+    "bench_weight=0-form_window=10-risk_aversion=0": {
+      "bench_weight": 0.0,
+      "form_window": 10,
+      "mean_candidate_pool_size": 111.91891891891892,
+      "mean_realized_squad_points": 54.86486486486486,
+      "risk_aversion": 0.0,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0-form_window=10-risk_aversion=0.5": {
+      "bench_weight": 0.0,
+      "form_window": 10,
+      "mean_candidate_pool_size": 111.91891891891892,
+      "mean_realized_squad_points": 44.2972972972973,
+      "risk_aversion": 0.5,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0-form_window=3-risk_aversion=0": {
+      "bench_weight": 0.0,
+      "form_window": 3,
+      "mean_candidate_pool_size": 111.56756756756756,
+      "mean_realized_squad_points": 53.16216216216216,
+      "risk_aversion": 0.0,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0-form_window=5-risk_aversion=0": {
+      "bench_weight": 0.0,
+      "form_window": 5,
+      "mean_candidate_pool_size": 111.78378378378379,
+      "mean_realized_squad_points": 56.027027027027025,
+      "risk_aversion": 0.0,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0-form_window=6-risk_aversion=0": {
+      "bench_weight": 0.0,
+      "form_window": 6,
+      "mean_candidate_pool_size": 111.83783783783784,
+      "mean_realized_squad_points": 57.108108108108105,
+      "risk_aversion": 0.0,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0-form_window=7-risk_aversion=0": {
+      "bench_weight": 0.0,
+      "form_window": 7,
+      "mean_candidate_pool_size": 111.86486486486487,
+      "mean_realized_squad_points": 56.027027027027025,
+      "risk_aversion": 0.0,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0.1-form_window=3-risk_aversion=1": {
+      "bench_weight": 0.1,
+      "form_window": 3,
+      "mean_candidate_pool_size": 111.56756756756756,
+      "mean_realized_squad_points": 19.513513513513512,
+      "risk_aversion": 1.0,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0.1-form_window=8-risk_aversion=0": {
+      "bench_weight": 0.1,
+      "form_window": 8,
+      "mean_candidate_pool_size": 111.91891891891892,
+      "mean_realized_squad_points": 53.972972972972975,
+      "risk_aversion": 0.0,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0.2-form_window=10-risk_aversion=0": {
+      "bench_weight": 0.2,
+      "form_window": 10,
+      "mean_candidate_pool_size": 111.91891891891892,
+      "mean_realized_squad_points": 54.24324324324324,
+      "risk_aversion": 0.0,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0.25-form_window=9-risk_aversion=0.6": {
+      "bench_weight": 0.25,
+      "form_window": 9,
+      "mean_candidate_pool_size": 111.91891891891892,
+      "mean_realized_squad_points": 44.75675675675676,
+      "risk_aversion": 0.6,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0.3-form_window=10-risk_aversion=0": {
+      "bench_weight": 0.3,
+      "form_window": 10,
+      "mean_candidate_pool_size": 111.91891891891892,
+      "mean_realized_squad_points": 54.75675675675676,
+      "risk_aversion": 0.0,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    },
+    "bench_weight=0.3-form_window=3-risk_aversion=0.1": {
+      "bench_weight": 0.3,
+      "form_window": 3,
+      "mean_candidate_pool_size": 111.56756756756756,
+      "mean_realized_squad_points": 44.891891891891895,
+      "risk_aversion": 0.1,
+      "scenario_count": 100,
+      "scored_folds": 37,
+      "tail_fraction": 0.1
+    }
+  },
+  "cheap_pool_per_position": 8,
+  "created_utc": "2026-08-15T08:18:36+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "evaluated_fold_count": 37,
+  "evaluated_seasons": [
+    "2024-25"
+  ],
+  "evaluation_count": 12,
+  "locked_holdout_accessed": false,
+  "min_history_folds": 8,
+  "objective_configuration_fingerprint": "caa12d77757511768c0406ae5cd5b6b6711368589c1461af86319b94bc54ca03",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "1b8da379d0a3824c56b12ef5ab8e1f33e0ee9463",
+    "working_tree_dirty": false
+  },
+  "recommendation_only": true,
+  "recommended_candidate": {
+    "bench_weight": 0.0,
+    "form_window": 6,
+    "risk_aversion": 0.0
+  },
+  "recommended_candidate_id": "bench_weight=0-form_window=6-risk_aversion=0",
+  "reproducibility_note": "Per-fold scenario solves stop at a wall-clock cap, not a deterministic work budget; the trace is recommendation-quality measurement, not a formal reproducible benchmark.",
+  "residual_input": {
+    "candidate_label": "deterministic_baseline_control",
+    "model_name": "deterministic_baseline",
+    "model_version": "form_window_05_v1",
+    "path": "c:/Users/ertug/Desktop/football-squad-optimizer/artifacts/codex-worktrees/control-residual-export/artifacts/residuals/control_residuals.csv",
+    "preflight_passed": true,
+    "rows": 101447,
+    "table_sha256": "1ed41f94f245b06d012293a895cdee755a5b1803cb19bcc3795e4a414767a22f"
+  },
+  "run_fingerprint": "eb189a6a33dfa489ce26f9c21bb98e4951166511692c29fa716dccadf094662b",
+  "scenario_count": 100,
+  "scenario_policy_objective_contract_version": "scenario_policy_objective_v1",
+  "search_configuration_fingerprint": "97dc213256814dafe3ba997e141b93ff32626fcb423316cf18b42cb8a9159224",
+  "search_space_size": 616,
+  "solver_wall_cap_seconds": 10.0,
+  "stopped_reason": "evaluation_budget_exhausted",
+  "tail_fraction": 0.1,
+  "trace": [
+    {
+      "candidate_id": "bench_weight=0.25-form_window=9-risk_aversion=0.6",
+      "expected_improvement": null,
+      "iteration": 0,
+      "mean_realized_squad_points": 44.75675675675676,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=3-risk_aversion=0",
+      "expected_improvement": null,
+      "iteration": 1,
+      "mean_realized_squad_points": 53.16216216216216,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0.1-form_window=3-risk_aversion=1",
+      "expected_improvement": null,
+      "iteration": 2,
+      "mean_realized_squad_points": 19.513513513513512,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0.3-form_window=3-risk_aversion=0.1",
+      "expected_improvement": null,
+      "iteration": 3,
+      "mean_realized_squad_points": 44.891891891891895,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=10-risk_aversion=0",
+      "expected_improvement": null,
+      "iteration": 4,
+      "mean_realized_squad_points": 54.86486486486486,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0.2-form_window=10-risk_aversion=0",
+      "expected_improvement": 1.7637508484111466,
+      "iteration": 5,
+      "mean_realized_squad_points": 54.24324324324324,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=7-risk_aversion=0",
+      "expected_improvement": 1.531669279222122,
+      "iteration": 6,
+      "mean_realized_squad_points": 56.027027027027025,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0.1-form_window=8-risk_aversion=0",
+      "expected_improvement": 0.6814761093091753,
+      "iteration": 7,
+      "mean_realized_squad_points": 53.972972972972975,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0.3-form_window=10-risk_aversion=0",
+      "expected_improvement": 0.48083253159663697,
+      "iteration": 8,
+      "mean_realized_squad_points": 54.75675675675676,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=6-risk_aversion=0",
+      "expected_improvement": 0.2013020825869021,
+      "iteration": 9,
+      "mean_realized_squad_points": 57.108108108108105,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=5-risk_aversion=0",
+      "expected_improvement": 0.13075898036278016,
+      "iteration": 10,
+      "mean_realized_squad_points": 56.027027027027025,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=10-risk_aversion=0.5",
+      "expected_improvement": 0.05109982611355379,
+      "iteration": 11,
+      "mean_realized_squad_points": 44.2972972972973,
+      "phase": "expected_improvement"
+    }
+  ]
+}
