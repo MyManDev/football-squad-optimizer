@@ -47,6 +47,7 @@ from squadopt.experiments import (
     ScenarioPolicyObjective,
     ScenarioPolicyObjectiveConfig,
 )
+from squadopt.optimization import OptimizationConfig
 from squadopt.preflight import (
     compute_table_sha256,
     preflight_report_to_markdown,
@@ -71,6 +72,17 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--min-history-folds", type=int, default=8)
     parser.add_argument("--candidate-pool-per-position", type=int, default=20)
     parser.add_argument("--cheap-pool-per-position", type=int, default=8)
+    parser.add_argument("--solver-wall-cap-seconds", type=float, default=10.0)
+    parser.add_argument(
+        "--solver-deterministic-time-limit",
+        type=float,
+        default=None,
+        help=(
+            "CP-SAT deterministic-work budget per fold solve. When set, stopping is "
+            "machine-independent and the trace becomes formally reproducible; the "
+            "wall cap stays as a generous safety net."
+        ),
+    )
     parser.add_argument("--form-window-minimum", type=int, default=3)
     parser.add_argument("--form-window-maximum", type=int, default=10)
     parser.add_argument("--bench-weight-maximum", type=float, default=0.30)
@@ -117,10 +129,17 @@ def _result_document(
         "candidate_pool_per_position": objective.config.candidate_pool_per_position,
         "cheap_pool_per_position": objective.config.cheap_pool_per_position,
         "solver_wall_cap_seconds": (objective.config.optimization_config.solver_time_limit_seconds),
+        "solver_deterministic_time_limit": (
+            objective.config.optimization_config.solver_deterministic_time_limit
+        ),
         "reproducibility_note": (
-            "Per-fold scenario solves stop at a wall-clock cap, not a deterministic "
-            "work budget; the trace is recommendation-quality measurement, not a "
-            "formal reproducible benchmark."
+            "Per-fold scenario solves stop at a deterministic work budget; the wall "
+            "cap is a safety net, and the trace is machine-independent for identical "
+            "inputs."
+            if objective.config.optimization_config.solver_deterministic_time_limit is not None
+            else "Per-fold scenario solves stop at a wall-clock cap, not a "
+            "deterministic work budget; the trace is recommendation-quality "
+            "measurement, not a formal reproducible benchmark."
         ),
         "residual_input": dict(residual_provenance),
         "search_space_size": result.config.search_space_size,
@@ -165,8 +184,15 @@ def _result_markdown(
         f"- Candidate pool per position: top {objective.config.candidate_pool_per_position} "
         f"projected + {objective.config.cheap_pool_per_position} cheapest "
         "(one rule for every candidate; pool sizes are fingerprinted)",
-        "- Per-fold solves stop at a wall-clock cap, not a deterministic work budget; "
-        "this trace is recommendation-quality measurement, not a formal benchmark",
+        (
+            "- Per-fold solves stop at a deterministic work budget "
+            f"({objective.config.optimization_config.solver_deterministic_time_limit}); "
+            "the trace is machine-independent for identical inputs"
+            if objective.config.optimization_config.solver_deterministic_time_limit is not None
+            else "- Per-fold solves stop at a wall-clock cap, not a deterministic work "
+            "budget; this trace is recommendation-quality measurement, not a formal "
+            "benchmark"
+        ),
         f"- Search space: {result.config.search_space_size} candidates; "
         f"evaluated {len(result.evaluations)}",
         f"- Stopped: {result.stopped_reason}",
@@ -235,12 +261,17 @@ def main() -> int:
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
     panel = build_panel(archive_root)
     seasons = tuple(season.strip() for season in str(arguments.seasons).split(","))
+    optimization_config = OptimizationConfig(
+        solver_time_limit_seconds=arguments.solver_wall_cap_seconds,
+        solver_deterministic_time_limit=arguments.solver_deterministic_time_limit,
+    )
     objective_config = ScenarioPolicyObjectiveConfig(
         development_seasons=seasons,
         scenario_count=arguments.scenario_count,
         min_history_folds=arguments.min_history_folds,
         candidate_pool_per_position=arguments.candidate_pool_per_position,
         cheap_pool_per_position=arguments.cheap_pool_per_position,
+        optimization_config=optimization_config,
     )
     search_config = BayesianOptimizationConfig(
         factors=(
