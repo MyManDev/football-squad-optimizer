@@ -88,6 +88,34 @@ def test_the_manifest_names_the_control_regime() -> None:
     assert manifest["row_count"] == len(table)
 
 
+def test_a_second_regime_carries_its_own_label() -> None:
+    """Two exports claiming the same regime label cannot form a pair."""
+
+    table = _table()
+    manifest = control_residual_manifest(
+        table,
+        form_window=10,
+        repository_commit="a" * 40,
+        dataset_snapshot_id="vaastav-fpl@test-pin",
+        table_sha256="0" * 64,
+        created_at_utc="2026-08-15T00:00:00Z",
+        candidate_label="deterministic_baseline_fw10",
+    )
+
+    assert manifest["candidate_label"] == "deterministic_baseline_fw10"
+    assert manifest["model_version"] == control_model_version(10)
+    with pytest.raises(ExperimentExecutionError, match="candidate_label"):
+        control_residual_manifest(
+            table,
+            form_window=10,
+            repository_commit="a" * 40,
+            dataset_snapshot_id="vaastav-fpl@test-pin",
+            table_sha256="0" * 64,
+            created_at_utc="2026-08-15T00:00:00Z",
+            candidate_label="  ",
+        )
+
+
 def test_an_unknown_season_is_refused() -> None:
     with pytest.raises(ExperimentExecutionError, match="absent from the panel"):
         build_control_residual_table(
