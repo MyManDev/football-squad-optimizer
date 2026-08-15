@@ -204,8 +204,13 @@ class MultiGwRehearsal:
         self._settings = settings
         self._visible_panel = panel.loc[keep].copy(deep=True)
         self._fixture_counts = {
-            (int(row.gameweek), row.team_id): int(row.fixture_count)
-            for row in fixture_counts.itertuples(index=False)
+            (int(gameweek), team_id): int(count)
+            for gameweek, team_id, count in zip(
+                fixture_counts["gameweek"].tolist(),
+                fixture_counts["team_id"].tolist(),
+                fixture_counts["fixture_count"].tolist(),
+                strict=True,
+            )
         }
         self._decisions: dict[int, DecisionPoint] = {
             decision.gameweek: decision
@@ -260,18 +265,21 @@ class MultiGwRehearsal:
         gameweeks: tuple[int, ...],
     ) -> ProjectionHorizon:
         rows: list[dict[str, object]] = []
+        columns = ("player_id", "name", "team_id", "position", "price_tenths", "expected_points")
         for gameweek in gameweeks:
-            for row in pool.itertuples(index=False):
-                count = self._fixture_counts.get((gameweek, row.team_id), 0)
+            for player_id, name, team_id, position, price, expected in zip(
+                *(pool[column].tolist() for column in columns), strict=True
+            ):
+                count = self._fixture_counts.get((gameweek, team_id), 0)
                 rows.append(
                     {
                         "gameweek": gameweek,
-                        "player_id": row.player_id,
-                        "name": row.name,
-                        "team_id": row.team_id,
-                        "position": row.position,
-                        "price_tenths": int(row.price_tenths),
-                        "expected_points": float(row.expected_points) * count,
+                        "player_id": player_id,
+                        "name": name,
+                        "team_id": team_id,
+                        "position": position,
+                        "price_tenths": int(price),
+                        "expected_points": float(expected) * count,
                         "fixture_count": count,
                         "home_fixture_count": 0,
                     }
