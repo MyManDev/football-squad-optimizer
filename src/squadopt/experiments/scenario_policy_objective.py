@@ -71,6 +71,8 @@ class ScenarioPolicyObjectiveConfig:
     min_history_folds: int = 8
     min_player_observations: int = 8
     tail_fraction: float = 0.10
+    candidate_pool_per_position: int = 30
+    cheap_pool_per_position: int = 10
     cross_season_config: CrossSeasonConfig = field(default_factory=CrossSeasonConfig)
     optimization_config: OptimizationConfig = field(default_factory=OptimizationConfig)
 
@@ -94,6 +96,8 @@ class ScenarioPolicyObjectiveConfig:
             ("deterministic_seed", 0),
             ("min_history_folds", 2),
             ("min_player_observations", 2),
+            ("candidate_pool_per_position", 5),
+            ("cheap_pool_per_position", 0),
         ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, Integral) or int(value) < minimum:
@@ -132,6 +136,8 @@ class ScenarioPolicyObjectiveConfig:
             "min_history_folds": self.min_history_folds,
             "min_player_observations": self.min_player_observations,
             "tail_fraction": float(self.tail_fraction).hex(),
+            "candidate_pool_per_position": self.candidate_pool_per_position,
+            "cheap_pool_per_position": self.cheap_pool_per_position,
             "cross_season": {
                 "decay": self.cross_season_config.decay,
                 "min_minutes": self.cross_season_config.min_minutes,
@@ -277,9 +283,32 @@ class ScenarioPolicyObjective:
                 config=mapping.projection_config,
             )
             realized = realized_points_at(self._visible_panel, decision)
-            tables[decision.fold_id] = (projections, realized)
+            tables[decision.fold_id] = (self._candidate_pool(projections), realized)
         self._fold_cache[form_window] = tables
         return tables
+
+    def _candidate_pool(self, projections: pd.DataFrame) -> pd.DataFrame:
+        """Reduce one fold's projection table to a tractable candidate pool.
+
+        The scenario CVaR model grows with players x scenarios, and the full roster
+        makes it unsolvable inside a search budget. Per position the pool keeps the
+        highest-projected players plus the cheapest ones (budget feasibility), by one
+        rule applied identically to every candidate, so comparisons stay fair. The
+        measured objective is therefore the pooled decision problem's; the pool
+        sizes are part of the configuration fingerprint.
+        """
+
+        pieces: list[pd.DataFrame] = []
+        for _, group in projections.groupby("position", sort=True):
+            top = group.nlargest(
+                self._settings.candidate_pool_per_position, "expected_points", keep="first"
+            )
+            cheap = group.nsmallest(
+                self._settings.cheap_pool_per_position, "price_tenths", keep="first"
+            )
+            pieces.append(pd.concat([top, cheap]).drop_duplicates(subset="player_id"))
+        pool = pd.concat(pieces, ignore_index=True).drop_duplicates(subset="player_id")
+        return pool.sort_values("player_id", kind="stable", ignore_index=True)
 
     def _factors(self, candidate: BayesianCandidate) -> tuple[int, float, float]:
         if not isinstance(candidate, BayesianCandidate):
@@ -340,9 +369,11 @@ class ScenarioPolicyObjective:
         )
 
         scores: list[float] = []
+        pool_sizes: list[int] = []
         for decision, prior_fold_ids in self._evaluation:
             fold_id: str = decision.fold_id
             projections, realized = tables[fold_id]
+            pool_sizes.append(len(projections))
             history = self._history.loc[self._history["fold_id"].astype(str).isin(prior_fold_ids)]
             snapshot = prepare_optimizer_projection(
                 projections.loc[:, ["player_id", "name", "team_id", "position", "price_tenths"]],
@@ -377,5 +408,6 @@ class ScenarioPolicyObjective:
             "scored_folds": len(scores),
             "scenario_count": self._settings.scenario_count,
             "tail_fraction": self._settings.tail_fraction,
+            "mean_candidate_pool_size": sum(pool_sizes) / len(pool_sizes),
         }
         return mean_points
