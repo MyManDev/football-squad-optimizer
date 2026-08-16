@@ -59,6 +59,12 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--cheap-pool-per-position", type=int, default=8)
     parser.add_argument("--form-window", type=int, default=6)
     parser.add_argument("--bench-weight", type=float, default=0.0)
+    parser.add_argument(
+        "--player-location-shrinkage",
+        type=float,
+        default=None,
+        help="Opt-in per-player location component; omitted keeps centered scenarios.",
+    )
     parser.add_argument("--lower-quantile", type=float, default=0.10)
     parser.add_argument("--points-threshold", type=float, default=40.0)
     parser.add_argument(
@@ -207,6 +213,7 @@ def main() -> int:
                 min_history_folds=arguments.min_history_folds,
                 candidate_pool_per_position=arguments.candidate_pool_per_position,
                 cheap_pool_per_position=arguments.cheap_pool_per_position,
+                player_location_shrinkage=arguments.player_location_shrinkage,
             ),
         )
         LOGGER.info(

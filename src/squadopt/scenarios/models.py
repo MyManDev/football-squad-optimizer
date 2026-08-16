@@ -121,13 +121,21 @@ class ScenarioTarget:
 
 @dataclass(frozen=True, slots=True)
 class ScenarioConfig:
-    """Controls for deterministic hierarchical empirical residual sampling."""
+    """Controls for deterministic hierarchical empirical residual sampling.
+
+    ``player_location_shrinkage`` is opt-in: ``None`` keeps every component centered
+    (the original behavior, bit for bit). A non-negative value adds a per-player
+    location component — that player's historical mean residual shrunk by
+    ``n / (n + shrinkage)`` — so systematic per-player optimism or pessimism in the
+    projections is carried into the scenarios instead of being centered away.
+    """
 
     scenario_count: int = 1_000
     deterministic_seed: int = 0
     min_history_folds: int = 8
     min_player_observations: int = 8
     player_scale_shrinkage: float = 10.0
+    player_location_shrinkage: float | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -153,6 +161,12 @@ class ScenarioConfig:
             "player_scale_shrinkage",
             _finite_non_negative(self.player_scale_shrinkage, "player_scale_shrinkage"),
         )
+        if self.player_location_shrinkage is not None:
+            object.__setattr__(
+                self,
+                "player_location_shrinkage",
+                _finite_non_negative(self.player_location_shrinkage, "player_location_shrinkage"),
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +266,11 @@ def _scenario_fingerprint(
             "min_history_folds": config.min_history_folds,
             "min_player_observations": config.min_player_observations,
             "player_scale_shrinkage": float(config.player_scale_shrinkage).hex(),
+            "player_location_shrinkage": (
+                None
+                if config.player_location_shrinkage is None
+                else float(config.player_location_shrinkage).hex()
+            ),
         },
         "scenario_ids": scenario_ids,
         "source_fold_ids": source_fold_ids,
