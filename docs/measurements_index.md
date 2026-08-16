@@ -35,6 +35,7 @@ Regenerated artifacts must keep passing `scripts.run_measurement_preflight`.
 | `candidate_residual_export` (record) | Calendar-aware `learned-rate-v2` half of the pair; control regenerated at the same commit and byte-identical across three commits | #80 |
 | `time_aware_recalibration` | Held-out coverage **unchanged** on single gameweeks (0.9019 both) at **7.2% narrower** intervals; both regimes **undercover doubles** (0.83 / 0.80 vs nominal 0.90) | #82 |
 | `issue43_handoff_acceptance` + `issue43_stage_a_review` (records) | Handoff accepted item by item with independent re-runs at `93a87d6`: control export hash reproduces across machines, **candidate export does not** (BLAS-level last-bit differences; content identical to 4 dp); declaration fingerprints reproduce byte for byte; optimization-side Stage A review done, reading (a) confirmed, v2 clean enough to freeze; freeze pending the third owner | — |
+| `issue38_calibration_decision` (record) | Operational calibration stays bound to the control's residuals; #38 closes with the #43 verdict either way; the shared double-gameweek undercoverage (0.83/0.80 vs 0.90) is a calibration fact — a fixture-group conformal axis is this layer's next measured step | — |
 | `recalibration_dry_run` (+note) | Preflight-gated time-aware pipeline proven on real fw05-vs-fw10 regimes; fw10 tighter at unchanged coverage | #63 |
 
 ## Planning
