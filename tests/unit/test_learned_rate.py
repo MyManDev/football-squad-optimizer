@@ -149,6 +149,62 @@ def test_the_fit_recovers_a_signal_present_in_the_declared_inputs() -> None:
     assert float(np.corrcoef(predicted, actual)[0, 1]) > 0.9
 
 
+def test_the_fit_is_weighted_by_minutes_so_a_cameo_is_not_a_full_match() -> None:
+    """The defect this guards against was measured, not imagined.
+
+    Fitting unweighted, appearances under ten minutes average 44 points per 90 against
+    3.4 for full matches on the development seasons, which drags the intercept to 7.2
+    when the minutes-weighted rate is about 3.5. Every projection then over-predicts by
+    roughly half a point once multiplied back by expected minutes.
+    """
+
+    # Built to the shape the archive actually has rather than reusing the generic
+    # fixture, whose minutes and rate move together and so cannot show the effect:
+    # 500 full matches scoring at 3 per 90, and 100 two-minute cameos scoring once,
+    # which is 45 per 90 apiece.
+    columns = rate_input_columns(WINDOW)
+    full = pd.DataFrame({column: 1.0 for column in columns}, index=range(500)).assign(
+        minutes=90.0, total_points=3.0
+    )
+    cameos = pd.DataFrame({column: 1.0 for column in columns}, index=range(100)).assign(
+        minutes=2.0, total_points=1.0
+    )
+    training = pd.concat([full, cameos], ignore_index=True)
+
+    model = fit_learned_rate(training, config=LearnedRateConfig(window=WINDOW))
+
+    weighted = float(model.diagnostics["target_weighted_mean"])
+    unweighted = float(model.diagnostics["target_unweighted_mean"])
+    truth = training["total_points"].sum() / training["minutes"].sum() * 90.0
+
+    assert weighted == pytest.approx(truth, rel=1e-9)
+    assert weighted == pytest.approx(3.19, abs=0.01)
+    # The unweighted mean is where the defect lived: 10 percent cameos drag it to 10.
+    assert unweighted == pytest.approx(10.0, abs=0.1)
+
+
+def test_the_weighted_intercept_equals_the_ratio_of_sums() -> None:
+    """The same quantity the frozen rolling feature computes, not a mean of ratios."""
+
+    training = _training()
+
+    model = fit_learned_rate(training, config=LearnedRateConfig(window=WINDOW))
+
+    truth = training["total_points"].sum() / training["minutes"].sum() * 90.0
+    assert float(model.intercept) == pytest.approx(truth, rel=1e-9)
+
+
+def test_a_zero_minute_row_cannot_enter_the_weighted_fit() -> None:
+    """A zero weight is not evidence, and its target is undefined anyway."""
+
+    training = _training(rows=600)
+    training.loc[training.index[:50], "minutes"] = 0.0
+
+    model = fit_learned_rate(training, config=LearnedRateConfig(window=WINDOW))
+
+    assert model.training_rows == len(training) - 50
+
+
 def test_too_little_history_is_refused_rather_than_fitted() -> None:
     """A model fitted on forty rows would be reported as confidently as one on a season."""
 

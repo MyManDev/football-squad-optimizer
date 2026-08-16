@@ -97,7 +97,7 @@ def test_the_configuration_fingerprint_is_stable_across_calls() -> None:
     "field, value",
     [
         ("candidate_id", "something_else"),
-        ("model_version", "learned-rate-v2"),
+        ("model_version", "learned-rate-v99"),
         ("feature_contract_version", "other-features-v1"),
         ("changed_component", "expected_minutes"),
         ("change_summary", "a different summary"),

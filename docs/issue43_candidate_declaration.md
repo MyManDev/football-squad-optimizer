@@ -5,8 +5,8 @@ Stage A of `docs/candidate_declaration_review.md`. Both fingerprints below are c
 ## Fingerprints
 
 - Candidate: `learned_rate_calendar_candidate_v1`
-- Declaration: `3e94f5d90dca42bd9cfdec94f95d0d4c10bcb707e429dc7f8f4c3aba052794bc`
-- Benchmark configuration: `dbee287a69430aa6ffc920a2d460b480b6d70799a9f820cadc9691a7f487902a`
+- Declaration: `f72962a182e4d857448d860641c7ebc211a4f7101f3ed713362636fa2b3bce09`
+- Benchmark configuration: `b64a3ab9f06f1c1a207d66c8f1d59b0c3072f7fe8400cb598e378fca37e6f575`
 
 ## The single changed component
 
@@ -29,9 +29,9 @@ The first of these is the frozen rolling feature the replaced stage read directl
 | Field | Value |
 | --- | --- |
 | `model_name` | `squadopt-learned-rate` |
-| `model_version` | `learned-rate-v1` |
+| `model_version` | `learned-rate-v2` |
 | `feature_contract_version` | `learned-rate-calendar-appearance-v1` |
-| `training_contract_version` | `expanding_window_ridge_rate_v1` |
+| `training_contract_version` | `expanding_window_minutes_weighted_ridge_rate_v1` |
 | `evaluation_objective` | `single_gameweek_realized_squad_points_v1` |
 
 These strings appear unchanged in both residual manifests and in every returned `PredictionSnapshot`; the benchmark refuses the run if they differ.
