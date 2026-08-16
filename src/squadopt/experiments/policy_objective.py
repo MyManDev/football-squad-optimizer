@@ -43,6 +43,30 @@ POLICY_OBJECTIVE_CONTRACT_VERSION: Final = "baseline_policy_objective_v1"
 EVALUATION_OBJECTIVE_VERSION: Final = "single_gameweek_realized_squad_points_v1"
 POLICY_SEARCH_FACTOR_NAMES: Final = ("form_window", "bench_weight")
 PINNED_RISK_AVERSION: Final = 0.0
+SHRINKAGE_RULE_VERSION: Final = "position_mean_shrinkage_v1"
+
+
+def shrink_projections(projections: pd.DataFrame, strength: float) -> pd.DataFrame:
+    """Shrink expected points toward each position's within-fold mean.
+
+    The selection-optimism profile showed the projections are unbiased over the
+    roster while the *top of the ranking* is systematically optimistic. Proportional
+    shrinkage toward the position mean reduces exactly the extreme values the
+    optimizer selects, without touching the prediction contract: this is a
+    decision-side post-processing (`position_mean_shrinkage_v1`), applied after the
+    projection table is built and before the optimizer sees it.
+    """
+
+    if not 0.0 <= strength <= 1.0:
+        raise ExperimentConfigurationError("shrinkage strength must lie in [0, 1].")
+    if strength == 0.0:
+        return projections
+    table = projections.copy(deep=True)
+    position_means = table.groupby("position")["expected_points"].transform("mean")
+    table["expected_points"] = (1.0 - strength) * table["expected_points"].astype(
+        "float64"
+    ) + strength * position_means.astype("float64")
+    return table
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +75,7 @@ class PolicyObjectiveConfig:
 
     development_seasons: tuple[str, ...] = DEFAULT_DEVELOPMENT_SEASONS
     min_prior_gameweeks_in_season: int = 1
+    projection_shrinkage: float = 0.0
     cross_season_config: CrossSeasonConfig = field(default_factory=CrossSeasonConfig)
     optimization_config: OptimizationConfig = field(default_factory=OptimizationConfig)
 
@@ -75,6 +100,15 @@ class PolicyObjectiveConfig:
                 "opening gameweeks are a separate evidence regime."
             )
         object.__setattr__(self, "min_prior_gameweeks_in_season", int(minimum))
+        strength = self.projection_shrinkage
+        if (
+            isinstance(strength, bool)
+            or not isinstance(strength, Real)
+            or not math.isfinite(float(strength))
+            or not 0.0 <= float(strength) <= 1.0
+        ):
+            raise ExperimentConfigurationError("projection_shrinkage must lie in [0, 1].")
+        object.__setattr__(self, "projection_shrinkage", float(strength))
         if not isinstance(self.cross_season_config, CrossSeasonConfig):
             raise ExperimentConfigurationError(
                 "cross_season_config must be a CrossSeasonConfig instance."
@@ -95,6 +129,8 @@ class PolicyObjectiveConfig:
             "development_seasons": self.development_seasons,
             "min_prior_gameweeks_in_season": self.min_prior_gameweeks_in_season,
             "pinned_risk_aversion": PINNED_RISK_AVERSION,
+            "projection_shrinkage": float(self.projection_shrinkage).hex(),
+            "shrinkage_rule": SHRINKAGE_RULE_VERSION,
             "cross_season": {
                 "decay": self.cross_season_config.decay,
                 "min_minutes": self.cross_season_config.min_minutes,
@@ -187,17 +223,21 @@ class BaselinePolicyObjective:
         folds = tuple(
             EvaluationFold(
                 fold_id=decision.fold_id,
-                projections=build_projection_table(
-                    features,
-                    season=decision.season,
-                    gameweek=decision.gameweek,
-                    config=mapping.projection_config,
+                projections=shrink_projections(
+                    build_projection_table(
+                        features,
+                        season=decision.season,
+                        gameweek=decision.gameweek,
+                        config=mapping.projection_config,
+                    ),
+                    self._settings.projection_shrinkage,
                 ),
                 realized_points=realized_points_at(self._visible_panel, decision),
                 metadata={
                     "season": decision.season,
                     "gameweek": decision.gameweek,
                     "feature_preparation": "full_visible_season_shifted_v1",
+                    "projection_shrinkage": self._settings.projection_shrinkage,
                 },
             )
             for decision in self._decisions

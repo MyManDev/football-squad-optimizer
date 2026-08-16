@@ -49,8 +49,10 @@ from squadopt.experiments.policy_objective import (
     PINNED_RISK_AVERSION,
     POLICY_OBJECTIVE_CONTRACT_VERSION,
     POLICY_SEARCH_FACTOR_NAMES,
+    SHRINKAGE_RULE_VERSION,
     BaselinePolicyObjective,
     PolicyObjectiveConfig,
+    shrink_projections,
 )
 from squadopt.experiments.reporting import (
     frozen_candidate_from_dict,
@@ -111,6 +113,7 @@ __all__ = [
     "SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
     "SELECTION_OPTIMISM_CONTRACT_VERSION",
+    "SHRINKAGE_RULE_VERSION",
     "BaselinePolicyObjective",
     "CandidateAssessment",
     "ExperimentCandidate",
@@ -157,5 +160,6 @@ __all__ = [
     "screening_result_to_dict",
     "screening_result_to_markdown",
     "season_aware_moving_block_interval",
+    "shrink_projections",
     "summarize_search_efficiency",
 ]
