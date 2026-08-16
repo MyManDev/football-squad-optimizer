@@ -17,6 +17,26 @@ averaged 3.327 points against 2.688 facing the strongest — a spread of 0.639 p
 is roughly half the size of the double-gameweek effect. That measurement used season-average
 strength, which sees the whole season, so it is a ceiling rather than a promise: the shifted
 estimate below knows only what preceded each gameweek.
+
+**The promise has since been measured, and the paragraph above was incomplete in two ways.**
+See `docs/opponent_strength_signal.md`.
+
+It reported only the attacking direction. The defensive one is larger: over the 147-fold
+development residual population, goalkeepers and defenders facing the weakest quartile of
+attacks carry a mean residual of +0.1121 against −0.2097 facing the strongest, a spread of
+0.322, where the attacking side spreads 0.162.
+
+And "ceiling" understates what the shifted estimate delivers, because the ceiling was
+measured on raw outcomes. Against the operational control's out-of-sample residuals the
+effect is *larger* than in the raw outcomes — 1.24x on the attacking side, 1.06x on the
+defensive — since players facing the strongest opponents are on average the better players
+on the better teams, so squad quality moves against the fixture and dampens the raw spread.
+Projecting removes most of that quality term and leaves the opponent effect more exposed.
+
+The attacking side is monotone across all four quartiles; the defensive side is not, its
+two weakest quartiles being effectively tied. Neither result is gate evidence, and wiring
+this module into a projection remains a change to the expected-points rate that needs its
+own declaration and a single run under the frozen gates.
 """
 
 from typing import Final
