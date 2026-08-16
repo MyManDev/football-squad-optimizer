@@ -31,6 +31,20 @@ from squadopt.evaluation import EvaluationFold
 from squadopt.preflight import RESIDUAL_EXPORT_COLUMNS, RESIDUAL_EXPORT_CONTRACT_VERSION
 
 EVALUATION_OBJECTIVE_VERSION: Final = "single_gameweek_realized_squad_points_v1"
+
+# Written precision for the projected values, and the reason there is one at all.
+#
+# Two owners regenerated this export at the same commit and recorded different
+# `table_sha256` while every reported decimal agreed. The candidate fits a ridge system
+# through LAPACK, which is not bit-identical across machines, and a sixteen-digit
+# serialisation turns a last-bit difference into a different file. The control export has
+# no linear solve and reproduced exactly, which is what isolated the cause.
+#
+# Nine decimals is measured, not chosen: at that precision no row of 101,447 moves under a
+# relative perturbation of 1e-15, which is an order of magnitude above what double
+# precision can produce. The measurement is `docs/export_precision.md`. It is also five
+# orders below anything any report quotes, so it discards nothing a reader could notice.
+PREDICTED_POINTS_DECIMALS: Final = 9
 DEFAULT_DEVELOPMENT_SEASONS: Final = ("2021-22", "2022-23", "2023-24", "2024-25")
 
 # The provenance fields the handoff checklist pins across declaration, manifests, and
@@ -69,6 +83,44 @@ def candidate_identity(folds: Sequence[EvaluationFold]) -> Mapping[str, str]:
             )
         identity[field] = observed.pop()
     return identity
+
+
+def round_for_export(table: pd.DataFrame) -> pd.DataFrame:
+    """Round the projected values to the declared precision and rederive the residual.
+
+    Applied at the serialisation boundary rather than inside a builder, because the
+    precision belongs to the export contract and not to any one model: both halves of a
+    pair must be written the same way or a reader comparing them row by row sees one side
+    at nine decimals and the other at seventeen.
+
+    The residual is recomputed from the *rounded* projection rather than derived from the
+    unrounded one, so the identity `residual == realized_points - predicted_points` holds
+    on the values a reader actually sees. It holds to within float64's representation of
+    a nine-decimal number — measured at 3.6e-15 across 200,000 rows, with four fifths of
+    them exact — not to the last bit, because a rounded decimal is not exactly
+    representable in binary. Deriving the residual from the unrounded projection instead
+    would leave a discrepancy near 1e-9, five orders worse and inside the range a reader
+    might notice. Realized points are integral, so nothing is lost on that side.
+
+    Returns an independent copy; the input is never modified.
+    """
+
+    if not isinstance(table, pd.DataFrame):
+        raise BacktestConfigurationError("table must be a pandas DataFrame.")
+    missing = [
+        column for column in ("predicted_points", "realized_points") if column not in table.columns
+    ]
+    if missing:
+        raise BacktestConfigurationError(f"table is missing columns: {missing!r}.")
+
+    rounded = table.copy(deep=True)
+    rounded["predicted_points"] = (
+        rounded["predicted_points"].astype("float64").round(PREDICTED_POINTS_DECIMALS)
+    )
+    rounded["residual"] = (
+        rounded["realized_points"].astype("float64") - rounded["predicted_points"]
+    ).round(PREDICTED_POINTS_DECIMALS)
+    return rounded
 
 
 def _residual_rows(fold: EvaluationFold) -> pd.DataFrame:
@@ -135,8 +187,7 @@ def build_candidate_residual_table(
     )
     identity = candidate_identity(folds)
 
-    table = pd.concat([_residual_rows(fold) for fold in folds], ignore_index=True)
-    table["residual"] = table["realized_points"] - table["predicted_points"]
+    table = round_for_export(pd.concat([_residual_rows(fold) for fold in folds], ignore_index=True))
     table = table.loc[:, list(RESIDUAL_EXPORT_COLUMNS)]
     return (
         table.sort_values(["season", "gameweek", "player_id"], kind="stable", ignore_index=True),

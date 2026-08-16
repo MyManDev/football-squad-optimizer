@@ -33,8 +33,10 @@ from scripts._experiment_cli import (
 )
 
 from squadopt.backtest.candidate_residuals import (
+    PREDICTED_POINTS_DECIMALS,
     build_candidate_residual_table,
     candidate_residual_manifest,
+    round_for_export,
 )
 from squadopt.backtest.learned_candidate import (
     LEARNED_RATE_TRAINING_CONTRACT_VERSION,
@@ -209,6 +211,10 @@ def main() -> int:
         table_sha256=candidate_sha256,
         created_at_utc=created_utc,
     )
+    candidate_manifest = {
+        **dict(candidate_manifest),
+        "predicted_points_decimals": PREDICTED_POINTS_DECIMALS,
+    }
     candidate_manifest_path = output_dir / f"{table_stem}.manifest.json"
     write_json(candidate_manifest_path, dict(candidate_manifest))
 
@@ -258,10 +264,12 @@ def main() -> int:
     if not arguments.skip_control:
         print(f"Building the {CONTROL_LABEL!r} export at the same commit...")
         try:
-            control_table = build_control_residual_table(
-                panel,
-                PolicyObjectiveConfig(development_seasons=DEVELOPMENT_SEASONS),
-                form_window=int(arguments.control_form_window),
+            control_table = round_for_export(
+                build_control_residual_table(
+                    panel,
+                    PolicyObjectiveConfig(development_seasons=DEVELOPMENT_SEASONS),
+                    form_window=int(arguments.control_form_window),
+                )
             )
         except ExperimentError as error:
             print(f"Could not build the control residual export:\n  {error}")
@@ -277,6 +285,10 @@ def main() -> int:
             created_at_utc=created_utc,
             candidate_label=CONTROL_LABEL,
         )
+        control_manifest = {
+            **dict(control_manifest),
+            "predicted_points_decimals": PREDICTED_POINTS_DECIMALS,
+        }
         control_manifest_path = output_dir / "control_residuals.manifest.json"
         write_json(control_manifest_path, dict(control_manifest))
 

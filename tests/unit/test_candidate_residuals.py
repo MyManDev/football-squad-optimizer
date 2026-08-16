@@ -16,9 +16,11 @@ from tests.fixtures.synthetic_gameweeks import (
 )
 
 from squadopt.backtest.candidate_residuals import (
+    PREDICTED_POINTS_DECIMALS,
     build_candidate_residual_table,
     candidate_identity,
     candidate_residual_manifest,
+    round_for_export,
 )
 from squadopt.backtest.folds import build_walk_forward_folds, make_baseline_projection_builder
 from squadopt.backtest.splits import BacktestConfigurationError, DecisionPoint
@@ -166,11 +168,19 @@ def test_rows_are_sorted_by_season_gameweek_and_player() -> None:
 
 
 def test_the_residual_is_realized_minus_predicted() -> None:
+    """Holds to float64's representation of a nine-decimal number, not to the last bit.
+
+    Exactness became impossible once the projection was rounded for cross-machine
+    reproducibility: a rounded decimal is not exactly representable in binary. Measured at
+    3.6e-15 across 200,000 rows. The bound below is two orders tighter than the preflight's
+    own tolerance, so a real regression still fails.
+    """
+
     table, _ = _table()
 
     difference = table["realized_points"] - table["predicted_points"] - table["residual"]
 
-    assert float(difference.abs().max()) == 0.0
+    assert float(difference.abs().max()) < 1e-12
 
 
 def test_fold_identifiers_use_the_contract_format() -> None:
@@ -280,3 +290,45 @@ def test_an_empty_table_cannot_carry_a_manifest() -> None:
 
     with pytest.raises(BacktestConfigurationError, match="non-empty"):
         candidate_residual_manifest(pd.DataFrame(), identity, **MANIFEST_ARGUMENTS)
+
+
+# --- the declared write precision -------------------------------------------
+
+
+def test_the_export_rounds_the_projection_to_the_declared_precision() -> None:
+    """Not cosmetic: unrounded, two machines write different bytes for the same export."""
+
+    table, _ = _table()
+
+    written = table["predicted_points"].to_numpy(dtype="float64")
+    assert (written == written.round(PREDICTED_POINTS_DECIMALS)).all()
+
+
+def test_the_residual_is_derived_from_the_rounded_projection() -> None:
+    """Deriving it from the unrounded projection instead would leave a gap near 1e-9."""
+
+    table, _ = _table()
+
+    difference = table["realized_points"] - table["predicted_points"] - table["residual"]
+
+    assert float(difference.abs().max()) < 1e-12
+
+
+def test_rounding_is_applied_at_the_boundary_and_leaves_the_input_alone() -> None:
+    """The helper is shared with the control half, which comes from another owner's builder."""
+
+    frame = pd.DataFrame(
+        {"predicted_points": [1.1234567891234, 0.0], "realized_points": [2.0, 0.0]}
+    )
+
+    rounded = round_for_export(frame)
+
+    assert rounded["predicted_points"].iloc[0] == pytest.approx(1.123456789, abs=0.0)
+    assert frame["predicted_points"].iloc[0] == 1.1234567891234
+    identity = rounded["realized_points"] - rounded["predicted_points"] - rounded["residual"]
+    assert float(identity.abs().max()) < 1e-12
+
+
+def test_a_frame_without_the_projection_columns_is_refused() -> None:
+    with pytest.raises(BacktestConfigurationError, match="missing columns"):
+        round_for_export(pd.DataFrame({"player_id": [1]}))

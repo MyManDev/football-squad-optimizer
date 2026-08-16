@@ -1,0 +1,145 @@
+{
+  "artifact_type": "export_precision",
+  "column": "predicted_points",
+  "contract_version": "export_precision_v1",
+  "created_utc": "2026-08-16T18:08:27+00:00",
+  "decision": {
+    "applied_to": [
+      "candidate",
+      "control"
+    ],
+    "control_hash_after": "98b9dd20c912123d77d025b44634176337d6b185b8c4c80f6e480e772709c642",
+    "control_hash_before": "1ed41f94f245b06d012293a895cdee755a5b1803cb19bcc3795e4a414767a22f",
+    "predicted_points_decimals": 9,
+    "residual_identity_bound": 3.553e-15
+  },
+  "environment": {
+    "logical_cpu_count": 16,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
+    "python": "3.11.0"
+  },
+  "gate_evidence": false,
+  "measured_table": "learned_candidate_residuals.csv",
+  "non_zero_observations": 58855,
+  "observations": 101447,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 101447,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "fd0f8911ba5147f1f511760499a3755018b9b818",
+    "working_tree_dirty": true
+  },
+  "recommended_decimals_at_1e-15": 9,
+  "rows": [
+    {
+      "changed_rows": 52410,
+      "decimals": null,
+      "relative_perturbation": 1e-16,
+      "survives": false
+    },
+    {
+      "changed_rows": 30,
+      "decimals": 12,
+      "relative_perturbation": 1e-16,
+      "survives": false
+    },
+    {
+      "changed_rows": 0,
+      "decimals": 9,
+      "relative_perturbation": 1e-16,
+      "survives": true
+    },
+    {
+      "changed_rows": 0,
+      "decimals": 6,
+      "relative_perturbation": 1e-16,
+      "survives": true
+    },
+    {
+      "changed_rows": 58855,
+      "decimals": null,
+      "relative_perturbation": 1e-15,
+      "survives": false
+    },
+    {
+      "changed_rows": 240,
+      "decimals": 12,
+      "relative_perturbation": 1e-15,
+      "survives": false
+    },
+    {
+      "changed_rows": 0,
+      "decimals": 9,
+      "relative_perturbation": 1e-15,
+      "survives": true
+    },
+    {
+      "changed_rows": 0,
+      "decimals": 6,
+      "relative_perturbation": 1e-15,
+      "survives": true
+    },
+    {
+      "changed_rows": 58855,
+      "decimals": null,
+      "relative_perturbation": 1e-14,
+      "survives": false
+    },
+    {
+      "changed_rows": 2508,
+      "decimals": 12,
+      "relative_perturbation": 1e-14,
+      "survives": false
+    },
+    {
+      "changed_rows": 1,
+      "decimals": 9,
+      "relative_perturbation": 1e-14,
+      "survives": false
+    },
+    {
+      "changed_rows": 0,
+      "decimals": 6,
+      "relative_perturbation": 1e-14,
+      "survives": true
+    },
+    {
+      "changed_rows": 58855,
+      "decimals": null,
+      "relative_perturbation": 1e-12,
+      "survives": false
+    },
+    {
+      "changed_rows": 53237,
+      "decimals": 12,
+      "relative_perturbation": 1e-12,
+      "survives": false
+    },
+    {
+      "changed_rows": 267,
+      "decimals": 9,
+      "relative_perturbation": 1e-12,
+      "survives": false
+    },
+    {
+      "changed_rows": 1,
+      "decimals": 6,
+      "relative_perturbation": 1e-12,
+      "survives": false
+    }
+  ]
+}
