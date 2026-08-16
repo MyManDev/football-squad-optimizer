@@ -52,6 +52,17 @@ def test_an_out_of_range_strength_is_refused() -> None:
         PolicyObjectiveConfig(projection_shrinkage=-0.1)
 
 
+def test_scenario_objective_carries_the_same_control() -> None:
+    from squadopt.experiments import ScenarioPolicyObjectiveConfig
+
+    plain = ScenarioPolicyObjectiveConfig(development_seasons=(SEASON,), min_history_folds=3)
+    shrunk = ScenarioPolicyObjectiveConfig(
+        development_seasons=(SEASON,), min_history_folds=3, projection_shrinkage=0.5
+    )
+
+    assert plain.configuration_fingerprint != shrunk.configuration_fingerprint
+
+
 def test_shrinkage_changes_the_fingerprint_and_the_evaluation_runs() -> None:
     plain = PolicyObjectiveConfig(development_seasons=(SEASON,))
     shrunk = PolicyObjectiveConfig(development_seasons=(SEASON,), projection_shrinkage=0.3)
