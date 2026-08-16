@@ -10,7 +10,7 @@ This is the candidate half of the recalibration pair. The control half is rebuil
 {
   "candidate_label": "calendar_aware_learned_rate",
   "contract_version": "oos_residual_export_v1",
-  "created_at_utc": "2026-08-16T12:23:48+00:00",
+  "created_at_utc": "2026-08-16T18:12:29+00:00",
   "dataset_snapshot_id": "vaastav-fpl@8c97b2adb123863c3dd581e730f1360e89815ac2",
   "development_seasons": [
     "2021-22",
@@ -24,9 +24,10 @@ This is the candidate half of the recalibration pair. The control half is rebuil
   "model_name": "squadopt-learned-rate",
   "model_version": "learned-rate-v2",
   "opening_gameweeks_included": false,
-  "repository_commit": "8c0ff540a467f417e44d63f47bb0f8d8161ebb29",
+  "predicted_points_decimals": 9,
+  "repository_commit": "fd0f8911ba5147f1f511760499a3755018b9b818",
   "row_count": 101447,
-  "table_sha256": "424b0d76f37bab4ca0c6f6850f8444e95aa660ef69b91a2a8fb017d434fd367f",
+  "table_sha256": "d556938a7c42642347805b6f3153a0ebdd48ca55cbe55f56d522f8272af1c936",
   "training_contract_version": "expanding_window_minutes_weighted_ridge_rate_v1"
 }
 ```
@@ -43,7 +44,7 @@ This is the candidate half of the recalibration pair. The control half is rebuil
 {
   "candidate_label": "calendar_blind_baseline",
   "contract_version": "oos_residual_export_v1",
-  "created_at_utc": "2026-08-16T12:23:48+00:00",
+  "created_at_utc": "2026-08-16T18:12:29+00:00",
   "dataset_snapshot_id": "vaastav-fpl@8c97b2adb123863c3dd581e730f1360e89815ac2",
   "development_seasons": [
     "2021-22",
@@ -57,9 +58,10 @@ This is the candidate half of the recalibration pair. The control half is rebuil
   "model_name": "deterministic_baseline",
   "model_version": "form_window_05_v1",
   "opening_gameweeks_included": false,
-  "repository_commit": "8c0ff540a467f417e44d63f47bb0f8d8161ebb29",
+  "predicted_points_decimals": 9,
+  "repository_commit": "fd0f8911ba5147f1f511760499a3755018b9b818",
   "row_count": 101447,
-  "table_sha256": "1ed41f94f245b06d012293a895cdee755a5b1803cb19bcc3795e4a414767a22f",
+  "table_sha256": "98b9dd20c912123d77d025b44634176337d6b185b8c4c80f6e480e772709c642",
   "training_contract_version": "deterministic_baseline_no_training_v1"
 }
 ```
@@ -80,4 +82,4 @@ This is the candidate half of the recalibration pair. The control half is rebuil
 .venv\Scripts\python -m scripts.export_candidate_residuals
 ```
 
-Recorded at commit `8c0ff540a467f417e44d63f47bb0f8d8161ebb29` on 2026-08-16T12:23:48+00:00.
+Recorded at commit `fd0f8911ba5147f1f511760499a3755018b9b818` on 2026-08-16T18:12:29+00:00.
