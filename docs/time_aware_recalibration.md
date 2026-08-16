@@ -27,7 +27,14 @@ SHA-256 has not moved. That is a stronger reproducibility claim than the runbook
 and it is the reason the pair could be rebuilt at the merged commit without renegotiating
 anything.
 
-- Study fingerprint: `4284585c3aa22d7eba327025d6aab142f12f99c92684e8650c107597b67c74a9`
+| Fingerprint | Value |
+| --- | --- |
+| Measurement | `af5ad1582f47b1847599151e9490393966b0690e6ac9c23c70066ed976071305` |
+| Configuration | `0e01ee3cea125967b752469cf02eb23ac8879a908e30fdf04214f88060f3deb2` |
+| Study | `4284585c3aa22d7eba327025d6aab142f12f99c92684e8650c107597b67c74a9` |
+
+All three are required by the runbook's step-3 review list, and only the last of them
+reached this document when it was first merged. See the note at the end.
 
 ## Chronological split
 
@@ -84,6 +91,19 @@ itself, and a regime that sees the calendar should leave less of it unexplained.
 The deltas are predominantly negative — the candidate needs less inflation for the players
 whose variance the calendar was previously explaining — with a minority positive.
 
+## Limits the study states about itself
+
+Recorded here rather than paraphrased, because two of them bound how far the coverage
+result above can be read:
+
+- the report is development recalibration evidence, not model-promotion evidence;
+- opening-gameweek uncertainty is not inferred from later-gameweek residuals;
+- conformal intervals are marginal, and their interpretation still depends on
+  exchangeability — which the double-gameweek undercoverage above is itself a symptom of,
+  since a double gameweek is not exchangeable with a single one;
+- scenario component spreads are re-estimated empirically, and no parametric joint
+  distribution is claimed.
+
 ## What this permits
 
 Per runbook step 4:
@@ -117,3 +137,21 @@ report](gw1_blocker_report_2021-2026.md).
 
 Produced by the prediction side as the #38 handoff. Whether the calibration is updated on
 this evidence is the uncertainty/scenario owner's decision, not this document's.
+
+## Note on how this document was first merged
+
+PR #82 merged an incomplete version of this record, and the gap is worth naming rather than
+patching quietly.
+
+The branch was pushed, the fingerprint table and the limits section were committed *after*
+that push, and the pull request was opened without them. The commit never reached
+`develop`. So the merged document carried one fingerprint of the three the runbook requires,
+and no limits section — while **PR #82's own body listed all three fingerprints**, which
+means the pull request claimed something the merged file did not contain.
+
+Nothing measured changed. The numbers here are from the same run and the same three
+fingerprints identify it. What was missing was the record, which is the part this whole
+procedure exists to protect, so it is recorded rather than silently corrected.
+
+The habit that caused it: opening a pull request without first checking that the pushed tip
+matches local `HEAD`. `git log origin/<branch>..<branch>` answers that in one line.

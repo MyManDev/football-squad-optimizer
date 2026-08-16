@@ -123,6 +123,41 @@ The experiment contract adds a requirement beyond mere availability: fixture
 information must be versioned as it was known at each decision timestamp. A single
 current-value fixture table is not sufficient for backtesting.
 
+**Status: this item has split into three, and "no feature uses them" is no longer true of
+any of them in the same way.**
+
+*Calendar-derived features are in use.* `attach_fixture_features` produces `fixture_count`
+and `home_fixture_count` — the latter derived from `is_home` — and three places read them:
+the expected-minutes stage scales by fixture count and caps at that many full matches, the
+two-stage production candidate consumes both, and the Issue #43 learned-rate candidate names
+both among its declared rate inputs. The versioning requirement above is met by
+`fixture_snapshot_v1`, which keys on the persistent team code and records the snapshot each
+row came from.
+
+*The source's own difficulty rating is still unused, and now the reason is written down
+rather than pending.* `attach_fixture_features` computes `mean_fixture_difficulty` and
+`minimum_fixture_difficulty` on every fold and **no model reads either**. The condition this
+item set — usable only if genuinely pre-match — was never settled, and
+[`features/strength.py`](../src/squadopt/features/strength.py) explains why it was not worth
+settling: the rating is opaque, so nobody here can say what it measures, and its stability
+within a season is unverified. A strength estimate computed from results already held is
+reproducible and its timing is ours to control, which is the better trade. Whether to keep
+computing two columns nothing consumes is an open question for the three owners, since
+`attach_fixture_features` is shared.
+
+*The opponent-strength proposal has been measured.* Not by wiring it in, but by asking
+whether the operational control's out-of-sample residuals still move with it. They do:
+attackers spread +0.162 across opponent-defence quartiles, monotone across all four;
+goalkeepers and defenders spread +0.322 against opponent attacks, larger but not monotone.
+The effect is bigger in the residuals than in the raw outcomes, so the existing feature set
+is not spending it. See [`opponent_strength_signal.md`](opponent_strength_signal.md). That
+is evidence for a candidate, not a candidate — consuming it changes the expected-points rate
+and needs its own declaration and a single run under the frozen gates.
+
+`opponent_team_id` at player-gameweek grain remains unmapped for the reason item 10 gives: a
+player with two fixtures in one gameweek has two opponents, so the column has no single
+correct value at that grain.
+
 ### 5. Resolving the archive's price timing
 
 **Now.** Prices are shifted back one gameweek because the archive does not document
