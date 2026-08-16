@@ -61,6 +61,23 @@ SCENARIO_POLICY_FACTOR_NAMES: Final = ("form_window", "bench_weight", "risk_aver
 
 
 @dataclass(frozen=True, slots=True)
+class ScenarioFoldContext:
+    """One eligible fold's decision-time inputs and later outcomes.
+
+    Exposed so measurement code (audits, diagnostics) can reuse exactly the fold
+    population, candidate pools, and leakage rule the search evaluates under,
+    instead of re-deriving them and silently drifting.
+    """
+
+    fold_id: str
+    season: str
+    gameweek: int
+    projections: pd.DataFrame
+    realized_points: pd.DataFrame
+    prior_fold_ids: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
 class ScenarioPolicyObjectiveConfig:
     """Frozen evaluation controls shared by every candidate in one search."""
 
@@ -264,6 +281,22 @@ class ScenarioPolicyObjective:
 
         return MappingProxyType(
             {key: MappingProxyType(dict(value)) for key, value in self._records.items()}
+        )
+
+    def fold_contexts(self, form_window: int) -> tuple[ScenarioFoldContext, ...]:
+        """Return every eligible fold's pooled projections, outcomes, and history ids."""
+
+        tables = self._fold_tables(form_window)
+        return tuple(
+            ScenarioFoldContext(
+                fold_id=decision.fold_id,
+                season=decision.season,
+                gameweek=decision.gameweek,
+                projections=tables[decision.fold_id][0].copy(deep=True),
+                realized_points=tables[decision.fold_id][1].copy(deep=True),
+                prior_fold_ids=prior_fold_ids,
+            )
+            for decision, prior_fold_ids in self._evaluation
         )
 
     def _fold_tables(self, form_window: int) -> dict[str, tuple[pd.DataFrame, pd.DataFrame]]:
