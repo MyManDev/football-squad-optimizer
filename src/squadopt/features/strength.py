@@ -23,7 +23,7 @@ See `docs/opponent_strength_signal.md`.
 
 It reported only the attacking direction. The defensive one is larger: over the 147-fold
 development residual population, goalkeepers and defenders facing the weakest quartile of
-attacks carry a mean residual of +0.1121 against −0.2097 facing the strongest, a spread of
+attacks carry a mean residual of +0.1121 against -0.2097 facing the strongest, a spread of
 0.322, where the attacking side spreads 0.162.
 
 And "ceiling" understates what the shifted estimate delivers, because the ceiling was
