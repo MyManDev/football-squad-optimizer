@@ -28,9 +28,14 @@ from squadopt.backtest.learned_candidate import (
     build_learned_candidate_snapshot,
     make_learned_rate_projection_builder,
 )
-from squadopt.backtest.production import build_production_prediction_snapshot
+from squadopt.backtest.production import (
+    build_production_prediction_snapshot,
+    production_feature_config,
+)
 from squadopt.backtest.splits import BacktestConfigurationError
+from squadopt.prediction.factors import FormWindowMapping
 from squadopt.prediction.learned_rate import LearnedRateConfig
+from squadopt.prediction.minutes import ExpectedMinutesConfig
 from squadopt.prediction.production import ProductionProjectionConfig
 
 LEARNED = LearnedRateConfig(window=WINDOW, min_training_rows=5)
@@ -115,6 +120,53 @@ def test_expected_points_stay_finite_and_non_negative() -> None:
 
     assert bool(values.notna().all())
     assert float(values.min()) >= 0.0
+
+
+# --- the frozen form_window_v1 mapping --------------------------------------
+
+
+@pytest.mark.parametrize("window", [3, 5, 6, 10])
+def test_the_candidate_applies_the_frozen_mapping_plus_the_appearance_window(
+    window: int,
+) -> None:
+    """Checklist item 7, as a comparison rather than a statement.
+
+    ``form_window_v1`` is ``w -> minutes/points/per-90 windows, min_periods=1``. The
+    candidate reads the same windows and adds one: the appearance decomposition, which
+    ``minutes per appearance`` cannot be computed without and which the declaration names
+    as a permitted input. Nothing else differs, and this asserts that field by field so a
+    future widening of the feature set fails here rather than inside a gate run.
+    """
+
+    frozen = FormWindowMapping(form_window=window).feature_config
+    candidate = production_feature_config(
+        ProductionProjectionConfig(rate_window=window, minutes=ExpectedMinutesConfig(window=window))
+    )
+
+    assert candidate.minutes_windows == frozen.minutes_windows
+    assert candidate.points_windows == frozen.points_windows
+    assert candidate.per_90_window == frozen.per_90_window
+    assert candidate.min_periods == frozen.min_periods == 1
+    assert candidate.appearance_windows == (window,)
+    assert frozen.appearance_windows == ()
+
+
+def test_the_appearance_window_is_the_only_addition_to_the_frozen_mapping() -> None:
+    """Enumerated over the dataclass, so a new field cannot slip past the check above."""
+
+    window = 6
+    frozen = FormWindowMapping(form_window=window).feature_config
+    candidate = production_feature_config(
+        ProductionProjectionConfig(rate_window=window, minutes=ExpectedMinutesConfig(window=window))
+    )
+
+    differing = {
+        name
+        for name in type(frozen).__dataclass_fields__
+        if getattr(frozen, name) != getattr(candidate, name)
+    }
+
+    assert differing == {"appearance_windows"}
 
 
 # --- the window must match --------------------------------------------------
