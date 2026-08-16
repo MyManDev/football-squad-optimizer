@@ -49,7 +49,11 @@ def _candidate_matrix(
             value = float(candidate.values[factor.name])
             lower = float(factor.lower_bound)
             upper = float(factor.upper_bound)
-            matrix[row_index, column_index] = (value - lower) / (upper - lower)
+            # A fixed factor spans no range: it contributes a constant coordinate, so it
+            # neither divides by zero here nor separates any two candidates in the kernel.
+            matrix[row_index, column_index] = (
+                0.0 if factor.is_fixed else (value - lower) / (upper - lower)
+            )
     return matrix
 
 

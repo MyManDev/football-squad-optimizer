@@ -60,7 +60,13 @@ def _decimal_token(value: int | float) -> str:
 
 @dataclass(frozen=True, slots=True)
 class BayesianFactor:
-    """One bounded factor represented by an exact finite quantization grid."""
+    """One bounded factor represented by an exact finite quantization grid.
+
+    ``lower_bound == upper_bound`` declares a *fixed* factor: a single level that is
+    carried through the search unchanged. This is how a factor a contract requires but
+    an evaluator cannot vary — ``risk_aversion`` under a deterministic projection — is
+    pinned instead of silently ignored.
+    """
 
     name: str
     lower_bound: int | float
@@ -91,9 +97,9 @@ class BayesianFactor:
             lower = _integer(self.lower_bound, f"{normalized_name}.lower_bound", 0)
             upper = _integer(self.upper_bound, f"{normalized_name}.upper_bound", 0)
             step = _integer(self.step, f"{normalized_name}.step", 1)
-            if lower >= upper:
+            if lower > upper:
                 raise BayesianOptimizationConfigurationError(
-                    f"{normalized_name} lower_bound must be smaller than upper_bound."
+                    f"{normalized_name} lower_bound must not exceed upper_bound."
                 )
             if (upper - lower) % step != 0:
                 raise BayesianOptimizationConfigurationError(
@@ -116,9 +122,9 @@ class BayesianFactor:
             lower_decimal = Decimal(str(self.lower_bound))
             upper_decimal = Decimal(str(self.upper_bound))
             step_decimal = Decimal(str(self.step))
-            if lower_decimal >= upper_decimal or step_decimal <= 0:
+            if lower_decimal > upper_decimal or step_decimal <= 0:
                 raise BayesianOptimizationConfigurationError(
-                    f"{normalized_name} requires lower_bound < upper_bound and step > 0."
+                    f"{normalized_name} requires lower_bound <= upper_bound and step > 0."
                 )
             quotient = (upper_decimal - lower_decimal) / step_decimal
             if quotient != quotient.to_integral_value():
@@ -134,6 +140,17 @@ class BayesianFactor:
         object.__setattr__(self, "lower_bound", lower)
         object.__setattr__(self, "upper_bound", upper)
         object.__setattr__(self, "step", step)
+
+    @property
+    def is_fixed(self) -> bool:
+        """True when the factor has one level and is pinned rather than searched.
+
+        A fixed factor keeps a contract's factor set intact while removing the axis
+        from the search: the value still appears in every candidate and every trace, so
+        a report cannot attribute an effect to a factor that never moved.
+        """
+
+        return self.lower_bound == self.upper_bound
 
     @property
     def levels(self) -> tuple[int | float, ...]:

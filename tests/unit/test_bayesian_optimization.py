@@ -237,3 +237,74 @@ def test_default_policy_space_contains_declared_three_factors() -> None:
         "risk_aversion",
     )
     assert config.search_space_size == 616
+
+
+# --- fixed factors ------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("factor", "expected_levels"),
+    [
+        (BayesianFactor("risk_aversion", 0.0, 0.0, 0.1), (0.0,)),
+        (BayesianFactor("form_window", 5, 5, 1, FactorKind.INTEGER), (5,)),
+    ],
+)
+def test_a_factor_with_equal_bounds_is_a_single_pinned_level(
+    factor: BayesianFactor, expected_levels: tuple[int | float, ...]
+) -> None:
+    assert factor.is_fixed is True
+    assert factor.levels == expected_levels
+
+
+def test_a_searched_factor_is_not_fixed() -> None:
+    assert BayesianFactor("bench_weight", 0.0, 0.2, 0.1).is_fixed is False
+
+
+def test_inverted_bounds_are_still_refused() -> None:
+    with pytest.raises(BayesianOptimizationConfigurationError, match="upper_bound"):
+        BayesianFactor("bench_weight", 0.3, 0.2, 0.1)
+    with pytest.raises(BayesianOptimizationConfigurationError, match="upper_bound"):
+        BayesianFactor("form_window", 6, 5, 1, FactorKind.INTEGER)
+
+
+def test_a_fixed_factor_removes_an_axis_without_leaving_the_contract() -> None:
+    """The grid shrinks to the searched axes; every candidate still carries the pin."""
+
+    config = _small_config(
+        factors=(
+            BayesianFactor("form_window", 1, 5, 1, FactorKind.INTEGER),
+            BayesianFactor("bench_weight", 0.0, 1.0, 0.5),
+            BayesianFactor("risk_aversion", 0.0, 0.0, 0.1),
+        ),
+    )
+    candidates = enumerate_candidates(config)
+
+    assert config.search_space_size == 15
+    assert all(candidate.values["risk_aversion"] == 0.0 for candidate in candidates)
+    assert len({candidate.candidate_id for candidate in candidates}) == 15
+
+
+def test_a_search_over_a_space_with_a_fixed_factor_runs_and_finds_the_optimum() -> None:
+    """The constant coordinate neither divides by zero nor confuses the surrogate."""
+
+    config = _small_config(
+        factors=(
+            BayesianFactor("form_window", 1, 5, 1, FactorKind.INTEGER),
+            BayesianFactor("bench_weight", 0.0, 1.0, 0.5),
+            BayesianFactor("risk_aversion", 0.0, 0.0, 0.1),
+        ),
+        evaluation_budget=15,
+        initial_design_size=4,
+    )
+
+    first = run_bayesian_optimization(_objective, DEVELOPMENT_FOLDS, config)
+    second = run_bayesian_optimization(_objective, DEVELOPMENT_FOLDS, config)
+
+    assert first.recommended_candidate.values == {
+        "form_window": 4,
+        "bench_weight": 0.5,
+        "risk_aversion": 0.0,
+    }
+    assert [record.candidate.candidate_id for record in first.evaluations] == [
+        record.candidate.candidate_id for record in second.evaluations
+    ]

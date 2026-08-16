@@ -302,14 +302,11 @@ def test_a_smoke_sweep_through_the_binding_is_deterministic() -> None:
 
 
 def test_a_search_space_that_varies_risk_aversion_fails_loudly() -> None:
-    """Recorded as a seam gap, not worked around.
+    """A search that moves ``risk_aversion`` hands this evaluator a nonzero value.
 
-    ``policy_factors_from_candidate`` requires all three policy factors and
-    ``BayesianFactor`` requires ``lower_bound < upper_bound``, so a search space cannot
-    pin ``risk_aversion`` at zero. Any real search therefore hands this evaluator a
-    nonzero value, which it refuses. The alternative — accepting the value and ignoring
-    it — is the fake axis this evaluator exists to prevent, so the failure is the
-    correct behaviour and the contract is what needs a pinned-factor concept.
+    It refuses rather than accepting-and-ignoring, because a flat axis in the search
+    trace is the fake effect this evaluator exists to prevent. Pinning the factor is
+    the supported alternative, tested below.
     """
 
     space = BayesianOptimizationConfig(
@@ -331,10 +328,35 @@ def test_a_search_space_that_varies_risk_aversion_fails_loudly() -> None:
         )
 
 
-def test_a_degenerate_pinned_factor_is_not_expressible_today() -> None:
-    """The concrete gap, stated as a test so a future contract change trips it."""
+def test_a_pinned_risk_aversion_lets_the_deterministic_evaluator_be_searched() -> None:
+    """The seam gap closed: ``risk_aversion`` pinned at zero, the two real axes searched.
 
-    from squadopt.bayesopt import BayesianOptimizationConfigurationError
+    The factor stays in the contract and in every trace record at exactly zero, so the
+    search is honest about what it varied; and the search is deterministic end to end.
+    """
 
-    with pytest.raises(BayesianOptimizationConfigurationError, match="lower_bound"):
-        BayesianFactor("risk_aversion", 0.0, 0.0, 0.1)
+    space = BayesianOptimizationConfig(
+        factors=(
+            BayesianFactor("form_window", 3, 5, 1, FactorKind.INTEGER),
+            BayesianFactor("bench_weight", 0.0, 0.2, 0.1),
+            BayesianFactor("risk_aversion", 0.0, 0.0, 0.1),
+        ),
+        evaluation_budget=4,
+        initial_design_size=2,
+    )
+    evaluator = _evaluator()
+
+    def search() -> tuple[tuple[str, float], ...]:
+        result = run_bayesian_optimization(
+            bind_policy_evaluator(evaluator),
+            development_fold_ids=evaluator.development_fold_ids,
+            config=space,
+        )
+        assert all(
+            float(record.candidate.values["risk_aversion"]) == 0.0 for record in result.evaluations
+        )
+        return tuple(
+            (record.candidate.candidate_id, record.objective_value) for record in result.evaluations
+        )
+
+    assert search() == search()
