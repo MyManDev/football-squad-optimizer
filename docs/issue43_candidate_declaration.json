@@ -1,0 +1,55 @@
+{
+  "artifact_type": "candidate_declaration_freeze",
+  "benchmark_configuration_fingerprint": "dbee287a69430aa6ffc920a2d460b480b6d70799a9f820cadc9691a7f487902a",
+  "candidate_id": "learned_rate_calendar_candidate_v1",
+  "declaration": {
+    "candidate_id": "learned_rate_calendar_candidate_v1",
+    "change_summary": "The expected-points rate is fitted per fold on the expanding visible history instead of read straight from the shifted rolling points-per-90 feature. That feature remains an input, joined by fixture count, home fixture count, appearance rate, and minutes per appearance. Closed-form ridge on standardised inputs, solved with numpy, so the fit carries no seed, iteration count, or solver choice.",
+    "changed_component": "expected_points_rate",
+    "contract_version": "candidate_change_declaration_v1",
+    "evaluation_objective": "single_gameweek_realized_squad_points_v1",
+    "feature_contract_version": "learned-rate-calendar-appearance-v1",
+    "frozen_components": [
+      "expected_minutes_stage",
+      "cold_start_ladder",
+      "availability_post_processing",
+      "two_stage_combination",
+      "feature_window_mapping",
+      "shrinkage_weights",
+      "opening_price_prior",
+      "development_fold_set",
+      "baseline_control",
+      "ridge_reference",
+      "optimization_contract",
+      "budget_and_formation_constraints",
+      "promotion_gates",
+      "evaluation_objective"
+    ],
+    "model_name": "squadopt-learned-rate",
+    "model_version": "learned-rate-v1",
+    "source_reference": "docs/candidate_gate_spec.md",
+    "training_contract_version": "expanding_window_ridge_rate_v1"
+  },
+  "declaration_fingerprint": "3e94f5d90dca42bd9cfdec94f95d0d4c10bcb707e429dc7f8f4c3aba052794bc",
+  "development_seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "formal_run_completed": false,
+  "issue": 43,
+  "locked_holdout_accessed": false,
+  "rate_controls": {
+    "min_training_rows": 500,
+    "ridge_alpha": 1.0,
+    "window": 6
+  },
+  "rate_inputs": [
+    "points_per_90_last_6",
+    "appearance_rate_last_6",
+    "minutes_per_appearance_last_6",
+    "fixture_count",
+    "home_fixture_count"
+  ]
+}
