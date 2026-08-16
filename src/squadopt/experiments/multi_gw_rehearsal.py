@@ -152,7 +152,19 @@ class RehearsalWindowResult:
         return self.planned_net_points - self.myopic_net_points
 
 
-def _score_week(week: PlanningWeekResult, realized: pd.DataFrame) -> float:
+def _score_week(
+    week: PlanningWeekResult,
+    realized: pd.DataFrame,
+    blank_players: frozenset[object] = frozenset(),
+) -> float:
+    """Score one selected week: starters plus the captain again.
+
+    A player whose team has no fixture that gameweek has no realized row in the panel,
+    because the archive records appearances rather than absences. Such a player scores
+    zero rather than breaking the window; anyone else without a realized row is still
+    an error, because that would be a projection of someone the data cannot score.
+    """
+
     points = {
         player_id: float(total)
         for player_id, total in zip(
@@ -161,12 +173,16 @@ def _score_week(week: PlanningWeekResult, realized: pd.DataFrame) -> float:
     }
     starters = list(week.starting_xi["player_id"])
     captain = week.captain["player_id"]
-    missing = [player for player in [*starters, captain] if player not in points]
+    missing = [
+        player
+        for player in [*starters, captain]
+        if player not in points and player not in blank_players
+    ]
     if missing:
         raise ExperimentExecutionError(
             f"Realized points do not cover selected players: {missing[:5]!r}."
         )
-    return sum(points[player] for player in starters) + points[captain]
+    return sum(points.get(player, 0.0) for player in starters) + points.get(captain, 0.0)
 
 
 class MultiGwRehearsal:
@@ -259,6 +275,17 @@ class MultiGwRehearsal:
         pool = pd.concat(pieces, ignore_index=True).drop_duplicates(subset="player_id")
         return pool.sort_values("player_id", kind="stable", ignore_index=True)
 
+    def _blank_players(self, pool: pd.DataFrame, gameweek: int) -> frozenset[object]:
+        """Pool players whose team has no fixture in ``gameweek``."""
+
+        return frozenset(
+            player_id
+            for player_id, team_id in zip(
+                pool["player_id"].tolist(), pool["team_id"].tolist(), strict=True
+            )
+            if self._fixture_counts.get((gameweek, team_id), 0) == 0
+        )
+
     def _naive_horizon(
         self,
         pool: pd.DataFrame,
@@ -305,7 +332,6 @@ class MultiGwRehearsal:
                     f"Window {gameweeks!r} leaves the season's decision points."
                 )
         pool = self._candidate_pool(self._projection_at(start_gameweek))
-        pool_ids = set(pool["player_id"].tolist())
 
         opening = optimize_squad(pool, settings.frozen_optimization_config)
         opening_cost = opening.total_cost_tenths
@@ -330,8 +356,8 @@ class MultiGwRehearsal:
             raise ExperimentExecutionError(
                 f"The planner found no feasible plan for window {gameweeks!r}."
             )
-        planned_points, planned_hits = self._score_plan(plan, gameweeks)
-        myopic_points, myopic_hits = self._score_myopic(pool_ids, initial_state, gameweeks)
+        planned_points, planned_hits = self._score_plan(plan, pool, gameweeks)
+        myopic_points, myopic_hits = self._score_myopic(pool, initial_state, gameweeks)
 
         return RehearsalWindowResult(
             season=settings.season,
@@ -352,6 +378,7 @@ class MultiGwRehearsal:
     def _score_plan(
         self,
         plan: TransferPlanResult,
+        pool: pd.DataFrame,
         gameweeks: tuple[int, ...],
     ) -> tuple[float, float]:
         if len(plan.weeks) != len(gameweeks):
@@ -359,14 +386,44 @@ class MultiGwRehearsal:
         total = 0.0
         hits = 0.0
         for week in plan.weeks:
-            realized = realized_points_at(self._visible_panel, self._decisions[int(week.gameweek)])
-            total += _score_week(week, realized)
+            gameweek = int(week.gameweek)
+            realized = realized_points_at(self._visible_panel, self._decisions[gameweek])
+            total += _score_week(week, realized, self._blank_players(pool, gameweek))
             hits += float(week.transfer_hit_points)
         return total, hits
 
+    def _myopic_week_pool(self, pool: pd.DataFrame, gameweek: int) -> pd.DataFrame:
+        """The pool re-projected with that week's information, blank rows carried.
+
+        The archive holds no row for a player whose team does not play, so a fresh
+        projection at a blank gameweek is missing that pool member. Dropping the row
+        would leave a squad holding a player the week's table does not know, which the
+        planner refuses; the row is carried from the decision-time pool with a zero
+        projection instead, which is what a blank week is worth.
+        """
+
+        projections = self._projection_at(gameweek)
+        pool_ids = set(pool["player_id"].tolist())
+        fresh = projections.loc[projections["player_id"].isin(pool_ids)]
+        carried_ids = pool_ids - set(fresh["player_id"].tolist())
+        blank_ids = self._blank_players(pool, gameweek)
+        unexplained = sorted(carried_ids - blank_ids, key=str)
+        if unexplained:
+            raise ExperimentExecutionError(
+                f"Gameweek {gameweek} projects no row for pool players {unexplained[:5]!r} "
+                "although their teams have fixtures; the myopic baseline cannot score them."
+            )
+        carried = pool.loc[pool["player_id"].isin(carried_ids), list(fresh.columns)].copy(deep=True)
+        carried["expected_points"] = 0.0
+        return (
+            pd.concat([fresh, carried], ignore_index=True)
+            .sort_values("player_id", kind="stable")
+            .reset_index(drop=True)
+        )
+
     def _score_myopic(
         self,
-        pool_ids: set[object],
+        pool: pd.DataFrame,
         initial_state: InitialSquadState,
         gameweeks: tuple[int, ...],
     ) -> tuple[float, float]:
@@ -374,12 +431,7 @@ class MultiGwRehearsal:
         total = 0.0
         hits = 0.0
         for gameweek in gameweeks:
-            projections = self._projection_at(gameweek)
-            week_pool = (
-                projections.loc[projections["player_id"].isin(pool_ids)]
-                .sort_values("player_id", kind="stable")
-                .reset_index(drop=True)
-            )
+            week_pool = self._myopic_week_pool(pool, gameweek)
             plan = optimize_transfer_plan(
                 to_planning_horizon(self._naive_horizon(week_pool, (gameweek,))),
                 state,
@@ -392,7 +444,7 @@ class MultiGwRehearsal:
                 )
             week = plan.weeks[0]
             realized = realized_points_at(self._visible_panel, self._decisions[gameweek])
-            total += _score_week(week, realized)
+            total += _score_week(week, realized, self._blank_players(pool, gameweek))
             hits += float(week.transfer_hit_points)
             state = InitialSquadState(
                 tuple(week.selected_squad["player_id"].tolist()),

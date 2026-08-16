@@ -107,3 +107,39 @@ def test_an_unknown_season_is_refused() -> None:
             _fixture_counts(),
             MultiGwRehearsalConfig(season="1999-00"),
         )
+
+
+def test_a_blank_gameweek_absent_from_the_panel_still_scores_both_strategies() -> None:
+    """The archive records appearances, not absences: a blank team has no rows.
+
+    The planner carries the pool through the window, but the myopic baseline
+    re-projects each week from the panel, so a blank team's players vanish from its
+    table while the squad still holds them. The rehearsal must carry those rows at a
+    zero projection and score a blank starter as zero rather than fail the window.
+    """
+
+    panel = make_canonical_gameweeks()
+    absent = panel.loc[~((panel["gameweek"] == 4) & (panel["team_id"] == 6))]
+    assert len(absent) < len(panel)
+
+    window = MultiGwRehearsal(absent, _fixture_counts(), CONFIG).rehearse_window(3)
+
+    assert window.gameweeks == (3, 4, 5)
+    assert window.myopic_realized_points >= 0.0
+    assert window.planned_realized_points >= 0.0
+
+
+def test_a_pool_player_missing_without_a_blank_is_refused() -> None:
+    """A row missing while the team plays is a data hole, not a blank, and says so."""
+
+    panel = make_canonical_gameweeks()
+    rehearsal = MultiGwRehearsal(panel, _fixture_counts(), CONFIG)
+    pool = rehearsal._candidate_pool(rehearsal._projection_at(3))
+    victim = int(pool["player_id"].iloc[0])
+    holed = panel.loc[~((panel["gameweek"] == 4) & (panel["player_id"] == victim))]
+
+    with pytest.raises(
+        ExperimentExecutionError,
+        match=r"do not cover selected players|although their teams have fixtures",
+    ):
+        MultiGwRehearsal(holed, _fixture_counts(), CONFIG).rehearse_window(3)
