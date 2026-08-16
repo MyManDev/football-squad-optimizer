@@ -185,6 +185,7 @@ def _markdown(
     starts: tuple[int, ...],
     variants: list[Mapping[str, object]],
     windows: list[dict[str, object]],
+    skipped: list[dict[str, object]],
 ) -> str:
     lines = [
         "# Planner horizon length across the development seasons",
@@ -250,8 +251,14 @@ def _markdown(
             f"| {float(str(row['planning_advantage_points'])):+.0f} "
             f"| {transfers} | {doubles} | {blanks} |"
         )
+    if skipped:
+        lines += ["", "## Skipped windows", ""]
+        for entry in skipped:
+            lines.append(f"- {entry['season']} start {entry['start_gameweek']}: {entry['reason']}")
     lines += [
         "",
+        "Every horizon is measured on the same windows; a start is dropped for all",
+        "horizons when the longest one does not fit the season's decision points.",
         "Measurement only: no horizon is promoted, the transfer planner is unchanged, and",
         "the locked holdout was not read.",
     ]
@@ -272,9 +279,12 @@ def main() -> int:
     panel = build_panel(arguments.archive_root)
 
     window_records: list[dict[str, object]] = []
+    skipped: list[dict[str, object]] = []
+    longest = max(horizons)
     try:
         for season in seasons:
             counts = _fixture_counts(arguments.archive_root, season)
+            season_starts: tuple[int, ...] | None = None
             for horizon_length in horizons:
                 config = MultiGwRehearsalConfig(
                     season=season,
@@ -285,9 +295,28 @@ def main() -> int:
                     transfer_config=TransferPlanningConfig(),
                 )
                 rehearsal = MultiGwRehearsal(panel, counts, config)
-                for start in starts:
-                    if start + horizon_length - 1 > max(rehearsal.available_gameweeks):
-                        continue
+                if season_starts is None:
+                    # Every horizon is measured on the same windows: a start is kept
+                    # only if the longest horizon fits inside the season's decision
+                    # points, so a postponed gameweek (2022-23 GW7) removes the window
+                    # for all horizons rather than for the long ones alone.
+                    available = set(rehearsal.available_gameweeks)
+                    kept: list[int] = []
+                    for start in starts:
+                        span = range(start, start + longest)
+                        if all(gameweek in available for gameweek in span):
+                            kept.append(start)
+                        else:
+                            skipped.append(
+                                {
+                                    "season": season,
+                                    "start_gameweek": start,
+                                    "reason": "a gameweek of the longest window is not a "
+                                    "decision point in this season",
+                                }
+                            )
+                    season_starts = tuple(kept)
+                for start in season_starts:
                     LOGGER.info("Season %s horizon %s: window %s", season, horizon_length, start)
                     window = rehearsal.rehearse_window(start)
                     window_records.append(
@@ -320,10 +349,11 @@ def main() -> int:
         },
         "variants": variants,
         "windows": window_records,
+        "skipped_windows": skipped,
         "measurement_only": True,
         "locked_holdout_accessed": False,
     }
-    markdown = _markdown(seasons, starts, variants, window_records)
+    markdown = _markdown(seasons, starts, variants, window_records, skipped)
     write_json(arguments.json_output, document)
     write_text(arguments.markdown_output, markdown)
     print(markdown)
