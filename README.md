@@ -521,6 +521,29 @@ The [residual export contract](docs/residual_export_contract.md) and
 [recalibration runbook](docs/recalibration_runbook.md) define the cross-owner handoff and
 execution sequence.
 
+## Multi-gameweek projection horizon
+
+The transfer planner consumes a validated `PlanningHorizon`; the prediction side produces
+the `ProjectionHorizon` it converts from. One call projects every requested gameweek from a
+single captured decision snapshot:
+
+```powershell
+.venv\Scripts\python -m scripts.build_projection_horizon --from-gameweek 1 --gameweeks 4
+```
+
+One information state covers the whole horizon: player features come from the decision
+point and never move, and only the calendar varies per gameweek. A blank gameweek is a row
+with zero fixtures projecting exactly zero points; a double scales linearly, under
+`linear_fixture_count_scaling_v1`, which is post-processing applied on top of a
+calendar-blind control rather than something the model learned.
+
+A one-gameweek horizon reproduces `recommend_current_squad`'s projection exactly. See
+[the recorded run](docs/projection_horizon_run.md) — including why an opening capture
+produces a flat horizon, which is the honest answer rather than a defect.
+
+This is planning input, **not gate evidence**: the frozen objective is single-gameweek
+realized squad points, and nothing yet measures how far a longer projection drifts.
+
 ## Residual exports for the recalibration pair
 
 Both halves of the pair are produced by one command at one commit, because the pairing

@@ -16,6 +16,13 @@ from squadopt.live.calibration import (
     calibration_markdown,
     measure_live_calibration,
 )
+from squadopt.live.horizon import (
+    FIXTURE_SCALING_RULE_VERSION,
+    HORIZON_POST_PROCESSING_CONTRACT_VERSION,
+    build_projection_horizon,
+    gameweek_fixture_fingerprints,
+    make_projection_horizon_builder,
+)
 from squadopt.live.ledger import (
     SEASON_LEDGER_CONTRACT_VERSION,
     LedgerEntry,
@@ -61,8 +68,10 @@ from squadopt.live.risk import (
 __all__ = [
     "CONTROL_MODEL_NAME",
     "CONTROL_MODEL_VERSION",
+    "FIXTURE_SCALING_RULE_VERSION",
     "HISTORICAL_CAPTAIN_OPTIMISM",
     "HISTORICAL_XI_OPTIMISM_PER_STARTER",
+    "HORIZON_POST_PROCESSING_CONTRACT_VERSION",
     "INTERVAL_RULE_VERSION",
     "LIVE_CALIBRATION_CONTRACT_VERSION",
     "LIVE_RISK_CONTRACT_VERSION",
@@ -84,14 +93,17 @@ __all__ = [
     "Projection",
     "Recommendation",
     "RecommendationInputs",
+    "build_projection_horizon",
     "build_recommendation",
     "calibration_markdown",
     "evaluate_live_risk",
     "extract_event_points",
+    "gameweek_fixture_fingerprints",
     "infer_season",
     "ledger_summary",
     "load_entry",
     "load_ledger",
+    "make_projection_horizon_builder",
     "measure_live_calibration",
     "project",
     "projection_fingerprint",
