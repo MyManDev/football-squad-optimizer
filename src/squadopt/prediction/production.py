@@ -161,6 +161,32 @@ def _numeric(features: pd.DataFrame, column: str, *, required: bool) -> pd.Serie
     return pd.to_numeric(features[column], errors="coerce").astype("float64")
 
 
+def _validated_rate(
+    rate: tuple[pd.Series, pd.Series],
+    features: pd.DataFrame,
+) -> tuple[pd.Series, pd.Series]:
+    """Check an injected rate lines up with the rows it will be multiplied against.
+
+    Reindexing a misaligned rate would silently pair one player's playing time with
+    another's scoring, which no downstream check could detect.
+    """
+
+    if not isinstance(rate, tuple) or len(rate) != 2:
+        raise PredictionConfigurationError("rate must be a (values, source) pair of pandas Series.")
+    values, source = rate
+    if not isinstance(values, pd.Series) or not isinstance(source, pd.Series):
+        raise PredictionConfigurationError("rate must be a (values, source) pair of pandas Series.")
+    if not values.index.equals(features.index) or not source.index.equals(features.index):
+        raise PredictionConfigurationError(
+            "An injected rate must share the feature dataset's index; it is multiplied "
+            "row by row against expected minutes."
+        )
+    return (
+        pd.to_numeric(values, errors="coerce").astype("float64"),
+        source.astype("string"),
+    )
+
+
 def expected_points_per_90(
     features: pd.DataFrame,
     *,
@@ -199,6 +225,7 @@ def production_projection(
     features: pd.DataFrame,
     *,
     config: ProductionProjectionConfig | None = None,
+    rate: tuple[pd.Series, pd.Series] | None = None,
 ) -> ProductionProjection:
     """Project expected points for every row of a feature dataset.
 
@@ -214,6 +241,13 @@ def production_projection(
     The result is finite and non-negative everywhere. A row that reaches the end
     without a value is an error rather than a zero, because a silent zero would read as
     a confident prediction of nothing.
+
+    ``rate`` supplies an already-projected ``(values, source)`` pair instead of reading
+    the rolling feature. It exists so the Issue #43 candidate can replace the scoring
+    rate and nothing else: the minutes stage, the price prior, the blank-gameweek rule,
+    and the combination below stay literally this code rather than a copy of it, which
+    is what makes "only the rate changed" checkable instead of merely asserted. A rate
+    that does not align with ``features`` is refused rather than reindexed.
     """
 
     settings = ProductionProjectionConfig() if config is None else config
@@ -225,7 +259,10 @@ def production_projection(
         raise PredictionConfigurationError("Feature dataset has no rows to project.")
 
     minutes: MinutesProjection = expected_minutes(features, config=settings.minutes)
-    rate, rate_source = expected_points_per_90(features, config=settings)
+    if rate is None:
+        rate_values, rate_source = expected_points_per_90(features, config=settings)
+    else:
+        rate_values, rate_source = _validated_rate(rate, features)
 
     price = _numeric(features, "price_tenths", required=True)
     if bool(price.isna().any()) or bool(price.lt(0.0).any()):
@@ -245,9 +282,11 @@ def production_projection(
     # will. That is the difference between "we expect nothing from him" and "we know
     # nothing about him", and only the second warrants a prior.
     absent = minutes.expected_minutes.notna() & minutes.expected_minutes.le(0.0)
-    measured = minutes.expected_minutes.notna() & minutes.expected_minutes.gt(0.0) & rate.notna()
+    measured = (
+        minutes.expected_minutes.notna() & minutes.expected_minutes.gt(0.0) & rate_values.notna()
+    )
 
-    product = minutes.expected_minutes.div(float(MINUTES_PER_FULL_MATCH)).mul(rate)
+    product = minutes.expected_minutes.div(float(MINUTES_PER_FULL_MATCH)).mul(rate_values)
     values = values.mask(measured, product)
     source = source.mask(measured, POINTS_FROM_TWO_STAGE)
 
@@ -269,7 +308,7 @@ def production_projection(
     return ProductionProjection(
         expected_points=values,
         expected_minutes=minutes.expected_minutes,
-        expected_points_per_90=rate,
+        expected_points_per_90=rate_values,
         minutes_source=minutes.source,
         rate_source=rate_source,
         points_source=source.astype("string"),
