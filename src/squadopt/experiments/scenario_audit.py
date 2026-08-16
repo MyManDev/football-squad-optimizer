@@ -135,6 +135,7 @@ def audit_scenario_calibration(
         deterministic_seed=settings.deterministic_seed,
         min_history_folds=settings.min_history_folds,
         min_player_observations=settings.min_player_observations,
+        player_location_shrinkage=settings.player_location_shrinkage,
     )
     evaluation_config = ScenarioEvaluationConfig(
         lower_quantile=lower_quantile,
@@ -232,6 +233,7 @@ def audit_scenario_calibration(
             "form_window": form_window,
             "bench_weight": bench_weight,
             "scenario_count": settings.scenario_count,
+            "player_location_shrinkage": settings.player_location_shrinkage,
             "decision_rule": "risk_neutral_deterministic_squad",
             "objective_configuration_fingerprint": settings.configuration_fingerprint,
         },

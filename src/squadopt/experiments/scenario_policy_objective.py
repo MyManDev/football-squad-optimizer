@@ -90,6 +90,7 @@ class ScenarioPolicyObjectiveConfig:
     tail_fraction: float = 0.10
     candidate_pool_per_position: int = 30
     cheap_pool_per_position: int = 10
+    player_location_shrinkage: float | None = None
     cross_season_config: CrossSeasonConfig = field(default_factory=CrossSeasonConfig)
     optimization_config: OptimizationConfig = field(default_factory=OptimizationConfig)
 
@@ -129,6 +130,18 @@ class ScenarioPolicyObjectiveConfig:
         if not math.isfinite(number) or not 0.0 < number < 1.0:
             raise ExperimentConfigurationError("tail_fraction must lie strictly in (0, 1).")
         object.__setattr__(self, "tail_fraction", number)
+        shrinkage = self.player_location_shrinkage
+        if shrinkage is not None:
+            if (
+                isinstance(shrinkage, bool)
+                or not isinstance(shrinkage, Real)
+                or not math.isfinite(float(shrinkage))
+                or float(shrinkage) < 0.0
+            ):
+                raise ExperimentConfigurationError(
+                    "player_location_shrinkage must be a finite non-negative number or None."
+                )
+            object.__setattr__(self, "player_location_shrinkage", float(shrinkage))
         if not isinstance(self.cross_season_config, CrossSeasonConfig):
             raise ExperimentConfigurationError(
                 "cross_season_config must be a CrossSeasonConfig instance."
@@ -155,6 +168,11 @@ class ScenarioPolicyObjectiveConfig:
             "tail_fraction": float(self.tail_fraction).hex(),
             "candidate_pool_per_position": self.candidate_pool_per_position,
             "cheap_pool_per_position": self.cheap_pool_per_position,
+            "player_location_shrinkage": (
+                None
+                if self.player_location_shrinkage is None
+                else float(self.player_location_shrinkage).hex()
+            ),
             "cross_season": {
                 "decay": self.cross_season_config.decay,
                 "min_minutes": self.cross_season_config.min_minutes,
@@ -390,6 +408,7 @@ class ScenarioPolicyObjective:
             deterministic_seed=self._settings.deterministic_seed,
             min_history_folds=self._settings.min_history_folds,
             min_player_observations=self._settings.min_player_observations,
+            player_location_shrinkage=self._settings.player_location_shrinkage,
         )
         risk_config = ScenarioOptimizationConfig(
             risk_aversion=risk_aversion,

@@ -262,6 +262,33 @@ def _idiosyncratic_draws(
     return draws, source_counts, scales
 
 
+def _player_locations(
+    history: pd.DataFrame,
+    projections: pd.DataFrame,
+    shrinkage: float,
+) -> tuple[np.ndarray, int]:
+    """Return each projected player's shrunk historical mean residual.
+
+    The hierarchical shocks are zero-mean by construction, so without this component
+    the scenarios are centered exactly on the projections and carry no memory of a
+    player's systematic optimism or pessimism. The shrunk location restores that
+    memory; a player with no history contributes zero rather than a borrowed value.
+    """
+
+    grouped = history.groupby("player_id", sort=False)["residual"]
+    means = grouped.mean()
+    counts = grouped.size()
+    locations = np.zeros(len(projections), dtype="float64")
+    players_with_history = 0
+    for column, player_id in enumerate(projections["player_id"].tolist()):
+        if player_id in means.index:
+            count = float(counts.loc[player_id])
+            weight = count / (count + shrinkage) if (count + shrinkage) > 0.0 else 0.0
+            locations[column] = weight * float(means.loc[player_id])
+            players_with_history += 1
+    return locations, players_with_history
+
+
 def generate_scenarios(
     projections: PredictionSnapshot,
     residual_history: pd.DataFrame,
@@ -304,7 +331,18 @@ def generate_scenarios(
         rng,
     )
     point_values = projection_table["expected_points"].to_numpy(dtype="float64")
-    values = point_values + common_draws[:, None] + shared_team_draws + idiosyncratic
+    if settings.player_location_shrinkage is not None:
+        locations, players_with_history = _player_locations(
+            history,
+            projection_table,
+            settings.player_location_shrinkage,
+        )
+    else:
+        locations = np.zeros(len(projection_table), dtype="float64")
+        players_with_history = 0
+    values = (
+        point_values + locations[None, :] + common_draws[:, None] + shared_team_draws
+    ) + idiosyncratic
     scenario_ids = tuple(f"scenario-{index:06d}" for index in range(settings.scenario_count))
     points = pd.DataFrame(
         values,
@@ -337,6 +375,9 @@ def generate_scenarios(
             "residual_definition": "realized_points_minus_predicted_points",
             "components": ("common_gameweek", "team_gameweek", "idiosyncratic"),
             "component_centering": "empirical_zero_mean",
+            "player_location_shrinkage": settings.player_location_shrinkage,
+            "players_with_location_history": players_with_history,
+            "mean_absolute_player_location": float(np.abs(locations).mean()),
             "team_shock_shared_within_target_team": True,
             "idiosyncratic_fallback_counts": fallback_counts,
             "player_effective_scales": player_scales,
