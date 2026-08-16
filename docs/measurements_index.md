@@ -44,6 +44,7 @@ Regenerated artifacts must keep passing `scripts.run_measurement_preflight`.
 | `planner_doe` | Horizon length is the live control (H2 +4.83 / H4 −3.67); hit cost matters only below 4; discount dead | #71 |
 | `projection_horizon_run` (record) | First real multi-gameweek handoff; an opening capture yields a **flat** horizon because the published calendar has no blanks or doubles | #83 |
 | `horizon_decay` | Projection MAE grows only **+7.8% over three gameweeks** (~2.6%/GW); doubles decay faster (+10.6%) than singles (+7.5%) — so the H4 planner loss is mostly **not** projection staleness | #85 |
+| `opponent_strength_signal` | Control residuals still move with opponent strength: **+0.162** attacking (monotone), **+0.322** defensive; effect is *larger* after the model than before it (1.24x / 1.06x) — unspent signal | #87 |
 
 ## Process references
 

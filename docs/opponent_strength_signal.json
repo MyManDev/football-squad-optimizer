@@ -1,0 +1,134 @@
+{
+  "artifact_type": "opponent_strength_signal",
+  "contract_version": "opponent_strength_signal_v1",
+  "created_utc": "2026-08-16T13:29:59+00:00",
+  "dataset_snapshot_id": "vaastav-fpl@8c97b2adb123863c3dd581e730f1360e89815ac2",
+  "environment": {
+    "logical_cpu_count": 16,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
+    "python": "3.11.0"
+  },
+  "folds": 147,
+  "gate_evidence": false,
+  "locked_holdout_accessed": false,
+  "observations": 101447,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "ab1ce210998f00a224be8c20bcec76646d3e38de",
+    "working_tree_dirty": true
+  },
+  "residual_source": "control_residuals.csv",
+  "seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "sides": [
+    {
+      "observations": 56263,
+      "positions": [
+        "MID",
+        "FWD"
+      ],
+      "quartiles": [
+        {
+          "mean_opponent_strength": 8.904921396772398,
+          "mean_realized_points": 1.359974958263773,
+          "mean_residual": 0.05415290279354056,
+          "observations": 14376,
+          "quartile": "Q1"
+        },
+        {
+          "mean_opponent_strength": 14.270766968001146,
+          "mean_realized_points": 1.3537810302769406,
+          "mean_residual": 0.03622407154610874,
+          "observations": 13938,
+          "quartile": "Q2"
+        },
+        {
+          "mean_opponent_strength": 18.49056443101132,
+          "mean_realized_points": 1.3305267702936097,
+          "mean_residual": 0.00573611248421406,
+          "observations": 13896,
+          "quartile": "Q3"
+        },
+        {
+          "mean_opponent_strength": 26.298194928722218,
+          "mean_realized_points": 1.2288479328257311,
+          "mean_residual": -0.10809564287332254,
+          "observations": 14053,
+          "quartile": "Q4"
+        }
+      ],
+      "raw_monotone": true,
+      "raw_spread": 0.1311270254380419,
+      "residual_monotone": true,
+      "residual_spread": 0.16224854566686311,
+      "side": "attacking",
+      "strength_column": "opponent_defence_strength",
+      "surviving_ratio": 1.2373387188861864
+    },
+    {
+      "observations": 45184,
+      "positions": [
+        "GK",
+        "DEF"
+      ],
+      "quartiles": [
+        {
+          "mean_opponent_strength": 18.48384701718035,
+          "mean_realized_points": 1.1602348269014935,
+          "mean_residual": 0.11206532062890286,
+          "observations": 11583,
+          "quartile": "Q1"
+        },
+        {
+          "mean_opponent_strength": 23.08805031446541,
+          "mean_realized_points": 1.2067307692307692,
+          "mean_residual": 0.12478288176831528,
+          "observations": 11024,
+          "quartile": "Q2"
+        },
+        {
+          "mean_opponent_strength": 27.245871836946193,
+          "mean_realized_points": 1.042058899732274,
+          "mean_residual": -0.06662332325024573,
+          "observations": 11579,
+          "quartile": "Q3"
+        },
+        {
+          "mean_opponent_strength": 35.26265684669939,
+          "mean_realized_points": 0.8578832515002728,
+          "mean_residual": -0.20970577609311214,
+          "observations": 10998,
+          "quartile": "Q4"
+        }
+      ],
+      "raw_monotone": false,
+      "raw_spread": 0.3023515754012207,
+      "residual_monotone": false,
+      "residual_spread": 0.321771096722015,
+      "side": "defensive",
+      "strength_column": "opponent_attack_strength",
+      "surviving_ratio": 1.0642282789333066
+    }
+  ],
+  "strength_window": 6
+}

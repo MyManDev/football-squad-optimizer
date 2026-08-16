@@ -555,6 +555,24 @@ against that gameweek and each of the next few, applying the same fixture-count 
 the horizon ships. See [the recorded measurement](docs/horizon_decay.md). It reports what
 the drift is; choosing a horizon length on that evidence is a separate decision.
 
+## Signal the control has not spent
+
+Opponent strength is estimated from shifted results in `squadopt.features.strength` and no
+projection consumes it. Whether that is a missed opportunity is a measurement rather than
+an opinion:
+
+```powershell
+.venv\Scripts\python -m scripts.run_opponent_strength_signal
+```
+
+It attaches the estimate to the control's out-of-sample residuals and reports how they
+move with it, separately for the attacking and defensive sides. A residual that still moves
+with something the model could have seen is signal not yet spent. See
+[the recorded measurement](docs/opponent_strength_signal.md).
+
+Not gate evidence and not a candidate: consuming opponent strength changes the
+expected-points rate and needs its own declaration and a single run under the frozen gates.
+
 ## Residual exports for the recalibration pair
 
 Both halves of the pair are produced by one command at one commit, because the pairing
