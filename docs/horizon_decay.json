@@ -1,0 +1,156 @@
+{
+  "artifact_type": "horizon_decay",
+  "contract_version": "horizon_decay_v1",
+  "created_utc": "2026-08-16T13:10:34+00:00",
+  "dataset_snapshot_id": "vaastav-fpl@8c97b2adb123863c3dd581e730f1360e89815ac2",
+  "development_seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "environment": {
+    "logical_cpu_count": 16,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
+    "python": "3.11.0"
+  },
+  "fixture_scaling_rule": "linear_fixture_count_scaling_v1",
+  "folds": 147,
+  "form_window": 5,
+  "gate_evidence": false,
+  "locked_holdout_accessed": false,
+  "max_offset": 3,
+  "offsets": [
+    {
+      "bias": -0.06792487744644349,
+      "by_fixture_group": {
+        "double_plus": {
+          "bias": -0.23970764629602506,
+          "mean_absolute_error": 1.8585913187008238,
+          "observations": 5112.0,
+          "root_mean_squared_error": 3.469928935720026
+        },
+        "single": {
+          "bias": -0.05880925473030646,
+          "mean_absolute_error": 1.0955823468201027,
+          "observations": 96335.0,
+          "root_mean_squared_error": 2.152563498333624
+        }
+      },
+      "dropped_players": 0,
+      "mean_absolute_error": 1.1340310132592704,
+      "mean_absolute_error_growth": 0.0,
+      "observations": 101447,
+      "offset": 0,
+      "root_mean_squared_error": 2.237580928516311
+    },
+    {
+      "bias": -0.06275843349359957,
+      "by_fixture_group": {
+        "blank": {
+          "bias": 1.0,
+          "mean_absolute_error": 1.0,
+          "observations": 2.0,
+          "root_mean_squared_error": 1.4142135623730951
+        },
+        "double_plus": {
+          "bias": -0.23248736489322733,
+          "mean_absolute_error": 1.9058720904884003,
+          "observations": 4669.0,
+          "root_mean_squared_error": 3.537170601502395
+        },
+        "single": {
+          "bias": -0.05393611183082636,
+          "mean_absolute_error": 1.1323079656886528,
+          "observations": 89584.0,
+          "root_mean_squared_error": 2.195529534581277
+        }
+      },
+      "dropped_players": 3404,
+      "mean_absolute_error": 1.1706243020396012,
+      "mean_absolute_error_growth": 0.03226833159982068,
+      "observations": 94255,
+      "offset": 1,
+      "root_mean_squared_error": 2.280631794074526
+    },
+    {
+      "bias": -0.06764350289896455,
+      "by_fixture_group": {
+        "blank": {
+          "bias": 1.3333333333333333,
+          "mean_absolute_error": 1.3333333333333333,
+          "observations": 3.0,
+          "root_mean_squared_error": 1.632993161855452
+        },
+        "double_plus": {
+          "bias": -0.2705994695614192,
+          "mean_absolute_error": 2.025557467714172,
+          "observations": 4741.0,
+          "root_mean_squared_error": 3.71473457154975
+        },
+        "single": {
+          "bias": -0.056511991013043765,
+          "mean_absolute_error": 1.1560165921028869,
+          "observations": 86063.0,
+          "root_mean_squared_error": 2.220598420907002
+        }
+      },
+      "dropped_players": 3748,
+      "mean_absolute_error": 1.2014208587507973,
+      "mean_absolute_error_growth": 0.05942504632024548,
+      "observations": 90807,
+      "offset": 2,
+      "root_mean_squared_error": 2.3224960196130233
+    },
+    {
+      "bias": -0.06931403862641754,
+      "by_fixture_group": {
+        "blank": {
+          "bias": 0.3333333333333333,
+          "mean_absolute_error": 0.3333333333333333,
+          "observations": 3.0,
+          "root_mean_squared_error": 0.5773502691896257
+        },
+        "double_plus": {
+          "bias": -0.32137625304917505,
+          "mean_absolute_error": 2.056491751732303,
+          "observations": 4535.0,
+          "root_mean_squared_error": 3.7185197689712854
+        },
+        "single": {
+          "bias": -0.055602038911114086,
+          "mean_absolute_error": 1.1776869770701541,
+          "observations": 83277.0,
+          "root_mean_squared_error": 2.2487872819560977
+        }
+      },
+      "dropped_players": 3608,
+      "mean_absolute_error": 1.223041945949749,
+      "mean_absolute_error_growth": 0.07849073936228268,
+      "observations": 87815,
+      "offset": 3,
+      "root_mean_squared_error": 2.347297763914276
+    }
+  ],
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "c09603cefc8ff279b111368724cff96f208b668a",
+    "working_tree_dirty": true
+  }
+}

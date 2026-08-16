@@ -542,7 +542,18 @@ A one-gameweek horizon reproduces `recommend_current_squad`'s projection exactly
 produces a flat horizon, which is the honest answer rather than a defect.
 
 This is planning input, **not gate evidence**: the frozen objective is single-gameweek
-realized squad points, and nothing yet measures how far a longer projection drifts.
+realized squad points.
+
+How far a longer projection drifts is measured separately:
+
+```powershell
+.venv\Scripts\python -m scripts.run_horizon_decay
+```
+
+One projection is made at every chronological development decision point and scored
+against that gameweek and each of the next few, applying the same fixture-count scaling
+the horizon ships. See [the recorded measurement](docs/horizon_decay.md). It reports what
+the drift is; choosing a horizon length on that evidence is a separate decision.
 
 ## Residual exports for the recalibration pair
 
