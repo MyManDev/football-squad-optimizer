@@ -1,0 +1,362 @@
+"""Season ledger: the permanent record of live decisions and their outcomes.
+
+A live recommendation that is acted on and then forgotten teaches nothing. The
+ledger freezes each gameweek's decision at decision time — squad, projections,
+provenance, the rendered report — and later attaches the realized outcome, forming
+the season's out-of-sample series entry by entry. Entries are immutable and
+checksummed like captured snapshots: a recorded decision can be proven to be the
+decision that was made, or it cannot support any claim at all.
+"""
+
+import hashlib
+import json
+import math
+from collections.abc import Mapping
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Final
+
+import pandas as pd
+
+from squadopt.data.errors import DataError
+from squadopt.data.snapshots import CapturedSnapshot
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
+from squadopt.live.recommendation import Projection
+from squadopt.live.report import Recommendation
+
+SEASON_LEDGER_CONTRACT_VERSION: Final = "season_ledger_v1"
+_DECISION_FILE: Final = "decision.json"
+_PROJECTIONS_FILE: Final = "projections.csv"
+_REPORT_FILE: Final = "report.txt"
+_OUTCOME_FILE: Final = "outcome.json"
+_MANIFEST_FILE: Final = "manifest.json"
+
+
+class LedgerError(DataError):
+    """Raised when a ledger entry cannot be recorded, read, or trusted."""
+
+
+def _digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _entry_directory(root: Path, season: str, gameweek: int) -> Path:
+    if not isinstance(season, str) or not season.strip():
+        raise LedgerError("season must be a non-empty string.")
+    if not isinstance(gameweek, int) or isinstance(gameweek, bool) or gameweek < 1:
+        raise LedgerError("gameweek must be a positive integer.")
+    return Path(root) / season.strip() / f"gw{gameweek:02d}"
+
+
+def _write_manifest(directory: Path) -> None:
+    """Re-derive the manifest from every present, individually immutable file."""
+
+    entries = {
+        path.name: _digest(path.read_bytes())
+        for path in sorted(directory.iterdir())
+        if path.name != _MANIFEST_FILE and path.is_file()
+    }
+    manifest = {
+        "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
+        "files": entries,
+    }
+    (directory / _MANIFEST_FILE).write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _verify_manifest(directory: Path) -> None:
+    manifest_path = directory / _MANIFEST_FILE
+    if not manifest_path.is_file():
+        raise LedgerError(f"Ledger entry {directory} has no manifest.")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    files = manifest.get("files")
+    if not isinstance(files, dict):
+        raise LedgerError(f"Ledger manifest in {directory} is malformed.")
+    for name, expected in files.items():
+        path = directory / str(name)
+        if not path.is_file():
+            raise LedgerError(f"Ledger entry {directory} is missing recorded file {name!r}.")
+        if _digest(path.read_bytes()) != expected:
+            raise LedgerError(
+                f"Ledger file {name!r} in {directory} does not match its recorded "
+                "digest; the entry cannot be trusted."
+            )
+
+
+def record_decision(
+    root: Path,
+    recommendation: Recommendation,
+    projection: Projection,
+    *,
+    report_text: str,
+    metadata: Mapping[str, object] | None = None,
+) -> Path:
+    """Freeze one gameweek's decision. An existing entry is never overwritten."""
+
+    if not isinstance(recommendation, Recommendation):
+        raise LedgerError("recommendation must be a Recommendation.")
+    if not isinstance(projection, Projection):
+        raise LedgerError("projection must be a Projection.")
+    if not isinstance(report_text, str) or not report_text.strip():
+        raise LedgerError("report_text must be non-empty text.")
+    directory = _entry_directory(root, recommendation.season, recommendation.gameweek)
+    if directory.exists():
+        raise LedgerError(
+            f"Ledger entry {directory} already exists; recorded decisions are "
+            "immutable. A revised decision needs an explicit, separate record."
+        )
+    directory.mkdir(parents=True)
+
+    decision = {
+        "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
+        "snapshot_id": recommendation.snapshot_id,
+        "captured_at_utc": recommendation.captured_at_utc,
+        "season": recommendation.season,
+        "gameweek": recommendation.gameweek,
+        "deadline_utc": recommendation.deadline_utc,
+        "model_name": recommendation.model_name,
+        "model_version": recommendation.model_version,
+        "feature_contract_version": recommendation.feature_contract_version,
+        "prediction_fingerprint": recommendation.prediction_fingerprint,
+        "report_contract_version": recommendation.contract_version,
+        "solver_status": recommendation.solver_status,
+        "squad_player_ids": [int(value) for value in recommendation.squad["player_id"]],
+        "starting_xi_player_ids": [int(value) for value in recommendation.starting_xi["player_id"]],
+        "bench_player_ids": [int(value) for value in recommendation.bench["player_id"]],
+        "captain_player_id": int(recommendation.captain["player_id"]),
+        "total_cost_tenths": int(recommendation.total_cost_tenths),
+        "projected_score": float(recommendation.projected_score),
+        "unavailable_player_count": len(projection.unavailable_players),
+        "risk_status": str(recommendation.risk.status.value),
+        "metadata": dict(metadata or {}),
+    }
+    (directory / _DECISION_FILE).write_text(
+        json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    projection.table.to_csv(directory / _PROJECTIONS_FILE, index=False)
+    (directory / _REPORT_FILE).write_text(report_text, encoding="utf-8")
+    _write_manifest(directory)
+    return directory
+
+
+def extract_event_points(snapshot: CapturedSnapshot, *, gameweek: int) -> dict[int, float]:
+    """Read realized points for one finished gameweek from a later capture.
+
+    The raw bootstrap payload is read directly: `event_points` describes the
+    capture's current event, so the named gameweek must be marked finished in the
+    same capture — otherwise these numbers describe a match still being played.
+    Player identity uses the persistent `code`, matching the live projection.
+    """
+
+    payload = snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
+    if payload is None:
+        raise LedgerError(
+            f"Snapshot {snapshot.metadata.snapshot_id!r} carries no bootstrap payload."
+        )
+    document = json.loads(payload.decode("utf-8"))
+    events = document.get("events")
+    if not isinstance(events, list):
+        raise LedgerError("Bootstrap payload has no events list.")
+    event = next(
+        (entry for entry in events if isinstance(entry, dict) and entry.get("id") == gameweek),
+        None,
+    )
+    if event is None:
+        raise LedgerError(f"The capture publishes no gameweek {gameweek}.")
+    if event.get("finished") is not True:
+        raise LedgerError(
+            f"Gameweek {gameweek} is not finished in this capture; realized points "
+            "read now would describe matches still being played."
+        )
+    elements = document.get("elements")
+    if not isinstance(elements, list) or not elements:
+        raise LedgerError("Bootstrap payload has no elements list.")
+    points: dict[int, float] = {}
+    for element in elements:
+        if not isinstance(element, dict) or "code" not in element:
+            raise LedgerError("Bootstrap elements must carry persistent player codes.")
+        if "event_points" not in element:
+            raise LedgerError(
+                "Bootstrap elements carry no event_points; realized outcomes cannot "
+                "be read from this capture."
+            )
+        value = float(element["event_points"])
+        if not math.isfinite(value):
+            raise LedgerError("event_points must be finite.")
+        points[int(element["code"])] = value
+    return points
+
+
+def record_outcome(
+    root: Path,
+    season: str,
+    gameweek: int,
+    event_points: Mapping[int, float],
+    *,
+    source_snapshot_id: str,
+) -> Path:
+    """Attach the realized outcome to an already-frozen decision, exactly once."""
+
+    directory = _entry_directory(root, season, gameweek)
+    decision_path = directory / _DECISION_FILE
+    if not decision_path.is_file():
+        raise LedgerError(
+            f"No recorded decision for {season} GW{gameweek}; an outcome without a "
+            "frozen decision is not evidence."
+        )
+    outcome_path = directory / _OUTCOME_FILE
+    if outcome_path.exists():
+        raise LedgerError(
+            f"Outcome for {season} GW{gameweek} is already recorded; outcomes are immutable."
+        )
+    if not isinstance(source_snapshot_id, str) or not source_snapshot_id.strip():
+        raise LedgerError("source_snapshot_id must be non-empty text.")
+    _verify_manifest(directory)
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    starters = [int(value) for value in decision["starting_xi_player_ids"]]
+    captain = int(decision["captain_player_id"])
+    selected = [int(value) for value in decision["squad_player_ids"]]
+    missing = [player for player in {*selected, captain} if player not in event_points]
+    if missing:
+        raise LedgerError(
+            f"Realized points do not cover every selected player; missing {sorted(missing)[:10]!r}."
+        )
+    realized_xi = sum(float(event_points[player]) for player in starters) + float(
+        event_points[captain]
+    )
+    outcome = {
+        "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
+        "season": season,
+        "gameweek": gameweek,
+        "source_snapshot_id": source_snapshot_id.strip(),
+        "realized_points_by_player": {
+            str(player): float(event_points[player]) for player in sorted(selected)
+        },
+        "realized_xi_score": realized_xi,
+        "projected_score": float(decision["projected_score"]),
+        "projection_error": realized_xi - float(decision["projected_score"]),
+    }
+    outcome_path.write_text(json.dumps(outcome, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _write_manifest(directory)
+    return outcome_path
+
+
+@dataclass(frozen=True, slots=True)
+class LedgerEntry:
+    """One verified gameweek entry: the frozen decision and its outcome, if any."""
+
+    season: str
+    gameweek: int
+    decision: Mapping[str, object]
+    outcome: Mapping[str, object] | None
+    directory: Path
+
+
+def load_entry(root: Path, season: str, gameweek: int) -> LedgerEntry:
+    """Load one entry, refusing any file that fails its recorded checksum."""
+
+    directory = _entry_directory(root, season, gameweek)
+    if not directory.is_dir():
+        raise LedgerError(f"No ledger entry at {directory}.")
+    _verify_manifest(directory)
+    decision = json.loads((directory / _DECISION_FILE).read_text(encoding="utf-8"))
+    outcome_path = directory / _OUTCOME_FILE
+    outcome = (
+        json.loads(outcome_path.read_text(encoding="utf-8")) if outcome_path.is_file() else None
+    )
+    return LedgerEntry(
+        season=season,
+        gameweek=gameweek,
+        decision=decision,
+        outcome=outcome,
+        directory=directory,
+    )
+
+
+def load_ledger(root: Path, season: str) -> tuple[LedgerEntry, ...]:
+    """Load every recorded gameweek of one season in chronological order."""
+
+    season_directory = Path(root) / season
+    if not season_directory.is_dir():
+        return ()
+    gameweeks = sorted(
+        int(path.name[2:])
+        for path in season_directory.iterdir()
+        if path.is_dir() and path.name.startswith("gw")
+    )
+    return tuple(load_entry(root, season, gameweek) for gameweek in gameweeks)
+
+
+def ledger_summary(root: Path, season: str) -> pd.DataFrame:
+    """Return one row per recorded gameweek: projected, realized, and the gap."""
+
+    rows: list[dict[str, object]] = []
+    for entry in load_ledger(root, season):
+        realized = float(str(entry.outcome["realized_xi_score"])) if entry.outcome else None
+        projected = float(str(entry.decision["projected_score"]))
+        rows.append(
+            {
+                "gameweek": entry.gameweek,
+                "snapshot_id": entry.decision["snapshot_id"],
+                "solver_status": entry.decision["solver_status"],
+                "projected_score": projected,
+                "realized_score": realized,
+                "projection_error": (realized - projected) if realized is not None else None,
+                "unavailable_players": entry.decision["unavailable_player_count"],
+                "settled": entry.outcome is not None,
+            }
+        )
+    return pd.DataFrame(
+        rows,
+        columns=[
+            "gameweek",
+            "snapshot_id",
+            "solver_status",
+            "projected_score",
+            "realized_score",
+            "projection_error",
+            "unavailable_players",
+            "settled",
+        ],
+    )
+
+
+def summary_markdown(root: Path, season: str) -> str:
+    """Render the committed season summary; raw entries stay local."""
+
+    table = ledger_summary(root, season)
+    lines = [
+        f"# Season Ledger {season}",
+        "",
+        f"- Contract: `{SEASON_LEDGER_CONTRACT_VERSION}`",
+        "- One row per live decision; raw entries (decision, projections, report, "
+        "outcome) live locally under `data/ledger/` with per-file checksums.",
+        "",
+        "| GW | Snapshot | Solver | Projected | Realized | Error | Unavailable |",
+        "| ---: | --- | --- | ---: | ---: | ---: | ---: |",
+    ]
+    for record in table.to_dict(orient="records"):
+        realized_value = record["realized_score"]
+        error_value = record["projection_error"]
+        realized = "-" if realized_value is None else f"{float(str(realized_value)):.0f}"
+        error = "-" if error_value is None else f"{float(str(error_value)):+.1f}"
+        lines.append(
+            f"| {record['gameweek']} | `{record['snapshot_id']}` "
+            f"| {record['solver_status']} "
+            f"| {float(str(record['projected_score'])):.1f} | {realized} | {error} "
+            f"| {record['unavailable_players']} |"
+        )
+    settled = table.loc[table["settled"]]
+    if not settled.empty:
+        lines += [
+            "",
+            f"Settled gameweeks: {len(settled)}; mean realized "
+            f"{settled['realized_score'].astype(float).mean():.1f}; mean projection "
+            f"error {settled['projection_error'].astype(float).mean():+.1f}.",
+        ]
+    lines += [
+        "",
+        "The ledger records; it never promotes. Every live decision uses the operational control.",
+    ]
+    return "\n".join(lines) + "\n"

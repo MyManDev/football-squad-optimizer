@@ -31,27 +31,34 @@ control is `form_window=5, bench_weight=0.1, risk_aversion=0`).
 - Capture early enough to leave time for a re-capture if the source hiccups; a later
   capture simply supersedes the earlier one (both are retained).
 
-### After capture: recommend
+### After capture: decide (recommend + machine verification + ledger)
 
 ```powershell
-.venv\Scripts\python -m scripts.recommend_current_squad --output artifacts\live\gw1_report.txt
+.venv\Scripts\python -m scripts.run_gameweek_ops --phase decide
 ```
 
 Omitted arguments resolve honestly: the most recent capture, the earliest deadline
 still open at capture time, the season derived from the capture's own deadlines.
+The decide phase applies every check below **as code** and exits 1 without recording
+anything if any check fails; on success it freezes the decision (squad, projections,
+report, checksums) into the season ledger under `data/ledger/<season>/gw<NN>/`.
+(`scripts.recommend_current_squad` remains available for a report-only run that
+touches no ledger.)
 
-### Immediately after: verify the report before acting
+### The checks the decide phase enforces
 
 1. **Provenance leads the report** — snapshot ID, capture time, report contract,
    feature contract. The model named must be the operational control
    (`projection_source: operational_control`); an unpromoted candidate on a live
    decision is a stop-everything defect.
 2. **Availability is applied, not predicted** — unavailable players appear zeroed
-   with the captured rule (`captured_availability_rule_v1`), never silently dropped.
-3. **Squad sanity** — 15 players, budget respected, ≤3 per club, captain in the XI.
+   with the captured rule (`captured_availability_rule_v1`), never silently dropped,
+   and no unavailable player may be selected.
+3. **Squad sanity** — 15 players, budget respected, ≤3 per club, captain in the XI,
+   solver-proven optimality.
 4. **Prior dependence is stated** — GW1 projections lean on carry-over and the
    opening price prior; the report says how much rests on the prior. High reliance is
-   expected at GW1, not an error.
+   expected at GW1, not an error. (This one stays a human read of the report.)
 
 ### Risk block: what GW1 must say
 
@@ -66,14 +73,27 @@ GW1 risk state is:
 
 ### After the deadline: archive
 
-Store together, outside the working tree: the `snapshot_id`, the report file, the
-repository commit, and the command lines used. The replay path
-(`--snapshot-id <id>`) must reproduce the same report from the same commit — spot-check
-it once after the deadline:
+The ledger entry is the archive: `decision.json`, `projections.csv`, `report.txt`,
+and `manifest.json` (per-file SHA-256) under `data/ledger/<season>/gw01/`. Note the
+repository commit alongside it. The replay path (`--snapshot-id <id>`) must reproduce
+the same report from the same commit — spot-check it once after the deadline:
 
 ```powershell
 .venv\Scripts\python -m scripts.recommend_current_squad --snapshot-id <id> --output artifacts\live\gw1_replay.txt
 ```
+
+### After the gameweek finishes: settle
+
+Capture again (the later bootstrap carries realized `event_points`), then:
+
+```powershell
+.venv\Scripts\python -m scripts.run_gameweek_ops --phase settle --gameweek 1
+```
+
+This scores the frozen decision (starting XI plus captain double), records the
+immutable outcome next to it, and regenerates the committed season summary
+`docs/season_ledger_<season>.md`. Raw ledger entries stay local; only the summary
+is committed.
 
 ## Contingencies
 
