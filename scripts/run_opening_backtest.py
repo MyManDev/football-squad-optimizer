@@ -61,17 +61,31 @@ def main() -> int:
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
     panel = build_panel(arguments.archive_root)
     ranks = season_ranks(panel)
+    rank_of_row = panel["season"].map(lambda value: ranks[str(value)])
     rows: list[dict[str, object]] = []
     for season in BACKTEST_SEASONS:
         LOGGER.info("Opening decision for %s", season)
-        history = panel.loc[panel["season"].map(lambda value: ranks[str(value)] < ranks[season])]
+        history = panel.loc[rank_of_row < ranks[season]]
         opening_rows = panel.loc[(panel["season"] == season) & (panel["gameweek"] == 1)]
         if opening_rows.empty:
             print(f"Season {season} has no GW1 rows in the panel.")
             return 1
-        roster = opening_rows.loc[
-            :, ["player_id", "name", "team_id", "position", "price_tenths"]
-        ].reset_index(drop=True)
+        # The opening builder expects the live roster's raw shape; team names are
+        # factorized to stable integers, which only the per-club limit reads.
+        team_code = {
+            name: index
+            for index, name in enumerate(sorted(set(opening_rows["team_id"].astype(str))), 1)
+        }
+        roster = (
+            opening_rows.assign(
+                code=opening_rows["player_id"],
+                web_name=opening_rows["name"],
+                team=opening_rows["team_id"].astype(str).map(team_code),
+                now_cost=opening_rows["price_tenths"],
+            )
+            .loc[:, ["code", "web_name", "team", "position", "now_cost"]]
+            .reset_index(drop=True)
+        )
         projection = build_opening_projection_table(history, roster, season=season)
         prior_share = float(projection["has_prior_record"].mean())
         realized = opening_rows.loc[:, ["player_id", "total_points"]].reset_index(drop=True)
