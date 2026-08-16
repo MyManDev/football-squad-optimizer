@@ -84,6 +84,11 @@ from squadopt.experiments.scenario_policy_objective import (
     ScenarioPolicyObjective,
     ScenarioPolicyObjectiveConfig,
 )
+from squadopt.experiments.selection_optimism import (
+    SELECTION_OPTIMISM_CONTRACT_VERSION,
+    SelectionOptimismResult,
+    measure_selection_optimism,
+)
 from squadopt.experiments.statistics import season_aware_moving_block_interval
 
 __all__ = [
@@ -105,6 +110,7 @@ __all__ = [
     "SCENARIO_POLICY_FACTOR_NAMES",
     "SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
+    "SELECTION_OPTIMISM_CONTRACT_VERSION",
     "BaselinePolicyObjective",
     "CandidateAssessment",
     "ExperimentCandidate",
@@ -133,6 +139,7 @@ __all__ = [
     "ScenarioPolicyObjectiveConfig",
     "ScreeningExperimentConfig",
     "ScreeningExperimentResult",
+    "SelectionOptimismResult",
     "audit_scenario_calibration",
     "build_control_residual_table",
     "control_model_version",
@@ -144,6 +151,7 @@ __all__ = [
     "holdout_result_to_dict",
     "holdout_result_to_markdown",
     "measure_risk_frontier",
+    "measure_selection_optimism",
     "run_frozen_holdout",
     "run_screening_experiment",
     "screening_result_to_dict",
