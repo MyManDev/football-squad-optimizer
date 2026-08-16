@@ -36,6 +36,10 @@ from squadopt.backtest.candidate_residuals import (
     build_candidate_residual_table,
     candidate_residual_manifest,
 )
+from squadopt.backtest.learned_candidate import (
+    LEARNED_RATE_TRAINING_CONTRACT_VERSION,
+    make_learned_rate_projection_builder,
+)
 from squadopt.backtest.production import make_production_projection_builder
 from squadopt.data.errors import DataError
 from squadopt.data.sources.vaastav import (
@@ -51,6 +55,7 @@ from squadopt.experiments import (
     control_residual_manifest,
 )
 from squadopt.features import CrossSeasonConfig
+from squadopt.prediction.learned_rate import LearnedRateConfig
 from squadopt.prediction.minutes import ExpectedMinutesConfig
 from squadopt.prediction.production import ProductionProjectionConfig
 from squadopt.preflight import (
@@ -61,19 +66,30 @@ from squadopt.preflight import (
     run_residual_export_preflight,
 )
 
-CANDIDATE_LABEL = "calendar_aware_production"
 CONTROL_LABEL = "calendar_blind_baseline"
+
+# Two calendar-aware regimes can be exported. ``learned`` is the Issue #43 candidate and
+# is what the handoff checklist means by the candidate export, because its manifest must
+# carry the declaration's own model identity. ``production`` is the already-measured
+# two-stage regime, kept because the #38 recalibration CLI names it by default.
+CANDIDATE_REGIMES = {
+    "learned": "calendar_aware_learned_rate",
+    "production": "calendar_aware_production",
+}
+
+# Each regime's training contract, named rather than left implicit because the manifest
+# must state one. Both refit the opening price prior on an expanding window; the learned
+# candidate additionally refits its rate model there.
+TRAINING_CONTRACTS = {
+    "learned": LEARNED_RATE_TRAINING_CONTRACT_VERSION,
+    "production": "expanding_window_opening_price_prior_v1",
+}
 
 # The receiving side's agreed development population. Asserted here so a manifest cannot
 # quietly redefine what it claims to cover; a run that produces a different population
 # fails loudly rather than handing over a smaller table with a confident manifest.
 EXPECTED_FOLD_COUNT = 147
 EXPECTED_ROW_COUNT = 101_447
-
-# The candidate refits the opening price coefficient on an expanding window of completed
-# seasons at every fold; that is its training contract, and it is named rather than left
-# implicit because the manifest must state one.
-CANDIDATE_TRAINING_CONTRACT_VERSION = "expanding_window_opening_price_prior_v1"
 
 # History the development folds may read as carry-over, but never decide on.
 HISTORY_SEASON = "2020-21"
@@ -83,7 +99,14 @@ DEVELOPMENT_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25")
 def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
+    parser.add_argument(
+        "--candidate",
+        choices=sorted(CANDIDATE_REGIMES),
+        default="learned",
+        help="which calendar-aware regime to export",
+    )
     parser.add_argument("--window", type=int, default=6, help="candidate rate/appearance window")
+    parser.add_argument("--ridge-alpha", type=float, default=1.0)
     parser.add_argument("--control-form-window", type=int, default=5)
     parser.add_argument(
         "--output-dir",
@@ -141,17 +164,31 @@ def main() -> int:
     repository_commit = str(provenance["repository_commit"])
     dataset_snapshot_id = f"vaastav-fpl@{ARCHIVE_COMMIT}"
 
+    regime = str(arguments.candidate)
+    candidate_label = CANDIDATE_REGIMES[regime]
     window = int(arguments.window)
-    builder = make_production_projection_builder(
-        fixtures=fixtures,
-        team_codes=team_codes,
-        config=ProductionProjectionConfig(
-            rate_window=window, minutes=ExpectedMinutesConfig(window=window)
-        ),
-        cross_season=CrossSeasonConfig(),
+    projection_config = ProductionProjectionConfig(
+        rate_window=window, minutes=ExpectedMinutesConfig(window=window)
     )
+    if regime == "learned":
+        builder = make_learned_rate_projection_builder(
+            fixtures=fixtures,
+            team_codes=team_codes,
+            config=projection_config,
+            learned_config=LearnedRateConfig(
+                window=window, ridge_alpha=float(arguments.ridge_alpha)
+            ),
+            cross_season=CrossSeasonConfig(),
+        )
+    else:
+        builder = make_production_projection_builder(
+            fixtures=fixtures,
+            team_codes=team_codes,
+            config=projection_config,
+            cross_season=CrossSeasonConfig(),
+        )
 
-    print(f"Building the {CANDIDATE_LABEL!r} export over {len(DEVELOPMENT_SEASONS)} seasons...")
+    print(f"Building the {candidate_label!r} export over {len(DEVELOPMENT_SEASONS)} seasons...")
     try:
         candidate_table, identity = build_candidate_residual_table(
             panel, builder, seasons=DEVELOPMENT_SEASONS
@@ -160,18 +197,19 @@ def main() -> int:
         print(f"Could not build the candidate residual export:\n  {error}")
         return 1
 
-    candidate_path, candidate_sha256 = _write(candidate_table, output_dir, "candidate_residuals")
+    table_stem = f"{regime}_candidate_residuals"
+    candidate_path, candidate_sha256 = _write(candidate_table, output_dir, table_stem)
     candidate_manifest = candidate_residual_manifest(
         candidate_table,
         identity,
-        candidate_label=CANDIDATE_LABEL,
-        training_contract_version=CANDIDATE_TRAINING_CONTRACT_VERSION,
+        candidate_label=candidate_label,
+        training_contract_version=TRAINING_CONTRACTS[regime],
         repository_commit=repository_commit,
         dataset_snapshot_id=dataset_snapshot_id,
         table_sha256=candidate_sha256,
         created_at_utc=created_utc,
     )
-    candidate_manifest_path = output_dir / "candidate_residuals.manifest.json"
+    candidate_manifest_path = output_dir / f"{table_stem}.manifest.json"
     write_json(candidate_manifest_path, dict(candidate_manifest))
 
     expectations = PreflightExpectations(
