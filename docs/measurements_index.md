@@ -32,6 +32,8 @@ Regenerated artifacts must keep passing `scripts.run_measurement_preflight`.
 | --- | --- | --- |
 | `control_uncertainty_calibration` | Player-adaptive holds 0.90 coverage at ~11.5% narrower intervals; fully development-internal | #62 |
 | `control_residual_export` (record) | Control-regime `oos_residual_export_v1`: exactly 147 folds / 101,447 rows; preflight-clean | #59 |
+| `candidate_residual_export` (record) | Calendar-aware `learned-rate-v2` half of the pair; control regenerated at the same commit and byte-identical across three commits | #80 |
+| `time_aware_recalibration` | Held-out coverage **unchanged** on single gameweeks (0.9019 both) at **7.2% narrower** intervals; both regimes **undercover doubles** (0.83 / 0.80 vs nominal 0.90) | #82 |
 | `recalibration_dry_run` (+note) | Preflight-gated time-aware pipeline proven on real fw05-vs-fw10 regimes; fw10 tighter at unchanged coverage | #63 |
 
 ## Planning
