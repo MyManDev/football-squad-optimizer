@@ -521,6 +521,42 @@ The [residual export contract](docs/residual_export_contract.md) and
 [recalibration runbook](docs/recalibration_runbook.md) define the cross-owner handoff and
 execution sequence.
 
+## Residual exports for the recalibration pair
+
+Both halves of the pair are produced by one command at one commit, because the pairing
+rule requires both manifests to name the same `repository_commit`:
+
+```powershell
+.venv\Scripts\python -m scripts.export_candidate_residuals --candidate learned
+```
+
+`--candidate learned` exports the Issue #43 learned-rate candidate, whose manifest carries
+that candidate's own model identity; `--candidate production` exports the already-measured
+two-stage regime the recalibration CLI names by default. Each run rebuilds the
+calendar-blind control export and checks the single-artifact and pair preflights before
+reporting success. The tables stay local — they are derived from third-party data — and
+the committed record is [the export summary](docs/candidate_residual_export.md).
+
+## The Issue #43 learned-rate candidate
+
+The candidate changes one component, the expected-points rate, which is fitted per fold on
+the expanding visible history from the shifted rolling points-per-90 feature together with
+fixture count, home fixture count, appearance rate, and minutes per appearance. Every other
+component is reached through the existing code rather than reimplemented, so "only the rate
+changed" is checkable rather than asserted.
+
+```powershell
+.venv\Scripts\python -m scripts.freeze_candidate_declaration
+```
+
+This prints and records the declaration with its two fingerprints for Stage A of
+[the declaration review](docs/candidate_declaration_review.md). No formal gate run may
+precede that freeze. See [the frozen declaration](docs/issue43_candidate_declaration.md).
+
+Historical opening-gameweek residuals cannot be produced under the live availability
+contract; [the GW1 blocker report](docs/gw1_blocker_report_2021-2026.md) records why, which
+is the accepted deliverable for that checklist item.
+
 ## Quality checks
 
 ```powershell
