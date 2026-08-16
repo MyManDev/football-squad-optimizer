@@ -114,6 +114,9 @@ def judgement_to_dict(result: ProductionBenchmarkResult) -> dict[str, object]:
             label: dict(counts) for label, counts in sorted(result.solver_statuses.items())
         },
         "truncated_candidates": list(result.truncated_candidates),
+        "route_counts": {
+            label: dict(counts) for label, counts in sorted(result.route_counts.items())
+        },
         "mean_realized_points": dict(result.mean_realized_points),
         "prediction_metrics": {
             label: {
@@ -261,6 +264,26 @@ def judgement_to_markdown(result: ProductionBenchmarkResult) -> str:
             f"{comparison.difference_stdev:.4f} | "
             f"{comparison.candidate_wins}/{comparison.ties}/{comparison.candidate_losses} |"
         )
+
+    if result.route_counts:
+        lines += [
+            "",
+            "## Projection ladder",
+            "",
+            "Rows each candidate routed down each rung, summed over folds. A score alone "
+            "cannot distinguish a candidate that used its changed stage everywhere from one "
+            "that fell through to a fallback on a large share of its rows.",
+            "",
+        ]
+        for label, counts in sorted(result.route_counts.items()):
+            if not counts:
+                continue
+            total = sum(counts.values())
+            lines += [f"**{label}**", "", "| Rung | Rows | Share |", "| --- | ---: | ---: |"]
+            for rung, value in counts.items():
+                share = value / total if total else 0.0
+                lines.append(f"| `{rung}` | {value:,} | {share:.1%} |")
+            lines.append("")
 
     lines += [
         "",

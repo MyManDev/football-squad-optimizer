@@ -192,16 +192,29 @@ def main() -> int:
         "rows is reported as it is and means nothing; it is left in rather than hidden so "
         "nobody reads its absence as a claim.",
         "",
-        "## Read against the planner DoE",
+        "## Read against the planner measurements",
         "",
-        "`planner_doe` measured the planner itself against a myopic baseline and found "
-        "horizon two worth +4.83 while horizon four cost -3.67. If that reversal were "
-        "driven by the projection going stale, the decay above would have to be steep. It "
-        "is not — a few percent per gameweek — so most of what makes a long horizon lose "
-        "is happening inside the planner rather than inside the projection.",
+        "`planner_doe` measured the planner against a myopic baseline and found horizon two "
+        "worth +4.83 while horizon four cost -3.67. If that reversal were driven by the "
+        "projection going stale, the decay above would have to be steep. It is not.",
         "",
-        "That is a claim about where to look next, not a diagnosis, and the planner is not "
-        "this side's module.",
+        "**That pointed in the right direction and stopped one step short.** "
+        "`planner_horizon_seasons` then measured four seasons and 23 common windows per "
+        "horizon: the +4.83 was one season, the four-season mean is -0.57, and no horizon "
+        "beats myopic beyond noise. Horizon four loses -4.87, and the loss is a *selection* "
+        "loss (-6.43) rather than a hit-cost one -- the planner pays fewer hits than myopic, "
+        "2.26 against 3.83 per window. It concentrates in windows with no calendar structure: "
+        "-9.60 across ten plain windows against -1.23 across thirteen structured ones.",
+        "",
+        'So "inside the planner" was the wrong place to look. Roster-level drift is small, '
+        "as measured above, but a plan is not built from the roster -- it is built from the "
+        "top of the ranking, and the top is where selection optimism is worst (-2.96 per "
+        "selected starter). Weekly reprojection reshuffles that top as form regresses; a "
+        "four-week plan stays committed to week one's ordering. The cost lands at the "
+        "interface between the projection and the planner, not inside either.",
+        "",
+        "Neither module is this side's to change, and neither of those measurements is mine. "
+        "This one is recorded here because it is the claim this document got half right.",
         "",
         "## Limits",
         "",

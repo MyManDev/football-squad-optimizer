@@ -47,6 +47,8 @@ Regenerated artifacts must keep passing `scripts.run_measurement_preflight`.
 | `projection_horizon_run` (record) | First real multi-gameweek handoff; an opening capture yields a **flat** horizon because the published calendar has no blanks or doubles | #83 |
 | `horizon_decay` | Projection MAE grows only **+7.8% over three gameweeks** (~2.6%/GW); doubles decay faster (+10.6%) than singles (+7.5%) — so the H4 planner loss is mostly **not** projection staleness | #85 |
 | `planner_horizon_seasons` (+note) | Four seasons / 23 windows per horizon: H2's +4.83 was one season (4-season mean −0.57); no horizon beats myopic beyond noise (SE 1.7–3.4); H4 −4.87 loses on **selection, not hits** (planner pays fewer hits than myopic), concentrated in windows with **no** calendar structure → information staleness at the top of the ranking, not calendar handling; wall-clock-capped, recommendation-quality | — |
+| `export_precision` | Unrounded, **all 58,855 non-zero rows move** under a 1e-15 perturbation — why two owners hashed the same export differently; **9 dp moves none**, so the export now writes nine decimals | #94 |
+| `candidate_runtime` | Checklist item 15: learned candidate **590 s** over 147 folds (4.02 s/fold) against the control's **11.7 s** — about fifty times the cost, projection-only, no solver | — |
 | `opponent_strength_signal` | Control residuals still move with opponent strength: **+0.162** attacking (monotone), **+0.322** defensive; effect is *larger* after the model than before it (1.24x / 1.06x) — unspent signal | #87 |
 
 ## Process references
