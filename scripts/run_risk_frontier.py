@@ -64,6 +64,7 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--cheap-pool-per-position", type=int, default=8)
     parser.add_argument("--form-window", type=int, default=6)
     parser.add_argument("--bench-weight", type=float, default=0.0)
+    parser.add_argument("--projection-shrinkage", type=float, default=0.0)
     parser.add_argument("--risk-aversion-levels", default=DEFAULT_LEVELS)
     parser.add_argument("--lower-quantile", type=float, default=0.10)
     parser.add_argument("--worst-fraction", type=float, default=0.10)
@@ -226,6 +227,7 @@ def main() -> int:
                 min_history_folds=arguments.min_history_folds,
                 candidate_pool_per_position=arguments.candidate_pool_per_position,
                 cheap_pool_per_position=arguments.cheap_pool_per_position,
+                projection_shrinkage=arguments.projection_shrinkage,
             ),
         )
         LOGGER.info(
