@@ -71,9 +71,16 @@ from squadopt.experiments.runner import (
     run_frozen_holdout,
     run_screening_experiment,
 )
+from squadopt.experiments.scenario_audit import (
+    SCENARIO_AUDIT_CONTRACT_VERSION,
+    ScenarioAuditFoldRow,
+    ScenarioAuditResult,
+    audit_scenario_calibration,
+)
 from squadopt.experiments.scenario_policy_objective import (
     SCENARIO_POLICY_FACTOR_NAMES,
     SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION,
+    ScenarioFoldContext,
     ScenarioPolicyObjective,
     ScenarioPolicyObjectiveConfig,
 )
@@ -94,6 +101,7 @@ __all__ = [
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
     "POLICY_SEARCH_FACTOR_NAMES",
     "RISK_FRONTIER_CONTRACT_VERSION",
+    "SCENARIO_AUDIT_CONTRACT_VERSION",
     "SCENARIO_POLICY_FACTOR_NAMES",
     "SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
@@ -118,10 +126,14 @@ __all__ = [
     "RehearsalWindowResult",
     "RiskFrontierPoint",
     "RiskFrontierResult",
+    "ScenarioAuditFoldRow",
+    "ScenarioAuditResult",
+    "ScenarioFoldContext",
     "ScenarioPolicyObjective",
     "ScenarioPolicyObjectiveConfig",
     "ScreeningExperimentConfig",
     "ScreeningExperimentResult",
+    "audit_scenario_calibration",
     "build_control_residual_table",
     "control_model_version",
     "control_residual_manifest",
