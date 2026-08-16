@@ -106,6 +106,23 @@ suggestive rather than conclusive: in 2025-26 gameweek 1 it differs from `player
 Shifting is the conservative choice — a stale price costs accuracy, a leaky one costs
 correctness — but it does cost up to one price change of precision on every row.
 
+**The opening gameweek is the exception, and it is load-bearing.** GW1 has no earlier
+price, so it keeps its own value and is the one gameweek in a season whose price timing
+is unproven rather than hedged. Comparing GW1 against GW2 prices per player bounds the
+exposure: 41/554 players changed price in 2021-22 (7.4%), 45/573 in 2022-23 (7.9%),
+19/585 in 2023-24 (3.2%), 40/616 in 2024-25 (6.5%). Small in magnitude — at most one
+0.1 step — but not random, because prices rise after good performances, so the affected
+players are disproportionately the ones that scored, which is exactly the population a
+squad optimizer selects.
+
+This is harmless while walk-forward folds skip GW1, and it becomes load-bearing the
+moment an opening gameweek is folded or backtested. It applies today to the
+opening-decision backtest (`docs/opening_backtest.md`, #76), which reads the panel's
+unshifted GW1 `price_tenths`; that measurement is a decision-level comparison rather
+than a residual export and applies no availability rule, so the caveat qualifies it
+rather than invalidating it. Proposed to the artifact's owner rather than edited into
+the generated document. See `gw1_blocker_report_2021-2026.md` §4.
+
 **Proposal.** Settle the question rather than hedging it. The official API's
 `element-summary` endpoint records per-gameweek `value` for the current season, so once
 2026-27 has a few gameweeks played, comparing its live values against the archive's
