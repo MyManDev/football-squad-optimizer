@@ -539,3 +539,60 @@ def test_incomplete_tiebreak_must_stop_on_deterministic_work(
     )
 
     assert _non_deterministic_truncations(SimpleNamespace(folds=(fold,))) == expected
+
+
+# --- the projection ladder in the report ------------------------------------
+
+
+def _result_with_routes() -> ProductionBenchmarkResult:
+    from dataclasses import replace
+
+    return replace(
+        _result(_gates()),
+        route_counts={
+            "production": {
+                "rate_source:learned_model": 294,
+                "rate_source:carry_over": 39,
+                "rate_source:unknown": 128,
+            },
+            "baseline": {},
+        },
+    )
+
+
+def test_the_report_carries_the_ladder_counts() -> None:
+    """A score alone cannot say a fifth of the rows never reached the changed stage."""
+
+    document = judgement_to_dict(_result_with_routes())
+
+    assert document["route_counts"] == {
+        "baseline": {},
+        "production": {
+            "rate_source:carry_over": 39,
+            "rate_source:learned_model": 294,
+            "rate_source:unknown": 128,
+        },
+    }
+
+
+def test_the_markdown_shows_each_rung_with_its_share() -> None:
+    text = judgement_to_markdown(_result_with_routes())
+
+    assert "Projection ladder" in text
+    assert "rate_source:learned_model" in text
+    # 294 of 461 routed rows.
+    assert "63.8%" in text
+
+
+def test_a_candidate_reporting_no_rungs_is_left_out_rather_than_shown_as_zero() -> None:
+    """Absent and none-taken are different claims."""
+
+    text = judgement_to_markdown(_result_with_routes())
+
+    ladder = text.split("## Projection ladder", 1)[1].split("## Prediction metrics", 1)[0]
+    assert "**production**" in ladder
+    assert "**baseline**" not in ladder
+
+
+def test_a_run_without_ladder_diagnostics_omits_the_section() -> None:
+    assert "Projection ladder" not in judgement_to_markdown(_result(_gates()))

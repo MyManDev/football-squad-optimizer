@@ -9,7 +9,7 @@ deterministic baseline; a later sprint passes a fitted model without touching th
 splitting logic, which is the part that must not be re-derived.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import TypeAlias
 
 import pandas as pd
@@ -42,6 +42,32 @@ from squadopt.prediction import (
 ProjectionBuilder: TypeAlias = Callable[
     [pd.DataFrame, DecisionPoint], pd.DataFrame | PredictionSnapshot
 ]
+
+
+# Diagnostics whose keys name a ladder rung and count the rows that took it, written by
+# the projection builders as ``"<route>:<rung>"``. Lifted by prefix rather than by name so
+# a new rung reaches the report the day it is added, instead of being silently dropped by
+# a list nobody remembered to extend.
+ROUTE_DIAGNOSTIC_PREFIXES: tuple[str, ...] = (
+    "minutes_source:",
+    "rate_source:",
+    "points_source:",
+)
+
+
+def _route_counts(diagnostics: Mapping[str, object]) -> dict[str, object]:
+    """Return the rung counts a snapshot reported, keyed for fold metadata.
+
+    A gate report that says which rung each projection came from is the difference
+    between "the candidate scored X" and "the candidate scored X, and a fifth of its rows
+    never reached the learned stage at all".
+    """
+
+    return {
+        f"prediction_{name}": value
+        for name, value in diagnostics.items()
+        if name.startswith(ROUTE_DIAGNOSTIC_PREFIXES)
+    }
 
 
 def make_baseline_projection_builder(
@@ -140,6 +166,7 @@ def build_walk_forward_fold(
         ):
             if diagnostic_name in verified.diagnostics:
                 prediction_metadata[metadata_name] = verified.diagnostics[diagnostic_name]
+        prediction_metadata.update(_route_counts(verified.diagnostics))
     elif isinstance(built, pd.DataFrame):
         projections = built
     else:

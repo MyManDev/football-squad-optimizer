@@ -1,7 +1,7 @@
 {
   "artifact_type": "horizon_decay",
   "contract_version": "horizon_decay_v1",
-  "created_utc": "2026-08-16T13:10:34+00:00",
+  "created_utc": "2026-08-16T18:59:50+00:00",
   "dataset_snapshot_id": "vaastav-fpl@8c97b2adb123863c3dd581e730f1360e89815ac2",
   "development_seasons": [
     "2021-22",
@@ -150,7 +150,7 @@
       "2024-25",
       "2025-26"
     ],
-    "repository_commit": "c09603cefc8ff279b111368724cff96f208b668a",
+    "repository_commit": "fd0f8911ba5147f1f511760499a3755018b9b818",
     "working_tree_dirty": true
   }
 }

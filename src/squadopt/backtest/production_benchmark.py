@@ -312,6 +312,10 @@ class ProductionBenchmarkResult:
     candidate_declaration: CandidateDeclaration = field(
         default_factory=_default_candidate_declaration
     )
+    # Rows each candidate routed down each rung of the projection ladder, summed over
+    # folds. A score alone cannot distinguish a candidate that used its learned stage
+    # everywhere from one that fell through to carry-over on a fifth of its rows.
+    route_counts: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
 
     @property
     def all_gates_passed(self) -> bool:
@@ -484,6 +488,24 @@ def _evaluate_gates(
             passed=all(count == fold_count for count in feasible.values()),
         ),
     )
+
+
+def _fold_route_counts(folds: Sequence[EvaluationFold]) -> Mapping[str, int]:
+    """Sum each ladder rung's row count across a candidate's folds.
+
+    Read from fold metadata by prefix, so a rung added to a projection reaches the report
+    without this function being edited. A candidate whose builder returns a plain frame
+    reports nothing rather than zeros: absent and none-taken are different claims.
+    """
+
+    totals: dict[str, int] = {}
+    for fold in folds:
+        for name, value in fold.metadata.items():
+            if not name.startswith("prediction_") or ":" not in name:
+                continue
+            rung = name.removeprefix("prediction_")
+            totals[rung] = totals.get(rung, 0) + int(str(value))
+    return dict(sorted(totals.items()))
 
 
 def _feasible_folds(result: EvaluationResult) -> int:
@@ -679,6 +701,7 @@ def _judge_prepared_candidates(
             label: sum(_realized(result).values()) / max(len(_realized(result)), 1)
             for label, result in results.items()
         },
+        route_counts={label: _fold_route_counts(folds) for label, (folds, _) in prepared.items()},
         prediction_metrics=metrics,
         decision_metrics={
             BASELINE_LABEL: paired_decision_metrics(

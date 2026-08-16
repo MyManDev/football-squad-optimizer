@@ -246,3 +246,44 @@ def test_the_opening_gameweek_fold_can_be_requested_and_uses_the_price_prior() -
     opening = next(fold for fold in folds if fold.metadata["gameweek"] == 1)
 
     assert opening.projections["expected_points"].nunique() > 1
+
+
+# --- projection ladder diagnostics ------------------------------------------
+
+
+def test_route_counts_are_lifted_into_fold_metadata() -> None:
+    """A gate report that cannot say which rung a projection took explains nothing."""
+
+    from squadopt.backtest.folds import _route_counts
+
+    lifted = _route_counts(
+        {
+            "rate_source:learned_model": 294,
+            "minutes_source:in_season_history": 300,
+            "points_source:price_prior": 4,
+            "model_fingerprint": "abc",
+            "training_rows": 13528,
+        }
+    )
+
+    assert lifted == {
+        "prediction_rate_source:learned_model": 294,
+        "prediction_minutes_source:in_season_history": 300,
+        "prediction_points_source:price_prior": 4,
+    }
+
+
+def test_a_new_rung_is_lifted_without_editing_the_lifter() -> None:
+    """Lifted by prefix, so a rung added to a projection is not silently dropped."""
+
+    from squadopt.backtest.folds import _route_counts
+
+    lifted = _route_counts({"rate_source:some_future_rung": 7})
+
+    assert lifted == {"prediction_rate_source:some_future_rung": 7}
+
+
+def test_diagnostics_without_a_rung_are_not_lifted() -> None:
+    from squadopt.backtest.folds import _route_counts
+
+    assert _route_counts({"training_rows": 1, "opening_price_prior_origin": "refit"}) == {}
