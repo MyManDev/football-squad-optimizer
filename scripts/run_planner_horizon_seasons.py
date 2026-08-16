@@ -24,7 +24,7 @@ import sys
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from statistics import median
+from statistics import median, pstdev
 
 import pandas as pd
 from scripts._experiment_cli import (
@@ -159,6 +159,14 @@ def _variant_summary(
             float(str(row["planning_advantage_points"])) for row in rows if row["season"] == season
         ]
         by_season[season] = sum(season_rows) / len(season_rows) if season_rows else None
+    # A window is "calendar-structured" when some team has a double or a blank in a
+    # week the plan looks ahead to (week two onward). Under naive calendar scaling that
+    # structure is the only thing that makes one week's projection differ from another,
+    # so it separates windows where a plan can differ from a repeated weekly choice
+    # from windows where only information staleness can.
+    structured = [row for row in rows if _looks_ahead_at_structure(row)]
+    plain = [row for row in rows if not _looks_ahead_at_structure(row)]
+    stdev = float(pstdev(advantages)) if len(advantages) > 1 else 0.0
     return {
         "horizon_length": horizon_length,
         "windows": len(rows),
@@ -176,7 +184,46 @@ def _variant_summary(
         "total_planner_hit_points": sum(
             float(str(row["planned_transfer_hit_points"])) for row in rows
         ),
+        "mean_myopic_hit_points_per_window": sum(
+            float(str(row["myopic_transfer_hit_points"])) for row in rows
+        )
+        / len(rows),
+        "advantage_stdev": stdev,
+        "advantage_standard_error": stdev / len(advantages) ** 0.5,
         "mean_advantage_by_season": by_season,
+        "calendar_structured_windows": _split_summary(structured),
+        "plain_windows": _split_summary(plain),
+    }
+
+
+def _looks_ahead_at_structure(row: dict[str, object]) -> bool:
+    doubles = _ints(row["double_gameweek_teams"])[1:]
+    blanks = _ints(row["blank_gameweek_teams"])[1:]
+    return any(value > 0 for value in doubles) or any(value > 0 for value in blanks)
+
+
+def _split_summary(rows: list[dict[str, object]]) -> dict[str, object]:
+    if not rows:
+        return {
+            "windows": 0,
+            "mean_planning_advantage_points": None,
+            "mean_selection_advantage_points": None,
+            "mean_hit_disadvantage_points": None,
+        }
+    return {
+        "windows": len(rows),
+        "mean_planning_advantage_points": sum(
+            float(str(row["planning_advantage_points"])) for row in rows
+        )
+        / len(rows),
+        "mean_selection_advantage_points": sum(
+            float(str(row["selection_advantage_points"])) for row in rows
+        )
+        / len(rows),
+        "mean_hit_disadvantage_points": sum(
+            float(str(row["hit_disadvantage_points"])) for row in rows
+        )
+        / len(rows),
     }
 
 
@@ -200,14 +247,16 @@ def _markdown(
         "",
         "## Per horizon",
         "",
-        "| Horizon | Windows | Mean adv | Median | Per GW | Positive share "
-        "| Min | Max | Selection | Hit disadv | Transfers | Hit pts |",
-        "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Horizon | Windows | Mean adv | SE | Median | Per GW | Positive share "
+        "| Min | Max | Selection | Hit disadv | Transfers | Hit pts | Myopic hits/window |",
+        "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: "
+        "| ---: | ---: |",
     ]
     for record in variants:
         lines.append(
             f"| {record['horizon_length']} | {record['windows']} "
             f"| {float(str(record['mean_planning_advantage_points'])):+.2f} "
+            f"| {float(str(record['advantage_standard_error'])):.2f} "
             f"| {float(str(record['median_planning_advantage_points'])):+.1f} "
             f"| {float(str(record['mean_advantage_per_gameweek'])):+.2f} "
             f"| {float(str(record['positive_window_share'])):.2f} "
@@ -216,8 +265,35 @@ def _markdown(
             f"| {float(str(record['mean_selection_advantage_points'])):+.2f} "
             f"| {float(str(record['mean_hit_disadvantage_points'])):+.2f} "
             f"| {record['total_planner_transfers']} "
-            f"| {float(str(record['total_planner_hit_points'])):.0f} |"
+            f"| {float(str(record['total_planner_hit_points'])):.0f} "
+            f"| {float(str(record['mean_myopic_hit_points_per_window'])):.2f} |"
         )
+    lines += [
+        "",
+        "## Calendar-structured versus plain windows",
+        "",
+        "A window is calendar-structured when a double or blank gameweek falls in a week "
+        "the plan looks ahead to (week two onward); under naive calendar scaling that is "
+        "the only way one week's projection differs from another's.",
+        "",
+        "| Horizon | Structured windows | Adv | Selection | Hit disadv "
+        "| Plain windows | Adv | Selection | Hit disadv |",
+        "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for record in variants:
+        cells = [str(record["horizon_length"])]
+        for key in ("calendar_structured_windows", "plain_windows"):
+            split = record[key]
+            assert isinstance(split, dict)
+            cells.append(str(split["windows"]))
+            for metric in (
+                "mean_planning_advantage_points",
+                "mean_selection_advantage_points",
+                "mean_hit_disadvantage_points",
+            ):
+                value = split[metric]
+                cells.append("-" if value is None else f"{float(str(value)):+.2f}")
+        lines.append("| " + " | ".join(cells) + " |")
     lines += ["", "## Per horizon and season (mean advantage)", ""]
     lines.append("| Horizon | " + " | ".join(seasons) + " |")
     lines.append("| ---: | " + " | ".join("---:" for _ in seasons) + " |")
