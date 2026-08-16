@@ -1,0 +1,142 @@
+{
+  "automatic_promotion": false,
+  "bench_weight": 0.0,
+  "cells": [
+    {
+      "delta_vs_unshrunk": 0.0,
+      "form_window": 5,
+      "mean_realized_squad_points": 54.2108843537415,
+      "objective_configuration_fingerprint": "56aa60e8162787143586d6cf1148893f145068d07fe15b1fea0f6ef71d6ec919",
+      "projection_shrinkage": 0.0
+    },
+    {
+      "delta_vs_unshrunk": 0.0,
+      "form_window": 6,
+      "mean_realized_squad_points": 54.795918367346935,
+      "objective_configuration_fingerprint": "56aa60e8162787143586d6cf1148893f145068d07fe15b1fea0f6ef71d6ec919",
+      "projection_shrinkage": 0.0
+    },
+    {
+      "delta_vs_unshrunk": 0.0,
+      "form_window": 10,
+      "mean_realized_squad_points": 56.50340136054422,
+      "objective_configuration_fingerprint": "56aa60e8162787143586d6cf1148893f145068d07fe15b1fea0f6ef71d6ec919",
+      "projection_shrinkage": 0.0
+    },
+    {
+      "delta_vs_unshrunk": 0.03401360544217624,
+      "form_window": 5,
+      "mean_realized_squad_points": 54.244897959183675,
+      "objective_configuration_fingerprint": "71aa695b98bab45f4cc24f341fa1812e4ea0a0a3a80837862afab4625ef0fb1e",
+      "projection_shrinkage": 0.1
+    },
+    {
+      "delta_vs_unshrunk": 0.040816326530617175,
+      "form_window": 6,
+      "mean_realized_squad_points": 54.83673469387755,
+      "objective_configuration_fingerprint": "71aa695b98bab45f4cc24f341fa1812e4ea0a0a3a80837862afab4625ef0fb1e",
+      "projection_shrinkage": 0.1
+    },
+    {
+      "delta_vs_unshrunk": 0.29931972789115946,
+      "form_window": 10,
+      "mean_realized_squad_points": 56.802721088435376,
+      "objective_configuration_fingerprint": "71aa695b98bab45f4cc24f341fa1812e4ea0a0a3a80837862afab4625ef0fb1e",
+      "projection_shrinkage": 0.1
+    },
+    {
+      "delta_vs_unshrunk": 0.027210884353742415,
+      "form_window": 5,
+      "mean_realized_squad_points": 54.23809523809524,
+      "objective_configuration_fingerprint": "9d263a53d2f42bcb538eec8a36d61ebd56c3b7f2ab8e0a04b630f066bfe6caad",
+      "projection_shrinkage": 0.2
+    },
+    {
+      "delta_vs_unshrunk": 0.027210884353742415,
+      "form_window": 6,
+      "mean_realized_squad_points": 54.82312925170068,
+      "objective_configuration_fingerprint": "9d263a53d2f42bcb538eec8a36d61ebd56c3b7f2ab8e0a04b630f066bfe6caad",
+      "projection_shrinkage": 0.2
+    },
+    {
+      "delta_vs_unshrunk": 0.23129251700680697,
+      "form_window": 10,
+      "mean_realized_squad_points": 56.734693877551024,
+      "objective_configuration_fingerprint": "9d263a53d2f42bcb538eec8a36d61ebd56c3b7f2ab8e0a04b630f066bfe6caad",
+      "projection_shrinkage": 0.2
+    },
+    {
+      "delta_vs_unshrunk": 0.027210884353742415,
+      "form_window": 5,
+      "mean_realized_squad_points": 54.23809523809524,
+      "objective_configuration_fingerprint": "3b94084948da46d01ad447a9b35a81b589f86267547984fae9608cf9d6fa2151",
+      "projection_shrinkage": 0.3
+    },
+    {
+      "delta_vs_unshrunk": -0.03401360544217624,
+      "form_window": 6,
+      "mean_realized_squad_points": 54.76190476190476,
+      "objective_configuration_fingerprint": "3b94084948da46d01ad447a9b35a81b589f86267547984fae9608cf9d6fa2151",
+      "projection_shrinkage": 0.3
+    },
+    {
+      "delta_vs_unshrunk": 0.22448979591836604,
+      "form_window": 10,
+      "mean_realized_squad_points": 56.72789115646258,
+      "objective_configuration_fingerprint": "3b94084948da46d01ad447a9b35a81b589f86267547984fae9608cf9d6fa2151",
+      "projection_shrinkage": 0.3
+    },
+    {
+      "delta_vs_unshrunk": 0.06122448979591866,
+      "form_window": 5,
+      "mean_realized_squad_points": 54.27210884353742,
+      "objective_configuration_fingerprint": "413968452c6eb3af250caf42911086044d6656ab5e58f1f20c27ce9c3a312cac",
+      "projection_shrinkage": 0.5
+    },
+    {
+      "delta_vs_unshrunk": 0.08843537414966107,
+      "form_window": 6,
+      "mean_realized_squad_points": 54.8843537414966,
+      "objective_configuration_fingerprint": "413968452c6eb3af250caf42911086044d6656ab5e58f1f20c27ce9c3a312cac",
+      "projection_shrinkage": 0.5
+    },
+    {
+      "delta_vs_unshrunk": 0.3809523809523796,
+      "form_window": 10,
+      "mean_realized_squad_points": 56.8843537414966,
+      "objective_configuration_fingerprint": "413968452c6eb3af250caf42911086044d6656ab5e58f1f20c27ce9c3a312cac",
+      "projection_shrinkage": 0.5
+    }
+  ],
+  "contract_version": "projection_shrinkage_grid_v1",
+  "created_utc": "2026-08-16T06:29:08+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "locked_holdout_accessed": false,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "849f48ec7604c03aad91bfa94c7e955dcb136dd1",
+    "working_tree_dirty": false
+  },
+  "recommendation_only": true,
+  "shrinkage_rule": "position_mean_shrinkage_v1"
+}

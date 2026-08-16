@@ -37,7 +37,10 @@ from squadopt.experiments.config import (
     ExperimentConfigurationError,
     ExperimentExecutionError,
 )
-from squadopt.experiments.policy_objective import EVALUATION_OBJECTIVE_VERSION
+from squadopt.experiments.policy_objective import (
+    EVALUATION_OBJECTIVE_VERSION,
+    shrink_projections,
+)
 from squadopt.features import CrossSeasonConfig, build_feature_dataset
 from squadopt.optimization import OptimizationConfig
 from squadopt.prediction import (
@@ -91,6 +94,7 @@ class ScenarioPolicyObjectiveConfig:
     candidate_pool_per_position: int = 30
     cheap_pool_per_position: int = 10
     player_location_shrinkage: float | None = None
+    projection_shrinkage: float = 0.0
     cross_season_config: CrossSeasonConfig = field(default_factory=CrossSeasonConfig)
     optimization_config: OptimizationConfig = field(default_factory=OptimizationConfig)
 
@@ -142,6 +146,15 @@ class ScenarioPolicyObjectiveConfig:
                     "player_location_shrinkage must be a finite non-negative number or None."
                 )
             object.__setattr__(self, "player_location_shrinkage", float(shrinkage))
+        strength = self.projection_shrinkage
+        if (
+            isinstance(strength, bool)
+            or not isinstance(strength, Real)
+            or not math.isfinite(float(strength))
+            or not 0.0 <= float(strength) <= 1.0
+        ):
+            raise ExperimentConfigurationError("projection_shrinkage must lie in [0, 1].")
+        object.__setattr__(self, "projection_shrinkage", float(strength))
         if not isinstance(self.cross_season_config, CrossSeasonConfig):
             raise ExperimentConfigurationError(
                 "cross_season_config must be a CrossSeasonConfig instance."
@@ -173,6 +186,7 @@ class ScenarioPolicyObjectiveConfig:
                 if self.player_location_shrinkage is None
                 else float(self.player_location_shrinkage).hex()
             ),
+            "projection_shrinkage": float(self.projection_shrinkage).hex(),
             "cross_season": {
                 "decay": self.cross_season_config.decay,
                 "min_minutes": self.cross_season_config.min_minutes,
@@ -336,7 +350,8 @@ class ScenarioPolicyObjective:
                 config=mapping.projection_config,
             )
             realized = realized_points_at(self._visible_panel, decision)
-            tables[decision.fold_id] = (self._candidate_pool(projections), realized)
+            shrunk = shrink_projections(projections, self._settings.projection_shrinkage)
+            tables[decision.fold_id] = (self._candidate_pool(shrunk), realized)
         self._fold_cache[form_window] = tables
         return tables
 

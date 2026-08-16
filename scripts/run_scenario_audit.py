@@ -65,6 +65,12 @@ def _parse_arguments() -> argparse.Namespace:
         default=None,
         help="Opt-in per-player location component; omitted keeps centered scenarios.",
     )
+    parser.add_argument(
+        "--projection-shrinkage",
+        type=float,
+        default=0.0,
+        help="Decision-side position-mean shrinkage applied before pooling.",
+    )
     parser.add_argument("--lower-quantile", type=float, default=0.10)
     parser.add_argument("--points-threshold", type=float, default=40.0)
     parser.add_argument(
@@ -214,6 +220,7 @@ def main() -> int:
                 candidate_pool_per_position=arguments.candidate_pool_per_position,
                 cheap_pool_per_position=arguments.cheap_pool_per_position,
                 player_location_shrinkage=arguments.player_location_shrinkage,
+                projection_shrinkage=arguments.projection_shrinkage,
             ),
         )
         LOGGER.info(
