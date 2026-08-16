@@ -81,6 +81,33 @@ captured, and move each column into `PRE_MATCH_COLUMNS` or `OUTCOME_COLUMNS`
 accordingly. Until that inspection happens, excluding them is the only defensible
 choice.
 
+**Status: resolved, and the two sources answer differently.** The inspection has now
+happened on both paths, and the outcome is not one classification but two.
+
+*The live path is verified pre-deadline.* `scripts/capture_deadline_snapshot.py` records
+`status` and `chance_of_playing_this_round` together with an explicit `captured_at_utc`
+that `normalize_utc_timestamp` refuses unless it is timezone-aware UTC, and the capture is
+immutable and checksummed. Capture-before-deadline is provable rather than assumed, which
+is what `captured_availability_rule_v1` rests on. Availability therefore reaches a live
+decision as post-processing on a projection, never as a feature — the distinction that
+keeps it out of the fitted model while still letting it zero an unavailable player.
+
+*The archive path is verified post-hoc, permanently.* Measured against the pinned archive:
+`players_raw.csv` is one snapshot per season and its latest `news_added` falls after that
+season's final kickoff in all five seasons — 2021-22 at 2022-05-21T14:00Z against a final
+kickoff of 2022-05-22T15:00Z, and the same shape in 2022-23, 2023-24, 2024-25 and 2025-26.
+`gws/merged_gw.csv` carries no availability column at all. So the archive's availability is
+the end-of-season state, nine months after an opening deadline, and using it as a
+historical feature would leak the rest of the season into the decision.
+
+The conclusion for `AMBIGUOUS_TIMING_COLUMNS` is therefore to keep `availability_status`
+excluded from historical features **on evidence rather than caution**, while the live rule
+consumes the captured value as post-processing. `selected_by_percent` was not inspected;
+it stays excluded on the original conservative grounds and is a separate question.
+
+Full measurement and its consequences: [GW1 evidence blocker
+report](gw1_blocker_report_2021-2026.md), sections 2 to 5.
+
 ### 4. Fixture context features
 
 **Now.** `opponent_team_id`, `is_home`, and `fixture_difficulty` are classified as
@@ -167,6 +194,23 @@ evaluation run writes, so a stored result can be tied to the exact feature
 definitions that produced it. Without it, two runs with different feature code but
 identical parameters are indistinguishable after the fact, which defeats the
 reproducibility the contract is asking for.
+
+**Status: resolved.** `FEATURE_GENERATION_CONTRACT_VERSION` (`form_window_v1`) lives in
+`src/squadopt/prediction/factors.py` beside the mapping it names, and every run that
+writes a record surfaces it — the screening runner, the baseline benchmark, the learned
+benchmark (which composes it with the Ridge feature contract), the control residual
+manifest, and the multi-gameweek rehearsal.
+
+The version sits on the module rather than on `FeatureConfig` itself, which is the
+narrower placement and the right one: `FeatureConfig` is a parameter object that a caller
+may construct with any windows, while the contract version names the *mapping* from a
+declared factor to those windows. Versioning the parameter object would let a caller
+claim a contract it did not follow.
+
+Candidates that read beyond the frozen mapping declare their own contract on top of it
+rather than editing this one — `two-stage-appearance-calendar-v1` for the production
+projection and `learned-rate-calendar-appearance-v1` for the Issue #43 candidate — which
+is what item 9 below requires of any wider feature bank.
 
 ## Cross-owner coordination
 
