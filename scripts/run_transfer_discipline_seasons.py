@@ -51,6 +51,7 @@ from scripts.run_season_chain_seasons import (
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.experiments import (
     NAIVE_PROJECTION_RULE,
+    PROJECTION_RULES,
     SEASON_CHAIN_CONTRACT_VERSION,
     ExperimentError,
     SeasonChain,
@@ -81,6 +82,9 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--form-window", type=int, default=5)
     parser.add_argument("--candidate-pool-per-position", type=int, default=20)
     parser.add_argument("--cheap-pool-per-position", type=int, default=8)
+    parser.add_argument(
+        "--projection-rule", choices=PROJECTION_RULES, default=NAIVE_PROJECTION_RULE
+    )
     parser.add_argument("--merge", default=None, help="comma list of per-season artifacts")
     parser.add_argument(
         "--json-output", type=Path, default=REPOSITORY_ROOT / "docs" / "transfer_discipline.json"
@@ -293,7 +297,11 @@ def _document(
         **metadata,
         "contract_version": TRANSFER_DISCIPLINE_CONTRACT_VERSION,
         "chain_contract_version": SEASON_CHAIN_CONTRACT_VERSION,
-        "projection_rule": NAIVE_PROJECTION_RULE,
+        "projection_rule": (
+            str(dict(chains[0]["diagnostics"]).get("projection_rule", NAIVE_PROJECTION_RULE))  # type: ignore[call-overload]
+            if chains
+            else NAIVE_PROJECTION_RULE
+        ),
         "seasons": list(seasons),
         "lookaheads": list(lookaheads),
         "chip_mode": mode,
@@ -404,6 +412,7 @@ def main() -> int:
                         chip_windows=chip_windows_for(season) if mode != "off" else (),
                         chip_policy="double_gameweeks_only" if mode == "reserve" else "planner",
                         hit_points_charged=RULE_HIT_COST,
+                        projection_rule=str(arguments.projection_rule),
                         optimization_config=optimization_config,
                         transfer_config=TransferPlanningConfig(
                             max_free_transfers=cap_free,

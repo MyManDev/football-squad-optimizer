@@ -255,6 +255,38 @@ def test_a_planning_hit_cost_is_a_threshold_and_the_charge_stays_the_rule(
     assert myopic.diagnostics["max_transfers_per_gameweek"] is None
 
 
+def test_the_calendar_blind_rule_projects_a_double_like_a_single(myopic: SeasonChainResult) -> None:
+    """Gameweek 4 doubles team 1 and blanks team 6: scaled, team 1 projects twice; blind,
+    once — and a blank projects zero under both rules."""
+
+    from squadopt.experiments import CALENDAR_BLIND_PROJECTION_RULE
+
+    blind = _run(projection_rule=CALENDAR_BLIND_PROJECTION_RULE)
+    assert blind.diagnostics["projection_rule"] == CALENDAR_BLIND_PROJECTION_RULE
+    assert myopic.diagnostics["projection_rule"] == "naive_calendar_scaling_v1"
+
+    chain = SeasonChain(
+        make_canonical_gameweeks(),
+        _fixture_counts(),
+        SeasonChainConfig(season=SEASON, projection_rule=CALENDAR_BLIND_PROJECTION_RULE, **POOL),
+    )
+    pool = chain._candidate_pool(chain._projection_at(4))
+    horizon = chain._naive_horizon(pool, (4,)).table
+    scaled = SeasonChain(
+        make_canonical_gameweeks(), _fixture_counts(), SeasonChainConfig(season=SEASON, **POOL)
+    )
+    scaled_horizon = scaled._naive_horizon(pool, (4,)).table
+    doubles = horizon["team_id"] == 1
+    blanks = horizon["team_id"] == 6
+    assert (horizon.loc[doubles, "expected_points"] * 2).tolist() == pytest.approx(
+        scaled_horizon.loc[doubles, "expected_points"].tolist()
+    )
+    assert horizon.loc[blanks, "expected_points"].eq(0.0).all()
+    assert scaled_horizon.loc[blanks, "expected_points"].eq(0.0).all()
+    with pytest.raises(ExperimentConfigurationError):
+        SeasonChainConfig(season=SEASON, projection_rule="oracle")
+
+
 def test_a_lookahead_is_truncated_at_the_last_decision_gameweek() -> None:
     result = _run(lookahead=3, start_gameweek=5)
     assert [week.lookahead_gameweeks for week in result.weeks] == [3, 3, 2, 1]

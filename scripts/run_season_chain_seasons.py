@@ -55,6 +55,7 @@ from scripts._experiment_cli import (
 from squadopt.data.sources.vaastav import build_fixture_panel, build_panel, load_team_codes
 from squadopt.experiments import (
     NAIVE_PROJECTION_RULE,
+    PROJECTION_RULES,
     SEASON_CHAIN_CONTRACT_VERSION,
     ChipWindowRule,
     ExperimentError,
@@ -104,6 +105,13 @@ def _parse_arguments() -> argparse.Namespace:
         "--chip-holding-values",
         default="bboost=20,3xc=18,wildcard=12",
         help="terminal value of an unplayed chip under --chips value, points per chip",
+    )
+    parser.add_argument(
+        "--projection-rule",
+        choices=PROJECTION_RULES,
+        default=NAIVE_PROJECTION_RULE,
+        help="naive_calendar_scaling_v1 scales the control projection by fixture count; "
+        "control_calendar_blind_v1 is the control as evaluated (a double projects like a single)",
     )
     parser.add_argument("--start-gameweek", type=int, default=None)
     parser.add_argument("--end-gameweek", type=int, default=None)
@@ -395,8 +403,10 @@ def _markdown(
         "",
         "## Assumptions recorded with this run",
         "",
-        f"- Projection rule: `{NAIVE_PROJECTION_RULE}` (decision-time baseline scaled by fixture "
-        "count); the measurement is of the planning mechanism, not of projection quality.",
+        f"- Projection rule: `{assumptions.get('projection_rule', NAIVE_PROJECTION_RULE)}` "
+        "(the decision-time operational control projection, scaled by the known fixture "
+        "count under naive_calendar_scaling_v1, unscaled under control_calendar_blind_v1); the "
+        "measurement is of the planning mechanism.",
         "- Chip windows per development season are assumed, not read from a capture: "
         + "; ".join(
             f"{season}: first wildcard through GW{split}"
@@ -503,7 +513,7 @@ def _merge(arguments: argparse.Namespace) -> int:
         **{key: first[key] for key in ("created_utc", "provenance", "environment")},
         "contract_version": SEASON_CHAIN_SEASONS_CONTRACT_VERSION,
         "chain_contract_version": SEASON_CHAIN_CONTRACT_VERSION,
-        "projection_rule": NAIVE_PROJECTION_RULE,
+        "projection_rule": first.get("projection_rule", NAIVE_PROJECTION_RULE),
         "merged_from": [str(path) for path in sources],
         "seasons": seasons,
         "lookaheads": list(lookaheads),
@@ -592,6 +602,7 @@ def main() -> int:
                         cheap_pool_per_position=arguments.cheap_pool_per_position,
                         chip_windows=chip_windows_for(season) if chips else (),
                         chip_policy="double_gameweeks_only" if mode == "reserve" else "planner",
+                        projection_rule=str(arguments.projection_rule),
                         optimization_config=optimization_config,
                         transfer_config=transfer_config,
                     )
@@ -629,6 +640,7 @@ def main() -> int:
         },
         "max_free_transfers": caps,
         "chip_windows_source": "assumed; not read from a capture",
+        "projection_rule": str(arguments.projection_rule),
         "chip_holding_values_points": holding_values if "value" in chip_modes else None,
         "sell_rule": "purchase plus half of any rise, rounded down to a tenth",
         "automatic_substitutions": False,
@@ -638,7 +650,7 @@ def main() -> int:
         **artifact_metadata(panel_rows=len(panel), created_utc=created_utc),
         "contract_version": SEASON_CHAIN_SEASONS_CONTRACT_VERSION,
         "chain_contract_version": SEASON_CHAIN_CONTRACT_VERSION,
-        "projection_rule": NAIVE_PROJECTION_RULE,
+        "projection_rule": str(arguments.projection_rule),
         "seasons": list(seasons),
         "lookaheads": list(lookaheads),
         "chip_modes": list(chip_modes),

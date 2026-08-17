@@ -44,6 +44,7 @@ from squadopt.experiments.config import (
 )
 from squadopt.experiments.multi_gw_rehearsal import (
     NAIVE_PROJECTION_RULE,
+    PROJECTION_RULES,
     DecisionSeason,
     _relative_gap,
     realize_week,
@@ -113,6 +114,10 @@ class SeasonChainConfig:
     """Sell a squad member at purchase price plus half of any rise, rounded down to a
     tenth (the game's rule); False sells at the market price, as the windowed
     rehearsal does."""
+    projection_rule: str = NAIVE_PROJECTION_RULE
+    """``naive_calendar_scaling_v1`` scales the decision-time control projection by the
+    known fixture count (a double counts twice); ``control_calendar_blind_v1`` is the
+    control as evaluated, with no scaling — a double projects like a single."""
     hit_points_charged: float = 4.0
     """What the game charges per paid transfer on the realized sheet. The planner's
     own ``transfer_config.transfer_hit_cost_points`` is a decision control — a higher
@@ -161,6 +166,10 @@ class SeasonChainConfig:
                 "hit_points_charged must be a finite non-negative number."
             )
         object.__setattr__(self, "hit_points_charged", float(charged))
+        if self.projection_rule not in PROJECTION_RULES:
+            raise ExperimentConfigurationError(
+                f"projection_rule must be one of {PROJECTION_RULES!r}."
+            )
         if self.chip_policy not in CHIP_POLICIES:
             raise ExperimentConfigurationError(f"chip_policy must be one of {CHIP_POLICIES!r}.")
         windows = tuple(self.chip_windows)
@@ -367,6 +376,7 @@ class SeasonChain(DecisionSeason):
             candidate_pool_per_position=settings.candidate_pool_per_position,
             cheap_pool_per_position=settings.cheap_pool_per_position,
             cross_season_config=settings.cross_season_config,
+            projection_rule=settings.projection_rule,
         )
         self._settings = settings
         # Last projection row seen for each squad member, so a member without a row
@@ -442,7 +452,7 @@ class SeasonChain(DecisionSeason):
             weeks=tuple(weeks),
             opening_squad_ids=squad_ids,
             diagnostics={
-                "projection_rule": NAIVE_PROJECTION_RULE,
+                "projection_rule": settings.projection_rule,
                 "form_window": settings.form_window,
                 "candidate_pool_per_position": settings.candidate_pool_per_position,
                 "cheap_pool_per_position": settings.cheap_pool_per_position,

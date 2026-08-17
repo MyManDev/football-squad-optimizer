@@ -32,8 +32,10 @@ from squadopt.experiments.models import (
     ScreeningExperimentResult,
 )
 from squadopt.experiments.multi_gw_rehearsal import (
+    CALENDAR_BLIND_PROJECTION_RULE,
     MULTI_GW_REHEARSAL_CONTRACT_VERSION,
     NAIVE_PROJECTION_RULE,
+    PROJECTION_RULES,
     MultiGwRehearsal,
     MultiGwRehearsalConfig,
     RehearsalWindowResult,
@@ -103,6 +105,7 @@ from squadopt.experiments.selection_optimism import (
 from squadopt.experiments.statistics import season_aware_moving_block_interval
 
 __all__ = [
+    "CALENDAR_BLIND_PROJECTION_RULE",
     "CHIP_POLICIES",
     "CONTROL_CANDIDATE_LABEL",
     "CONTROL_MODEL_NAME",
@@ -117,6 +120,7 @@ __all__ = [
     "POLICY_GRID_CONTRACT_VERSION",
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
     "POLICY_SEARCH_FACTOR_NAMES",
+    "PROJECTION_RULES",
     "RISK_FRONTIER_CONTRACT_VERSION",
     "SCENARIO_AUDIT_CONTRACT_VERSION",
     "SCENARIO_POLICY_FACTOR_NAMES",

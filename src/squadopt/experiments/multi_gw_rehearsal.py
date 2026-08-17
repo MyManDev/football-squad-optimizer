@@ -56,6 +56,11 @@ from squadopt.prediction import (
 
 MULTI_GW_REHEARSAL_CONTRACT_VERSION: Final = "multi_gw_rehearsal_v1"
 NAIVE_PROJECTION_RULE: Final = "naive_calendar_scaling_v1"
+CALENDAR_BLIND_PROJECTION_RULE: Final = "control_calendar_blind_v1"
+"""The operational control as it is evaluated: no fixture-count scaling, so a double
+gameweek projects like a single. A blank still projects zero — a team that does not
+play cannot score, and that is known before the deadline, not modelled."""
+PROJECTION_RULES: Final = (NAIVE_PROJECTION_RULE, CALENDAR_BLIND_PROJECTION_RULE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,10 +302,16 @@ class DecisionSeason:
         candidate_pool_per_position: int,
         cheap_pool_per_position: int,
         cross_season_config: CrossSeasonConfig | None,
+        projection_rule: str = NAIVE_PROJECTION_RULE,
     ) -> None:
         """``fixture_counts``: one row per (gameweek, team_id) with the known number
         of fixtures, using the panel's own team labels."""
 
+        if projection_rule not in PROJECTION_RULES:
+            raise ExperimentConfigurationError(
+                f"projection_rule must be one of {PROJECTION_RULES!r}, got {projection_rule!r}."
+            )
+        self._projection_rule = projection_rule
         if not isinstance(panel, pd.DataFrame):
             raise ExperimentExecutionError("panel must be a pandas DataFrame.")
         if not isinstance(fixture_counts, pd.DataFrame):
@@ -398,6 +409,7 @@ class DecisionSeason:
                 *(pool[column].tolist() for column in columns), strict=True
             ):
                 count = self._fixture_counts.get((gameweek, team_id), 0)
+                scale = count if self._projection_rule == NAIVE_PROJECTION_RULE else min(count, 1)
                 rows.append(
                     {
                         "gameweek": gameweek,
@@ -406,7 +418,7 @@ class DecisionSeason:
                         "team_id": team_id,
                         "position": position,
                         "price_tenths": int(price),
-                        "expected_points": float(expected) * count,
+                        "expected_points": float(expected) * scale,
                         "fixture_count": count,
                         "home_fixture_count": 0,
                     }
@@ -418,7 +430,7 @@ class DecisionSeason:
             model_name="deterministic_baseline",
             model_version=f"form_window_{self._form_window:02d}_v1",
             feature_contract_version=FEATURE_GENERATION_CONTRACT_VERSION,
-            post_processing_contract_version=NAIVE_PROJECTION_RULE,
+            post_processing_contract_version=self._projection_rule,
         )
 
 
