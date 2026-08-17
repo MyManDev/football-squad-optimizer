@@ -42,9 +42,11 @@ from squadopt.live import (
     infer_season,
     project,
     read_inputs,
+    read_season_rules,
     record_decision,
     record_outcome,
     render,
+    render_rules,
     summary_markdown,
 )
 from squadopt.optimization import OptimizationConfig
@@ -189,14 +191,24 @@ def _decide(arguments: argparse.Namespace) -> int:
     print("Decision verification passed: all runbook checks hold.")
 
     report = render(recommendation)
+    # The season's published rules travel with the decision so a later reader knows
+    # which scoring, chip, and transfer regime it was made under.
+    rules = read_season_rules(snapshot, season=season)
     directory = record_decision(
         arguments.ledger_root,
         recommendation,
         projection,
-        report_text=report,
-        metadata={"ops_phase": "decide", "mode": mode},
+        report_text=report + "\n" + render_rules(rules),
+        metadata={
+            "ops_phase": "decide",
+            "mode": mode,
+            "season_rules_contract_version": rules.contract_version,
+            "season_rules_fingerprint": rules.fingerprint,
+            "awards_defensive_contribution": rules.scoring.awards_defensive_contribution,
+        },
     )
     print(report)
+    print(render_rules(rules))
     print(f"Recorded decision at {directory}")
     return 0
 
