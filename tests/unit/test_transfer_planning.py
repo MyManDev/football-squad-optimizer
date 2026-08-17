@@ -11,6 +11,7 @@ from pandas.testing import assert_frame_equal
 import squadopt.planning.optimizer as planning_optimizer
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import (
+    ChipAvailability,
     InitialSquadState,
     PlanningHorizon,
     TransferPlanningConfig,
@@ -351,3 +352,195 @@ def test_unknown_solver_status_is_structured(
     assert result.solver_status is SolverStatus.UNKNOWN
     assert result.weeks == ()
     assert result.objective_value is None
+
+
+# --- chips -------------------------------------------------------------------------
+
+
+def _weekly(players: pd.DataFrame, overrides: dict[int, dict[str, float]]) -> pd.DataFrame:
+    """A two-week horizon with per-week expected-point overrides ({gameweek: {id: pts}})."""
+
+    table = _horizon_table(players, (1, 2))
+    for gameweek, values in overrides.items():
+        for player_id, points in values.items():
+            mask = (table["gameweek"] == gameweek) & (table["player_id"] == player_id)
+            table.loc[mask, "expected_points"] = points
+    return table
+
+
+def test_no_chip_availability_is_the_chip_less_planner(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+
+    plain = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config)
+    empty = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=ChipAvailability())
+
+    assert plain.chips_played == {} and empty.chips_played == {}
+    assert plain.objective_value == empty.objective_value
+    assert [w.selected_squad["player_id"].tolist() for w in plain.weeks] == [
+        w.selected_squad["player_id"].tolist() for w in empty.weeks
+    ]
+    assert all(week.chip is None for week in plain.weeks)
+
+
+def test_bench_boost_is_played_where_the_bench_is_worth_most(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    # DEF_A sits on the bench (XI is GK + MID + FWD); it is worth 4 in week 1, 8 in week 2.
+    horizon = PlanningHorizon(_weekly(known_optimum_players, {2: {"DEF_A": 8.0}}))
+    chips = ChipAvailability(available={"bboost": {1, 2}})
+
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=chips)
+
+    assert result.chips_played == {2: "bboost"}
+    week_two = result.weeks[1]
+    assert week_two.chip == "bboost"
+    assert week_two.bench["player_id"].tolist() == ["DEF_A"]
+    assert week_two.projected_bench_points == pytest.approx(8.0)
+    # Full bench points count in the boosted week's contribution; only bench_weight
+    # of them in the other.
+    assert week_two.discounted_objective_contribution == pytest.approx(
+        week_two.projected_score + 8.0
+    )
+    week_one = result.weeks[0]
+    assert week_one.discounted_objective_contribution == pytest.approx(
+        week_one.projected_score + small_config.bench_weight * 4.0
+    )
+
+
+def test_triple_captain_is_played_on_the_biggest_captain_week(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    horizon = PlanningHorizon(_weekly(known_optimum_players, {2: {"MID_A": 12.0}}))
+    chips = ChipAvailability(available={"3xc": {1, 2}})
+
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=chips)
+
+    assert result.chips_played == {2: "3xc"}
+    week_two = result.weeks[1]
+    assert week_two.captain["player_id"] == "MID_A"
+    # GK_A 5 + FWD_A 6 + MID_A 12, captain counted twice more under the chip.
+    assert week_two.projected_score == pytest.approx(5.0 + 6.0 + 12.0 * 3)
+    assert result.weeks[0].projected_score == pytest.approx(5.0 + 6.0 + 10.0 * 2)
+
+
+@pytest.mark.parametrize("preserves", [True, False])
+def test_a_wildcard_rebuilds_the_squad_without_hits(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    preserves: bool,
+) -> None:
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    weak_start = _initial("GK_B", "DEF_B", "MID_B", "FWD_B")
+    config = TransferPlanningConfig(wildcard_preserves_free_transfers=preserves)
+
+    without = optimize_transfer_plan(horizon, weak_start, small_config, config)
+    with_wildcard = optimize_transfer_plan(
+        horizon, weak_start, small_config, config, chips=ChipAvailability({"wildcard": {1}})
+    )
+
+    # Without the chip the bench upgrade (0.3 weighted points) is not worth a 4-point
+    # hit, so three transfers are made and two are paid.
+    assert without.weeks[0].transfer_count == 3
+    assert without.weeks[0].paid_transfer_count == 2
+    assert without.weeks[0].transfer_hit_points == 8.0
+    week = with_wildcard.weeks[0]
+    assert with_wildcard.chips_played == {1: "wildcard"}
+    assert week.transfer_count == 4
+    assert week.paid_transfer_count == 0
+    assert week.transfer_hit_points == 0.0
+    assert sorted(week.selected_squad["player_id"]) == ["DEF_A", "FWD_A", "GK_A", "MID_A"]
+    if preserves:
+        assert week.free_transfers_unused == 1
+        assert week.free_transfers_for_next_gameweek == 2
+    else:
+        assert week.free_transfers_unused == 0
+        assert week.free_transfers_for_next_gameweek == 1
+
+
+def test_a_chip_is_played_at_most_once_and_one_chip_per_week(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    # Bench worth boosting in both weeks; a captain worth tripling in both weeks.
+    horizon = PlanningHorizon(
+        _weekly(known_optimum_players, {1: {"DEF_A": 9.0}, 2: {"DEF_A": 9.0}})
+    )
+    chips = ChipAvailability(available={"bboost": {1, 2}, "3xc": {1, 2}})
+
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=chips)
+
+    played = list(result.chips_played.values())
+    assert sorted(played) == ["3xc", "bboost"]  # each once
+    assert len(set(result.chips_played)) == 2  # in different weeks
+    assert all(week.chip is not None for week in result.weeks)
+
+
+def test_a_forced_chip_is_played_where_it_is_forced(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    horizon = PlanningHorizon(_weekly(known_optimum_players, {2: {"DEF_A": 8.0}}))
+    chips = ChipAvailability(available={"bboost": {1, 2}}, forced={1: "bboost"})
+
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=chips)
+
+    assert result.chips_played == {1: "bboost"}
+
+
+def test_a_chip_that_buys_nothing_is_kept(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """Tie-break: with no bench value to boost, the bench boost stays unplayed."""
+
+    players = known_optimum_players.copy()
+    players.loc[players["player_id"].isin(["DEF_A", "DEF_B"]), "expected_points"] = 0.0
+    horizon = PlanningHorizon(_horizon_table(players, (1,)))
+
+    result = optimize_transfer_plan(
+        horizon, OPTIMAL_INITIAL, small_config, chips=ChipAvailability({"bboost": {1}})
+    )
+
+    assert result.chips_played == {}
+    assert result.weeks[0].chip is None
+
+
+@pytest.mark.parametrize(
+    ("available", "forced", "message"),
+    [
+        ({"freehit": {1}}, {}, "Unknown chip"),
+        ({"bboost": {1}}, {2: "bboost"}, "not available there"),
+        ({"bboost": {1}}, {1: "3xc"}, "not available there"),
+        ({}, {1: "manager"}, "Unknown forced chip"),
+    ],
+)
+def test_invalid_chip_availability_is_refused(
+    available: dict[str, set[int]], forced: dict[int, str], message: str
+) -> None:
+    with pytest.raises(TransferPlanningValidationError, match=message):
+        ChipAvailability(available=available, forced=forced)
+
+
+def test_chip_plans_are_deterministic_and_fingerprinted(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    horizon = PlanningHorizon(_weekly(known_optimum_players, {2: {"DEF_A": 8.0, "MID_A": 12.0}}))
+    chips = ChipAvailability(available={"bboost": {1, 2}, "3xc": {1, 2}, "wildcard": {1, 2}})
+
+    first = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=chips)
+    second = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=chips)
+
+    assert first.chips_played == second.chips_played
+    assert first.objective_value == second.objective_value
+    assert first.diagnostics["chip_availability_fingerprint"] == chips.availability_fingerprint
+    assert first.diagnostics["chips_played"] == dict(first.chips_played)
+    assert (
+        ChipAvailability(available={"bboost": {1}}).availability_fingerprint
+        != ChipAvailability(available={"bboost": {2}}).availability_fingerprint
+    )
