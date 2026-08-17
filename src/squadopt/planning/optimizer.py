@@ -167,6 +167,10 @@ def _validate_integer_bounds(
         objective_bound += (
             discount_weight * abs(banked_value_scaled) * transfer_config.max_free_transfers
         )
+        objective_bound += discount_weight * sum(
+            abs(scale_expected_points(value, optimization_config.expected_points_scale))
+            for value in transfer_config.chip_holding_value_points.values()
+        )
         largest_sell_prices = sorted(
             (int(value) for value in players["sell_price_tenths"]),
             reverse=True,
@@ -433,6 +437,17 @@ def _build_model(
         # giving up by spending one now on a small gain, which a finite horizon cannot
         # otherwise see.
         objective_terms.append(discount_weights[-1] * banked_value_scaled * free_next_vars[-1])
+    for name in sorted(chips.available):
+        holding_value = transfer_config.chip_holding_value_points.get(name, 0.0)
+        if holding_value == 0.0:
+            continue
+        # Terminal value of a chip left unplayed: one minus its plays in the horizon.
+        holding_scaled = scale_expected_points(
+            holding_value, optimization_config.expected_points_scale
+        )
+        plays = [week[name] for week in chip_vars if name in week]
+        held = 1 - cp_model.LinearExpr.sum(plays)
+        objective_terms.append(discount_weights[-1] * holding_scaled * held)
     primary_objective = cp_model.LinearExpr.sum(objective_terms)
     model.maximize(primary_objective)
     return _PlanArtifacts(
@@ -670,6 +685,14 @@ def _extract_plan(
     )
     diagnostics["terminal_banked_transfer_value"] = terminal_value
     total_objective += terminal_value
+    last_discount = transfer_config.horizon_discount_factor ** (len(weeks) - 1)
+    holding_value = sum(
+        transfer_config.chip_holding_value_points.get(name, 0.0)
+        for name in artifacts.chips.available
+        if name not in chips_played.values()
+    )
+    diagnostics["terminal_chip_holding_value"] = holding_value * last_discount
+    total_objective += holding_value * last_discount
     return TransferPlanResult(
         solver_status=status,
         weeks=tuple(weeks),

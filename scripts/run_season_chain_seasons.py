@@ -96,8 +96,14 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--chips",
         default="off,on,reserve",
-        help="comma subset of off,on,reserve: on offers every open chip to the planner; "
-        "reserve offers bench boost and triple captain only in double gameweeks",
+        help="comma subset of off,on,reserve,value: on offers every open chip to the "
+        "planner; reserve offers bench boost and triple captain only in double gameweeks; "
+        "value offers every open chip but holds each at its --chip-holding-values",
+    )
+    parser.add_argument(
+        "--chip-holding-values",
+        default="bboost=20,3xc=18,wildcard=12",
+        help="terminal value of an unplayed chip under --chips value, points per chip",
     )
     parser.add_argument("--start-gameweek", type=int, default=None)
     parser.add_argument("--end-gameweek", type=int, default=None)
@@ -164,7 +170,20 @@ def chip_windows_for(season: str) -> tuple[ChipWindowRule, ...]:
     )
 
 
-CHIP_MODES = ("off", "on", "reserve")
+CHIP_MODES = ("off", "on", "reserve", "value")
+
+
+def parse_holding_values(text: str) -> dict[str, float]:
+    """Parse ``name=points,...`` into the planner's chip holding values."""
+
+    values: dict[str, float] = {}
+    for token in str(text).split(","):
+        token = token.strip()
+        if not token:
+            continue
+        name, _, number = token.partition("=")
+        values[name.strip()] = float(number)
+    return values
 
 
 def _variant_label(lookahead: int, mode: str) -> str:
@@ -529,6 +548,7 @@ def main() -> int:
     if any(mode not in CHIP_MODES for mode in chip_modes):
         print(f"--chips must be a comma subset of {','.join(CHIP_MODES)}.")
         return 1
+    holding_values = parse_holding_values(arguments.chip_holding_values)
 
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
     panel = build_panel(arguments.archive_root)
@@ -553,10 +573,13 @@ def main() -> int:
                 else MAX_FREE_TRANSFERS.get(season, 5)
             )
             caps[season] = cap
-            transfer_config = TransferPlanningConfig(max_free_transfers=cap)
             for lookahead in lookaheads:
                 for mode in chip_modes:
                     chips = mode != "off"
+                    transfer_config = TransferPlanningConfig(
+                        max_free_transfers=cap,
+                        chip_holding_value_points=holding_values if mode == "value" else {},
+                    )
                     label = _variant_label(lookahead, mode)
                     LOGGER.info("Season %s: %s", season, label)
                     config = SeasonChainConfig(
@@ -600,12 +623,13 @@ def main() -> int:
         block_length=arguments.moving_block_length,
     )
 
-    assumptions = {
+    assumptions: dict[str, object] = {
         "first_wildcard_last_gameweek": {
             season: FIRST_WILDCARD_LAST_GAMEWEEK.get(season, 19) for season in seasons
         },
         "max_free_transfers": caps,
         "chip_windows_source": "assumed; not read from a capture",
+        "chip_holding_values_points": holding_values if "value" in chip_modes else None,
         "sell_rule": "purchase plus half of any rise, rounded down to a tenth",
         "automatic_substitutions": False,
         "free_hit_modelled": False,

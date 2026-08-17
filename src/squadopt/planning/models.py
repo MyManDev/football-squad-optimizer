@@ -354,6 +354,11 @@ class TransferPlanningConfig:
     """Terminal value of each free transfer banked past the horizon's last gameweek,
     in points. Zero means an unused free transfer at the end is worth nothing to the
     plan — the myopic default, which spends a free transfer on any positive gain."""
+    chip_holding_value_points: Mapping[str, float] = field(default_factory=dict)
+    """Terminal value, in points, of each named chip left unplayed past the horizon:
+    the option value a finite horizon cannot otherwise see, so a chip is played only
+    when what it buys inside the horizon exceeds it. Absent chips hold no value — the
+    default, under which a horizon plays a chip worth anything now."""
     contract_version: str = TRANSFER_PLANNING_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
@@ -376,6 +381,14 @@ class TransferPlanningConfig:
             "banked_transfer_value_points",
             _finite(self.banked_transfer_value_points, "banked_transfer_value_points", minimum=0.0),
         )
+        holding: dict[str, float] = {}
+        for name, value in dict(self.chip_holding_value_points).items():
+            if name not in CHIP_NAMES_V1:
+                raise TransferPlanningConfigurationError(
+                    f"chip_holding_value_points names unknown chip {name!r}."
+                )
+            holding[name] = _finite(value, f"chip_holding_value_points[{name}]", minimum=0.0)
+        object.__setattr__(self, "chip_holding_value_points", MappingProxyType(holding))
         maximum = _integer(self.max_free_transfers, "max_free_transfers", 1)
         accrual = _integer(self.free_transfer_accrual, "free_transfer_accrual", 0)
         if accrual > maximum:
@@ -423,6 +436,10 @@ class TransferPlanningConfig:
             "wildcard_preserves_free_transfers": self.wildcard_preserves_free_transfers,
             "max_transfers_per_gameweek": self.max_transfers_per_gameweek,
             "banked_transfer_value_points": float(self.banked_transfer_value_points).hex(),
+            "chip_holding_value_points": {
+                name: float(value).hex()
+                for name, value in sorted(self.chip_holding_value_points.items())
+            },
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()

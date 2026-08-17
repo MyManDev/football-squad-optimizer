@@ -597,6 +597,70 @@ def test_discipline_settings_enter_the_configuration_fingerprint() -> None:
         TransferPlanningConfig(banked_transfer_value_points=-1.0)
 
 
+@pytest.mark.parametrize(("holding", "played"), [(0.0, True), (1.0, True), (10.0, False)])
+def test_a_chip_is_held_when_its_holding_value_exceeds_what_it_buys(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    holding: float,
+    played: bool,
+) -> None:
+    """A bench boost buys DEF_A's bench remainder (a few points) inside the horizon;
+    held past it, the chip is worth ``holding``. Played only when the gain is larger."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    config = TransferPlanningConfig(chip_holding_value_points={"bboost": holding})
+
+    result = optimize_transfer_plan(
+        horizon,
+        OPTIMAL_INITIAL,
+        small_config,
+        config,
+        chips=ChipAvailability({"bboost": {1, 2}}),
+    )
+
+    assert (result.chips_played == {2: "bboost"}) is played
+    assert result.diagnostics["terminal_chip_holding_value"] == pytest.approx(
+        0.0 if played else holding
+    )
+
+
+@pytest.mark.parametrize(("holding", "played"), [(5.0, True), (10.0, False)])
+def test_a_wildcard_is_held_unless_the_rebuild_saves_more(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    holding: float,
+    played: bool,
+) -> None:
+    """From the weak squad the best plan without a wildcard makes three moves and pays
+    two hits (8 points); the wildcard saves those and adds the fourth move's bench
+    gain — about 8.3 points. Held at 5 it is played; held at 10 it is kept."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    weak_start = _initial("GK_B", "DEF_B", "MID_B", "FWD_B")
+    config = TransferPlanningConfig(chip_holding_value_points={"wildcard": holding})
+
+    result = optimize_transfer_plan(
+        horizon, weak_start, small_config, config, chips=ChipAvailability({"wildcard": {1}})
+    )
+
+    assert (result.chips_played == {1: "wildcard"}) is played
+    if not played:
+        assert result.weeks[0].transfer_hit_points == 8.0
+
+
+def test_holding_values_are_validated_and_fingerprinted() -> None:
+    with pytest.raises(TransferPlanningConfigurationError, match="unknown chip"):
+        TransferPlanningConfig(chip_holding_value_points={"freehit": 3.0})
+    with pytest.raises(TransferPlanningConfigurationError):
+        TransferPlanningConfig(chip_holding_value_points={"bboost": -1.0})
+    assert (
+        TransferPlanningConfig().configuration_fingerprint
+        != TransferPlanningConfig(
+            chip_holding_value_points={"bboost": 2.0}
+        ).configuration_fingerprint
+    )
+
+
 def test_a_chip_that_buys_nothing_is_kept(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,
