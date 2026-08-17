@@ -296,6 +296,9 @@ def render(recommendation: Recommendation) -> str:
             "  residual digest     "
             f"{str(risk.residual_provenance.get('residual_fingerprint'))[:16]}…",
         ]
+        limits = risk.diagnostics.get("stated_limits")
+        if isinstance(limits, list | tuple):
+            lines += [f"  stated limit        {limit}" for limit in limits]
     else:
         blockers = ", ".join(blocker.value for blocker in risk.blockers) or "none"
         lines += [

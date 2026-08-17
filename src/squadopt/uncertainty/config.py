@@ -10,6 +10,12 @@ from typing import Final
 from squadopt.uncertainty.errors import UncertaintyConfigurationError
 
 PROJECTION_UNCERTAINTY_CONTRACT_VERSION: Final = "projection_uncertainty_v1"
+PROJECTION_UNCERTAINTY_FIXTURE_CONTRACT_VERSION: Final = "projection_uncertainty_v2"
+UNCERTAINTY_GROUPINGS: Final = ("position", "position_fixture_group")
+CONTRACT_BY_GROUPING: Final = {
+    "position": PROJECTION_UNCERTAINTY_CONTRACT_VERSION,
+    "position_fixture_group": PROJECTION_UNCERTAINTY_FIXTURE_CONTRACT_VERSION,
+}
 PLAYER_ADAPTIVE_UNCERTAINTY_CONTRACT_VERSION: Final = "player_adaptive_uncertainty_v1"
 DEFAULT_UNCERTAINTY_DEVELOPMENT_SEASONS: Final = (
     "2021-22",
@@ -66,9 +72,20 @@ class UncertaintyConfig:
     holdout_season: str = DEFAULT_UNCERTAINTY_HOLDOUT_SEASON
     min_pooled_observations: int = 30
     min_group_observations: int = 30
+    grouping: str = "position"
+    """``position`` is the v1 contract: one conformal radius per position.
+    ``position_fixture_group`` is v2: one radius per position and fixture group
+    (``single`` / ``double_plus``, pooled fallback per position under the floor);
+    fitting and applying it require a ``fixture_count`` column, and a blank (zero
+    fixtures) projects zero with a zero radius. The contract version follows the
+    grouping and must agree with it."""
     contract_version: str = PROJECTION_UNCERTAINTY_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
+        if self.grouping not in UNCERTAINTY_GROUPINGS:
+            raise UncertaintyConfigurationError(
+                f"grouping must be one of {UNCERTAINTY_GROUPINGS!r}, got {self.grouping!r}."
+            )
         confidence = self.confidence_level
         if isinstance(confidence, bool) or not isinstance(confidence, Real):
             raise UncertaintyConfigurationError(
@@ -93,9 +110,10 @@ class UncertaintyConfig:
             raise UncertaintyConfigurationError(
                 "holdout_season must be disjoint from development_seasons."
             )
-        if self.contract_version != PROJECTION_UNCERTAINTY_CONTRACT_VERSION:
+        if self.contract_version != CONTRACT_BY_GROUPING[self.grouping]:
             raise UncertaintyConfigurationError(
-                "contract_version must match the implemented uncertainty contract."
+                "contract_version must match the implemented uncertainty contract for the "
+                f"grouping: {self.grouping!r} is {CONTRACT_BY_GROUPING[self.grouping]!r}."
             )
 
         object.__setattr__(self, "confidence_level", confidence)
@@ -116,7 +134,7 @@ class UncertaintyConfig:
     def configuration_fingerprint(self) -> str:
         """Return a stable digest of every comparison-affecting control."""
 
-        payload = {
+        payload: dict[str, object] = {
             "confidence_level": self.confidence_level,
             "contract_version": self.contract_version,
             "development_seasons": self.development_seasons,
@@ -124,8 +142,15 @@ class UncertaintyConfig:
             "min_group_observations": self.min_group_observations,
             "min_pooled_observations": self.min_pooled_observations,
         }
+        # The v1 payload is unchanged so recorded v1 fingerprints still reproduce.
+        if self.grouping != "position":
+            payload["grouping"] = self.grouping
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
+
+    @property
+    def uses_fixture_groups(self) -> bool:
+        return self.grouping == "position_fixture_group"
 
 
 @dataclass(frozen=True, slots=True)

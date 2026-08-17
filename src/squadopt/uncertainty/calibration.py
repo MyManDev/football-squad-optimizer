@@ -34,6 +34,33 @@ UNCERTAINTY_OBSERVATIONS_COLUMN = "uncertainty_observations"
 
 _PROJECTION_COLUMNS: tuple[str, ...] = ("player_id", "position", "expected_points")
 _REALIZED_COLUMNS: tuple[str, ...] = ("player_id", "total_points")
+FIXTURE_COUNT_COLUMN = "fixture_count"
+FIXTURE_GROUPS: tuple[str, ...] = ("single", "double_plus")
+BLANK_FIXTURE_GROUP = "blank"
+
+
+def fixture_group_of(count: int) -> str:
+    """Name the calendar group of a fixture count: blank, single, or double_plus."""
+
+    if count <= 0:
+        return BLANK_FIXTURE_GROUP
+    return "single" if count == 1 else "double_plus"
+
+
+def _fixture_counts(table: pd.DataFrame, fold_id: str) -> list[int]:
+    if FIXTURE_COUNT_COLUMN not in table.columns:
+        raise UncertaintyValidationError(
+            f"Fold {fold_id!r} projections carry no {FIXTURE_COUNT_COLUMN!r} column; the "
+            "position_fixture_group contract needs the published calendar on every row."
+        )
+    counts: list[int] = []
+    for value in table[FIXTURE_COUNT_COLUMN].tolist():
+        if isinstance(value, bool) or not isinstance(value, Integral) or int(value) < 0:
+            raise UncertaintyValidationError(
+                f"Fold {fold_id!r} {FIXTURE_COUNT_COLUMN} must hold non-negative integers."
+            )
+        counts.append(int(value))
+    return counts
 
 
 @dataclass(frozen=True, slots=True)
@@ -298,6 +325,8 @@ def _aligned_scoring_table(
 
 def _development_residuals(
     contexts: tuple[_FoldContext, ...],
+    *,
+    with_fixture_groups: bool = False,
 ) -> pd.DataFrame:
     records: list[pd.DataFrame] = []
     expected_id_kind: str | None = None
@@ -317,6 +346,11 @@ def _development_residuals(
         block = aligned.loc[:, ["player_id", "position", "expected_points", "total_points"]].copy(
             deep=True
         )
+        if with_fixture_groups:
+            counts = _fixture_counts(aligned, context.fold.fold_id)
+            block["fixture_group"] = pd.Series(
+                [fixture_group_of(count) for count in counts], index=block.index, dtype="string"
+            )
         block.insert(0, "fold_id", context.fold.fold_id)
         block.insert(1, "season", context.season)
         block.insert(2, "gameweek", context.gameweek)
@@ -379,14 +413,56 @@ def _group_calibration(
     )
 
 
+def _fixture_cell_calibration(
+    position: Position,
+    fixture_group: str,
+    cell_values: list[float],
+    position_group: GroupCalibration,
+    position_values: list[float],
+    pooled_values: list[float],
+    config: UncertaintyConfig,
+) -> GroupCalibration:
+    """One position-by-fixture cell; falls back to the position, then to the pool."""
+
+    if len(cell_values) >= config.min_group_observations:
+        effective, source = cell_values, "position_fixture_group"
+    elif position_group.source == "position":
+        effective, source = position_values, "position_fallback"
+    else:
+        effective, source = pooled_values, "pooled_fallback"
+    radius, rank = _conformal_radius(effective, config.confidence_level)
+    residual_mean = fmean(effective)
+    residual_stddev = pstdev(effective)
+    if not all(math.isfinite(value) for value in (residual_mean, residual_stddev, radius)):
+        raise UncertaintyValidationError(
+            f"Calibration diagnostics for {position!r}/{fixture_group!r} must be finite."
+        )
+    return GroupCalibration(
+        position=position,
+        source=source,
+        group_observations=len(cell_values),
+        calibration_observations=len(effective),
+        residual_mean=residual_mean,
+        residual_stddev=residual_stddev,
+        interval_radius=radius,
+        conformal_rank=rank,
+        fixture_group=fixture_group,
+    )
+
+
 def _calibration_fingerprint(
     config: UncertaintyConfig,
     groups: Mapping[Position, GroupCalibration],
+    fixture_groups: Mapping[str, GroupCalibration] | None = None,
 ) -> str:
-    payload = {
+    payload: dict[str, object] = {
         "configuration_fingerprint": config.configuration_fingerprint,
         "groups": {position: asdict(groups[position]) for position in POSITIONS},
     }
+    if fixture_groups:
+        payload["fixture_groups"] = {
+            key: asdict(fixture_groups[key]) for key in sorted(fixture_groups)
+        }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
@@ -510,7 +586,33 @@ def _validate_calibration_integrity(
         raise UncertaintyValidationError(
             "calibration pooled observations must equal the sum of position observations."
         )
-    expected_fingerprint = _calibration_fingerprint(calibration.config, calibration.groups)
+    if calibration.config.uses_fixture_groups:
+        expected_keys = {
+            f"{position}/{group}" for position in POSITIONS for group in FIXTURE_GROUPS
+        }
+        if set(calibration.fixture_groups) != expected_keys:
+            raise UncertaintyValidationError(
+                "calibration.fixture_groups must hold every position by fixture group cell."
+            )
+        for key, cell in calibration.fixture_groups.items():
+            position, group = key.split("/", 1)
+            if cell.position != position or cell.fixture_group != group:
+                raise UncertaintyValidationError(f"fixture cell {key!r} is mislabelled.")
+            if cell.source not in {
+                "position_fixture_group",
+                "position_fallback",
+                "pooled_fallback",
+            }:
+                raise UncertaintyValidationError(f"fixture cell {key!r} has an unknown source.")
+            if cell.interval_radius < 0.0 or cell.calibration_observations < 2:
+                raise UncertaintyValidationError(f"fixture cell {key!r} is malformed.")
+    elif calibration.fixture_groups:
+        raise UncertaintyValidationError(
+            "calibration.fixture_groups must be empty under the position contract."
+        )
+    expected_fingerprint = _calibration_fingerprint(
+        calibration.config, calibration.groups, calibration.fixture_groups
+    )
     if calibration.calibration_fingerprint != expected_fingerprint:
         raise UncertaintyValidationError(
             "calibration fingerprint does not match its configuration and group state."
@@ -527,7 +629,13 @@ def fit_projection_uncertainty(
     if not isinstance(settings, UncertaintyConfig):
         raise UncertaintyValidationError("config must be an UncertaintyConfig instance.")
     contexts = _fold_contexts(folds, settings, role="development")
-    residuals = _development_residuals(contexts)
+    residuals = _development_residuals(contexts, with_fixture_groups=settings.uses_fixture_groups)
+    if settings.uses_fixture_groups:
+        # A blank projects zero and scores zero by construction; it is not a residual to
+        # calibrate on and gets a zero radius when applied.
+        residuals = residuals.loc[residuals["fixture_group"] != BLANK_FIXTURE_GROUP].reset_index(
+            drop=True
+        )
     pooled = [float(value) for value in residuals["residual"].tolist()]
     if len(pooled) < settings.min_pooled_observations:
         raise UncertaintyValidationError(
@@ -536,13 +644,23 @@ def fit_projection_uncertainty(
         )
 
     groups: dict[Position, GroupCalibration] = {}
+    fixture_cells: dict[str, GroupCalibration] = {}
     for position in POSITIONS:
         values = [
             float(value)
             for value in residuals.loc[residuals["position"].eq(position), "residual"].tolist()
         ]
         groups[position] = _group_calibration(position, values, pooled, settings)
-    fingerprint = _calibration_fingerprint(settings, groups)
+        if settings.uses_fixture_groups:
+            for fixture_group in FIXTURE_GROUPS:
+                mask = residuals["position"].eq(position) & residuals["fixture_group"].eq(
+                    fixture_group
+                )
+                cell_values = [float(value) for value in residuals.loc[mask, "residual"].tolist()]
+                fixture_cells[f"{position}/{fixture_group}"] = _fixture_cell_calibration(
+                    position, fixture_group, cell_values, groups[position], values, pooled, settings
+                )
+    fingerprint = _calibration_fingerprint(settings, groups, fixture_cells)
     calibration = ProjectionUncertaintyCalibration(
         config=settings,
         pooled_observations=len(pooled),
@@ -555,9 +673,15 @@ def fit_projection_uncertainty(
             "residual_definition": "total_points-minus-expected_points",
             "interval_method": "symmetric-split-conformal-absolute-residual",
             "quantile_rank": "ceil((n+1)*confidence_level)-capped-at-n",
-            "grouping": "position-with-pooled-fallback",
+            "grouping": (
+                "position-by-fixture-group-with-position-then-pooled-fallback"
+                if settings.uses_fixture_groups
+                else "position-with-pooled-fallback"
+            ),
             "opening_gameweeks_excluded": True,
+            "blank_rows_excluded_from_calibration": settings.uses_fixture_groups,
         },
+        fixture_groups=fixture_cells,
     )
     _validate_calibration_integrity(calibration)
     return calibration
@@ -575,32 +699,49 @@ def apply_projection_uncertainty(
         )
     _validate_calibration_integrity(calibration)
     validated, _ = _validate_projection_table(projections, "application")
+    fixture_groups: list[str] | None = None
+    if calibration.config.uses_fixture_groups:
+        fixture_groups = [
+            fixture_group_of(count) for count in _fixture_counts(validated, "application")
+        ]
     stddevs: list[float] = []
     lowers: list[float] = []
     uppers: list[float] = []
     groups: list[str] = []
     sources: list[str] = []
     observations: list[int] = []
-    for position_value, expected_value in zip(
-        validated["position"].tolist(),
-        validated["expected_points"].tolist(),
-        strict=True,
+    for row_index, (position_value, expected_value) in enumerate(
+        zip(
+            validated["position"].tolist(),
+            validated["expected_points"].tolist(),
+            strict=True,
+        )
     ):
         position = cast(Position, str(position_value))
-        group = calibration.groups[position]
         expected = float(expected_value)
-        lower = expected - group.interval_radius
-        upper = expected + group.interval_radius
+        if fixture_groups is None:
+            group = calibration.groups[position]
+            label = str(position)
+        elif fixture_groups[row_index] == BLANK_FIXTURE_GROUP:
+            # No fixture: the projection is zero by construction and so is its interval.
+            group = None
+            label = f"{position}/{BLANK_FIXTURE_GROUP}"
+        else:
+            label = f"{position}/{fixture_groups[row_index]}"
+            group = calibration.fixture_groups[label]
+        radius = 0.0 if group is None else group.interval_radius
+        lower = expected - radius
+        upper = expected + radius
         if not math.isfinite(lower) or not math.isfinite(upper):
             raise UncertaintyValidationError(
                 "Applying calibration produced non-finite prediction interval bounds."
             )
-        stddevs.append(group.residual_stddev)
+        stddevs.append(0.0 if group is None else group.residual_stddev)
         lowers.append(lower)
         uppers.append(upper)
-        groups.append(position)
-        sources.append(group.source)
-        observations.append(group.calibration_observations)
+        groups.append(label)
+        sources.append("blank_zero" if group is None else group.source)
+        observations.append(0 if group is None else group.calibration_observations)
 
     result = validated.copy(deep=True)
     result[UNCERTAINTY_STDDEV_COLUMN] = stddevs
@@ -725,17 +866,30 @@ def evaluate_projection_uncertainty(
         )
     fold_results = tuple(result for result, _ in scored)
     combined = pd.concat([fold.scored_players for fold in fold_results], ignore_index=True)
+    diagnostics: dict[str, object] = {
+        "contract_version": calibration.config.contract_version,
+        "calibration_fingerprint": calibration.calibration_fingerprint,
+        "holdout_season": calibration.config.holdout_season,
+        "holdout_fold_count": len(fold_results),
+        "holdout_refit": False,
+        "opening_gameweeks_excluded": True,
+    }
+    if calibration.config.uses_fixture_groups:
+        labels = combined[UNCERTAINTY_GROUP_COLUMN].astype(str)
+        by_group: dict[str, dict[str, float | int]] = {}
+        for fixture_group in (*FIXTURE_GROUPS, BLANK_FIXTURE_GROUP):
+            subset = combined.loc[labels.str.endswith(f"/{fixture_group}")]
+            if not subset.empty:
+                by_group[fixture_group] = asdict(_metrics(subset))
+        for key in sorted(set(labels)):
+            subset = combined.loc[labels == key]
+            if not subset.empty:
+                by_group[key] = asdict(_metrics(subset))
+        diagnostics["fixture_group_metrics"] = by_group
     return UncertaintyEvaluationResult(
         calibration=calibration,
         folds=fold_results,
         metrics=_metrics(combined),
         group_metrics=_group_metrics(combined),
-        diagnostics={
-            "contract_version": calibration.config.contract_version,
-            "calibration_fingerprint": calibration.calibration_fingerprint,
-            "holdout_season": calibration.config.holdout_season,
-            "holdout_fold_count": len(fold_results),
-            "holdout_refit": False,
-            "opening_gameweeks_excluded": True,
-        },
+        diagnostics=diagnostics,
     )

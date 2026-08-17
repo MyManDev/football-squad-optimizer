@@ -1,7 +1,7 @@
 """Immutable public results for projection uncertainty calibration and evaluation."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 
 import pandas as pd
@@ -12,7 +12,8 @@ from squadopt.uncertainty.config import PlayerAdaptiveUncertaintyConfig, Uncerta
 
 @dataclass(frozen=True, slots=True)
 class GroupCalibration:
-    """Effective residual distribution used for one canonical position."""
+    """Effective residual distribution used for one canonical position (and, under the
+    fixture-group contract, one fixture group of it)."""
 
     position: Position
     source: str
@@ -22,6 +23,7 @@ class GroupCalibration:
     residual_stddev: float
     interval_radius: float
     conformal_rank: int
+    fixture_group: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,9 +35,13 @@ class ProjectionUncertaintyCalibration:
     groups: Mapping[Position, GroupCalibration]
     calibration_fingerprint: str
     diagnostics: Mapping[str, object]
+    fixture_groups: Mapping[str, GroupCalibration] = field(default_factory=dict)
+    """Under the fixture-group contract, one cell per ``"<position>/<fixture_group>"``;
+    empty under the position contract."""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "groups", MappingProxyType(dict(self.groups)))
+        object.__setattr__(self, "fixture_groups", MappingProxyType(dict(self.fixture_groups)))
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
 

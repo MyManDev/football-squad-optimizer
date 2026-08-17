@@ -561,6 +561,11 @@ def test_matching_opening_residuals_produce_all_requested_risk_metrics(
     assert "lower 10% quantile" in report
     assert "mean worst 10%" in report
     assert "P(score < 40)" in report
+    # An available lower tail states the limit of the evidence behind it: the residual
+    # history is calendar-blind, so a double gameweek's tail is optimistic.
+    limits = risk.diagnostics["stated_limits"]
+    assert isinstance(limits, list) and any("double gameweek" in limit for limit in limits)
+    assert "stated limit" in report and "calendar-blind" in report
 
 
 def test_available_risk_names_and_fingerprints_its_residual_input(

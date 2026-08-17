@@ -78,8 +78,10 @@ The fixture-group axis was measured on the control's export on 2026-08-18
 ([fixture_group_conformal_note.md](fixture_group_conformal_note.md)): held-out
 double-gameweek coverage rises from 0.849 to 0.901 against nominal 0.90, singles narrow
 slightly and stay above nominal, no cell needed the pooled fallback. The
-`projection_uncertainty_v2` declaration is the next step; the operational contract is
-unchanged until it is made.
+`projection_uncertainty_v2` declaration followed the same day
+([projection_uncertainty_v2_declaration.md](projection_uncertainty_v2_declaration.md)):
+the contract is implemented and measured on the control; v1 stays the default until
+the risk-screening and live folds carry the calendar.
 
 ## What this decision does not do
 
