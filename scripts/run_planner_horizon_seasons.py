@@ -43,6 +43,9 @@ from squadopt.experiments import (
     MultiGwRehearsalConfig,
     RehearsalWindowResult,
 )
+from squadopt.experiments.config import PromotionPolicy
+from squadopt.experiments.statistics import season_aware_moving_block_interval
+from squadopt.optimization import OptimizationConfig
 from squadopt.planning import TransferPlanningConfig
 
 LOGGER = logging.getLogger(__name__)
@@ -54,8 +57,27 @@ def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
     parser.add_argument("--seasons", default=DEFAULT_SEASONS)
-    parser.add_argument("--start-gameweeks", default="5,10,15,20,25,30")
+    parser.add_argument(
+        "--start-gameweeks",
+        default="5,10,15,20,25,30",
+        help="comma list, 'all' (every decision gameweek), or 'every:N' (every N-th)",
+    )
     parser.add_argument("--horizons", default="2,3,4")
+    parser.add_argument(
+        "--rolling",
+        action="store_true",
+        help="also run the rolling-horizon planner (re-plan weekly, apply week one)",
+    )
+    parser.add_argument(
+        "--deterministic-time-limit",
+        type=float,
+        default=None,
+        help="CP-SAT deterministic work budget per solve; when set, the wall-clock cap "
+        "is raised so the deterministic budget binds and the run is reproducible",
+    )
+    parser.add_argument("--wall-time-limit", type=float, default=None)
+    parser.add_argument("--bootstrap-resamples", type=int, default=2_000)
+    parser.add_argument("--moving-block-length", type=int, default=4)
     parser.add_argument("--form-window", type=int, default=5)
     parser.add_argument("--candidate-pool-per-position", type=int, default=20)
     parser.add_argument("--cheap-pool-per-position", type=int, default=8)
@@ -112,6 +134,11 @@ def _ints(value: object) -> list[int]:
     return [int(item) for item in value]
 
 
+def _seq(value: object) -> list[object]:
+    assert isinstance(value, list | tuple)
+    return list(value)
+
+
 def _window_record(
     season: str,
     horizon_length: int,
@@ -126,7 +153,27 @@ def _window_record(
     myopic_hits = float(window.myopic_transfer_hit_points)
     advantage = float(window.planning_advantage_points)
     transfers = _ints(window.diagnostics.get("planner_transfers", []))
+    rolling_advantage = window.rolling_advantage_points
+    rolling_statuses = window.diagnostics.get("rolling_solver_statuses", [])
+    assert isinstance(rolling_statuses, list | tuple)
+    rolling_gaps = window.diagnostics.get("rolling_relative_gaps", [])
+    assert isinstance(rolling_gaps, list | tuple)
     return {
+        "rolling_realized_points": window.rolling_realized_points,
+        "rolling_transfer_hit_points": window.rolling_transfer_hit_points,
+        "rolling_advantage_points": rolling_advantage,
+        "rolling_selection_advantage_points": (
+            None
+            if window.rolling_realized_points is None
+            else float(window.rolling_realized_points) - myopic
+        ),
+        "rolling_transfers_by_week": _ints(window.diagnostics.get("rolling_transfers", [])),
+        "rolling_solver_statuses": [str(value) for value in rolling_statuses],
+        "rolling_relative_gaps": [
+            None if value is None else float(str(value)) for value in rolling_gaps
+        ],
+        "planner_solver_status": str(window.diagnostics.get("planner_solver_status")),
+        "planner_relative_gap": window.diagnostics.get("planner_relative_gap"),
         "season": season,
         "horizon_length": horizon_length,
         "start_gameweek": start,
@@ -144,10 +191,43 @@ def _window_record(
     }
 
 
+def _interval(
+    rows: list[dict[str, object]],
+    key: str,
+    *,
+    resamples: int,
+    block_length: int,
+    label: str,
+) -> tuple[float, float] | None:
+    pairs = [(str(row["season"]), float(str(row[key]))) for row in rows if row.get(key) is not None]
+    if len(pairs) < 2:
+        return None
+    policy = PromotionPolicy(
+        bootstrap_resamples=resamples,
+        moving_block_length=block_length,
+    )
+    return season_aware_moving_block_interval(pairs, policy=policy, candidate_id=label)
+
+
+def _proven_share(rows: list[dict[str, object]], key: str) -> float | None:
+    statuses = [str(status) for row in rows for status in _seq(row.get(key, []))]
+    if not statuses:
+        return None
+    return sum(1 for status in statuses if status == "OPTIMAL") / len(statuses)
+
+
+def _mean_gap(rows: list[dict[str, object]], key: str) -> float | None:
+    gaps = [float(str(gap)) for row in rows for gap in _seq(row.get(key, [])) if gap is not None]
+    return sum(gaps) / len(gaps) if gaps else None
+
+
 def _variant_summary(
     horizon_length: int,
     rows: list[dict[str, object]],
     seasons: tuple[str, ...],
+    *,
+    resamples: int = 2_000,
+    block_length: int = 4,
 ) -> dict[str, object]:
     advantages = [float(str(row["planning_advantage_points"])) for row in rows]
     per_gw = [float(str(row["advantage_per_gameweek"])) for row in rows]
@@ -193,6 +273,58 @@ def _variant_summary(
         "mean_advantage_by_season": by_season,
         "calendar_structured_windows": _split_summary(structured),
         "plain_windows": _split_summary(plain),
+        "advantage_block_bootstrap_interval": _interval(
+            rows,
+            "planning_advantage_points",
+            resamples=resamples,
+            block_length=block_length,
+            label=f"one_shot_h{horizon_length}",
+        ),
+        "planner_proven_share": (
+            sum(1 for row in rows if row.get("planner_solver_status") == "OPTIMAL") / len(rows)
+        ),
+        "rolling": _rolling_summary(
+            horizon_length, rows, resamples=resamples, block_length=block_length
+        ),
+    }
+
+
+def _rolling_summary(
+    horizon_length: int,
+    rows: list[dict[str, object]],
+    *,
+    resamples: int,
+    block_length: int,
+) -> dict[str, object] | None:
+    scored = [row for row in rows if row.get("rolling_advantage_points") is not None]
+    if not scored:
+        return None
+    advantages = [float(str(row["rolling_advantage_points"])) for row in scored]
+    selection = [float(str(row["rolling_selection_advantage_points"])) for row in scored]
+    hits = [
+        float(str(row["rolling_transfer_hit_points"]))
+        - float(str(row["myopic_transfer_hit_points"]))
+        for row in scored
+    ]
+    stdev = float(pstdev(advantages)) if len(advantages) > 1 else 0.0
+    return {
+        "windows": len(scored),
+        "mean_advantage_points": sum(advantages) / len(advantages),
+        "median_advantage_points": float(median(advantages)),
+        "advantage_standard_error": stdev / len(advantages) ** 0.5,
+        "positive_window_share": sum(1 for value in advantages if value > 0) / len(advantages),
+        "mean_selection_advantage_points": sum(selection) / len(selection),
+        "mean_hit_disadvantage_points": sum(hits) / len(hits),
+        "advantage_block_bootstrap_interval": _interval(
+            scored,
+            "rolling_advantage_points",
+            resamples=resamples,
+            block_length=block_length,
+            label=f"rolling_h{horizon_length}",
+        ),
+        "proven_week_share": _proven_share(scored, "rolling_solver_statuses"),
+        "mean_relative_gap_unproven": _mean_gap(scored, "rolling_relative_gaps"),
+        "total_transfers": sum(sum(_ints(row["rolling_transfers_by_week"])) for row in scored),
     }
 
 
@@ -294,6 +426,48 @@ def _markdown(
                 value = split[metric]
                 cells.append("-" if value is None else f"{float(str(value)):+.2f}")
         lines.append("| " + " | ".join(cells) + " |")
+    lines += [
+        "",
+        "## Confidence and solve quality",
+        "",
+        "Season-aware moving-block bootstrap intervals (90%) on the per-window advantages; "
+        "proven share = solves that reached OPTIMAL under the run's solver limits.",
+        "",
+        "| Horizon | One-shot 90% interval | One-shot proven | Rolling windows | Rolling mean "
+        "| Rolling SE | Rolling 90% interval | Rolling positive | Rolling selection "
+        "| Rolling hit disadv | Rolling proven weeks | Mean gap (unproven) |",
+        "| ---: | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for record in variants:
+        interval = record.get("advantage_block_bootstrap_interval")
+        one_shot_interval = (
+            "-" if interval is None else f"[{float(interval[0]):+.2f}, {float(interval[1]):+.2f}]"  # type: ignore[index]
+        )
+        rolling = record.get("rolling")
+        if isinstance(rolling, dict):
+            r_interval = rolling.get("advantage_block_bootstrap_interval")
+            r_text = (
+                "-"
+                if r_interval is None
+                else f"[{float(r_interval[0]):+.2f}, {float(r_interval[1]):+.2f}]"
+            )
+            proven = rolling.get("proven_week_share")
+            gap = rolling.get("mean_relative_gap_unproven")
+            rolling_cells = (
+                f"| {rolling['windows']} | {float(str(rolling['mean_advantage_points'])):+.2f} "
+                f"| {float(str(rolling['advantage_standard_error'])):.2f} | {r_text} "
+                f"| {float(str(rolling['positive_window_share'])):.2f} "
+                f"| {float(str(rolling['mean_selection_advantage_points'])):+.2f} "
+                f"| {float(str(rolling['mean_hit_disadvantage_points'])):+.2f} "
+                f"| {'-' if proven is None else f'{float(str(proven)):.2f}'} "
+                f"| {'-' if gap is None else f'{float(str(gap)):.3f}'} |"
+            )
+        else:
+            rolling_cells = "| - | - | - | - | - | - | - | - | - |"
+        lines.append(
+            f"| {record['horizon_length']} | {one_shot_interval} "
+            f"| {float(str(record['planner_proven_share'])):.2f} " + rolling_cells
+        )
     lines += ["", "## Per horizon and season (mean advantage)", ""]
     lines.append("| Horizon | " + " | ".join(seasons) + " |")
     lines.append("| ---: | " + " | ".join("---:" for _ in seasons) + " |")
@@ -310,10 +484,13 @@ def _markdown(
         "## Every window",
         "",
         "| Season | H | Start | Gameweeks | Planned | Myopic | Selection | Hit disadv "
-        "| Advantage | Transfers by week | DGW teams by week | Blank teams by week |",
-        "| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |",
+        "| Advantage | Rolling adv | Transfers by week | DGW teams by week "
+        "| Blank teams by week |",
+        "| --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |",
     ]
     for row in windows:
+        rolling_value = row.get("rolling_advantage_points")
+        rolling_text = "-" if rolling_value is None else f"{float(str(rolling_value)):+.0f}"
         gameweeks = ",".join(str(value) for value in _ints(row["gameweeks"]))
         transfers = ",".join(str(value) for value in _ints(row["planner_transfers_by_week"]))
         doubles = ",".join(str(value) for value in _ints(row["double_gameweek_teams"]))
@@ -325,7 +502,7 @@ def _markdown(
             f"| {float(str(row['selection_advantage_points'])):+.0f} "
             f"| {float(str(row['hit_disadvantage_points'])):+.0f} "
             f"| {float(str(row['planning_advantage_points'])):+.0f} "
-            f"| {transfers} | {doubles} | {blanks} |"
+            f"| {rolling_text} | {transfers} | {doubles} | {blanks} |"
         )
     if skipped:
         lines += ["", "## Skipped windows", ""]
@@ -350,9 +527,27 @@ def main() -> int:
 
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
     seasons = tuple(value.strip() for value in str(arguments.seasons).split(","))
-    starts = tuple(int(value.strip()) for value in str(arguments.start_gameweeks).split(","))
     horizons = tuple(int(value.strip()) for value in str(arguments.horizons).split(","))
     panel = build_panel(arguments.archive_root)
+    start_spec = str(arguments.start_gameweeks).strip()
+    if start_spec == "all":
+        starts = tuple(range(2, 39))
+    elif start_spec.startswith("every:"):
+        stride = int(start_spec.split(":", 1)[1])
+        starts = tuple(range(2, 39, stride))
+    else:
+        starts = tuple(int(value.strip()) for value in start_spec.split(","))
+    optimization_config = OptimizationConfig()
+    if arguments.deterministic_time_limit is not None or arguments.wall_time_limit is not None:
+        wall = arguments.wall_time_limit
+        if wall is None:
+            # Raise the wall-clock cap well above the deterministic budget so the
+            # deterministic budget is the binding stopping rule.
+            wall = max(60.0, 6.0 * float(arguments.deterministic_time_limit or 10.0))
+        optimization_config = OptimizationConfig(
+            solver_time_limit_seconds=wall,
+            solver_deterministic_time_limit=arguments.deterministic_time_limit,
+        )
 
     window_records: list[dict[str, object]] = []
     skipped: list[dict[str, object]] = []
@@ -369,6 +564,8 @@ def main() -> int:
                     candidate_pool_per_position=arguments.candidate_pool_per_position,
                     cheap_pool_per_position=arguments.cheap_pool_per_position,
                     transfer_config=TransferPlanningConfig(),
+                    optimization_config=optimization_config,
+                    rolling_replan=bool(arguments.rolling),
                 )
                 rehearsal = MultiGwRehearsal(panel, counts, config)
                 if season_starts is None:
@@ -409,7 +606,15 @@ def main() -> int:
     for horizon_length in horizons:
         rows = [row for row in window_records if row["horizon_length"] == horizon_length]
         if rows:
-            variants.append(_variant_summary(horizon_length, rows, seasons))
+            variants.append(
+                _variant_summary(
+                    horizon_length,
+                    rows,
+                    seasons,
+                    resamples=arguments.bootstrap_resamples,
+                    block_length=arguments.moving_block_length,
+                )
+            )
 
     defaults = TransferPlanningConfig()
     document = {
@@ -422,6 +627,17 @@ def main() -> int:
         "transfer_config": {
             "transfer_hit_cost_points": defaults.transfer_hit_cost_points,
             "horizon_discount_factor": defaults.horizon_discount_factor,
+        },
+        "solver_limits": {
+            "solver_time_limit_seconds": optimization_config.solver_time_limit_seconds,
+            "solver_deterministic_time_limit": optimization_config.solver_deterministic_time_limit,
+        },
+        "rolling_replan": bool(arguments.rolling),
+        "start_gameweeks_spec": start_spec,
+        "bootstrap": {
+            "resamples": arguments.bootstrap_resamples,
+            "moving_block_length": arguments.moving_block_length,
+            "confidence_level": 0.90,
         },
         "variants": variants,
         "windows": window_records,
