@@ -65,11 +65,56 @@ def _elements(event_points: int | None = None) -> list[dict[str, Any]]:
     return records
 
 
+def _game_config() -> dict[str, Any]:
+    """The season's published rules; the decide phase records their fingerprint."""
+
+    positions = ("GKP", "DEF", "MID", "FWD")
+    return {
+        "rules": {
+            "squad_squadsize": 15,
+            "squad_squadplay": 11,
+            "squad_team_limit": 3,
+            "squad_total_spend": 1000,
+            "max_extra_free_transfers": 4,
+            "transfers_cap": 20,
+            "transfers_sell_on_fee": 0.5,
+            "element_sell_at_purchase_price": False,
+        },
+        "scoring": {
+            "long_play": 2,
+            "short_play": 1,
+            "assists": 3,
+            "saves": 1,
+            "penalties_saved": 5,
+            "penalties_missed": -2,
+            "yellow_cards": -1,
+            "red_cards": -3,
+            "own_goals": -2,
+            "bonus": 1,
+            "goals_scored": dict(zip(positions, (10, 6, 5, 4), strict=True)),
+            "clean_sheets": dict(zip(positions, (4, 4, 1, 0), strict=True)),
+            "goals_conceded": dict(zip(positions, (-1, -1, 0, 0), strict=True)),
+            "defensive_contribution": dict(zip(positions, (0, 2, 2, 2), strict=True)),
+        },
+    }
+
+
 def _bootstrap(**overrides: Any) -> bytes:
     document: dict[str, Any] = {
         "events": EVENTS,
         "teams": TEAMS,
         "elements": _elements(),
+        "game_config": _game_config(),
+        "chips": [
+            {
+                "name": "bboost",
+                "number": 1,
+                "start_event": 1,
+                "stop_event": 19,
+                "chip_type": "team",
+            },
+            {"name": "3xc", "number": 1, "start_event": 20, "stop_event": 38, "chip_type": "team"},
+        ],
     }
     document.update(overrides)
     return json.dumps(document).encode("utf-8")
@@ -153,7 +198,12 @@ def test_decide_verifies_and_freezes_the_decision(
     assert decision["snapshot_id"] == world["decide_id"]
     assert decision["gameweek"] == 1
     assert decision["risk_status"] == "not_requested"
-    assert decision["metadata"] == {"mode": "replay", "ops_phase": "decide"}
+    assert decision["metadata"]["mode"] == "replay"
+    assert decision["metadata"]["ops_phase"] == "decide"
+    assert decision["metadata"]["season_rules_contract_version"] == "season_rules_v1"
+    assert len(decision["metadata"]["season_rules_fingerprint"]) == 64
+    assert decision["metadata"]["awards_defensive_contribution"] is True
+    assert "Season rules 2026-27" in (entry / "report.txt").read_text(encoding="utf-8")
     assert (entry / "manifest.json").is_file()
 
 

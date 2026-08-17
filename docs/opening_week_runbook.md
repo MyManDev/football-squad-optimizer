@@ -43,7 +43,11 @@ The decide phase applies every check below **as code** and exits 1 without recor
 anything if any check fails; on success it freezes the decision (squad, projections,
 report, checksums) into the season ledger under `data/ledger/<season>/gw<NN>/`.
 (`scripts.recommend_current_squad` remains available for a report-only run that
-touches no ledger.)
+touches no ledger.) The decision also records the season's published rules —
+scoring, chips, transfer limits — read from the capture's `game_config` (`season_rules_v1`,
+fingerprint in the ledger metadata), so a later reader knows which regime it was made
+under; 2026-27 awards defensive-contribution points and values a goalkeeper's goal at ten,
+neither of which the development seasons had.
 
 ### The checks the decide phase enforces
 
