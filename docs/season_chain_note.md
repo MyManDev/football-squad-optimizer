@@ -127,6 +127,33 @@ game's sell rule.
   free transfers consumed under a wildcard are pinned in both directions (a free variable
   in a horizon's last week made the extraction verification fail).
 
+## Addendum (2026-08-18): a holding value instead of the calendar rule
+
+[season_chain_value.md](season_chain_value.md) adds a third chip mode at lookahead 1:
+**value** — every open chip offered, each held at a terminal option value
+(`TransferPlanningConfig.chip_holding_value_points`: bench boost 20, triple captain 18,
+wildcard 12 points; an assumption calibrated to the naive projection's scale, where a
+captain projects ~10 and a bench remainder ~10 in a single week and doubles roughly
+double them). Same seasons, opening squads, and protocol.
+
+| Variant vs L1 chips off | Season delta by season | Mean | Weekly [90%] | Chip gains (mean) |
+| --- | --- | ---: | --- | --- |
+| reserve (calendar rule) | +124, +34, +21, +171 | **+88** | [+1.31, +3.75] | WC 63, BB 17, TC 10.5 |
+| value (holding value) | +70, +34, +185, +98 | **+97** | [+1.24, +3.86] | WC 76, BB 11.5, TC 17 |
+
+- **Triple captain**: the holding value times it better than the calendar rule — played
+  on the season's largest projected captain week (a double, GW22–36), realizing 20 points
+  in three seasons of four against the rule's 2–29.
+- **Wildcard**: held past the opening weeks (played GW5–9 instead of GW3) and again in
+  the second half at a larger rebuild (9–13 moves), worth 64–92 against ~63.
+- **Bench boost**: still played in GW2 in every season. The bench remainder projected in
+  GW2 exceeds 20 because a one-gameweek form window inflates early projections; no
+  constant holding value stands against that, and the calendar rule (a double only) does.
+- Net: **value ≥ reserve on average (+9.5 per season)**, better on two chips, worse on one;
+  the intervals overlap. The obvious combination — holding values for the transfer and
+  captain chips, the calendar rule for the bench boost — is untested and the next cheap
+  step; a projection that does not inflate the opening weeks would remove the reason for it.
+
 ## What follows
 
 - Live path: the weekly baseline stays the operational control. Chips can be recommended
