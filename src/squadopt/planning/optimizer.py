@@ -291,9 +291,10 @@ def _build_model(
             model.add(free_before == free_next_vars[week_index - 1])
         wildcard = chip_vars[week_index].get("wildcard")
         # Transfers that draw on the free-transfer bank this week. Under a wildcard
-        # (when the rule preserves the bank) none of them do; the lower bound is what
-        # matters, because unused free transfers are worth keeping and the solver will
-        # not consume more than it must.
+        # (when the rule preserves the bank) none of them do. The value is pinned in
+        # both directions — count without the chip, zero with it — because the bank it
+        # feeds is not always in the objective (a horizon's last week, a full bank), and
+        # a free variable there would let the solver leave the accounting inconsistent.
         consumed = model.new_int_var(
             0,
             optimization_config.squad_size,
@@ -302,6 +303,7 @@ def _build_model(
         if wildcard is not None and transfer_config.wildcard_preserves_free_transfers:
             model.add(consumed >= transfer_count - optimization_config.squad_size * wildcard)
             model.add(consumed <= transfer_count)
+            model.add(consumed <= optimization_config.squad_size * (1 - wildcard))
         else:
             model.add(consumed == transfer_count)
         free_unused = model.new_int_var(
@@ -452,19 +454,27 @@ def _add_tiebreak(
         + max_squad_rank_sum
     )
     chip_count = sum(len(week) for week in artifacts.chip_vars)
-    if conservative_bound * (chip_count + 2) > CP_SAT_SAFE_INTEGER_MAX:
+    week_count = len(artifacts.players_by_week)
+    # Two chip tiers sit above every rank term. First: among plans with equal objective,
+    # keep chips unplayed — a chip that buys nothing on paper is worth more later.
+    # Second: among plans that play the same number of chips, play them later — a
+    # rolling planner re-decides a deferred chip next week with fresher information,
+    # and committing it early buys nothing on paper. The tiers are weighted so the
+    # count always decides before the timing, and the timing before any rank term.
+    later_weight = conservative_bound + 1
+    later_bound = later_weight * max(0, week_count - 1) * chip_count + conservative_bound
+    count_weight = later_bound + 1
+    if count_weight * chip_count + later_bound > CP_SAT_SAFE_INTEGER_MAX:
         raise SolverExecutionError(
             "Transfer-plan deterministic tie-break exceeds the safe CP-SAT integer range."
         )
     artifacts.model.add(artifacts.primary_objective == primary_value)
     terms: list[cp_model.LinearExpr] = []
     player_count = len(artifacts.players_by_week[0])
-    # Among plans with equal objective, keep chips unplayed: a chip that buys nothing
-    # on paper is worth more later. Weighted above every rank term so it decides first.
-    chip_weight = conservative_bound + 1
-    for week_chips in artifacts.chip_vars:
+    for week_index, week_chips in enumerate(artifacts.chip_vars):
+        weight = count_weight + later_weight * (week_count - 1 - week_index)
         for name in sorted(week_chips):
-            terms.append(chip_weight * week_chips[name])
+            terms.append(weight * week_chips[name])
     for week_index in range(len(artifacts.players_by_week)):
         for player_index in range(player_count):
             rank = week_index * player_count + player_index

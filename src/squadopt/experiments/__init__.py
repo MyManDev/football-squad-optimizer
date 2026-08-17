@@ -86,6 +86,16 @@ from squadopt.experiments.scenario_policy_objective import (
     ScenarioPolicyObjective,
     ScenarioPolicyObjectiveConfig,
 )
+from squadopt.experiments.season_chain import (
+    CHIP_POLICIES,
+    SEASON_CHAIN_CONTRACT_VERSION,
+    ChipWindowRule,
+    SeasonChain,
+    SeasonChainConfig,
+    SeasonChainResult,
+    SeasonChainWeek,
+    sell_price_tenths,
+)
 from squadopt.experiments.selection_optimism import (
     SELECTION_OPTIMISM_CONTRACT_VERSION,
     SelectionOptimismResult,
@@ -94,6 +104,7 @@ from squadopt.experiments.selection_optimism import (
 from squadopt.experiments.statistics import season_aware_moving_block_interval
 
 __all__ = [
+    "CHIP_POLICIES",
     "CONTROL_CANDIDATE_LABEL",
     "CONTROL_MODEL_NAME",
     "CONTROL_TRAINING_CONTRACT_VERSION",
@@ -112,10 +123,12 @@ __all__ = [
     "SCENARIO_POLICY_FACTOR_NAMES",
     "SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
+    "SEASON_CHAIN_CONTRACT_VERSION",
     "SELECTION_OPTIMISM_CONTRACT_VERSION",
     "SHRINKAGE_RULE_VERSION",
     "BaselinePolicyObjective",
     "CandidateAssessment",
+    "ChipWindowRule",
     "ExperimentCandidate",
     "ExperimentConfigurationError",
     "ExperimentError",
@@ -142,6 +155,10 @@ __all__ = [
     "ScenarioPolicyObjectiveConfig",
     "ScreeningExperimentConfig",
     "ScreeningExperimentResult",
+    "SeasonChain",
+    "SeasonChainConfig",
+    "SeasonChainResult",
+    "SeasonChainWeek",
     "SelectionOptimismResult",
     "audit_scenario_calibration",
     "build_control_residual_table",
@@ -160,6 +177,7 @@ __all__ = [
     "screening_result_to_dict",
     "screening_result_to_markdown",
     "season_aware_moving_block_interval",
+    "sell_price_tenths",
     "shrink_projections",
     "summarize_search_efficiency",
 ]

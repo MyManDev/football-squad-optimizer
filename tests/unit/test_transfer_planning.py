@@ -492,6 +492,25 @@ def test_a_forced_chip_is_played_where_it_is_forced(
     assert result.chips_played == {1: "bboost"}
 
 
+def test_a_chip_worth_the_same_in_every_week_is_played_in_the_last(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """Tie-break: equal value now or later, the planner defers.
+
+    A rolling planner re-decides a deferred chip next week with fresher information;
+    committing it early buys nothing on paper. DEF_A is worth 4 on the bench in both
+    weeks, so a bench boost is worth the same in either.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    result = optimize_transfer_plan(
+        horizon, OPTIMAL_INITIAL, small_config, chips=ChipAvailability({"bboost": {1, 2}})
+    )
+
+    assert result.chips_played == {2: "bboost"}
+
+
 def test_a_chip_that_buys_nothing_is_kept(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,
