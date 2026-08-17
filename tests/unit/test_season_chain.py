@@ -193,11 +193,43 @@ def test_the_hybrid_policy_reserves_only_the_bench_boost() -> None:
     assert result.diagnostics["chip_policy"] == "hybrid"
 
 
-def test_free_hit_is_refused_in_chip_windows() -> None:
+def test_unknown_chips_and_inverted_windows_are_refused() -> None:
     with pytest.raises(ExperimentConfigurationError, match="Unknown chip"):
-        ChipWindowRule("freehit", 1, 38)
+        ChipWindowRule("assistant_manager", 1, 38)
     with pytest.raises(ExperimentConfigurationError, match="may not end before"):
         ChipWindowRule("bboost", 5, 4)
+
+
+def test_a_free_hit_reverts_the_held_squad_and_reports_its_gain() -> None:
+    """Gameweek 4 blanks team 6 and doubles team 1: a structured week, so under the
+    reservation policy the free hit is offered there and only there. Fielding a
+    temporary squad in it, the squad held afterwards is the squad held before, and the
+    chip's gain is measured against the same decision made without it."""
+
+    reserved = _run(
+        lookahead=1,
+        chip_windows=(ChipWindowRule("freehit", 2, 8),),
+        chip_policy="double_gameweeks_only",
+    )
+    for week in reserved.weeks:
+        for planned_week, name in week.planned_chips.items():
+            if name == "freehit":
+                assert planned_week == 4
+
+    result = _run(lookahead=1, chip_windows=(ChipWindowRule("freehit", 4, 4),))
+    played = [week for week in result.weeks if week.chip == "freehit"]
+    assert [week.gameweek for week in played] == [4]
+    week = played[0]
+    before = next(w for w in result.weeks if w.gameweek == 3)
+    assert set(week.squad_player_ids) == set(before.squad_player_ids)
+    assert week.bank_after_tenths == before.bank_after_tenths
+    assert week.transfer_hit_points == 0.0
+    assert week.chip_counterfactual_net_points is not None
+    assert result.chip_realized_gains["freehit"] == pytest.approx(
+        week.net_points - week.chip_counterfactual_net_points
+    )
+    after = next(w for w in result.weeks if w.gameweek == 5)
+    assert after.free_transfers_before == week.free_transfers_after
 
 
 @pytest.mark.parametrize(

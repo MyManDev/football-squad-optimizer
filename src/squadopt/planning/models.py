@@ -15,11 +15,13 @@ from squadopt.optimization import SolverStatus
 from squadopt.optimization.config import POSITIONS
 
 PLANNING_HORIZON_CONTRACT_VERSION: Final = "planning_horizon_v1"
-TRANSFER_PLANNING_CONTRACT_VERSION: Final = "deterministic_transfer_planning_v1"
-# The chips this planner models. Free hit is deliberately absent: it makes one week's
-# squad temporary and restores the previous one, which breaks the state chain every
-# other constraint relies on, and it belongs to a later contract version.
+TRANSFER_PLANNING_CONTRACT_VERSION: Final = "deterministic_transfer_planning_v2"
+# The chips this planner models. Free hit arrived with contract v2: it makes one week's
+# squad temporary and restores the previous squad and bank the week after, which the
+# model carries as a per-week "base" state that reverts under the chip.
 CHIP_NAMES_V1: Final = ("bboost", "3xc", "wildcard")
+CHIP_NAMES_V2: Final = ("bboost", "3xc", "wildcard", "freehit")
+CHIP_NAMES: Final = CHIP_NAMES_V2
 PLANNING_HORIZON_COLUMNS: Final = (
     "gameweek",
     "player_id",
@@ -291,9 +293,9 @@ class ChipAvailability:
     def __post_init__(self) -> None:
         available: dict[str, frozenset[int]] = {}
         for name, gameweeks in dict(self.available).items():
-            if name not in CHIP_NAMES_V1:
+            if name not in CHIP_NAMES:
                 raise TransferPlanningValidationError(
-                    f"Unknown chip {name!r}; this planner models {CHIP_NAMES_V1!r}."
+                    f"Unknown chip {name!r}; this planner models {CHIP_NAMES!r}."
                 )
             weeks = frozenset(_state_integer(week, f"{name} gameweek", 1) for week in gameweeks)
             if weeks:
@@ -301,7 +303,7 @@ class ChipAvailability:
         forced: dict[int, str] = {}
         for week, name in dict(self.forced).items():
             gameweek = _state_integer(week, "forced chip gameweek", 1)
-            if name not in CHIP_NAMES_V1:
+            if name not in CHIP_NAMES:
                 raise TransferPlanningValidationError(f"Unknown forced chip {name!r}.")
             if gameweek not in available.get(name, frozenset()):
                 raise TransferPlanningValidationError(
@@ -383,7 +385,7 @@ class TransferPlanningConfig:
         )
         holding: dict[str, float] = {}
         for name, value in dict(self.chip_holding_value_points).items():
-            if name not in CHIP_NAMES_V1:
+            if name not in CHIP_NAMES:
                 raise TransferPlanningConfigurationError(
                     f"chip_holding_value_points names unknown chip {name!r}."
                 )
@@ -470,7 +472,7 @@ class PlanningWeekResult:
     chip: str | None = None
 
     def __post_init__(self) -> None:
-        if self.chip is not None and self.chip not in CHIP_NAMES_V1:
+        if self.chip is not None and self.chip not in CHIP_NAMES:
             raise TransferPlanningValidationError(f"Unknown chip {self.chip!r} on a week result.")
         for name in ("selected_squad", "starting_xi", "bench", "transfers_in", "transfers_out"):
             value = getattr(self, name)
@@ -501,7 +503,7 @@ class TransferPlanResult:
         if self.contract_version != TRANSFER_PLANNING_CONTRACT_VERSION:
             raise TransferPlanningValidationError("Unsupported transfer plan contract_version.")
         played = {int(week): str(name) for week, name in dict(self.chips_played).items()}
-        if any(name not in CHIP_NAMES_V1 for name in played.values()):
+        if any(name not in CHIP_NAMES for name in played.values()):
             raise TransferPlanningValidationError("chips_played names an unknown chip.")
         object.__setattr__(self, "chips_played", MappingProxyType(played))
         if not isinstance(self.solver_status, SolverStatus):

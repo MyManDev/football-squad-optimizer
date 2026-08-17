@@ -68,7 +68,7 @@ from squadopt.live import (
     summary_markdown,
 )
 from squadopt.optimization import OptimizationConfig
-from squadopt.planning import CHIP_NAMES_V1
+from squadopt.planning import CHIP_NAMES as PLANNER_CHIP_NAMES
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
@@ -98,7 +98,7 @@ def _parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--chip",
-        choices=sorted(set(CHIP_NAMES) & set(CHIP_NAMES_V1)),
+        choices=sorted(set(CHIP_NAMES) & set(PLANNER_CHIP_NAMES)),
         help="decide, gameweek 2 onward: play this chip now (refused outside its window "
         "or if already spent inside it)",
     )
@@ -255,7 +255,7 @@ def _verify_transfers(recommendation: Recommendation, held: HeldSquad | None) ->
         failures.append(f"The bank after transfers is {transfers.bank_after_tenths} tenths.")
     expected_paid = (
         0
-        if transfers.chip == "wildcard"
+        if transfers.chip in {"wildcard", "freehit"}
         else max(0, transfers.transfer_count - transfers.free_transfers_before)
     )
     if transfers.paid_transfer_count != expected_paid:

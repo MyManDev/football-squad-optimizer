@@ -365,21 +365,39 @@ def held_squad_from_ledger(
         )
     entry = matched[0]
     decision = entry.decision
+    block = decision.get("transfers")
+    free_hit_played = isinstance(block, Mapping) and block.get("chip") == "freehit"
+    if free_hit_played:
+        # A free hit's squad was temporary: the squad, bank, and purchase prices held
+        # are the ones the free-hit week started from — the entry before it — while
+        # the free transfers carried are the free-hit week's own.
+        assert isinstance(block, Mapping)
+        free = int(str(block["free_transfers_after"]))
+        earlier_entries = [candidate for candidate in entries if candidate.gameweek == previous - 1]
+        if not earlier_entries:
+            raise LedgerError(
+                f"GW{previous} was a free-hit week; the squad it started from is GW"
+                f"{previous - 1}'s, which the ledger does not hold."
+            )
+        entry = earlier_entries[0]
+        decision = entry.decision
+        block = decision.get("transfers")
     squad_ids = decision["squad_player_ids"]
     if not isinstance(squad_ids, list):
         raise LedgerError("Ledger decision squad_player_ids is not a list.")
     squad = tuple(int(value) for value in squad_ids)
-    block = decision.get("transfers")
     if isinstance(block, Mapping):
         purchase = {
             int(player): int(price) for player, price in dict(block["purchase_prices"]).items()
         }
         bank = int(str(block["bank_after_tenths"]))
-        free = int(str(block["free_transfers_after"]))
+        if not free_hit_played:
+            free = int(str(block["free_transfers_after"]))
     else:
         purchase = _purchase_prices_from_entry(entry, squad)
         bank = int(budget_tenths) - int(str(decision["total_cost_tenths"]))
-        free = FREE_TRANSFERS_AFTER_OPENING
+        if not free_hit_played:
+            free = FREE_TRANSFERS_AFTER_OPENING
     chips: dict[str, list[int]] = {}
     for earlier in entries:
         if earlier.gameweek > previous:
@@ -390,7 +408,7 @@ def held_squad_from_ledger(
             chips.setdefault(str(chip), []).append(int(earlier.gameweek))
     return HeldSquad(
         season=season,
-        decided_gameweek=entry.gameweek,
+        decided_gameweek=previous,
         squad_player_ids=squad,
         purchase_prices=purchase,
         bank_tenths=bank,

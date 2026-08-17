@@ -239,6 +239,8 @@ def _build_model(
     )
 
     squad_vars: list[list[cp_model.IntVar]] = []
+    base_squad_vars: list[list[cp_model.LinearExpr | int]] = []
+    base_bank_vars: list[cp_model.LinearExpr | int] = []
     starter_vars: list[list[cp_model.IntVar]] = []
     captain_vars: list[list[cp_model.IntVar]] = []
     transfer_in_vars: list[list[cp_model.IntVar]] = []
@@ -278,16 +280,32 @@ def _build_model(
             captains,
             enforce_budget=False,
         )
+        free_hit = chip_vars[week_index].get("freehit")
+        bases: list[cp_model.LinearExpr | int] = []
         for player_index, player_id in enumerate(players["player_id"]):
             previous: cp_model.LinearExpr | int
             if week_index == 0:
                 previous = int(player_id in initial_ids)
             else:
-                previous = squad_vars[week_index - 1][player_index]
+                previous = base_squad_vars[week_index - 1][player_index]
             model.add(
                 squads[player_index]
                 == previous + transfers_in[player_index] - transfers_out[player_index]
             )
+            # The squad the next week starts from: this week's squad, or — under a free
+            # hit, which makes this week's squad temporary — the squad this week started
+            # from. A Boolean base variable pinned to one or the other by the chip.
+            base: cp_model.LinearExpr | int
+            if free_hit is None:
+                base = squads[player_index]
+            else:
+                base_var = model.new_bool_var(f"base_gw{gameweek}_{player_index}")
+                model.add(base_var >= squads[player_index] - free_hit)
+                model.add(base_var <= squads[player_index] + free_hit)
+                model.add(base_var >= previous - (1 - free_hit))
+                model.add(base_var <= previous + (1 - free_hit))
+                base = base_var
+            bases.append(base)
             model.add(transfers_in[player_index] + transfers_out[player_index] <= 1)
 
         transfer_count = model.new_int_var(
@@ -306,12 +324,17 @@ def _build_model(
         else:
             model.add(free_before == free_next_vars[week_index - 1])
         wildcard = chip_vars[week_index].get("wildcard")
-        # Transfer discipline: a hard cap on moves per gameweek, lifted under a wildcard,
-        # which rebuilds by definition.
+        # A free hit rebuilds for one week as a wildcard does; both lift the cap, cost
+        # no hits, and (per the flag) leave the free-transfer bank alone.
+        rebuild_vars = [chip for chip in (wildcard, free_hit) if chip is not None]
+        rebuild: cp_model.LinearExpr | int = (
+            cp_model.LinearExpr.sum(rebuild_vars) if rebuild_vars else 0
+        )
+        # Transfer discipline: a hard cap on moves per gameweek, lifted under a rebuild.
         cap = transfer_config.max_transfers_per_gameweek
         if cap is not None:
-            if wildcard is not None:
-                model.add(transfer_count <= cap + optimization_config.squad_size * wildcard)
+            if rebuild_vars:
+                model.add(transfer_count <= cap + optimization_config.squad_size * rebuild)
             else:
                 model.add(transfer_count <= cap)
         # Transfers that draw on the free-transfer bank this week. Under a wildcard
@@ -324,10 +347,10 @@ def _build_model(
             optimization_config.squad_size,
             f"free_consumed_gw{gameweek}",
         )
-        if wildcard is not None and transfer_config.wildcard_preserves_free_transfers:
-            model.add(consumed >= transfer_count - optimization_config.squad_size * wildcard)
+        if rebuild_vars and transfer_config.wildcard_preserves_free_transfers:
+            model.add(consumed >= transfer_count - optimization_config.squad_size * rebuild)
             model.add(consumed <= transfer_count)
-            model.add(consumed <= optimization_config.squad_size * (1 - wildcard))
+            model.add(consumed <= optimization_config.squad_size * (1 - rebuild))
         else:
             model.add(consumed == transfer_count)
         free_unused = model.new_int_var(
@@ -356,10 +379,10 @@ def _build_model(
         # Inequality form: paid transfers carry a negative objective weight, so the
         # solver takes the smallest value the bounds allow — max(count - free, 0)
         # without a wildcard, zero under one.
-        if wildcard is not None:
+        if rebuild_vars:
             model.add(
                 paid_transfers
-                >= transfer_count - free_before - optimization_config.squad_size * wildcard
+                >= transfer_count - free_before - optimization_config.squad_size * rebuild
             )
         else:
             model.add(paid_transfers >= transfer_count - free_before)
@@ -369,7 +392,7 @@ def _build_model(
         if week_index == 0:
             bank_before = initial_state.bank_tenths
         else:
-            bank_before = bank_after_vars[week_index - 1]
+            bank_before = base_bank_vars[week_index - 1]
         sell_prices = [int(value) for value in players["sell_price_tenths"]]
         buy_prices = [int(value) for value in players["buy_price_tenths"]]
         model.add(
@@ -421,6 +444,19 @@ def _build_model(
                 model.add(tripled <= captains[player_index])
                 objective_terms.append(discount_weight * captain_coefficient * tripled)
 
+        # The bank the next week starts from reverts with the squad under a free hit.
+        base_bank: cp_model.LinearExpr | int
+        if free_hit is None:
+            base_bank = bank_after
+        else:
+            base_bank_var = model.new_int_var(0, bank_bound, f"base_bank_gw{gameweek}")
+            model.add(base_bank_var >= bank_after - bank_bound * free_hit)
+            model.add(base_bank_var <= bank_after + bank_bound * free_hit)
+            model.add(base_bank_var >= bank_before - bank_bound * (1 - free_hit))
+            model.add(base_bank_var <= bank_before + bank_bound * (1 - free_hit))
+            base_bank = base_bank_var
+        base_squad_vars.append(bases)
+        base_bank_vars.append(base_bank)
         squad_vars.append(squads)
         starter_vars.append(starters)
         captain_vars.append(captains)
@@ -591,6 +627,8 @@ def _extract_plan(
         bank_after = int(solver.value(artifacts.bank_after_vars[week_index]))
         if bank_after != bank_before + sold - bought or bank_after < 0:
             raise SolverExecutionError("Transfer-plan bank accounting failed verification.")
+        base_squad = previous_squad
+        base_bank = bank_before
         transfer_count = int(solver.value(artifacts.transfer_count_vars[week_index]))
         paid_count = int(solver.value(artifacts.paid_transfer_vars[week_index]))
         free_before = int(solver.value(artifacts.free_before_vars[week_index]))
@@ -604,7 +642,7 @@ def _extract_plan(
         if len(played) > 1:
             raise SolverExecutionError("More than one chip was played in a single gameweek.")
         chip = played[0] if played else None
-        wildcard_played = chip == "wildcard"
+        wildcard_played = chip in {"wildcard", "freehit"}
         expected_paid = 0 if wildcard_played else max(0, transfer_count - free_before)
         if transfer_count != len(transfer_in_indices) or paid_count != expected_paid:
             raise SolverExecutionError("Transfer counts failed verification.")
@@ -668,8 +706,10 @@ def _extract_plan(
                 chip=chip,
             )
         )
-        previous_squad = squad_ids
-        bank_before = bank_after
+        # A free hit's squad and bank are temporary: the next week starts from the
+        # squad and bank this week started from.
+        previous_squad = base_squad if chip == "freehit" else squad_ids
+        bank_before = base_bank if chip == "freehit" else bank_after
         total_score += projected_score
         total_bench += projected_bench
         total_hits += hit_points

@@ -29,7 +29,7 @@ from squadopt.live.recommendation import Projection, RecommendationInputs
 from squadopt.live.rules import SeasonRules, chip_availability_for
 from squadopt.optimization import OptimizationConfig
 from squadopt.planning import (
-    CHIP_NAMES_V1,
+    CHIP_NAMES,
     ChipAvailability,
     InitialSquadState,
     PlanningHorizon,
@@ -114,7 +114,7 @@ class TransferDecision:
     contract_version: str = LEDGER_TRANSFERS_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
-        if self.chip is not None and self.chip not in CHIP_NAMES_V1:
+        if self.chip is not None and self.chip not in CHIP_NAMES:
             raise DataSourceError(f"Unknown chip {self.chip!r} on a transfer decision.")
         if not math.isfinite(float(self.transfer_hit_points)) or self.transfer_hit_points < 0:
             raise DataSourceError("transfer_hit_points must be finite and non-negative.")
@@ -187,9 +187,9 @@ def _chip_availability(
 
     if chip is None:
         return None
-    if chip not in CHIP_NAMES_V1:
+    if chip not in CHIP_NAMES:
         raise DataSourceError(
-            f"Chip {chip!r} is not one the live path can play; it plays {CHIP_NAMES_V1!r}."
+            f"Chip {chip!r} is not one the live path can play; it plays {CHIP_NAMES!r}."
         )
     offered = chip_availability_for(rules, (gameweek,), used=held.chips_used)
     if gameweek not in offered.gameweeks_for(chip):

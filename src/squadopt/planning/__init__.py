@@ -8,7 +8,9 @@ from squadopt.planning.horizon import (
     to_planning_horizon,
 )
 from squadopt.planning.models import (
+    CHIP_NAMES,
     CHIP_NAMES_V1,
+    CHIP_NAMES_V2,
     PLANNING_HORIZON_COLUMNS,
     PLANNING_HORIZON_CONTRACT_VERSION,
     TRANSFER_PLANNING_CONTRACT_VERSION,
@@ -26,7 +28,9 @@ from squadopt.planning.optimizer import optimize_transfer_plan
 from squadopt.planning.pricing import sell_price_tenths
 
 __all__ = [
+    "CHIP_NAMES",
     "CHIP_NAMES_V1",
+    "CHIP_NAMES_V2",
     "PLANNING_HORIZON_COLUMNS",
     "PLANNING_HORIZON_CONTRACT_VERSION",
     "PROJECTION_HORIZON_COLUMNS",

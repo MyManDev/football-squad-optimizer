@@ -118,6 +118,7 @@ CHIPS: list[dict[str, Any]] = [
     {"name": "bboost", "number": 1, "start_event": 1, "stop_event": 19, "chip_type": "team"},
     {"name": "3xc", "number": 1, "start_event": 20, "stop_event": 38, "chip_type": "team"},
     {"name": "wildcard", "number": 1, "start_event": 1, "stop_event": 19, "chip_type": "transfer"},
+    {"name": "freehit", "number": 1, "start_event": 1, "stop_event": 19, "chip_type": "transfer"},
 ]
 
 
@@ -533,6 +534,31 @@ def test_a_wildcard_rebuilds_without_hits_and_keeps_the_free_transfer(
     assert block["transfer_count"] >= 2
     assert block["paid_transfer_count"] == 0 and block["transfer_hit_points"] == 0.0
     assert block["free_transfers_after"] == 2  # the banked one plus the weekly accrual
+
+
+def test_a_free_hit_week_is_temporary_in_the_ledger(
+    monkeypatch: pytest.MonkeyPatch, world: dict[str, Any]
+) -> None:
+    """After a free hit the next deadline starts from the squad, bank, and purchase
+    prices the free-hit week started from; only its free transfers carry."""
+
+    gw1 = _decide_gw1(monkeypatch, world)
+    points = {int(player): 0.1 for player in gw1["squad_player_ids"][:6]}
+    assert _decide_gw2(monkeypatch, world, _handoff(world, points=points), "--chip", "freehit") == 0
+    block = json.loads(
+        (world["ledger_root"] / SEASON / "gw02" / "decision.json").read_text(encoding="utf-8")
+    )["transfers"]
+    assert block["chip"] == "freehit"
+    assert block["transfer_count"] >= 2 and block["paid_transfer_count"] == 0
+
+    held = held_squad_from_ledger(
+        world["ledger_root"], SEASON, before_gameweek=3, budget_tenths=1000
+    )
+    assert held.decided_gameweek == 2
+    assert set(held.squad_player_ids) == set(gw1["squad_player_ids"])
+    assert held.bank_tenths == 1000 - int(gw1["total_cost_tenths"])
+    assert held.free_transfers == block["free_transfers_after"]
+    assert held.chips_used == {"freehit": (2,)}
 
 
 # --- settle --------------------------------------------------------------------------

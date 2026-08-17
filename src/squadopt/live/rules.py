@@ -22,7 +22,8 @@ from typing import Final
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
-from squadopt.planning import CHIP_NAMES_V1, ChipAvailability
+from squadopt.planning import CHIP_NAMES as PLANNER_CHIP_NAMES
+from squadopt.planning import ChipAvailability
 
 SEASON_RULES_CONTRACT_VERSION: Final = "season_rules_v1"
 POSITIONS: Final = ("GKP", "DEF", "MID", "FWD")
@@ -253,7 +254,8 @@ def chip_availability_for(
     A chip is available in a horizon gameweek when one of its published windows covers
     that gameweek and the chip has not already been used inside that same window
     (``used`` maps chip name to the gameweeks it was played in). Chips the planner does
-    not model — free hit — are left out rather than mapped to something else. If the
+    not model are left out rather than mapped to something else (since contract v2 it
+    models all four, free hit included). If the
     horizon crosses a window boundary the chip is available on both sides, but the
     planner plays each chip at most once per horizon; a horizon-spanning second play
     is a later concern, and it is stated here rather than silently allowed.
@@ -263,7 +265,7 @@ def chip_availability_for(
     played = {name: {int(week) for week in weeks} for name, weeks in dict(used or {}).items()}
     available: dict[str, set[int]] = {}
     for window in rules.chips:
-        if window.name not in CHIP_NAMES_V1:
+        if window.name not in PLANNER_CHIP_NAMES:
             continue
         spent = any(window.covers(week) for week in played.get(window.name, set()))
         if spent:

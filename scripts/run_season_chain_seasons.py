@@ -105,7 +105,7 @@ def _parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--chip-holding-values",
-        default="bboost=20,3xc=18,wildcard=12",
+        default="bboost=20,3xc=18,wildcard=12,freehit=15",
         help="terminal value of an unplayed chip under --chips value, points per chip",
     )
     parser.add_argument(
@@ -177,6 +177,7 @@ def chip_windows_for(season: str) -> tuple[ChipWindowRule, ...]:
         ChipWindowRule("wildcard", split + 1, 38),
         ChipWindowRule("bboost", 1, 38),
         ChipWindowRule("3xc", 1, 38),
+        ChipWindowRule("freehit", 1, 38),
     )
 
 
@@ -414,7 +415,7 @@ def _markdown(
             f"{season}: first wildcard through GW{split}"
             for season, split in dict(assumptions["first_wildcard_last_gameweek"]).items()  # type: ignore[call-overload]
         )
-        + "; one bench boost and one triple captain per season; free hit not modelled.",
+        + "; one bench boost, one triple captain, and one free hit per season.",
         "- Free-transfer bank cap per season: "
         + ", ".join(
             f"{season} {cap}"
@@ -656,7 +657,7 @@ def main() -> int:
         ),
         "sell_rule": "purchase plus half of any rise, rounded down to a tenth",
         "automatic_substitutions": False,
-        "free_hit_modelled": False,
+        "free_hit_modelled": True,
     }
     document = {
         **artifact_metadata(panel_rows=len(panel), created_utc=created_utc),

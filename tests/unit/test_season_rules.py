@@ -199,12 +199,15 @@ def test_chip_availability_follows_the_published_windows(tmp_path: Path) -> None
     rules = read_season_rules(_capture(tmp_path), season=SEASON)
 
     opening = chip_availability_for(rules, (1, 2, 3))
-    assert dict(opening.available) == {
-        "bboost": frozenset({1, 2, 3}),
-        "3xc": frozenset({1, 2, 3}),
-        "wildcard": frozenset({2, 3}),  # wildcard opens at GW2
-    }
-    assert "freehit" not in opening.available  # not modelled by this planner
+    assert opening.available["bboost"] == frozenset({1, 2, 3})
+    assert opening.available["3xc"] == frozenset({1, 2, 3})
+    assert opening.available["wildcard"] == frozenset({2, 3})  # wildcard opens at GW2
+    # Free hit is modelled since planner contract v2 and follows its own window.
+    assert opening.gameweeks_for("freehit") == frozenset(
+        week
+        for week in (1, 2, 3)
+        if any(w.covers(week) for w in rules.chips if w.name == "freehit")
+    )
 
     boundary = chip_availability_for(rules, (18, 19, 20, 21))
     assert boundary.available["bboost"] == frozenset({18, 19, 20, 21})

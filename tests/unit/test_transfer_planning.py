@@ -672,7 +672,7 @@ def test_a_wildcard_is_held_unless_the_rebuild_saves_more(
 
 def test_holding_values_are_validated_and_fingerprinted() -> None:
     with pytest.raises(TransferPlanningConfigurationError, match="unknown chip"):
-        TransferPlanningConfig(chip_holding_value_points={"freehit": 3.0})
+        TransferPlanningConfig(chip_holding_value_points={"assistant_manager": 3.0})
     with pytest.raises(TransferPlanningConfigurationError):
         TransferPlanningConfig(chip_holding_value_points={"bboost": -1.0})
     assert (
@@ -681,6 +681,81 @@ def test_holding_values_are_validated_and_fingerprinted() -> None:
             chip_holding_value_points={"bboost": 2.0}
         ).configuration_fingerprint
     )
+
+
+def test_a_free_hit_rebuilds_for_one_week_and_reverts_the_squad_and_bank(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """From the weak squad with 30 in the bank: week one on a free hit fields the optimal
+    squad at no hit; week two starts again from the weak squad and the same bank."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    weak_start = _initial("GK_B", "DEF_B", "MID_B", "FWD_B", bank_tenths=30)
+
+    result = optimize_transfer_plan(
+        horizon,
+        weak_start,
+        small_config,
+        chips=ChipAvailability({"freehit": {1}}, forced={1: "freehit"}),
+    )
+
+    first, second = result.weeks
+    assert result.chips_played == {1: "freehit"}
+    assert first.chip == "freehit"
+    assert sorted(first.selected_squad["player_id"]) == ["DEF_A", "FWD_A", "GK_A", "MID_A"]
+    assert first.transfer_count == 4 and first.paid_transfer_count == 0
+    assert first.transfer_hit_points == 0.0
+    # Week two starts from the weak squad and the pre-chip bank, free transfers kept.
+    assert set(second.transfers_out["player_id"]).issubset({"GK_B", "DEF_B", "MID_B", "FWD_B"})
+    assert second.bank_before_tenths == 30
+    assert second.free_transfers_before == 2
+    held_after_two = set(second.selected_squad["player_id"])
+    assert held_after_two == (
+        {"GK_B", "DEF_B", "MID_B", "FWD_B"} - set(second.transfers_out["player_id"])
+    ) | set(second.transfers_in["player_id"])
+
+
+def test_a_free_hit_is_played_where_the_temporary_squad_is_worth_most(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """Offered in both weeks from the optimal squad, a free hit buys nothing and is kept;
+    with a huge one-week bench-only upside it is played there."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    kept = optimize_transfer_plan(
+        horizon, OPTIMAL_INITIAL, small_config, chips=ChipAvailability({"freehit": {1, 2}})
+    )
+    assert kept.chips_played == {}
+
+    # Week two: every B player surges for one week only; fielding them takes four moves
+    # and reverting takes four more. A free hit does both for nothing.
+    table = _horizon_table(known_optimum_players, (1, 2, 3))
+    surge_rows = (table["gameweek"] == 2) & table["player_id"].str.endswith("_B")
+    table.loc[surge_rows, "expected_points"] = 30.0
+    played = optimize_transfer_plan(
+        PlanningHorizon(table),
+        OPTIMAL_INITIAL,
+        small_config,
+        chips=ChipAvailability({"freehit": {1, 2, 3}}),
+    )
+    assert played.chips_played == {2: "freehit"}
+    assert sorted(played.weeks[1].selected_squad["player_id"]) == [
+        "DEF_B",
+        "FWD_B",
+        "GK_B",
+        "MID_B",
+    ]
+    assert played.weeks[1].transfer_hit_points == 0.0
+    # Week three is back on the optimal squad without transfers or hits.
+    assert played.weeks[2].transfer_count == 0
+    assert sorted(played.weeks[2].selected_squad["player_id"]) == [
+        "DEF_A",
+        "FWD_A",
+        "GK_A",
+        "MID_A",
+    ]
 
 
 def test_a_chip_that_buys_nothing_is_kept(
@@ -704,7 +779,7 @@ def test_a_chip_that_buys_nothing_is_kept(
 @pytest.mark.parametrize(
     ("available", "forced", "message"),
     [
-        ({"freehit": {1}}, {}, "Unknown chip"),
+        ({"assistant_manager": {1}}, {}, "Unknown chip"),
         ({"bboost": {1}}, {2: "bboost"}, "not available there"),
         ({"bboost": {1}}, {1: "3xc"}, "not available there"),
         ({}, {1: "manager"}, "Unknown forced chip"),

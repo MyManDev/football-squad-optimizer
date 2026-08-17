@@ -75,7 +75,7 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--chips", default="reserve", help="one of off,on,reserve,value,hybrid")
     parser.add_argument(
         "--chip-holding-values",
-        default="bboost=20,3xc=18,wildcard=12",
+        default="bboost=20,3xc=18,wildcard=12,freehit=15",
         help="terminal value of an unplayed chip under --chips value or hybrid",
     )
     parser.add_argument("--hit-costs", default="4,6,8", help="planning hit costs (points)")

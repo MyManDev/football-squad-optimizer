@@ -13,8 +13,10 @@ Every variant of the chain shares the same protocol; only the controls differ:
 * ``lookahead`` — one is the myopic weekly baseline; more re-plans every week over the
   next ``lookahead`` decision gameweeks and applies the first week (the rolling planner).
 * ``chip_windows`` — empty means no chips; otherwise each entry offers one play of one
-  chip inside one gameweek range, and the planner decides when. Free hit is refused
-  here as it is in the planner (`CHIP_NAMES_V1`).
+  chip inside one gameweek range, and the planner decides when. Free hit (contract v2)
+  fields a temporary squad for one week; the chain reverts to the held squad, bank, and
+  purchase prices the week after, and reports the chip's realized gain against a
+  counterfactual decision made without it.
 
 Projection rule, candidate pool rule, and scoring are the rehearsal's (naive calendar
 scaling, decision-time pools, starters plus the captain again, no automatic
@@ -52,7 +54,7 @@ from squadopt.experiments.multi_gw_rehearsal import (
 from squadopt.features import CrossSeasonConfig
 from squadopt.optimization import OptimizationConfig, optimize_squad
 from squadopt.planning import (
-    CHIP_NAMES_V1,
+    CHIP_NAMES,
     ChipAvailability,
     InitialSquadState,
     PlanningHorizon,
@@ -75,9 +77,9 @@ class ChipWindowRule:
     stop_gameweek: int
 
     def __post_init__(self) -> None:
-        if self.name not in CHIP_NAMES_V1:
+        if self.name not in CHIP_NAMES:
             raise ExperimentConfigurationError(
-                f"Unknown chip {self.name!r}; the chain models {CHIP_NAMES_V1!r}."
+                f"Unknown chip {self.name!r}; the chain models {CHIP_NAMES!r}."
             )
         for name in ("start_gameweek", "stop_gameweek"):
             value = getattr(self, name)
@@ -111,7 +113,9 @@ class SeasonChainConfig:
     ``planner`` (and held by their holding values when the transfer config sets them).
     A finite horizon cannot see that the season continues past its end, so under
     ``planner`` a chip worth anything now is worth playing now; the reservation rule is
-    the cheapest stand-in for the option value the horizon cannot price."""
+    the cheapest stand-in for the option value the horizon cannot price. Under both
+    reservation policies the free hit is offered only in structured gameweeks — one
+    where some team is blank or doubles — the weeks a temporary squad is for."""
     sell_on_fee_halved: bool = True
     """Sell a squad member at purchase price plus half of any rise, rounded down to a
     tenth (the game's rule); False sells at the market price, as the windowed
@@ -227,13 +231,17 @@ class SeasonChainWeek:
     carried_blank_rows: int
     carried_unexplained_rows: int
     squad_player_ids: tuple[object, ...] = ()
-    """The squad held after this decision, for provenance and for the next week."""
+    """The squad held after this decision, for provenance and for the next week; under
+    a free hit this is the reverted squad, not the one fielded."""
+    chip_counterfactual_net_points: float | None = None
+    """For a free-hit week: what the same decision without the chip would have realized
+    net of hits, so the chip's gain is measured against it."""
 
     def __post_init__(self) -> None:
         for name in ("realized_points", "transfer_hit_points", "projected_points"):
             if not math.isfinite(float(getattr(self, name))):
                 raise ExperimentExecutionError(f"{name} must be finite.")
-        if self.chip is not None and self.chip not in CHIP_NAMES_V1:
+        if self.chip is not None and self.chip not in CHIP_NAMES:
             raise ExperimentExecutionError(f"Unknown chip {self.chip!r} on a chain week.")
         object.__setattr__(self, "planned_chips", MappingProxyType(dict(self.planned_chips)))
         object.__setattr__(self, "squad_player_ids", tuple(self.squad_player_ids))
@@ -266,6 +274,7 @@ class SeasonChainWeek:
             "carried_blank_rows": self.carried_blank_rows,
             "carried_unexplained_rows": self.carried_unexplained_rows,
             "squad_player_ids": [str(player) for player in self.squad_player_ids],
+            "chip_counterfactual_net_points": self.chip_counterfactual_net_points,
         }
 
 
@@ -337,6 +346,10 @@ class SeasonChainResult:
             elif week.chip == "wildcard":
                 avoided = max(0, week.transfer_count - week.free_transfers_before) * hit_cost
                 gains["wildcard"] = gains.get("wildcard", 0.0) + avoided
+            elif week.chip == "freehit" and week.chip_counterfactual_net_points is not None:
+                gains["freehit"] = gains.get("freehit", 0.0) + (
+                    week.net_points - week.chip_counterfactual_net_points
+                )
         return gains
 
     @property
@@ -581,6 +594,8 @@ class SeasonChain(DecisionSeason):
             weeks = {gameweek for gameweek in horizon_gameweeks if window.covers(gameweek)}
             if window.name in reserved:
                 weeks = {gameweek for gameweek in weeks if self._is_double_gameweek(gameweek)}
+            elif window.name == "freehit" and policy != "planner":
+                weeks = {gameweek for gameweek in weeks if self._is_structured_gameweek(gameweek)}
             if weeks:
                 available.setdefault(window.name, set()).update(weeks)
         return ChipAvailability(
@@ -593,6 +608,12 @@ class SeasonChain(DecisionSeason):
         return any(
             count >= 2 for (week, _), count in self._fixture_counts.items() if week == gameweek
         )
+
+    def _is_structured_gameweek(self, gameweek: int) -> bool:
+        """True when some team doubles or some team is blank in ``gameweek``."""
+
+        counts = [count for (week, _), count in self._fixture_counts.items() if week == gameweek]
+        return any(count >= 2 for count in counts) or any(count == 0 for count in counts)
 
     def _spend_chip(
         self, chip: str, gameweek: int, state: _ChainState
@@ -637,12 +658,29 @@ class SeasonChain(DecisionSeason):
         week = plan.weeks[0]
         realized = realized_points_at(self._visible_panel, self._decisions[gameweek])
         realization = realize_week(week, realized, carried_ids)
+        counterfactual_net: float | None = None
+        if week.chip == "freehit":
+            # The chip's worth is what the same decision without it would have realized.
+            without = optimize_transfer_plan(
+                horizon,
+                InitialSquadState(
+                    state.squad_ids,
+                    bank_tenths=state.bank_tenths,
+                    free_transfers=state.free_transfers,
+                ),
+                settings.frozen_optimization_config,
+                settings.frozen_transfer_config,
+                chips=None,
+            )
+            if without.has_solution:
+                plain = without.weeks[0]
+                counterfactual_net = realize_week(plain, realized, carried_ids).total(None) - (
+                    int(plain.paid_transfer_count) * settings.hit_points_charged
+                )
 
-        # Carry the state: squad, bank, free transfers, purchase prices, spent chips.
-        new_squad = tuple(week.selected_squad["player_id"].tolist())
-        purchase = dict(state.purchase_prices)
-        for player in week.transfers_out["player_id"].tolist():
-            purchase.pop(player, None)
+        # Carry the state: squad, bank, free transfers, purchase prices, spent chips. A
+        # free hit's squad is temporary: the held squad, bank, and purchase prices are
+        # what the week started from.
         buy_prices = dict(
             zip(
                 pool["player_id"].tolist(),
@@ -650,14 +688,24 @@ class SeasonChain(DecisionSeason):
                 strict=True,
             )
         )
-        for player in week.transfers_in["player_id"].tolist():
-            purchase[player] = buy_prices[player]
+        if week.chip == "freehit":
+            new_squad = tuple(state.squad_ids)
+            purchase = dict(state.purchase_prices)
+            bank_after = int(state.bank_tenths)
+        else:
+            new_squad = tuple(week.selected_squad["player_id"].tolist())
+            purchase = dict(state.purchase_prices)
+            for player in week.transfers_out["player_id"].tolist():
+                purchase.pop(player, None)
+            for player in week.transfers_in["player_id"].tolist():
+                purchase[player] = buy_prices[player]
+            bank_after = int(week.bank_after_tenths)
         used = state.used_chips
         if week.chip is not None:
             used = self._spend_chip(week.chip, gameweek, state)
         new_state = _ChainState(
             squad_ids=new_squad,
-            bank_tenths=int(week.bank_after_tenths),
+            bank_tenths=bank_after,
             free_transfers=int(week.free_transfers_for_next_gameweek),
             purchase_prices=MappingProxyType({player: purchase[player] for player in new_squad}),
             used_chips=used,
@@ -687,11 +735,12 @@ class SeasonChain(DecisionSeason):
             projected_points=float(week.projected_score),
             captain_realized_points=realization.captain_points,
             bench_realized_points=realization.bench_points,
-            bank_after_tenths=int(week.bank_after_tenths),
+            bank_after_tenths=bank_after,
             squad_sell_value_tenths=int(sell_value),
             pool_size=len(pool),
             carried_blank_rows=blank,
             carried_unexplained_rows=holes,
             squad_player_ids=new_squad,
+            chip_counterfactual_net_points=counterfactual_net,
         )
         return record, new_state
