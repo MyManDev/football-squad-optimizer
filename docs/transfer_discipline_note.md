@@ -79,6 +79,23 @@ the reservation rule, and on 2024-25 being the season it is not true.
 3. **Banked-transfer value is not worth having** at lookahead 1 (negative where
    significant) and was not measured at lookahead 3 in this run.
 
+## Addendum (2026-08-18): the cap under other projections and chip modes
+
+- **Calendar-blind control** ([transfer_discipline_blind_rolling.md](transfer_discipline_blind_rolling.md)):
+  with no fixture-count scaling the one-transfer cap is still worth **+122** a season to
+  the rolling planner (+270, +131, +147, −58; [+1.89, +5.18] per week). The finding does
+  not depend on the naive scaling.
+- **Holding-value chips** ([transfer_discipline_value_rolling.md](transfer_discipline_value_rolling.md)):
+  with chips held at their option values instead of the calendar rule, the capped rolling
+  planner reaches **1968** — +130 over its uncapped rule cell but **below** the capped
+  rolling planner under the reservation rule (2016) and below the weekly control with the
+  same holding values (2018; −81, +23, −140, 0 by season). A three-week horizon rarely sees
+  a bench remainder or a captain clear the holding values, so bench boosts go unplayed and
+  triple captains late; the calendar rule times them better for this planner. The answer to
+  "does the capped rolling planner stay ahead once chip timing is improved by the option
+  value?" is **no** — its edge over the weekly control was with the reservation rule, and
+  it stays a draw (2016 vs 2008), not a lead.
+
 ## Caveats
 
 - Four seasons; season heterogeneity is the dominant term at lookahead 1. Intervals are on
@@ -86,11 +103,12 @@ the reservation rule, and on 2024-25 being the season it is not true.
 - Naive calendar-scaling projection; the mechanism, not projection quality, is measured.
 - Rolling solves are proven optimal in 35–76% of weeks at budget 8.0 (unproven weeks are
   FEASIBLE with recorded gaps and bias the rolling planner down, not up).
-- Chip windows assumed as in the season chain; free hit not modelled; no auto-subs.
+- Chip windows assumed as in the season chain; the free hit was not in these runs (it
+  arrived with planner contract v2 afterwards); no auto-subs.
 
 ## What follows
 
 - The season chain and the discipline factorial with the operational projection once an
   in-season projection producer exists (`projection_handoff_v1` is the interface).
-- Rolling lookahead 3 with cap 1 under the chip *value* mode, and lookahead 2.
+- Lookahead 2 with the cap; the value-mode run is in the addendum above.
 - Not changing the live control's transfer settings on this evidence.

@@ -184,6 +184,26 @@ This is the case for the live in-season projection being calendar-aware: the
 opening-week control is calendar-blind by construction, and a GW2+ handoff that is not
 calendar-aware would leave both the transfer and the chip decisions half-blind.
 
+## Addendum (2026-08-18, last): the free hit
+
+Contract v2 models the free hit ([transfer_planning_spec.md](transfer_planning_spec.md)):
+one week's squad is temporary; the held squad, bank, and purchase prices return the week
+after. The chain offers it once per season, in structured gameweeks (a blank or a
+double) under the reservation policies, and scores its gain against the same decision
+made without it ([season_chain_freehit.md](season_chain_freehit.md), lookahead 1):
+
+| Policy | Without free hit | With free hit | Free-hit realized gain by season |
+| --- | ---: | ---: | --- |
+| reserve | 2008 | **2024** | +12, −15, +21, +16 (mean +8.5) |
+| hybrid | 2022 | **2035** | +16, +20, +24, +9 (mean +17) |
+
+Played where a manager plays it — 2021-22 GW25, 2022-23 GW22/25, 2023-24 GW25, 2024-25
+GW32, the seasons' big blank-and-double weeks — with 8–13 temporary moves; worth about
++9 to +17 net points a season under this projection, the smallest of the four chips and
+the only one that can come out negative (2022-23 under the reservation rule: the
+temporary squad scored 15 fewer than the held one would have). All four chips together:
+reserve **+103**, hybrid **+114** per season over no chips.
+
 ## What follows
 
 - Live path: the weekly baseline stays the operational control. Chips can be recommended
