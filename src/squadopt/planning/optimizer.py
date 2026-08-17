@@ -144,8 +144,10 @@ def _validate_integer_bounds(
     players_by_week: list[pd.DataFrame],
     initial_state: InitialSquadState,
     optimization_config: OptimizationConfig,
+    transfer_config: TransferPlanningConfig,
     discount_weights: list[int],
     hit_cost_scaled: int,
+    banked_value_scaled: int,
 ) -> int:
     objective_bound = 0
     bank_bound = initial_state.bank_tenths
@@ -162,6 +164,9 @@ def _validate_integer_bounds(
             abs(starter) + abs(captain) for _, starter, captain in coefficients
         )
         objective_bound += discount_weight * abs(hit_cost_scaled) * optimization_config.squad_size
+        objective_bound += (
+            discount_weight * abs(banked_value_scaled) * transfer_config.max_free_transfers
+        )
         largest_sell_prices = sorted(
             (int(value) for value in players["sell_price_tenths"]),
             reverse=True,
@@ -214,12 +219,18 @@ def _build_model(
         transfer_config.transfer_hit_cost_points,
         optimization_config.expected_points_scale,
     )
+    banked_value_scaled = scale_expected_points(
+        transfer_config.banked_transfer_value_points,
+        optimization_config.expected_points_scale,
+    )
     bank_bound = _validate_integer_bounds(
         players_by_week,
         initial_state,
         optimization_config,
+        transfer_config,
         discount_weights,
         hit_cost_scaled,
+        banked_value_scaled,
     )
 
     squad_vars: list[list[cp_model.IntVar]] = []
@@ -290,6 +301,14 @@ def _build_model(
         else:
             model.add(free_before == free_next_vars[week_index - 1])
         wildcard = chip_vars[week_index].get("wildcard")
+        # Transfer discipline: a hard cap on moves per gameweek, lifted under a wildcard,
+        # which rebuilds by definition.
+        cap = transfer_config.max_transfers_per_gameweek
+        if cap is not None:
+            if wildcard is not None:
+                model.add(transfer_count <= cap + optimization_config.squad_size * wildcard)
+            else:
+                model.add(transfer_count <= cap)
         # Transfers that draw on the free-transfer bank this week. Under a wildcard
         # (when the rule preserves the bank) none of them do. The value is pinned in
         # both directions — count without the chip, zero with it — because the bank it
@@ -409,6 +428,11 @@ def _build_model(
         transfer_count_vars.append(transfer_count)
         paid_transfer_vars.append(paid_transfers)
 
+    if banked_value_scaled != 0:
+        # Terminal value of free transfers banked past the horizon: what the plan is
+        # giving up by spending one now on a small gain, which a finite horizon cannot
+        # otherwise see.
+        objective_terms.append(discount_weights[-1] * banked_value_scaled * free_next_vars[-1])
     primary_objective = cp_model.LinearExpr.sum(objective_terms)
     model.maximize(primary_objective)
     return _PlanArtifacts(
@@ -639,6 +663,13 @@ def _extract_plan(
         if sum(1 for played_name in chips_played.values() if played_name == name) > 1:
             raise SolverExecutionError(f"Chip {name!r} was played more than once in the horizon.")
     diagnostics["chips_played"] = dict(chips_played)
+    terminal_value = (
+        transfer_config.banked_transfer_value_points
+        * weeks[-1].free_transfers_for_next_gameweek
+        * transfer_config.horizon_discount_factor ** (len(weeks) - 1)
+    )
+    diagnostics["terminal_banked_transfer_value"] = terminal_value
+    total_objective += terminal_value
     return TransferPlanResult(
         solver_status=status,
         weeks=tuple(weeks),

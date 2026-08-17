@@ -113,6 +113,10 @@ class SeasonChainConfig:
     """Sell a squad member at purchase price plus half of any rise, rounded down to a
     tenth (the game's rule); False sells at the market price, as the windowed
     rehearsal does."""
+    hit_points_charged: float = 4.0
+    """What the game charges per paid transfer on the realized sheet. The planner's
+    own ``transfer_config.transfer_hit_cost_points`` is a decision control — a higher
+    planning cost is a hit threshold — and may differ from what is charged."""
     cross_season_config: CrossSeasonConfig | None = None
     optimization_config: OptimizationConfig | None = None
     transfer_config: TransferPlanningConfig | None = None
@@ -146,6 +150,17 @@ class SeasonChainConfig:
             raise ExperimentConfigurationError("end_gameweek may not precede start_gameweek.")
         if not isinstance(self.sell_on_fee_halved, bool):
             raise ExperimentConfigurationError("sell_on_fee_halved must be a boolean.")
+        charged = self.hit_points_charged
+        if (
+            isinstance(charged, bool)
+            or not isinstance(charged, int | float)
+            or not math.isfinite(float(charged))
+            or float(charged) < 0.0
+        ):
+            raise ExperimentConfigurationError(
+                "hit_points_charged must be a finite non-negative number."
+            )
+        object.__setattr__(self, "hit_points_charged", float(charged))
         if self.chip_policy not in CHIP_POLICIES:
             raise ExperimentConfigurationError(f"chip_policy must be one of {CHIP_POLICIES!r}.")
         windows = tuple(self.chip_windows)
@@ -302,7 +317,7 @@ class SeasonChainResult:
         """
 
         gains: dict[str, float] = {}
-        hit_cost = float(str(self.diagnostics.get("transfer_hit_cost_points", 4.0)))
+        hit_cost = float(str(self.diagnostics.get("hit_points_charged", 4.0)))
         for week in self.weeks:
             if week.chip == "bboost":
                 gains["bboost"] = gains.get("bboost", 0.0) + week.bench_realized_points
@@ -441,7 +456,10 @@ class SeasonChain(DecisionSeason):
                     }
                     for window in settings.chip_windows
                 ],
-                "transfer_hit_cost_points": transfer_config.transfer_hit_cost_points,
+                "hit_points_charged": settings.hit_points_charged,
+                "planning_hit_cost_points": transfer_config.transfer_hit_cost_points,
+                "max_transfers_per_gameweek": transfer_config.max_transfers_per_gameweek,
+                "banked_transfer_value_points": transfer_config.banked_transfer_value_points,
                 "max_free_transfers": transfer_config.max_free_transfers,
                 "wildcard_preserves_free_transfers": (
                     transfer_config.wildcard_preserves_free_transfers
@@ -637,7 +655,7 @@ class SeasonChain(DecisionSeason):
         record = SeasonChainWeek(
             gameweek=gameweek,
             realized_points=realization.total(week.chip),
-            transfer_hit_points=float(week.transfer_hit_points),
+            transfer_hit_points=int(week.paid_transfer_count) * settings.hit_points_charged,
             transfer_count=int(week.transfer_count),
             paid_transfer_count=int(week.paid_transfer_count),
             free_transfers_before=int(week.free_transfers_before),

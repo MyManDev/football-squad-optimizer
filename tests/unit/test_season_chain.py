@@ -239,6 +239,22 @@ def test_a_squad_member_missing_without_a_blank_is_carried_and_counted(
     assert at_hole.carried_unexplained_rows == 1
 
 
+def test_a_planning_hit_cost_is_a_threshold_and_the_charge_stays_the_rule(
+    myopic: SeasonChainResult,
+) -> None:
+    from squadopt.planning import TransferPlanningConfig
+
+    strict = _run(transfer_config=TransferPlanningConfig(transfer_hit_cost_points=8.0))
+
+    paid_strict = sum(week.paid_transfer_count for week in strict.weeks)
+    paid_rule = sum(week.paid_transfer_count for week in myopic.weeks)
+    assert paid_strict <= paid_rule
+    assert strict.transfer_hit_points == 4.0 * paid_strict
+    assert strict.diagnostics["planning_hit_cost_points"] == 8.0
+    assert strict.diagnostics["hit_points_charged"] == 4.0
+    assert myopic.diagnostics["max_transfers_per_gameweek"] is None
+
+
 def test_a_lookahead_is_truncated_at_the_last_decision_gameweek() -> None:
     result = _run(lookahead=3, start_gameweek=5)
     assert [week.lookahead_gameweeks for week in result.weeks] == [3, 3, 2, 1]

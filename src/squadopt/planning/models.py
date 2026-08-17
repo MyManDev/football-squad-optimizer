@@ -347,6 +347,13 @@ class TransferPlanningConfig:
     horizon_discount_factor: float = 1.0
     objective_weight_scale: int = 1_000
     wildcard_preserves_free_transfers: bool = True
+    max_transfers_per_gameweek: int | None = None
+    """Transfer discipline: at most this many transfers in any gameweek (a wildcard
+    week is exempt); None leaves the count to the objective and the hit cost."""
+    banked_transfer_value_points: float = 0.0
+    """Terminal value of each free transfer banked past the horizon's last gameweek,
+    in points. Zero means an unused free transfer at the end is worth nothing to the
+    plan — the myopic default, which spends a free transfer on any positive gain."""
     contract_version: str = TRANSFER_PLANNING_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
@@ -358,6 +365,17 @@ class TransferPlanningConfig:
             raise TransferPlanningConfigurationError(
                 "wildcard_preserves_free_transfers must be a boolean."
             )
+        if self.max_transfers_per_gameweek is not None:
+            object.__setattr__(
+                self,
+                "max_transfers_per_gameweek",
+                _integer(self.max_transfers_per_gameweek, "max_transfers_per_gameweek", 1),
+            )
+        object.__setattr__(
+            self,
+            "banked_transfer_value_points",
+            _finite(self.banked_transfer_value_points, "banked_transfer_value_points", minimum=0.0),
+        )
         maximum = _integer(self.max_free_transfers, "max_free_transfers", 1)
         accrual = _integer(self.free_transfer_accrual, "free_transfer_accrual", 0)
         if accrual > maximum:
@@ -403,6 +421,8 @@ class TransferPlanningConfig:
             "horizon_discount_factor": float(self.horizon_discount_factor).hex(),
             "objective_weight_scale": self.objective_weight_scale,
             "wildcard_preserves_free_transfers": self.wildcard_preserves_free_transfers,
+            "max_transfers_per_gameweek": self.max_transfers_per_gameweek,
+            "banked_transfer_value_points": float(self.banked_transfer_value_points).hex(),
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
