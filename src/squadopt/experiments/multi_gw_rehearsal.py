@@ -21,6 +21,7 @@ features - so a planner win here is a conservative finding.
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from itertools import takewhile
 from types import MappingProxyType
 from typing import Final
 
@@ -69,6 +70,11 @@ class MultiGwRehearsalConfig:
     cross_season_config: CrossSeasonConfig | None = None
     optimization_config: OptimizationConfig | None = None
     transfer_config: TransferPlanningConfig | None = None
+    rolling_replan: bool = False
+    """Also run the planner as a rolling horizon: re-plan every week with the same
+    horizon length on that week's fresh projection, apply only the first week's
+    decision, and carry the state. This is the comparison a live planner faces; the
+    one-shot plan is what a plan made once and followed looks like."""
 
     def __post_init__(self) -> None:
         if not isinstance(self.season, str) or not self.season.strip():
@@ -85,6 +91,8 @@ class MultiGwRehearsalConfig:
                 raise ExperimentConfigurationError(
                     f"{name} must be an integer of at least {minimum}."
                 )
+        if not isinstance(self.rolling_replan, bool):
+            raise ExperimentConfigurationError("rolling_replan must be a boolean.")
         if self.cross_season_config is None:
             object.__setattr__(self, "cross_season_config", CrossSeasonConfig())
         if self.optimization_config is None:
@@ -121,6 +129,8 @@ class RehearsalWindowResult:
     candidate_pool_size: int
     horizon_fingerprint: str
     diagnostics: Mapping[str, object]
+    rolling_realized_points: float | None = None
+    rolling_transfer_hit_points: float | None = None
 
     def __post_init__(self) -> None:
         for name in (
@@ -130,6 +140,14 @@ class RehearsalWindowResult:
             "myopic_transfer_hit_points",
         ):
             if not math.isfinite(float(getattr(self, name))):
+                raise ExperimentExecutionError(f"{name} must be finite.")
+        if (self.rolling_realized_points is None) != (self.rolling_transfer_hit_points is None):
+            raise ExperimentExecutionError(
+                "rolling_realized_points and rolling_transfer_hit_points come together."
+            )
+        for name in ("rolling_realized_points", "rolling_transfer_hit_points"):
+            value = getattr(self, name)
+            if value is not None and not math.isfinite(float(value)):
                 raise ExperimentExecutionError(f"{name} must be finite.")
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
@@ -150,6 +168,21 @@ class RehearsalWindowResult:
         """Return planner-minus-myopic net realized points for the window."""
 
         return self.planned_net_points - self.myopic_net_points
+
+    @property
+    def rolling_net_points(self) -> float | None:
+        """Return the rolling planner's realized total after hits, when it was run."""
+
+        if self.rolling_realized_points is None or self.rolling_transfer_hit_points is None:
+            return None
+        return self.rolling_realized_points - self.rolling_transfer_hit_points
+
+    @property
+    def rolling_advantage_points(self) -> float | None:
+        """Return rolling-planner-minus-myopic net realized points, when it was run."""
+
+        rolling = self.rolling_net_points
+        return None if rolling is None else rolling - self.myopic_net_points
 
 
 def _score_week(
@@ -183,6 +216,26 @@ def _score_week(
             f"Realized points do not cover selected players: {missing[:5]!r}."
         )
     return sum(points.get(player, 0.0) for player in starters) + points.get(captain, 0.0)
+
+
+def _relative_gap(diagnostics: Mapping[str, object]) -> float | None:
+    """The solver's relative optimality gap, or None when the solve was proven."""
+
+    value = diagnostics.get("relative_optimality_gap")
+    if value is None:
+        return None
+    gap = float(str(value))
+    return gap if math.isfinite(gap) else None
+
+
+@dataclass(frozen=True, slots=True)
+class _RollingOutcome:
+    realized_points: float
+    hit_points: float
+    transfers: tuple[int, ...]
+    statuses: tuple[str, ...]
+    lookahead_lengths: tuple[int, ...]
+    relative_gaps: tuple[float | None, ...]
 
 
 class MultiGwRehearsal:
@@ -357,7 +410,27 @@ class MultiGwRehearsal:
                 f"The planner found no feasible plan for window {gameweeks!r}."
             )
         planned_points, planned_hits = self._score_plan(plan, pool, gameweeks)
-        myopic_points, myopic_hits = self._score_myopic(pool, initial_state, gameweeks)
+        myopic = self._score_rolling(pool, initial_state, gameweeks, lookahead=1)
+        diagnostics: dict[str, object] = {
+            "projection_rule": NAIVE_PROJECTION_RULE,
+            "planner_transfers": [week.transfer_count for week in plan.weeks],
+            "planner_solver_status": plan.solver_status.value,
+            "planner_relative_gap": _relative_gap(plan.diagnostics),
+            "myopic_transfers": list(myopic.transfers),
+            "myopic_solver_statuses": list(myopic.statuses),
+            "myopic_relative_gaps": list(myopic.relative_gaps),
+        }
+        rolling_points: float | None = None
+        rolling_hits: float | None = None
+        if settings.rolling_replan:
+            rolling = self._score_rolling(
+                pool, initial_state, gameweeks, lookahead=settings.horizon_length
+            )
+            rolling_points, rolling_hits = rolling.realized_points, rolling.hit_points
+            diagnostics["rolling_transfers"] = list(rolling.transfers)
+            diagnostics["rolling_solver_statuses"] = list(rolling.statuses)
+            diagnostics["rolling_relative_gaps"] = list(rolling.relative_gaps)
+            diagnostics["rolling_lookahead_gameweeks"] = list(rolling.lookahead_lengths)
 
         return RehearsalWindowResult(
             season=settings.season,
@@ -365,14 +438,13 @@ class MultiGwRehearsal:
             gameweeks=gameweeks,
             planned_realized_points=planned_points,
             planned_transfer_hit_points=planned_hits,
-            myopic_realized_points=myopic_points,
-            myopic_transfer_hit_points=myopic_hits,
+            myopic_realized_points=myopic.realized_points,
+            myopic_transfer_hit_points=myopic.hit_points,
             candidate_pool_size=len(pool),
             horizon_fingerprint=horizon.horizon_fingerprint,
-            diagnostics={
-                "projection_rule": NAIVE_PROJECTION_RULE,
-                "planner_transfers": [week.transfer_count for week in plan.weeks],
-            },
+            diagnostics=diagnostics,
+            rolling_realized_points=rolling_points,
+            rolling_transfer_hit_points=rolling_hits,
         )
 
     def _score_plan(
@@ -421,34 +493,72 @@ class MultiGwRehearsal:
             .reset_index(drop=True)
         )
 
-    def _score_myopic(
+    def _score_rolling(
         self,
         pool: pd.DataFrame,
         initial_state: InitialSquadState,
         gameweeks: tuple[int, ...],
-    ) -> tuple[float, float]:
+        *,
+        lookahead: int,
+    ) -> _RollingOutcome:
+        """Decide week by week with a fresh projection and a ``lookahead``-week horizon.
+
+        ``lookahead=1`` is the myopic baseline. A longer lookahead re-plans every week
+        over the next ``lookahead`` decision gameweeks (truncated at the season's last
+        one), applies only the first week's decision, and carries the state forward —
+        the rolling-horizon planner a live user would actually run. Future weeks in
+        each horizon are the fresh projection scaled by their fixture counts, exactly as
+        the one-shot plan scales the window's opening projection.
+        """
+
         state = initial_state
         total = 0.0
         hits = 0.0
+        transfers: list[int] = []
+        statuses: list[str] = []
+        lengths: list[int] = []
+        gaps: list[float | None] = []
+        available = self.available_gameweeks
         for gameweek in gameweeks:
+            # The horizon is the consecutive run of decision gameweeks ahead: a
+            # gameweek the season never played (2022-23 GW7) ends the lookahead
+            # rather than being skipped, because a projection horizon must be
+            # consecutive and a postponed round is not a blank.
+            horizon_gameweeks = tuple(
+                takewhile(
+                    lambda candidate: candidate in available, range(gameweek, gameweek + lookahead)
+                )
+            )
             week_pool = self._myopic_week_pool(pool, gameweek)
             plan = optimize_transfer_plan(
-                to_planning_horizon(self._naive_horizon(week_pool, (gameweek,))),
+                to_planning_horizon(self._naive_horizon(week_pool, horizon_gameweeks)),
                 state,
                 self._settings.frozen_optimization_config,
                 self._settings.frozen_transfer_config,
             )
             if not plan.has_solution:
                 raise ExperimentExecutionError(
-                    f"The myopic baseline found no feasible week at gameweek {gameweek}."
+                    f"The rolling planner (lookahead {lookahead}) found no feasible week "
+                    f"at gameweek {gameweek}."
                 )
             week = plan.weeks[0]
             realized = realized_points_at(self._visible_panel, self._decisions[gameweek])
             total += _score_week(week, realized, self._blank_players(pool, gameweek))
             hits += float(week.transfer_hit_points)
+            transfers.append(int(week.transfer_count))
+            statuses.append(plan.solver_status.value)
+            lengths.append(len(horizon_gameweeks))
+            gaps.append(_relative_gap(plan.diagnostics))
             state = InitialSquadState(
                 tuple(week.selected_squad["player_id"].tolist()),
                 bank_tenths=int(week.bank_after_tenths),
                 free_transfers=int(week.free_transfers_for_next_gameweek),
             )
-        return total, hits
+        return _RollingOutcome(
+            realized_points=total,
+            hit_points=hits,
+            transfers=tuple(transfers),
+            statuses=tuple(statuses),
+            lookahead_lengths=tuple(lengths),
+            relative_gaps=tuple(gaps),
+        )

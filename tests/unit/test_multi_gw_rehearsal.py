@@ -16,6 +16,8 @@ from squadopt.experiments import (
     MultiGwRehearsalConfig,
     RehearsalWindowResult,
 )
+from squadopt.optimization import optimize_squad
+from squadopt.planning import InitialSquadState
 
 CONFIG = MultiGwRehearsalConfig(
     season=SEASON,
@@ -143,3 +145,93 @@ def test_a_pool_player_missing_without_a_blank_is_refused() -> None:
         match=r"do not cover selected players|although their teams have fixtures",
     ):
         MultiGwRehearsal(holed, _fixture_counts(), CONFIG).rehearse_window(3)
+
+
+def test_rolling_replan_is_off_by_default_and_reports_solver_statuses(
+    window: RehearsalWindowResult,
+) -> None:
+    assert window.rolling_realized_points is None
+    assert window.rolling_advantage_points is None
+    assert window.diagnostics["planner_solver_status"] in {"OPTIMAL", "FEASIBLE"}
+    assert len(list(window.diagnostics["myopic_solver_statuses"])) == len(window.gameweeks)
+
+
+def test_a_rolling_horizon_of_one_week_is_the_myopic_baseline() -> None:
+    """The identity that anchors the rolling planner: lookahead one re-derives myopic."""
+
+    rehearsal = _rehearsal()
+    pool = rehearsal._candidate_pool(rehearsal._projection_at(3))
+    window = rehearsal.rehearse_window(3)
+
+    opening = optimize_squad(pool, CONFIG.frozen_optimization_config)
+    assert opening.total_cost_tenths is not None
+    state = InitialSquadState(
+        tuple(opening.selected_squad["player_id"].tolist()),
+        bank_tenths=CONFIG.frozen_optimization_config.budget_tenths
+        - int(opening.total_cost_tenths),
+        free_transfers=1,
+    )
+    outcome = rehearsal._score_rolling(pool, state, window.gameweeks, lookahead=1)
+
+    assert outcome.realized_points == window.myopic_realized_points
+    assert outcome.hit_points == window.myopic_transfer_hit_points
+    assert outcome.lookahead_lengths == (1, 1, 1)
+
+
+def test_rolling_replan_scores_the_window_and_records_its_lookahead() -> None:
+    config = MultiGwRehearsalConfig(
+        season=SEASON,
+        horizon_length=3,
+        candidate_pool_per_position=10,
+        cheap_pool_per_position=2,
+        rolling_replan=True,
+    )
+    window = MultiGwRehearsal(
+        make_canonical_gameweeks(), _fixture_counts(), config
+    ).rehearse_window(3)
+
+    assert window.rolling_realized_points is not None
+    assert window.rolling_transfer_hit_points is not None
+    assert window.rolling_advantage_points == (
+        window.rolling_realized_points
+        - window.rolling_transfer_hit_points
+        - window.myopic_net_points
+    )
+    assert list(window.diagnostics["rolling_lookahead_gameweeks"]) == [3, 3, 3]
+    assert len(list(window.diagnostics["rolling_solver_statuses"])) == 3
+
+
+def test_a_rolling_lookahead_is_truncated_at_the_last_decision_gameweek() -> None:
+    config = MultiGwRehearsalConfig(
+        season=SEASON,
+        horizon_length=3,
+        candidate_pool_per_position=10,
+        cheap_pool_per_position=2,
+        rolling_replan=True,
+    )
+    rehearsal = MultiGwRehearsal(make_canonical_gameweeks(), _fixture_counts(), config)
+    last = max(rehearsal.available_gameweeks)
+
+    window = rehearsal.rehearse_window(last - 2)
+
+    assert list(window.diagnostics["rolling_lookahead_gameweeks"]) == [3, 2, 1]
+
+
+def test_a_rolling_lookahead_stops_at_a_gameweek_the_season_never_played() -> None:
+    """A postponed round is not a blank: the lookahead ends there instead of skipping it."""
+
+    panel = make_canonical_gameweeks()
+    without_gw6 = panel.loc[panel["gameweek"] != 6]
+    config = MultiGwRehearsalConfig(
+        season=SEASON,
+        horizon_length=3,
+        candidate_pool_per_position=10,
+        cheap_pool_per_position=2,
+        rolling_replan=True,
+    )
+    rehearsal = MultiGwRehearsal(without_gw6, _fixture_counts(), config)
+
+    window = rehearsal.rehearse_window(3)
+
+    # Weeks 3, 4, 5: lookaheads 3-5, 4-5 (6 is missing), 5 alone.
+    assert list(window.diagnostics["rolling_lookahead_gameweeks"]) == [3, 2, 1]
