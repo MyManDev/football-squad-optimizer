@@ -182,6 +182,17 @@ def test_the_reservation_policy_offers_boost_and_captain_only_in_double_gameweek
     assert result.diagnostics["chip_policy"] == "double_gameweeks_only"
 
 
+def test_the_hybrid_policy_reserves_only_the_bench_boost() -> None:
+    result = _run(lookahead=2, chip_windows=ALL_CHIPS, chip_policy="hybrid")
+
+    for week in result.weeks:
+        for planned_week, name in week.planned_chips.items():
+            if name == "bboost":
+                assert planned_week == 4
+    # Triple captain is not reserved: with two lookahead weeks it may be planned anywhere.
+    assert result.diagnostics["chip_policy"] == "hybrid"
+
+
 def test_free_hit_is_refused_in_chip_windows() -> None:
     with pytest.raises(ExperimentConfigurationError, match="Unknown chip"):
         ChipWindowRule("freehit", 1, 38)

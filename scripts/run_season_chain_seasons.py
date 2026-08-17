@@ -97,9 +97,11 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--chips",
         default="off,on,reserve",
-        help="comma subset of off,on,reserve,value: on offers every open chip to the "
-        "planner; reserve offers bench boost and triple captain only in double gameweeks; "
-        "value offers every open chip but holds each at its --chip-holding-values",
+        help="comma subset of off,on,reserve,value,hybrid: on offers every open chip to "
+        "the planner; reserve offers bench boost and triple captain only in double "
+        "gameweeks; value offers every open chip but holds each at its "
+        "--chip-holding-values; hybrid reserves the bench boost for doubles and holds "
+        "triple captain and wildcard at their holding values",
     )
     parser.add_argument(
         "--chip-holding-values",
@@ -178,7 +180,7 @@ def chip_windows_for(season: str) -> tuple[ChipWindowRule, ...]:
     )
 
 
-CHIP_MODES = ("off", "on", "reserve", "value")
+CHIP_MODES = ("off", "on", "reserve", "value", "hybrid")
 
 
 def parse_holding_values(text: str) -> dict[str, float]:
@@ -588,7 +590,9 @@ def main() -> int:
                     chips = mode != "off"
                     transfer_config = TransferPlanningConfig(
                         max_free_transfers=cap,
-                        chip_holding_value_points=holding_values if mode == "value" else {},
+                        chip_holding_value_points=(
+                            holding_values if mode in {"value", "hybrid"} else {}
+                        ),
                     )
                     label = _variant_label(lookahead, mode)
                     LOGGER.info("Season %s: %s", season, label)
@@ -601,7 +605,13 @@ def main() -> int:
                         candidate_pool_per_position=arguments.candidate_pool_per_position,
                         cheap_pool_per_position=arguments.cheap_pool_per_position,
                         chip_windows=chip_windows_for(season) if chips else (),
-                        chip_policy="double_gameweeks_only" if mode == "reserve" else "planner",
+                        chip_policy=(
+                            "double_gameweeks_only"
+                            if mode == "reserve"
+                            else "hybrid"
+                            if mode == "hybrid"
+                            else "planner"
+                        ),
                         projection_rule=str(arguments.projection_rule),
                         optimization_config=optimization_config,
                         transfer_config=transfer_config,
@@ -641,7 +651,9 @@ def main() -> int:
         "max_free_transfers": caps,
         "chip_windows_source": "assumed; not read from a capture",
         "projection_rule": str(arguments.projection_rule),
-        "chip_holding_values_points": holding_values if "value" in chip_modes else None,
+        "chip_holding_values_points": (
+            holding_values if {"value", "hybrid"} & set(chip_modes) else None
+        ),
         "sell_rule": "purchase plus half of any rise, rounded down to a tenth",
         "automatic_substitutions": False,
         "free_hit_modelled": False,

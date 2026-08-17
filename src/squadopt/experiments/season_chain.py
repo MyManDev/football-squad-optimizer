@@ -63,7 +63,7 @@ from squadopt.planning import (
 )
 
 SEASON_CHAIN_CONTRACT_VERSION: Final = "season_chain_v1"
-CHIP_POLICIES: Final = ("planner", "double_gameweeks_only")
+CHIP_POLICIES: Final = ("planner", "double_gameweeks_only", "hybrid")
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,10 +106,12 @@ class SeasonChainConfig:
     """``planner``: every open chip is offered in every horizon week and the planner
     decides. ``double_gameweeks_only``: bench boost and triple captain are offered only
     in gameweeks where some team plays twice — the common human reservation rule — and
-    the wildcard is offered as under ``planner``. A finite horizon cannot see that the
-    season continues past its end, so under ``planner`` a chip worth anything now is
-    worth playing now; the reservation rule is the cheapest stand-in for the option
-    value the horizon cannot price."""
+    the wildcard is offered as under ``planner``. ``hybrid``: only the bench boost is
+    reserved for double gameweeks; triple captain and wildcard are offered as under
+    ``planner`` (and held by their holding values when the transfer config sets them).
+    A finite horizon cannot see that the season continues past its end, so under
+    ``planner`` a chip worth anything now is worth playing now; the reservation rule is
+    the cheapest stand-in for the option value the horizon cannot price."""
     sell_on_fee_halved: bool = True
     """Sell a squad member at purchase price plus half of any rise, rounded down to a
     tenth (the game's rule); False sells at the market price, as the windowed
@@ -565,12 +567,19 @@ class SeasonChain(DecisionSeason):
         if not self._settings.chips_enabled:
             return None
         available: dict[str, set[int]] = {}
-        reserve = self._settings.chip_policy == "double_gameweeks_only"
+        policy = self._settings.chip_policy
+        reserved = (
+            {"bboost", "3xc"}
+            if policy == "double_gameweeks_only"
+            else {"bboost"}
+            if policy == "hybrid"
+            else set()
+        )
         for index, window in enumerate(self._settings.chip_windows):
             if (window.name, index) in state.used_chips:
                 continue
             weeks = {gameweek for gameweek in horizon_gameweeks if window.covers(gameweek)}
-            if reserve and window.name in {"bboost", "3xc"}:
+            if window.name in reserved:
                 weeks = {gameweek for gameweek in weeks if self._is_double_gameweek(gameweek)}
             if weeks:
                 available.setdefault(window.name, set()).update(weeks)
