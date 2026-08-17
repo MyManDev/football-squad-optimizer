@@ -511,6 +511,28 @@ def test_a_chip_worth_the_same_in_every_week_is_played_in_the_last(
     assert result.chips_played == {2: "bboost"}
 
 
+def test_a_held_squad_over_the_club_limit_is_planned_into_compliance(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """A player who moved clubs can leave four held from one club; the game allows the
+    hold, so the planner accepts the start and every planned squad obeys the limit."""
+
+    players = known_optimum_players.copy()
+    # Put the whole optimal squad on one club, over a limit of three.
+    players.loc[players["player_id"].isin(["GK_A", "DEF_A", "MID_A", "FWD_A"]), "team_id"] = "T1"
+    config = replace(small_config, max_players_per_team=3)
+    horizon = PlanningHorizon(_horizon_table(players, (1,)))
+
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=None)
+    assert result.weeks[0].transfer_count == 0  # limit four: nothing forced
+
+    forced = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, config)
+    week = forced.weeks[0]
+    assert week.transfer_count >= 1
+    assert week.selected_squad.groupby("team_id").size().max() <= 3
+
+
 # --- transfer discipline --------------------------------------------------------------
 
 

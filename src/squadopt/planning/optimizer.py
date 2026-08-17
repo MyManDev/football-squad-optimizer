@@ -119,9 +119,10 @@ def _validate_initial_state(
             raise TransferPlanningValidationError(
                 f"Initial squad violates the {position} position quota."
             )
-    team_counts = Counter(initial_rows["team_id"])
-    if any(count > optimization_config.max_players_per_team for count in team_counts.values()):
-        raise TransferPlanningValidationError("Initial squad violates max_players_per_team.")
+    # The club limit is not checked on the held squad: a player who moved clubs after he
+    # was bought can leave a manager holding four from one club, which the game allows
+    # until the next transfer. Every planned squad still satisfies the limit, so such a
+    # start forces a sale rather than a refusal.
     return initial_ids
 
 

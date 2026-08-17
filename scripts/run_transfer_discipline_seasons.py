@@ -46,6 +46,7 @@ from scripts.run_season_chain_seasons import (
     _comparison,
     _fixture_counts,
     chip_windows_for,
+    parse_holding_values,
 )
 
 from squadopt.data.sources.vaastav import build_panel
@@ -71,7 +72,12 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
     parser.add_argument("--seasons", default=DEFAULT_SEASONS)
     parser.add_argument("--lookaheads", default="1")
-    parser.add_argument("--chips", default="reserve", help="one of off,on,reserve")
+    parser.add_argument("--chips", default="reserve", help="one of off,on,reserve,value,hybrid")
+    parser.add_argument(
+        "--chip-holding-values",
+        default="bboost=20,3xc=18,wildcard=12",
+        help="terminal value of an unplayed chip under --chips value or hybrid",
+    )
     parser.add_argument("--hit-costs", default="4,6,8", help="planning hit costs (points)")
     parser.add_argument("--transfer-caps", default="none,2,1", help="per-gameweek caps")
     parser.add_argument("--banked-values", default="0,1,2", help="terminal free-transfer values")
@@ -334,9 +340,10 @@ def main() -> int:
     values = tuple(float(v.strip()) for v in str(arguments.banked_values).split(","))
     lookaheads = tuple(int(v.strip()) for v in str(arguments.lookaheads).split(","))
     mode = str(arguments.chips).strip()
-    if mode not in {"off", "on", "reserve"}:
-        print("--chips must be one of off,on,reserve.")
+    if mode not in {"off", "on", "reserve", "value", "hybrid"}:
+        print("--chips must be one of off,on,reserve,value,hybrid.")
         return 1
+    holding_values = parse_holding_values(arguments.chip_holding_values)
     bootstrap = {
         "resamples": arguments.bootstrap_resamples,
         "moving_block_length": arguments.moving_block_length,
@@ -410,7 +417,13 @@ def main() -> int:
                         candidate_pool_per_position=arguments.candidate_pool_per_position,
                         cheap_pool_per_position=arguments.cheap_pool_per_position,
                         chip_windows=chip_windows_for(season) if mode != "off" else (),
-                        chip_policy="double_gameweeks_only" if mode == "reserve" else "planner",
+                        chip_policy=(
+                            "double_gameweeks_only"
+                            if mode == "reserve"
+                            else "hybrid"
+                            if mode == "hybrid"
+                            else "planner"
+                        ),
                         hit_points_charged=RULE_HIT_COST,
                         projection_rule=str(arguments.projection_rule),
                         optimization_config=optimization_config,
@@ -419,6 +432,9 @@ def main() -> int:
                             transfer_hit_cost_points=hit,
                             max_transfers_per_gameweek=cap,
                             banked_transfer_value_points=value,
+                            chip_holding_value_points=(
+                                holding_values if mode in {"value", "hybrid"} else {}
+                            ),
                         ),
                     )
                     started = datetime.now(UTC)
