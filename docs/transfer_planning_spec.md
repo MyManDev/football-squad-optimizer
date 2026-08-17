@@ -146,8 +146,16 @@ hard-codes a season. `forced` pins a chip to a gameweek (hand-timed play).
   wildcard_preserves_free_transfers` (default `True`) states the assumed rule that transfers
   under a wildcard do not consume banked free transfers; the source does not publish this,
   so it is a flag rather than a constant.
-- Tie-break: among plans with equal objective, chips stay unplayed (a chip that buys
-  nothing on paper is worth more later).
+- Wildcard free-transfer accounting is pinned in both directions (`consumed = count`
+  without the chip, `0` under it): the bank it feeds is not always in the objective (a
+  horizon's last week, a full bank), and a free variable there left the accounting
+  inconsistent — found by the season-long chain, which plays wildcards in last weeks.
+- Tie-break, two tiers above every rank term: among plans with equal objective, fewer
+  chips (a chip that buys nothing on paper is worth more later); among plans playing the
+  same number, the later week (a rolling planner re-decides a deferred chip next week
+  with fresher information; committing early buys nothing on paper). Both are paper
+  ties only — a horizon still plays a chip worth anything now rather than hold it for a
+  season it cannot see, which is why the season chain also carries a reservation policy.
 - Extraction re-verifies chip accounting (zero paid transfers under a wildcard, the
   free-transfer bank per the flag, full bench value and tripled captain in the reported
   contribution) and reports `chips_played`; `chip_availability_fingerprint` and

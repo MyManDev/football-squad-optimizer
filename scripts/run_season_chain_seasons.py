@@ -321,7 +321,10 @@ def _markdown(
     for row in chains:
         chips = ", ".join(
             f"GW{week} {name}"
-            for week, name in dict(row["chips_played"]).items()  # type: ignore[call-overload]
+            for week, name in sorted(
+                dict(row["chips_played"]).items(),  # type: ignore[call-overload]
+                key=lambda item: int(item[0]),
+            )
         )
         gains = ", ".join(
             f"{name} {value:+.0f}"
