@@ -19,11 +19,10 @@ from squadopt.experiments import (
     SeasonChain,
     SeasonChainConfig,
     SeasonChainResult,
-    sell_price_tenths,
 )
 from squadopt.experiments.multi_gw_rehearsal import WeekRealization
 from squadopt.optimization import optimize_squad
-from squadopt.planning import InitialSquadState
+from squadopt.planning import InitialSquadState, sell_price_tenths
 
 POOL = {"candidate_pool_per_position": 10, "cheap_pool_per_position": 2}
 ALL_CHIPS = (
@@ -191,19 +190,20 @@ def test_free_hit_is_refused_in_chip_windows() -> None:
 
 
 @pytest.mark.parametrize(
-    ("current", "purchase", "halved", "expected"),
+    ("current", "purchase", "fee", "expected"),
     [
-        (53, 50, True, 51),
-        (52, 50, True, 51),
-        (51, 50, True, 50),
-        (49, 50, True, 49),
-        (53, 50, False, 53),
+        (53, 50, 0.5, 51),
+        (52, 50, 0.5, 51),
+        (51, 50, 0.5, 50),
+        (49, 50, 0.5, 49),
+        (53, 50, 0.0, 53),
+        (53, 50, 1.0, 50),
     ],
 )
 def test_the_sell_price_rule_halves_a_rise_and_keeps_a_fall(
-    current: int, purchase: int, halved: bool, expected: int
+    current: int, purchase: int, fee: float, expected: int
 ) -> None:
-    assert sell_price_tenths(current, purchase, halved=halved) == expected
+    assert sell_price_tenths(current, purchase, sell_on_fee=fee) == expected
 
 
 def test_a_blank_squad_member_is_carried_at_zero(myopic: SeasonChainResult) -> None:

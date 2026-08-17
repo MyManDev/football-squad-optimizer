@@ -27,6 +27,8 @@ from squadopt.live.risk import (
     evaluate_live_risk,
     risk_not_requested,
 )
+from squadopt.live.rules import SeasonRules
+from squadopt.live.transfers import HeldSquad, TransferDecision, plan_transfers
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
 from squadopt.optimization.models import OptimizationResult
 from squadopt.scenarios import ScenarioConfig, ScenarioEvaluationConfig
@@ -65,6 +67,9 @@ class Recommendation:
     projected_score: float
     diagnostics: Mapping[str, object]
     risk: LiveRiskDiagnostics = field(default_factory=risk_not_requested)
+    transfers: TransferDecision | None = None
+    """Present for a mid-season decision made from the held squad; absent for the opening
+    squad, whose report and ledger entry are unchanged by this field."""
 
     @property
     def solver_proved_optimal(self) -> bool:
@@ -170,6 +175,64 @@ def build_recommendation(
     )
 
 
+def build_transfer_recommendation(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    held: HeldSquad,
+    rules: SeasonRules,
+    *,
+    optimization: OptimizationConfig | None = None,
+    chip: str | None = None,
+) -> Recommendation:
+    """Decide a mid-season deadline from the held squad and return it with provenance.
+
+    The squad reported is the squad after the transfers; ``total_cost_tenths`` is what
+    it would sell for (the wealth the game shows), not what it cost, and the budget check
+    a reader should make is that the bank after is not negative.
+    """
+
+    settings = OptimizationConfig() if optimization is None else optimization
+    plan, decision, _ = plan_transfers(
+        inputs, projection, held, rules, optimization=settings, chip=chip
+    )
+    if plan.solver_status not in PROVEN_STATUSES:
+        raise DataSourceError(
+            f"The transfer planner returned {plan.solver_status.name} for {inputs.season} "
+            f"gameweek {inputs.deadline.gameweek} but did not prove the plan optimal. "
+            "A live decision requires an OPTIMAL result."
+        )
+    week = plan.weeks[0]
+    return Recommendation(
+        contract_version=REPORT_CONTRACT_VERSION,
+        snapshot_id=inputs.snapshot_id,
+        captured_at_utc=inputs.captured_at_utc,
+        season=inputs.season,
+        gameweek=inputs.deadline.gameweek,
+        deadline_utc=inputs.deadline.deadline_utc,
+        model_name=str(projection.diagnostics["model_name"]),
+        model_version=str(projection.diagnostics["model_version"]),
+        feature_contract_version=str(projection.diagnostics["feature_contract_version"]),
+        prediction_fingerprint=projection_fingerprint(projection.table),
+        solver_status=plan.solver_status.name,
+        squad=week.selected_squad,
+        starting_xi=week.starting_xi,
+        bench=week.bench,
+        captain=week.captain,
+        total_cost_tenths=int(decision.squad_sell_value_tenths),
+        projected_score=float(week.projected_score),
+        diagnostics={
+            **dict(projection.diagnostics),
+            **{f"planner_{key}": value for key, value in dict(plan.diagnostics).items()},
+            "unavailable_players_in_pool": len(projection.unavailable_players),
+            "budget_tenths": settings.budget_tenths,
+            "bench_weight": settings.bench_weight,
+            "decision_kind": "transfer",
+        },
+        risk=risk_not_requested(),
+        transfers=decision,
+    )
+
+
 def _frame_lines(frame: pd.DataFrame, title: str) -> list[str]:
     columns = [column for column in SQUAD_COLUMNS if column in frame.columns]
     rendered = frame.loc[:, columns]
@@ -194,7 +257,11 @@ def render(recommendation: Recommendation) -> str:
         f"  feature contract    {recommendation.feature_contract_version}",
         f"  projection digest   {recommendation.prediction_fingerprint[:16]}…",
         f"  solver              {recommendation.solver_status}",
-        f"  squad cost          {recommendation.total_cost_tenths / 10:.1f}",
+        (
+            f"  squad cost          {recommendation.total_cost_tenths / 10:.1f}"
+            if recommendation.transfers is None
+            else f"  squad sell value    {recommendation.total_cost_tenths / 10:.1f}"
+        ),
         f"  projected score     {recommendation.projected_score:.4f}",
     ]
 
@@ -236,6 +303,26 @@ def render(recommendation: Recommendation) -> str:
             f"  blockers            {blockers}",
             "  No lower-tail number is printed without supporting residual evidence.",
         ]
+
+    transfers = recommendation.transfers
+    if transfers is not None:
+        lines += [
+            "",
+            "Transfers",
+            "-" * 9,
+            f"  from gameweek       {transfers.previous_gameweek} squad",
+            f"  transfers           {transfers.transfer_count} "
+            f"({transfers.paid_transfer_count} paid, {transfers.transfer_hit_points:.0f} pts)",
+            f"  free transfers      {transfers.free_transfers_before} before, "
+            f"{transfers.free_transfers_after} after",
+            f"  bank                {transfers.bank_before_tenths / 10:.1f} before, "
+            f"{transfers.bank_after_tenths / 10:.1f} after",
+            f"  squad sell value    {transfers.squad_sell_value_tenths / 10:.1f}",
+            f"  chip                {transfers.chip or 'none'}",
+        ]
+        if not transfers.transfers_in.empty:
+            lines += _frame_lines(transfers.transfers_out, "Out")
+            lines += _frame_lines(transfers.transfers_in, "In")
 
     lines += _frame_lines(recommendation.starting_xi, "Starting XI")
     lines += _frame_lines(recommendation.bench, "Bench")

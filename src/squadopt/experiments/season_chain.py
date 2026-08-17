@@ -57,6 +57,7 @@ from squadopt.planning import (
     PlanningHorizon,
     TransferPlanningConfig,
     optimize_transfer_plan,
+    sell_price_tenths,
     to_planning_horizon,
 )
 
@@ -317,12 +318,8 @@ class SeasonChainResult:
         return sum(1 for week in self.weeks if week.solver_status == "OPTIMAL") / len(self.weeks)
 
 
-def sell_price_tenths(current_tenths: int, purchase_tenths: int, *, halved: bool) -> int:
-    """The game's sell price: purchase plus half of any rise, rounded down to a tenth."""
-
-    if not halved or current_tenths <= purchase_tenths:
-        return int(current_tenths)
-    return int(purchase_tenths + (current_tenths - purchase_tenths) // 2)
+def _sell_on_fee(halved: bool) -> float:
+    return 0.5 if halved else 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -524,7 +521,7 @@ class SeasonChain(DecisionSeason):
         if self._settings.sell_on_fee_halved:
             purchase = state.purchase_prices
             sell = [
-                sell_price_tenths(int(current), purchase[player], halved=True)
+                sell_price_tenths(int(current), purchase[player], sell_on_fee=0.5)
                 if player in purchase
                 else int(current)
                 for player, current in zip(
@@ -631,7 +628,9 @@ class SeasonChain(DecisionSeason):
         self._remember_rows(pool, new_squad)
         sell_value = sum(
             sell_price_tenths(
-                buy_prices[player], purchase[player], halved=settings.sell_on_fee_halved
+                buy_prices[player],
+                purchase[player],
+                sell_on_fee=_sell_on_fee(settings.sell_on_fee_halved),
             )
             for player in new_squad
         )

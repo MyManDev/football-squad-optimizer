@@ -23,6 +23,7 @@ from squadopt.planning.models import (
     TransferPlanResult,
 )
 from squadopt.planning.optimizer import optimize_transfer_plan
+from squadopt.planning.pricing import sell_price_tenths
 
 __all__ = [
     "CHIP_NAMES_V1",
@@ -43,5 +44,6 @@ __all__ = [
     "TransferPlanningError",
     "TransferPlanningValidationError",
     "optimize_transfer_plan",
+    "sell_price_tenths",
     "to_planning_horizon",
 ]

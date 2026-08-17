@@ -94,7 +94,6 @@ from squadopt.experiments.season_chain import (
     SeasonChainConfig,
     SeasonChainResult,
     SeasonChainWeek,
-    sell_price_tenths,
 )
 from squadopt.experiments.selection_optimism import (
     SELECTION_OPTIMISM_CONTRACT_VERSION,
@@ -177,7 +176,6 @@ __all__ = [
     "screening_result_to_dict",
     "screening_result_to_markdown",
     "season_aware_moving_block_interval",
-    "sell_price_tenths",
     "shrink_projections",
     "summarize_search_efficiency",
 ]
