@@ -21,6 +21,7 @@ features - so a planner win here is a conservative finding.
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass
+from itertools import takewhile
 from types import MappingProxyType
 from typing import Final
 
@@ -519,10 +520,14 @@ class MultiGwRehearsal:
         gaps: list[float | None] = []
         available = self.available_gameweeks
         for gameweek in gameweeks:
+            # The horizon is the consecutive run of decision gameweeks ahead: a
+            # gameweek the season never played (2022-23 GW7) ends the lookahead
+            # rather than being skipped, because a projection horizon must be
+            # consecutive and a postponed round is not a blank.
             horizon_gameweeks = tuple(
-                candidate
-                for candidate in range(gameweek, gameweek + lookahead)
-                if candidate in available
+                takewhile(
+                    lambda candidate: candidate in available, range(gameweek, gameweek + lookahead)
+                )
             )
             week_pool = self._myopic_week_pool(pool, gameweek)
             plan = optimize_transfer_plan(

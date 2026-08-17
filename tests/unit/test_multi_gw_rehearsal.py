@@ -215,3 +215,23 @@ def test_a_rolling_lookahead_is_truncated_at_the_last_decision_gameweek() -> Non
     window = rehearsal.rehearse_window(last - 2)
 
     assert list(window.diagnostics["rolling_lookahead_gameweeks"]) == [3, 2, 1]
+
+
+def test_a_rolling_lookahead_stops_at_a_gameweek_the_season_never_played() -> None:
+    """A postponed round is not a blank: the lookahead ends there instead of skipping it."""
+
+    panel = make_canonical_gameweeks()
+    without_gw6 = panel.loc[panel["gameweek"] != 6]
+    config = MultiGwRehearsalConfig(
+        season=SEASON,
+        horizon_length=3,
+        candidate_pool_per_position=10,
+        cheap_pool_per_position=2,
+        rolling_replan=True,
+    )
+    rehearsal = MultiGwRehearsal(without_gw6, _fixture_counts(), config)
+
+    window = rehearsal.rehearse_window(3)
+
+    # Weeks 3, 4, 5: lookaheads 3-5, 4-5 (6 is missing), 5 alone.
+    assert list(window.diagnostics["rolling_lookahead_gameweeks"]) == [3, 2, 1]
