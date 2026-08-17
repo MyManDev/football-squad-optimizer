@@ -154,6 +154,36 @@ double them). Same seasons, opening squads, and protocol.
   captain chips, the calendar rule for the bench boost — is untested and the next cheap
   step; a projection that does not inflate the opening weeks would remove the reason for it.
 
+## Addendum (2026-08-18, later): hybrid policy, calendar-blind control
+
+**Hybrid chip policy** ([season_chain_hybrid.md](season_chain_hybrid.md)): the bench boost
+reserved for doubles, triple captain and wildcard held at their holding values. Lookahead 1,
+same protocol: **+102 per season** over no chips (+59, +67, +191, +90; weekly
+[+1.50, +4.15]) against reserve +88 and value +97. Best of the three on average, and each
+still has a hole: hybrid burned the triple captain in 2021-22's GW2 (the inflated opening
+captain clears 18) and never found a bench-boost double in 2024-25 after GW25. The three
+policies sit within ~15 points of each other; the ordering is not settled by four seasons.
+
+**Calendar-blind control** ([season_chain_blind.md](season_chain_blind.md), projection rule
+`control_calendar_blind_v1`: the operational control exactly as it is evaluated, no
+fixture-count scaling, a double projecting like a single). This answers what the naive
+calendar scaling in every chain measurement is worth:
+
+| Lookahead 1 | scaled (naive_calendar_scaling_v1) | calendar-blind | difference |
+| --- | ---: | ---: | ---: |
+| chips off | 1921 (hits 167, 78 transfers) | 1863 (hits 89, 59 transfers) | **+58** |
+| chips reserve | 2008 | 1912 (+48 over blind off) | +96 |
+| chips value | 2018 | 1915 (+52 over blind off) | +103 |
+
+Knowing the calendar is worth about **58 net points a season** to the weekly control —
+its calendar-chasing hits pay for themselves — and roughly **halves the value of chips**
+when it is missing (the blind planner never triples a captain under the holding value,
+because no captain ever projects a double). The rolling planner's cap-1 result holds
+blind as well (+122 per season over the uncapped rolling rule; [+1.89, +5.18]).
+This is the case for the live in-season projection being calendar-aware: the
+opening-week control is calendar-blind by construction, and a GW2+ handoff that is not
+calendar-aware would leave both the transfer and the chip decisions half-blind.
+
 ## What follows
 
 - Live path: the weekly baseline stays the operational control. Chips can be recommended
