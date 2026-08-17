@@ -17,6 +17,7 @@ from squadopt.live import (
     SEASON_RULES_CONTRACT_VERSION,
     ChipWindow,
     SeasonRulesError,
+    chip_availability_for,
     read_season_rules,
     render_rules,
     rules_to_dict,
@@ -189,3 +190,39 @@ def test_the_rendering_names_the_defensive_contribution_and_the_chips(tmp_path: 
     assert "defensive contrib.  GKP 0, DEF 2, MID 2, FWD 2" in text
     assert "wildcard GW2-19" in text
     assert "up to 5 banked" in text
+
+
+# --- the planner bridge --------------------------------------------------------
+
+
+def test_chip_availability_follows_the_published_windows(tmp_path: Path) -> None:
+    rules = read_season_rules(_capture(tmp_path), season=SEASON)
+
+    opening = chip_availability_for(rules, (1, 2, 3))
+    assert dict(opening.available) == {
+        "bboost": frozenset({1, 2, 3}),
+        "3xc": frozenset({1, 2, 3}),
+        "wildcard": frozenset({2, 3}),  # wildcard opens at GW2
+    }
+    assert "freehit" not in opening.available  # not modelled by this planner
+
+    boundary = chip_availability_for(rules, (18, 19, 20, 21))
+    assert boundary.available["bboost"] == frozenset({18, 19, 20, 21})
+
+
+def test_a_chip_used_in_a_window_is_gone_for_that_window_only(tmp_path: Path) -> None:
+    rules = read_season_rules(_capture(tmp_path), season=SEASON)
+
+    availability = chip_availability_for(rules, (18, 19, 20, 21), used={"bboost": [7]})
+
+    # Used in the first half: gone for 18-19, back for 20-21.
+    assert availability.available["bboost"] == frozenset({20, 21})
+    assert availability.available["3xc"] == frozenset({18, 19, 20, 21})
+
+
+def test_a_forced_chip_passes_through_the_bridge(tmp_path: Path) -> None:
+    rules = read_season_rules(_capture(tmp_path), season=SEASON)
+
+    availability = chip_availability_for(rules, (10, 11), forced={11: "wildcard"})
+
+    assert dict(availability.forced) == {11: "wildcard"}

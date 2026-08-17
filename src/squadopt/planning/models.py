@@ -16,6 +16,10 @@ from squadopt.optimization.config import POSITIONS
 
 PLANNING_HORIZON_CONTRACT_VERSION: Final = "planning_horizon_v1"
 TRANSFER_PLANNING_CONTRACT_VERSION: Final = "deterministic_transfer_planning_v1"
+# The chips this planner models. Free hit is deliberately absent: it makes one week's
+# squad temporary and restores the previous one, which breaks the state chain every
+# other constraint relies on, and it belongs to a later contract version.
+CHIP_NAMES_V1: Final = ("bboost", "3xc", "wildcard")
 PLANNING_HORIZON_COLUMNS: Final = (
     "gameweek",
     "player_id",
@@ -269,20 +273,90 @@ class InitialSquadState:
 
 
 @dataclass(frozen=True, slots=True)
+class ChipAvailability:
+    """Which chips the planner may play in which gameweeks of one horizon.
+
+    ``available`` maps a chip name to the gameweeks it may be played in; a chip absent
+    from the mapping is not available. ``forced`` pins a chip to a gameweek — the
+    hand-timed case — and a forced chip must also be available there. The caller
+    derives both from the season's published rules and the chips already used; the
+    planner does not know about seasons or halves, only about this horizon, and it
+    plays each available chip at most once inside it. An empty availability is the
+    chip-less planner exactly.
+    """
+
+    available: Mapping[str, frozenset[int]] = field(default_factory=dict)
+    forced: Mapping[int, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        available: dict[str, frozenset[int]] = {}
+        for name, gameweeks in dict(self.available).items():
+            if name not in CHIP_NAMES_V1:
+                raise TransferPlanningValidationError(
+                    f"Unknown chip {name!r}; this planner models {CHIP_NAMES_V1!r}."
+                )
+            weeks = frozenset(_state_integer(week, f"{name} gameweek", 1) for week in gameweeks)
+            if weeks:
+                available[name] = weeks
+        forced: dict[int, str] = {}
+        for week, name in dict(self.forced).items():
+            gameweek = _state_integer(week, "forced chip gameweek", 1)
+            if name not in CHIP_NAMES_V1:
+                raise TransferPlanningValidationError(f"Unknown forced chip {name!r}.")
+            if gameweek not in available.get(name, frozenset()):
+                raise TransferPlanningValidationError(
+                    f"Forced chip {name!r} in gameweek {gameweek} is not available there."
+                )
+            forced[gameweek] = name
+        object.__setattr__(self, "available", MappingProxyType(available))
+        object.__setattr__(self, "forced", MappingProxyType(forced))
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.available
+
+    def gameweeks_for(self, name: str) -> frozenset[int]:
+        return self.available.get(name, frozenset())
+
+    @property
+    def availability_fingerprint(self) -> str:
+        """Stable digest of the availability and any forced plays."""
+
+        payload = {
+            "available": {name: sorted(weeks) for name, weeks in self.available.items()},
+            "forced": {str(week): name for week, name in sorted(self.forced.items())},
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
 class TransferPlanningConfig:
-    """Controls transfer accounting and deterministic horizon weighting."""
+    """Controls transfer accounting and deterministic horizon weighting.
+
+    ``wildcard_preserves_free_transfers`` states the rule this planner assumes for a
+    wildcard week: transfers made under the chip do not consume banked free transfers,
+    and accrual continues as usual. It is a flag rather than a constant because the
+    source's payload does not publish it; if the rule turns out otherwise, one flag
+    changes and nothing else.
+    """
 
     max_free_transfers: int = 5
     free_transfer_accrual: int = 1
     transfer_hit_cost_points: float = 4.0
     horizon_discount_factor: float = 1.0
     objective_weight_scale: int = 1_000
+    wildcard_preserves_free_transfers: bool = True
     contract_version: str = TRANSFER_PLANNING_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
         if self.contract_version != TRANSFER_PLANNING_CONTRACT_VERSION:
             raise TransferPlanningConfigurationError(
                 "contract_version does not match the implemented transfer planner."
+            )
+        if not isinstance(self.wildcard_preserves_free_transfers, bool):
+            raise TransferPlanningConfigurationError(
+                "wildcard_preserves_free_transfers must be a boolean."
             )
         maximum = _integer(self.max_free_transfers, "max_free_transfers", 1)
         accrual = _integer(self.free_transfer_accrual, "free_transfer_accrual", 0)
@@ -328,6 +402,7 @@ class TransferPlanningConfig:
             "transfer_hit_cost_points": float(self.transfer_hit_cost_points).hex(),
             "horizon_discount_factor": float(self.horizon_discount_factor).hex(),
             "objective_weight_scale": self.objective_weight_scale,
+            "wildcard_preserves_free_transfers": self.wildcard_preserves_free_transfers,
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
@@ -355,8 +430,11 @@ class PlanningWeekResult:
     projected_score: float
     projected_bench_points: float
     discounted_objective_contribution: float
+    chip: str | None = None
 
     def __post_init__(self) -> None:
+        if self.chip is not None and self.chip not in CHIP_NAMES_V1:
+            raise TransferPlanningValidationError(f"Unknown chip {self.chip!r} on a week result.")
         for name in ("selected_squad", "starting_xi", "bench", "transfers_in", "transfers_out"):
             value = getattr(self, name)
             if not isinstance(value, pd.DataFrame):
@@ -380,10 +458,15 @@ class TransferPlanResult:
     objective_value: float | None
     diagnostics: Mapping[str, object]
     contract_version: str = TRANSFER_PLANNING_CONTRACT_VERSION
+    chips_played: Mapping[int, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.contract_version != TRANSFER_PLANNING_CONTRACT_VERSION:
             raise TransferPlanningValidationError("Unsupported transfer plan contract_version.")
+        played = {int(week): str(name) for week, name in dict(self.chips_played).items()}
+        if any(name not in CHIP_NAMES_V1 for name in played.values()):
+            raise TransferPlanningValidationError("chips_played names an unknown chip.")
+        object.__setattr__(self, "chips_played", MappingProxyType(played))
         if not isinstance(self.solver_status, SolverStatus):
             raise TransferPlanningValidationError("solver_status must be a SolverStatus.")
         if (

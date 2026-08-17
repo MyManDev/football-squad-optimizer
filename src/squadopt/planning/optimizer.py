@@ -37,6 +37,7 @@ from squadopt.optimization.optimizer import (
 )
 from squadopt.optimization.validation import validate_players
 from squadopt.planning.models import (
+    ChipAvailability,
     InitialSquadState,
     PlanningHorizon,
     PlanningWeekResult,
@@ -65,6 +66,8 @@ class _PlanArtifacts:
     primary_objective: cp_model.LinearExpr
     discount_weights: list[int]
     hit_cost_scaled: int
+    chip_vars: list[dict[str, cp_model.IntVar]]
+    chips: ChipAvailability
 
 
 def _validated_week_tables(
@@ -153,6 +156,11 @@ def _validate_integer_bounds(
         objective_bound += discount_weight * sum(
             abs(squad) + abs(starter) + abs(captain) for squad, starter, captain in coefficients
         )
+        # A bench boost adds every squad member's unweighted remainder; a triple
+        # captain adds the captain's points once more. Both bounded by the sums below.
+        objective_bound += discount_weight * sum(
+            abs(starter) + abs(captain) for _, starter, captain in coefficients
+        )
         objective_bound += discount_weight * abs(hit_cost_scaled) * optimization_config.squad_size
         largest_sell_prices = sorted(
             (int(value) for value in players["sell_price_tenths"]),
@@ -177,10 +185,30 @@ def _build_model(
     initial_state: InitialSquadState,
     optimization_config: OptimizationConfig,
     transfer_config: TransferPlanningConfig,
+    chips: ChipAvailability,
 ) -> _PlanArtifacts:
     model = cp_model.CpModel()
     player_count = len(players_by_week[0])
     week_count = len(players_by_week)
+    horizon_gameweeks = [int(players.iloc[0]["gameweek"]) for players in players_by_week]
+    # A chip is a variable only in the gameweeks it is available in; a chip available
+    # only outside this horizon simply has no variable here.
+    chip_vars: list[dict[str, cp_model.IntVar]] = []
+    for gameweek in horizon_gameweeks:
+        week_chips: dict[str, cp_model.IntVar] = {}
+        for name in chips.available:
+            if gameweek in chips.gameweeks_for(name):
+                week_chips[name] = model.new_bool_var(f"chip_{name}_gw{gameweek}")
+        if len(week_chips) > 1:
+            model.add(cp_model.LinearExpr.sum(list(week_chips.values())) <= 1)
+        forced = chips.forced.get(gameweek)
+        if forced is not None:
+            model.add(week_chips[forced] == 1)
+        chip_vars.append(week_chips)
+    for name in chips.available:
+        plays = [week[name] for week in chip_vars if name in week]
+        if len(plays) > 1:
+            model.add(cp_model.LinearExpr.sum(plays) <= 1)
     discount_weights = _discount_weights(week_count, transfer_config)
     hit_cost_scaled = scale_expected_points(
         transfer_config.transfer_hit_cost_points,
@@ -261,12 +289,27 @@ def _build_model(
             model.add(free_before == initial_state.free_transfers)
         else:
             model.add(free_before == free_next_vars[week_index - 1])
+        wildcard = chip_vars[week_index].get("wildcard")
+        # Transfers that draw on the free-transfer bank this week. Under a wildcard
+        # (when the rule preserves the bank) none of them do; the lower bound is what
+        # matters, because unused free transfers are worth keeping and the solver will
+        # not consume more than it must.
+        consumed = model.new_int_var(
+            0,
+            optimization_config.squad_size,
+            f"free_consumed_gw{gameweek}",
+        )
+        if wildcard is not None and transfer_config.wildcard_preserves_free_transfers:
+            model.add(consumed >= transfer_count - optimization_config.squad_size * wildcard)
+            model.add(consumed <= transfer_count)
+        else:
+            model.add(consumed == transfer_count)
         free_unused = model.new_int_var(
             0,
             transfer_config.max_free_transfers,
             f"free_unused_gw{gameweek}",
         )
-        model.add_max_equality(free_unused, [free_before - transfer_count, 0])
+        model.add_max_equality(free_unused, [free_before - consumed, 0])
         free_next = model.new_int_var(
             0,
             transfer_config.max_free_transfers,
@@ -284,7 +327,16 @@ def _build_model(
             optimization_config.squad_size,
             f"paid_transfers_gw{gameweek}",
         )
-        model.add_max_equality(paid_transfers, [transfer_count - free_before, 0])
+        # Inequality form: paid transfers carry a negative objective weight, so the
+        # solver takes the smallest value the bounds allow — max(count - free, 0)
+        # without a wildcard, zero under one.
+        if wildcard is not None:
+            model.add(
+                paid_transfers
+                >= transfer_count - free_before - optimization_config.squad_size * wildcard
+            )
+        else:
+            model.add(paid_transfers >= transfer_count - free_before)
 
         bank_after = model.new_int_var(0, bank_bound, f"bank_after_gw{gameweek}")
         bank_before: cp_model.LinearExpr | int
@@ -320,6 +372,29 @@ def _build_model(
             )
         objective_terms.append(-discount_weight * hit_cost_scaled * paid_transfers)
 
+        bench_boost = chip_vars[week_index].get("bboost")
+        if bench_boost is not None:
+            # Under a bench boost every squad member scores in full: add each bench
+            # player's unweighted remainder. Upper bounds suffice because the remainder
+            # is non-negative and the objective is maximised.
+            for player_index, (_, starter_coefficient, _) in enumerate(coefficients):
+                if starter_coefficient == 0:
+                    continue
+                boosted = model.new_bool_var(f"bboost_gw{gameweek}_{player_index}")
+                model.add(boosted <= bench_boost)
+                model.add(boosted <= squads[player_index])
+                model.add(boosted <= 1 - starters[player_index])
+                objective_terms.append(discount_weight * starter_coefficient * boosted)
+        triple_captain = chip_vars[week_index].get("3xc")
+        if triple_captain is not None:
+            for player_index, (_, _, captain_coefficient) in enumerate(coefficients):
+                if captain_coefficient == 0:
+                    continue
+                tripled = model.new_bool_var(f"tripled_gw{gameweek}_{player_index}")
+                model.add(tripled <= triple_captain)
+                model.add(tripled <= captains[player_index])
+                objective_terms.append(discount_weight * captain_coefficient * tripled)
+
         squad_vars.append(squads)
         starter_vars.append(starters)
         captain_vars.append(captains)
@@ -351,6 +426,8 @@ def _build_model(
         primary_objective=primary_objective,
         discount_weights=discount_weights,
         hit_cost_scaled=hit_cost_scaled,
+        chip_vars=chip_vars,
+        chips=chips,
     )
 
 
@@ -374,13 +451,20 @@ def _add_tiebreak(
         + starter_weight * max_starter_rank_sum
         + max_squad_rank_sum
     )
-    if conservative_bound > CP_SAT_SAFE_INTEGER_MAX:
+    chip_count = sum(len(week) for week in artifacts.chip_vars)
+    if conservative_bound * (chip_count + 2) > CP_SAT_SAFE_INTEGER_MAX:
         raise SolverExecutionError(
             "Transfer-plan deterministic tie-break exceeds the safe CP-SAT integer range."
         )
     artifacts.model.add(artifacts.primary_objective == primary_value)
     terms: list[cp_model.LinearExpr] = []
     player_count = len(artifacts.players_by_week[0])
+    # Among plans with equal objective, keep chips unplayed: a chip that buys nothing
+    # on paper is worth more later. Weighted above every rank term so it decides first.
+    chip_weight = conservative_bound + 1
+    for week_chips in artifacts.chip_vars:
+        for name in sorted(week_chips):
+            terms.append(chip_weight * week_chips[name])
     for week_index in range(len(artifacts.players_by_week)):
         for player_index in range(player_count):
             rank = week_index * player_count + player_index
@@ -422,6 +506,7 @@ def _extract_plan(
     diagnostics: dict[str, object],
 ) -> TransferPlanResult:
     weeks: list[PlanningWeekResult] = []
+    chips_played: dict[int, str] = {}
     previous_squad = set(initial_state.squad_player_ids)
     bank_before = initial_state.bank_tenths
     total_score = 0.0
@@ -461,11 +546,24 @@ def _extract_plan(
         free_before = int(solver.value(artifacts.free_before_vars[week_index]))
         free_unused = int(solver.value(artifacts.free_unused_vars[week_index]))
         free_next = int(solver.value(artifacts.free_next_vars[week_index]))
-        if transfer_count != len(transfer_in_indices) or paid_count != max(
-            0, transfer_count - free_before
-        ):
+        played = [
+            name
+            for name, variable in sorted(artifacts.chip_vars[week_index].items())
+            if solver.value(variable) == 1
+        ]
+        if len(played) > 1:
+            raise SolverExecutionError("More than one chip was played in a single gameweek.")
+        chip = played[0] if played else None
+        wildcard_played = chip == "wildcard"
+        expected_paid = 0 if wildcard_played else max(0, transfer_count - free_before)
+        if transfer_count != len(transfer_in_indices) or paid_count != expected_paid:
             raise SolverExecutionError("Transfer counts failed verification.")
-        if free_unused != max(0, free_before - transfer_count):
+        consumed = (
+            0
+            if wildcard_played and transfer_config.wildcard_preserves_free_transfers
+            else transfer_count
+        )
+        if free_unused != max(0, free_before - consumed):
             raise SolverExecutionError("Unused free transfers failed verification.")
         expected_next = min(
             transfer_config.max_free_transfers,
@@ -483,13 +581,16 @@ def _extract_plan(
         captain = players.iloc[captain_indices[0]].copy(deep=True)
         captain.name = None
         projected_score = float(starting_xi["expected_points"].sum() + captain["expected_points"])
+        if chip == "3xc":
+            projected_score += float(captain["expected_points"])
         projected_bench = float(bench["expected_points"].sum())
         hit_points = paid_count * transfer_config.transfer_hit_cost_points
         discount = transfer_config.horizon_discount_factor**week_index
-        contribution = discount * (
-            projected_score + optimization_config.bench_weight * projected_bench - hit_points
-        )
+        bench_weight = 1.0 if chip == "bboost" else optimization_config.bench_weight
+        contribution = discount * (projected_score + bench_weight * projected_bench - hit_points)
         gameweek = int(players.iloc[0]["gameweek"])
+        if chip is not None:
+            chips_played[gameweek] = chip
         weeks.append(
             PlanningWeekResult(
                 gameweek=gameweek,
@@ -514,6 +615,7 @@ def _extract_plan(
                 projected_score=projected_score,
                 projected_bench_points=projected_bench,
                 discounted_objective_contribution=contribution,
+                chip=chip,
             )
         )
         previous_squad = squad_ids
@@ -523,6 +625,10 @@ def _extract_plan(
         total_hits += hit_points
         total_objective += contribution
 
+    for name in artifacts.chips.available:
+        if sum(1 for played_name in chips_played.values() if played_name == name) > 1:
+            raise SolverExecutionError(f"Chip {name!r} was played more than once in the horizon.")
+    diagnostics["chips_played"] = dict(chips_played)
     return TransferPlanResult(
         solver_status=status,
         weeks=tuple(weeks),
@@ -532,6 +638,7 @@ def _extract_plan(
         total_transfer_hit_points=total_hits,
         objective_value=total_objective,
         diagnostics=diagnostics,
+        chips_played=chips_played,
     )
 
 
@@ -540,8 +647,15 @@ def optimize_transfer_plan(
     initial_state: InitialSquadState,
     optimization_config: OptimizationConfig,
     transfer_config: TransferPlanningConfig | None = None,
+    chips: ChipAvailability | None = None,
 ) -> TransferPlanResult:
-    """Optimize squads and transfers over one deterministic projection horizon."""
+    """Optimize squads and transfers over one deterministic projection horizon.
+
+    ``chips`` names the chips that may be played in which gameweeks of this horizon
+    (bench boost, triple captain, wildcard); omitted or empty, the planner is exactly
+    the chip-less planner. Each available chip is played at most once in the horizon
+    and at most one chip is played per gameweek.
+    """
 
     if not isinstance(horizon, PlanningHorizon):
         raise TransferPlanningValidationError("horizon must be a PlanningHorizon.")
@@ -556,6 +670,9 @@ def optimize_transfer_plan(
         raise TransferPlanningConfigurationError(
             "transfer_config must be a TransferPlanningConfig instance."
         )
+    availability = ChipAvailability() if chips is None else chips
+    if not isinstance(availability, ChipAvailability):
+        raise TransferPlanningValidationError("chips must be a ChipAvailability instance.")
 
     verified_horizon = horizon.validated_copy()
     players_by_week = _validated_week_tables(verified_horizon, optimization_config)
@@ -571,6 +688,7 @@ def optimize_transfer_plan(
         initial_state,
         optimization_config,
         settings,
+        availability,
     )
     started_at = perf_counter()
     deadline = started_at + optimization_config.solver_time_limit_seconds
@@ -598,6 +716,8 @@ def optimize_transfer_plan(
         "horizon_fingerprint": verified_horizon.horizon_fingerprint,
         "gameweeks": verified_horizon.gameweeks,
         "horizon_length": len(verified_horizon.gameweeks),
+        "chip_availability_fingerprint": availability.availability_fingerprint,
+        "chips_available": {name: sorted(weeks) for name, weeks in availability.available.items()},
         "expected_points_scale": optimization_config.expected_points_scale,
         "objective_weight_scale": settings.objective_weight_scale,
         "discount_weights": artifacts.discount_weights,
