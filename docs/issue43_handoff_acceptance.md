@@ -15,12 +15,12 @@ value of an acceptance pass is that it is independent.
 
 ## Verdict
 
-**Accepted with one recorded finding.** Every applicable checklist item passes. Item 15
-(per-candidate runtime) was not delivered and stays open as a report request, which
-the acceptance rule permits only because it is informational: it gates nothing in the
-formal run. The recorded finding (item 9/10, below) is not a checklist failure — the
-preflight exits 0 — but it changes what a `table_sha256` can be used to claim, and it
-must be read before the fingerprints are frozen.
+**Accepted with one recorded finding — since resolved.** Every applicable checklist item
+passes. Item 15 (per-candidate runtime) was delivered after this record was first written
+(PR #95). The recorded finding (item 9/10, below) was not a checklist failure — the
+preflight exits 0 — but it changed what a `table_sha256` could be used to claim; the
+prediction side measured it and took the fix in PR #94 (see the follow-up note at the
+end).
 
 ## Item by item
 
@@ -40,7 +40,7 @@ must be read before the fingerprints are frozen.
 | 12 | Historical GW1 residual feasibility analysis | PASS | Delivered as the completed blocker report [gw1_blocker_report_2021-2026.md](gw1_blocker_report_2021-2026.md); "infeasible" is an accepted outcome under this item. Closing #45 on it is a three-owner decision, not part of this acceptance. |
 | 13 | BO-ready deterministic prediction builder | PASS | `DevelopmentFoldPredictionEvaluator` implements the seam; `bind_policy_evaluator` accepts it; the synthetic search is deterministic. The seam gap it recorded (`risk_aversion` could not be pinned) was closed on this side in PR #90 (`BayesianFactor` fixed factor); the gap tests are now tests of the pinned search. |
 | 14 | Prediction factor mapping | PASS | `form_window` passes through `FormWindowMapping` unchanged; a nonzero `risk_aversion` is refused rather than ignored, and the contract refuses missing/unexpected factors. |
-| 15 | Candidate evaluation cost/runtime | OPEN | Not reported in the handoff. Informational only. Observed here as an upper bound, not a measurement: the paired export (candidate + control, 147 folds each) finished in roughly a quarter of an hour on this machine while the full test suite ran concurrently. Please report the per-candidate wall time, machine, and stopping rule from a dedicated run. |
+| 15 | Candidate evaluation cost/runtime | PASS (delivered after acceptance) | Measured in PR #95 ([candidate_runtime.md](candidate_runtime.md)): candidate 590.3 s / 147 folds (4.02 s per fold) against control 11.7 s — about fifty times the cost, ~7% run-to-run spread, machine and stopping rule named. Informational; gates nothing. |
 | 16 | Quality gates | PASS | On `93a87d6`: `pytest` 1785 passed / 1 skipped; `ruff check` clean; `ruff format --check` 257 files formatted; `mypy --strict src` clean over 119 files. |
 | 17 | Declaration and config fingerprints | PASS (computed) / PENDING (frozen) | `scripts.freeze_candidate_declaration` re-run here reproduces the committed JSON **byte for byte**: declaration `f72962a182e4d857448d860641c7ebc211a4f7101f3ed713362636fa2b3bce09`, benchmark configuration `b64a3ab9f06f1c1a207d66c8f1d59b0c3072f7fe8400cb598e378fca37e6f575`. Freezing requires all three owners; the optimization side's review is recorded, the architecture/CI side's is pending. |
 
@@ -88,3 +88,31 @@ prediction side's module):
 It does not freeze the fingerprints (three owners), does not run Stage B, does not read
 the locked holdout, and does not modify any delivered file. Regenerated tables stay
 local under `artifacts/residuals-verify/`; this document is the committed record.
+
+## Follow-up: how the finding was resolved (PR #94, PR #95)
+
+The prediction side measured the finding rather than choosing between the two remedies
+offered above ([export_precision.md](export_precision.md)): perturbing the real
+101,447-row table by a last-bit-sized relative amount (1e-16) moves **all 58,855**
+non-zero unrounded values — two machines disagreeing was certain, not unlucky — while
+nine written decimals move zero rows at 1e-15 and one row at 1e-14. `oos_residual_export`
+now writes `predicted_points` at nine decimals with the precision declared in the
+manifest, and the tolerance-beside-the-hash option was rejected on the right ground: a
+checksum's job is integrity, and an approximate-equality checksum cannot detect a
+corrupted file.
+
+Two consequences this record's numbers inherit:
+
+- **The control hash quoted in item 8 (`1ed41f94…`) is superseded once**, to
+  `98b9dd20…`, because a pair whose halves are written at different precision is not a
+  pair. What `1ed41f94…` proved — byte reproducibility across four commits and two
+  machines — stands; the new hash is the one future runs must match. The candidate hash
+  is now `d556938a…` on the delivering side and should reproduce here; that check is a
+  routine re-run of item 9, not a new acceptance.
+- **The residual identity is no longer exact** (recomputed from the rounded projection;
+  measured 3.55e-15 across real rows, well inside the preflight's 1e-10).
+
+PR #95 also carried the Stage A review's one observation into the gate report (rate-rung
+counts lifted by prefix, absent rungs omitted rather than shown as zeros), so the formal
+run's diagnostics will show the ladder comparison this record asked for.
+
