@@ -608,6 +608,8 @@ def test_available_risk_is_shifted_for_selection_optimism_and_states_it(tmp_path
     assert isinstance(limits, list)
     assert any("shifted by" in limit for limit in limits)
     assert any("calendar-blind" in limit for limit in limits)
+    # The raw squad-level spread is stated as such (the audit measured it slightly narrow).
+    assert any("raw scenario spread" in limit for limit in limits)
     interval = risk.diagnostics["probability_below_threshold_interval"]
     assert isinstance(interval, tuple | list) and len(interval) == 2
     assert risk.metrics is not None

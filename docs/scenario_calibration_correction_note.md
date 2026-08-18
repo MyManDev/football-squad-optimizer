@@ -82,3 +82,36 @@ rows.
   online estimate once enough settled gameweeks exist (a `season_ledger` reader is the
   natural place).
 - Then the rank-probability objective (goal menus) on these scenarios.
+
+## Follow-up (2026-08-18, later): squad-level dispersion
+
+Artifacts: `scenario_calibration_audit_development_disp.{json,md}`,
+`scenario_calibration_audit_online_disp.{json,md}` (audit contract unchanged; the
+evaluation config gained `dispersion_scale`, applied around the raw scenario mean before
+the shift, and the audit gained `--dispersion none|development|online`; online = the
+root mean square of the earlier folds' location-corrected gaps in units of their own
+scenario standard deviation, once the warm-up folds exist).
+
+| Variant | Scale (mean / final online) | Realized < q10 | PIT < 0.10 | PIT > 0.90 |
+| --- | ---: | ---: | ---: | ---: |
+| development shift, raw spread | 1.000 | 0.16 | 0.14 (5/37) | 0.14 (5/37) |
+| development shift, online dispersion | 1.146 / 1.155 | 0.14 | 0.14 (5/37) | 0.08 (3/37) |
+| online shift, raw spread | 1.000 | 0.24 | 0.22 (8/37) | 0.16 (6/37) |
+| online shift, online dispersion | 1.146 / 1.155 | 0.19 | 0.16 (6/37) | 0.16 (6/37) |
+
+Reading, honestly:
+
+- The spread **is** narrow, by about **15%** (the online scale settles at 1.15 and the
+  development-constant estimate is the same number); widening by it moves every tail
+  rate toward nominal or leaves it, and never away.
+- The evidence is **thin**: at 37 folds one tail is five folds, and the 90% interval of
+  5/37 is [0.07, 0.25] — it contains 0.10 before the correction as well as after. The
+  online-shift variant's tail hits are concentrated in the warm-up folds (after them:
+  3/32 and 1/32 low, 6/32 high).
+- The **live default stays at 1.0**: a 15% widening on this evidence is a candidate,
+  not a measured correction, and the live report now states the raw spread as a limit
+  ("about 15% narrow, intervals including nominal"). `recommend_current_squad
+  --risk-dispersion-scale` applies the candidate when asked and the report says so.
+- What would settle it: more folds (a second season of the control export, or the
+  ledger's own settled weeks) and the component-level measurement (common / team / player
+  variances against realized) rather than one squad-level scale.

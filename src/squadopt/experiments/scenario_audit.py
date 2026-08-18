@@ -63,6 +63,8 @@ class ScenarioAuditFoldRow:
     location_shift_points: float = 0.0
     """The selection-optimism shift applied to this fold's scenario scores before the
     summaries above were read (zero in the uncorrected audit)."""
+    dispersion_scale: float = 1.0
+    """The spread factor applied around the raw scenario mean (one in the raw audit)."""
 
     def __post_init__(self) -> None:
         values = (
@@ -109,6 +111,7 @@ class ScenarioAuditResult:
 
 
 SELECTION_SHIFT_MODES: tuple[str, ...] = ("none", "development", "online")
+DISPERSION_MODES: tuple[str, ...] = ("none", "development", "online")
 
 
 def audit_scenario_calibration(
@@ -124,6 +127,8 @@ def audit_scenario_calibration(
     online_warmup_folds: int = 5,
     double_gameweek_scale: float = 1.0,
     fixture_counts_by_fold: Mapping[str, Mapping[object, int]] | None = None,
+    dispersion: str = "none",
+    development_dispersion_scale: float = 1.0,
 ) -> ScenarioAuditResult:
     """Measure scenario calibration on the objective's own folds and pools.
 
@@ -138,6 +143,12 @@ def audit_scenario_calibration(
     one, once ``online_warmup_folds`` are available — leakage-safe by construction).
     ``double_gameweek_scale`` with ``fixture_counts_by_fold`` widens double-gameweek
     players' idiosyncratic spread.
+
+    ``dispersion`` names the decision-level spread correction: ``none``, ``development``
+    (a fixed ``development_dispersion_scale``), or ``online`` (the root mean square of
+    the location-corrected gaps of the audited folds *before* this one, each divided by
+    its own scenario standard deviation — the factor by which the spread was too narrow
+    so far; one until ``online_warmup_folds`` are available).
     """
 
     if not isinstance(objective, ScenarioPolicyObjective):
@@ -153,6 +164,14 @@ def audit_scenario_calibration(
         raise ExperimentExecutionError(
             "double_gameweek_scale differs from one; fixture_counts_by_fold are required."
         )
+    if dispersion not in DISPERSION_MODES:
+        raise ExperimentExecutionError(f"dispersion must be one of {DISPERSION_MODES!r}.")
+    if (
+        isinstance(development_dispersion_scale, bool)
+        or not isinstance(development_dispersion_scale, int | float)
+        or not development_dispersion_scale > 0.0
+    ):
+        raise ExperimentExecutionError("development_dispersion_scale must be positive.")
     settings = objective.config
     optimization_config = OptimizationConfig(bench_weight=bench_weight)
     scenario_config = ScenarioConfig(
@@ -183,6 +202,7 @@ def audit_scenario_calibration(
     covered_by_position: dict[str, int] = {}
     total_by_position: dict[str, int] = {}
     prior_gaps: list[float] = []
+    prior_spreads: list[float] = []
     for context in contexts:
         if selection_shift == "development":
             shift = float(development_shift_points)
@@ -190,7 +210,22 @@ def audit_scenario_calibration(
             shift = -float(np.mean(prior_gaps))
         else:
             shift = 0.0
-        evaluation_config = replace(base_evaluation, location_shift_points=shift)
+        if dispersion == "development":
+            scale = float(development_dispersion_scale)
+        elif dispersion == "online" and len(prior_gaps) >= online_warmup_folds:
+            # Gaps are scenario-mean-minus-realized; centre them on their own mean (the
+            # location correction) and measure them in units of each fold's own spread.
+            gaps = np.asarray(prior_gaps, dtype="float64")
+            spreads = np.asarray(prior_spreads, dtype="float64")
+            standardized = (gaps - gaps.mean()) / np.where(spreads > 0.0, spreads, np.nan)
+            finite = standardized[np.isfinite(standardized)]
+            scale = float(np.sqrt(np.mean(finite**2))) if finite.size else 1.0
+            scale = max(scale, 1e-6)
+        else:
+            scale = 1.0
+        evaluation_config = replace(
+            base_evaluation, location_shift_points=shift, dispersion_scale=scale
+        )
         history = residual_history.loc[
             residual_history["fold_id"].astype(str).isin(context.prior_fold_ids)
         ]
@@ -222,6 +257,9 @@ def audit_scenario_calibration(
         scores = np.asarray(evaluated.scenario_scores, dtype="float64")
         raw_mean = float(str(evaluated.diagnostics.get("mean_score_before_shift", 0.0)))
         prior_gaps.append(raw_mean - realized_score)
+        prior_spreads.append(
+            float(str(evaluated.diagnostics.get("standard_deviation_before_scale", 0.0)))
+        )
         rows.append(
             ScenarioAuditFoldRow(
                 fold_id=context.fold_id,
@@ -231,6 +269,7 @@ def audit_scenario_calibration(
                 probability_below_threshold=(evaluated.metrics.probability_below_threshold),
                 probability_integral_transform=float((scores <= realized_score).mean()),
                 location_shift_points=shift,
+                dispersion_scale=scale,
             )
         )
 
@@ -285,5 +324,11 @@ def audit_scenario_calibration(
                 np.mean([row.location_shift_points for row in rows])
             ),
             "double_gameweek_scale": double_gameweek_scale,
+            "dispersion": dispersion,
+            "development_dispersion_scale": development_dispersion_scale,
+            "mean_dispersion_scale": float(np.mean([row.dispersion_scale for row in rows])),
+            "final_online_dispersion_scale": (
+                float(rows[-1].dispersion_scale) if rows and dispersion == "online" else None
+            ),
         },
     )

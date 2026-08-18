@@ -387,6 +387,38 @@ def test_a_location_shift_moves_every_summary_and_leaves_the_projection_alone() 
         ScenarioEvaluationConfig(location_shift_points=float("nan"))
 
 
+def test_a_dispersion_scale_widens_the_spread_around_the_shifted_centre() -> None:
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+
+    plain = evaluate_fixed_decision(decision, scenarios)
+    widened = evaluate_fixed_decision(
+        decision,
+        scenarios,
+        ScenarioEvaluationConfig(location_shift_points=-30.0, dispersion_scale=1.5),
+    )
+
+    # The centre moves by the shift only; the spread scales; the tail widens.
+    assert widened.metrics.mean_score == pytest.approx(plain.metrics.mean_score - 30.0)
+    assert widened.metrics.score_standard_deviation == pytest.approx(
+        1.5 * plain.metrics.score_standard_deviation
+    )
+    assert widened.metrics.lower_quantile_score == pytest.approx(
+        plain.metrics.mean_score
+        - 30.0
+        + 1.5 * (plain.metrics.lower_quantile_score - plain.metrics.mean_score)
+    )
+    assert widened.diagnostics["dispersion_scale"] == 1.5
+    assert widened.diagnostics["standard_deviation_before_scale"] == pytest.approx(
+        plain.metrics.score_standard_deviation
+    )
+    assert plain.diagnostics["dispersion_scale"] == 1.0
+    for bad in (0.0, -1.0, float("inf")):
+        with pytest.raises(ScenarioConfigurationError, match="dispersion_scale"):
+            ScenarioEvaluationConfig(dispersion_scale=bad)
+
+
 def test_wilson_interval_narrows_with_more_scenarios_and_brackets_the_estimate() -> None:
     from squadopt.scenarios import wilson_interval
 

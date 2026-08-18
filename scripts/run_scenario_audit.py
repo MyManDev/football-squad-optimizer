@@ -91,6 +91,20 @@ def _parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument("--online-warmup-folds", type=int, default=5)
     parser.add_argument(
+        "--dispersion",
+        choices=("none", "development", "online"),
+        default="none",
+        help="decision-level spread correction of the scenario scores: none; development "
+        "(a fixed --development-dispersion-scale); online (root mean square of the "
+        "location-corrected standardized gaps over the audited folds before each fold)",
+    )
+    parser.add_argument(
+        "--development-dispersion-scale",
+        type=float,
+        default=1.0,
+        help="the fixed spread factor used by --dispersion development",
+    )
+    parser.add_argument(
         "--double-gameweek-scale",
         type=float,
         default=1.0,
@@ -181,6 +195,7 @@ def _document(
                 "probability_below_threshold": row.probability_below_threshold,
                 "probability_integral_transform": row.probability_integral_transform,
                 "location_shift_points": row.location_shift_points,
+                "dispersion_scale": row.dispersion_scale,
             }
             for row in audit.rows
         ],
@@ -204,6 +219,14 @@ def _markdown(audit: ScenarioAuditResult) -> str:
         f"- Selection shift: {audit.diagnostics.get('selection_shift', 'none')} "
         f"(mean {float(str(audit.diagnostics.get('mean_location_shift_points', 0.0))):+.2f} pts); "
         f"double-gameweek scale {audit.diagnostics.get('double_gameweek_scale', 1.0)}",
+        f"- Dispersion: {audit.diagnostics.get('dispersion', 'none')} "
+        f"(mean scale {float(str(audit.diagnostics.get('mean_dispersion_scale', 1.0))):.3f}"
+        + (
+            f", final online scale "
+            f"{float(str(audit.diagnostics.get('final_online_dispersion_scale'))):.3f})"
+            if audit.diagnostics.get("final_online_dispersion_scale") is not None
+            else ")"
+        ),
         "",
         "## Decision-level calibration",
         "",
@@ -312,6 +335,8 @@ def main() -> int:
             online_warmup_folds=arguments.online_warmup_folds,
             double_gameweek_scale=arguments.double_gameweek_scale,
             fixture_counts_by_fold=fixture_counts_by_fold,
+            dispersion=arguments.dispersion,
+            development_dispersion_scale=arguments.development_dispersion_scale,
         )
     except ExperimentError as error:
         print(f"Could not audit scenario calibration:\n  {error}")

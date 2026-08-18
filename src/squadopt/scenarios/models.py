@@ -195,6 +195,13 @@ class ScenarioEvaluationConfig:
     about -3 points a starter, -3.9 for the captain, +34.5 at squad level in the audit),
     so an honest lower tail for the chosen squad is the scenario distribution shifted
     down by that amount. Zero keeps the uncorrected summaries."""
+    dispersion_scale: float = 1.0
+    """Factor applied to every scenario score's deviation from the raw scenario mean
+    before the summaries are read — the decision-level dispersion correction. The
+    scenario audit found the squad-level distribution slightly narrow after the location
+    shift (PIT tails 0.14 against 0.10); a scale above one widens it around its centre.
+    One keeps the raw spread. Applied before the location shift, so the shifted mean is
+    unchanged."""
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -204,6 +211,15 @@ class ScenarioEvaluationConfig:
         if isinstance(shift, bool) or not isinstance(shift, Real) or not math.isfinite(shift):
             raise ScenarioConfigurationError("location_shift_points must be a finite number.")
         object.__setattr__(self, "location_shift_points", float(shift))
+        scale = self.dispersion_scale
+        if (
+            isinstance(scale, bool)
+            or not isinstance(scale, Real)
+            or not math.isfinite(scale)
+            or scale <= 0.0
+        ):
+            raise ScenarioConfigurationError("dispersion_scale must be a finite positive number.")
+        object.__setattr__(self, "dispersion_scale", float(scale))
         object.__setattr__(
             self, "worst_fraction", _probability(self.worst_fraction, "worst_fraction")
         )

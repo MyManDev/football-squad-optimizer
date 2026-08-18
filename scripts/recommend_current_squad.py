@@ -119,6 +119,13 @@ def main() -> int:
         help="widen double-gameweek players' scenario spread by this factor, using the "
         "capture's calendar (the fixture-group conformal ratio; 1.0 disables it)",
     )
+    parser.add_argument(
+        "--risk-dispersion-scale",
+        type=float,
+        default=1.0,
+        help="widen the chosen squad's scenario spread around its centre by this factor "
+        "(the scenario audit measured about 1.15 online; 1.0 keeps the raw spread)",
+    )
     parser.add_argument("--risk-lower-quantile", type=float, default=0.10)
     parser.add_argument("--risk-worst-fraction", type=float, default=0.10)
     parser.add_argument("--risk-points-threshold", type=float, default=40.0)
@@ -181,6 +188,7 @@ def main() -> int:
                 lower_quantile=arguments.risk_lower_quantile,
                 worst_fraction=arguments.risk_worst_fraction,
                 points_threshold=arguments.risk_points_threshold,
+                dispersion_scale=arguments.risk_dispersion_scale,
             )
         recommendation = build_recommendation(
             inputs,

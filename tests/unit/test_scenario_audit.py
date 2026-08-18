@@ -149,6 +149,59 @@ def test_a_development_shift_moves_every_fold_by_the_same_amount(
     assert shifted.diagnostics["selection_shift"] == "development"
 
 
+def test_a_dispersion_correction_scales_each_fold_around_its_centre(
+    audit: ScenarioAuditResult,
+) -> None:
+    fixed = audit_scenario_calibration(
+        _objective(),
+        _history(),
+        form_window=5,
+        bench_weight=0.1,
+        points_threshold=30.0,
+        dispersion="development",
+        development_dispersion_scale=2.0,
+    )
+    assert all(row.dispersion_scale == 2.0 for row in fixed.rows)
+    for plain, wide in zip(audit.rows, fixed.rows, strict=True):
+        assert wide.scenario_mean_score == pytest.approx(plain.scenario_mean_score)
+        assert wide.scenario_lower_quantile_score == pytest.approx(
+            plain.scenario_mean_score
+            + 2.0 * (plain.scenario_lower_quantile_score - plain.scenario_mean_score)
+        )
+    assert fixed.diagnostics["dispersion"] == "development"
+    assert fixed.diagnostics["mean_dispersion_scale"] == 2.0
+
+    online = audit_scenario_calibration(
+        _objective(),
+        _history(),
+        form_window=5,
+        bench_weight=0.1,
+        points_threshold=30.0,
+        selection_shift="online",
+        dispersion="online",
+        online_warmup_folds=2,
+    )
+    rows = online.rows
+    assert rows[0].dispersion_scale == 1.0 and rows[1].dispersion_scale == 1.0
+    assert all(row.dispersion_scale > 0.0 for row in rows)
+    # From the warm-up on, the scale is the RMS of the earlier folds' location-corrected
+    # gaps in units of their own spread — earlier folds only, so it is leakage-safe.
+    assert online.diagnostics["final_online_dispersion_scale"] == rows[-1].dispersion_scale
+    with pytest.raises(ExperimentExecutionError, match="dispersion"):
+        audit_scenario_calibration(
+            _objective(), _history(), form_window=3, bench_weight=0.0, dispersion="magic"
+        )
+    with pytest.raises(ExperimentExecutionError, match="development_dispersion_scale"):
+        audit_scenario_calibration(
+            _objective(),
+            _history(),
+            form_window=3,
+            bench_weight=0.0,
+            dispersion="development",
+            development_dispersion_scale=0.0,
+        )
+
+
 def test_an_online_shift_uses_only_earlier_folds(audit: ScenarioAuditResult) -> None:
     online = audit_scenario_calibration(
         _objective(),
