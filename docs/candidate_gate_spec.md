@@ -60,7 +60,21 @@ candidates are remeasured together under the same deterministic solver-work cont
 
 1. Review and freeze the candidate declaration and benchmark configuration fingerprints.
 2. Build the candidate with no further model or hyperparameter changes.
-3. Run `run_declared_candidate_benchmark` exactly once for the formal development result.
+3. Run `run_declared_candidate_benchmark` exactly once for the formal development result:
+
+   ```powershell
+   .venv\Scripts\python -m scripts.run_candidate_gate --confirm-frozen
+   ```
+
+   The command carries no tuning arguments by design. The configuration fingerprint covers
+   the evaluated seasons and the solver's deterministic budget as well as the projection
+   settings, so a season or time-limit flag would move the fingerprint and void the freeze.
+   Both fingerprints are checked against `issue43_candidate_declaration.json` before any
+   season is loaded; a mismatch refuses the run, because a run whose fingerprints disagree
+   with the frozen ones is not the formal run. `--confirm-frozen` is the operator's
+   assertion that step 1 is complete — a script cannot read whether three owners reviewed
+   anything.
+
 4. Serialize the result; the report includes both fingerprints and the declared change.
 5. Treat a passing development verdict only as eligibility for the locked-holdout
    protocol, never as automatic operational promotion.
