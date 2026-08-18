@@ -28,6 +28,7 @@ from scripts._experiment_cli import (
     write_text,
 )
 
+from squadopt.backtest.export_precision import write_export_table
 from squadopt.data.sources.vaastav import ARCHIVE_COMMIT, build_panel
 from squadopt.experiments import (
     ExperimentError,
@@ -91,7 +92,7 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
     table_name = str(arguments.table_name)
     table_path = output_dir / f"{table_name}.csv"
-    table.to_csv(table_path, index=False)
+    write_export_table(table, table_path)
     table_sha256 = compute_table_sha256(table_path)
     label_override: dict[str, str] = (
         {"candidate_label": str(arguments.candidate_label)}

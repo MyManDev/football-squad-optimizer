@@ -30,6 +30,7 @@ from scripts._experiment_cli import (
     write_text,
 )
 
+from squadopt.backtest.export_precision import write_export_table
 from squadopt.backtest.horizon_decay import (
     FIXTURE_GROUPS,
     FIXTURE_SCALING_RULE_VERSION,
@@ -128,7 +129,7 @@ def main() -> int:
 
     output_dir: Path = arguments.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
-    result.residuals.to_csv(output_dir / "horizon_decay_residuals.csv", index=False)
+    write_export_table(result.residuals, output_dir / "horizon_decay_residuals.csv")
 
     lines = [
         "# Horizon Decay",

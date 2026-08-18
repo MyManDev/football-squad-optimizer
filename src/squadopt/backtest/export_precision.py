@@ -18,11 +18,21 @@ The measurement is deliberately run against an existing export rather than again
 regenerated ones. Regenerating on one machine cannot show the effect at all: the same
 machine is bit-identical with itself. Perturbing a real table shows what *would* happen,
 at any magnitude, without needing the second machine present.
+
+Rounding the values is necessary and it is not sufficient. Identical values still reach
+disk as different bytes if the line terminator differs, because `DataFrame.to_csv` defaults
+to `os.linesep` — so the same table writes `\r\n` on Windows and `\n` on Linux, and
+`table_sha256` digests the raw file bytes. The two owners who compared hashes were both on
+Windows, which is why the value half of the problem was the only half visible. Writing
+through `write_export_table` fixes the terminator; the measurement above fixes the values.
+Both halves are needed before a hash means "the same table" rather than "the same table on
+the same operating system".
 """
 
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Final
 
 import numpy as np
@@ -32,6 +42,11 @@ from squadopt.backtest.splits import BacktestConfigurationError
 
 EXPORT_PRECISION_CONTRACT_VERSION: Final = "export_precision_v1"
 
+# The line terminator every export is written with, on every platform. Explicit because
+# pandas defaults to os.linesep and a digest over the file bytes would otherwise identify
+# the operating system as much as the table.
+EXPORT_LINE_TERMINATOR: Final = "\n"
+
 # Double precision carries about 2.2e-16 of relative resolution, so a last-bit difference
 # in a coefficient reaches the output somewhere near 1e-16. The larger sizes are headroom:
 # they say how far the answer would have to degrade before a precision stopped working.
@@ -40,6 +55,22 @@ DEFAULT_PERTURBATIONS: Final = (1e-16, 1e-15, 1e-14, 1e-12)
 # Candidates for the written precision. Nine decimals is five orders below anything any
 # report quotes, so it discards nothing a reader could notice.
 DEFAULT_DECIMALS: Final = (12, 9, 6)
+
+
+def write_export_table(table: pd.DataFrame, path: Path) -> None:
+    """Write one export table in the bytes every machine agrees on.
+
+    Every measurement table whose `table_sha256` is recorded goes through here, so the
+    digest identifies the table and not the operating system that wrote it. The parent
+    directory is created if it is missing, which lets a caller name an output path without
+    preparing it first.
+
+    Rounding the values is the caller's job and is measured by this module; the terminator
+    is this function's job. A hash means "the same table" only when both are settled.
+    """
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    table.to_csv(path, index=False, lineterminator=EXPORT_LINE_TERMINATOR)
 
 
 @dataclass(frozen=True, slots=True)
