@@ -1,0 +1,102 @@
+# Ownership
+
+Who may change what, which files need more than one signature, and when the live path is
+frozen. The question this document exists to answer is "who approves this, and where do I put
+it?" — if you cannot answer that from this page alone, the page is wrong.
+
+Ownership means review authority, not exclusive access. Anyone may read anything and propose a
+change to anything. The owner of a zone is who must approve a change to it, and who is
+accountable for its contracts staying honest.
+
+## The three roles
+
+These names are not new. They are already used throughout the docs — `data_contract.md:3`
+("Owner: data / data mining"), `candidate_declaration_review.md:65` ("Reviewer of frozen
+components: the optimization/evaluation side"), and the architecture/CI side named in
+`issue43_stage_a_review.md:104`. This document collects them in one place for the first time.
+
+| Role | Zone |
+| --- | --- |
+| **data / data mining** | `data/`, `features/`, `prediction/` |
+| **optimization / evaluation** | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`, `live/` |
+| **architecture / CI** | `.github/`, `pyproject.toml`, `integration.py` and `squadopt/__init__.py`, the future `application/`, `scripts/_experiment_cli.py` and the script shells, `docs/architecture/` |
+| **shared — all three** | `contracts/` (when it exists), `data/schema.py`, `optimization/config.py`, `backtest/` |
+
+## Shared boundaries
+
+Four surfaces need all three owners because every layer depends on them and a casual edit
+there is the most expensive kind:
+
+- **`contracts/`** — every package will import it by construction. It is also the natural
+  dumping ground for anything awkward to place, so the friction is the safeguard. See
+  [dependency rules](dependency_rules.md) for what is allowed in.
+- **`data/schema.py`** — the canonical column vocabulary, 17 column tuples, imported by 27
+  modules in `src/`.
+- **`optimization/config.py`** — where `Position` and `POSITIONS` live until `contracts`
+  exists.
+- **`backtest/`** — genuinely co-developed: 9 commits from the data side and 7 from the
+  optimization side, and it sits directly under `experiments` in the layer order. Rather than
+  award it to whoever committed most recently, it is a joint surface. This is the one entry in
+  the table that is a deliberate choice rather than a description of practice.
+
+A change to a shared boundary needs one approving review from each of the other two roles. A
+change that only *reads* a shared boundary needs nothing extra.
+
+## `live/` and the handover
+
+`live/` belongs to the optimization/evaluation side today — that is where all 13 of its commits
+came from, and the operational surface (`ledger.py`, `tick.py`, `recommendation.py`) is the
+least safe thing in the repository to hand to a new owner mid-season.
+
+On handover, the architecture/CI side takes the operational surface of `live/` along with CI,
+packaging, the `application/` layer and the script shells. Measurement logic and the contracts
+stay with the sides that own them. The handover happens **after** the opening gameweek is
+captured, decided and settled, not before.
+
+## Live-path freeze window
+
+No merge touching `live/`, `optimization/`, `prediction/` or `scenarios/` inside **24 hours
+either side of a deadline**. The deadline is whatever the current capture publishes, not a date
+written here — `run_season_tick` resolves it from the snapshot.
+
+Inside the window the only permitted changes are a fix for a blocker found by the runbook's own
+checks, recorded with the blocker report template (`../gw1_blocker_report_template.md`). Docs
+and measurement PRs in other zones are unaffected.
+
+Outside the window, any PR touching the live path carries the replay check named in
+[PR discipline](pr_discipline.md).
+
+## Open sign-offs this document clears
+
+The architecture/CI role has been referenced with pending obligations in three places. Naming
+the role's zone here is what makes those actionable rather than addressed to nobody:
+
+| Where | Item |
+| --- | --- |
+| `../issue43_stage_a_review.md:109` | "Reviewed by the architecture/CI side: **pending**" |
+| `../issue43_candidate_declaration.md:59` | "Reviewed by the architecture/CI side: pending" |
+| `../issue43_handoff_acceptance.md:45` | Item 17: freezing requires all three owners; the architecture/CI side's review is pending |
+
+These stay open. This document does not grant the sign-off — it says who owes it.
+
+## Unresolved
+
+- **`data/identity.py`** sits in the data zone but has no importers inside `src/squadopt` —
+  only `scripts/` and `tests/`. Whether it is a public utility, a contract, or dead is the data
+  side's call to make and record.
+- **`recalibration/` and `preflight/`** are assigned to the optimization/evaluation side on the
+  strength of who wrote them (2 commits each). If the data side ends up doing the recalibration
+  work in practice, move it here rather than working around the table.
+
+## Verification
+
+Ownership claims about who wrote what are checkable:
+
+```bash
+git log origin/develop --format='%an' -- src/squadopt/backtest | sort | uniq -c | sort -rn
+```
+
+Run it for any zone. If the table and the history disagree for a whole package, the table needs
+a deliberate decision rather than a quiet edit.
+
+Last reviewed against `b031ef1` (PR #110).

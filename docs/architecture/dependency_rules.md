@@ -1,0 +1,159 @@
+# Dependency Rules
+
+The one-directional order every import inside `squadopt` must respect, the exceptions that
+exist today, and the rule for changing either. This document is the contract that
+`lint-imports` enforces once the architecture/CI owner wires it up; until then it is enforced
+by review.
+
+For what the graph actually looks like right now, see [system map](system_map.md). For why
+the shape is a single layered package, see [ADR 0001](decisions/0001-modular-monolith.md).
+
+## The order
+
+A package may import anything **below** it and nothing at or above it.
+
+```
+contracts
+  data
+    features
+      prediction
+        optimization
+          evaluation
+            uncertainty
+              scenarios
+                risk
+                  planning
+                    bayesopt
+                      preflight
+                        recalibration
+                          backtest
+                            experiments
+                              live
+                                application
+                                  scripts
+```
+
+`contracts` and `application` do not exist yet. They are in the order so that when they are
+built there is no argument about where they go: `contracts` depends on nothing, and
+`application` may reach everything below it but nothing may reach it except `scripts`.
+
+### Why this order and not the obvious one
+
+The first draft of this order grouped the packages by what they are about, which reads better
+and does not work. Three groupings had to be broken, each because the code already says
+otherwise:
+
+| Tempting grouping | Why it fails |
+| --- | --- |
+| `evaluation` above `uncertainty`/`scenarios`/`risk` | `uncertainty` imports `EvaluationFold` three times (`adaptive.py:16`, `calibration.py:16`, `fixture_folds.py:17`) and `risk` once (`evaluation.py:9`). Scoring a fold is more primitive than describing its spread, so `evaluation` goes below. |
+| `{uncertainty, scenarios, risk}` as one tier | `risk` imports `uncertainty` three times (`config.py:13`, `evaluation.py:29`, `optimizer.py:20`). Risk is built on top of spread, not beside it. |
+| `{experiments, bayesopt, recalibration, preflight}` as one tier | Four separate edges cross it: `experiments` to `bayesopt` (4), `backtest` to `bayesopt` (1), `backtest` to `preflight` (1), `experiments` to `preflight` (1). `bayesopt` is in fact a pure leaf and `preflight` only imports `data`, so both belong far lower. |
+
+Choosing the order above instead of the thematic one takes the violation count from **16
+imports across 9 pairs** to **5 imports across 3 pairs** without moving a single line of code.
+That is the whole point of writing the order down before starting the migration: most of what
+looked like technical debt was a mis-drawn diagram.
+
+### Where the order is genuinely free
+
+Some packages are independent of each other and their relative position is arbitrary. Do not
+read meaning into it, and do not "fix" it:
+
+- `bayesopt` imports no other subpackage at all. It could sit immediately above `contracts`.
+- `preflight` imports only `data`.
+- `recalibration` imports `data`, `features` and `scenarios`, so it needs to be above
+  `scenarios` but is otherwise unconstrained.
+- `scenarios` does not import `uncertainty`, and `planning` imports only `optimization`.
+
+If a future import makes one of these positions load-bearing, say so here at the same time.
+
+## The exceptions that exist today
+
+Five import statements violate the order. They are listed exhaustively, they are the
+`lint-imports` baseline, and **the list may only get shorter**.
+
+| # | Edge | Imports | Sites | Closes with |
+| --- | --- | --- | --- | --- |
+| 1 | `data` to `optimization` | 2 | `data/schema.py:19`, `data/schema.py:20` | `contracts` |
+| 2 | `prediction` to `optimization` | 1 | `prediction/integration.py:15` | `contracts` |
+| 3 | `backtest` to `experiments` | 2 | `backtest/production_benchmark.py:57`, `:58` | `statistics` and `PromotionPolicy` moving to `evaluation` |
+
+Both remedies are already planned work, and between them they take the baseline to zero. No
+other package move is required to reach a clean contract — in particular, narrowing the wide
+barrels (`experiments` re-exports 82 names, `live` 79, `data` 68) is a separate quality
+concern and not a prerequisite.
+
+### What goes in `contracts`
+
+Only vocabulary. Nothing that computes a decision, and nothing that imports anything else in
+`squadopt`.
+
+- `Position` (`optimization/config.py:12`) and `POSITIONS` (`:13`)
+- `REQUIRED_COLUMNS` (`optimization/validation.py:15`), the projection contract
+- `sort_players_by_id` (`optimization/coefficients.py:46`) — nine lines whose docstring calls
+  it "the stable player ordering used by the model and its fingerprints"; canonical ordering
+  is a contract even though it is a function
+- the identity and fingerprint primitives, and the contract-version registry, per
+  [ADR 0002](decisions/0002-contract-versioning.md)
+
+`contracts` is a shared boundary in [ownership](ownership.md): changes need all three owners.
+That is deliberate friction. A module every layer depends on is the one place where a casual
+edit is most expensive, and it is the natural dumping ground for anything that is awkward to
+place. If a symbol is not vocabulary that at least two layers need, it does not go here.
+
+## Rules for changing this document
+
+1. **The baseline may only shrink.** A PR that adds a violating import is rejected, not
+   baselined. If the import is genuinely necessary, the order is wrong and this document
+   changes first, in its own PR, with all three owners agreeing.
+2. **Re-exports live exactly one release.** When a symbol moves, the old location keeps
+   re-exporting it so no import breaks in the same PR that moves it. The re-export is removed
+   in a later, separate PR. This is what makes each migration step reviewable in isolation.
+3. **Boundary files change only by joint approval** — see [ownership](ownership.md).
+4. **The order is a claim about the code, so it is verified, not trusted.** Any change here
+   comes with the regenerated numbers.
+
+## Verification
+
+Until `lint-imports` is wired into CI, the check is the AST walk described in
+[system map](system_map.md): attribute every `import squadopt.*` and
+`from squadopt.* import ...` statement to the subpackage containing the importing file, treat
+`data/sources` as `data`, and report any edge whose target sits at or above its source in the
+order above. The expected output is exactly the three pairs and five statements in the
+exceptions table.
+
+Once it is wired up, the same contract in `pyproject.toml` is:
+
+```toml
+[tool.importlinter]
+root_package = "squadopt"
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture"
+type = "layers"
+layers = [
+    "live",
+    "experiments",
+    "backtest",
+    "recalibration",
+    "preflight",
+    "bayesopt",
+    "planning",
+    "risk",
+    "scenarios",
+    "uncertainty",
+    "evaluation",
+    "optimization",
+    "prediction",
+    "features",
+    "data",
+]
+```
+
+Note that `import-linter` lists layers **highest first**, which is the reverse of the order
+written at the top of this document. The five baseline violations are expressed as
+`ignore_imports` entries, one per statement, each carrying the issue that will remove it — not
+as a blanket exemption for the package pair, so a *new* bad import between the same two
+packages still fails.
+
+Last measured against `b031ef1` (PR #110).

@@ -206,7 +206,9 @@ def _training_identity(panel: pd.DataFrame) -> tuple[str, str]:
         if column in panel.columns
     ]
     ordered = panel.loc[:, columns].sort_values(["season", "gameweek", "player_id"], kind="stable")
-    fingerprint = hashlib.sha256(ordered.to_csv(index=False).encode("utf-8")).hexdigest()
+    fingerprint = hashlib.sha256(
+        ordered.to_csv(index=False, lineterminator="\n").encode("utf-8")
+    ).hexdigest()
     last = ordered.iloc[-1]
     cutoff = f"{last['season']}:GW{int(last['gameweek']):02d}"
     return cutoff, fingerprint

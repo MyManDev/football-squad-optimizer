@@ -62,7 +62,9 @@ def _text(value: object, name: str) -> str:
 
 def _residual_fingerprint(frame: pd.DataFrame) -> str:
     ordered = frame.sort_values(["season", "gameweek", "fold_id", "player_id"], kind="stable")
-    return hashlib.sha256(ordered.to_csv(index=False).encode("utf-8")).hexdigest()
+    return hashlib.sha256(
+        ordered.to_csv(index=False, lineterminator="\n").encode("utf-8")
+    ).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)

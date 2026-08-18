@@ -394,6 +394,100 @@ def test_a_changed_projection_changes_the_fingerprint() -> None:
     )
 
 
+# The opening-gameweek decision this capture produces, recorded so that a change to the
+# live path has to declare itself. Every other replay test above compares two runs of the
+# same commit, which passes even if every number moved; these literals are the only thing
+# in the suite that would notice.
+GW1_REPLAY_PREDICTION_FINGERPRINT = (
+    "8af1337e0394baab54d1b706b24ff42230c163683b52df50cf0af0da19140b90"
+)
+GW1_REPLAY_SQUAD = (
+    1001,
+    1002,
+    1004,
+    1006,
+    1007,
+    1009,
+    1011,
+    1012,
+    1014,
+    1015,
+    1017,
+    1019,
+    1022,
+    1023,
+    1024,
+)
+GW1_REPLAY_STARTING_XI = (1001, 1004, 1006, 1007, 1011, 1012, 1014, 1015, 1019, 1022, 1023)
+GW1_REPLAY_BENCH = (1002, 1009, 1017, 1024)
+GW1_REPLAY_CAPTAIN = 1001
+GW1_REPLAY_TOTAL_COST_TENTHS = 795
+GW1_REPLAY_PROJECTED_SCORE = 33.92236255572065
+
+
+def test_the_recorded_gw1_replay_decision_holds(tmp_path: Path) -> None:
+    """Replaying the opening gameweek reproduces the decision recorded here.
+
+    This is the live-path gate. A pull request touching ``live/``, ``optimization/``,
+    ``prediction/`` or ``scenarios/`` runs it, and a failure means one of two things:
+
+    - the change altered a live decision, which is legitimate but must be stated in the
+      pull request and agreed by the live-path owner, and these literals updated in the
+      same commit; or
+    - the change altered a live decision by accident, which is the bug this test exists
+      to find.
+
+    Deliberately not asserted: a digest of ``render()``. The report prints its player
+    tables through pandas, whose column widths and float formatting vary between the
+    pandas versions this project permits, so a hash of the text would fail for reasons
+    that have nothing to do with the decision. Report stability within a commit is
+    covered by ``test_the_same_capture_recommends_identically_twice`` above.
+
+    If these literals do not reproduce on another machine at the same commit, that is a
+    determinism defect worth reporting rather than a test to loosen.
+    """
+
+    snapshot = _capture(tmp_path)
+    panel = _panel(players=(1001, 1004, 1012))
+
+    recommendation = _recommend(tmp_path, snapshot=snapshot, panel=panel, gameweek=1)
+
+    assert recommendation.snapshot_id == "fpl-live-20260813T201143Z-dfa626378b35"
+    assert recommendation.gameweek == 1
+    assert recommendation.deadline_utc == "2026-08-21T17:30:00Z"
+    assert recommendation.solver_status == SolverStatus.OPTIMAL.name
+    assert recommendation.prediction_fingerprint == GW1_REPLAY_PREDICTION_FINGERPRINT
+    assert tuple(int(value) for value in recommendation.squad["player_id"]) == GW1_REPLAY_SQUAD
+    assert (
+        tuple(int(value) for value in recommendation.starting_xi["player_id"])
+        == GW1_REPLAY_STARTING_XI
+    )
+    assert tuple(int(value) for value in recommendation.bench["player_id"]) == GW1_REPLAY_BENCH
+    assert int(recommendation.captain["player_id"]) == GW1_REPLAY_CAPTAIN
+    assert recommendation.total_cost_tenths == GW1_REPLAY_TOTAL_COST_TENTHS
+    assert recommendation.projected_score == pytest.approx(GW1_REPLAY_PROJECTED_SCORE, abs=1e-9)
+
+
+def test_the_recorded_gw1_replay_matches_the_live_reading_of_the_same_capture(
+    tmp_path: Path,
+) -> None:
+    """Naming gameweek 1 and letting the capture resolve it reach the same decision.
+
+    The pinned test above names the gameweek explicitly, which is what replay does. If
+    that ever diverges from what the capture resolves on its own, the recorded literals
+    would still pass while the live path had changed.
+    """
+
+    snapshot = _capture(tmp_path)
+    panel = _panel(players=(1001, 1004, 1012))
+
+    live = _recommend(tmp_path, snapshot=snapshot, panel=panel)
+
+    assert live.prediction_fingerprint == GW1_REPLAY_PREDICTION_FINGERPRINT
+    assert tuple(int(value) for value in live.squad["player_id"]) == GW1_REPLAY_SQUAD
+    assert int(live.captain["player_id"]) == GW1_REPLAY_CAPTAIN
+
+
 # --- the report -------------------------------------------------------------
 
 

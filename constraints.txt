@@ -1,0 +1,28 @@
+# Pinned versions of the environment that produced the committed measurement artifacts
+# (2026-08-18, Python 3.13). The 3.13 CI job installs with `pip install -c constraints.txt
+# -e ".[dev]"`; the 3.11 job installs the declared ranges (numpy 2.5 has no 3.11 wheels).
+# A bump is a deliberate PR that re-runs the gates, not a drift.
+absl-py==2.5.0
+click==8.4.2
+grimp==3.15
+immutabledict==4.3.1
+import-linter==2.13
+iniconfig==2.3.0
+joblib==1.5.3
+mypy==2.3.0
+mypy_extensions==1.1.0
+numpy==2.5.2
+ortools==9.15.6755
+packaging==26.3
+pandas-stubs==3.0.5.260730
+pandas==3.0.5
+pluggy==1.6.0
+protobuf==6.33.6
+pytest==9.1.1
+python-dateutil==2.9.0.post0
+ruff==0.16.2
+scikit-learn==1.9.0
+scipy==1.18.0
+threadpoolctl==3.6.0
+typing_extensions==4.16.0
+tzdata==2026.3

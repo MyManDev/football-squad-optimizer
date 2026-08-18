@@ -256,7 +256,7 @@ def record_decision(
             (staging / _DECISION_FILE).write_text(
                 json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
-            projection.table.to_csv(staging / _PROJECTIONS_FILE, index=False)
+            projection.table.to_csv(staging / _PROJECTIONS_FILE, index=False, lineterminator="\n")
             (staging / _REPORT_FILE).write_text(report_text, encoding="utf-8")
             _write_manifest(staging)
             _verify_manifest(staging)
