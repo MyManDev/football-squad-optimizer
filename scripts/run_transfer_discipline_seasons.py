@@ -39,15 +39,6 @@ from scripts._experiment_cli import (
     write_json,
     write_text,
 )
-from scripts.run_season_chain_seasons import (
-    LOCKED_HOLDOUT_SEASON,
-    MAX_FREE_TRANSFERS,
-    _chain_record,
-    _comparison,
-    _fixture_counts,
-    chip_windows_for,
-    parse_holding_values,
-)
 
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.experiments import (
@@ -57,6 +48,15 @@ from squadopt.experiments import (
     ExperimentError,
     SeasonChain,
     SeasonChainConfig,
+)
+from squadopt.experiments.season_chain_runs import (
+    LOCKED_HOLDOUT_SEASON,
+    MAX_FREE_TRANSFERS,
+    chain_comparison,
+    chain_record,
+    chip_windows_for,
+    parse_holding_values,
+    season_fixture_counts,
 )
 from squadopt.optimization import OptimizationConfig
 from squadopt.planning import TransferPlanningConfig
@@ -266,7 +266,7 @@ def _document(
             label = _label(lookahead, mode, hit, cap, value)
             if label == baseline_label:
                 continue
-            comparison = _comparison(
+            comparison = chain_comparison(
                 label,
                 baseline_label,
                 chains,
@@ -404,7 +404,7 @@ def main() -> int:
     records: list[dict[str, object]] = []
     try:
         for season in seasons_tuple:
-            counts = _fixture_counts(arguments.archive_root, season)
+            counts = season_fixture_counts(arguments.archive_root, season)
             cap_free = MAX_FREE_TRANSFERS.get(season, 5)
             for lookahead in lookaheads:
                 for hit, cap, value in itertools.product(hit_costs, caps, values):
@@ -440,7 +440,7 @@ def main() -> int:
                     started = datetime.now(UTC)
                     result = SeasonChain(panel, counts, config).run()
                     elapsed = (datetime.now(UTC) - started).total_seconds()
-                    record = _chain_record(result, label, elapsed)
+                    record = chain_record(result, label, elapsed)
                     record["factors"] = {
                         "planning_hit_cost": hit,
                         "transfer_cap": cap,

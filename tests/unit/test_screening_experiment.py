@@ -46,6 +46,7 @@ def screening_result(
     return result
 
 
+@pytest.mark.slow
 def test_screening_runs_all_twelve_cells_on_identical_development_folds(
     screening_result: ScreeningExperimentResult,
 ) -> None:

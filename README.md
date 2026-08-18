@@ -618,6 +618,11 @@ is the accepted deliverable for that checklist item.
 .venv\Scripts\python -m mypy src\squadopt
 ```
 
+Two pytest markers split the suite: `slow` (solver-heavy tests of more than about five
+seconds each) and `integration` (everything under `tests/integration`, applied
+automatically). The fast suite for a pull request is `pytest -m "not slow"`; the full
+suite is plain `pytest` and is what the merge gate means.
+
 See [the optimization specification](docs/optimization_spec.md) for the formulation,
 rounding rules, deterministic tie-breaking, assumptions, and current limitations.
 The [screening experiment specification](docs/experimentation_spec.md) records the

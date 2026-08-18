@@ -11,6 +11,18 @@ from tests.fixtures.synthetic_players import (
 )
 
 
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """Mark every test under tests/integration as ``integration``.
+
+    ``slow`` is applied by hand to the solver-heavy tests; the fast suite is
+    ``pytest -m "not slow"``, the full suite is plain ``pytest``.
+    """
+
+    for item in items:
+        if "integration" in item.path.parts:
+            item.add_marker(pytest.mark.integration)
+
+
 @pytest.fixture
 def baseline_players() -> pd.DataFrame:
     return make_baseline_players()
