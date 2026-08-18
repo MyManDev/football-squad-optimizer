@@ -237,6 +237,7 @@ data/snapshots/
 # is the generated summary under docs/ (season_ledger_<season>.md).
 data/ledger/
 data/handoffs/
+data/logs/
 
 # Reproducible local experiment outputs (reports are generated, not source data)
 artifacts/
