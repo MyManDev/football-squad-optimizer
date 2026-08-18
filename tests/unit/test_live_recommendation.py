@@ -592,3 +592,88 @@ def test_live_residual_history_copies_input_and_rejects_missing_columns() -> Non
             post_processing_contract_version="captured_availability_rule_v1",
             source_id="broken",
         )
+
+
+def test_available_risk_is_shifted_for_selection_optimism_and_states_it(tmp_path: Path) -> None:
+    from squadopt.live.risk import DEVELOPMENT_SELECTION_OPTIMISM
+
+    recommendation = _recommend_with_risk(tmp_path)
+    risk = recommendation.risk
+    assert risk.status is LiveRiskStatus.AVAILABLE
+    expected_shift = DEVELOPMENT_SELECTION_OPTIMISM.location_shift(11)
+    assert risk.diagnostics["location_shift_points"] == pytest.approx(expected_shift)
+    assert expected_shift == pytest.approx(-(11 * 2.951 + 3.863))
+    assert risk.diagnostics["selection_optimism_source"].startswith("selection_optimism_profile_v1")
+    limits = risk.diagnostics["stated_limits"]
+    assert isinstance(limits, list)
+    assert any("shifted by" in limit for limit in limits)
+    assert any("calendar-blind" in limit for limit in limits)
+    interval = risk.diagnostics["probability_below_threshold_interval"]
+    assert isinstance(interval, tuple | list) and len(interval) == 2
+    assert risk.metrics is not None
+    assert interval[0] <= risk.metrics.probability_below_threshold <= interval[1]
+    assert "90% [" in render(recommendation)
+
+
+def test_rivals_are_compared_in_the_same_scenarios_and_reported(tmp_path: Path) -> None:
+    from squadopt.live.risk import evaluate_live_risk
+    from squadopt.optimization import optimize_squad
+    from squadopt.scenarios import RivalSquad
+
+    inputs = read_inputs(_capture(tmp_path), season=SEASON)
+    projection = project(inputs, _panel(players=(1001, 1004, 1012)))
+    history = _risk_history(projection, seasons=("2024-25", "2025-26"), gameweek=1)
+    pool = projection.table.loc[
+        :, ["player_id", "name", "team_id", "position", "price_tenths", "expected_points"]
+    ]
+    decision = optimize_squad(pool, OptimizationConfig())
+    assert decision.captain is not None
+    starters = tuple(int(v) for v in decision.starting_xi["player_id"].tolist())
+    captain = int(decision.captain["player_id"])
+    other = next(p for p in starters if p != captain)
+    rivals = (
+        RivalSquad("twin", starters, captain),
+        RivalSquad("captain-swap", starters, other),
+    )
+    counts = {int(p): 1 for p in projection.table["player_id"].tolist()}
+
+    risk = evaluate_live_risk(
+        inputs,
+        projection,
+        decision,
+        history,
+        scenario_config=ScenarioConfig(
+            scenario_count=64,
+            min_history_folds=2,
+            min_player_observations=2,
+            double_gameweek_scale=1.4,
+        ),
+        evaluation_config=ScenarioEvaluationConfig(points_threshold=40.0),
+        fixture_counts=counts,
+        rivals=rivals,
+    )
+
+    assert risk.status is LiveRiskStatus.AVAILABLE
+    comparisons = risk.diagnostics["rival_comparisons"]
+    assert [entry["rival"] for entry in comparisons] == ["twin", "captain-swap"]
+    assert comparisons[0]["probability_ahead"] == 0.0
+    assert comparisons[0]["shared_starters"] == 11
+    assert 0.0 <= comparisons[1]["probability_ahead"] <= 1.0
+    assert risk.diagnostics["double_gameweek_scale"] == 1.4
+    assert risk.diagnostics["double_gameweek_players"] == 0
+    limits = risk.diagnostics["stated_limits"]
+    assert not any("calendar-blind" in limit for limit in limits)
+    assert any("widened by 1.4" in limit for limit in limits)
+    with pytest.raises(LiveRiskValidationError, match="fixture_counts"):
+        evaluate_live_risk(
+            inputs,
+            projection,
+            decision,
+            history,
+            scenario_config=ScenarioConfig(
+                scenario_count=64,
+                min_history_folds=2,
+                min_player_observations=2,
+                double_gameweek_scale=1.4,
+            ),
+        )

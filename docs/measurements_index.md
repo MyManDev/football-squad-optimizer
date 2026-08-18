@@ -24,6 +24,7 @@ Regenerated artifacts must keep passing `scripts.run_measurement_preflight`.
 | `scenario_bayesopt_deterministic` | Same recommendation under a deterministic work budget (`det=2.0`); trace machine-independent | #64 |
 | `risk_frontier` | **Every ra>0 worsens mean AND floor** (q10 −10..−28); premium buys negative protection | #67 |
 | `scenario_calibration_audit` | Cause found: +34.5 decision-level location bias; realized scores in the scenarios' extreme lower tail (PIT 0.07) | #68 |
+| `scenario_calibration_audit_{development,online,dev_dgw,online_dgw}` (+correction note) | Decision-level **selection-optimism shift** (−36.3 at squad level from `selection_optimism_profile_v1`; or online from earlier folds) fixes the location: mean PIT 0.07 → 0.55/0.51, bias +34.5 → −1.8/+2.7; squad-level spread now slightly narrow both ways (PIT tails 0.14/0.14 vs 0.10) — dispersion is the next item; double-gameweek scale 1.45 and rival comparison (same scenarios, shared players cancel) added; live risk applies the shift by default and states its limits | — |
 | `scenario_calibration_audit_located_k10/_k2` | Honest negative result: per-player location component does not fix the bias — the curse is selection-time, not player-persistent | #70 |
 
 ## Uncertainty and recalibration

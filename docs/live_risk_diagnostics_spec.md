@@ -100,3 +100,26 @@ python -m scripts.recommend_current_squad `
 
 Until a matching historical opening-week residual export exists, the expected live state is
 `unavailable`, not a synthetic substitute derived from midseason folds.
+
+
+## Calibration corrections (2026-08-18)
+
+- **Selection-optimism shift.** An available lower tail is read from the chosen squad's
+  scenario scores shifted by `SelectionOptimism.location_shift(starters)` — by default
+  `DEVELOPMENT_SELECTION_OPTIMISM` (−2.951 a starter, −3.863 the captain, from
+  `selection_optimism_profile_v1` on the control), because the uncorrected scenarios
+  are centred on projections that are optimistic by construction for a selected squad
+  (`docs/scenario_calibration_correction_note.md`: mean PIT 0.07 → 0.55). The shift and
+  its source are in the diagnostics (`location_shift_points`, `selection_optimism_source`)
+  and named in the stated limits. `selection_optimism=None` leaves the scores uncorrected
+  and says so.
+- **Scenario sampling interval.** `probability_below_threshold_interval` is the Wilson
+  90% interval for the reported probability given the scenario count; the report prints
+  it beside the point value.
+- **Calendar.** `fixture_counts` (from `fixture_counts_by_player(snapshot, gameweek)`)
+  with `ScenarioConfig(double_gameweek_scale=…)` widens double-gameweek players' spread;
+  without it the calendar-blind limit is stated.
+- **Rivals.** `rivals=(RivalSquad(...), ...)` scores each rival's eleven and captain in the
+  same scenarios; `rival_comparisons` carries P(ahead) with its interval, mean and
+  quantiles of the difference, and shared starters. The shift is not applied to the
+  difference (both squads were selected; it cancels).

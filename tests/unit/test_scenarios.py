@@ -357,3 +357,108 @@ def test_scenario_reports_are_json_safe_and_explicitly_fixed_decision() -> None:
     assert encoded["history"]["folds"] == 5
     assert "no scenario reoptimization" in markdown
     assert "No CVaR" in markdown
+
+
+# --- calibration corrections and rival comparison -------------------------------------
+
+
+def test_a_location_shift_moves_every_summary_and_leaves_the_projection_alone() -> None:
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+
+    plain = evaluate_fixed_decision(decision, scenarios)
+    shifted = evaluate_fixed_decision(
+        decision, scenarios, ScenarioEvaluationConfig(location_shift_points=-30.0)
+    )
+
+    assert shifted.metrics.mean_score == pytest.approx(plain.metrics.mean_score - 30.0)
+    assert shifted.metrics.lower_quantile_score == pytest.approx(
+        plain.metrics.lower_quantile_score - 30.0
+    )
+    assert shifted.metrics.point_projection_score == plain.metrics.point_projection_score
+    assert shifted.metrics.probability_below_threshold >= plain.metrics.probability_below_threshold
+    assert shifted.diagnostics["location_shift_points"] == -30.0
+    assert shifted.diagnostics["mean_score_before_shift"] == pytest.approx(plain.metrics.mean_score)
+    low, high = shifted.diagnostics["probability_below_threshold_interval"]  # type: ignore[misc]
+    assert 0.0 <= low <= shifted.metrics.probability_below_threshold <= high <= 1.0
+    with pytest.raises(ScenarioConfigurationError, match="finite"):
+        ScenarioEvaluationConfig(location_shift_points=float("nan"))
+
+
+def test_wilson_interval_narrows_with_more_scenarios_and_brackets_the_estimate() -> None:
+    from squadopt.scenarios import wilson_interval
+
+    small = wilson_interval(14, 100)
+    large = wilson_interval(140, 1000)
+    assert small[0] < 0.14 < small[1]
+    assert large[0] < 0.14 < large[1]
+    assert (large[1] - large[0]) < (small[1] - small[0])
+    assert wilson_interval(0, 50)[0] == 0.0 and wilson_interval(50, 50)[1] == 1.0
+
+
+def test_a_double_gameweek_scale_widens_only_the_doubles_and_needs_the_calendar() -> None:
+    snapshot = _snapshot()
+    history = _residual_history(snapshot)
+    doubles = set(snapshot.table.loc[snapshot.table["team_id"] == 1, "player_id"].tolist())
+    counts = {
+        player_id: (2 if player_id in doubles else 1)
+        for player_id in snapshot.table["player_id"].tolist()
+    }
+    plain = generate_scenarios(snapshot, history, TARGET, SMALL_CONFIG)
+    scaled_config = replace(SMALL_CONFIG, double_gameweek_scale=1.5)
+    scaled = generate_scenarios(snapshot, history, TARGET, scaled_config, fixture_counts=counts)
+
+    assert scaled.diagnostics["double_gameweek_players"] == len(doubles)
+    assert scaled.scenario_fingerprint != plain.scenario_fingerprint
+    plain_sd = plain.scenario_points.std(ddof=0)
+    scaled_sd = scaled.scenario_points.std(ddof=0)
+    for player_id in snapshot.table["player_id"].tolist():
+        if player_id in doubles:
+            assert scaled_sd[player_id] > plain_sd[player_id]
+        else:
+            assert scaled_sd[player_id] == pytest.approx(plain_sd[player_id])
+    # Means are (up to the empirical draws' own finite-sample mean) untouched: the
+    # scale widens, it does not move.
+    single_ids = [p for p in snapshot.table["player_id"].tolist() if p not in doubles]
+    assert scaled.scenario_points[single_ids].mean().to_numpy() == pytest.approx(
+        plain.scenario_points[single_ids].mean().to_numpy(), abs=1e-9
+    )
+    drift = (scaled.scenario_points.mean() - plain.scenario_points.mean()).abs().max()
+    assert drift < 0.1
+    with pytest.raises(ScenarioValidationError, match="fixture_counts"):
+        generate_scenarios(snapshot, history, TARGET, scaled_config)
+
+
+def test_a_rival_comparison_scores_both_squads_in_the_same_world() -> None:
+    from squadopt.scenarios import RivalSquad, compare_fixed_decisions
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    assert decision.captain is not None
+    my_starters = decision.starting_xi["player_id"].tolist()
+    my_captain = decision.captain["player_id"]
+
+    # The same eleven and captain: never ahead, difference exactly zero.
+    twin = RivalSquad("twin", tuple(my_starters), my_captain)
+    same = compare_fixed_decisions(decision, twin, scenarios)
+    assert same.probability_ahead == 0.0
+    assert same.mean_difference == pytest.approx(0.0)
+    assert same.shared_starters == 11
+    assert same.diagnostics["location_shift_applied"] is False
+
+    # A rival that captains a different starter: the difference is exactly the
+    # captain swing, scenario by scenario, so shared players cancel.
+    other = next(p for p in my_starters if p != my_captain)
+    rival = RivalSquad("captain-swap", tuple(my_starters), other)
+    swap = compare_fixed_decisions(decision, rival, scenarios)
+    matrix = scenarios.scenario_points
+    expected = (matrix[my_captain] - matrix[other]).to_numpy()
+    assert swap.mean_difference == pytest.approx(float(expected.mean()))
+    assert swap.probability_ahead == pytest.approx(float((expected > 0).mean()))
+    low, high = swap.probability_ahead_interval
+    assert low <= swap.probability_ahead <= high
+    assert set(swap.difference_quantiles) == {"q10", "q25", "q50", "q75", "q90"}
+    with pytest.raises(ScenarioValidationError, match="captain must be one"):
+        RivalSquad("bad", tuple(my_starters), 999_999)

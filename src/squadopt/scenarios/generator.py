@@ -1,6 +1,7 @@
 """Hierarchical empirical bootstrap of joint player-point residuals."""
 
 import math
+from collections.abc import Mapping
 from numbers import Integral
 
 import numpy as np
@@ -294,12 +295,24 @@ def generate_scenarios(
     residual_history: pd.DataFrame,
     target: ScenarioTarget,
     config: ScenarioConfig | None = None,
+    *,
+    fixture_counts: Mapping[object, int] | None = None,
 ) -> ScenarioSet:
-    """Generate deterministic joint player-point scenarios from past OOS residuals."""
+    """Generate deterministic joint player-point scenarios from past OOS residuals.
+
+    ``fixture_counts`` maps a projected player to the number of fixtures their team
+    plays in the target gameweek; required when ``config.double_gameweek_scale`` is not
+    one, ignored otherwise.
+    """
 
     settings = ScenarioConfig() if config is None else config
     if not isinstance(settings, ScenarioConfig):
         raise ScenarioValidationError("config must be a ScenarioConfig.")
+    if settings.double_gameweek_scale != 1.0 and fixture_counts is None:
+        raise ScenarioValidationError(
+            "double_gameweek_scale differs from one; fixture_counts (the target gameweek's "
+            "calendar per player) are required to apply it."
+        )
     if not isinstance(target, ScenarioTarget):
         raise ScenarioValidationError("target must be a ScenarioTarget.")
     if not isinstance(projections, PredictionSnapshot):
@@ -330,6 +343,18 @@ def generate_scenarios(
         settings,
         rng,
     )
+    double_players = 0
+    if settings.double_gameweek_scale != 1.0 and fixture_counts is not None:
+        counts = dict(fixture_counts)
+        double_mask = np.asarray(
+            [int(counts.get(player_id, 1)) >= 2 for player_id in projection_table["player_id"]],
+            dtype=bool,
+        )
+        double_players = int(double_mask.sum())
+        idiosyncratic[:, double_mask] *= settings.double_gameweek_scale
+        for player_id, is_double in zip(projection_table["player_id"], double_mask, strict=True):
+            if is_double:
+                player_scales[str(player_id)] *= settings.double_gameweek_scale
     point_values = projection_table["expected_points"].to_numpy(dtype="float64")
     if settings.player_location_shrinkage is not None:
         locations, players_with_history = _player_locations(
@@ -368,6 +393,8 @@ def generate_scenarios(
         scenario_points=points,
         scenario_fingerprint=fingerprint,
         diagnostics={
+            "double_gameweek_scale": settings.double_gameweek_scale,
+            "double_gameweek_players": double_players,
             "history_rows": len(history),
             "history_folds": len(fold_ids),
             "history_first_fold": fold_ids[0],

@@ -124,3 +124,54 @@ def test_a_non_objective_input_is_refused() -> None:
             form_window=5,
             bench_weight=0.1,
         )
+
+
+def test_a_development_shift_moves_every_fold_by_the_same_amount(
+    audit: ScenarioAuditResult,
+) -> None:
+    shifted = audit_scenario_calibration(
+        _objective(),
+        _history(),
+        form_window=5,
+        bench_weight=0.1,
+        points_threshold=30.0,
+        selection_shift="development",
+        development_shift_points=-10.0,
+    )
+    assert all(row.location_shift_points == -10.0 for row in shifted.rows)
+    for plain, moved in zip(audit.rows, shifted.rows, strict=True):
+        assert moved.scenario_mean_score == pytest.approx(plain.scenario_mean_score - 10.0)
+        assert moved.realized_score == plain.realized_score
+    assert shifted.mean_score_bias == pytest.approx(audit.mean_score_bias - 10.0)
+    assert shifted.diagnostics["selection_shift"] == "development"
+
+
+def test_an_online_shift_uses_only_earlier_folds(audit: ScenarioAuditResult) -> None:
+    online = audit_scenario_calibration(
+        _objective(),
+        _history(),
+        form_window=5,
+        bench_weight=0.1,
+        points_threshold=30.0,
+        selection_shift="online",
+        online_warmup_folds=1,
+    )
+    rows = online.rows
+    assert rows[0].location_shift_points == 0.0
+    # From the second fold on, the shift is minus the mean raw gap of the earlier folds.
+    raw_gaps = [plain.scenario_mean_score - plain.realized_score for plain in audit.rows]
+    for index in range(1, len(rows)):
+        expected = -sum(raw_gaps[:index]) / index
+        assert rows[index].location_shift_points == pytest.approx(expected)
+    with pytest.raises(Exception, match="selection_shift"):
+        audit_scenario_calibration(
+            _objective(), _history(), form_window=3, bench_weight=0.0, selection_shift="magic"
+        )
+    with pytest.raises(Exception, match="fixture_counts_by_fold"):
+        audit_scenario_calibration(
+            _objective(),
+            _history(),
+            form_window=3,
+            bench_weight=0.0,
+            double_gameweek_scale=1.5,
+        )

@@ -20,6 +20,7 @@ from squadopt.live.horizon import (
     FIXTURE_SCALING_RULE_VERSION,
     HORIZON_POST_PROCESSING_CONTRACT_VERSION,
     build_projection_horizon,
+    fixture_counts_by_player,
     gameweek_fixture_fingerprints,
     make_projection_horizon_builder,
 )
@@ -157,6 +158,7 @@ __all__ = [
     "chip_availability_for",
     "evaluate_live_risk",
     "extract_event_points",
+    "fixture_counts_by_player",
     "gameweek_fixture_fingerprints",
     "handoff_path_for",
     "held_squad_from_ledger",

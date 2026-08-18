@@ -16,7 +16,7 @@ import argparse
 import json
 import logging
 import sys
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -29,11 +29,12 @@ from scripts._experiment_cli import (
     write_text,
 )
 
-from squadopt.data.sources.vaastav import build_panel
+from squadopt.data.sources.vaastav import build_fixture_panel, build_panel, load_team_codes
 from squadopt.experiments import (
     SCENARIO_AUDIT_CONTRACT_VERSION,
     ExperimentError,
     ScenarioAuditResult,
+    ScenarioFoldContext,
     ScenarioPolicyObjective,
     ScenarioPolicyObjectiveConfig,
     audit_scenario_calibration,
@@ -74,6 +75,29 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--lower-quantile", type=float, default=0.10)
     parser.add_argument("--points-threshold", type=float, default=40.0)
     parser.add_argument(
+        "--selection-shift",
+        choices=("none", "development", "online"),
+        default="none",
+        help="decision-level selection-optimism correction of the scenario scores: none "
+        "(original audit); development (a fixed shift from the selection-optimism profile, "
+        "-(11*2.951+3.863) by default); online (minus the mean scenario-mean-minus-realized "
+        "over the audited folds before each fold, leakage-safe)",
+    )
+    parser.add_argument(
+        "--development-shift-points",
+        type=float,
+        default=-(11 * 2.951 + 3.863),
+        help="the fixed shift used by --selection-shift development",
+    )
+    parser.add_argument("--online-warmup-folds", type=int, default=5)
+    parser.add_argument(
+        "--double-gameweek-scale",
+        type=float,
+        default=1.0,
+        help="widen double-gameweek players' idiosyncratic spread by this factor (the "
+        "published calendar is attached from the archive)",
+    )
+    parser.add_argument(
         "--json-output",
         type=Path,
         default=REPOSITORY_ROOT / "docs" / "scenario_calibration_audit.json",
@@ -84,6 +108,45 @@ def _parse_arguments() -> argparse.Namespace:
         default=REPOSITORY_ROOT / "docs" / "scenario_calibration_audit.md",
     )
     return parser.parse_args()
+
+
+def _fixture_counts_by_fold(
+    archive_root: Path,
+    seasons: tuple[str, ...],
+    contexts: Sequence[ScenarioFoldContext],
+) -> dict[str, dict[object, int]]:
+    """Per fold, each projected player's fixture count from the published calendar."""
+
+    fixtures = build_fixture_panel(archive_root, seasons=seasons)
+    names: dict[tuple[str, int], str] = {}
+    for season in seasons:
+        codes = load_team_codes(archive_root, season)
+        for name, code in zip(codes["name"].tolist(), codes["code"].tolist(), strict=True):
+            names[(season, int(code))] = str(name)
+    counts = (
+        fixtures.groupby(["season", "gameweek", "team_id"], sort=True)
+        .size()
+        .reset_index(name="fixture_count")
+    )
+    by_key: dict[tuple[str, int, str], int] = {}
+    for season, gameweek, team, count in zip(
+        counts["season"].tolist(),
+        counts["gameweek"].tolist(),
+        counts["team_id"].tolist(),
+        counts["fixture_count"].tolist(),
+        strict=True,
+    ):
+        by_key[(str(season), int(gameweek), names[(str(season), int(team))])] = int(count)
+    out: dict[str, dict[object, int]] = {}
+    for context in contexts:
+        table = context.projections
+        out[context.fold_id] = {
+            player: by_key.get((context.season, int(context.gameweek), str(team)), 0)
+            for player, team in zip(
+                table["player_id"].tolist(), table["team_id"].tolist(), strict=True
+            )
+        }
+    return out
 
 
 def _document(
@@ -117,6 +180,7 @@ def _document(
                 "scenario_lower_quantile_score": row.scenario_lower_quantile_score,
                 "probability_below_threshold": row.probability_below_threshold,
                 "probability_integral_transform": row.probability_integral_transform,
+                "location_shift_points": row.location_shift_points,
             }
             for row in audit.rows
         ],
@@ -137,6 +201,9 @@ def _markdown(audit: ScenarioAuditResult) -> str:
         f"- Anchor: form_window={audit.diagnostics['form_window']}, "
         f"bench_weight={audit.diagnostics['bench_weight']}; "
         f"{audit.diagnostics['scenario_count']} scenarios/fold",
+        f"- Selection shift: {audit.diagnostics.get('selection_shift', 'none')} "
+        f"(mean {float(str(audit.diagnostics.get('mean_location_shift_points', 0.0))):+.2f} pts); "
+        f"double-gameweek scale {audit.diagnostics.get('double_gameweek_scale', 1.0)}",
         "",
         "## Decision-level calibration",
         "",
@@ -227,6 +294,12 @@ def main() -> int:
             "Auditing scenario calibration on %s folds",
             len(objective.development_fold_ids),
         )
+        fixture_counts_by_fold = None
+        if arguments.double_gameweek_scale != 1.0:
+            LOGGER.info("Attaching the published calendar to every audited fold")
+            fixture_counts_by_fold = _fixture_counts_by_fold(
+                arguments.archive_root, seasons, objective.fold_contexts(arguments.form_window)
+            )
         audit = audit_scenario_calibration(
             objective,
             residuals,
@@ -234,6 +307,11 @@ def main() -> int:
             bench_weight=arguments.bench_weight,
             lower_quantile=arguments.lower_quantile,
             points_threshold=arguments.points_threshold,
+            selection_shift=arguments.selection_shift,
+            development_shift_points=arguments.development_shift_points,
+            online_warmup_folds=arguments.online_warmup_folds,
+            double_gameweek_scale=arguments.double_gameweek_scale,
+            fixture_counts_by_fold=fixture_counts_by_fold,
         )
     except ExperimentError as error:
         print(f"Could not audit scenario calibration:\n  {error}")

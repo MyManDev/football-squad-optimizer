@@ -1,8 +1,8 @@
 """Structured risk evidence for one already-optimized live recommendation."""
 
 import hashlib
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Final
@@ -19,11 +19,14 @@ from squadopt.prediction import (
 )
 from squadopt.scenarios import (
     RESIDUAL_HISTORY_COLUMNS,
+    RivalSquad,
+    ScenarioComparisonResult,
     ScenarioConfig,
     ScenarioError,
     ScenarioEvaluationConfig,
     ScenarioRiskMetrics,
     ScenarioTarget,
+    compare_fixed_decisions,
     evaluate_fixed_decision,
     generate_scenarios,
 )
@@ -153,12 +156,41 @@ class LiveRiskDiagnostics:
 # Limits of the evidence behind an available lower tail, stated with it rather than
 # left silent. The calendar limit is measured: the position-only calibration undercovers
 # double gameweeks (docs/fixture_group_conformal_note.md), and the residual history a
-# live evaluation resamples carries the same blindness until the fixture-group contract
-# (projection_uncertainty_v2) is the operational one.
-LIVE_RISK_STATED_LIMITS: Final = (
+# live evaluation resamples carries the same blindness unless the caller supplies the
+# calendar and a double-gameweek scale.
+CALENDAR_BLIND_LIMIT: Final = (
     "The residual history is calendar-blind: on a double gameweek the lower tail is "
     "optimistic by roughly the measured undercoverage (0.85 against nominal 0.90; "
-    "docs/fixture_group_conformal_note.md).",
+    "docs/fixture_group_conformal_note.md)."
+)
+LIVE_RISK_STATED_LIMITS: Final = (CALENDAR_BLIND_LIMIT,)
+
+
+@dataclass(frozen=True, slots=True)
+class SelectionOptimism:
+    """The winner's curse the scenarios must be shifted by for a *selected* squad.
+
+    Scenarios are centred on the projections; the projections of the players an
+    optimizer selects are optimistic by construction. `selection_optimism_profile_v1`
+    measured it on the control over 147 development folds: -2.951 points per starter,
+    -3.863 for the captain (once more, doubled in the score). The squad-level shift is
+    what the scenario audit found uncorrected (+34.5) and corrected (-4.4 with the
+    decision-side shrinkage stand-in). Stated as data so a later measurement (the live
+    ledger, a promoted model's own profile) replaces it explicitly.
+    """
+
+    per_starter_points: float
+    captain_points: float
+    source: str
+
+    def location_shift(self, starters: int = 11) -> float:
+        return -(starters * self.per_starter_points + self.captain_points)
+
+
+DEVELOPMENT_SELECTION_OPTIMISM: Final = SelectionOptimism(
+    per_starter_points=2.951,
+    captain_points=3.863,
+    source="selection_optimism_profile_v1 (control, 147 development folds, fw06)",
 )
 
 
@@ -210,13 +242,35 @@ def evaluate_live_risk(
     *,
     scenario_config: ScenarioConfig | None = None,
     evaluation_config: ScenarioEvaluationConfig | None = None,
+    selection_optimism: SelectionOptimism | None = DEVELOPMENT_SELECTION_OPTIMISM,
+    fixture_counts: Mapping[int, int] | None = None,
+    rivals: Sequence[RivalSquad] = (),
 ) -> LiveRiskDiagnostics:
-    """Evaluate a fixed live decision only when model and target evidence match."""
+    """Evaluate a fixed live decision only when model and target evidence match.
+
+    ``selection_optimism`` shifts the chosen squad's scenario scores by the measured
+    winner's curse (None or a zero shift leaves them uncorrected, and says so).
+    ``fixture_counts`` (player code → fixtures this gameweek) lets the scenario config's
+    ``double_gameweek_scale`` widen doubles; without it the calendar-blind limit is
+    stated. ``rivals`` are scored in the same scenarios and the difference is reported.
+    """
 
     if not isinstance(residual_history, LiveResidualHistory):
         raise LiveRiskValidationError("residual_history must be a LiveResidualHistory instance.")
     scenarios = ScenarioConfig() if scenario_config is None else scenario_config
     evaluation = ScenarioEvaluationConfig() if evaluation_config is None else evaluation_config
+    if selection_optimism is not None and evaluation.location_shift_points == 0.0:
+        evaluation = replace(
+            evaluation,
+            location_shift_points=selection_optimism.location_shift(
+                len(optimization_result.starting_xi)
+            ),
+        )
+    if scenarios.double_gameweek_scale != 1.0 and fixture_counts is None:
+        raise LiveRiskValidationError(
+            "scenario_config.double_gameweek_scale differs from one; fixture_counts are "
+            "required to apply it."
+        )
     if not isinstance(scenarios, ScenarioConfig):
         raise LiveRiskValidationError("scenario_config must be a ScenarioConfig.")
     if not isinstance(evaluation, ScenarioEvaluationConfig):
@@ -303,8 +357,13 @@ def evaluate_live_risk(
             eligible,
             ScenarioTarget(inputs.season, inputs.deadline.gameweek),
             scenarios,
+            fixture_counts=(None if fixture_counts is None else dict(fixture_counts.items())),
         )
         result = evaluate_fixed_decision(optimization_result, scenario_set, evaluation)
+        comparisons: list[ScenarioComparisonResult] = [
+            compare_fixed_decisions(optimization_result, rival, scenario_set, evaluation)
+            for rival in rivals
+        ]
     except (PredictionError, ScenarioError) as error:
         raise LiveRiskValidationError(
             f"Live-risk evidence could not be evaluated: {error}"
@@ -324,6 +383,54 @@ def evaluate_live_risk(
             "lower_quantile": evaluation.lower_quantile,
             "worst_fraction": evaluation.worst_fraction,
             "points_threshold": evaluation.points_threshold,
-            "stated_limits": list(LIVE_RISK_STATED_LIMITS),
+            "location_shift_points": evaluation.location_shift_points,
+            "selection_optimism_source": (
+                None if selection_optimism is None else selection_optimism.source
+            ),
+            "double_gameweek_scale": scenarios.double_gameweek_scale,
+            "double_gameweek_players": scenario_set.diagnostics.get("double_gameweek_players"),
+            "probability_below_threshold_interval": result.diagnostics.get(
+                "probability_below_threshold_interval"
+            ),
+            "rival_comparisons": [
+                {
+                    "rival": comparison.rival_label,
+                    "probability_ahead": comparison.probability_ahead,
+                    "probability_ahead_interval": list(comparison.probability_ahead_interval),
+                    "mean_difference": comparison.mean_difference,
+                    "difference_quantiles": dict(comparison.difference_quantiles),
+                    "shared_starters": comparison.shared_starters,
+                }
+                for comparison in comparisons
+            ],
+            "stated_limits": _stated_limits(evaluation, scenarios, fixture_counts),
         },
     )
+
+
+def _stated_limits(
+    evaluation: ScenarioEvaluationConfig,
+    scenarios: ScenarioConfig,
+    fixture_counts: Mapping[int, int] | None,
+) -> list[str]:
+    limits: list[str] = []
+    if evaluation.location_shift_points == 0.0:
+        limits.append(
+            "No selection-optimism correction was applied: the chosen squad's scenario "
+            "scores are centred on projections that are optimistic by construction "
+            "(about +34 points at squad level in the scenario audit)."
+        )
+    else:
+        limits.append(
+            f"The lower tail is shifted by {evaluation.location_shift_points:+.1f} points for "
+            "selection optimism measured on development folds, not yet on this season's "
+            "ledger."
+        )
+    if fixture_counts is None or scenarios.double_gameweek_scale == 1.0:
+        limits.append(CALENDAR_BLIND_LIMIT)
+    else:
+        limits.append(
+            f"Double-gameweek players' spread is widened by {scenarios.double_gameweek_scale:g} "
+            "(fixture-group conformal ratio); the shift is not calendar-specific."
+        )
+    return limits
