@@ -123,7 +123,7 @@ every gameweek, plus horizon totals and solver diagnostics.
   second solve applies a stable rank tie-break after a proven primary optimum.
 - `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, and `UNKNOWN` remain solver-independent statuses.
 
-## Chips (bench boost, triple captain, wildcard)
+## Chips (bench boost, triple captain, wildcard, free hit)
 
 `optimize_transfer_plan(..., chips=ChipAvailability(...))` names the chips the planner may
 play in which gameweeks of the horizon; omitted or empty, the model is exactly the chip-less
@@ -146,21 +146,36 @@ hard-codes a season. `forced` pins a chip to a gameweek (hand-timed play).
   wildcard_preserves_free_transfers` (default `True`) states the assumed rule that transfers
   under a wildcard do not consume banked free transfers; the source does not publish this,
   so it is a flag rather than a constant.
-- Tie-break: among plans with equal objective, chips stay unplayed (a chip that buys
-  nothing on paper is worth more later).
+- Wildcard free-transfer accounting is pinned in both directions (`consumed = count`
+  without the chip, `0` under it): the bank it feeds is not always in the objective (a
+  horizon's last week, a full bank), and a free variable there left the accounting
+  inconsistent — found by the season-long chain, which plays wildcards in last weeks.
+- Tie-break, two tiers above every rank term: among plans with equal objective, fewer
+  chips (a chip that buys nothing on paper is worth more later); among plans playing the
+  same number, the later week (a rolling planner re-decides a deferred chip next week
+  with fresher information; committing early buys nothing on paper). Both are paper
+  ties only — a horizon still plays a chip worth anything now rather than hold it for a
+  season it cannot see, which is why the season chain also carries a reservation policy.
 - Extraction re-verifies chip accounting (zero paid transfers under a wildcard, the
   free-transfer bank per the flag, full bench value and tripled captain in the reported
   contribution) and reports `chips_played`; `chip_availability_fingerprint` and
   `chips_available` are in the diagnostics.
-- **Free hit is not modelled**: it makes one week's squad temporary and restores the
-  previous one, which breaks the state chain; it belongs to a later contract version.
+- **Free hit** (contract `deterministic_transfer_planning_v2`): the week's squad is
+  temporary. Transfers under it cost no hits and (per the flag) leave the free-transfer
+  bank alone, the per-gameweek cap is lifted, and the next week starts from the squad and
+  bank the free-hit week started from — carried as per-week *base* variables pinned to
+  either this week's squad and bank or the previous ones by the chip's Boolean
+  (`base ≥ squad − fh`, `≤ squad + fh`, `≥ previous − (1 − fh)`, `≤ previous + (1 − fh)`;
+  the bank likewise with the bank bound as big-M). Extraction reverts the carried squad
+  and bank after a free-hit week and verifies continuity against the base.
 
 ## Current limitations
 
 - Projections are deterministic; scenario-aware multi-stage recourse is not implemented.
 - The player universe must remain constant across the horizon.
-- Free hit and automatic substitutions are excluded; the value a chip buys depends entirely
-  on the projection's view of doubles and blanks (see the rolling-horizon measurement).
+- Automatic substitutions are excluded; the value a chip buys depends entirely on the
+  projection's view of doubles and blanks (see the rolling-horizon and season-chain
+  measurements).
 - Future buy and sell prices must be supplied; this layer does not forecast them.
 - There is no terminal squad or bank value beyond the final included gameweek.
 - Runtime grows with both players and horizon length, so long horizons require explicit

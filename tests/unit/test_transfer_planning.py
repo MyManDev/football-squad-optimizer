@@ -492,6 +492,272 @@ def test_a_forced_chip_is_played_where_it_is_forced(
     assert result.chips_played == {1: "bboost"}
 
 
+def test_a_chip_worth_the_same_in_every_week_is_played_in_the_last(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """Tie-break: equal value now or later, the planner defers.
+
+    A rolling planner re-decides a deferred chip next week with fresher information;
+    committing it early buys nothing on paper. DEF_A is worth 4 on the bench in both
+    weeks, so a bench boost is worth the same in either.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    result = optimize_transfer_plan(
+        horizon, OPTIMAL_INITIAL, small_config, chips=ChipAvailability({"bboost": {1, 2}})
+    )
+
+    assert result.chips_played == {2: "bboost"}
+
+
+def test_a_held_squad_over_the_club_limit_is_planned_into_compliance(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """A player who moved clubs can leave four held from one club; the game allows the
+    hold, so the planner accepts the start and every planned squad obeys the limit."""
+
+    players = known_optimum_players.copy()
+    # Put the whole optimal squad on one club, over a limit of three.
+    players.loc[players["player_id"].isin(["GK_A", "DEF_A", "MID_A", "FWD_A"]), "team_id"] = "T1"
+    config = replace(small_config, max_players_per_team=3)
+    horizon = PlanningHorizon(_horizon_table(players, (1,)))
+
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, small_config, chips=None)
+    assert result.weeks[0].transfer_count == 0  # limit four: nothing forced
+
+    forced = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, config)
+    week = forced.weeks[0]
+    assert week.transfer_count >= 1
+    assert week.selected_squad.groupby("team_id").size().max() <= 3
+
+
+# --- transfer discipline --------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("cap", "expected"), [(1, 1), (2, 2), (None, 3)])
+def test_the_per_gameweek_transfer_cap_binds(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    cap: int | None,
+    expected: int,
+) -> None:
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    weak_start = _initial("GK_B", "DEF_B", "MID_B", "FWD_B")
+
+    result = optimize_transfer_plan(
+        horizon, weak_start, small_config, TransferPlanningConfig(max_transfers_per_gameweek=cap)
+    )
+
+    # Uncapped, the planner makes three moves and declines the fourth (a 4-point hit for
+    # DEF_B -> DEF_A's 0.3 bench gain); the cap binds below that.
+    week = result.weeks[0]
+    assert week.transfer_count == expected
+    if cap == 1:
+        # The single move is the biggest gain: MID_B (1) -> MID_A (10).
+        assert week.transfers_in["player_id"].tolist() == ["MID_A"]
+
+
+def test_a_wildcard_lifts_the_transfer_cap(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    weak_start = _initial("GK_B", "DEF_B", "MID_B", "FWD_B")
+
+    result = optimize_transfer_plan(
+        horizon,
+        weak_start,
+        small_config,
+        TransferPlanningConfig(max_transfers_per_gameweek=1),
+        chips=ChipAvailability({"wildcard": {1}}, forced={1: "wildcard"}),
+    )
+
+    assert result.chips_played == {1: "wildcard"}
+    assert result.weeks[0].transfer_count == 4
+
+
+@pytest.mark.parametrize(("value", "moves"), [(0.0, 1), (0.2, 1), (0.5, 0)])
+def test_a_banked_free_transfer_with_terminal_value_is_kept_for_a_small_gain(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    value: float,
+    moves: int,
+) -> None:
+    """DEF_B -> DEF_A improves the bench by 3, worth 0.3 at the bench weight; keeping the
+    free transfer is worth ``value``. Below the gain the move is made, above it is banked."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    start = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    result = optimize_transfer_plan(
+        horizon, start, small_config, TransferPlanningConfig(banked_transfer_value_points=value)
+    )
+
+    week = result.weeks[0]
+    assert week.transfer_count == moves
+    assert week.free_transfers_for_next_gameweek == (1 if moves else 2)
+    assert result.diagnostics["terminal_banked_transfer_value"] == pytest.approx(
+        value * week.free_transfers_for_next_gameweek
+    )
+
+
+def test_discipline_settings_enter_the_configuration_fingerprint() -> None:
+    base = TransferPlanningConfig()
+    assert (
+        base.configuration_fingerprint
+        != TransferPlanningConfig(max_transfers_per_gameweek=2).configuration_fingerprint
+    )
+    assert (
+        base.configuration_fingerprint
+        != TransferPlanningConfig(banked_transfer_value_points=1.0).configuration_fingerprint
+    )
+    with pytest.raises(TransferPlanningConfigurationError):
+        TransferPlanningConfig(max_transfers_per_gameweek=0)
+    with pytest.raises(TransferPlanningConfigurationError):
+        TransferPlanningConfig(banked_transfer_value_points=-1.0)
+
+
+@pytest.mark.parametrize(("holding", "played"), [(0.0, True), (1.0, True), (10.0, False)])
+def test_a_chip_is_held_when_its_holding_value_exceeds_what_it_buys(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    holding: float,
+    played: bool,
+) -> None:
+    """A bench boost buys DEF_A's bench remainder (a few points) inside the horizon;
+    held past it, the chip is worth ``holding``. Played only when the gain is larger."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    config = TransferPlanningConfig(chip_holding_value_points={"bboost": holding})
+
+    result = optimize_transfer_plan(
+        horizon,
+        OPTIMAL_INITIAL,
+        small_config,
+        config,
+        chips=ChipAvailability({"bboost": {1, 2}}),
+    )
+
+    assert (result.chips_played == {2: "bboost"}) is played
+    assert result.diagnostics["terminal_chip_holding_value"] == pytest.approx(
+        0.0 if played else holding
+    )
+
+
+@pytest.mark.parametrize(("holding", "played"), [(5.0, True), (10.0, False)])
+def test_a_wildcard_is_held_unless_the_rebuild_saves_more(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+    holding: float,
+    played: bool,
+) -> None:
+    """From the weak squad the best plan without a wildcard makes three moves and pays
+    two hits (8 points); the wildcard saves those and adds the fourth move's bench
+    gain — about 8.3 points. Held at 5 it is played; held at 10 it is kept."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    weak_start = _initial("GK_B", "DEF_B", "MID_B", "FWD_B")
+    config = TransferPlanningConfig(chip_holding_value_points={"wildcard": holding})
+
+    result = optimize_transfer_plan(
+        horizon, weak_start, small_config, config, chips=ChipAvailability({"wildcard": {1}})
+    )
+
+    assert (result.chips_played == {1: "wildcard"}) is played
+    if not played:
+        assert result.weeks[0].transfer_hit_points == 8.0
+
+
+def test_holding_values_are_validated_and_fingerprinted() -> None:
+    with pytest.raises(TransferPlanningConfigurationError, match="unknown chip"):
+        TransferPlanningConfig(chip_holding_value_points={"assistant_manager": 3.0})
+    with pytest.raises(TransferPlanningConfigurationError):
+        TransferPlanningConfig(chip_holding_value_points={"bboost": -1.0})
+    assert (
+        TransferPlanningConfig().configuration_fingerprint
+        != TransferPlanningConfig(
+            chip_holding_value_points={"bboost": 2.0}
+        ).configuration_fingerprint
+    )
+
+
+def test_a_free_hit_rebuilds_for_one_week_and_reverts_the_squad_and_bank(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """From the weak squad with 30 in the bank: week one on a free hit fields the optimal
+    squad at no hit; week two starts again from the weak squad and the same bank."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    weak_start = _initial("GK_B", "DEF_B", "MID_B", "FWD_B", bank_tenths=30)
+
+    result = optimize_transfer_plan(
+        horizon,
+        weak_start,
+        small_config,
+        chips=ChipAvailability({"freehit": {1}}, forced={1: "freehit"}),
+    )
+
+    first, second = result.weeks
+    assert result.chips_played == {1: "freehit"}
+    assert first.chip == "freehit"
+    assert sorted(first.selected_squad["player_id"]) == ["DEF_A", "FWD_A", "GK_A", "MID_A"]
+    assert first.transfer_count == 4 and first.paid_transfer_count == 0
+    assert first.transfer_hit_points == 0.0
+    # Week two starts from the weak squad and the pre-chip bank, free transfers kept.
+    assert set(second.transfers_out["player_id"]).issubset({"GK_B", "DEF_B", "MID_B", "FWD_B"})
+    assert second.bank_before_tenths == 30
+    assert second.free_transfers_before == 2
+    held_after_two = set(second.selected_squad["player_id"])
+    assert held_after_two == (
+        {"GK_B", "DEF_B", "MID_B", "FWD_B"} - set(second.transfers_out["player_id"])
+    ) | set(second.transfers_in["player_id"])
+
+
+def test_a_free_hit_is_played_where_the_temporary_squad_is_worth_most(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """Offered in both weeks from the optimal squad, a free hit buys nothing and is kept;
+    with a huge one-week bench-only upside it is played there."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    kept = optimize_transfer_plan(
+        horizon, OPTIMAL_INITIAL, small_config, chips=ChipAvailability({"freehit": {1, 2}})
+    )
+    assert kept.chips_played == {}
+
+    # Week two: every B player surges for one week only; fielding them takes four moves
+    # and reverting takes four more. A free hit does both for nothing.
+    table = _horizon_table(known_optimum_players, (1, 2, 3))
+    surge_rows = (table["gameweek"] == 2) & table["player_id"].str.endswith("_B")
+    table.loc[surge_rows, "expected_points"] = 30.0
+    played = optimize_transfer_plan(
+        PlanningHorizon(table),
+        OPTIMAL_INITIAL,
+        small_config,
+        chips=ChipAvailability({"freehit": {1, 2, 3}}),
+    )
+    assert played.chips_played == {2: "freehit"}
+    assert sorted(played.weeks[1].selected_squad["player_id"]) == [
+        "DEF_B",
+        "FWD_B",
+        "GK_B",
+        "MID_B",
+    ]
+    assert played.weeks[1].transfer_hit_points == 0.0
+    # Week three is back on the optimal squad without transfers or hits.
+    assert played.weeks[2].transfer_count == 0
+    assert sorted(played.weeks[2].selected_squad["player_id"]) == [
+        "DEF_A",
+        "FWD_A",
+        "GK_A",
+        "MID_A",
+    ]
+
+
 def test_a_chip_that_buys_nothing_is_kept(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,
@@ -513,7 +779,7 @@ def test_a_chip_that_buys_nothing_is_kept(
 @pytest.mark.parametrize(
     ("available", "forced", "message"),
     [
-        ({"freehit": {1}}, {}, "Unknown chip"),
+        ({"assistant_manager": {1}}, {}, "Unknown chip"),
         ({"bboost": {1}}, {2: "bboost"}, "not available there"),
         ({"bboost": {1}}, {1: "3xc"}, "not available there"),
         ({}, {1: "manager"}, "Unknown forced chip"),

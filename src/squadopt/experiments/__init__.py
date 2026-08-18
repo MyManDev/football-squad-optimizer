@@ -32,8 +32,10 @@ from squadopt.experiments.models import (
     ScreeningExperimentResult,
 )
 from squadopt.experiments.multi_gw_rehearsal import (
+    CALENDAR_BLIND_PROJECTION_RULE,
     MULTI_GW_REHEARSAL_CONTRACT_VERSION,
     NAIVE_PROJECTION_RULE,
+    PROJECTION_RULES,
     MultiGwRehearsal,
     MultiGwRehearsalConfig,
     RehearsalWindowResult,
@@ -86,6 +88,15 @@ from squadopt.experiments.scenario_policy_objective import (
     ScenarioPolicyObjective,
     ScenarioPolicyObjectiveConfig,
 )
+from squadopt.experiments.season_chain import (
+    CHIP_POLICIES,
+    SEASON_CHAIN_CONTRACT_VERSION,
+    ChipWindowRule,
+    SeasonChain,
+    SeasonChainConfig,
+    SeasonChainResult,
+    SeasonChainWeek,
+)
 from squadopt.experiments.selection_optimism import (
     SELECTION_OPTIMISM_CONTRACT_VERSION,
     SelectionOptimismResult,
@@ -94,6 +105,8 @@ from squadopt.experiments.selection_optimism import (
 from squadopt.experiments.statistics import season_aware_moving_block_interval
 
 __all__ = [
+    "CALENDAR_BLIND_PROJECTION_RULE",
+    "CHIP_POLICIES",
     "CONTROL_CANDIDATE_LABEL",
     "CONTROL_MODEL_NAME",
     "CONTROL_TRAINING_CONTRACT_VERSION",
@@ -107,15 +120,18 @@ __all__ = [
     "POLICY_GRID_CONTRACT_VERSION",
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
     "POLICY_SEARCH_FACTOR_NAMES",
+    "PROJECTION_RULES",
     "RISK_FRONTIER_CONTRACT_VERSION",
     "SCENARIO_AUDIT_CONTRACT_VERSION",
     "SCENARIO_POLICY_FACTOR_NAMES",
     "SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
+    "SEASON_CHAIN_CONTRACT_VERSION",
     "SELECTION_OPTIMISM_CONTRACT_VERSION",
     "SHRINKAGE_RULE_VERSION",
     "BaselinePolicyObjective",
     "CandidateAssessment",
+    "ChipWindowRule",
     "ExperimentCandidate",
     "ExperimentConfigurationError",
     "ExperimentError",
@@ -142,6 +158,10 @@ __all__ = [
     "ScenarioPolicyObjectiveConfig",
     "ScreeningExperimentConfig",
     "ScreeningExperimentResult",
+    "SeasonChain",
+    "SeasonChainConfig",
+    "SeasonChainResult",
+    "SeasonChainWeek",
     "SelectionOptimismResult",
     "audit_scenario_calibration",
     "build_control_residual_table",

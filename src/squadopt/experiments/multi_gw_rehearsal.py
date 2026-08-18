@@ -56,6 +56,11 @@ from squadopt.prediction import (
 
 MULTI_GW_REHEARSAL_CONTRACT_VERSION: Final = "multi_gw_rehearsal_v1"
 NAIVE_PROJECTION_RULE: Final = "naive_calendar_scaling_v1"
+CALENDAR_BLIND_PROJECTION_RULE: Final = "control_calendar_blind_v1"
+"""The operational control as it is evaluated: no fixture-count scaling, so a double
+gameweek projects like a single. A blank still projects zero — a team that does not
+play cannot score, and that is known before the deadline, not modelled."""
+PROJECTION_RULES: Final = (NAIVE_PROJECTION_RULE, CALENDAR_BLIND_PROJECTION_RULE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,12 +190,35 @@ class RehearsalWindowResult:
         return None if rolling is None else rolling - self.myopic_net_points
 
 
-def _score_week(
+@dataclass(frozen=True, slots=True)
+class WeekRealization:
+    """Realized points of one selected week, split the way chips act on them."""
+
+    starters_points: float
+    captain_points: float
+    bench_points: float
+
+    def total(self, chip: str | None = None) -> float:
+        """Starters plus the captain again; a chip changes what counts.
+
+        Bench boost counts the bench; triple captain counts the captain once more.
+        Automatic substitutions are not modelled here or anywhere in the rehearsal.
+        """
+
+        total = self.starters_points + self.captain_points
+        if chip == "bboost":
+            total += self.bench_points
+        elif chip == "3xc":
+            total += self.captain_points
+        return total
+
+
+def realize_week(
     week: PlanningWeekResult,
     realized: pd.DataFrame,
-    blank_players: frozenset[object] = frozenset(),
-) -> float:
-    """Score one selected week: starters plus the captain again.
+    absent_players: frozenset[object] = frozenset(),
+) -> WeekRealization:
+    """Read one selected week's realized points, starters, captain, and bench apart.
 
     A player whose team has no fixture that gameweek has no realized row in the panel,
     because the archive records appearances rather than absences. Such a player scores
@@ -205,17 +233,34 @@ def _score_week(
         )
     }
     starters = list(week.starting_xi["player_id"])
+    bench = list(week.bench["player_id"])
     captain = week.captain["player_id"]
+    # The bench is read for chips and reporting; a bench player without a row scores
+    # zero either way, so only the players who count are held to the coverage rule.
     missing = [
         player
         for player in [*starters, captain]
-        if player not in points and player not in blank_players
+        if player not in points and player not in absent_players
     ]
     if missing:
         raise ExperimentExecutionError(
             f"Realized points do not cover selected players: {missing[:5]!r}."
         )
-    return sum(points.get(player, 0.0) for player in starters) + points.get(captain, 0.0)
+    return WeekRealization(
+        starters_points=sum(points.get(player, 0.0) for player in starters),
+        captain_points=points.get(captain, 0.0),
+        bench_points=sum(points.get(player, 0.0) for player in bench),
+    )
+
+
+def _score_week(
+    week: PlanningWeekResult,
+    realized: pd.DataFrame,
+    blank_players: frozenset[object] = frozenset(),
+) -> float:
+    """Score one selected week without chips: starters plus the captain again."""
+
+    return realize_week(week, realized, blank_players).total()
 
 
 def _relative_gap(diagnostics: Mapping[str, object]) -> float | None:
@@ -238,21 +283,35 @@ class _RollingOutcome:
     relative_gaps: tuple[float | None, ...]
 
 
-class MultiGwRehearsal:
-    """Run planner-versus-myopic comparisons on real decision windows."""
+class DecisionSeason:
+    """One season's decision-time view: projections, candidate pools, naive horizons.
+
+    Shared by the windowed rehearsal and the season-long chain, which differ only in
+    how they walk the season. Everything here is decision-time information: the
+    visible panel stops at the season, projections are built at each decision point,
+    and fixture counts are the published calendar.
+    """
 
     def __init__(
         self,
         panel: pd.DataFrame,
         fixture_counts: pd.DataFrame,
-        config: MultiGwRehearsalConfig | None = None,
+        *,
+        season: str,
+        form_window: int,
+        candidate_pool_per_position: int,
+        cheap_pool_per_position: int,
+        cross_season_config: CrossSeasonConfig | None,
+        projection_rule: str = NAIVE_PROJECTION_RULE,
     ) -> None:
         """``fixture_counts``: one row per (gameweek, team_id) with the known number
         of fixtures, using the panel's own team labels."""
 
-        settings = MultiGwRehearsalConfig() if config is None else config
-        if not isinstance(settings, MultiGwRehearsalConfig):
-            raise ExperimentExecutionError("config must be a MultiGwRehearsalConfig.")
+        if projection_rule not in PROJECTION_RULES:
+            raise ExperimentConfigurationError(
+                f"projection_rule must be one of {PROJECTION_RULES!r}, got {projection_rule!r}."
+            )
+        self._projection_rule = projection_rule
         if not isinstance(panel, pd.DataFrame):
             raise ExperimentExecutionError("panel must be a pandas DataFrame.")
         if not isinstance(fixture_counts, pd.DataFrame):
@@ -267,10 +326,13 @@ class MultiGwRehearsal:
                 f"fixture_counts is missing required columns: {missing!r}."
             )
         ranks = season_ranks(panel)
-        if settings.season not in ranks:
-            raise ExperimentExecutionError(f"Season {settings.season!r} is absent from the panel.")
-        keep = panel["season"].map(lambda season: ranks[str(season)] <= ranks[settings.season])
-        self._settings = settings
+        if season not in ranks:
+            raise ExperimentExecutionError(f"Season {season!r} is absent from the panel.")
+        keep = panel["season"].map(lambda label: ranks[str(label)] <= ranks[season])
+        self._season = season
+        self._form_window = form_window
+        self._candidate_pool_per_position = candidate_pool_per_position
+        self._cheap_pool_per_position = cheap_pool_per_position
         self._visible_panel = panel.loc[keep].copy(deep=True)
         self._fixture_counts = {
             (int(gameweek), team_id): int(count)
@@ -285,16 +347,16 @@ class MultiGwRehearsal:
             decision.gameweek: decision
             for decision in walk_forward_decision_points(
                 self._visible_panel,
-                seasons=(settings.season,),
+                seasons=(season,),
                 min_prior_gameweeks_in_season=1,
             )
         }
-        mapping = FormWindowMapping(form_window=settings.form_window)
+        mapping = FormWindowMapping(form_window=form_window)
         self._mapping = mapping
         self._features = build_feature_dataset(
             self._visible_panel,
             config=mapping.feature_config,
-            cross_season=settings.cross_season_config,
+            cross_season=cross_season_config,
         )
 
     @property
@@ -306,11 +368,11 @@ class MultiGwRehearsal:
     def _projection_at(self, gameweek: int) -> pd.DataFrame:
         if gameweek not in self._decisions:
             raise ExperimentExecutionError(
-                f"Gameweek {gameweek} has no decision point in {self._settings.season}."
+                f"Gameweek {gameweek} has no decision point in {self._season}."
             )
         return build_projection_table(
             self._features,
-            season=self._settings.season,
+            season=self._season,
             gameweek=gameweek,
             config=self._mapping.projection_config,
         )
@@ -318,12 +380,8 @@ class MultiGwRehearsal:
     def _candidate_pool(self, projections: pd.DataFrame) -> pd.DataFrame:
         pieces: list[pd.DataFrame] = []
         for _, group in projections.groupby("position", sort=True):
-            top = group.nlargest(
-                self._settings.candidate_pool_per_position, "expected_points", keep="first"
-            )
-            cheap = group.nsmallest(
-                self._settings.cheap_pool_per_position, "price_tenths", keep="first"
-            )
+            top = group.nlargest(self._candidate_pool_per_position, "expected_points", keep="first")
+            cheap = group.nsmallest(self._cheap_pool_per_position, "price_tenths", keep="first")
             pieces.append(pd.concat([top, cheap]).drop_duplicates(subset="player_id"))
         pool = pd.concat(pieces, ignore_index=True).drop_duplicates(subset="player_id")
         return pool.sort_values("player_id", kind="stable", ignore_index=True)
@@ -351,6 +409,7 @@ class MultiGwRehearsal:
                 *(pool[column].tolist() for column in columns), strict=True
             ):
                 count = self._fixture_counts.get((gameweek, team_id), 0)
+                scale = count if self._projection_rule == NAIVE_PROJECTION_RULE else min(count, 1)
                 rows.append(
                     {
                         "gameweek": gameweek,
@@ -359,20 +418,44 @@ class MultiGwRehearsal:
                         "team_id": team_id,
                         "position": position,
                         "price_tenths": int(price),
-                        "expected_points": float(expected) * count,
+                        "expected_points": float(expected) * scale,
                         "fixture_count": count,
                         "home_fixture_count": 0,
                     }
                 )
         return ProjectionHorizon(
             pd.DataFrame(rows),
-            season=self._settings.season,
-            source_snapshot_id=f"panel@{self._settings.season}-gw{gameweeks[0]:02d}",
+            season=self._season,
+            source_snapshot_id=f"panel@{self._season}-gw{gameweeks[0]:02d}",
             model_name="deterministic_baseline",
-            model_version=f"form_window_{self._settings.form_window:02d}_v1",
+            model_version=f"form_window_{self._form_window:02d}_v1",
             feature_contract_version=FEATURE_GENERATION_CONTRACT_VERSION,
-            post_processing_contract_version=NAIVE_PROJECTION_RULE,
+            post_processing_contract_version=self._projection_rule,
         )
+
+
+class MultiGwRehearsal(DecisionSeason):
+    """Run planner-versus-myopic comparisons on real decision windows."""
+
+    def __init__(
+        self,
+        panel: pd.DataFrame,
+        fixture_counts: pd.DataFrame,
+        config: MultiGwRehearsalConfig | None = None,
+    ) -> None:
+        settings = MultiGwRehearsalConfig() if config is None else config
+        if not isinstance(settings, MultiGwRehearsalConfig):
+            raise ExperimentExecutionError("config must be a MultiGwRehearsalConfig.")
+        super().__init__(
+            panel,
+            fixture_counts,
+            season=settings.season,
+            form_window=settings.form_window,
+            candidate_pool_per_position=settings.candidate_pool_per_position,
+            cheap_pool_per_position=settings.cheap_pool_per_position,
+            cross_season_config=settings.cross_season_config,
+        )
+        self._settings = settings
 
     def rehearse_window(self, start_gameweek: int) -> RehearsalWindowResult:
         """Compare the planner against the myopic baseline for one window."""

@@ -6,6 +6,11 @@ provenance, the rendered report — and later attaches the realized outcome, for
 the season's out-of-sample series entry by entry. Entries are immutable and
 checksummed like captured snapshots: a recorded decision can be proven to be the
 decision that was made, or it cannot support any claim at all.
+
+A mid-season decision carries a ``transfers`` block (`ledger_transfers_v1`): what
+moved, what it cost, the bank and free transfers after, the purchase prices the next
+week sells at, and the chip played. The opening entry has none; the state a second
+deadline starts from is read out of the opening entry's own record.
 """
 
 import hashlib
@@ -18,11 +23,12 @@ from typing import Final
 
 import pandas as pd
 
-from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
+from squadopt.live.errors import LedgerError as LedgerError
 from squadopt.live.recommendation import Projection
 from squadopt.live.report import Recommendation
+from squadopt.live.transfers import FREE_TRANSFERS_AFTER_OPENING, HeldSquad
 
 SEASON_LEDGER_CONTRACT_VERSION: Final = "season_ledger_v1"
 _DECISION_FILE: Final = "decision.json"
@@ -30,10 +36,6 @@ _PROJECTIONS_FILE: Final = "projections.csv"
 _REPORT_FILE: Final = "report.txt"
 _OUTCOME_FILE: Final = "outcome.json"
 _MANIFEST_FILE: Final = "manifest.json"
-
-
-class LedgerError(DataError):
-    """Raised when a ledger entry cannot be recorded, read, or trusted."""
 
 
 def _digest(data: bytes) -> str:
@@ -131,6 +133,8 @@ def record_decision(
         "risk_status": str(recommendation.risk.status.value),
         "metadata": dict(metadata or {}),
     }
+    if recommendation.transfers is not None:
+        decision["transfers"] = recommendation.transfers.as_record()
     (directory / _DECISION_FILE).write_text(
         json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -215,6 +219,7 @@ def record_outcome(
     _verify_manifest(directory)
     decision = json.loads(decision_path.read_text(encoding="utf-8"))
     starters = [int(value) for value in decision["starting_xi_player_ids"]]
+    bench = [int(value) for value in decision["bench_player_ids"]]
     captain = int(decision["captain_player_id"])
     selected = [int(value) for value in decision["squad_player_ids"]]
     missing = [player for player in {*selected, captain} if player not in event_points]
@@ -222,9 +227,21 @@ def record_outcome(
         raise LedgerError(
             f"Realized points do not cover every selected player; missing {sorted(missing)[:10]!r}."
         )
+    transfers = decision.get("transfers")
+    chip = transfers.get("chip") if isinstance(transfers, dict) else None
+    hit_points = (
+        float(transfers.get("transfer_hit_points", 0.0)) if isinstance(transfers, dict) else 0.0
+    )
+    # Starters plus the captain again; a bench boost counts the bench, a triple captain
+    # counts the captain once more. Automatic substitutions are not applied: the ledger
+    # scores the eleven that were named, which is what the projection was for.
     realized_xi = sum(float(event_points[player]) for player in starters) + float(
         event_points[captain]
     )
+    if chip == "bboost":
+        realized_xi += sum(float(event_points[player]) for player in bench)
+    elif chip == "3xc":
+        realized_xi += float(event_points[captain])
     outcome = {
         "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
         "season": season,
@@ -234,6 +251,9 @@ def record_outcome(
             str(player): float(event_points[player]) for player in sorted(selected)
         },
         "realized_xi_score": realized_xi,
+        "transfer_hit_points": hit_points,
+        "realized_net_score": realized_xi - hit_points,
+        "chip": chip,
         "projected_score": float(decision["projected_score"]),
         "projection_error": realized_xi - float(decision["projected_score"]),
     }
@@ -288,13 +308,125 @@ def load_ledger(root: Path, season: str) -> tuple[LedgerEntry, ...]:
     return tuple(load_entry(root, season, gameweek) for gameweek in gameweeks)
 
 
+def _purchase_prices_from_entry(entry: LedgerEntry, squad: tuple[int, ...]) -> dict[int, int]:
+    """Purchase prices of a squad recorded before the transfer block existed.
+
+    The opening entry records the roster it projected, price included, so the price a
+    player was bought at is the price the entry shows for that player. Read from the
+    verified projections file rather than assumed.
+    """
+
+    projections = pd.read_csv(entry.directory / _PROJECTIONS_FILE)
+    prices = {
+        int(player): int(price)
+        for player, price in zip(
+            projections["player_id"].tolist(), projections["price_tenths"].tolist(), strict=True
+        )
+    }
+    missing = sorted(set(squad) - set(prices))
+    if missing:
+        raise LedgerError(
+            f"Ledger entry for {entry.season} GW{entry.gameweek} records no price for held "
+            f"players {missing[:5]!r}."
+        )
+    return {player: prices[player] for player in squad}
+
+
+def held_squad_from_ledger(
+    root: Path,
+    season: str,
+    *,
+    before_gameweek: int,
+    budget_tenths: int,
+) -> HeldSquad:
+    """Read the state a deadline starts from: the decision recorded for the week before.
+
+    The ledger must hold a decision for exactly the previous gameweek: a decision made
+    for a later week from an older squad would ignore whatever the game did with the
+    weeks between (free transfers accrue, prices move), and pretending otherwise would
+    put a squad the ledger never held into the record. Recording a no-transfer roll for
+    a skipped week is the honest way to catch up.
+    """
+
+    entries = load_ledger(root, season)
+    if not entries:
+        raise LedgerError(
+            f"No decisions recorded for {season}; a mid-season deadline needs the held "
+            "squad from the ledger."
+        )
+    previous = before_gameweek - 1
+    matched = [entry for entry in entries if entry.gameweek == previous]
+    if not matched:
+        held = sorted(entry.gameweek for entry in entries)
+        raise LedgerError(
+            f"No decision recorded for {season} GW{previous}; the ledger holds "
+            f"{held!r}. Record GW{previous} (a no-transfer roll if nothing was done) "
+            f"before deciding GW{before_gameweek}."
+        )
+    entry = matched[0]
+    decision = entry.decision
+    block = decision.get("transfers")
+    free_hit_played = isinstance(block, Mapping) and block.get("chip") == "freehit"
+    if free_hit_played:
+        # A free hit's squad was temporary: the squad, bank, and purchase prices held
+        # are the ones the free-hit week started from — the entry before it — while
+        # the free transfers carried are the free-hit week's own.
+        assert isinstance(block, Mapping)
+        free = int(str(block["free_transfers_after"]))
+        earlier_entries = [candidate for candidate in entries if candidate.gameweek == previous - 1]
+        if not earlier_entries:
+            raise LedgerError(
+                f"GW{previous} was a free-hit week; the squad it started from is GW"
+                f"{previous - 1}'s, which the ledger does not hold."
+            )
+        entry = earlier_entries[0]
+        decision = entry.decision
+        block = decision.get("transfers")
+    squad_ids = decision["squad_player_ids"]
+    if not isinstance(squad_ids, list):
+        raise LedgerError("Ledger decision squad_player_ids is not a list.")
+    squad = tuple(int(value) for value in squad_ids)
+    if isinstance(block, Mapping):
+        purchase = {
+            int(player): int(price) for player, price in dict(block["purchase_prices"]).items()
+        }
+        bank = int(str(block["bank_after_tenths"]))
+        if not free_hit_played:
+            free = int(str(block["free_transfers_after"]))
+    else:
+        purchase = _purchase_prices_from_entry(entry, squad)
+        bank = int(budget_tenths) - int(str(decision["total_cost_tenths"]))
+        if not free_hit_played:
+            free = FREE_TRANSFERS_AFTER_OPENING
+    chips: dict[str, list[int]] = {}
+    for earlier in entries:
+        if earlier.gameweek > previous:
+            continue
+        earlier_block = earlier.decision.get("transfers")
+        chip = earlier_block.get("chip") if isinstance(earlier_block, Mapping) else None
+        if chip is not None:
+            chips.setdefault(str(chip), []).append(int(earlier.gameweek))
+    return HeldSquad(
+        season=season,
+        decided_gameweek=previous,
+        squad_player_ids=squad,
+        purchase_prices=purchase,
+        bank_tenths=bank,
+        free_transfers=free,
+        chips_used={name: tuple(weeks) for name, weeks in chips.items()},
+    )
+
+
 def ledger_summary(root: Path, season: str) -> pd.DataFrame:
-    """Return one row per recorded gameweek: projected, realized, and the gap."""
+    """Return one row per recorded gameweek: projected, realized, hits, and the gap."""
 
     rows: list[dict[str, object]] = []
     for entry in load_ledger(root, season):
         realized = float(str(entry.outcome["realized_xi_score"])) if entry.outcome else None
         projected = float(str(entry.decision["projected_score"]))
+        transfers = entry.decision.get("transfers")
+        block = transfers if isinstance(transfers, Mapping) else {}
+        hits = float(str(block.get("transfer_hit_points", 0.0)))
         rows.append(
             {
                 "gameweek": entry.gameweek,
@@ -304,6 +436,10 @@ def ledger_summary(root: Path, season: str) -> pd.DataFrame:
                 "realized_score": realized,
                 "projection_error": (realized - projected) if realized is not None else None,
                 "unavailable_players": entry.decision["unavailable_player_count"],
+                "transfers": int(str(block.get("transfer_count", 0))),
+                "transfer_hit_points": hits,
+                "realized_net_score": (realized - hits) if realized is not None else None,
+                "chip": block.get("chip"),
                 "settled": entry.outcome is not None,
             }
         )
@@ -317,6 +453,10 @@ def ledger_summary(root: Path, season: str) -> pd.DataFrame:
             "realized_score",
             "projection_error",
             "unavailable_players",
+            "transfers",
+            "transfer_hit_points",
+            "realized_net_score",
+            "chip",
             "settled",
         ],
     )
@@ -333,26 +473,33 @@ def summary_markdown(root: Path, season: str) -> str:
         "- One row per live decision; raw entries (decision, projections, report, "
         "outcome) live locally under `data/ledger/` with per-file checksums.",
         "",
-        "| GW | Snapshot | Solver | Projected | Realized | Error | Unavailable |",
-        "| ---: | --- | --- | ---: | ---: | ---: | ---: |",
+        "| GW | Snapshot | Solver | Projected | Realized | Error | Transfers | Hits | Chip "
+        "| Net | Unavailable |",
+        "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
     ]
     for record in table.to_dict(orient="records"):
         realized_value = record["realized_score"]
         error_value = record["projection_error"]
+        net_value = record["realized_net_score"]
         realized = "-" if realized_value is None else f"{float(str(realized_value)):.0f}"
         error = "-" if error_value is None else f"{float(str(error_value)):+.1f}"
+        net = "-" if net_value is None else f"{float(str(net_value)):.0f}"
+        chip = record["chip"] if record["chip"] is not None else "-"
         lines.append(
             f"| {record['gameweek']} | `{record['snapshot_id']}` "
             f"| {record['solver_status']} "
             f"| {float(str(record['projected_score'])):.1f} | {realized} | {error} "
-            f"| {record['unavailable_players']} |"
+            f"| {record['transfers']} | {float(str(record['transfer_hit_points'])):.0f} "
+            f"| {chip} | {net} | {record['unavailable_players']} |"
         )
     settled = table.loc[table["settled"]]
     if not settled.empty:
         lines += [
             "",
             f"Settled gameweeks: {len(settled)}; mean realized "
-            f"{settled['realized_score'].astype(float).mean():.1f}; mean projection "
+            f"{settled['realized_score'].astype(float).mean():.1f}; total hits "
+            f"{settled['transfer_hit_points'].astype(float).sum():.0f}; net "
+            f"{settled['realized_net_score'].astype(float).sum():.0f}; mean projection "
             f"error {settled['projection_error'].astype(float).mean():+.1f}.",
         ]
     lines += [

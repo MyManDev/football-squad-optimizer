@@ -99,6 +99,61 @@ immutable outcome next to it, and regenerates the committed season summary
 `docs/season_ledger_<season>.md`. Raw ledger entries stay local; only the summary
 is committed.
 
+## Gameweek 2 onward: decide from the held squad
+
+Every deadline after the opening one starts from the squad the ledger holds — the
+previous gameweek's recorded decision — and decides **transfers**, not a fresh squad.
+The machine is the same script:
+
+```powershell
+.venv\Scripts\python -m scripts.capture_deadline_snapshot
+.venv\Scripts\python -m scripts.run_gameweek_ops --phase decide --gameweek 2 `
+    --in-season-projection handoffs\2026-27-gw02.json
+```
+
+What it needs, and refuses without:
+
+- **The previous gameweek's decision in the ledger.** The held squad, bank, banked free
+  transfers, purchase prices, and chips already played are read from `data/ledger/`;
+  the opening entry supplies its own (purchase price = the price it projected at, bank =
+  budget − cost, one free transfer). A gap (GW3 without GW2) is refused; record the
+  missing week first, as a no-transfer roll if that is what happened.
+- **A projection handoff** (`projection_handoff_v1`) from the model that produced it —
+  the archive holds no played gameweek of the current season at deadline time, so the
+  opening carry-over path cannot project GW2+. The file states season, gameweek, the
+  capture it projected from, model name and version, and expected points per player
+  code; identity, club, position, and price come from the capture; availability is
+  applied by the live path as before. A handoff for another capture or gameweek is
+  refused; an edited handoff fails its fingerprint.
+- **A promoted in-season model version.** Verification requires the handoff's model
+  version to be in `IN_SEASON_CONTROL_MODEL_VERSIONS` (`squadopt.live`); the list is
+  empty until an in-season control clears its gates, and pinning a version there is the
+  promotion decision, made in a reviewed change. Until then a GW2+ decision is refused
+  at verification, not made from an unpromoted model.
+
+The decision is the transfer planner with a **one-week horizon** — the weekly baseline
+the planner measurements kept as control — under the season's published rules read
+from the capture: free transfers banked to the cap, a hit per extra move, sales at the
+sell price (purchase plus half of any rise, rounded down), the bank never negative.
+Chips are **not timed by the planner** (a one-week horizon plays them at the first
+opportunity; see `docs/season_chain_note.md`); play one by naming it:
+
+```powershell
+... --phase decide --gameweek 24 --in-season-projection ... --chip bboost
+```
+
+A named chip is refused outside its published window or if already played inside it.
+The report gains a *Transfers* section (out, in, hits, free transfers, bank, chip); the
+ledger entry gains a `transfers` block (`ledger_transfers_v1`) with the purchase prices
+the next week sells at. Additional checks the decide phase enforces for a transfer
+decision: what left was held, what came in was not, the squad after is held − out +
+in, the bank after is not negative, hits equal paid transfers at the hit cost, a chip
+played was offered, no selected player lacked a projection.
+
+Settle is unchanged in use; the outcome nets the hits and counts a bench boost's bench
+or a triple captain's third captain score, and the season summary shows transfers,
+hits, chip, and net per gameweek.
+
 ## Contingencies
 
 - **Source unreachable near the deadline:** use the latest good capture; the report's

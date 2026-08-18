@@ -7,6 +7,8 @@ from squadopt.uncertainty.adaptive import (
     fit_player_adaptive_uncertainty,
 )
 from squadopt.uncertainty.calibration import (
+    BLANK_FIXTURE_GROUP,
+    FIXTURE_COUNT_COLUMN,
     INTERVAL_LOWER_COLUMN,
     INTERVAL_UPPER_COLUMN,
     UNCERTAINTY_GROUP_COLUMN,
@@ -16,12 +18,16 @@ from squadopt.uncertainty.calibration import (
     apply_projection_uncertainty,
     evaluate_projection_uncertainty,
     fit_projection_uncertainty,
+    fixture_group_of,
 )
 from squadopt.uncertainty.config import (
+    CONTRACT_BY_GROUPING,
     DEFAULT_UNCERTAINTY_DEVELOPMENT_SEASONS,
     DEFAULT_UNCERTAINTY_HOLDOUT_SEASON,
     PLAYER_ADAPTIVE_UNCERTAINTY_CONTRACT_VERSION,
     PROJECTION_UNCERTAINTY_CONTRACT_VERSION,
+    PROJECTION_UNCERTAINTY_FIXTURE_CONTRACT_VERSION,
+    UNCERTAINTY_GROUPINGS,
     PlayerAdaptiveUncertaintyConfig,
     UncertaintyConfig,
 )
@@ -30,6 +36,23 @@ from squadopt.uncertainty.errors import (
     UncertaintyError,
     UncertaintyValidationError,
 )
+from squadopt.uncertainty.fixture_conformal import (
+    FIXTURE_GROUP_CONFORMAL_CONTRACT_VERSION,
+    FIXTURE_GROUPS,
+    CellMetrics,
+    ConformalCell,
+    FixtureGroupConformalConfig,
+    FixtureGroupConformalResult,
+    fit_and_evaluate_fixture_group_conformal,
+    fixture_group,
+)
+from squadopt.uncertainty.fixture_conformal import (
+    result_to_dict as fixture_group_conformal_to_dict,
+)
+from squadopt.uncertainty.fixture_conformal import (
+    validate_residual_table as validate_fixture_residual_table,
+)
+from squadopt.uncertainty.fixture_folds import attach_fixture_counts_to_folds
 from squadopt.uncertainty.models import (
     AdaptiveGroupCalibration,
     CalibratedProjectionResult,
@@ -44,19 +67,30 @@ from squadopt.uncertainty.models import (
 )
 
 __all__ = [
+    "BLANK_FIXTURE_GROUP",
+    "CONTRACT_BY_GROUPING",
     "DEFAULT_UNCERTAINTY_DEVELOPMENT_SEASONS",
     "DEFAULT_UNCERTAINTY_HOLDOUT_SEASON",
+    "FIXTURE_COUNT_COLUMN",
+    "FIXTURE_GROUPS",
+    "FIXTURE_GROUP_CONFORMAL_CONTRACT_VERSION",
     "INTERVAL_LOWER_COLUMN",
     "INTERVAL_UPPER_COLUMN",
     "PLAYER_ADAPTIVE_UNCERTAINTY_CONTRACT_VERSION",
     "PLAYER_UNCERTAINTY_OBSERVATIONS_COLUMN",
     "PROJECTION_UNCERTAINTY_CONTRACT_VERSION",
+    "PROJECTION_UNCERTAINTY_FIXTURE_CONTRACT_VERSION",
+    "UNCERTAINTY_GROUPINGS",
     "UNCERTAINTY_GROUP_COLUMN",
     "UNCERTAINTY_OBSERVATIONS_COLUMN",
     "UNCERTAINTY_SOURCE_COLUMN",
     "UNCERTAINTY_STDDEV_COLUMN",
     "AdaptiveGroupCalibration",
     "CalibratedProjectionResult",
+    "CellMetrics",
+    "ConformalCell",
+    "FixtureGroupConformalConfig",
+    "FixtureGroupConformalResult",
     "GroupCalibration",
     "PlayerAdaptiveUncertaintyCalibration",
     "PlayerAdaptiveUncertaintyConfig",
@@ -72,8 +106,14 @@ __all__ = [
     "UncertaintyValidationError",
     "apply_player_adaptive_uncertainty",
     "apply_projection_uncertainty",
+    "attach_fixture_counts_to_folds",
     "evaluate_player_adaptive_uncertainty",
     "evaluate_projection_uncertainty",
+    "fit_and_evaluate_fixture_group_conformal",
     "fit_player_adaptive_uncertainty",
     "fit_projection_uncertainty",
+    "fixture_group",
+    "fixture_group_conformal_to_dict",
+    "fixture_group_of",
+    "validate_fixture_residual_table",
 ]

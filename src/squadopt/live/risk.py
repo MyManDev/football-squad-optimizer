@@ -150,6 +150,18 @@ class LiveRiskDiagnostics:
         return self.status is LiveRiskStatus.AVAILABLE
 
 
+# Limits of the evidence behind an available lower tail, stated with it rather than
+# left silent. The calendar limit is measured: the position-only calibration undercovers
+# double gameweeks (docs/fixture_group_conformal_note.md), and the residual history a
+# live evaluation resamples carries the same blindness until the fixture-group contract
+# (projection_uncertainty_v2) is the operational one.
+LIVE_RISK_STATED_LIMITS: Final = (
+    "The residual history is calendar-blind: on a double gameweek the lower tail is "
+    "optimistic by roughly the measured undercoverage (0.85 against nominal 0.90; "
+    "docs/fixture_group_conformal_note.md).",
+)
+
+
 def risk_not_requested() -> LiveRiskDiagnostics:
     """Return the honest default when no residual evidence was supplied."""
 
@@ -312,5 +324,6 @@ def evaluate_live_risk(
             "lower_quantile": evaluation.lower_quantile,
             "worst_fraction": evaluation.worst_fraction,
             "points_threshold": evaluation.points_threshold,
+            "stated_limits": list(LIVE_RISK_STATED_LIMITS),
         },
     )

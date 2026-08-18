@@ -210,7 +210,7 @@ def test_decide_verifies_and_freezes_the_decision(
 def test_a_failed_verification_publishes_nothing(
     monkeypatch: pytest.MonkeyPatch, world: dict[str, Any]
 ) -> None:
-    monkeypatch.setattr(ops, "verify_decision", lambda rec, proj: ["a check failed"])
+    monkeypatch.setattr(ops, "verify_decision", lambda rec, proj, held=None: ["a check failed"])
 
     exit_code = _run(monkeypatch, world, "--phase", "decide", "--snapshot-id", world["decide_id"])
 

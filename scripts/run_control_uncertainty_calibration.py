@@ -17,6 +17,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pandas as pd
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
@@ -26,12 +27,15 @@ from scripts._experiment_cli import (
 )
 
 from squadopt.backtest import build_walk_forward_folds, make_baseline_projection_builder
-from squadopt.data.sources.vaastav import build_panel
+from squadopt.data.sources.vaastav import build_fixture_panel, build_panel, load_team_codes
 from squadopt.prediction import BASELINE_FORM_WINDOW
 from squadopt.uncertainty import (
+    CONTRACT_BY_GROUPING,
+    UNCERTAINTY_GROUPINGS,
     PlayerAdaptiveUncertaintyConfig,
     UncertaintyConfig,
     UncertaintyError,
+    attach_fixture_counts_to_folds,
     evaluate_player_adaptive_uncertainty,
     evaluate_projection_uncertainty,
     fit_player_adaptive_uncertainty,
@@ -52,16 +56,47 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--confidence-level", type=float, default=0.90)
     parser.add_argument("--form-window", type=int, default=BASELINE_FORM_WINDOW)
     parser.add_argument(
-        "--json-output",
-        type=Path,
-        default=REPOSITORY_ROOT / "docs" / "control_uncertainty_calibration.json",
+        "--grouping",
+        choices=UNCERTAINTY_GROUPINGS,
+        default="position",
+        help="position is projection_uncertainty_v1; position_fixture_group is v2 (the "
+        "published calendar is attached to every fold row and doubles get their own radius)",
     )
-    parser.add_argument(
-        "--markdown-output",
-        type=Path,
-        default=REPOSITORY_ROOT / "docs" / "control_uncertainty_calibration.md",
-    )
-    return parser.parse_args()
+    parser.add_argument("--json-output", type=Path, default=None)
+    parser.add_argument("--markdown-output", type=Path, default=None)
+    arguments = parser.parse_args()
+    suffix = "" if arguments.grouping == "position" else "_v2"
+    if arguments.json_output is None:
+        arguments.json_output = (
+            REPOSITORY_ROOT / "docs" / f"control_uncertainty_calibration{suffix}.json"
+        )
+    if arguments.markdown_output is None:
+        arguments.markdown_output = (
+            REPOSITORY_ROOT / "docs" / f"control_uncertainty_calibration{suffix}.md"
+        )
+    return arguments
+
+
+def _fixture_counts(archive_root: Path, seasons: tuple[str, ...]) -> pd.DataFrame:
+    """Known fixture counts per (season, gameweek, club name), the panel's team labels."""
+
+    fixtures = build_fixture_panel(archive_root, seasons=seasons)
+    pieces: list[pd.DataFrame] = []
+    for season in seasons:
+        codes = load_team_codes(archive_root, season)
+        name_by_code = {
+            int(code): str(name)
+            for name, code in zip(codes["name"].tolist(), codes["code"].tolist(), strict=True)
+        }
+        block = fixtures.loc[fixtures["season"] == season]
+        counts = (
+            block.groupby(["season", "gameweek", "team_id"], sort=True)
+            .size()
+            .reset_index(name="fixture_count")
+        )
+        counts["team_id"] = [name_by_code[int(code)] for code in counts["team_id"].tolist()]
+        pieces.append(counts)
+    return pd.concat(pieces, ignore_index=True)
 
 
 def _metric_rows(label: str, metrics: object, group_metrics: dict[str, object]) -> list[str]:
@@ -79,6 +114,25 @@ def _metric_row(label: str, population: str, metrics: object) -> str:
         f"| {record['mean_absolute_error']:.4f} "
         f"| {record['root_mean_squared_error']:.4f} |"
     )
+
+
+def _fixture_rows(metrics: object) -> list[str]:
+    if not isinstance(metrics, dict):
+        return []
+    lines = [
+        "",
+        "Fixture-group populations (position-level calibration, held-out season):",
+        "",
+        "| Population | Observations | Coverage | Mean width | MAE |",
+        "| --- | ---: | ---: | ---: | ---: |",
+    ]
+    for key in sorted(metrics, key=lambda item: ("/" in item, item)):
+        row = metrics[key]
+        lines.append(
+            f"| {key} | {row['observations']} | {row['empirical_coverage']:.4f} "
+            f"| {row['mean_interval_width']:.2f} | {row['mean_absolute_error']:.2f} |"
+        )
+    return lines
 
 
 def main() -> int:
@@ -108,6 +162,8 @@ def main() -> int:
             confidence_level=arguments.confidence_level,
             development_seasons=calibration_seasons,
             holdout_season=evaluation_season,
+            grouping=arguments.grouping,
+            contract_version=CONTRACT_BY_GROUPING[arguments.grouping],
         )
         adaptive_config = PlayerAdaptiveUncertaintyConfig(
             confidence_level=arguments.confidence_level,
@@ -128,6 +184,13 @@ def main() -> int:
             min_prior_gameweeks_in_season=1,
             projection_builder=builder,
         )
+        if position_config.uses_fixture_groups:
+            LOGGER.info("Attaching the published calendar to every fold row")
+            calendar = _fixture_counts(
+                arguments.archive_root, (*calibration_seasons, evaluation_season)
+            )
+            calibration_folds = attach_fixture_counts_to_folds(calibration_folds, calendar)
+            evaluation_folds = attach_fixture_counts_to_folds(evaluation_folds, calendar)
         position_calibration = fit_projection_uncertainty(calibration_folds, position_config)
         position_result = evaluate_projection_uncertainty(evaluation_folds, position_calibration)
         adaptive_calibration = fit_player_adaptive_uncertainty(calibration_folds, adaptive_config)
@@ -147,6 +210,8 @@ def main() -> int:
         "form_window": arguments.form_window,
         "calibration_fold_count": len(calibration_folds),
         "evaluation_fold_count": len(evaluation_folds),
+        "grouping": arguments.grouping,
+        "contract_version": position_config.contract_version,
         "position_level": {
             "configuration_fingerprint": (position_config.configuration_fingerprint),
             "calibration_fingerprint": (position_calibration.calibration_fingerprint),
@@ -154,6 +219,10 @@ def main() -> int:
             "group_metrics": {
                 position: asdict(metrics)
                 for position, metrics in position_result.group_metrics.items()
+            },
+            "fixture_group_metrics": position_result.diagnostics.get("fixture_group_metrics"),
+            "fixture_cells": {
+                key: asdict(cell) for key, cell in position_calibration.fixture_groups.items()
             },
         },
         "player_adaptive": {
@@ -180,6 +249,7 @@ def main() -> int:
         "frozen calibrations, no refit)",
         f"- Confidence level: {arguments.confidence_level}",
         f"- Baseline form window: {arguments.form_window}",
+        f"- Grouping: {arguments.grouping} (`{position_config.contract_version}`)",
         "- The 2025-26 locked holdout was **not** read.",
         "",
         "| Calibration | Population | Observations | Coverage | Mean width | MAE | RMSE |",
@@ -187,13 +257,14 @@ def main() -> int:
         *_metric_rows(
             "Position-level",
             position_result.metrics,
-            dict(position_result.group_metrics),
+            {str(k): v for k, v in position_result.group_metrics.items()},
         ),
         *_metric_rows(
             "Player-adaptive",
             adaptive_result.metrics,
-            dict(adaptive_result.group_metrics),
+            {str(k): v for k, v in adaptive_result.group_metrics.items()},
         ),
+        *_fixture_rows(position_result.diagnostics.get("fixture_group_metrics")),
         "",
         "The comparison to read: at the same confidence level, does the player-adaptive",
         "calibration hold coverage while narrowing the mean interval width?",
