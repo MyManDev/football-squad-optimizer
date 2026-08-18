@@ -74,6 +74,12 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--chip-mode", choices=("value", "hybrid"), default="hybrid")
     parser.add_argument("--robustness-weight", type=float, default=1.0)
     parser.add_argument(
+        "--wildcard-hold-upper",
+        type=int,
+        default=40,
+        help="upper edge of the wildcard_hold grid (step 4; the first run's 24 was hit)",
+    )
+    parser.add_argument(
         "--json-output", type=Path, default=REPOSITORY_ROOT / "docs" / "chip_bayesopt.json"
     )
     parser.add_argument(
@@ -82,11 +88,13 @@ def _parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _factors() -> tuple[BayesianFactor, ...]:
+def _factors(wildcard_upper: int = 40) -> tuple[BayesianFactor, ...]:
+    # The first run's recommended wildcard_hold sat on the old upper edge (24); the grid
+    # now reaches 40 so the search can say where the value stops rising.
     return (
         BayesianFactor("bboost_hold", 0, 30, 5, FactorKind.INTEGER),
         BayesianFactor("threexc_hold", 0, 30, 5, FactorKind.INTEGER),
-        BayesianFactor("wildcard_hold", 0, 24, 4, FactorKind.INTEGER),
+        BayesianFactor("wildcard_hold", 0, wildcard_upper, 4, FactorKind.INTEGER),
         BayesianFactor("freehit_hold", 0, 20, 5, FactorKind.INTEGER),
         BayesianFactor("planning_hit_cost", 4, 8, 1, FactorKind.INTEGER),
     )
@@ -154,7 +162,7 @@ def main() -> int:
         return 1
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
     config = BayesianOptimizationConfig(
-        factors=_factors(),
+        factors=_factors(int(arguments.wildcard_hold_upper)),
         evaluation_budget=arguments.evaluation_budget,
         initial_design_size=arguments.initial_design_size,
         deterministic_seed=arguments.seed,
@@ -226,7 +234,7 @@ def main() -> int:
         ),
         "factors": [
             {"name": f.name, "lower": f.lower_bound, "upper": f.upper_bound, "step": f.step}
-            for f in _factors()
+            for f in config.factors
         ],
         "evaluation_budget": arguments.evaluation_budget,
         "initial_design_size": arguments.initial_design_size,
