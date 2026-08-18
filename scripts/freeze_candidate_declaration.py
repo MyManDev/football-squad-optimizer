@@ -16,6 +16,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Final
 
 from scripts._experiment_cli import REPOSITORY_ROOT, write_json, write_text
 
@@ -35,6 +36,35 @@ from squadopt.prediction.production import ProductionProjectionConfig
 
 CANDIDATE_ID = "learned_rate_calendar_candidate_v1"
 WINDOW = 6
+
+# Stage A's review state, per steps 4 and 5 of docs/candidate_declaration_review.md.
+#
+# Data rather than prose in the renderer, because these were three literal strings that
+# re-emitted "pending" on every regeneration — including for a review that had already
+# happened. The record therefore contradicted docs/issue43_stage_a_review.md, which states
+# the optimization/evaluation side's position as "v2 is clean enough to freeze", and left a
+# reader unable to tell what the freeze was actually waiting on.
+#
+# Nothing here reaches either fingerprint: both are computed from the typed
+# CandidateDeclaration and ProductionBenchmarkConfig, so recording a review cannot move the
+# values it is a review of. A test holds that, because it is the property that makes editing
+# this tuple safe.
+#
+# Each owner updates their own line when their review lands; the freeze line goes last, and
+# only once every line above it is recorded.
+STAGE_A_STATUS: Final = (
+    (
+        "Reviewed by the optimization/evaluation side",
+        "recorded — `issue43_stage_a_review.md`: this side's position is that v2 is clean "
+        "enough to freeze",
+    ),
+    ("Reviewed by the architecture/CI side", "**pending**"),
+    (
+        "Fingerprints frozen",
+        "**pending** — both are computed and reproduce byte for byte; the freeze is recorded "
+        "when the third review lands",
+    ),
+)
 
 # Every component the declaration freezes. Listed explicitly rather than derived, because
 # a frozen set that a code change can silently widen is not frozen.
@@ -188,9 +218,9 @@ def markdown(record: dict[str, object]) -> str:
         "",
         "## Stage A status",
         "",
-        "- Reviewed by the optimization/evaluation side: pending",
-        "- Reviewed by the architecture/CI side: pending",
-        "- Fingerprints frozen: pending",
+    ]
+    lines += [f"- {label}: {state}" for label, state in STAGE_A_STATUS]
+    lines += [
         "",
         "A change to anything above after the freeze voids it. There is no small-fix "
         "exception: a changed candidate is a new candidate with a new fingerprint.",

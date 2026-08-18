@@ -6,7 +6,10 @@ own constants, that the fingerprint moves when any declared input moves, and tha
 not move for reasons nobody decided.
 """
 
+from unittest import mock
+
 import pytest
+import scripts.freeze_candidate_declaration as freeze_module
 from scripts.freeze_candidate_declaration import (
     CANDIDATE_ID,
     FROZEN_COMPONENTS,
@@ -213,3 +216,47 @@ def test_the_markdown_publishes_both_fingerprints() -> None:
 
     assert str(record["declaration_fingerprint"]) in text
     assert str(record["benchmark_configuration_fingerprint"]) in text
+
+
+# --- the Stage A status the record reports ----------------------------------
+
+
+def test_the_record_names_what_the_freeze_is_still_waiting_on() -> None:
+    """A reader must be able to tell which review is outstanding, from the record alone."""
+
+    text = markdown(document())
+
+    assert "- Reviewed by the architecture/CI side: **pending**" in text
+    assert "- Reviewed by the optimization/evaluation side: recorded" in text
+
+
+def test_recording_a_review_cannot_move_either_fingerprint() -> None:
+    """The property that makes the status safe to edit.
+
+    Both digests are computed from the typed declaration and benchmark configuration, so a
+    review is a statement *about* the frozen values and never part of them. If this failed,
+    recording the third owner's review would void the freeze it was recording.
+    """
+
+    before = document()
+
+    with mock.patch.object(
+        freeze_module,
+        "STAGE_A_STATUS",
+        (("Reviewed by everyone", "recorded"), ("Fingerprints frozen", "recorded")),
+    ):
+        after = document()
+        text = markdown(after)
+
+    assert after["declaration_fingerprint"] == before["declaration_fingerprint"]
+    assert (
+        after["benchmark_configuration_fingerprint"]
+        == before["benchmark_configuration_fingerprint"]
+    )
+    assert "- Reviewed by everyone: recorded" in text
+
+
+def test_the_status_is_not_part_of_the_machine_readable_record() -> None:
+    """It belongs in the reviewable document, not in the artifact a gate reads."""
+
+    assert "stage_a_status" not in document()
