@@ -70,6 +70,11 @@ from squadopt.scenarios.models import (
 )
 
 RANK_OBJECTIVE_CONTRACT_VERSION: Final = "rank_probability_objective_v1"
+CLAIM_SCENARIO_MODES: Final = ("in_sample", "held_out_half")
+# Share of the solver's limits spent proving the ahead count; the rest goes to the
+# expected-score phase and the deterministic rank tie-break.
+_PRIMARY_PHASE_SHARE: Final = 0.6
+_SECONDARY_PHASE_SHARE: Final = 0.3
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +86,12 @@ class RankObjectiveConfig:
     expected_points_budget: float | None = None
     """When set with a reference, the squad's scenario-mean score may fall at most this
     far below the reference (the risk-neutral squad's mean): the price of the goal."""
+    claim_scenarios: str = "in_sample"
+    """Which scenarios the reported probability is read from. ``in_sample``: the same
+    scenarios the squad was chosen on (optimistic: the squad was picked to win them).
+    ``held_out_half``: the squad is chosen on the first half of the scenario sample and
+    the probability is read from the second half it never saw - the scenario-level
+    analogue of the selection-optimism shift."""
     objective_weight_scale: int = 1_000
     contract_version: str = RANK_OBJECTIVE_CONTRACT_VERSION
 
@@ -105,6 +116,10 @@ class RankObjectiveConfig:
         scale = self.objective_weight_scale
         if isinstance(scale, bool) or not isinstance(scale, int) or scale < 1:
             raise ScenarioConfigurationError("objective_weight_scale must be a positive integer.")
+        if self.claim_scenarios not in CLAIM_SCENARIO_MODES:
+            raise ScenarioConfigurationError(
+                f"claim_scenarios must be one of {CLAIM_SCENARIO_MODES!r}."
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,15 +205,29 @@ def optimize_rank_probability_squad(
         sum(row[i] for i in rival_columns) + row[rival_captain_column] for row in scaled_rows
     ]
     margin_scaled = scale_expected_points(settings.margin_points, scale)
-    scenario_count = len(scaled_rows)
+    total_scenarios = len(scaled_rows)
+    if settings.claim_scenarios == "held_out_half":
+        if total_scenarios < 4:
+            raise ScenarioValidationError("held_out_half needs at least four scenarios.")
+        selection_rows = list(range(total_scenarios // 2))
+        claim_rows = list(range(total_scenarios // 2, total_scenarios))
+    else:
+        selection_rows = list(range(total_scenarios))
+        claim_rows = list(range(total_scenarios))
+    scenario_count = len(selection_rows)
 
-    row_bounds = [2 * sum(abs(v) for v in row) for row in scaled_rows]
-    big_m = max(row_bounds, default=0) + max((abs(v) for v in rival_scaled), default=0)
-    big_m += abs(margin_scaled) + 1
-    # Objective weights: one scenario ahead outweighs any expected-score difference.
-    expected_bound = sum(row_bounds)
-    ahead_weight = expected_bound + 1
-    if ahead_weight * scenario_count + expected_bound > CP_SAT_SAFE_INTEGER_MAX:
+    starting_size = optimization_config.starting_size
+    # Per-scenario score bounds: at most the largest value twice (captain) plus the next
+    # starting_size - 1 largest; at least the smallest twice plus the next smallest.
+    # Tight per-scenario big-Ms keep the relaxation informative.
+    upper_by_row: list[int] = []
+    lower_by_row: list[int] = []
+    for row in scaled_rows:
+        ordered = sorted(row)
+        upper_by_row.append(2 * ordered[-1] + sum(ordered[-starting_size:-1]))
+        lower_by_row.append(2 * ordered[0] + sum(ordered[1:starting_size]))
+    expected_bound = sum(max(abs(upper_by_row[s]), abs(lower_by_row[s])) for s in selection_rows)
+    if scenario_count + expected_bound > CP_SAT_SAFE_INTEGER_MAX:
         raise SolverExecutionError(
             "Rank objective exceeds the safe CP-SAT integer range; reduce the scenario count "
             "or expected_points_scale."
@@ -213,33 +242,48 @@ def optimize_rank_probability_squad(
     )
     my_scores: list[cp_model.LinearExpr] = []
     ahead_vars: list[cp_model.IntVar] = []
-    for s, row in enumerate(scaled_rows):
+    for s in selection_rows:
+        row = scaled_rows[s]
         terms: list[cp_model.LinearExpr] = []
         for i, points in enumerate(row):
             terms.append(points * starter_vars[i])
             terms.append(points * captain_vars[i])
         score = cp_model.LinearExpr.sum(terms)
         my_scores.append(score)
+        threshold = rival_scaled[s] + margin_scaled + 1
         ahead = model.new_bool_var(f"ahead_{s}")
-        # ahead_s = 1 only if score_s >= rival_s + margin + 1 (strictly more than margin).
-        model.add(score >= rival_scaled[s] + margin_scaled + 1 - big_m * (1 - ahead))
-        model.add(score <= rival_scaled[s] + margin_scaled + big_m * ahead)
+        # ahead_s = 1 only if score_s >= rival_s + margin + 1 (strictly more than margin),
+        # pinned both ways with a big-M sized to this scenario's own score range.
+        big_m_low = max(0, threshold - lower_by_row[s])
+        big_m_high = max(0, upper_by_row[s] - threshold + 1)
+        model.add(score >= threshold - big_m_low * (1 - ahead))
+        model.add(score <= threshold - 1 + big_m_high * ahead)
         ahead_vars.append(ahead)
     total_score = cp_model.LinearExpr.sum(my_scores)
     if settings.expected_points_budget is not None and reference_expected_points is not None:
         floor_points = reference_expected_points - settings.expected_points_budget
         model.add(total_score >= scale_expected_points(floor_points, scale) * scenario_count)
-    primary_objective = ahead_weight * cp_model.LinearExpr.sum(ahead_vars) + total_score
-    model.maximize(primary_objective)
+    ahead_total = cp_model.LinearExpr.sum(ahead_vars)
+    # The rival's own eleven is a feasible start (it wins no scenario against itself, but
+    # it is a squad): the solver has an incumbent from the first node.
+    rival_squad_columns = set(rival_columns)
+    for i in range(len(players)):
+        model.add_hint(starter_vars[i], int(i in rival_squad_columns))
+        model.add_hint(captain_vars[i], int(i == rival_captain_column))
 
     started_at = perf_counter()
-    deadline = started_at + optimization_config.solver_time_limit_seconds
+    wall_limit = optimization_config.solver_time_limit_seconds
+    deterministic_limit = optimization_config.solver_deterministic_time_limit
+    deadline = started_at + wall_limit
+
+    # Phase 1: the ahead count alone (small integers; a bound the solver can prove).
+    model.maximize(ahead_total)
     solver = cp_model.CpSolver()
     _configure_solver(
         solver,
         optimization_config,
-        optimization_config.solver_time_limit_seconds,
-        optimization_config.solver_deterministic_time_limit,
+        wall_limit * _PRIMARY_PHASE_SHARE,
+        None if deterministic_limit is None else deterministic_limit * _PRIMARY_PHASE_SHARE,
     )
     raw_status = _solve(model, solver)
     status = _map_solver_status(raw_status)
@@ -249,16 +293,19 @@ def optimize_rank_probability_squad(
         "solver_status_name": _raw_status_name(raw_status),
         "objective_contract": settings.contract_version,
         "scenario_fingerprint": verified.scenario_fingerprint,
-        "scenario_count": scenario_count,
+        "scenario_count": total_scenarios,
+        "selection_scenario_count": scenario_count,
+        "claim_scenario_count": len(claim_rows),
+        "claim_scenarios": settings.claim_scenarios,
         "margin_points": settings.margin_points,
         "expected_points_budget": settings.expected_points_budget,
         "reference_expected_points": reference_expected_points,
         "rival_label": rival.label,
         "rival_scenario_mean_score": float(rival_raw.mean()),
-        "big_m": big_m,
-        "ahead_weight": ahead_weight,
         "num_search_workers": 1,
         "primary_deterministic_time": primary_deterministic_time,
+        "secondary_attempted": False,
+        "secondary_completed": False,
         "tiebreak_attempted": False,
         "tiebreak_completed": False,
         "location_shift_applied": False,
@@ -278,8 +325,7 @@ def optimize_rank_probability_squad(
             diagnostics=diagnostics,
         )
 
-    primary_value = int(solver.value(primary_objective))
-    primary_ahead_count = int(sum(solver.value(v) for v in ahead_vars))
+    primary_value = int(solver.value(ahead_total))
     best_bound = float(solver.best_objective_bound)
     diagnostics["best_objective_bound"] = best_bound
     diagnostics["absolute_optimality_gap"] = (
@@ -291,12 +337,51 @@ def optimize_rank_probability_squad(
         else max(0.0, best_bound - primary_value) / max(1.0, abs(primary_value))
     )
     result_solver = solver
+
+    # Phase 2: keep at least that many scenarios and maximise expected score. Runs even
+    # after a FEASIBLE phase 1 (it can only keep or improve the incumbent).
     remaining_time = deadline - perf_counter()
     remaining_deterministic = _remaining_deterministic_time(
-        optimization_config.solver_deterministic_time_limit, primary_deterministic_time
+        deterministic_limit, primary_deterministic_time
+    )
+    secondary_deterministic_time = 0.0
+    if remaining_time > MIN_TIEBREAK_TIME_SECONDS and (
+        remaining_deterministic is None or remaining_deterministic > MIN_TIEBREAK_DETERMINISTIC_TIME
+    ):
+        diagnostics["secondary_attempted"] = True
+        model.add(ahead_total >= primary_value)
+        model.maximize(total_score)
+        model.clear_hints()  # type: ignore[no-untyped-call]
+        for variables in (squad_vars, starter_vars, captain_vars):
+            for variable in variables:
+                model.add_hint(variable, int(solver.value(variable)))
+        secondary_share = _SECONDARY_PHASE_SHARE / (1.0 - _PRIMARY_PHASE_SHARE)
+        secondary_solver = cp_model.CpSolver()
+        _configure_solver(
+            secondary_solver,
+            optimization_config,
+            remaining_time * secondary_share,
+            None if remaining_deterministic is None else remaining_deterministic * secondary_share,
+        )
+        raw_secondary = _solve(model, secondary_solver)
+        secondary_status = _map_solver_status(raw_secondary)
+        secondary_deterministic_time = _deterministic_time_used(secondary_solver, raw_secondary)
+        if secondary_status in {SolverStatus.OPTIMAL, SolverStatus.FEASIBLE}:
+            result_solver = secondary_solver
+            diagnostics["secondary_completed"] = secondary_status is SolverStatus.OPTIMAL
+        elif secondary_status is SolverStatus.INFEASIBLE:
+            raise SolverExecutionError(
+                "The expected-score phase became infeasible after fixing the ahead count."
+            )
+
+    # Phase 3: the ordinary deterministic rank tie-break, once both objectives are proven.
+    remaining_time = deadline - perf_counter()
+    remaining_deterministic = _remaining_deterministic_time(
+        deterministic_limit, primary_deterministic_time + secondary_deterministic_time
     )
     if (
         status is SolverStatus.OPTIMAL
+        and diagnostics["secondary_completed"] is True
         and remaining_time > MIN_TIEBREAK_TIME_SECONDS
         and (
             remaining_deterministic is None
@@ -304,14 +389,15 @@ def optimize_rank_probability_squad(
         )
     ):
         diagnostics["tiebreak_attempted"] = True
+        secondary_value = int(result_solver.value(total_score))
         _add_tiebreak_objective(
             model,
             squad_vars,
             starter_vars,
             captain_vars,
-            primary_objective,
+            total_score,
             optimization_config,
-            primary_value,
+            secondary_value,
         )
         tiebreak_solver = cp_model.CpSolver()
         _configure_solver(
@@ -340,6 +426,26 @@ def optimize_rank_probability_squad(
     total_cost = sum(int(players.iloc[i]["price_tenths"]) for i in squad_indices)
     projected = float(starting_xi["expected_points"].sum() + captain["expected_points"])
     diagnostics["solve_time_seconds"] = perf_counter() - started_at
+
+    # Probabilities are read off the chosen squad's actual scenario scores: on the
+    # selection scenarios (what the model optimised; its indicators agree by
+    # construction) and on the claim scenarios (what is reported).
+    my_scaled = np.asarray(
+        [sum(row[i] for i in starter_indices) + row[captain_indices[0]] for row in scaled_rows],
+        dtype="int64",
+    )
+    rival_array = np.asarray(rival_scaled, dtype="int64")
+    ahead_all = my_scaled >= rival_array + margin_scaled + 1
+    selection_ahead = int(ahead_all[selection_rows].sum())
+    claim_ahead = int(ahead_all[claim_rows].sum())
+    my_means = matrix[:, starter_indices].sum(axis=1) + matrix[:, captain_indices[0]]
+    diagnostics["ahead_count"] = selection_ahead
+    diagnostics["ahead_count_from_indicators"] = int(
+        sum(result_solver.value(v) for v in ahead_vars)
+    )
+    diagnostics["selection_probability_ahead"] = selection_ahead / scenario_count
+    diagnostics["claim_ahead_count"] = claim_ahead
+    diagnostics["selection_mean_score"] = float(my_means[selection_rows].mean())
     optimization_result = OptimizationResult(
         solver_status=status,
         selected_squad=selected_squad,
@@ -348,29 +454,20 @@ def optimize_rank_probability_squad(
         captain=captain,
         total_cost_tenths=total_cost,
         projected_score=projected,
-        objective_value=float(primary_ahead_count),
+        objective_value=float(selection_ahead),
         diagnostics=diagnostics.copy(),
     )
-    # Read the probability off the chosen squad's actual scenario scores (the model's
-    # indicators agree by construction, and this is the same code path a report uses).
-    comparison = compare_fixed_decisions(optimization_result, rival, verified)
-    my_scaled = np.asarray(
-        [sum(row[i] for i in starter_indices) + row[captain_indices[0]] for row in scaled_rows],
-        dtype="int64",
-    )
-    rival_array = np.asarray(rival_scaled, dtype="int64")
-    ahead_count = int((my_scaled >= rival_array + margin_scaled + 1).sum())
-    my_mean = float((matrix[:, starter_indices].sum(axis=1) + matrix[:, captain_indices[0]]).mean())
-    diagnostics["ahead_count"] = ahead_count
-    diagnostics["ahead_count_from_indicators"] = int(
-        sum(result_solver.value(v) for v in ahead_vars)
+    comparison = (
+        compare_fixed_decisions(optimization_result, rival, verified)
+        if settings.claim_scenarios == "in_sample"
+        else None
     )
     return RankOptimizationResult(
         optimization_result=optimization_result,
         rival_label=rival.label,
-        probability_ahead=ahead_count / scenario_count,
-        probability_ahead_interval=wilson_interval(ahead_count, scenario_count),
-        scenario_mean_score=my_mean,
+        probability_ahead=claim_ahead / len(claim_rows),
+        probability_ahead_interval=wilson_interval(claim_ahead, len(claim_rows)),
+        scenario_mean_score=float(my_means[claim_rows].mean()),
         reference_expected_points=reference_expected_points,
         expected_points_budget=settings.expected_points_budget,
         comparison=comparison,

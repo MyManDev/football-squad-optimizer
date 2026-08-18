@@ -190,18 +190,26 @@ def test_the_rank_rehearsal_reports_claimed_and_realized_per_budget() -> None:
         form_window=5,
         bench_weight=0.1,
         budgets=(0.0, None),
+        claim_scenarios="held_out_half",
         optimization_config=OptimizationConfig(solver_time_limit_seconds=4.0),
     )
+    assert result.diagnostics["claim_scenarios"] == "held_out_half"
     assert {s.expected_points_budget for s in result.summaries} <= {0.0, None}
     for summary in result.summaries:
         assert 0.0 <= summary.mean_claimed_probability <= 1.0
+        assert 0.0 <= summary.mean_selection_probability <= 1.0
+        assert 0.0 <= summary.realized_level_share <= 1.0
+        assert summary.realized_ahead_frequency + summary.realized_level_share <= 1.0 + 1e-9
         low, high = summary.realized_ahead_interval
         assert low <= summary.realized_ahead_frequency <= high
         assert summary.folds >= 1
     for row in result.rows:
         assert row.realized_ahead == (row.realized_score > row.template_realized_score)
-        if row.expected_points_budget == 0.0:
-            assert row.template_scenario_mean_score - row.scenario_mean_score <= 1e-6
+        assert row.realized_level == (row.realized_score == row.template_realized_score)
+        assert not (row.realized_ahead and row.realized_level)
+        # Under a held-out claim the budget binds on the selection half, so the cost
+        # read on the claim half may be positive; the row keeps both probabilities.
+        assert 0.0 <= row.selection_probability_ahead <= 1.0
         # The runner writes rows and summaries to JSON: built-in scalars only.
         json.dumps(asdict(row))
     for summary in result.summaries:
