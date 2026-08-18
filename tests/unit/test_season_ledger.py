@@ -202,6 +202,109 @@ def test_a_missing_recorded_file_is_refused(
         load_entry(root, SEASON, 1)
 
 
+# --- crash safety and the writer lock -----------------------------------------
+
+
+def test_a_crash_before_the_manifest_leaves_no_entry_and_the_retry_succeeds(
+    decision_world: tuple[Recommendation, Projection, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from squadopt.live import ledger as ledger_module
+
+    recommendation, projection, root = decision_world
+
+    def explode(directory: Path) -> None:
+        raise RuntimeError("power cut")
+
+    monkeypatch.setattr(ledger_module, "_write_manifest", explode)
+    with pytest.raises(RuntimeError, match="power cut"):
+        record_decision(root, recommendation, projection, report_text="report")
+    monkeypatch.undo()
+
+    # Nothing landed: no gameweek directory, no staging leftovers, no lock; the
+    # season reads as empty and the retry records normally.
+    assert not (root / SEASON / "gw01").exists()
+    assert [p.name for p in (root / SEASON).iterdir()] == []
+    assert load_ledger(root, SEASON) == ()
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    assert directory.is_dir()
+    assert load_entry(root, SEASON, 1).decision["gameweek"] == 1
+
+
+def test_a_stale_staging_directory_is_ignored_by_readers_and_pruned_by_the_writer(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    import os
+    import time
+
+    from squadopt.live.ledger import prune_stale_staging
+
+    recommendation, projection, root = decision_world
+    stale = root / SEASON / ".gw01.staging-999-deadbeef"
+    stale.mkdir(parents=True)
+    (stale / "decision.json").write_text("{}", encoding="utf-8")
+    old = time.time() - 2 * 3600
+    os.utime(stale, (old, old))
+    fresh = root / SEASON / ".gw01.staging-1000-cafef00d"
+    fresh.mkdir()
+
+    assert load_ledger(root, SEASON) == ()
+    with pytest.raises(LedgerError, match="No ledger entry"):
+        load_entry(root, SEASON, 1)
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    assert directory.is_dir()
+    assert not stale.exists()  # pruned before writing
+    assert fresh.exists()  # a young staging directory may belong to a live writer
+    assert prune_stale_staging(root, SEASON, older_than_seconds=0.0) == 1
+    assert not fresh.exists()
+    assert [entry.gameweek for entry in load_ledger(root, SEASON)] == [1]
+
+
+def test_a_second_writer_is_refused_while_the_lock_is_held_and_a_stale_lock_is_broken(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    import os
+    import time
+
+    recommendation, projection, root = decision_world
+    lock = root / SEASON / ".gw01.lock"
+    lock.parent.mkdir(parents=True)
+    lock.write_text("1234 held", encoding="utf-8")
+
+    with pytest.raises(LedgerError, match="holds the ledger lock"):
+        record_decision(root, recommendation, projection, report_text="report")
+    assert not (root / SEASON / "gw01").exists()
+
+    old = time.time() - 3600
+    os.utime(lock, (old, old))
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    assert directory.is_dir()
+    assert not lock.exists()  # released after the write
+
+
+def test_an_outcome_whose_manifest_rewrite_was_lost_is_completed_not_refused(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    recommendation, projection, root = decision_world
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    points = _flat_points(recommendation, value=2.0)
+    outcome_path = record_outcome(
+        root, SEASON, 1, points, source_snapshot_id=recommendation.snapshot_id
+    )
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    assert "outcome.json" in manifest["files"]
+
+    # Simulate the crash window: outcome landed, manifest still the decision-time one.
+    del manifest["files"]["outcome.json"]
+    (directory / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    again = record_outcome(root, SEASON, 1, points, source_snapshot_id=recommendation.snapshot_id)
+    assert again == outcome_path
+    repaired = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    assert "outcome.json" in repaired["files"]
+    # And a genuinely recorded outcome is still immutable.
+    with pytest.raises(LedgerError, match="immutable"):
+        record_outcome(root, SEASON, 1, points, source_snapshot_id=recommendation.snapshot_id)
+
+
 # --- settling outcomes ------------------------------------------------------
 
 

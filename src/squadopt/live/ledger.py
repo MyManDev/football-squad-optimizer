@@ -11,13 +11,27 @@ A mid-season decision carries a ``transfers`` block (`ledger_transfers_v1`): wha
 moved, what it cost, the bank and free transfers after, the purchase prices the next
 week sells at, and the chip played. The opening entry has none; the state a second
 deadline starts from is read out of the opening entry's own record.
+
+Writes are crash-safe. A decision is assembled in a hidden staging directory next to
+its final place, verified against its own manifest, and then moved into place with one
+rename, so a gameweek directory either exists complete or does not exist at all; a
+process that dies mid-write leaves only a staging directory that readers ignore and
+the next writer prunes. One writer per gameweek is enforced with an exclusive lock
+file, so two ticks cannot race the immutability check. An outcome is written the same
+way (temporary file, rename), and a manifest that was not rewritten after the outcome
+landed is completed on the next call rather than refused.
 """
 
+import contextlib
 import hashlib
 import json
 import math
-from collections.abc import Mapping
+import os
+import secrets
+import shutil
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -36,10 +50,91 @@ _PROJECTIONS_FILE: Final = "projections.csv"
 _REPORT_FILE: Final = "report.txt"
 _OUTCOME_FILE: Final = "outcome.json"
 _MANIFEST_FILE: Final = "manifest.json"
+_STAGING_MARKER: Final = ".staging-"
+_LOCK_SUFFIX: Final = ".lock"
+STALE_STAGING_SECONDS: Final = 3600.0
+"""A staging directory older than this belongs to a writer that died; it is pruned."""
+STALE_LOCK_SECONDS: Final = 900.0
+"""A lock older than this belongs to a writer that died; it is broken, once."""
 
 
 def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _write_atomic(path: Path, data: bytes) -> None:
+    """Write bytes to ``path`` through a sibling temporary file and one rename."""
+
+    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
+    try:
+        temporary.write_bytes(data)
+        os.replace(temporary, path)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            temporary.unlink()
+
+
+def _staging_directory(directory: Path) -> Path:
+    return directory.with_name(
+        f".{directory.name}{_STAGING_MARKER}{os.getpid()}-{secrets.token_hex(4)}"
+    )
+
+
+def prune_stale_staging(root: Path, season: str, *, older_than_seconds: float | None = None) -> int:
+    """Remove staging directories left by writers that died; return how many."""
+
+    limit = STALE_STAGING_SECONDS if older_than_seconds is None else float(older_than_seconds)
+    season_directory = Path(root) / season
+    if not season_directory.is_dir():
+        return 0
+    now = datetime.now(UTC).timestamp()
+    removed = 0
+    for path in season_directory.iterdir():
+        if not path.is_dir() or _STAGING_MARKER not in path.name:
+            continue
+        if now - path.stat().st_mtime < limit:
+            continue
+        shutil.rmtree(path, ignore_errors=True)
+        removed += 1
+    return removed
+
+
+@contextlib.contextmanager
+def _gameweek_lock(directory: Path) -> Iterator[None]:
+    """Hold the gameweek's exclusive writer lock (a sibling ``.gwNN.lock`` file).
+
+    A second writer is refused while the lock exists; a lock older than
+    ``STALE_LOCK_SECONDS`` is treated as abandoned and broken once.
+    """
+
+    directory.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = directory.with_name(f".{directory.name}{_LOCK_SUFFIX}")
+    for attempt in range(2):
+        try:
+            handle = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            age = datetime.now(UTC).timestamp() - lock_path.stat().st_mtime
+            if attempt == 0 and age >= STALE_LOCK_SECONDS:
+                with contextlib.suppress(FileNotFoundError):
+                    lock_path.unlink()
+                continue
+            raise LedgerError(
+                f"Another writer holds the ledger lock {lock_path} ({age:.0f} s old); "
+                "one process records a gameweek at a time."
+            ) from None
+        break
+    else:  # pragma: no cover - the loop returns or raises
+        raise LedgerError(f"Could not acquire the ledger lock {lock_path}.")
+    try:
+        os.write(
+            handle,
+            f"{os.getpid()} {datetime.now(UTC).isoformat(timespec='seconds')}\n".encode(),
+        )
+        os.close(handle)
+        yield
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            lock_path.unlink()
 
 
 def _entry_directory(root: Path, season: str, gameweek: int) -> Path:
@@ -62,9 +157,19 @@ def _write_manifest(directory: Path) -> None:
         "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
         "files": entries,
     }
-    (directory / _MANIFEST_FILE).write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    _write_atomic(
+        directory / _MANIFEST_FILE,
+        (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode("utf-8"),
     )
+
+
+def _manifest_files(directory: Path) -> dict[str, str]:
+    manifest_path = directory / _MANIFEST_FILE
+    if not manifest_path.is_file():
+        return {}
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    files = manifest.get("files")
+    return {str(k): str(v) for k, v in files.items()} if isinstance(files, dict) else {}
 
 
 def _verify_manifest(directory: Path) -> None:
@@ -108,7 +213,6 @@ def record_decision(
             f"Ledger entry {directory} already exists; recorded decisions are "
             "immutable. A revised decision needs an explicit, separate record."
         )
-    directory.mkdir(parents=True)
 
     decision = {
         "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
@@ -135,12 +239,30 @@ def record_decision(
     }
     if recommendation.transfers is not None:
         decision["transfers"] = recommendation.transfers.as_record()
-    (directory / _DECISION_FILE).write_text(
-        json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
-    projection.table.to_csv(directory / _PROJECTIONS_FILE, index=False)
-    (directory / _REPORT_FILE).write_text(report_text, encoding="utf-8")
-    _write_manifest(directory)
+    with _gameweek_lock(directory):
+        # Re-check under the lock: another writer may have landed the entry between
+        # the check above and the lock.
+        if directory.exists():
+            raise LedgerError(
+                f"Ledger entry {directory} already exists; recorded decisions are "
+                "immutable. A revised decision needs an explicit, separate record."
+            )
+        prune_stale_staging(root, recommendation.season)
+        staging = _staging_directory(directory)
+        staging.mkdir(parents=True)
+        try:
+            (staging / _DECISION_FILE).write_text(
+                json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            projection.table.to_csv(staging / _PROJECTIONS_FILE, index=False)
+            (staging / _REPORT_FILE).write_text(report_text, encoding="utf-8")
+            _write_manifest(staging)
+            _verify_manifest(staging)
+            # One rename: the entry exists complete or not at all.
+            os.replace(staging, directory)
+        except BaseException:
+            shutil.rmtree(staging, ignore_errors=True)
+            raise
     return directory
 
 
@@ -211,6 +333,12 @@ def record_outcome(
         )
     outcome_path = directory / _OUTCOME_FILE
     if outcome_path.exists():
+        if _OUTCOME_FILE not in _manifest_files(directory):
+            # A writer landed the outcome but died before rewriting the manifest:
+            # finish its work instead of refusing forever.
+            with _gameweek_lock(directory):
+                _write_manifest(directory)
+            return outcome_path
         raise LedgerError(
             f"Outcome for {season} GW{gameweek} is already recorded; outcomes are immutable."
         )
@@ -257,8 +385,16 @@ def record_outcome(
         "projected_score": float(decision["projected_score"]),
         "projection_error": realized_xi - float(decision["projected_score"]),
     }
-    outcome_path.write_text(json.dumps(outcome, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    _write_manifest(directory)
+    with _gameweek_lock(directory):
+        if outcome_path.exists():
+            raise LedgerError(
+                f"Outcome for {season} GW{gameweek} is already recorded; outcomes are immutable."
+            )
+        _write_atomic(
+            outcome_path,
+            (json.dumps(outcome, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        )
+        _write_manifest(directory)
     return outcome_path
 
 
@@ -300,10 +436,12 @@ def load_ledger(root: Path, season: str) -> tuple[LedgerEntry, ...]:
     season_directory = Path(root) / season
     if not season_directory.is_dir():
         return ()
+    # Staging directories and lock files are hidden siblings (".gwNN.staging-…",
+    # ".gwNN.lock"); only landed entries are named "gwNN".
     gameweeks = sorted(
         int(path.name[2:])
         for path in season_directory.iterdir()
-        if path.is_dir() and path.name.startswith("gw")
+        if path.is_dir() and path.name.startswith("gw") and path.name[2:].isdigit()
     )
     return tuple(load_entry(root, season, gameweek) for gameweek in gameweeks)
 

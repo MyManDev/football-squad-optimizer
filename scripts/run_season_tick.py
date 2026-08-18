@@ -122,7 +122,9 @@ def _print_plan(plan: TickPlan) -> None:
 def _execute(action: TickAction, arguments: argparse.Namespace, season: str | None) -> int:
     if action.kind == "capture":
         metadata = capture_snapshot(arguments.snapshot_root)
-        assert metadata is not None
+        if metadata is None:
+            print("capture returned no snapshot; nothing was recorded")
+            return 1
         print(f"captured {metadata.snapshot_id}")
         return 0
     if action.kind == "decide":
