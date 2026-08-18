@@ -26,16 +26,28 @@ from squadopt.scenarios.models import (
     ScenarioValidationError,
 )
 from squadopt.scenarios.optimization import optimize_scenario_aware_squad
+from squadopt.scenarios.rank import (
+    RANK_OBJECTIVE_CONTRACT_VERSION,
+    GoalMenuEntry,
+    RankObjectiveConfig,
+    RankOptimizationResult,
+    goal_menu,
+    optimize_rank_probability_squad,
+)
 from squadopt.scenarios.reporting import (
     scenario_result_to_dict,
     scenario_result_to_markdown,
 )
 
 __all__ = [
+    "RANK_OBJECTIVE_CONTRACT_VERSION",
     "RESIDUAL_HISTORY_COLUMNS",
     "SCENARIO_CONTRACT_VERSION",
     "SCENARIO_EVALUATION_CONTRACT_VERSION",
     "SCENARIO_OPTIMIZATION_CONTRACT_VERSION",
+    "GoalMenuEntry",
+    "RankObjectiveConfig",
+    "RankOptimizationResult",
     "RivalSquad",
     "ScenarioComparisonResult",
     "ScenarioConfig",
@@ -52,6 +64,8 @@ __all__ = [
     "compare_fixed_decisions",
     "evaluate_fixed_decision",
     "generate_scenarios",
+    "goal_menu",
+    "optimize_rank_probability_squad",
     "optimize_scenario_aware_squad",
     "scenario_result_to_dict",
     "scenario_result_to_markdown",
