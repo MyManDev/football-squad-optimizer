@@ -232,6 +232,11 @@ data/processed/
 # private use and forbids redistribution. Reproducibility comes from the snapshot
 # being immutable and checksummed on disk, not from committing it.
 data/snapshots/
+# The season ledger and projection handoffs derive from those captures (per-player
+# rows, prices, projections) and stay local for the same reason; the committed record
+# is the generated summary under docs/ (season_ledger_<season>.md).
+data/ledger/
+data/handoffs/
 
 # Reproducible local experiment outputs (reports are generated, not source data)
 artifacts/
