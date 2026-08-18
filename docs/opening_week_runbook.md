@@ -154,6 +154,34 @@ Settle is unchanged in use; the outcome nets the hits and counts a bench boost's
 or a triple captain's third captain score, and the season summary shows transfers,
 hits, chip, and net per gameweek.
 
+## The season on a schedule: `run_season_tick`
+
+Every step above can be chosen by the clock instead of by a person. One command,
+safe to run every hour by hand, cron, or a workflow:
+
+```powershell
+.venv\Scripts\python -m scripts.run_season_tick            # do what is due
+.venv\Scripts\python -m scripts.run_season_tick --dry-run  # say what is due, change nothing
+```
+
+It reads the captures held and the ledger and does, in order, whichever is due:
+**capture** when the next deadline is within 3 h and no capture from inside that window
+is held (or when a decided gameweek needs a post-gameweek capture to settle, polled at
+most every 12 h after a 48 h grace); **decide** when an in-window capture exists and the
+gameweek is undecided — GW1 from the capture alone, later gameweeks only if the
+producer's handoff `data/handoffs/<season>-gwNN.json` is present, otherwise it waits and
+names the path; **settle** when the latest capture marks a decided gameweek finished.
+After a capture it re-plans once, so a deadline capture is decided in the same tick.
+Everything is idempotent — a second tick in the same state does nothing — and every
+step is the same code as the manual commands; the tick only chooses the moment. It
+never plays a chip: run `run_gameweek_ops --phase decide --chip ...` by hand before the
+tick would decide, and the tick then finds the decision recorded.
+
+A missed deadline (closed with no decision) is reported, not decided late. Wiring the
+tick to a scheduler (GitHub Actions cron, a small host) is the CI/app side's step; the
+ledger and captures stay local by design, so a scheduled runner needs its own private
+persistence for them.
+
 ## Contingencies
 
 - **Source unreachable near the deadline:** use the latest good capture; the report's

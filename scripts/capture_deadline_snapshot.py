@@ -26,7 +26,12 @@ from pathlib import Path
 
 from squadopt.data.errors import DataError
 from squadopt.data.identity import reconcile_player_identity
-from squadopt.data.snapshots import list_snapshot_ids, read_snapshot, write_snapshot
+from squadopt.data.snapshots import (
+    SnapshotMetadata,
+    list_snapshot_ids,
+    read_snapshot,
+    write_snapshot,
+)
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
@@ -84,7 +89,7 @@ def summarise(payloads: dict[str, bytes], captured_at: str) -> None:
     print(f"  next open        gameweek {target.gameweek} at {target.deadline_utc}")
     print(f"  players          {len(players)}")
     print(f"  teams            {players['team_id'].nunique()}")
-    by_position = players["position"].value_counts().to_dict()
+    by_position = {str(k): int(v) for k, v in players["position"].value_counts().items()}
     print(f"  by position      {ordered_positions(by_position)}")
     prices = players["price_tenths"]
     print(f"  price range      {prices.min() / 10:.1f} to {prices.max() / 10:.1f}")
@@ -129,6 +134,27 @@ def main() -> int:
             print(f"  {identifier}  captured {metadata.captured_at_utc}")
         return 0
 
+    try:
+        written = capture(SNAPSHOT_ROOT, dry_run=arguments.dry_run)
+    except DataError as error:
+        print(f"\nThe capture does not satisfy the adapter contract:\n  {error}")
+        return 1
+    if written is None:
+        print("\nDry run: nothing written.")
+        return 0
+    print(f"\nWrote snapshot {written.snapshot_id}")
+    print(f"  fingerprint    {written.fingerprint}")
+    print(f"  directory      {SNAPSHOT_ROOT / written.snapshot_id}")
+    return 0
+
+
+def capture(snapshot_root: Path, *, dry_run: bool = False) -> SnapshotMetadata | None:
+    """Read the endpoints, summarise, and (unless dry) write one immutable snapshot.
+
+    The one network step of the project, callable by the season tick as well as by
+    hand. Returns the written snapshot's metadata, or None on a dry run.
+    """
+
     print(f"Reading {len(ENDPOINTS)} endpoint(s) from {BASE_URL}")
     payloads = {name: fetch(url) for name, url in sorted(ENDPOINTS.items())}
     for name, content in sorted(payloads.items()):
@@ -139,26 +165,15 @@ def main() -> int:
     captured_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     print()
-    try:
-        summarise(payloads, captured_at)
-    except DataError as error:
-        print(f"\nThe capture does not satisfy the adapter contract:\n  {error}")
-        return 1
-
-    if arguments.dry_run:
-        print("\nDry run: nothing written.")
-        return 0
-
-    metadata = write_snapshot(
-        SNAPSHOT_ROOT,
+    summarise(payloads, captured_at)
+    if dry_run:
+        return None
+    return write_snapshot(
+        snapshot_root,
         source=FPL_LIVE_SOURCE,
         captured_at_utc=captured_at,
         payloads=payloads,
     )
-    print(f"\nWrote snapshot {metadata.snapshot_id}")
-    print(f"  fingerprint    {metadata.fingerprint}")
-    print(f"  directory      {SNAPSHOT_ROOT / metadata.snapshot_id}")
-    return 0
 
 
 if __name__ == "__main__":
