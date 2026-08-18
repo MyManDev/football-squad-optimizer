@@ -87,7 +87,9 @@ def projection_fingerprint(table: pd.DataFrame) -> str:
 
     columns = [column for column in ("player_id", *SQUAD_COLUMNS) if column in table.columns]
     ordered = table.loc[:, columns].sort_values("player_id", kind="stable")
-    return hashlib.sha256(ordered.to_csv(index=False).encode("utf-8")).hexdigest()
+    return hashlib.sha256(
+        ordered.to_csv(index=False, lineterminator="\n").encode("utf-8")
+    ).hexdigest()
 
 
 def build_recommendation(

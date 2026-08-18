@@ -89,7 +89,7 @@ def _fingerprint(training: pd.DataFrame) -> str:
         if column in training.columns
     ]
     ordered = training.loc[:, columns].sort_values(columns, kind="stable")
-    payload = ordered.to_csv(index=False).encode("utf-8")
+    payload = ordered.to_csv(index=False, lineterminator="\n").encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
 
