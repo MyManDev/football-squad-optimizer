@@ -550,3 +550,36 @@ def test_the_rank_objective_is_deterministic() -> None:
     assert first.optimization_result.selected_squad["player_id"].tolist() == (
         second.optimization_result.selected_squad["player_id"].tolist()
     )
+
+
+def test_a_held_out_claim_is_read_from_scenarios_the_squad_never_saw() -> None:
+    from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
+
+    _, scenarios, (_reference, rival) = _rank_world()
+    with pytest.raises(ScenarioConfigurationError, match="claim_scenarios"):
+        RankObjectiveConfig(claim_scenarios="all")
+
+    held_out = optimize_rank_probability_squad(
+        scenarios, rival, OptimizationConfig(), RankObjectiveConfig(claim_scenarios="held_out_half")
+    )
+    assert held_out.has_solution
+    assert held_out.diagnostics["selection_scenario_count"] == 48
+    assert held_out.diagnostics["claim_scenario_count"] == 48
+    assert held_out.probability_ahead is not None
+    # The reported probability is the claim-half frequency; the selection-half one is
+    # kept as a diagnostic, and the two are read from the same chosen squad.
+    claim = held_out.diagnostics["claim_ahead_count"]
+    assert held_out.probability_ahead == pytest.approx(claim / 48)  # type: ignore[operator]
+    assert held_out.diagnostics["ahead_count"] == round(
+        held_out.diagnostics["selection_probability_ahead"] * 48  # type: ignore[operator]
+    )
+    assert (
+        held_out.diagnostics["ahead_count_from_indicators"] == held_out.diagnostics["ahead_count"]
+    )
+    low, high = held_out.probability_ahead_interval  # type: ignore[misc]
+    assert low <= held_out.probability_ahead <= high
+    # No in-sample comparison object is attached to a held-out claim.
+    assert held_out.comparison is None
+    # The lexicographic phases are recorded.
+    assert held_out.diagnostics["secondary_attempted"] is True
+    assert held_out.diagnostics["claim_scenarios"] == "held_out_half"

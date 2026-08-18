@@ -61,3 +61,51 @@ widening the menu — fewer, better scenarios (the calibrated draw from #103), a
 sample the solver can prove, and a warm start from the template; (d) only then rehearse
 against a rival that is *not* the template (an ownership-weighted rival from the capture),
 which is the case the recommender exists for.
+
+## Second pass (2026-08-18, later): held-out claim, ties, provable phases
+
+Artifact: `rank_objective_rehearsal_heldout.{json,md}` (rehearsal contract
+`rank_objective_rehearsal_v2`; same 37 folds and residual input; 200 scenarios per fold,
+solver 40 s wall / 20 deterministic). Three changes to the instrument, none to the data:
+
+1. **Held-out claim** (`RankObjectiveConfig.claim_scenarios="held_out_half"`): the squad is
+   chosen on the first 100 scenarios and its P(ahead) is read from the second 100 it never
+   saw — the scenario-level analogue of the selection-optimism shift.
+2. **Ties stated**: realized ahead / level / behind are reported separately (scenario
+   points never tie; realized integers do).
+3. **Provable phases**: the model maximises the ahead count alone first (small integers,
+   per-scenario big-Ms sized to each scenario's own score range, the rival's eleven as a
+   solver hint), then expected score with the ahead count held, then the ordinary rank
+   tie-break; each phase gets a share of the limits.
+
+| Budget | Claimed (held-out) | In-sample | Realized ahead [90%] | Level | Expected cost | Realized cost | Proven |
+| ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| 0 | 0.40 | 0.51 | 0.30 [0.19, 0.43] | 0.14 | +0.80 | +2.92 | 0.84 |
+| 2 | 0.44 | 0.55 | 0.32 [0.21, 0.46] | 0.03 | +1.06 | +3.76 | 0.08 |
+| 4 | 0.45 | 0.53 | 0.30 [0.19, 0.43] | 0.11 | +0.99 | +2.78 | 0.00 |
+| none | 0.45 | 0.53 | 0.35 [0.24, 0.49] | 0.16 | +0.95 | +1.51 | 0.00 |
+
+What changed, honestly:
+
+- **The winner's curse is measured and removed from the claim.** In-sample the chosen
+  squads "win" 0.51–0.55 of the scenarios they were chosen on; on scenarios they never
+  saw, 0.40–0.45. That ~0.10 is the optimism the first pass reported as a claim.
+- **The claim now sits inside the realized interval** at every budget but one (0.45 vs
+  [0.19, 0.43] at budget 4, by 0.02), against 0.30–0.35 realized strict wins; with 3–16%
+  level weeks, "ahead or level" is 0.35–0.51. The claim is no longer refuted; it is
+  also not confirmed — 37 folds give ±0.13 either way.
+- **The menu is monotone again** (0.40 → 0.44 → 0.45 → 0.45) although only the tightest
+  budget is proven (0.84): the hint and the phase structure fixed the incumbent quality,
+  not the proof. Unconstrained proofs need a different formulation or far more time.
+- **The goal still costs more than it says**: realized cost +2.8 to +3.8 against an
+  expected +0.8 to +1.1 (unconstrained +1.5). Being chosen to beat the template costs
+  the chosen squad real points that the scenarios' expected-score term does not price
+  — the same selection optimism on the *score* that the location shift corrects at
+  squad level, and it must be applied to the differential's expected cost too before a
+  menu line ("P for x points") is honest in both columns.
+
+Status: still a measurement instrument, not on the live path. Next: (a) apply the
+selection-optimism shift to the chosen squad's *cost* (or read the cost held-out as the
+claim now is); (b) more folds (the second control season, or the ledger's settled weeks)
+before any P(ahead) is shown to a user; (c) a non-template rival built from the capture's
+ownership (`selected_by_percent`), which the recommender exists for.

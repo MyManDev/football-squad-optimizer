@@ -40,7 +40,7 @@ from squadopt.scenarios import (
     wilson_interval,
 )
 
-RANK_REHEARSAL_CONTRACT_VERSION: Final = "rank_objective_rehearsal_v1"
+RANK_REHEARSAL_CONTRACT_VERSION: Final = "rank_objective_rehearsal_v2"
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,11 +48,15 @@ class RankRehearsalRow:
     fold_id: str
     expected_points_budget: float | None
     claimed_probability_ahead: float
+    """The probability the optimizer reports (claim scenarios per ``claim_scenarios``)."""
+    selection_probability_ahead: float
+    """The in-sample share on the scenarios the squad was chosen on."""
     scenario_mean_score: float
     template_scenario_mean_score: float
     realized_score: float
     template_realized_score: float
     realized_ahead: bool
+    realized_level: bool
     starters_changed: int
     captain_changed: bool
     solver_status: str
@@ -63,8 +67,12 @@ class RankRehearsalBudgetSummary:
     expected_points_budget: float | None
     folds: int
     mean_claimed_probability: float
+    mean_selection_probability: float
     realized_ahead_frequency: float
     realized_ahead_interval: tuple[float, float]
+    realized_level_share: float
+    """Share of folds that ended level with the template: scenario points never tie,
+    realized integers do, so a strict-win claim is compared with ahead / level / behind."""
     mean_expected_cost: float
     mean_realized_cost: float
     mean_starters_changed: float
@@ -93,9 +101,15 @@ def rehearse_rank_objective(
     bench_weight: float,
     budgets: Sequence[float | None] = (0.0, 2.0, 4.0, None),
     margin_points: float = 0.0,
+    claim_scenarios: str = "in_sample",
     optimization_config: OptimizationConfig | None = None,
+    max_folds: int | None = None,
 ) -> RankRehearsalResult:
-    """Run the rank objective against the template rival on every eligible fold."""
+    """Run the rank objective against the template rival on every eligible fold.
+
+    ``max_folds`` keeps only the first eligible folds (a smoke run); the diagnostics
+    record it so a truncated artifact cannot pass as the full rehearsal.
+    """
 
     if not isinstance(objective, ScenarioPolicyObjective):
         raise ExperimentExecutionError("objective must be a ScenarioPolicyObjective.")
@@ -110,6 +124,10 @@ def rehearse_rank_objective(
         player_location_shrinkage=settings.player_location_shrinkage,
     )
     contexts = objective.fold_contexts(form_window)
+    if max_folds is not None:
+        if isinstance(max_folds, bool) or not isinstance(max_folds, int) or max_folds < 1:
+            raise ExperimentExecutionError("max_folds must be a positive integer or None.")
+        contexts = contexts[:max_folds]
     provenance = PredictionProvenance(
         model_name="deterministic_baseline",
         model_version=f"form_window_{form_window:02d}_v1",
@@ -140,19 +158,30 @@ def rehearse_rank_objective(
         template_starters = tuple(template.starting_xi["player_id"].tolist())
         rival = RivalSquad("template", template_starters, template.captain["player_id"])
         matrix = scenarios.scenario_points
-        template_mean = float(
-            (
-                matrix[list(template_starters)].sum(axis=1) + matrix[template.captain["player_id"]]
-            ).mean()
-        )
+        template_scores = (
+            matrix[list(template_starters)].sum(axis=1) + matrix[template.captain["player_id"]]
+        ).to_numpy(dtype="float64")
+        # The reference for the budget is the template's mean on the scenarios the squad
+        # is chosen on; the cost is reported on the scenarios the claim is read from.
+        half = len(template_scores) // 2
+        if claim_scenarios == "held_out_half":
+            template_reference = float(template_scores[:half].mean())
+            template_mean = float(template_scores[half:].mean())
+        else:
+            template_reference = float(template_scores.mean())
+            template_mean = template_reference
         template_realized = float(score_realized_squad_points(template, context.realized_points))
         for budget in budgets:
             result = optimize_rank_probability_squad(
                 scenarios,
                 rival,
                 base_optimization,
-                RankObjectiveConfig(margin_points=margin_points, expected_points_budget=budget),
-                reference_expected_points=template_mean,
+                RankObjectiveConfig(
+                    margin_points=margin_points,
+                    expected_points_budget=budget,
+                    claim_scenarios=claim_scenarios,
+                ),
+                reference_expected_points=template_reference,
             )
             if not result.has_solution or result.probability_ahead is None:
                 continue
@@ -164,12 +193,16 @@ def rehearse_rank_objective(
                     fold_id=context.fold_id,
                     expected_points_budget=budget,
                     claimed_probability_ahead=result.probability_ahead,
+                    selection_probability_ahead=float(
+                        str(result.diagnostics["selection_probability_ahead"])
+                    ),
                     scenario_mean_score=float(result.scenario_mean_score or 0.0),
                     template_scenario_mean_score=template_mean,
                     realized_score=realized,
                     template_realized_score=template_realized,
                     # Built-in bool/int/float, not numpy scalars: the rows are written to JSON.
                     realized_ahead=bool(realized > template_realized),
+                    realized_level=bool(realized == template_realized),
                     starters_changed=len(
                         set(chosen.starting_xi["player_id"]) - set(template_starters)
                     ),
@@ -186,6 +219,7 @@ def rehearse_rank_objective(
         if not block:
             continue
         ahead = sum(1 for row in block if row.realized_ahead)
+        level = sum(1 for row in block if row.realized_level)
         summaries.append(
             RankRehearsalBudgetSummary(
                 expected_points_budget=budget,
@@ -193,8 +227,12 @@ def rehearse_rank_objective(
                 mean_claimed_probability=float(
                     np.mean([r.claimed_probability_ahead for r in block])
                 ),
+                mean_selection_probability=float(
+                    np.mean([r.selection_probability_ahead for r in block])
+                ),
                 realized_ahead_frequency=ahead / len(block),
                 realized_ahead_interval=wilson_interval(ahead, len(block)),
+                realized_level_share=level / len(block),
                 mean_expected_cost=float(
                     np.mean([r.template_scenario_mean_score - r.scenario_mean_score for r in block])
                 ),
@@ -211,11 +249,13 @@ def rehearse_rank_objective(
         summaries=tuple(summaries),
         diagnostics={
             "fold_count": len(contexts),
+            "max_folds": max_folds,
             "form_window": form_window,
             "bench_weight": bench_weight,
             "scenario_count": settings.scenario_count,
             "budgets": [budget for budget in budgets],
             "margin_points": margin_points,
+            "claim_scenarios": claim_scenarios,
             "rival": "template: the fold's risk-neutral deterministic squad",
             "solver_time_limit_seconds": base_optimization.solver_time_limit_seconds,
             "solver_deterministic_time_limit": base_optimization.solver_deterministic_time_limit,

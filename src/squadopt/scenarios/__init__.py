@@ -27,6 +27,7 @@ from squadopt.scenarios.models import (
 )
 from squadopt.scenarios.optimization import optimize_scenario_aware_squad
 from squadopt.scenarios.rank import (
+    CLAIM_SCENARIO_MODES,
     RANK_OBJECTIVE_CONTRACT_VERSION,
     GoalMenuEntry,
     RankObjectiveConfig,
@@ -40,6 +41,7 @@ from squadopt.scenarios.reporting import (
 )
 
 __all__ = [
+    "CLAIM_SCENARIO_MODES",
     "RANK_OBJECTIVE_CONTRACT_VERSION",
     "RESIDUAL_HISTORY_COLUMNS",
     "SCENARIO_CONTRACT_VERSION",
