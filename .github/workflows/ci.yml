@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    name: gates (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints.txt
+
+      # 3.13 reproduces the measurement environment exactly (constraints.txt: numpy 2.5
+      # has no 3.11 wheels); 3.11 installs the declared ranges and proves the floor.
+      - name: Install (pinned measurement environment)
+        if: matrix.python-version == '3.13'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -c constraints.txt -e ".[dev]"
+
+      - name: Install (declared ranges)
+        if: matrix.python-version != '3.13'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Ruff lint
+        run: python -m ruff check .
+
+      - name: Ruff format
+        run: python -m ruff format --check .
+
+      - name: Mypy (strict, src)
+        run: python -m mypy --strict src
+
+      - name: Import boundaries
+        run: lint-imports
+
+      - name: Pytest (full suite is the merge gate)
+        run: python -m pytest -q -p no:cacheprovider --durations=15
