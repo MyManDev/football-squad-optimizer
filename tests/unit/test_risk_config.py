@@ -73,3 +73,20 @@ def test_configs_are_frozen_and_fingerprints_cover_controls() -> None:
     assert first.configuration_fingerprint != second.configuration_fingerprint
     with pytest.raises(dataclasses.FrozenInstanceError):
         first.downside_quantile = 0.2  # type: ignore[misc]
+
+
+def test_the_uncertainty_grouping_is_validated_and_only_a_non_default_enters_the_fingerprint() -> (
+    None
+):
+    from squadopt.risk import RiskConfigurationError, RiskScreeningConfig
+
+    base = RiskScreeningConfig()
+    assert base.uncertainty_grouping == "position"
+    fixture = RiskScreeningConfig(uncertainty_grouping="position_fixture_group")
+    assert fixture.configuration_fingerprint != base.configuration_fingerprint
+    assert (
+        RiskScreeningConfig(uncertainty_grouping="position").configuration_fingerprint
+        == base.configuration_fingerprint
+    )
+    with pytest.raises(RiskConfigurationError, match="uncertainty_grouping"):
+        RiskScreeningConfig(uncertainty_grouping="team")

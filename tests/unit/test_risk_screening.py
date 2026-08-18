@@ -172,3 +172,25 @@ def test_invalid_unselected_target_outcome_is_rejected_before_scoring() -> None:
 
     with pytest.raises(RiskValidationError, match="realized-point columns contain missing values"):
         run_risk_screening((folds[0], broken_target, folds[2]), _config())
+
+
+def test_the_fixture_group_contract_needs_the_calendar_on_the_folds() -> None:
+    from dataclasses import replace as dc_replace
+
+    from squadopt.risk import RiskValidationError
+
+    config = dc_replace(_config(), uncertainty_grouping="position_fixture_group")
+    with pytest.raises(RiskValidationError, match="fixture_count"):
+        run_risk_screening(_folds(), config)
+
+    with_calendar = tuple(
+        EvaluationFold(
+            fold_id=fold.fold_id,
+            projections=fold.projections.assign(fixture_count=1),
+            realized_points=fold.realized_points,
+            metadata=dict(fold.metadata),
+        )
+        for fold in _folds()
+    )
+    result = run_risk_screening(with_calendar, config)
+    assert result.config.uncertainty_grouping == "position_fixture_group"

@@ -27,6 +27,7 @@ from squadopt.risk.models import (
 )
 from squadopt.risk.optimizer import optimize_risk_aware_squad
 from squadopt.uncertainty import (
+    CONTRACT_BY_GROUPING,
     PLAYER_ADAPTIVE_UNCERTAINTY_CONTRACT_VERSION,
     UncertaintyConfig,
     UncertaintyValidationError,
@@ -254,6 +255,8 @@ def run_risk_screening(
             holdout_season=target_season,
             min_pooled_observations=config.min_pooled_observations,
             min_group_observations=config.min_group_observations,
+            grouping=config.uncertainty_grouping,
+            contract_version=CONTRACT_BY_GROUPING[config.uncertainty_grouping],
         )
         try:
             calibration = fit_projection_uncertainty(

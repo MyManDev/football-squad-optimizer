@@ -27,8 +27,21 @@ def _relabeled_panel() -> pd.DataFrame:
     )
 
 
+def _synthetic_calendar(*_a: object, **_k: object) -> pd.DataFrame:
+    """One fixture per club and gameweek, in the panel's own club labels."""
+
+    panel = _relabeled_panel()
+    return (
+        panel.loc[:, ["season", "gameweek", "team_id"]]
+        .drop_duplicates()
+        .assign(fixture_count=1)
+        .reset_index(drop=True)
+    )
+
+
 def _run(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *extra: str) -> int:
     monkeypatch.setattr(calibration_cli, "build_panel", lambda *_a, **_k: _relabeled_panel())
+    monkeypatch.setattr(calibration_cli, "calendar_from_archive", _synthetic_calendar)
     monkeypatch.setattr(
         sys,
         "argv",
@@ -66,6 +79,18 @@ def test_the_cli_scores_both_calibrations_on_the_held_out_season(
     markdown = (tmp_path / "calibration.md").read_text(encoding="utf-8")
     assert "Player-adaptive" in markdown
     assert "locked holdout was **not** read" in markdown
+
+
+def test_the_cli_defaults_to_the_operational_grouping_and_still_runs_v1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert _run(monkeypatch, tmp_path) == 0
+    default_document = json.loads((tmp_path / "calibration.json").read_text(encoding="utf-8"))
+    assert default_document["grouping"] == "position_fixture_group"
+
+    assert _run(monkeypatch, tmp_path, "--grouping", "position") == 0
+    v1_document = json.loads((tmp_path / "calibration.json").read_text(encoding="utf-8"))
+    assert v1_document["grouping"] == "position"
 
 
 def test_the_cli_refuses_to_read_the_locked_holdout(

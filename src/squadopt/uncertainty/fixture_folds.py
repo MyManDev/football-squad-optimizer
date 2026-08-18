@@ -8,15 +8,43 @@ calendar in a gameweek has no fixture there — a blank — and gets zero, which
 blank is, not a guess.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
+from pathlib import Path
 
 import pandas as pd
 
+from squadopt.data.sources.vaastav import build_fixture_panel, load_team_codes
 from squadopt.evaluation import EvaluationFold
 from squadopt.uncertainty.calibration import FIXTURE_COUNT_COLUMN
 from squadopt.uncertainty.errors import UncertaintyValidationError
 
 _CALENDAR_COLUMNS = ("season", "gameweek", "team_id", "fixture_count")
+
+
+def calendar_from_archive(archive_root: Path, seasons: Sequence[str]) -> pd.DataFrame:
+    """Known fixture counts per (season, gameweek, club name) from the raw archive.
+
+    Club labels are the archive's names, which is what the panel's folds carry, so the
+    result joins the folds directly.
+    """
+
+    fixtures = build_fixture_panel(archive_root, seasons=tuple(seasons))
+    pieces: list[pd.DataFrame] = []
+    for season in seasons:
+        codes = load_team_codes(archive_root, season)
+        name_by_code = {
+            int(code): str(name)
+            for name, code in zip(codes["name"].tolist(), codes["code"].tolist(), strict=True)
+        }
+        block = fixtures.loc[fixtures["season"] == season]
+        counts = (
+            block.groupby(["season", "gameweek", "team_id"], sort=True)
+            .size()
+            .reset_index(name="fixture_count")
+        )
+        counts["team_id"] = [name_by_code[int(code)] for code in counts["team_id"].tolist()]
+        pieces.append(counts)
+    return pd.concat(pieces, ignore_index=True)
 
 
 def attach_fixture_counts_to_folds(

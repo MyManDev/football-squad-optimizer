@@ -13,7 +13,7 @@ capture rather than that two runs happened to coincide.
 """
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Final
 
@@ -31,7 +31,7 @@ from squadopt.live.rules import SeasonRules
 from squadopt.live.transfers import HeldSquad, TransferDecision, plan_transfers
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
 from squadopt.optimization.models import OptimizationResult
-from squadopt.scenarios import ScenarioConfig, ScenarioEvaluationConfig
+from squadopt.scenarios import RivalSquad, ScenarioConfig, ScenarioEvaluationConfig
 
 REPORT_CONTRACT_VERSION: Final = "live_recommendation_v3"
 
@@ -98,8 +98,15 @@ def build_recommendation(
     risk_history: LiveResidualHistory | None = None,
     risk_scenario_config: ScenarioConfig | None = None,
     risk_evaluation_config: ScenarioEvaluationConfig | None = None,
+    risk_fixture_counts: Mapping[int, int] | None = None,
+    risk_rivals: Sequence[RivalSquad] = (),
 ) -> Recommendation:
     """Optimise the projected pool and return the recommendation with its provenance.
+
+    ``risk_fixture_counts`` (player code -> fixtures this gameweek, from the capture's
+    calendar) and ``risk_rivals`` pass through to the risk layer when residual history
+    is supplied: the calendar widens double-gameweek players' spread under the scenario
+    config's ``double_gameweek_scale``, and each rival is scored in the same scenarios.
 
     An infeasible solve raises. A squad that could not be built is not a result to report
     quietly: it means the pool, the budget or the constraints disagree, and continuing
@@ -143,6 +150,8 @@ def build_recommendation(
             risk_history,
             scenario_config=risk_scenario_config,
             evaluation_config=risk_evaluation_config,
+            fixture_counts=risk_fixture_counts,
+            rivals=risk_rivals,
         )
     )
 

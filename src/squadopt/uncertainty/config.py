@@ -16,6 +16,11 @@ CONTRACT_BY_GROUPING: Final = {
     "position": PROJECTION_UNCERTAINTY_CONTRACT_VERSION,
     "position_fixture_group": PROJECTION_UNCERTAINTY_FIXTURE_CONTRACT_VERSION,
 }
+# The grouping the runners use unless told otherwise (docs/projection_uncertainty_v2_
+# declaration.md). `UncertaintyConfig()` itself keeps the v1 default so recorded v1
+# artifacts and their fingerprints reproduce; the operational choice is made where a
+# calibration is fitted for use, and it needs the calendar on the folds.
+OPERATIONAL_UNCERTAINTY_GROUPING: Final = "position_fixture_group"
 PLAYER_ADAPTIVE_UNCERTAINTY_CONTRACT_VERSION: Final = "player_adaptive_uncertainty_v1"
 DEFAULT_UNCERTAINTY_DEVELOPMENT_SEASONS: Final = (
     "2021-22",

@@ -24,6 +24,7 @@ from squadopt.uncertainty.config import (
     CONTRACT_BY_GROUPING,
     DEFAULT_UNCERTAINTY_DEVELOPMENT_SEASONS,
     DEFAULT_UNCERTAINTY_HOLDOUT_SEASON,
+    OPERATIONAL_UNCERTAINTY_GROUPING,
     PLAYER_ADAPTIVE_UNCERTAINTY_CONTRACT_VERSION,
     PROJECTION_UNCERTAINTY_CONTRACT_VERSION,
     PROJECTION_UNCERTAINTY_FIXTURE_CONTRACT_VERSION,
@@ -52,7 +53,10 @@ from squadopt.uncertainty.fixture_conformal import (
 from squadopt.uncertainty.fixture_conformal import (
     validate_residual_table as validate_fixture_residual_table,
 )
-from squadopt.uncertainty.fixture_folds import attach_fixture_counts_to_folds
+from squadopt.uncertainty.fixture_folds import (
+    attach_fixture_counts_to_folds,
+    calendar_from_archive,
+)
 from squadopt.uncertainty.models import (
     AdaptiveGroupCalibration,
     CalibratedProjectionResult,
@@ -76,6 +80,7 @@ __all__ = [
     "FIXTURE_GROUP_CONFORMAL_CONTRACT_VERSION",
     "INTERVAL_LOWER_COLUMN",
     "INTERVAL_UPPER_COLUMN",
+    "OPERATIONAL_UNCERTAINTY_GROUPING",
     "PLAYER_ADAPTIVE_UNCERTAINTY_CONTRACT_VERSION",
     "PLAYER_UNCERTAINTY_OBSERVATIONS_COLUMN",
     "PROJECTION_UNCERTAINTY_CONTRACT_VERSION",
@@ -107,6 +112,7 @@ __all__ = [
     "apply_player_adaptive_uncertainty",
     "apply_projection_uncertainty",
     "attach_fixture_counts_to_folds",
+    "calendar_from_archive",
     "evaluate_player_adaptive_uncertainty",
     "evaluate_projection_uncertainty",
     "fit_and_evaluate_fixture_group_conformal",

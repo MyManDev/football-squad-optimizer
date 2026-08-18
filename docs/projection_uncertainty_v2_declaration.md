@@ -48,17 +48,33 @@ Read with the four-season chronological measurement (0.849 → 0.901 on 1,265 do
 overall coverage and width unchanged. It is the honest interval on a double, wider by
 about 45%, and it costs the singles nothing.
 
+## Operational default (2026-08-18, later the same day)
+
+The runners now default to v2 and carry the calendar themselves:
+
+- `scripts.run_risk_screening --uncertainty-grouping` defaults to
+  `position_fixture_group`; `RiskScreeningConfig.uncertainty_grouping` selects the
+  contract (its default stays `position`, so recorded screenings and their fingerprints
+  reproduce; the fingerprint payload gains the key only when it is not the default), and
+  the runner attaches the archive calendar to every fold (`calendar_from_archive`,
+  `attach_fixture_counts_to_folds`). The risk optimizer accepts v2 group labels
+  (`<position>/<group>`) and sources (`position_fixture_group`, `blank_zero`).
+- `scripts.run_control_uncertainty_calibration --grouping` defaults to v2 and writes the
+  `_v2` record; the v1 record is left as it was.
+- Live: `recommend_current_squad --risk-double-gameweek-scale` (default 1.45) reads the
+  capture's calendar (`fixture_counts_by_player`) and widens double-gameweek players'
+  scenario spread; the report states it instead of the calendar-blind limit.
+- `UncertaintyConfig()` itself keeps `grouping="position"`; `OPERATIONAL_UNCERTAINTY_
+  GROUPING` names the operational choice for callers that fit a calibration for use.
+
 ## What is and is not changed by this declaration
 
 - **Available**: v2 can be fitted, applied, and evaluated; the control calibration
   script runs it with `--grouping position_fixture_group`.
-- **Default unchanged**: `UncertaintyConfig()` is still v1. The risk-aware screening
-  (`squadopt.risk.evaluation`) builds folds without a fixture count and the live risk
-  layer resamples a residual history that is calendar-blind; both keep working exactly as
-  before. Making v2 the default needs the calendar on their folds (the
-  `attach_fixture_counts_to_folds` bridge, plus the capture's fixtures payload on the
-  live side) and a re-run of the committed control record under v2 — a change to
-  measured artifacts that deserves its own PR.
+- **Library default unchanged, runners on v2**: `UncertaintyConfig()` is still v1 so the
+  recorded v1 artifacts reproduce; the risk screening and control calibration runners
+  default to v2 with the calendar attached, and the live risk layer widens doubles from
+  the capture's calendar (see "Operational default" above).
 - **Stated in the live report meanwhile**: an available live lower tail now carries a
   stated limit — the residual history is calendar-blind, so a double gameweek's tail is
   optimistic by roughly the measured undercoverage — instead of leaving it silent, as the
