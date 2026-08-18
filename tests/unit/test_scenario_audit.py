@@ -5,6 +5,9 @@ scenarios it is measured against, PIT and coverage must come from the recorded
 distributions, and the fold population must be exactly the objective's own.
 """
 
+import json
+from dataclasses import asdict
+
 import pandas as pd
 import pytest
 from tests.fixtures.synthetic_gameweeks import SEASON, make_canonical_gameweeks
@@ -175,3 +178,32 @@ def test_an_online_shift_uses_only_earlier_folds(audit: ScenarioAuditResult) -> 
             bench_weight=0.0,
             double_gameweek_scale=1.5,
         )
+
+
+def test_the_rank_rehearsal_reports_claimed_and_realized_per_budget() -> None:
+    from squadopt.experiments import rehearse_rank_objective
+    from squadopt.optimization import OptimizationConfig
+
+    result = rehearse_rank_objective(
+        _objective(),
+        _history(),
+        form_window=5,
+        bench_weight=0.1,
+        budgets=(0.0, None),
+        optimization_config=OptimizationConfig(solver_time_limit_seconds=4.0),
+    )
+    assert {s.expected_points_budget for s in result.summaries} <= {0.0, None}
+    for summary in result.summaries:
+        assert 0.0 <= summary.mean_claimed_probability <= 1.0
+        low, high = summary.realized_ahead_interval
+        assert low <= summary.realized_ahead_frequency <= high
+        assert summary.folds >= 1
+    for row in result.rows:
+        assert row.realized_ahead == (row.realized_score > row.template_realized_score)
+        if row.expected_points_budget == 0.0:
+            assert row.template_scenario_mean_score - row.scenario_mean_score <= 1e-6
+        # The runner writes rows and summaries to JSON: built-in scalars only.
+        json.dumps(asdict(row))
+    for summary in result.summaries:
+        json.dumps(asdict(summary))
+    assert result.diagnostics["rival"].startswith("template")

@@ -3,6 +3,7 @@
 import json
 from collections.abc import Mapping
 from dataclasses import replace
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -462,3 +463,90 @@ def test_a_rival_comparison_scores_both_squads_in_the_same_world() -> None:
     assert set(swap.difference_quantiles) == {"q10", "q25", "q50", "q75", "q90"}
     with pytest.raises(ScenarioValidationError, match="captain must be one"):
         RivalSquad("bad", tuple(my_starters), 999_999)
+
+
+# --- rank-probability objective ---------------------------------------------------------
+
+
+def _rank_world() -> tuple[Any, Any, Any]:
+    from squadopt.scenarios import RivalSquad
+
+    snapshot = _snapshot()
+    # A modest scenario count: the big-M indicator model is a harder solve than the
+    # CVaR one, and the tests want proven optima, not time-limited ones.
+    scenarios = generate_scenarios(
+        snapshot, _residual_history(snapshot), TARGET, replace(SMALL_CONFIG, scenario_count=96)
+    )
+    reference = optimize_squad(snapshot.table, OptimizationConfig())
+    assert reference.captain is not None
+    starters = tuple(reference.starting_xi["player_id"].tolist())
+    rival = RivalSquad("template", starters, reference.captain["player_id"])
+    return snapshot, scenarios, (reference, rival)
+
+
+def test_against_its_own_template_the_rank_objective_finds_a_differential_and_reports_it() -> None:
+    from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
+
+    _, scenarios, (_reference, rival) = _rank_world()
+
+    result = optimize_rank_probability_squad(scenarios, rival, OptimizationConfig())
+
+    assert result.has_solution
+    assert result.probability_ahead is not None and 0.0 <= result.probability_ahead <= 1.0
+    # The template itself is never ahead of itself; the optimizer must do at least as well.
+    assert result.probability_ahead > 0.0
+    low, high = result.probability_ahead_interval  # type: ignore[misc]
+    assert low <= result.probability_ahead <= high
+    assert result.comparison is not None
+    assert result.comparison.probability_ahead == pytest.approx(result.probability_ahead)
+    chosen = result.optimization_result
+    assert len(chosen.selected_squad) == OptimizationConfig().squad_size
+    assert result.diagnostics["ahead_count"] == round(result.probability_ahead * 96)
+    assert result.diagnostics["ahead_count_from_indicators"] == result.diagnostics["ahead_count"]
+    # A margin no squad can clear leaves every indicator at zero.
+    hopeless = optimize_rank_probability_squad(
+        scenarios, rival, OptimizationConfig(), RankObjectiveConfig(margin_points=10_000.0)
+    )
+    assert hopeless.probability_ahead == 0.0
+
+
+def test_the_expected_points_budget_binds_and_a_menu_is_monotone_in_the_budget() -> None:
+    from squadopt.scenarios import RankObjectiveConfig, goal_menu, optimize_rank_probability_squad
+
+    _, scenarios, (reference, rival) = _rank_world()
+    with pytest.raises(ScenarioConfigurationError, match="reference_expected_points"):
+        optimize_rank_probability_squad(
+            scenarios, rival, OptimizationConfig(), RankObjectiveConfig(expected_points_budget=1.0)
+        )
+
+    menu = goal_menu(
+        scenarios, rival, reference, OptimizationConfig(), budgets=(0.0, 0.5, 2.0, None)
+    )
+    entries = [entry for entry, _ in menu]
+    assert [e.expected_points_budget for e in entries] == [0.0, 0.5, 2.0, None]
+    probabilities = [e.probability_ahead for e in entries]
+    costs = [e.expected_points_cost for e in entries]
+    assert all(p is not None for p in probabilities)
+    # More budget can only widen the feasible set: among proven optima, probability
+    # ahead never falls with the budget.
+    proven = [e.probability_ahead for e in entries if e.solver_status == "OPTIMAL"]
+    assert proven == sorted(proven)  # type: ignore[type-var]
+    assert len(proven) >= 2
+    # And each cost respects its budget (the unconstrained entry has no cap).
+    for entry in entries[:-1]:
+        assert entry.expected_points_cost is not None and entry.expected_points_budget is not None
+        assert entry.expected_points_cost <= entry.expected_points_budget + 1e-6
+    assert all(cost is not None for cost in costs)
+    assert all(e.solver_status in {"OPTIMAL", "FEASIBLE"} for e in entries)
+
+
+def test_the_rank_objective_is_deterministic() -> None:
+    from squadopt.scenarios import optimize_rank_probability_squad
+
+    _, scenarios, (_, rival) = _rank_world()
+    first = optimize_rank_probability_squad(scenarios, rival, OptimizationConfig())
+    second = optimize_rank_probability_squad(scenarios, rival, OptimizationConfig())
+    assert first.probability_ahead == second.probability_ahead
+    assert first.optimization_result.selected_squad["player_id"].tolist() == (
+        second.optimization_result.selected_squad["player_id"].tolist()
+    )

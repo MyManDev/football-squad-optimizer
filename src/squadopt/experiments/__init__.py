@@ -56,6 +56,13 @@ from squadopt.experiments.policy_objective import (
     PolicyObjectiveConfig,
     shrink_projections,
 )
+from squadopt.experiments.rank_rehearsal import (
+    RANK_REHEARSAL_CONTRACT_VERSION,
+    RankRehearsalBudgetSummary,
+    RankRehearsalResult,
+    RankRehearsalRow,
+    rehearse_rank_objective,
+)
 from squadopt.experiments.reporting import (
     frozen_candidate_from_dict,
     frozen_candidate_to_dict,
@@ -121,6 +128,7 @@ __all__ = [
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
     "POLICY_SEARCH_FACTOR_NAMES",
     "PROJECTION_RULES",
+    "RANK_REHEARSAL_CONTRACT_VERSION",
     "RISK_FRONTIER_CONTRACT_VERSION",
     "SCENARIO_AUDIT_CONTRACT_VERSION",
     "SCENARIO_POLICY_FACTOR_NAMES",
@@ -148,6 +156,9 @@ __all__ = [
     "PolicyGridResult",
     "PolicyObjectiveConfig",
     "PromotionPolicy",
+    "RankRehearsalBudgetSummary",
+    "RankRehearsalResult",
+    "RankRehearsalRow",
     "RehearsalWindowResult",
     "RiskFrontierPoint",
     "RiskFrontierResult",
@@ -175,6 +186,7 @@ __all__ = [
     "holdout_result_to_markdown",
     "measure_risk_frontier",
     "measure_selection_optimism",
+    "rehearse_rank_objective",
     "run_frozen_holdout",
     "run_screening_experiment",
     "screening_result_to_dict",
