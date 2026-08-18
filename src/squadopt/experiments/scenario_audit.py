@@ -19,7 +19,7 @@ The audit measures; it does not repair, reweight, or decide.
 import hashlib
 import math
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import Final
 
@@ -60,6 +60,9 @@ class ScenarioAuditFoldRow:
     scenario_lower_quantile_score: float
     probability_below_threshold: float
     probability_integral_transform: float
+    location_shift_points: float = 0.0
+    """The selection-optimism shift applied to this fold's scenario scores before the
+    summaries above were read (zero in the uncorrected audit)."""
 
     def __post_init__(self) -> None:
         values = (
@@ -105,6 +108,9 @@ class ScenarioAuditResult:
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
 
+SELECTION_SHIFT_MODES: tuple[str, ...] = ("none", "development", "online")
+
+
 def audit_scenario_calibration(
     objective: ScenarioPolicyObjective,
     residual_history: pd.DataFrame,
@@ -113,12 +119,25 @@ def audit_scenario_calibration(
     bench_weight: float,
     lower_quantile: float = 0.10,
     points_threshold: float = 40.0,
+    selection_shift: str = "none",
+    development_shift_points: float = 0.0,
+    online_warmup_folds: int = 5,
+    double_gameweek_scale: float = 1.0,
+    fixture_counts_by_fold: Mapping[str, Mapping[object, int]] | None = None,
 ) -> ScenarioAuditResult:
     """Measure scenario calibration on the objective's own folds and pools.
 
     The frozen decision per fold is the risk-neutral deterministic squad, so the
     audit isolates the scenarios: the decision never depends on them, and every
     comparison is scenario-implied versus realized for one fixed squad.
+
+    ``selection_shift`` names the decision-level correction applied to each fold's
+    scenario scores: ``none`` (the original audit), ``development`` (a fixed shift,
+    ``development_shift_points``, from the selection-optimism profile), or ``online``
+    (minus the mean of scenario-mean-minus-realized over the audited folds *before* this
+    one, once ``online_warmup_folds`` are available — leakage-safe by construction).
+    ``double_gameweek_scale`` with ``fixture_counts_by_fold`` widens double-gameweek
+    players' idiosyncratic spread.
     """
 
     if not isinstance(objective, ScenarioPolicyObjective):
@@ -128,6 +147,12 @@ def audit_scenario_calibration(
     if not isinstance(lower_quantile, float) or not 0.0 < lower_quantile < 1.0:
         raise ExperimentExecutionError("lower_quantile must lie strictly in (0, 1).")
 
+    if selection_shift not in SELECTION_SHIFT_MODES:
+        raise ExperimentExecutionError(f"selection_shift must be one of {SELECTION_SHIFT_MODES!r}.")
+    if double_gameweek_scale != 1.0 and fixture_counts_by_fold is None:
+        raise ExperimentExecutionError(
+            "double_gameweek_scale differs from one; fixture_counts_by_fold are required."
+        )
     settings = objective.config
     optimization_config = OptimizationConfig(bench_weight=bench_weight)
     scenario_config = ScenarioConfig(
@@ -136,8 +161,9 @@ def audit_scenario_calibration(
         min_history_folds=settings.min_history_folds,
         min_player_observations=settings.min_player_observations,
         player_location_shrinkage=settings.player_location_shrinkage,
+        double_gameweek_scale=double_gameweek_scale,
     )
-    evaluation_config = ScenarioEvaluationConfig(
+    base_evaluation = ScenarioEvaluationConfig(
         lower_quantile=lower_quantile,
         worst_fraction=settings.tail_fraction,
         points_threshold=points_threshold,
@@ -156,7 +182,15 @@ def audit_scenario_calibration(
     rows: list[ScenarioAuditFoldRow] = []
     covered_by_position: dict[str, int] = {}
     total_by_position: dict[str, int] = {}
+    prior_gaps: list[float] = []
     for context in contexts:
+        if selection_shift == "development":
+            shift = float(development_shift_points)
+        elif selection_shift == "online" and len(prior_gaps) >= online_warmup_folds:
+            shift = -float(np.mean(prior_gaps))
+        else:
+            shift = 0.0
+        evaluation_config = replace(base_evaluation, location_shift_points=shift)
         history = residual_history.loc[
             residual_history["fold_id"].astype(str).isin(context.prior_fold_ids)
         ]
@@ -177,10 +211,17 @@ def audit_scenario_calibration(
             history,
             ScenarioTarget(context.season, context.gameweek),
             scenario_config,
+            fixture_counts=(
+                None
+                if fixture_counts_by_fold is None
+                else fixture_counts_by_fold.get(context.fold_id)
+            ),
         )
         evaluated = evaluate_fixed_decision(decision, scenario_set, evaluation_config)
         realized_score = score_realized_squad_points(decision, context.realized_points)
         scores = np.asarray(evaluated.scenario_scores, dtype="float64")
+        raw_mean = float(str(evaluated.diagnostics.get("mean_score_before_shift", 0.0)))
+        prior_gaps.append(raw_mean - realized_score)
         rows.append(
             ScenarioAuditFoldRow(
                 fold_id=context.fold_id,
@@ -189,6 +230,7 @@ def audit_scenario_calibration(
                 scenario_lower_quantile_score=evaluated.metrics.lower_quantile_score,
                 probability_below_threshold=(evaluated.metrics.probability_below_threshold),
                 probability_integral_transform=float((scores <= realized_score).mean()),
+                location_shift_points=shift,
             )
         )
 
@@ -236,5 +278,12 @@ def audit_scenario_calibration(
             "player_location_shrinkage": settings.player_location_shrinkage,
             "decision_rule": "risk_neutral_deterministic_squad",
             "objective_configuration_fingerprint": settings.configuration_fingerprint,
+            "selection_shift": selection_shift,
+            "development_shift_points": development_shift_points,
+            "online_warmup_folds": online_warmup_folds,
+            "mean_location_shift_points": float(
+                np.mean([row.location_shift_points for row in rows])
+            ),
+            "double_gameweek_scale": double_gameweek_scale,
         },
     )

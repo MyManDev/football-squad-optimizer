@@ -43,6 +43,7 @@ from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
     fixture_snapshot,
+    player_snapshot,
     team_codes,
     team_names,
 )
@@ -284,6 +285,50 @@ def _gameweek_rows(
         .clip(lower=0.0)
     )
     return rows
+
+
+def fixture_counts_by_player(
+    decision_snapshot: CapturedSnapshot,
+    gameweek: int,
+    *,
+    season: str | None = None,
+) -> dict[int, int]:
+    """Each captured player's fixture count in ``gameweek``, from the capture's calendar.
+
+    A club absent from the calendar that gameweek is blank and gets zero. Built for the
+    live risk layer, whose double-gameweek scale needs the calendar per player.
+    """
+
+    if not isinstance(decision_snapshot, CapturedSnapshot):
+        raise DataSourceError("decision_snapshot must be a CapturedSnapshot.")
+    bootstrap = _payload(decision_snapshot, BOOTSTRAP_PAYLOAD)
+    fixtures_payload = _payload(decision_snapshot, FIXTURES_PAYLOAD)
+    resolved_season = season or infer_season(decision_snapshot)
+    calendar = aggregate_team_gameweek(
+        fixture_snapshot(
+            fixtures_payload,
+            bootstrap,
+            season=resolved_season,
+            snapshot_id=decision_snapshot.metadata.snapshot_id,
+            captured_at_utc=decision_snapshot.metadata.captured_at_utc,
+        )
+    )
+    counts_by_code = {
+        int(team): int(count)
+        for team, count in zip(
+            calendar.loc[calendar["gameweek"] == int(gameweek), "team_id"].tolist(),
+            calendar.loc[calendar["gameweek"] == int(gameweek), "fixture_count"].tolist(),
+            strict=True,
+        )
+    }
+    bridge = _team_code_by_name(bootstrap)
+    players = player_snapshot(bootstrap)
+    return {
+        int(player): counts_by_code.get(int(bridge[str(team)]), 0)
+        for player, team in zip(
+            players["player_id"].tolist(), players["team_id"].tolist(), strict=True
+        )
+    }
 
 
 def make_projection_horizon_builder(

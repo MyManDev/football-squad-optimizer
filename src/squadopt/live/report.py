@@ -296,6 +296,28 @@ def render(recommendation: Recommendation) -> str:
             "  residual digest     "
             f"{str(risk.residual_provenance.get('residual_fingerprint'))[:16]}…",
         ]
+        interval = risk.diagnostics.get("probability_below_threshold_interval")
+        if isinstance(interval, list | tuple) and len(interval) == 2:
+            lines.append(
+                f"  P(score < {metrics.points_threshold:g}) 90% "
+                f"[{float(interval[0]):.2f}, {float(interval[1]):.2f}] (scenario sampling)"
+            )
+        comparisons = risk.diagnostics.get("rival_comparisons")
+        if isinstance(comparisons, list) and comparisons:
+            lines.append("  against rivals (same scenarios; shared players cancel)")
+            for entry in comparisons:
+                if not isinstance(entry, Mapping):
+                    continue
+                low, high = entry["probability_ahead_interval"]
+                quantiles = entry["difference_quantiles"]
+                assert isinstance(quantiles, Mapping)
+                ahead = float(str(entry["probability_ahead"]))
+                median = float(str(quantiles["q50"]))
+                lines.append(
+                    f"    vs {entry['rival']:<14} P(ahead) {ahead:.2f} "
+                    f"[{float(low):.2f}, {float(high):.2f}]  median gap {median:+.1f}  "
+                    f"shared starters {entry['shared_starters']}"
+                )
         limits = risk.diagnostics.get("stated_limits")
         if isinstance(limits, list | tuple):
             lines += [f"  stated limit        {limit}" for limit in limits]

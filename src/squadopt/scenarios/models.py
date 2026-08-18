@@ -136,6 +136,12 @@ class ScenarioConfig:
     min_player_observations: int = 8
     player_scale_shrinkage: float = 10.0
     player_location_shrinkage: float | None = None
+    double_gameweek_scale: float = 1.0
+    """Multiplier on the idiosyncratic spread of a player whose team plays twice in the
+    target gameweek. One (the default) keeps the calendar-blind scenarios bit for bit;
+    a value above one carries the measured fact that a double's residual is wider (the
+    fixture-group conformal radii ratio is about 1.3 to 1.5). Any value other than one
+    requires the calendar (``fixture_counts``) at generation time."""
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -167,6 +173,11 @@ class ScenarioConfig:
                 "player_location_shrinkage",
                 _finite_non_negative(self.player_location_shrinkage, "player_location_shrinkage"),
             )
+        object.__setattr__(
+            self,
+            "double_gameweek_scale",
+            _finite_non_negative(self.double_gameweek_scale, "double_gameweek_scale"),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,11 +187,23 @@ class ScenarioEvaluationConfig:
     lower_quantile: float = 0.10
     worst_fraction: float = 0.10
     points_threshold: float = 40.0
+    location_shift_points: float = 0.0
+    """Points added to every scenario score of the fixed decision before the summaries
+    are read — the decision-level selection-optimism correction. Scenarios are centred
+    on the projections, and the projections of the players an optimizer *selects* are
+    optimistic by construction (the winner's curse measured in `selection_optimism`:
+    about -3 points a starter, -3.9 for the captain, +34.5 at squad level in the audit),
+    so an honest lower tail for the chosen squad is the scenario distribution shifted
+    down by that amount. Zero keeps the uncorrected summaries."""
 
     def __post_init__(self) -> None:
         object.__setattr__(
             self, "lower_quantile", _probability(self.lower_quantile, "lower_quantile")
         )
+        shift = self.location_shift_points
+        if isinstance(shift, bool) or not isinstance(shift, Real) or not math.isfinite(shift):
+            raise ScenarioConfigurationError("location_shift_points must be a finite number.")
+        object.__setattr__(self, "location_shift_points", float(shift))
         object.__setattr__(
             self, "worst_fraction", _probability(self.worst_fraction, "worst_fraction")
         )
@@ -270,6 +293,11 @@ def _scenario_fingerprint(
                 None
                 if config.player_location_shrinkage is None
                 else float(config.player_location_shrinkage).hex()
+            ),
+            **(
+                {"double_gameweek_scale": float(config.double_gameweek_scale).hex()}
+                if config.double_gameweek_scale != 1.0
+                else {}
             ),
         },
         "scenario_ids": scenario_ids,

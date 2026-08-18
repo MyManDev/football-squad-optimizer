@@ -359,3 +359,18 @@ def test_a_horizon_starting_after_the_opening_gameweek_is_refused(tmp_path: Path
 
     with pytest.raises(DataSourceError, match="must start at gameweek 1"):
         _horizon(tmp_path, (2, 3))
+
+
+def test_fixture_counts_by_player_read_the_capture_calendar(tmp_path: Path) -> None:
+    from squadopt.live import fixture_counts_by_player
+
+    capture = _capture(tmp_path, fixtures=_calendar(blank_club=2, double_club=1))
+    counts = fixture_counts_by_player(capture, 2, season=SEASON)
+    horizon = build_projection_horizon(capture, (1, 2), panel=_history(), season=SEASON).table
+    week_two = horizon.loc[horizon["gameweek"] == 2]
+    for player, count in zip(
+        week_two["player_id"].tolist(), week_two["fixture_count"].tolist(), strict=True
+    ):
+        assert counts[int(player)] == int(count)
+    assert set(counts.values()) == {0, 1, 2}
+    assert len(counts) == len(week_two)
