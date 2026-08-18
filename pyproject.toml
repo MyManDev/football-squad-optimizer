@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "import-linter>=2.0,<3",
     "mypy>=1.14,<3",
     "pandas-stubs>=2.2.3,<3.1",
     "pytest>=8.3,<10",
@@ -46,7 +47,45 @@ src = ["src", "tests"]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 
 [tool.mypy]
+# Type-checked against 3.13 semantics: numpy's stubs use the `type` statement (3.12+),
+# so a 3.11 target cannot even parse them. The package still runs on 3.11 (CI matrix).
 python_version = "3.13"
 strict = true
 mypy_path = "src"
 files = ["src/squadopt"]
+
+[tool.importlinter]
+root_package = "squadopt"
+include_external_packages = false
+
+# The layered modular monolith (docs/architecture/dependency_rules.md). Higher layers may
+# import lower ones, never the reverse. The ignore list is the measured baseline of
+# violations on the day the contract was added; it may only shrink (Stage 3/4 remove
+# every entry), and a new violation fails the gate.
+[[tool.importlinter.contracts]]
+name = "Layered architecture"
+type = "layers"
+layers = [
+    "squadopt.live",
+    "squadopt.experiments",
+    "squadopt.backtest",
+    "squadopt.recalibration",
+    "squadopt.preflight",
+    "squadopt.bayesopt",
+    "squadopt.planning",
+    "squadopt.risk",
+    "squadopt.scenarios",
+    "squadopt.uncertainty",
+    "squadopt.evaluation",
+    "squadopt.optimization",
+    "squadopt.prediction",
+    "squadopt.features",
+    "squadopt.data",
+]
+ignore_imports = [
+    "squadopt.data.schema -> squadopt.optimization.config",
+    "squadopt.data.schema -> squadopt.optimization.validation",
+    "squadopt.prediction.integration -> squadopt.optimization.coefficients",
+    "squadopt.backtest.production_benchmark -> squadopt.experiments",
+    "squadopt.backtest.production_benchmark -> squadopt.experiments.config",
+]
