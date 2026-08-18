@@ -4,7 +4,7 @@
 - Column: `predicted_points`
 - Population: 101,447 rows, 58,855 non-zero
 
-Rows whose written value changes when the underlying number is perturbed by the given relative amount. Zero means two machines write the same bytes.
+Rows whose written value changes when the underlying number is perturbed by the given relative amount. Zero means two machines write the same *values*. Writing the same *bytes* additionally needs the same line terminator — see "The half this measurement did not cover" below.
 
 | Relative perturbation | unrounded | 12 dp | 9 dp | 6 dp |
 | ---: | ---: | ---: | ---: | ---: |
@@ -62,3 +62,53 @@ unrounded one moved none. Rounding to nine creates values sitting exactly on a s
 boundary, so a second, coarser rounding is *less* stable than one applied directly. An
 argument against layering roundings, and a reason the precision is declared once and
 applied once.
+
+## The half this measurement did not cover
+
+Rounding settles the values. It does not settle the bytes, and `table_sha256` digests the
+raw file bytes.
+
+`DataFrame.to_csv` defaults its line terminator to `os.linesep`, so the same rounded table
+was written `\r\n` on Windows and `\n` on Linux. Two exports agreeing on every value to
+nine decimals still produced different hashes across that boundary, for a reason this
+measurement cannot see: it perturbs numbers, and the terminator is not a number.
+
+The reason it stayed invisible is worth recording rather than glossing. Both owners who
+compared hashes were on Windows. Their bytes agreed with each other, which read as
+reproducibility, and would have disagreed with any Linux run. The claim "stable across four
+commits and two machines" in the acceptance record is true and was never a claim about two
+*operating systems*. It became load-bearing when CI started running on `ubuntu-latest`.
+
+Exports are now written through `write_export_table`
+(`src/squadopt/backtest/export_precision.py`), which sets the terminator explicitly, and
+the four writers that produce recorded tables call it — the candidate and control residual
+exports, the projection horizon table, and the horizon-decay residuals. A pinned digest in
+`tests/unit/test_export_precision.py` holds the bytes to a known value on every platform.
+
+Note what a test can and cannot prove here: on Linux the default and the explicit
+terminator are the same bytes, so a regression fails on Windows and passes on Linux. The
+pinned digest is the part that holds everywhere. Recorded hashes produced before this
+change identify a table *and* the operating system that wrote it; a hash regenerated on a
+different family will differ for that reason alone, and that is a fact about the old
+records rather than a fault in the new ones.
+
+### Measured on the real export
+
+The control export was regenerated from the pinned archive on Windows, 147 folds and
+101,447 rows, preflight 31/31:
+
+| Bytes | Digest |
+| --- | --- |
+| `\n` (what is written now) | `b8d641cc80f0fdadc26ec4e7f013c00e9dcef1ae8c2e6b2202b6db586a5d0da1` |
+| the same bytes with `\n` → `\r\n` | `1ed41f94f245b06d012293a895cdee755a5b1803cb19bcc3795e4a414767a22f` |
+
+The second value is exactly what `control_residual_export.md` records. So the content is
+byte-for-byte the table already recorded — not one value moved — and the recorded digest is
+demonstrably its CRLF form. That is the whole defect, stated as arithmetic rather than as an
+argument.
+
+The recorded hashes are left as they are. They are honest records of runs that happened, on
+the machines that happened, and rewriting them here would put a measurement change inside a
+fix. A run that regenerates them belongs in its own pull request; the pair's control half
+(`98b9dd20…`, rounded for the pair) and the candidate half will shift the same way and have
+not been re-measured.

@@ -67,6 +67,22 @@ Each table is accompanied by a JSON manifest with these required fields:
 `opening_gameweeks_included` is evidence, not a convenience flag. A development export
 whose folds begin at GW2 must set it to `false`; it cannot be relabeled as opening evidence.
 
+## Byte rule
+
+`table_sha256` digests the exact file bytes, so the bytes are part of the contract and not
+an implementation detail of whoever wrote the file.
+
+Two things fix them. Values are written at `predicted_points_decimals`, measured in
+`export_precision.md`. Lines are terminated with `\n` on every platform, because
+`DataFrame.to_csv` otherwise defaults to `os.linesep` and the same table would hash
+differently on Windows and Linux. Both are settled by writing through
+`write_export_table` (`src/squadopt/backtest/export_precision.py`); an export written any
+other way may record a digest that identifies the operating system as much as the table.
+
+Hashes recorded before this rule was written identify a table on the family of machine that
+produced it. Regenerating such an export on a different family will change the digest for
+that reason alone.
+
 ## Pairing rule
 
 Reference and candidate exports used in one comparison must have identical

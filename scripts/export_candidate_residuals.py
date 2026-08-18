@@ -38,6 +38,7 @@ from squadopt.backtest.candidate_residuals import (
     candidate_residual_manifest,
     round_for_export,
 )
+from squadopt.backtest.export_precision import write_export_table
 from squadopt.backtest.learned_candidate import (
     LEARNED_RATE_TRAINING_CONTRACT_VERSION,
     make_learned_rate_projection_builder,
@@ -129,9 +130,8 @@ def _parse_arguments() -> argparse.Namespace:
 
 
 def _write(table: pd.DataFrame, directory: Path, name: str) -> tuple[Path, str]:
-    directory.mkdir(parents=True, exist_ok=True)
     path = directory / f"{name}.csv"
-    table.to_csv(path, index=False)
+    write_export_table(table, path)
     return path, compute_table_sha256(path)
 
 

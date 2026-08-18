@@ -23,6 +23,7 @@ from pathlib import Path
 
 from scripts._experiment_cli import REPOSITORY_ROOT, write_json, write_text
 
+from squadopt.backtest.export_precision import write_export_table
 from squadopt.data.errors import DataError
 from squadopt.data.fixtures import aggregate_team_gameweek
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -132,7 +133,7 @@ def main() -> int:
     output_dir: Path = arguments.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     table_path = output_dir / f"projection_horizon_{snapshot_id}.csv"
-    table.to_csv(table_path, index=False)
+    write_export_table(table, table_path)
     write_json(output_dir / f"projection_horizon_{snapshot_id}.json", document)
 
     flat = len({entry["total_expected_points"] for entry in per_gameweek}) == 1
