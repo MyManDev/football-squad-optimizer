@@ -426,6 +426,18 @@ def _stated_limits(
             "selection optimism measured on development folds, not yet on this season's "
             "ledger."
         )
+    if evaluation.dispersion_scale == 1.0:
+        limits.append(
+            "The squad-level spread is the raw scenario spread: the audit measured it about "
+            "15% narrow (PIT tails 0.14 against 0.10 on 37 folds, intervals including "
+            "nominal), so the lower tail is if anything slightly optimistic."
+        )
+    else:
+        limits.append(
+            f"The squad-level spread is widened by {evaluation.dispersion_scale:g} around its "
+            "centre (scenario audit, online root-mean-square of standardized gaps); the "
+            "evidence is 37 folds and the tails' intervals include nominal both ways."
+        )
     if fixture_counts is None or scenarios.double_gameweek_scale == 1.0:
         limits.append(CALENDAR_BLIND_LIMIT)
     else:

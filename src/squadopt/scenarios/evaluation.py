@@ -104,7 +104,12 @@ def evaluate_fixed_decision(
     # The decision-level correction: the chosen squad's projections are optimistic by
     # construction, so its honest distribution is the raw one shifted by the measured
     # selection optimism (negative), which the caller states in the config.
-    scores = raw_scores + settings.location_shift_points
+    raw_mean = float(raw_scores.mean())
+    scores = (
+        raw_mean
+        + settings.dispersion_scale * (raw_scores - raw_mean)
+        + settings.location_shift_points
+    )
 
     projections = verified.projections.table.set_index("player_id")["expected_points"]
     point_score = float(projections.loc[starter_ids].sum() + projections.loc[captain_id])
@@ -134,7 +139,9 @@ def evaluate_fixed_decision(
             "scoring_policy": "starting_xi_plus_captain_double_v1",
             "bench_points_included": False,
             "location_shift_points": settings.location_shift_points,
-            "mean_score_before_shift": float(raw_scores.mean()),
+            "dispersion_scale": settings.dispersion_scale,
+            "mean_score_before_shift": raw_mean,
+            "standard_deviation_before_scale": float(raw_scores.std(ddof=0)),
             "probability_below_threshold_interval": wilson_interval(
                 int((scores < settings.points_threshold).sum()), len(scores)
             ),
