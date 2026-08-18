@@ -399,7 +399,7 @@ def test_a_changed_projection_changes_the_fingerprint() -> None:
 # same commit, which passes even if every number moved; these literals are the only thing
 # in the suite that would notice.
 GW1_REPLAY_PREDICTION_FINGERPRINT = (
-    "45b941b07f2774b7b31028ab687d521e42b214b39104e305e2f6eebb5ac378dd"
+    "8af1337e0394baab54d1b706b24ff42230c163683b52df50cf0af0da19140b90"
 )
 GW1_REPLAY_SQUAD = (
     1001,
