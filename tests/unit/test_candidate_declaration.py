@@ -82,6 +82,45 @@ def test_the_development_seasons_exclude_the_locked_holdout() -> None:
 
 # --- the fingerprints bind what they claim to bind --------------------------
 
+# The two values Stage A freezes, as recorded in docs/issue43_candidate_declaration.md,
+# docs/issue43_stage_a_review.md and docs/issue43_handoff_acceptance.md item 17.
+#
+# Pinned here because the tests below this point prove the fingerprints are *stable* and
+# *sensitive* without ever proving they are the values three owners agreed to. A field added
+# to CandidateDeclaration or ProductionBenchmarkConfig moves both digests, which is correct
+# behaviour and exactly what step 7 of docs/candidate_declaration_review.md would catch — but
+# only at the formal run, and by then the declaration is immutable and the freeze is void
+# (candidate_declaration_review.md:35-37). Before that moment nothing in the suite notices,
+# because a stability test compares two calls in the same process and passes whatever they
+# both return.
+#
+# Both are pinned because they cover different surfaces, which is easy to get wrong: the
+# declaration fingerprint covers the candidate's identity and does **not** include the rate
+# window. Changing WINDOW moves only the configuration digest. So freezing the declaration
+# alone would leave the window free to move under a declaration that still looked honoured.
+#
+# If these fail, do not update them to make the suite green. The freeze is void: either
+# revert whatever moved the digest, or re-issue the declaration as a new version with a new
+# fingerprint and a fresh three-owner review, per candidate_declaration_review.md:35-37 and
+# the declaration's own closing line — "a changed candidate is a new candidate with a new
+# fingerprint".
+FROZEN_DECLARATION_FINGERPRINT = "f72962a182e4d857448d860641c7ebc211a4f7101f3ed713362636fa2b3bce09"
+FROZEN_CONFIGURATION_FINGERPRINT = (
+    "b64a3ab9f06f1c1a207d66c8f1d59b0c3072f7fe8400cb598e378fca37e6f575"
+)
+
+
+def test_the_declaration_fingerprint_is_the_recorded_one() -> None:
+    """The value the pre-registration is made of, held to what the documents record."""
+
+    assert declaration().declaration_fingerprint == FROZEN_DECLARATION_FINGERPRINT
+
+
+def test_the_benchmark_configuration_fingerprint_is_the_recorded_one() -> None:
+    """The second half of the freeze: the configuration the run must execute under."""
+
+    assert benchmark_config().configuration_fingerprint == FROZEN_CONFIGURATION_FINGERPRINT
+
 
 def test_the_declaration_fingerprint_is_stable_across_calls() -> None:
     assert declaration().declaration_fingerprint == declaration().declaration_fingerprint
