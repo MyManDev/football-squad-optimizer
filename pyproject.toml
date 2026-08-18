@@ -32,6 +32,10 @@ include = ["squadopt*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["-ra", "--strict-config", "--strict-markers"]
+markers = [
+    "slow: solver-heavy tests that take more than about five seconds each (deselect with -m 'not slow' for the fast suite)",
+    "integration: end-to-end tests under tests/integration (applied automatically by tests/conftest.py)",
+]
 
 [tool.ruff]
 target-version = "py311"

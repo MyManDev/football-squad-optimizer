@@ -38,7 +38,6 @@ from scripts._experiment_cli import (
     write_json,
     write_text,
 )
-from scripts.run_season_chain_seasons import MAX_FREE_TRANSFERS, _fixture_counts, chip_windows_for
 
 from squadopt.bayesopt import (
     BayesianCandidate,
@@ -50,6 +49,11 @@ from squadopt.bayesopt import (
 )
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.experiments import SeasonChain, SeasonChainConfig
+from squadopt.experiments.season_chain_runs import (
+    MAX_FREE_TRANSFERS,
+    chip_windows_for,
+    season_fixture_counts,
+)
 from squadopt.optimization import OptimizationConfig
 from squadopt.planning import TransferPlanningConfig
 
@@ -117,7 +121,7 @@ def _season_net(task: tuple[str, dict[str, float], str]) -> tuple[str, float, di
     counts_cache = _WORKER_STATE["counts"]
     assert isinstance(counts_cache, dict)
     if season not in counts_cache:
-        counts_cache[season] = _fixture_counts(root, season)
+        counts_cache[season] = season_fixture_counts(root, season)
     holding = {
         "bboost": float(values["bboost_hold"]),
         "3xc": float(values["threexc_hold"]),

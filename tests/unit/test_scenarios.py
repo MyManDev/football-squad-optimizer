@@ -516,6 +516,7 @@ def _rank_world() -> tuple[Any, Any, Any]:
     return snapshot, scenarios, (reference, rival)
 
 
+@pytest.mark.slow
 def test_against_its_own_template_the_rank_objective_finds_a_differential_and_reports_it() -> None:
     from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
 
@@ -542,6 +543,7 @@ def test_against_its_own_template_the_rank_objective_finds_a_differential_and_re
     assert hopeless.probability_ahead == 0.0
 
 
+@pytest.mark.slow
 def test_the_expected_points_budget_binds_and_a_menu_is_monotone_in_the_budget() -> None:
     from squadopt.scenarios import RankObjectiveConfig, goal_menu, optimize_rank_probability_squad
 
@@ -572,6 +574,7 @@ def test_the_expected_points_budget_binds_and_a_menu_is_monotone_in_the_budget()
     assert all(e.solver_status in {"OPTIMAL", "FEASIBLE"} for e in entries)
 
 
+@pytest.mark.slow
 def test_the_rank_objective_is_deterministic() -> None:
     from squadopt.scenarios import optimize_rank_probability_squad
 
@@ -584,6 +587,7 @@ def test_the_rank_objective_is_deterministic() -> None:
     )
 
 
+@pytest.mark.slow
 def test_a_held_out_claim_is_read_from_scenarios_the_squad_never_saw() -> None:
     from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
 

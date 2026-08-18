@@ -101,6 +101,7 @@ def test_every_gameweek_with_history_is_solvable(gameweek: int) -> None:
     assert result.has_solution
 
 
+@pytest.mark.slow
 def test_the_opening_gameweek_is_solvable_and_price_informative() -> None:
     """The fitted deadline-price prior ranks players before form exists."""
 

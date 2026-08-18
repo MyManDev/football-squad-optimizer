@@ -233,6 +233,7 @@ def test_an_online_shift_uses_only_earlier_folds(audit: ScenarioAuditResult) -> 
         )
 
 
+@pytest.mark.slow
 def test_the_rank_rehearsal_reports_claimed_and_realized_per_budget() -> None:
     from squadopt.experiments import rehearse_rank_objective
     from squadopt.optimization import OptimizationConfig

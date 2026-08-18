@@ -164,6 +164,7 @@ def test_risk_neutral_and_risk_averse_candidates_are_evaluated_separately() -> N
 # --- the objective under the real search loop --------------------------------
 
 
+@pytest.mark.slow
 def test_the_three_factor_search_runs_deterministically() -> None:
     search_config = BayesianOptimizationConfig(
         factors=(
