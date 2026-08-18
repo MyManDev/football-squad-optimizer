@@ -10,7 +10,10 @@ from typing import Final
 
 from squadopt.optimization import OptimizationConfig
 from squadopt.risk.errors import RiskConfigurationError
-from squadopt.uncertainty.config import PlayerAdaptiveUncertaintyConfig
+from squadopt.uncertainty.config import (
+    UNCERTAINTY_GROUPINGS,
+    PlayerAdaptiveUncertaintyConfig,
+)
 
 RISK_OPTIMIZATION_CONTRACT_VERSION: Final = "conformal_lcb_objective_v1"
 RISK_SCREENING_CONTRACT_VERSION: Final = "rolling_risk_screening_v1"
@@ -111,12 +114,20 @@ class RiskScreeningConfig:
     min_group_observations: int = 30
     min_prior_gameweeks_in_season: int = 1
     optimization_config: OptimizationConfig = field(default_factory=OptimizationConfig)
+    uncertainty_grouping: str = "position"
+    """Which conformal contract calibrates the intervals: ``position`` (v1, the default
+    so recorded screenings reproduce) or ``position_fixture_group`` (v2, the operational
+    grouping; the folds must then carry ``fixture_count``)."""
     contract_version: str = RISK_SCREENING_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
         if self.contract_version != RISK_SCREENING_CONTRACT_VERSION:
             raise RiskConfigurationError(
                 "contract_version must match the implemented risk screening contract."
+            )
+        if self.uncertainty_grouping not in UNCERTAINTY_GROUPINGS:
+            raise RiskConfigurationError(
+                f"uncertainty_grouping must be one of {UNCERTAINTY_GROUPINGS!r}."
             )
         if not isinstance(self.season_order, tuple) or len(self.season_order) < 2:
             raise RiskConfigurationError("season_order must be a tuple with at least two seasons.")
@@ -205,6 +216,11 @@ class RiskScreeningConfig:
             "min_pooled_observations": self.min_pooled_observations,
             "min_group_observations": self.min_group_observations,
             "min_prior_gameweeks_in_season": self.min_prior_gameweeks_in_season,
+            **(
+                {"uncertainty_grouping": self.uncertainty_grouping}
+                if self.uncertainty_grouping != "position"
+                else {}
+            ),
             "optimization": {
                 "budget_tenths": optimization.budget_tenths,
                 "squad_size": optimization.squad_size,

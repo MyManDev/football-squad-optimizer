@@ -25,6 +25,12 @@ from squadopt.backtest import build_walk_forward_folds, make_baseline_projection
 from squadopt.data.sources.vaastav import ARCHIVE_COMMIT, ARCHIVE_REPOSITORY, build_panel
 from squadopt.prediction import BASELINE_FORM_WINDOW, FEATURE_GENERATION_CONTRACT_VERSION
 from squadopt.risk import RiskScreeningConfig, RiskScreeningResult, run_risk_screening
+from squadopt.uncertainty import (
+    OPERATIONAL_UNCERTAINTY_GROUPING,
+    UNCERTAINTY_GROUPINGS,
+    attach_fixture_counts_to_folds,
+    calendar_from_archive,
+)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
@@ -35,6 +41,13 @@ MANIFEST_PATH = REPOSITORY_ROOT / "data" / "sources" / "vaastav_fpl_manifest.jso
 def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
+    parser.add_argument(
+        "--uncertainty-grouping",
+        choices=UNCERTAINTY_GROUPINGS,
+        default=OPERATIONAL_UNCERTAINTY_GROUPING,
+        help="conformal grouping for the intervals: position (v1) or position_fixture_group "
+        "(v2, the operational default; the calendar is attached to every fold)",
+    )
     parser.add_argument(
         "--json-output",
         type=Path,
@@ -316,7 +329,7 @@ def main() -> int:
         )
         return 1
 
-    config = RiskScreeningConfig()
+    config = RiskScreeningConfig(uncertainty_grouping=str(arguments.uncertainty_grouping))
     panel = build_panel(arguments.archive_root)
     folds = build_walk_forward_folds(
         panel,
@@ -324,6 +337,10 @@ def main() -> int:
         min_prior_gameweeks_in_season=config.min_prior_gameweeks_in_season,
         projection_builder=make_baseline_projection_builder(form_window=BASELINE_FORM_WINDOW),
     )
+    if config.uncertainty_grouping == "position_fixture_group":
+        folds = attach_fixture_counts_to_folds(
+            folds, calendar_from_archive(arguments.archive_root, config.season_order)
+        )
     result = run_risk_screening(folds, config)
     report = _build_report(
         result,

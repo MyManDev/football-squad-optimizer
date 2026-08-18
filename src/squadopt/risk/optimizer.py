@@ -33,6 +33,9 @@ _ALLOWED_UNCERTAINTY_SOURCES = {
     "pooled_fallback",
     "position",
     "position_fallback",
+    # projection_uncertainty_v2 (position by fixture group) sources:
+    "position_fixture_group",
+    "blank_zero",
 }
 _UNCERTAINTY_COLUMNS = (
     INTERVAL_LOWER_COLUMN,
@@ -130,14 +133,18 @@ def _risk_adjusted_table(
             )
         if stddev < 0:
             raise RiskValidationError("expected_points_stddev must be non-negative.")
-        if group != position:
+        # v1 labels the group by position; v2 by "<position>/<fixture group>". Either
+        # way the label must name this row's position.
+        group_position = str(group).split("/", 1)[0]
+        if group_position != position:
             raise RiskValidationError("uncertainty_group must match the canonical position.")
         if source not in _ALLOWED_UNCERTAINTY_SOURCES:
             raise RiskValidationError("uncertainty_source must be a supported calibrated source.")
+        blank_row = source == "blank_zero"
         if (
             isinstance(observations, bool)
             or not isinstance(observations, Integral)
-            or int(observations) < 2
+            or int(observations) < (0 if blank_row else 2)
         ):
             raise RiskValidationError("uncertainty_observations must be an integer of at least 2.")
 

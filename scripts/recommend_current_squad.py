@@ -37,6 +37,7 @@ from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
     LiveResidualHistory,
     build_recommendation,
+    fixture_counts_by_player,
     infer_season,
     project,
     read_inputs,
@@ -111,6 +112,13 @@ def main() -> int:
     parser.add_argument("--risk-scenario-count", type=int, default=1_000)
     parser.add_argument("--risk-seed", type=int, default=0)
     parser.add_argument("--risk-min-history-folds", type=int, default=8)
+    parser.add_argument(
+        "--risk-double-gameweek-scale",
+        type=float,
+        default=1.45,
+        help="widen double-gameweek players' scenario spread by this factor, using the "
+        "capture's calendar (the fixture-group conformal ratio; 1.0 disables it)",
+    )
     parser.add_argument("--risk-lower-quantile", type=float, default=0.10)
     parser.add_argument("--risk-worst-fraction", type=float, default=0.10)
     parser.add_argument("--risk-points-threshold", type=float, default=40.0)
@@ -134,6 +142,7 @@ def main() -> int:
         risk_history = None
         risk_scenario_config = None
         risk_evaluation_config = None
+        risk_fixture_counts = None
         if arguments.risk_residuals:
             metadata = {
                 "--risk-model-name": arguments.risk_model_name,
@@ -163,6 +172,10 @@ def main() -> int:
                 scenario_count=arguments.risk_scenario_count,
                 deterministic_seed=arguments.risk_seed,
                 min_history_folds=arguments.risk_min_history_folds,
+                double_gameweek_scale=arguments.risk_double_gameweek_scale,
+            )
+            risk_fixture_counts = fixture_counts_by_player(
+                snapshot, inputs.deadline.gameweek, season=season
             )
             risk_evaluation_config = ScenarioEvaluationConfig(
                 lower_quantile=arguments.risk_lower_quantile,
@@ -175,6 +188,7 @@ def main() -> int:
             risk_history=risk_history,
             risk_scenario_config=risk_scenario_config,
             risk_evaluation_config=risk_evaluation_config,
+            risk_fixture_counts=risk_fixture_counts,
         )
     except (DataError, ScenarioError) as error:
         print(f"\nCould not produce a recommendation:\n  {error}")

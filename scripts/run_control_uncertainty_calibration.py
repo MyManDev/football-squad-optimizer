@@ -17,7 +17,6 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-import pandas as pd
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
@@ -27,15 +26,17 @@ from scripts._experiment_cli import (
 )
 
 from squadopt.backtest import build_walk_forward_folds, make_baseline_projection_builder
-from squadopt.data.sources.vaastav import build_fixture_panel, build_panel, load_team_codes
+from squadopt.data.sources.vaastav import build_panel
 from squadopt.prediction import BASELINE_FORM_WINDOW
 from squadopt.uncertainty import (
     CONTRACT_BY_GROUPING,
+    OPERATIONAL_UNCERTAINTY_GROUPING,
     UNCERTAINTY_GROUPINGS,
     PlayerAdaptiveUncertaintyConfig,
     UncertaintyConfig,
     UncertaintyError,
     attach_fixture_counts_to_folds,
+    calendar_from_archive,
     evaluate_player_adaptive_uncertainty,
     evaluate_projection_uncertainty,
     fit_player_adaptive_uncertainty,
@@ -58,9 +59,10 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--grouping",
         choices=UNCERTAINTY_GROUPINGS,
-        default="position",
-        help="position is projection_uncertainty_v1; position_fixture_group is v2 (the "
-        "published calendar is attached to every fold row and doubles get their own radius)",
+        default=OPERATIONAL_UNCERTAINTY_GROUPING,
+        help="position is projection_uncertainty_v1 (the recorded v1 artifact); "
+        "position_fixture_group is v2, the operational default (the published calendar is "
+        "attached to every fold row and doubles get their own radius)",
     )
     parser.add_argument("--json-output", type=Path, default=None)
     parser.add_argument("--markdown-output", type=Path, default=None)
@@ -75,28 +77,6 @@ def _parse_arguments() -> argparse.Namespace:
             REPOSITORY_ROOT / "docs" / f"control_uncertainty_calibration{suffix}.md"
         )
     return arguments
-
-
-def _fixture_counts(archive_root: Path, seasons: tuple[str, ...]) -> pd.DataFrame:
-    """Known fixture counts per (season, gameweek, club name), the panel's team labels."""
-
-    fixtures = build_fixture_panel(archive_root, seasons=seasons)
-    pieces: list[pd.DataFrame] = []
-    for season in seasons:
-        codes = load_team_codes(archive_root, season)
-        name_by_code = {
-            int(code): str(name)
-            for name, code in zip(codes["name"].tolist(), codes["code"].tolist(), strict=True)
-        }
-        block = fixtures.loc[fixtures["season"] == season]
-        counts = (
-            block.groupby(["season", "gameweek", "team_id"], sort=True)
-            .size()
-            .reset_index(name="fixture_count")
-        )
-        counts["team_id"] = [name_by_code[int(code)] for code in counts["team_id"].tolist()]
-        pieces.append(counts)
-    return pd.concat(pieces, ignore_index=True)
 
 
 def _metric_rows(label: str, metrics: object, group_metrics: dict[str, object]) -> list[str]:
@@ -186,7 +166,7 @@ def main() -> int:
         )
         if position_config.uses_fixture_groups:
             LOGGER.info("Attaching the published calendar to every fold row")
-            calendar = _fixture_counts(
+            calendar = calendar_from_archive(
                 arguments.archive_root, (*calibration_seasons, evaluation_season)
             )
             calibration_folds = attach_fixture_counts_to_folds(calibration_folds, calendar)

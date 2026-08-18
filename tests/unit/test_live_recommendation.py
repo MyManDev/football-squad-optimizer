@@ -677,3 +677,31 @@ def test_rivals_are_compared_in_the_same_scenarios_and_reported(tmp_path: Path) 
                 double_gameweek_scale=1.4,
             ),
         )
+
+
+def test_build_recommendation_passes_the_calendar_and_rivals_to_the_risk_layer(
+    tmp_path: Path,
+) -> None:
+    inputs = read_inputs(_capture(tmp_path), season=SEASON)
+    projection = project(inputs, _panel(players=(1001, 1004, 1012)))
+    history = _risk_history(projection, seasons=("2024-25", "2025-26"), gameweek=1)
+    counts = {int(p): 1 for p in projection.table["player_id"].tolist()}
+
+    recommendation = build_recommendation(
+        inputs,
+        projection,
+        risk_history=history,
+        risk_scenario_config=ScenarioConfig(
+            scenario_count=64,
+            min_history_folds=2,
+            min_player_observations=2,
+            double_gameweek_scale=1.45,
+        ),
+        risk_evaluation_config=ScenarioEvaluationConfig(points_threshold=40.0),
+        risk_fixture_counts=counts,
+    )
+
+    risk = recommendation.risk
+    assert risk.status is LiveRiskStatus.AVAILABLE
+    assert risk.diagnostics["double_gameweek_scale"] == 1.45
+    assert not any("calendar-blind" in limit for limit in risk.diagnostics["stated_limits"])
