@@ -97,16 +97,29 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--chips",
         default="off,on,reserve",
-        help="comma subset of off,on,reserve,value,hybrid: on offers every open chip to "
-        "the planner; reserve offers bench boost and triple captain only in double "
+        help="comma subset of off,on,reserve,value,hybrid,tuned: on offers every open chip "
+        "to the planner; reserve offers bench boost and triple captain only in double "
         "gameweeks; value offers every open chip but holds each at its "
         "--chip-holding-values; hybrid reserves the bench boost for doubles and holds "
-        "triple captain and wildcard at their holding values",
+        "triple captain and wildcard at their holding values; tuned is hybrid with the "
+        "--tuned-holding-values and --tuned-hit-cost (the Bayesian-search candidate)",
     )
     parser.add_argument(
         "--chip-holding-values",
         default="bboost=20,3xc=18,wildcard=12,freehit=15",
         help="terminal value of an unplayed chip under --chips value, points per chip",
+    )
+    parser.add_argument(
+        "--tuned-holding-values",
+        default="bboost=0,3xc=20,wildcard=24,freehit=0",
+        help="holding values of the tuned mode (default: the chip_bayesopt candidate)",
+    )
+    parser.add_argument(
+        "--tuned-hit-cost",
+        type=float,
+        default=7.0,
+        help="the planner's own hit cost under the tuned mode (default: the chip_bayesopt "
+        "candidate; the game's charge stays 4 in the ledger)",
     )
     parser.add_argument(
         "--projection-rule",
@@ -181,7 +194,7 @@ def chip_windows_for(season: str) -> tuple[ChipWindowRule, ...]:
     )
 
 
-CHIP_MODES = ("off", "on", "reserve", "value", "hybrid")
+CHIP_MODES = ("off", "on", "reserve", "value", "hybrid", "tuned")
 
 
 def parse_holding_values(text: str) -> dict[str, float]:
@@ -453,6 +466,18 @@ def _comparisons(
             )
             if comparison is not None:
                 comparisons.append(comparison)
+    # The tuned candidate against hybrid at the same lookahead: what the search bought.
+    if {"tuned", "hybrid"} <= set(chip_modes):
+        for lookahead in lookaheads:
+            comparison = _comparison(
+                _variant_label(lookahead, "tuned"),
+                _variant_label(lookahead, "hybrid"),
+                chains,
+                resamples=resamples,
+                block_length=block_length,
+            )
+            if comparison is not None:
+                comparisons.append(comparison)
     # Chips against no chips at the same lookahead: what the chips themselves buy.
     if "off" in chip_modes:
         for lookahead in lookaheads:
@@ -562,6 +587,8 @@ def main() -> int:
         print(f"--chips must be a comma subset of {','.join(CHIP_MODES)}.")
         return 1
     holding_values = parse_holding_values(arguments.chip_holding_values)
+    tuned_holding_values = parse_holding_values(arguments.tuned_holding_values)
+    tuned_hit_cost = float(arguments.tuned_hit_cost)
 
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
     panel = build_panel(arguments.archive_root)
@@ -589,12 +616,19 @@ def main() -> int:
             for lookahead in lookaheads:
                 for mode in chip_modes:
                     chips = mode != "off"
-                    transfer_config = TransferPlanningConfig(
-                        max_free_transfers=cap,
-                        chip_holding_value_points=(
-                            holding_values if mode in {"value", "hybrid"} else {}
-                        ),
-                    )
+                    if mode == "tuned":
+                        transfer_config = TransferPlanningConfig(
+                            max_free_transfers=cap,
+                            transfer_hit_cost_points=tuned_hit_cost,
+                            chip_holding_value_points=tuned_holding_values,
+                        )
+                    else:
+                        transfer_config = TransferPlanningConfig(
+                            max_free_transfers=cap,
+                            chip_holding_value_points=(
+                                holding_values if mode in {"value", "hybrid"} else {}
+                            ),
+                        )
                     label = _variant_label(lookahead, mode)
                     LOGGER.info("Season %s: %s", season, label)
                     config = SeasonChainConfig(
@@ -610,7 +644,7 @@ def main() -> int:
                             "double_gameweeks_only"
                             if mode == "reserve"
                             else "hybrid"
-                            if mode == "hybrid"
+                            if mode in {"hybrid", "tuned"}
                             else "planner"
                         ),
                         projection_rule=str(arguments.projection_rule),
@@ -654,6 +688,11 @@ def main() -> int:
         "projection_rule": str(arguments.projection_rule),
         "chip_holding_values_points": (
             holding_values if {"value", "hybrid"} & set(chip_modes) else None
+        ),
+        "tuned_mode": (
+            {"holding_values_points": tuned_holding_values, "planning_hit_cost": tuned_hit_cost}
+            if "tuned" in chip_modes
+            else None
         ),
         "sell_rule": "purchase plus half of any rise, rounded down to a tenth",
         "automatic_substitutions": False,
