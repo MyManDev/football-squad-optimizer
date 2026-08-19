@@ -241,6 +241,88 @@ def test_an_earlier_gameweek_does_reach_the_fitted_model() -> None:
     )
 
 
+def test_deleting_future_gameweeks_cannot_reach_the_fitted_model() -> None:
+    """Stronger than mutation: catches whole-dataset operations mutation misses.
+
+    Perturbing a future row leaves the row in place, so an operation that reads the shape of
+    the panel — a row count, a groupby size, a fillna over the whole frame — can still see
+    the future while every value test passes. Removing the rows entirely is the only way to
+    ask whether the fit depends on the future existing at all.
+    """
+
+    panel = _panel()
+    truncated = panel.loc[
+        ~((panel["season"] == _decision().season) & (panel["gameweek"] > _decision().gameweek))
+    ].reset_index(drop=True)
+
+    assert (
+        _candidate(panel=truncated).prediction_fingerprint
+        == _candidate(panel=panel).prediction_fingerprint
+    )
+
+
+def test_row_order_cannot_reach_the_fitted_model() -> None:
+    """The fit must not depend on how the archive happened to be concatenated.
+
+    This one passes for a reason worth stating, because it makes the guard easy to delete by
+    accident: the fit never sees the caller's row order at all. `build_feature_dataset` sorts
+    by the canonical key with a stable sort and resets the index, so the feature frame is
+    identical whatever order the panel arrives in, and the training slice is taken from that.
+
+    So the guard is prospective rather than currently load-bearing. It fails the day that
+    canonicalisation is removed or bypassed — at which point a ridge fit over
+    non-associative floating-point summation would make every recorded fingerprint depend on
+    input order. Its counterpart guards the frozen builder for the same reason.
+    """
+
+    panel = _panel()
+    shuffled = panel.sort_values(["gameweek", "player_id"], ascending=[False, False]).reset_index(
+        drop=True
+    )
+
+    assert (
+        _candidate(panel=shuffled).prediction_fingerprint
+        == _candidate(panel=panel).prediction_fingerprint
+    )
+
+
+def test_the_training_fingerprint_ignores_the_future() -> None:
+    """The provenance digest covers the training slice, so it must stop at the cutoff.
+
+    Distinct from the prediction fingerprint above: this one is what a gate reads to claim
+    two runs trained on the same data. If the future reached it, the claim would be false
+    even when the prediction happened not to move.
+    """
+
+    panel = _panel()
+    perturbed = panel.copy(deep=True)
+    later = (perturbed["season"] == _decision().season) & (
+        perturbed["gameweek"] > _decision().gameweek
+    )
+    perturbed.loc[later, "total_points"] = -50
+
+    assert (
+        _candidate(panel=perturbed).provenance.training_data_fingerprint
+        == _candidate(panel=panel).provenance.training_data_fingerprint
+    )
+
+
+def test_the_input_panel_is_not_modified() -> None:
+    """The caller's frame is an input, not scratch space.
+
+    The walk-forward runner hands the same panel to one fold after another, so a builder
+    that wrote into it would leak one fold's work into the next and the leak would look like
+    signal.
+    """
+
+    panel = _panel()
+    before = panel.copy(deep=True)
+
+    _candidate(panel=panel)
+
+    assert panel.equals(before)
+
+
 # --- determinism ------------------------------------------------------------
 
 
