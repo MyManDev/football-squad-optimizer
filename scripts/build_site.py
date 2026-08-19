@@ -18,6 +18,7 @@ from scripts.run_season_tick import DEFAULT_HANDOFF_ROOT, DEFAULT_LOG_ROOT, _pla
 
 from squadopt.application import UI_VIEW_SCHEMA_PATH, build_site, write_ui_view_schema
 from squadopt.data.errors import DataError
+from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.live import LedgerError
 from squadopt.live.tick import TickConfig
 
@@ -36,6 +37,9 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--out", type=Path, default=REPOSITORY_ROOT / "web" / "public")
     parser.add_argument("--now", help="pretend it is this UTC instant (replay / tests)")
     parser.add_argument("--no-status", action="store_true", help="skip the tick plan / status.json")
+    parser.add_argument(
+        "--no-league", action="store_true", help="skip league.json (no capture is read)"
+    )
     parser.add_argument(
         "--schema-only", action="store_true", help=f"only (re)write {UI_VIEW_SCHEMA_PATH}"
     )
@@ -68,12 +72,18 @@ def main() -> int:
         if season is None:
             print("Season could not be inferred; pass --season.")
             return 1
+        snapshot = None
+        if not arguments.no_league:
+            identifiers = list_snapshot_ids(arguments.snapshot_root)
+            if identifiers:
+                snapshot = read_snapshot(arguments.snapshot_root, identifiers[-1])
         report = build_site(
             ledger_root=arguments.ledger_root,
             season=str(season),
             out_dir=arguments.out,
             plan=plan,
             runlog_root=arguments.log_root,
+            snapshot=snapshot,
             now=datetime.fromisoformat(now_utc.replace("Z", "+00:00")),
         )
     except (DataError, LedgerError) as error:
@@ -83,6 +93,7 @@ def main() -> int:
         f"Wrote {len(report.files)} files under {report.out_dir / 'data'} for {report.season}: "
         f"gameweeks {list(report.decided_gameweeks)} (settled {list(report.settled_gameweeks)})"
         f"{'; status.json' if report.status_written else ''}"
+        f"{'; league.json' if report.league_written else ''}"
     )
     write_ui_view_schema()
     return 0

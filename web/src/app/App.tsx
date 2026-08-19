@@ -5,14 +5,17 @@ import { BrowserRouter, Route, Routes } from "react-router";
 import { EmptyState } from "../design/components/EmptyState";
 import { PageShell } from "../design/components/PageShell";
 
-const ThisWeekPage = lazy(() =>
-  import("../features/this-week/pages/ThisWeekPage").then((m) => ({ default: m.ThisWeekPage })),
+const SquadPage = lazy(() =>
+  import("../features/squad/pages/SquadPage").then((m) => ({ default: m.SquadPage })),
 );
-const HistoryPage = lazy(() =>
-  import("../features/history/pages/HistoryPage").then((m) => ({ default: m.HistoryPage })),
+const MovesPage = lazy(() =>
+  import("../features/moves/pages/MovesPage").then((m) => ({ default: m.MovesPage })),
 );
-const WhyPage = lazy(() =>
-  import("../features/why/pages/WhyPage").then((m) => ({ default: m.WhyPage })),
+const RivalsPage = lazy(() =>
+  import("../features/rivals/pages/RivalsPage").then((m) => ({ default: m.RivalsPage })),
+);
+const LeaguePage = lazy(() =>
+  import("../features/league/pages/LeaguePage").then((m) => ({ default: m.LeaguePage })),
 );
 const StatusPage = lazy(() =>
   import("../features/status/pages/StatusPage").then((m) => ({ default: m.StatusPage })),
@@ -29,10 +32,13 @@ export function App({ basename = import.meta.env.BASE_URL }: { basename?: string
         <PageShell>
           <Suspense fallback={<EmptyState title="Loading…" />}>
             <Routes>
-              <Route path="/" element={<ThisWeekPage />} />
-              <Route path="/gw/:season/:gameweek" element={<ThisWeekPage />} />
-              <Route path="/why/:season/:gameweek" element={<WhyPage />} />
-              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/" element={<SquadPage />} />
+              <Route path="/gw/:season/:gameweek" element={<SquadPage />} />
+              <Route path="/moves" element={<MovesPage />} />
+              <Route path="/moves/:season/:gameweek" element={<MovesPage />} />
+              <Route path="/rivals" element={<RivalsPage />} />
+              <Route path="/rivals/:season/:gameweek" element={<RivalsPage />} />
+              <Route path="/league" element={<LeaguePage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="*" element={<EmptyState title="There is no page here." />} />
             </Routes>

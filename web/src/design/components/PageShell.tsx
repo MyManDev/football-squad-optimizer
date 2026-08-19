@@ -5,9 +5,10 @@ import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
 const NAV = [
-  { to: "/", label: "This week", end: true },
-  { to: "/history", label: "History", end: false },
-  { to: "/status", label: "Status", end: false },
+  { to: "/", label: "Squad", end: true },
+  { to: "/moves", label: "Suggested moves", end: false },
+  { to: "/rivals", label: "Rivals", end: false },
+  { to: "/league", label: "League", end: false },
 ];
 
 export function PageShell({ children }: { children: ReactNode }) {
@@ -39,8 +40,13 @@ export function PageShell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <footer className={styles.footer}>
-        Every number on these pages was produced by the SquadOpt live path and frozen in its ledger;
-        the page renders, it does not compute.
+        <span>
+          Every number on these pages was produced by the SquadOpt live path and frozen in its
+          ledger; the page renders, it does not compute.
+        </span>
+        <NavLink to="/status" className={styles.footerLink}>
+          Operations status
+        </NavLink>
       </footer>
     </div>
   );

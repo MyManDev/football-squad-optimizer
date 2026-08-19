@@ -206,6 +206,46 @@ def ui_view_schema() -> dict[str, Any]:
             "chips_played": _array(_STR),
         }
     )
+    league_week = _obj(
+        {
+            "gameweek": _INT,
+            "deadline_utc": _STR,
+            "finished": _BOOL,
+            "average_entry_score": _nullable(_NUM),
+            "highest_score": _nullable(_NUM),
+            "our_projected_score": _nullable(_NUM),
+            "our_realized_score": _nullable(_NUM),
+            "our_realized_net_score": _nullable(_NUM),
+            "difference_to_average": _nullable(_NUM),
+        }
+    )
+    ownership = _obj(
+        {
+            "gameweek": _INT,
+            "squad": _array(_ref("PlayerView")),
+            "ownership_percent": {"type": "object", "additionalProperties": _NUM},
+            "mean_starter_ownership": _NUM,
+            "effective_ownership": _NUM,
+            "differentials": _array(_INT),
+            "differential_threshold_percent": _NUM,
+            "most_owned_starter": _nullable(_INT),
+            "least_owned_starter": _nullable(_INT),
+        }
+    )
+    league = _obj(
+        {
+            "season": _STR,
+            "source_snapshot_id": _STR,
+            "captured_at_utc": _STR,
+            "weeks": _array(_ref("LeagueWeekView")),
+            "scored_gameweeks": _INT,
+            "our_total_realized_net_score": _nullable(_NUM),
+            "league_total_average_score": _nullable(_NUM),
+            "total_difference_to_average": _nullable(_NUM),
+            "ownership": _nullable(_ref("OwnershipView")),
+            "verdict": _STR,
+        }
+    )
     tick_action = _obj(
         {
             "kind": {"type": "string", "enum": ["capture", "decide", "settle", "wait"]},
@@ -254,6 +294,7 @@ def ui_view_schema() -> dict[str, Any]:
                 "oneOf": [
                     _ref("RecommendationView"),
                     _ref("PoolView"),
+                    _ref("LeagueView"),
                     _ref("LedgerView"),
                     _ref("StatusView"),
                     _ref("SiteIndex"),
@@ -280,6 +321,9 @@ def ui_view_schema() -> dict[str, Any]:
             "RecommendationView": recommendation,
             "LedgerRowView": ledger_row,
             "LedgerView": ledger,
+            "LeagueWeekView": league_week,
+            "OwnershipView": ownership,
+            "LeagueView": league,
             "TickActionView": tick_action,
             "RunLogEventView": run_log_event,
             "StatusView": status,

@@ -1,5 +1,13 @@
-/* SquadOpt design tokens — direction B "Ledger" (light-first, one teal accent).
-   Every colour a component uses is a token; the dark palette redefines tokens only. */
+/* SquadOpt design tokens.
+
+   Colour comes from direction A "Matchday" — pitch night, one gold accent — and the data
+   craft from direction B "Ledger": typographic tables, hairline rules, restrained charts.
+   Dark is the design's home; the light variant keeps the same roles with a warm off-white
+   ground and a darkened gold that clears 4.5:1 on white.
+
+   Gold is spent once per screen (the captain badge, the active nav pill, the realized line).
+   Semantic colours are separate from it, and every colour is defined on bare :root first so a
+   viewer with no explicit choice still gets a complete palette. */
 
 :root {
   --font-display: "Newsreader", Georgia, "Times New Roman", serif;
@@ -22,76 +30,77 @@
   --space-7: 48px;
 
   --radius-s: 6px;
-  --radius-m: 8px;
+  --radius-m: 10px;
   --radius-pill: 999px;
 
-  --color-bg: #f6f7f5;
-  --color-surface: #ffffff;
-  --color-surface-2: #eef1ee;
-  --color-line: #d9dfda;
-  --color-text: #182320;
-  --color-text-muted: #5f6b66;
-  --color-text-faint: #8a948f;
-  --color-accent: #0f766e;
-  --color-accent-text: #ffffff;
-  --color-pitch: #e6efe9;
-  --color-pitch-line: #c8d8cf;
-  --color-chip: #ffffff;
-  --color-chip-text: #182320;
-  --color-chip-muted: #6b7772;
-  --color-good: #1f7a4d;
-  --color-warn: #a16207;
-  --color-bad: #b42318;
-  --color-focus: #0f766e;
+  /* Dark: the design's home. */
+  --color-bg: #0e1f18;
+  --color-surface: #15291f;
+  --color-surface-2: #1b3327;
+  --color-line: #27453a;
+  --color-text: #eef4ef;
+  --color-text-muted: #9fb5a8;
+  --color-text-faint: #6f8a7c;
+  --color-accent: #f2c14e;
+  --color-accent-text: #17210f;
+  --color-pitch: #123c2b;
+  --color-pitch-line: #1f5a41;
+  --color-chip: #e9f2ec;
+  --color-chip-text: #0f2419;
+  --color-chip-muted: #4b6a5b;
+  --color-good: #6fcf97;
+  --color-warn: #f2c14e;
+  --color-bad: #ef7a6d;
+  --color-focus: #f2c14e;
 
-  --shadow-1: 0 1px 0 rgba(24, 35, 32, 0.08);
+  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.35);
   --measure: 62ch;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --color-bg: #121715;
-    --color-surface: #182019;
-    --color-surface-2: #1f2a23;
-    --color-line: #2c3a31;
-    --color-text: #e8efe9;
-    --color-text-muted: #a3b3aa;
-    --color-text-faint: #7d8c84;
-    --color-accent: #4fd1c5;
-    --color-accent-text: #0b1a17;
-    --color-pitch: #16281f;
-    --color-pitch-line: #244635;
-    --color-chip: #1f2a23;
-    --color-chip-text: #e8efe9;
-    --color-chip-muted: #93a49b;
-    --color-good: #5ec98f;
-    --color-warn: #e0b04a;
-    --color-bad: #f0796d;
-    --color-focus: #4fd1c5;
-    --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.35);
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-bg: #f4f6f2;
+    --color-surface: #ffffff;
+    --color-surface-2: #e9efe9;
+    --color-line: #d3dcd4;
+    --color-text: #12241c;
+    --color-text-muted: #546b5e;
+    --color-text-faint: #7d9186;
+    --color-accent: #8a6a12;
+    --color-accent-text: #ffffff;
+    --color-pitch: #dfeadf;
+    --color-pitch-line: #c2d4c6;
+    --color-chip: #ffffff;
+    --color-chip-text: #12241c;
+    --color-chip-muted: #5f7568;
+    --color-good: #1f7a4d;
+    --color-warn: #8a6a12;
+    --color-bad: #b42318;
+    --color-focus: #12241c;
+    --shadow-1: 0 1px 0 rgba(18, 36, 28, 0.1);
   }
 }
 
-:root[data-theme="dark"] {
-  --color-bg: #121715;
-  --color-surface: #182019;
-  --color-surface-2: #1f2a23;
-  --color-line: #2c3a31;
-  --color-text: #e8efe9;
-  --color-text-muted: #a3b3aa;
-  --color-text-faint: #7d8c84;
-  --color-accent: #4fd1c5;
-  --color-accent-text: #0b1a17;
-  --color-pitch: #16281f;
-  --color-pitch-line: #244635;
-  --color-chip: #1f2a23;
-  --color-chip-text: #e8efe9;
-  --color-chip-muted: #93a49b;
-  --color-good: #5ec98f;
-  --color-warn: #e0b04a;
-  --color-bad: #f0796d;
-  --color-focus: #4fd1c5;
-  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.35);
+:root[data-theme="light"] {
+  --color-bg: #f4f6f2;
+  --color-surface: #ffffff;
+  --color-surface-2: #e9efe9;
+  --color-line: #d3dcd4;
+  --color-text: #12241c;
+  --color-text-muted: #546b5e;
+  --color-text-faint: #7d9186;
+  --color-accent: #8a6a12;
+  --color-accent-text: #ffffff;
+  --color-pitch: #dfeadf;
+  --color-pitch-line: #c2d4c6;
+  --color-chip: #ffffff;
+  --color-chip-text: #12241c;
+  --color-chip-muted: #5f7568;
+  --color-good: #1f7a4d;
+  --color-warn: #8a6a12;
+  --color-bad: #b42318;
+  --color-focus: #12241c;
+  --shadow-1: 0 1px 0 rgba(18, 36, 28, 0.1);
 }
 
 *,
@@ -101,7 +110,7 @@
 }
 
 html {
-  color-scheme: light dark;
+  color-scheme: dark light;
 }
 
 body {

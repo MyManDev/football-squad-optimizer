@@ -192,6 +192,42 @@ tick to a scheduler (GitHub Actions cron, a small host) is the CI/app side's ste
 ledger and captures stay local by design, so a scheduled runner needs its own private
 persistence for them.
 
+### Running a deadline by hand
+
+Until a scheduler exists, one person runs the tick about two hours before the deadline,
+from a checkout of the release tag the season runs from (`main`, tagged
+`v2026-27.gw01` for the opening):
+
+```powershell
+.venv\Scripts\python -m scripts.run_season_tick --dry-run   # read the plan first
+.venv\Scripts\python -m scripts.run_season_tick             # then do what is due
+```
+
+A healthy opening looks like this: the dry run says `-> capture GW1: gameweek 1 deadline
+in 2.0 h and no capture from inside the window is held`; the real run captures,
+re-plans, decides, prints the report, and ends `tick done: 2 action(s) performed`. A
+second run in the same state does nothing and says so. If it prints `wait`, read the
+reason — a decided gameweek waits for its outcome, and a gameweek 2 onward waits for the
+producer's handoff, naming the path it expects.
+
+Afterwards, three things are true and worth checking: `data/ledger/<season>/gw<NN>/`
+holds `decision.json`, `projections.csv`, `report.txt` and `manifest.json`;
+`data/logs/season_tick/<date>.jsonl` ends with `tick.done`; and the exit code was 0.
+
+### After a decision: refresh the site
+
+The web app renders a generated JSON tree, not the ledger itself, so a new decision is
+not visible until the tree is rebuilt:
+
+```powershell
+.venv\Scripts\python -m scripts.build_site --season 2026-27 --out web\public
+git add web/public/data && git commit -m "site: gameweek NN"
+```
+
+`web/public/data` is generated (about 50 KB): regenerate it, never edit it. Everything
+it contains comes from the frozen ledger entry and the capture the tick used, so the
+site can say nothing the decision did not.
+
 ## Contingencies
 
 - **Source unreachable near the deadline:** use the latest good capture; the report's

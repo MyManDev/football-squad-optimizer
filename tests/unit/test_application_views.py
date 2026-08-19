@@ -196,10 +196,20 @@ def test_build_site_writes_a_deterministic_validated_tree(
     now = datetime(2026, 8, 21, 15, 31, tzinfo=UTC)
 
     first = build_site(
-        ledger_root=root, season=SEASON, out_dir=tmp_path / "one", plan=plan, now=now
+        ledger_root=root,
+        season=SEASON,
+        out_dir=tmp_path / "one",
+        plan=plan,
+        snapshot=snapshot,
+        now=now,
     )
     second = build_site(
-        ledger_root=root, season=SEASON, out_dir=tmp_path / "two", plan=plan, now=now
+        ledger_root=root,
+        season=SEASON,
+        out_dir=tmp_path / "two",
+        plan=plan,
+        snapshot=snapshot,
+        now=now,
     )
 
     assert first.files == second.files
@@ -208,6 +218,7 @@ def test_build_site_writes_a_deterministic_validated_tree(
         f"{SEASON}/gw01/recommendation.json",
         f"{SEASON}/gw01/pool.json",
         f"{SEASON}/ledger.json",
+        f"{SEASON}/league.json",
         f"{SEASON}/status.json",
         f"schema/{UI_VIEW_CONTRACT_VERSION}.schema.json",
     }
@@ -235,6 +246,7 @@ def test_build_site_writes_a_deterministic_validated_tree(
     }
     assert index["gameweeks"] == {SEASON: [1]}
     assert first.status_written is True and first.decided_gameweeks == (1,)
+    assert first.league_written is True
     # No leftover temporary files from the atomic writes.
     assert not [p for p in (tmp_path / "one").rglob(".*.tmp-*")]
 
