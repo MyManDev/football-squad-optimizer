@@ -204,7 +204,8 @@ def main() -> int:
             ],
             ignore_index=True,
         )
-        enriched = attach_fixture_features(table, fixtures, team_codes)
+        # "omit": fixture-group conformal splits on the count, not on difficulty.
+        enriched = attach_fixture_features(table, fixtures, team_codes, unproven_difficulty="omit")
         config = FixtureGroupConformalConfig(
             confidence_level=arguments.confidence_level,
             calibration_fold_fraction=arguments.calibration_fold_fraction,
