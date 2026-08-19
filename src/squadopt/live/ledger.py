@@ -25,6 +25,7 @@ landed is completed on the next call rather than refused.
 import contextlib
 import hashlib
 import json
+import logging
 import math
 import os
 import secrets
@@ -45,6 +46,7 @@ from squadopt.live.report import Recommendation
 from squadopt.live.transfers import FREE_TRANSFERS_AFTER_OPENING, HeldSquad
 
 SEASON_LEDGER_CONTRACT_VERSION: Final = "season_ledger_v1"
+LOGGER = logging.getLogger(__name__)
 _DECISION_FILE: Final = "decision.json"
 _PROJECTIONS_FILE: Final = "projections.csv"
 _REPORT_FILE: Final = "report.txt"
@@ -263,6 +265,17 @@ def record_decision(
         except BaseException:
             shutil.rmtree(staging, ignore_errors=True)
             raise
+    LOGGER.info(
+        "ledger.decision.recorded",
+        extra={
+            "fields": {
+                "season": recommendation.season,
+                "gameweek": recommendation.gameweek,
+                "snapshot_id": recommendation.snapshot_id,
+                "directory": directory.as_posix(),
+            }
+        },
+    )
     return directory
 
 
@@ -395,6 +408,17 @@ def record_outcome(
             (json.dumps(outcome, indent=2, sort_keys=True) + "\n").encode("utf-8"),
         )
         _write_manifest(directory)
+    LOGGER.info(
+        "ledger.outcome.recorded",
+        extra={
+            "fields": {
+                "season": season,
+                "gameweek": gameweek,
+                "source_snapshot_id": source_snapshot_id,
+                "realized_net_score": realized_xi - hit_points,
+            }
+        },
+    )
     return outcome_path
 
 

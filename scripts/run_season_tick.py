@@ -39,6 +39,7 @@ from scripts.capture_deadline_snapshot import capture as capture_snapshot
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.live import LedgerError, infer_season, load_ledger
+from squadopt.live.runlog import RunLog, configure_run_logging
 from squadopt.live.tick import (
     HeldSnapshot,
     LedgerState,
@@ -53,6 +54,10 @@ DEFAULT_SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
 DEFAULT_LEDGER_ROOT = REPOSITORY_ROOT / "data" / "ledger"
 DEFAULT_ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
 DEFAULT_HANDOFF_ROOT = REPOSITORY_ROOT / "data" / "handoffs"
+DEFAULT_LOG_ROOT = REPOSITORY_ROOT / "data" / "logs"
+EXIT_OK = 0
+EXIT_KNOWN_FAILURE = 1
+EXIT_UNEXPECTED_FAILURE = 2
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -67,6 +72,13 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--settle-grace-hours", type=float, default=48.0)
     parser.add_argument("--settle-recapture-hours", type=float, default=12.0)
     parser.add_argument("--dry-run", action="store_true", help="print the plan; change nothing")
+    parser.add_argument(
+        "--log-root",
+        type=Path,
+        default=DEFAULT_LOG_ROOT,
+        help="structured JSON-lines run log root (data/logs/season_tick/<date>.jsonl); "
+        "'-' disables the file",
+    )
     parser.add_argument(
         "--summary-output",
         type=Path,
@@ -109,14 +121,32 @@ def _plan(arguments: argparse.Namespace, now_utc: str, config: TickConfig) -> Ti
     )
 
 
-def _print_plan(plan: TickPlan) -> None:
+_PLAN_KEYS = ("latest_capture", "next_gameweek", "next_deadline_utc", "hours_to_deadline")
+
+
+def _print_plan(plan: TickPlan, log: RunLog) -> None:
     print(f"tick at {plan.now_utc} (season {plan.season or 'unknown'})")
-    for key in ("latest_capture", "next_gameweek", "next_deadline_utc", "hours_to_deadline"):
+    for key in _PLAN_KEYS:
         if key in plan.diagnostics:
             print(f"  {key:<20} {plan.diagnostics[key]}")
     for action in plan.actions:
         target = f" GW{action.gameweek}" if action.gameweek is not None else ""
         print(f"  -> {action.kind}{target}: {action.reason}")
+    log.event(
+        "tick.plan",
+        now_utc=plan.now_utc,
+        season=plan.season,
+        actions=[
+            {
+                "kind": action.kind,
+                "gameweek": action.gameweek,
+                "snapshot_id": action.snapshot_id,
+                "reason": action.reason,
+            }
+            for action in plan.actions
+        ],
+        diagnostics={key: plan.diagnostics[key] for key in _PLAN_KEYS if key in plan.diagnostics},
+    )
 
 
 def _execute(action: TickAction, arguments: argparse.Namespace, season: str | None) -> int:
@@ -163,40 +193,66 @@ def main() -> int:
     now_utc = arguments.now or datetime.now(UTC).replace(microsecond=0).isoformat().replace(
         "+00:00", "Z"
     )
+    log_root = None if str(arguments.log_root) == "-" else Path(arguments.log_root)
+    log = configure_run_logging("season_tick", log_root=log_root, console=False)
     config = TickConfig(
         capture_window_hours=arguments.capture_window_hours,
         settle_grace_hours=arguments.settle_grace_hours,
         settle_recapture_hours=arguments.settle_recapture_hours,
     )
+    log.event("tick.start", now_utc=now_utc, dry_run=bool(arguments.dry_run))
+    performed = 0
     try:
         plan = _plan(arguments, now_utc, config)
-        _print_plan(plan)
+        _print_plan(plan, log)
         if arguments.dry_run:
             print("dry run: nothing changed")
-            return 0
-        performed = 0
+            log.event("tick.done", performed=0, dry_run=True, exit_code=EXIT_OK)
+            return EXIT_OK
         if plan.wants_capture:
             for action in plan.actions:
                 if action.kind == "capture":
+                    log.event("tick.action.start", kind=action.kind)
                     _execute(action, arguments, plan.season)
+                    log.event("tick.action.done", kind=action.kind)
                     performed += 1
             # A capture changes what is due: re-plan once so this tick can decide or
             # settle from what it just captured (a second capture is never taken).
             plan = _plan(arguments, now_utc, config)
             print("re-planned after capture:")
-            _print_plan(plan)
+            _print_plan(plan, log)
         for action in plan.actions:
             if action.kind in {"decide", "settle"}:
+                log.event(
+                    "tick.action.start",
+                    kind=action.kind,
+                    gameweek=action.gameweek,
+                    snapshot_id=action.snapshot_id,
+                )
                 code = _execute(action, arguments, plan.season)
                 if code != 0:
                     print(f"{action.kind} for GW{action.gameweek} failed; stopping this tick.")
+                    log.event(
+                        "tick.action.failed",
+                        kind=action.kind,
+                        gameweek=action.gameweek,
+                        exit_code=code,
+                    )
+                    log.event("tick.done", performed=performed, exit_code=code)
                     return code
+                log.event("tick.action.done", kind=action.kind, gameweek=action.gameweek)
                 performed += 1
     except (DataError, LedgerError) as error:
         print(f"\nSeason tick failed:\n  {error}")
-        return 1
+        log.failure("tick.failed", performed=performed, error=str(error))
+        return EXIT_KNOWN_FAILURE
+    except Exception as error:  # a scheduled tick must never die silently
+        print(f"\nSeason tick crashed:\n  {type(error).__name__}: {error}")
+        log.failure("tick.crashed", performed=performed, error=str(error))
+        return EXIT_UNEXPECTED_FAILURE
     print(f"tick done: {performed} action(s) performed")
-    return 0
+    log.event("tick.done", performed=performed, exit_code=EXIT_OK)
+    return EXIT_OK
 
 
 if __name__ == "__main__":

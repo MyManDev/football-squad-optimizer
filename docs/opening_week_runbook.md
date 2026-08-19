@@ -177,6 +177,16 @@ step is the same code as the manual commands; the tick only chooses the moment. 
 never plays a chip: run `run_gameweek_ops --phase decide --chip ...` by hand before the
 tick would decide, and the tick then finds the decision recorded.
 
+Every tick writes a structured run log — one JSON object per event (`tick.start`,
+`tick.plan`, `tick.action.start/done/failed`, `ledger.decision.recorded`,
+`ledger.outcome.recorded`, `tick.done`, or `tick.failed` / `tick.crashed` with the
+traceback), tagged with a `run_id` — appended to `data/logs/season_tick/<date>.jsonl`
+(`--log-root`, `-` disables the file). Exit codes: 0 done, 1 a known failure (data or
+ledger error, stated), 2 an unexpected crash (never silent). Ledger writes are
+crash-safe (staging directory, verified, one rename) and one writer per gameweek is
+enforced with a lock file, so a tick that dies mid-write leaves nothing a later tick
+refuses.
+
 A missed deadline (closed with no decision) is reported, not decided late. Wiring the
 tick to a scheduler (GitHub Actions cron, a small host) is the CI/app side's step; the
 ledger and captures stay local by design, so a scheduled runner needs its own private
