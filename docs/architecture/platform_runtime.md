@@ -65,10 +65,12 @@ Infrastructure dependencies stop at the platform boundary:
 
 ## The application seam today
 
-`squadopt.application` exists. Its current public surface turns frozen live records into
-`ui_view_v1` view models and writes the deterministic static JSON tree consumed by the web
-frontend. It is the first application-layer pilot, not yet a complete service API for every
-operation.
+`squadopt.application` exposes transport-neutral `DecideRequest`, `SettleRequest`, and
+`TickRequest` commands with typed results, alongside the `ui_view_v1` read models and the
+deterministic static JSON tree consumed by the web frontend. Decision verification and the
+capture/decide/settle lifecycle therefore have one implementation shared by script shells and
+future CLI, HTTP, and worker adapters. Network capture remains an injected entry-point
+dependency; the application package does not perform HTTP transport itself.
 
 The platform consumes this implementation; it does not rewrite it. In particular:
 
