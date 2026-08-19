@@ -58,13 +58,37 @@ def ui_view_schema() -> dict[str, Any]:
         {
             "player_id": _INT,
             "name": _STR,
+            "short_name": _STR,
             "team": _STR,
             "position": {"type": "string", "enum": ["GK", "DEF", "MID", "FWD", "UNK"]},
             "price_tenths": _INT,
             "expected_points": _NUM,
-            "role": {"type": "string", "enum": ["starter", "bench", "out", "in"]},
+            "role": {"type": "string", "enum": ["starter", "bench", "out", "in", "pool"]},
             "is_captain": _BOOL,
             "bench_order": _nullable(_INT),
+        }
+    )
+    pool_player = _obj(
+        {
+            "player_id": _INT,
+            "name": _STR,
+            "short_name": _STR,
+            "team": _STR,
+            "position": {"type": "string", "enum": ["GK", "DEF", "MID", "FWD"]},
+            "price_tenths": _INT,
+            "expected_points": _NUM,
+            "rank_in_position": _INT,
+            "selected": _BOOL,
+            "role": {"type": "string", "enum": ["starter", "bench", "pool"]},
+        }
+    )
+    pool = _obj(
+        {
+            "season": _STR,
+            "gameweek": _INT,
+            "pool_size": _INT,
+            "per_position": _INT,
+            "players": _array(_ref("PoolPlayerView")),
         }
     )
     transfer = _obj(
@@ -163,6 +187,8 @@ def ui_view_schema() -> dict[str, Any]:
             "chip": _nullable(_STR),
             "unavailable_player_count": _INT,
             "settled": _BOOL,
+            "cumulative_projected_score": _NUM,
+            "cumulative_realized_score": _nullable(_NUM),
         }
     )
     ledger = _obj(
@@ -227,6 +253,7 @@ def ui_view_schema() -> dict[str, Any]:
             "payload": {
                 "oneOf": [
                     _ref("RecommendationView"),
+                    _ref("PoolView"),
                     _ref("LedgerView"),
                     _ref("StatusView"),
                     _ref("SiteIndex"),
@@ -245,6 +272,8 @@ def ui_view_schema() -> dict[str, Any]:
         ),
         "$defs": {
             "PlayerView": player,
+            "PoolPlayerView": pool_player,
+            "PoolView": pool,
             "TransferView": transfer,
             "RivalComparisonView": rival,
             "RiskView": risk,

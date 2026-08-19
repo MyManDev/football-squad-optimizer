@@ -9,6 +9,7 @@ agree with the ledger path on everything the ledger stores.
 
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
@@ -18,6 +19,8 @@ from squadopt.application.views import (
     LedgerRowView,
     LedgerView,
     PlayerView,
+    PoolPlayerView,
+    PoolView,
     RecommendationView,
     RiskView,
     RivalComparisonView,
@@ -28,6 +31,7 @@ from squadopt.application.views import (
     ViewError,
     jsonable,
     positions_in_order,
+    short_name,
 )
 from squadopt.live.ledger import LedgerEntry, load_ledger
 from squadopt.live.report import Recommendation
@@ -100,6 +104,7 @@ def _player(
         return PlayerView(
             player_id=int(player_id),
             name=f"player {int(player_id)}",
+            short_name=f"#{int(player_id)}",
             team="",
             position=_UNKNOWN_POSITION,
             price_tenths=int(price_override or 0),
@@ -111,6 +116,7 @@ def _player(
     return PlayerView(
         player_id=int(player_id),
         name=str(row["name"]),
+        short_name=short_name(str(row["name"])),
         team=str(row["team_id"]),
         position=str(row["position"]),
         price_tenths=(
@@ -377,6 +383,8 @@ def _ledger_row(entry: LedgerEntry) -> LedgerRowView:
     projected = float(str(decision["projected_score"]))
     realized = None if outcome is None else float(str(outcome["realized_xi_score"]))
     return LedgerRowView(
+        cumulative_projected_score=0.0,
+        cumulative_realized_score=None,
         gameweek=int(str(decision["gameweek"])),
         snapshot_id=str(decision["snapshot_id"]),
         deadline_utc=str(decision["deadline_utc"]),
@@ -399,11 +407,25 @@ def ledger_view(root: Path, season: str) -> LedgerView:
     """Every recorded gameweek of a season, verified, with the season totals."""
 
     entries = load_ledger(root, season)
-    rows = tuple(_ledger_row(entry) for entry in entries)
+    rows: list[LedgerRowView] = []
+    projected_so_far = 0.0
+    realized_so_far: float | None = None
+    for entry in entries:
+        row = _ledger_row(entry)
+        projected_so_far += row.projected_score
+        if row.realized_score is not None:
+            realized_so_far = (realized_so_far or 0.0) + row.realized_score
+        rows.append(
+            replace(
+                row,
+                cumulative_projected_score=projected_so_far,
+                cumulative_realized_score=realized_so_far,
+            )
+        )
     settled = [row for row in rows if row.settled]
     return LedgerView(
         season=season,
-        rows=rows,
+        rows=tuple(rows),
         decided_gameweeks=len(rows),
         settled_gameweeks=len(settled),
         total_projected_score=float(sum(row.projected_score for row in rows)),
@@ -511,9 +533,53 @@ def status_view(
     )
 
 
+def pool_view(
+    entry: LedgerEntry, projections: pd.DataFrame | None = None, *, per_position: int = 12
+) -> PoolView:
+    """The top of the projected pool per position, with the frozen squad marked."""
+
+    decision = dict(entry.decision)
+    if projections is None:
+        projections = pd.read_csv(entry.directory / _PROJECTIONS_FILE)
+    index = _player_index(projections)
+    starters = set(_ints(decision["starting_xi_player_ids"]))
+    bench = set(_ints(decision["bench_player_ids"]))
+    players: list[PoolPlayerView] = []
+    for position in ("GK", "DEF", "MID", "FWD"):
+        rows = sorted(
+            (row for row in index.values() if str(row["position"]) == position),
+            key=lambda r: (-float(str(r["expected_points"])), int(str(r["player_id"]))),
+        )
+        for rank, row in enumerate(rows[:per_position], 1):
+            player_id = int(str(row["player_id"]))
+            role = "starter" if player_id in starters else "bench" if player_id in bench else "pool"
+            players.append(
+                PoolPlayerView(
+                    player_id=player_id,
+                    name=str(row["name"]),
+                    short_name=short_name(str(row["name"])),
+                    team=str(row["team_id"]),
+                    position=position,
+                    price_tenths=int(str(row["price_tenths"])),
+                    expected_points=float(str(row["expected_points"])),
+                    rank_in_position=rank,
+                    selected=player_id in starters or player_id in bench,
+                    role=role,
+                )
+            )
+    return PoolView(
+        season=str(decision["season"]),
+        gameweek=int(str(decision["gameweek"])),
+        pool_size=len(index),
+        per_position=per_position,
+        players=tuple(players),
+    )
+
+
 __all__ = [
     "JsonValue",
     "ledger_view",
+    "pool_view",
     "recommendation_view",
     "recommendation_view_from_ledger",
     "status_view",

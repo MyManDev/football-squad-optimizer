@@ -12,6 +12,15 @@
             "null"
           ]
         },
+        "cumulative_projected_score": {
+          "type": "number"
+        },
+        "cumulative_realized_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "deadline_utc": {
           "type": "string"
         },
@@ -68,6 +77,8 @@
       "required": [
         "captain_player_id",
         "chip",
+        "cumulative_projected_score",
+        "cumulative_realized_score",
         "deadline_utc",
         "decision_kind",
         "gameweek",
@@ -193,8 +204,12 @@
             "starter",
             "bench",
             "out",
-            "in"
+            "in",
+            "pool"
           ],
+          "type": "string"
+        },
+        "short_name": {
           "type": "string"
         },
         "team": {
@@ -210,7 +225,98 @@
         "position",
         "price_tenths",
         "role",
+        "short_name",
         "team"
+      ],
+      "type": "object"
+    },
+    "PoolPlayerView": {
+      "additionalProperties": false,
+      "properties": {
+        "expected_points": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "player_id": {
+          "type": "integer"
+        },
+        "position": {
+          "enum": [
+            "GK",
+            "DEF",
+            "MID",
+            "FWD"
+          ],
+          "type": "string"
+        },
+        "price_tenths": {
+          "type": "integer"
+        },
+        "rank_in_position": {
+          "type": "integer"
+        },
+        "role": {
+          "enum": [
+            "starter",
+            "bench",
+            "pool"
+          ],
+          "type": "string"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "short_name": {
+          "type": "string"
+        },
+        "team": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "expected_points",
+        "name",
+        "player_id",
+        "position",
+        "price_tenths",
+        "rank_in_position",
+        "role",
+        "selected",
+        "short_name",
+        "team"
+      ],
+      "type": "object"
+    },
+    "PoolView": {
+      "additionalProperties": false,
+      "properties": {
+        "gameweek": {
+          "type": "integer"
+        },
+        "per_position": {
+          "type": "integer"
+        },
+        "players": {
+          "items": {
+            "$ref": "#/$defs/PoolPlayerView"
+          },
+          "type": "array"
+        },
+        "pool_size": {
+          "type": "integer"
+        },
+        "season": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "gameweek",
+        "per_position",
+        "players",
+        "pool_size",
+        "season"
       ],
       "type": "object"
     },
@@ -827,6 +933,9 @@
               "$ref": "#/$defs/RecommendationView"
             },
             {
+              "$ref": "#/$defs/PoolView"
+            },
+            {
               "$ref": "#/$defs/LedgerView"
             },
             {
@@ -862,6 +971,9 @@
       "oneOf": [
         {
           "$ref": "#/$defs/RecommendationView"
+        },
+        {
+          "$ref": "#/$defs/PoolView"
         },
         {
           "$ref": "#/$defs/LedgerView"

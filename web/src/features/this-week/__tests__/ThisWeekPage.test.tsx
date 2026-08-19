@@ -23,6 +23,9 @@ const client: DataClient = {
     }
     throw new NotFoundError(`${season}/gw${gameweek}`);
   },
+  getPool: async () => {
+    throw new Error("not used");
+  },
   getLedger: async () => {
     throw new Error("not used");
   },
