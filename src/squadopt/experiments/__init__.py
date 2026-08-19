@@ -102,6 +102,12 @@ from squadopt.experiments.scenario_policy_objective import (
     ScenarioPolicyObjective,
     ScenarioPolicyObjectiveConfig,
 )
+from squadopt.experiments.schedule_signal import (
+    SCHEDULE_SIGNAL_STUDY_CONTRACT_VERSION,
+    ScheduleSignalConfig,
+    ScheduleSignalStudy,
+    run_schedule_signal_study,
+)
 from squadopt.experiments.season_chain import (
     CHIP_POLICIES,
     SEASON_CHAIN_CONTRACT_VERSION,
@@ -150,6 +156,7 @@ __all__ = [
     "SCENARIO_AUDIT_CONTRACT_VERSION",
     "SCENARIO_POLICY_FACTOR_NAMES",
     "SCENARIO_POLICY_OBJECTIVE_CONTRACT_VERSION",
+    "SCHEDULE_SIGNAL_STUDY_CONTRACT_VERSION",
     "SCREENING_EXPERIMENT_CONTRACT_VERSION",
     "SEASON_CHAIN_CONTRACT_VERSION",
     "SELECTION_OPTIMISM_CONTRACT_VERSION",
@@ -188,6 +195,8 @@ __all__ = [
     "ScenarioFoldContext",
     "ScenarioPolicyObjective",
     "ScenarioPolicyObjectiveConfig",
+    "ScheduleSignalConfig",
+    "ScheduleSignalStudy",
     "ScreeningExperimentConfig",
     "ScreeningExperimentResult",
     "SeasonChain",
@@ -214,6 +223,7 @@ __all__ = [
     "rehearse_rank_objective",
     "run_frozen_holdout",
     "run_opening_newcomer_study",
+    "run_schedule_signal_study",
     "run_screening_experiment",
     "run_team_rating_study",
     "screening_result_to_dict",
