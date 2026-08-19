@@ -5,6 +5,7 @@
     data/<season>/status.json                    StatusView (when a plan is supplied)
     data/<season>/ledger.json                    LedgerView
     data/<season>/gw<NN>/recommendation.json     RecommendationView
+    data/<season>/gw<NN>/pool.json               PoolView (why these players)
 
 Every file is a ``ViewEnvelope``; the tree is deterministic for a given ledger and clock
 (sorted keys, fixed indent, LF line ends) and each file lands through a temporary file
@@ -19,7 +20,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from squadopt.application.build import ledger_view, recommendation_view_from_ledger, status_view
+from squadopt.application.build import (
+    ledger_view,
+    pool_view,
+    recommendation_view_from_ledger,
+    status_view,
+)
 from squadopt.application.contract import UI_VIEW_CONTRACT_VERSION, ui_view_schema
 from squadopt.application.views import (
     JsonValue,
@@ -91,6 +97,7 @@ def build_site(
     for entry in entries:
         view = recommendation_view_from_ledger(entry)
         emit(f"{season}/gw{entry.gameweek:02d}/recommendation.json", view.to_dict())
+        emit(f"{season}/gw{entry.gameweek:02d}/pool.json", pool_view(entry).to_dict())
 
     ledger: LedgerView = ledger_view(Path(ledger_root), season)
     emit(f"{season}/ledger.json", ledger.to_dict())

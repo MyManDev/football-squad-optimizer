@@ -30,7 +30,9 @@ export function PlayerChip({ player }: { player: PlayerView }) {
           C
         </span>
       )}
-      <div className={styles.name}>{player.name}</div>
+      <div className={styles.name} title={player.name}>
+        {player.short_name}
+      </div>
       <div className={styles.meta}>
         <span>{player.team}</span>
         <span className={styles.xp}>{points(player.expected_points)}</span>

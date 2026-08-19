@@ -3,6 +3,7 @@
   "generated_at_utc": "2026-08-19T10:00:00Z",
   "payload": {
     "files": [
+      "2026-27/gw01/pool.json",
       "2026-27/gw01/recommendation.json",
       "2026-27/ledger.json",
       "2026-27/status.json",
