@@ -47,6 +47,12 @@ from squadopt.experiments.opening_newcomers import (
     run_opening_newcomer_study,
     study_to_markdown,
 )
+from squadopt.experiments.opponent_projection import (
+    OPPONENT_PROJECTION_STUDY_CONTRACT_VERSION,
+    OpponentProjectionConfig,
+    OpponentProjectionStudy,
+    run_opponent_projection_study,
+)
 from squadopt.experiments.policy_grid import (
     POLICY_GRID_CONTRACT_VERSION,
     PolicyGridCell,
@@ -146,6 +152,7 @@ __all__ = [
     "MULTI_GW_REHEARSAL_CONTRACT_VERSION",
     "NAIVE_PROJECTION_RULE",
     "OPENING_NEWCOMER_STUDY_CONTRACT_VERSION",
+    "OPPONENT_PROJECTION_STUDY_CONTRACT_VERSION",
     "PINNED_RISK_AVERSION",
     "POLICY_GRID_CONTRACT_VERSION",
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
@@ -179,6 +186,8 @@ __all__ = [
     "MultiGwRehearsalConfig",
     "OpeningNewcomerStudy",
     "OpeningStudyConfig",
+    "OpponentProjectionConfig",
+    "OpponentProjectionStudy",
     "PairedComparison",
     "PolicyGridCell",
     "PolicyGridResult",
@@ -223,6 +232,7 @@ __all__ = [
     "rehearse_rank_objective",
     "run_frozen_holdout",
     "run_opening_newcomer_study",
+    "run_opponent_projection_study",
     "run_schedule_signal_study",
     "run_screening_experiment",
     "run_team_rating_study",
