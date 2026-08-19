@@ -11,7 +11,7 @@ measures against, [ownership](ownership.md) says who may change what, and
 than several.
 
 This is the historical `b031ef1` measurement recorded at the bottom of the document. The
-`application` package was added later; its current seam and the future layer above it are in
+`application` and `platform` packages were added later; their current seam is in
 [platform and runtime boundary](platform_runtime.md).
 
 ## Shape
