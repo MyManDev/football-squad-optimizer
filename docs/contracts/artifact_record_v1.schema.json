@@ -1,0 +1,62 @@
+{
+  "$id": "https://squadopt.dev/contracts/artifact_record_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Immutable file provenance attached to one platform run.",
+  "properties": {
+    "artifact_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "type": "string"
+    },
+    "checksum": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "contract_version": {
+      "const": "artifact_record_v1",
+      "type": "string"
+    },
+    "created_at_utc": {
+      "format": "date-time",
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "kind": {
+      "pattern": "^[a-z][a-z0-9._-]{0,63}$",
+      "type": "string"
+    },
+    "location": {
+      "minLength": 1,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[^/]+(?:/[^/]+)*$",
+      "type": "string"
+    },
+    "role": {
+      "enum": [
+        "input",
+        "output"
+      ],
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+      "type": "string"
+    },
+    "schema_version": {
+      "pattern": "^[a-z][a-z0-9._-]{0,63}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "checksum",
+    "contract_version",
+    "created_at_utc",
+    "kind",
+    "location",
+    "role",
+    "run_id",
+    "schema_version"
+  ],
+  "title": "SquadOpt artifact record",
+  "type": "object"
+}
