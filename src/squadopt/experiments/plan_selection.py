@@ -161,7 +161,7 @@ def _week_scores(
     matrix = matrix + captain_points * (2.0 if triple_captain else 1.0)
     if bench:
         matrix = matrix + week_matrix.loc[:, list(bench)].to_numpy(dtype="float64").sum(axis=1)
-    return matrix
+    return np.asarray(matrix, dtype="float64")
 
 
 def score_candidate_on_paths(candidate: CandidatePlan, paths: ScenarioPathSet) -> np.ndarray:
