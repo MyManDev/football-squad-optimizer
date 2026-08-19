@@ -55,8 +55,8 @@ These strings appear unchanged in both residual manifests and in every returned 
 
 ## Stage A status
 
-- Reviewed by the optimization/evaluation side: pending
-- Reviewed by the architecture/CI side: pending
-- Fingerprints frozen: pending
+- Reviewed by the optimization/evaluation side: recorded — `issue43_stage_a_review.md`: this side's position is that v2 is clean enough to freeze
+- Reviewed by the architecture/CI side: **pending**
+- Fingerprints frozen: **pending** — both are computed and reproduce byte for byte; the freeze is recorded when the third review lands
 
 A change to anything above after the freeze voids it. There is no small-fix exception: a changed candidate is a new candidate with a new fingerprint.
