@@ -12,6 +12,7 @@
         "position": "GK",
         "price_tenths": 40,
         "role": "bench",
+        "short_name": "Dubravka",
         "team": "Spurs"
       },
       {
@@ -23,6 +24,7 @@
         "position": "DEF",
         "price_tenths": 40,
         "role": "bench",
+        "short_name": "O'Shea",
         "team": "Ipswich Town"
       },
       {
@@ -34,6 +36,7 @@
         "position": "DEF",
         "price_tenths": 45,
         "role": "bench",
+        "short_name": "Mitchell",
         "team": "Crystal Palace"
       },
       {
@@ -45,6 +48,7 @@
         "position": "FWD",
         "price_tenths": 45,
         "role": "bench",
+        "short_name": "Scarlett",
         "team": "Spurs"
       }
     ],
@@ -103,6 +107,7 @@
         "position": "GK",
         "price_tenths": 55,
         "role": "starter",
+        "short_name": "Donnarumma",
         "team": "Man City"
       },
       {
@@ -114,6 +119,7 @@
         "position": "DEF",
         "price_tenths": 55,
         "role": "starter",
+        "short_name": "Truffert",
         "team": "Bournemouth"
       },
       {
@@ -125,6 +131,7 @@
         "position": "DEF",
         "price_tenths": 65,
         "role": "starter",
+        "short_name": "van Dijk",
         "team": "Liverpool"
       },
       {
@@ -136,6 +143,7 @@
         "position": "DEF",
         "price_tenths": 60,
         "role": "starter",
+        "short_name": "Lacroix",
         "team": "Chelsea"
       },
       {
@@ -147,6 +155,7 @@
         "position": "MID",
         "price_tenths": 65,
         "role": "starter",
+        "short_name": "Rocha",
         "team": "Bournemouth"
       },
       {
@@ -158,6 +167,7 @@
         "position": "MID",
         "price_tenths": 85,
         "role": "starter",
+        "short_name": "Semenyo",
         "team": "Man City"
       },
       {
@@ -169,6 +179,7 @@
         "position": "MID",
         "price_tenths": 75,
         "role": "starter",
+        "short_name": "Rogers",
         "team": "Chelsea"
       },
       {
@@ -180,6 +191,7 @@
         "position": "MID",
         "price_tenths": 75,
         "role": "starter",
+        "short_name": "Rice",
         "team": "Arsenal"
       },
       {
@@ -191,6 +203,7 @@
         "position": "MID",
         "price_tenths": 60,
         "role": "starter",
+        "short_name": "Le Fée",
         "team": "Sunderland"
       },
       {
@@ -202,6 +215,7 @@
         "position": "FWD",
         "price_tenths": 155,
         "role": "starter",
+        "short_name": "Haaland",
         "team": "Man City"
       },
       {
@@ -213,6 +227,7 @@
         "position": "FWD",
         "price_tenths": 80,
         "role": "starter",
+        "short_name": "Watkins",
         "team": "Aston Villa"
       },
       {
@@ -224,6 +239,7 @@
         "position": "GK",
         "price_tenths": 40,
         "role": "bench",
+        "short_name": "Dubravka",
         "team": "Spurs"
       },
       {
@@ -235,6 +251,7 @@
         "position": "DEF",
         "price_tenths": 40,
         "role": "bench",
+        "short_name": "O'Shea",
         "team": "Ipswich Town"
       },
       {
@@ -246,6 +263,7 @@
         "position": "DEF",
         "price_tenths": 45,
         "role": "bench",
+        "short_name": "Mitchell",
         "team": "Crystal Palace"
       },
       {
@@ -257,6 +275,7 @@
         "position": "FWD",
         "price_tenths": 45,
         "role": "bench",
+        "short_name": "Scarlett",
         "team": "Spurs"
       }
     ],
@@ -270,6 +289,7 @@
         "position": "GK",
         "price_tenths": 55,
         "role": "starter",
+        "short_name": "Donnarumma",
         "team": "Man City"
       },
       {
@@ -281,6 +301,7 @@
         "position": "DEF",
         "price_tenths": 55,
         "role": "starter",
+        "short_name": "Truffert",
         "team": "Bournemouth"
       },
       {
@@ -292,6 +313,7 @@
         "position": "DEF",
         "price_tenths": 65,
         "role": "starter",
+        "short_name": "van Dijk",
         "team": "Liverpool"
       },
       {
@@ -303,6 +325,7 @@
         "position": "DEF",
         "price_tenths": 60,
         "role": "starter",
+        "short_name": "Lacroix",
         "team": "Chelsea"
       },
       {
@@ -314,6 +337,7 @@
         "position": "MID",
         "price_tenths": 65,
         "role": "starter",
+        "short_name": "Rocha",
         "team": "Bournemouth"
       },
       {
@@ -325,6 +349,7 @@
         "position": "MID",
         "price_tenths": 85,
         "role": "starter",
+        "short_name": "Semenyo",
         "team": "Man City"
       },
       {
@@ -336,6 +361,7 @@
         "position": "MID",
         "price_tenths": 75,
         "role": "starter",
+        "short_name": "Rogers",
         "team": "Chelsea"
       },
       {
@@ -347,6 +373,7 @@
         "position": "MID",
         "price_tenths": 75,
         "role": "starter",
+        "short_name": "Rice",
         "team": "Arsenal"
       },
       {
@@ -358,6 +385,7 @@
         "position": "MID",
         "price_tenths": 60,
         "role": "starter",
+        "short_name": "Le Fée",
         "team": "Sunderland"
       },
       {
@@ -369,6 +397,7 @@
         "position": "FWD",
         "price_tenths": 155,
         "role": "starter",
+        "short_name": "Haaland",
         "team": "Man City"
       },
       {
@@ -380,6 +409,7 @@
         "position": "FWD",
         "price_tenths": 80,
         "role": "starter",
+        "short_name": "Watkins",
         "team": "Aston Villa"
       }
     ],

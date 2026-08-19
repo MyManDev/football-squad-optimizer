@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 
 import { NotFoundError } from "../../../data/client";
 import { useIndex, useRecommendation } from "../../../data/queries";
@@ -17,7 +17,7 @@ import {
   shortDigest,
   utcShort,
 } from "../../../lib/format";
-import { Pitch, PlayerChip } from "../components/Pitch";
+import { Pitch } from "../components/Pitch";
 import styles from "./ThisWeekPage.module.css";
 
 /** A clock that ticks every `intervalMs`; the countdown text is derived during render. */
@@ -86,6 +86,9 @@ function Decision({ view, generatedAt }: { view: RecommendationView; generatedAt
             {view.decision_kind === "opening" ? "opening squad" : "transfer decision"}
           </div>
           <h1 className={styles.title}>Gameweek {view.gameweek}</h1>
+          <Link className={styles.whyLink} to={`/why/${view.season}/${view.gameweek}`}>
+            Why these players →
+          </Link>
         </div>
         <div className={styles.deadline}>
           <div className={styles.kicker}>deadline {remaining === "closed" ? "" : "in"}</div>
@@ -228,8 +231,13 @@ function Decision({ view, generatedAt }: { view: RecommendationView; generatedAt
           {view.bench.map((p) => (
             <div key={p.player_id} className={styles.benchRow}>
               <span className={`${styles.benchOrder} num`}>{p.bench_order}</span>
-              <PlayerChip player={p} />
-              <span className={styles.muted}>{p.position}</span>
+              <span className={styles.benchName}>
+                <strong>{p.name}</strong>
+                <span className={styles.muted}>
+                  {p.team} · {p.position} · {pounds(p.price_tenths)}
+                </span>
+              </span>
+              <span className={`${styles.benchXp} num`}>{points(p.expected_points)}</span>
             </div>
           ))}
         </div>

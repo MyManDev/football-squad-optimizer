@@ -3,7 +3,7 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import type { DataClient, Loaded } from "./client";
 import { StaticDataClient } from "./client";
-import type { LedgerView, RecommendationView, SiteIndex, StatusView } from "./schema";
+import type { LedgerView, PoolView, RecommendationView, SiteIndex, StatusView } from "./schema";
 
 export const DataClientContext = createContext<DataClient>(new StaticDataClient());
 
@@ -26,6 +26,19 @@ export function useRecommendation(
   return useQuery({
     queryKey: ["recommendation", season, gameweek],
     queryFn: () => client.getRecommendation(season as string, gameweek as number),
+    enabled: season !== undefined && gameweek !== undefined,
+    staleTime: STALE,
+  });
+}
+
+export function usePool(
+  season: string | undefined,
+  gameweek: number | undefined,
+): UseQueryResult<Loaded<PoolView>> {
+  const client = useDataClient();
+  return useQuery({
+    queryKey: ["pool", season, gameweek],
+    queryFn: () => client.getPool(season as string, gameweek as number),
     enabled: season !== undefined && gameweek !== undefined,
     staleTime: STALE,
   });

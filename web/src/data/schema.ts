@@ -6,7 +6,7 @@
 export interface SquadOptUIViewContract {
   contract_version: "ui_view_v1";
   generated_at_utc: string;
-  payload: RecommendationView | LedgerView | StatusView | SiteIndex;
+  payload: RecommendationView | PoolView | LedgerView | StatusView | SiteIndex;
 }
 export interface RecommendationView {
   bench: PlayerView[];
@@ -46,7 +46,8 @@ export interface PlayerView {
   player_id: number;
   position: "GK" | "DEF" | "MID" | "FWD" | "UNK";
   price_tenths: number;
-  role: "starter" | "bench" | "out" | "in";
+  role: "starter" | "bench" | "out" | "in" | "pool";
+  short_name: string;
   team: string;
 }
 export interface RiskView {
@@ -100,6 +101,25 @@ export interface TransferView {
   transfers_in: PlayerView[];
   transfers_out: PlayerView[];
 }
+export interface PoolView {
+  gameweek: number;
+  per_position: number;
+  players: PoolPlayerView[];
+  pool_size: number;
+  season: string;
+}
+export interface PoolPlayerView {
+  expected_points: number;
+  name: string;
+  player_id: number;
+  position: "GK" | "DEF" | "MID" | "FWD";
+  price_tenths: number;
+  rank_in_position: number;
+  role: "starter" | "bench" | "pool";
+  selected: boolean;
+  short_name: string;
+  team: string;
+}
 export interface LedgerView {
   chips_played: string[];
   decided_gameweeks: number;
@@ -116,6 +136,8 @@ export interface LedgerView {
 export interface LedgerRowView {
   captain_player_id: number;
   chip: string | null;
+  cumulative_projected_score: number;
+  cumulative_realized_score: number | null;
   deadline_utc: string;
   decision_kind: "opening" | "transfer";
   gameweek: number;

@@ -18,13 +18,14 @@ from squadopt.application import (
     UI_VIEW_CONTRACT_VERSION,
     build_site,
     ledger_view,
+    pool_view,
     recommendation_view,
     recommendation_view_from_ledger,
     status_view,
     ui_view_schema,
     write_ui_view_schema,
 )
-from squadopt.application.views import ViewError, jsonable
+from squadopt.application.views import ViewError, jsonable, short_name
 from squadopt.live import (
     Recommendation,
     build_recommendation,
@@ -205,6 +206,7 @@ def test_build_site_writes_a_deterministic_validated_tree(
     assert set(first.files) == {
         "index.json",
         f"{SEASON}/gw01/recommendation.json",
+        f"{SEASON}/gw01/pool.json",
         f"{SEASON}/ledger.json",
         f"{SEASON}/status.json",
         f"schema/{UI_VIEW_CONTRACT_VERSION}.schema.json",
@@ -235,6 +237,54 @@ def test_build_site_writes_a_deterministic_validated_tree(
     assert first.status_written is True and first.decided_gameweeks == (1,)
     # No leftover temporary files from the atomic writes.
     assert not [p for p in (tmp_path / "one").rglob(".*.tmp-*")]
+
+
+def test_the_pool_view_ranks_the_projected_pool_and_marks_the_squad(
+    world: tuple[Recommendation, Projection, Path, Any],
+) -> None:
+    recommendation, projection, root, _ = world
+    record_decision(root, recommendation, projection, report_text="report")
+    view = pool_view(load_entry(root, SEASON, 1), per_position=5)
+    _validate(view.to_dict(), "PoolView")
+    assert view.gameweek == 1 and view.per_position == 5
+    assert view.pool_size == len(projection.table)
+    squad_ids = {int(p) for p in recommendation.squad["player_id"]}
+    for position in ("GK", "DEF", "MID", "FWD"):
+        block = [p for p in view.players if p.position == position]
+        assert [p.rank_in_position for p in block] == list(range(1, len(block) + 1))
+        assert [p.expected_points for p in block] == sorted(
+            (p.expected_points for p in block), reverse=True
+        )
+        for player in block:
+            assert player.selected == (player.player_id in squad_ids)
+            assert (player.role != "pool") == player.selected
+
+
+def test_ledger_rows_carry_cumulative_scores(
+    world: tuple[Recommendation, Projection, Path, Any],
+) -> None:
+    recommendation, projection, root, _ = world
+    record_decision(root, recommendation, projection, report_text="report")
+    view = ledger_view(root, SEASON)
+    assert view.rows[0].cumulative_projected_score == pytest.approx(view.rows[0].projected_score)
+    assert view.rows[0].cumulative_realized_score is None
+    record_outcome(
+        root,
+        SEASON,
+        1,
+        _flat_points(recommendation, 2.0),
+        source_snapshot_id=recommendation.snapshot_id,
+    )
+    settled = ledger_view(root, SEASON).rows[0]
+    assert settled.cumulative_realized_score == pytest.approx(settled.realized_score)
+
+
+def test_short_names_keep_their_particles() -> None:
+    assert short_name("Virgil van Dijk") == "van Dijk"
+    assert short_name("Gianluigi Donnarumma") == "Donnarumma"
+    assert short_name("Rayan Vitor Simplício Rocha") == "Rocha"
+    assert short_name("Kevin De Bruyne") == "De Bruyne"
+    assert short_name("Rodri") == "Rodri"
 
 
 def test_jsonable_refuses_what_a_page_could_not_show() -> None:

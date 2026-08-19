@@ -10,6 +10,7 @@ a page shows was produced here, from the same records the ledger froze.
 
 from squadopt.application.build import (
     ledger_view,
+    pool_view,
     recommendation_view,
     recommendation_view_from_ledger,
     status_view,
@@ -25,6 +26,8 @@ from squadopt.application.views import (
     LedgerRowView,
     LedgerView,
     PlayerView,
+    PoolPlayerView,
+    PoolView,
     RecommendationView,
     RiskView,
     SiteIndex,
@@ -39,6 +42,8 @@ __all__ = [
     "LedgerRowView",
     "LedgerView",
     "PlayerView",
+    "PoolPlayerView",
+    "PoolView",
     "RecommendationView",
     "RiskView",
     "SiteBuildReport",
@@ -48,6 +53,7 @@ __all__ = [
     "ViewEnvelope",
     "build_site",
     "ledger_view",
+    "pool_view",
     "recommendation_view",
     "recommendation_view_from_ledger",
     "status_view",

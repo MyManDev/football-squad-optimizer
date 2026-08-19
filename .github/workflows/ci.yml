@@ -104,6 +104,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Bundle budget
+        run: npm run size
+
       - name: Playwright browser cache
         id: playwright-cache
         uses: actions/cache@v4

@@ -7,6 +7,7 @@ import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
 import { points, signedPoints, utcShort } from "../../../lib/format";
+import { CumulativeChart } from "../components/CumulativeChart";
 import styles from "./HistoryPage.module.css";
 
 export function HistoryPage() {
@@ -59,6 +60,11 @@ export function HistoryPage() {
           note={view.chips_played.length ? view.chips_played.join(", ") : "no chip played yet"}
         />
       </StatRow>
+      {view.rows.length > 0 && (
+        <Card title="Projected vs realized, cumulative" aside="points">
+          <CumulativeChart rows={view.rows} />
+        </Card>
+      )}
       {view.rows.length === 0 ? (
         <EmptyState title="No decision recorded yet.">
           The first row appears once gameweek 1 is decided.

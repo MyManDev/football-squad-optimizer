@@ -1,0 +1,3 @@
+# The web app is authored and formatted with LF line endings on every platform
+# (prettier, generated types, committed data); keep the working tree the same.
+web/** text eol=lf
