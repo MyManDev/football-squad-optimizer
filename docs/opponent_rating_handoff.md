@@ -189,15 +189,16 @@ because promoting it is your call and not mine. It is importable as it stands:
 
 ```python
 from squadopt.experiments.team_rating import (
-    load_match_results,        # archive fixtures with scorelines, keyed by club code
-    promoted_clubs,            # per season, clubs absent from the season before
-    measure_promoted_prior,    # what a promoted club's rating looks like, measured
-    select_dixon_coles_config, # half life and ridge, chosen on earlier seasons only
-    fit_dixon_coles,           # one rating, fitted on matches before an `as_of`
+    load_match_results,  # archive fixtures with scorelines, keyed by club code
+    promoted_clubs,  # per season, clubs absent from the season before
+    measure_promoted_prior,  # what a promoted club's rating looks like, measured
+    select_dixon_coles_config,  # half life and ridge, chosen on earlier seasons only
+    fit_dixon_coles,  # one rating, fitted on matches before an `as_of`
 )
 
-rating = fit_dixon_coles(matches, as_of=deadline, config=chosen,
-                         promoted_prior=prior, newly_promoted=arrivals)
+rating = fit_dixon_coles(
+    matches, as_of=deadline, config=chosen, promoted_prior=prior, newly_promoted=arrivals
+)
 home_goals, away_goals = rating.expected_goals(home_club, away_club)
 clean = rating.clean_sheet_probability(club, opponent, is_home=True)
 ```
