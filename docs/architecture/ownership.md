@@ -10,17 +10,27 @@ accountable for its contracts staying honest.
 
 ## The three roles
 
-These names are not new. They are already used throughout the docs — `data_contract.md:3`
-("Owner: data / data mining"), `candidate_declaration_review.md:65` ("Reviewer of frozen
-components: the optimization/evaluation side"), and the architecture/CI side named in
-`issue43_stage_a_review.md:104`. This document collects them in one place for the first time.
+The review-authority names are not new. They are already used throughout the docs —
+`data_contract.md:3` ("Owner: data / data mining"), `candidate_declaration_review.md:65`
+("Reviewer of frozen components: the optimization/evaluation side"), and the architecture/CI
+side named in `issue43_stage_a_review.md:104`. This document collects them in one place, and
+adds what each role is *for*, because a zone list says where someone may commit without saying
+what they are accountable for producing.
 
-| Role | Zone |
-| --- | --- |
-| **data / data mining** | `data/`, `features/`, `prediction/` |
-| **optimization / evaluation** | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`, `live/` |
-| **architecture / CI** | `.github/`, `pyproject.toml`, `integration.py` and `squadopt/__init__.py`, the future `application/`, `scripts/_experiment_cli.py` and the script shells, `docs/architecture/` |
-| **shared — all three** | `contracts/` (when it exists), `data/schema.py`, `optimization/config.py`, `backtest/` |
+| Role | Owns the question | Zone |
+| --- | --- | --- |
+| **data / data mining**<br>Data & Predictive Modeling | How do we produce the best available, leakage-safe, calibrated future information for the optimizer? | `data/`, `features/`, `prediction/` |
+| **optimization / evaluation**<br>Optimization & Decision Science | Given that information, what is the best decision, and how do we know? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`, `live/` |
+| **architecture / CI**<br>Platform & Backend | How does the research engine become a reliable runtime and product? | `.github/`, `pyproject.toml`, `integration.py` and `squadopt/__init__.py`, the future `application/`, `scripts/_experiment_cli.py` and the script shells, `docs/architecture/` |
+| **shared — all three** | — | `contracts/` (when it exists), `data/schema.py`, `optimization/config.py`, `backtest/` |
+
+The middle column is the useful half when a piece of work does not obviously belong to a
+directory. "Does the residual export cross machines byte for byte?" is a data-side question
+even though the writer lives in `scripts/`; "is this decision worth its risk?" is an
+optimization-side question even when the code is in `live/`.
+
+The data side's standing research programme is
+[prediction research agenda](../prediction_research_agenda.md).
 
 ## Shared boundaries
 
@@ -78,6 +88,29 @@ the role's zone here is what makes those actionable rather than addressed to nob
 | `../issue43_handoff_acceptance.md:45` | Item 17: freezing requires all three owners; the architecture/CI side's review is pending |
 
 These stay open. This document does not grant the sign-off — it says who owes it.
+
+## The calibration seam
+
+Calibrating prediction residuals into intervals or quantiles is the data side's **research**
+responsibility — it is the tail end of "produce the best available future information", and the
+open work on it (#38's calendar-aware recalibration) starts from prediction residuals.
+
+The `uncertainty/` **package** stays with optimization/evaluation, where all of it was written.
+Reassigning a package nobody is currently changing, on the strength of a research plan, would
+be churn for a hypothetical.
+
+The trigger for revisiting is specific rather than "later": **when the prediction side starts
+producing a distribution rather than a point estimate.** That is not a preference, it is a
+contract change. `prediction/integration.py:94` projects the hand-off table down to the six
+required columns, so `PredictionSnapshot` drops `expected_points_stddev`,
+`prediction_interval_lower`, quantiles — and even `fixture_count` — on the way through. Today's
+distributional objects (`CalibratedProjectionResult`, `ScenarioSet`) sit *beside* the snapshot
+rather than inside it, and `ScenarioSet` contains one as its point-estimate anchor.
+
+So the day a probabilistic hand-off is proposed, it touches `REQUIRED_COLUMNS`
+(`optimization/validation.py:15`), which is a shared boundary and needs all three owners
+anyway. That conversation is the right moment to decide where `uncertainty/` belongs, because
+by then it will be a decision about live code rather than about a roadmap.
 
 ## Unresolved
 
