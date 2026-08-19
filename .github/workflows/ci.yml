@@ -7,9 +7,12 @@ on:
     branches: [develop, main]
   workflow_dispatch:
 
+# One run per pull-request head (a newer push cancels the older run), but every push to
+# develop/main gets its own run: two merges in quick succession must not leave the earlier
+# one "cancelled" and the branch history looking red.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
