@@ -69,6 +69,13 @@ from squadopt.experiments.policy_objective import (
     PolicyObjectiveConfig,
     shrink_projections,
 )
+from squadopt.experiments.preseason_difficulty import (
+    PRESEASON_DIFFICULTY_RECORD_CONTRACT_VERSION,
+    DifficultyDrift,
+    PreseasonDifficultyRecord,
+    build_preseason_record,
+    compare_to_later,
+)
 from squadopt.experiments.rank_rehearsal import (
     RANK_REHEARSAL_CONTRACT_VERSION,
     RankRehearsalBudgetSummary,
@@ -157,6 +164,7 @@ __all__ = [
     "POLICY_GRID_CONTRACT_VERSION",
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
     "POLICY_SEARCH_FACTOR_NAMES",
+    "PRESEASON_DIFFICULTY_RECORD_CONTRACT_VERSION",
     "PROJECTION_RULES",
     "RANK_REHEARSAL_CONTRACT_VERSION",
     "RISK_FRONTIER_CONTRACT_VERSION",
@@ -172,6 +180,7 @@ __all__ = [
     "BaselinePolicyObjective",
     "CandidateAssessment",
     "ChipWindowRule",
+    "DifficultyDrift",
     "DixonColesConfig",
     "ExperimentCandidate",
     "ExperimentConfigurationError",
@@ -192,6 +201,7 @@ __all__ = [
     "PolicyGridCell",
     "PolicyGridResult",
     "PolicyObjectiveConfig",
+    "PreseasonDifficultyRecord",
     "PromotionPolicy",
     "RankRehearsalBudgetSummary",
     "RankRehearsalResult",
@@ -218,6 +228,8 @@ __all__ = [
     "TeamRatingStudyConfig",
     "audit_scenario_calibration",
     "build_control_residual_table",
+    "build_preseason_record",
+    "compare_to_later",
     "control_model_version",
     "control_residual_manifest",
     "evaluate_policy_grid",
