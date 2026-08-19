@@ -243,6 +243,7 @@ data/logs/
 artifacts/
 # web frontend
 web/node_modules/
+!web/src/lib/
 web/dist/
 web/playwright-report/
 web/test-results/
