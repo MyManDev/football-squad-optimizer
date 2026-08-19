@@ -2,11 +2,12 @@
 
 The one-directional order every import inside `squadopt` must respect, the exceptions that
 exist today, and the rule for changing either. This document is the contract that
-`lint-imports` enforces once the architecture/CI owner wires it up; until then it is enforced
-by review.
+`lint-imports` enforces in CI and review.
 
 For what the graph actually looks like right now, see [system map](system_map.md). For why
 the shape is a single layered package, see [ADR 0001](decisions/0001-modular-monolith.md).
+For the boundary above the application layer, see
+[platform and runtime boundary](platform_runtime.md).
 
 ## The order
 
@@ -30,12 +31,17 @@ contracts
                             experiments
                               live
                                 application
-                                  scripts
+                                  platform (future)
+                                    entry points
 ```
 
-`contracts` and `application` do not exist yet. They are in the order so that when they are
-built there is no argument about where they go: `contracts` depends on nothing, and
-`application` may reach everything below it but nothing may reach it except `scripts`.
+`application` now exists and is enforced as the highest package layer in `pyproject.toml`.
+`contracts` and `platform` do not exist yet. They are in the order so that when they are built
+there is no argument about where they go: `contracts` depends on nothing; `application` may
+reach everything below it; and `platform` may consume application contracts without allowing
+HTTP, persistence, queue, authentication, or deployment concerns to flow back into them.
+`entry points` means CLI, API, workers, schedulers, and script shells; it is an architectural
+role rather than one proposed package.
 
 ### Why this order and not the obvious one
 
@@ -115,14 +121,9 @@ place. If a symbol is not vocabulary that at least two layers need, it does not 
 
 ## Verification
 
-Until `lint-imports` is wired into CI, the check is the AST walk described in
-[system map](system_map.md): attribute every `import squadopt.*` and
-`from squadopt.* import ...` statement to the subpackage containing the importing file, treat
-`data/sources` as `data`, and report any edge whose target sits at or above its source in the
-order above. The expected output is exactly the three pairs and five statements in the
-exceptions table.
-
-Once it is wired up, the same contract in `pyproject.toml` is:
+CI runs `lint-imports` against the contract in `pyproject.toml`. `import-linter` lists layers
+**highest first**, which is the reverse of the order written at the top of this document. Its
+current top is:
 
 ```toml
 [tool.importlinter]
@@ -132,6 +133,7 @@ root_package = "squadopt"
 name = "Layered architecture"
 type = "layers"
 layers = [
+    "application",
     "live",
     "experiments",
     "backtest",
@@ -150,8 +152,10 @@ layers = [
 ]
 ```
 
-Note that `import-linter` lists layers **highest first**, which is the reverse of the order
-written at the top of this document. The five baseline violations are expressed as
+The excerpt abbreviates the fully qualified names used by `pyproject.toml`, which is the
+executable source of truth. The future `squadopt.platform` layer is added above
+`squadopt.application` in the same PR that creates the package; no empty placeholder package
+is needed before then. The five baseline violations are expressed as
 `ignore_imports` entries, one per statement, each carrying the issue that will remove it — not
 as a blanket exemption for the package pair, so a *new* bad import between the same two
 packages still fails.

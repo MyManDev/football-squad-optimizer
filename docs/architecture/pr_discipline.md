@@ -41,12 +41,13 @@ never dies; shorter, and every move is a wide breaking change.
 
 ## The gates
 
-Four today, five when `lint-imports` is wired in. All must pass on the delivering branch:
+Five gates are wired into CI. All must pass on the delivering branch:
 
 ```bash
 .venv/Scripts/python -m ruff check .
 .venv/Scripts/python -m ruff format --check .
 .venv/Scripts/python -m mypy
+.venv/Scripts/lint-imports
 .venv/Scripts/python -m pytest
 ```
 
@@ -63,7 +64,7 @@ tested the change. Details and the full timing table are in [branching](branchin
 
 Note also that mypy checks only `src/squadopt` and ruff's `src` setting covers only
 `src` and `tests`, so `scripts/` — 51 modules and 11,346 lines, holding most of the entry-point
-logic — is outside two of the four gates. Treat script changes as unchecked and review them
+logic — is outside two of the five gates. Treat script changes as unchecked and review them
 accordingly.
 
 ## The live path
@@ -107,7 +108,7 @@ Zones are in [ownership](ownership.md). In practice:
 ## Before opening a PR
 
 - [ ] One topic. No artifacts in a refactor; no moves in a measurement.
-- [ ] Four gates pass on the branch, full `pytest`.
+- [ ] Five gates pass on the branch, including full `pytest` and `lint-imports`.
 - [ ] Layer rules respected; no new entry in the dependency baseline.
 - [ ] Symbols that moved are re-exported from their old location.
 - [ ] Live-path changes carry the replay check and are outside the freeze window.

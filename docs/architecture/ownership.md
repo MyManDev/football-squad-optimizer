@@ -12,16 +12,16 @@ accountable for its contracts staying honest.
 
 The review-authority names are not new. They are already used throughout the docs —
 `data_contract.md:3` ("Owner: data / data mining"), `candidate_declaration_review.md:65`
-("Reviewer of frozen components: the optimization/evaluation side"), and the architecture/CI
-side named in `issue43_stage_a_review.md:104`. This document collects them in one place, and
-adds what each role is *for*, because a zone list says where someone may commit without saying
-what they are accountable for producing.
+("Reviewer of frozen components: the optimization/evaluation side"), and the former
+architecture/CI side named in `issue43_stage_a_review.md:104`. This document collects them in
+one place, and adds what each role is *for*, because a zone list says where someone may commit
+without saying what they are accountable for producing.
 
 | Role | Owns the question | Zone |
 | --- | --- | --- |
 | **data / data mining**<br>Data & Predictive Modeling | How do we produce the best available, leakage-safe, calibrated future information for the optimizer? | `data/`, `features/`, `prediction/` |
-| **optimization / evaluation**<br>Optimization & Decision Science | Given that information, what is the best decision, and how do we know? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`, `live/` |
-| **architecture / CI**<br>Platform & Backend | How does the research engine become a reliable runtime and product? | `.github/`, `pyproject.toml`, `integration.py` and `squadopt/__init__.py`, the future `application/`, `scripts/_experiment_cli.py` and the script shells, `docs/architecture/` |
+| **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`, `live/`; core CI, dependency enforcement, and the current `application/` pilot |
+| **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | the future `platform/`, runtime registries and adapters, installed CLI, API, workers, persistence adapters, deployment, and observability |
 | **shared — all three** | — | `contracts/` (when it exists), `data/schema.py`, `optimization/config.py`, `backtest/` |
 
 The middle column is the useful half when a piece of work does not obviously belong to a
@@ -31,6 +31,26 @@ optimization-side question even when the code is in `live/`.
 
 The data side's standing research programme is
 [prediction research agenda](../prediction_research_agenda.md).
+
+The platform role and its boundary with the current application pilot are fixed in
+[platform and runtime boundary](platform_runtime.md). The platform consumes public application
+contracts; it does not duplicate the application or engine implementation. Until the new
+packages exist, the existing CODEOWNERS entries remain the mechanical review baseline. Each
+implementation PR adds its own path and review authority rather than claiming an empty zone in
+advance.
+
+## Core architecture and platform are different work
+
+Core architecture hardening stays with optimization/evaluation while that side completes the
+current programme: CI gates, import enforcement, dependency reproducibility, branch/review
+discipline, core logging, solver budget hooks, and the application-layer pilot. Platform work
+starts above that seam: run and artifact registries, runtime orchestration, CLI/API/workers,
+persistence, deployment, observability, and scaling.
+
+This is a responsibility split, not a second implementation. When platform work needs a
+missing application service, the core-architecture owner adds the smallest transport-neutral
+contract in its own PR; the platform owner then consumes it. A public application contract
+already consumed by the platform needs both owners to approve a breaking change.
 
 ## Shared boundaries
 
@@ -58,10 +78,11 @@ change that only *reads* a shared boundary needs nothing extra.
 came from, and the operational surface (`ledger.py`, `tick.py`, `recommendation.py`) is the
 least safe thing in the repository to hand to a new owner mid-season.
 
-On handover, the architecture/CI side takes the operational surface of `live/` along with CI,
-packaging, the `application/` layer and the script shells. Measurement logic and the contracts
-stay with the sides that own them. The handover happens **after** the opening gameweek is
-captured, decided and settled, not before.
+On handover, the platform/backend side takes the operational surface of `live/` together with
+runtime orchestration, packaging, operational application services, and the script/CLI shells.
+Core CI and dependency enforcement remain core-architecture responsibilities; measurement
+logic and scientific contracts stay with the sides that own them. The handover happens
+**after** the opening gameweek is captured, decided and settled, not before.
 
 ## Live-path freeze window
 
@@ -78,8 +99,9 @@ Outside the window, any PR touching the live path carries the replay check named
 
 ## Open sign-offs this document clears
 
-The architecture/CI role has been referenced with pending obligations in three places. Naming
-the role's zone here is what makes those actionable rather than addressed to nobody:
+The former combined architecture/CI role has been referenced with pending obligations in three
+places. These remain cross-system runtime/reproducibility reviews and therefore stay with the
+platform/backend role unless the acceptance record explicitly reassigns them:
 
 | Where | Item |
 | --- | --- |

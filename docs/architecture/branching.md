@@ -35,9 +35,9 @@ closed.
 
 ## The gates
 
-Four exist today and are documented in three places — `../../README.md` under Quality checks,
-`../handoff_acceptance_checklist.md:36` item 16, and `../recalibration_runbook.md`. All four are
-currently manual PowerShell invocations that nothing enforces:
+Five exist today. The first four are also documented in `../../README.md` under Quality checks,
+`../handoff_acceptance_checklist.md:36` item 16, and `../recalibration_runbook.md`; the fifth is
+the layering contract in [dependency rules](dependency_rules.md). CI enforces all five:
 
 | # | Gate | Command |
 | --- | --- | --- |
@@ -47,9 +47,8 @@ currently manual PowerShell invocations that nothing enforces:
 | 4 | tests | `python -m pytest` |
 | 5 | imports | `lint-imports` |
 
-The fifth is new: the layering contract from [dependency rules](dependency_rules.md). It is
-listed here so the target is five, but it is not a gate until the architecture/CI owner adds
-`import-linter` and the contract to `pyproject.toml`.
+`pyproject.toml` is the executable source of truth for the import contract, and
+`.github/workflows/ci.yml` runs `lint-imports` alongside the other four gates.
 
 ### Two things to know before wiring these into CI
 
@@ -75,7 +74,7 @@ rank-objective and scenario searches at 8–21 s each.
 
 A genuinely fast suite needs either more marks, parallelism (`pytest-xdist` — note the
 determinism constraint applies within a solve, not across tests), or both. Those are choices
-for the architecture/CI owner. The numbers above are the first test-suite timings recorded for
+for the core-architecture owner. The numbers above are the first test-suite timings recorded for
 this repository; regenerate them with `pytest --durations=15` rather than trusting this table
 after the suite grows.
 
