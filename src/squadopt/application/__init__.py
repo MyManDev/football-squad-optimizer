@@ -40,6 +40,12 @@ from squadopt.application.league import (
     ownership_by_player,
     ownership_view,
 )
+from squadopt.application.rivals import (
+    TEMPLATE_RIVAL_SOURCE,
+    LeagueRivalProvider,
+    TemplateRivalProvider,
+    iter_rivals,
+)
 from squadopt.application.season import (
     PerformedTickAction,
     TickObserver,
@@ -65,12 +71,14 @@ from squadopt.application.views import (
 )
 
 __all__ = [
+    "TEMPLATE_RIVAL_SOURCE",
     "UI_VIEW_CONTRACT_VERSION",
     "UI_VIEW_SCHEMA_PATH",
     "DecideRequest",
     "DecideResult",
     "DecisionVerificationError",
     "LeagueError",
+    "LeagueRivalProvider",
     "LeagueView",
     "LeagueWeekView",
     "LedgerRowView",
@@ -87,6 +95,7 @@ __all__ = [
     "SiteBuildReport",
     "SiteIndex",
     "StatusView",
+    "TemplateRivalProvider",
     "TickObserver",
     "TickRequest",
     "TickResult",
@@ -95,6 +104,7 @@ __all__ = [
     "ViewEnvelope",
     "build_site",
     "decide",
+    "iter_rivals",
     "league_view",
     "ledger_view",
     "ownership_by_player",
