@@ -1,0 +1,76 @@
+{
+  "contract_version": "hierarchical_residual_scenario_paths_v1",
+  "created_utc": "2026-08-19T18:01:09+00:00",
+  "deterministic_seed": 7,
+  "diagnostics": {
+    "common_block_week_means": [
+      0.00560867565766913,
+      0.006427771245632466,
+      0.0022738358086307454
+    ],
+    "contiguous_block_starts": 118,
+    "history_folds": 128,
+    "idiosyncratic_block_sources": {
+      "own_history": 711,
+      "pooled_fallback": 0,
+      "position_fallback": 0
+    }
+  },
+  "eleven_tail_width": {
+    "independent": 72.3182667950941,
+    "path": 69.58877371647694
+  },
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "first_gameweek": 20,
+  "history_folds": 128,
+  "horizon": 3,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "players": 711,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "587279a5f5870e030f94e2d905af8d800895c047",
+    "working_tree_dirty": true
+  },
+  "scenario_count": 4000,
+  "season": "2024-25",
+  "standard_deviation_ratio": 0.9827077336274784,
+  "summary": {
+    "independent": {
+      "eleven_mean": 266.14484253000654,
+      "eleven_p05": 232.00887779002184,
+      "eleven_p50": 265.7758188530036,
+      "eleven_p95": 304.32714458511595,
+      "eleven_standard_deviation": 22.107763618003677,
+      "mean_player_standard_deviation": 3.8215736041436803
+    },
+    "path": {
+      "eleven_mean": 265.9523140772778,
+      "eleven_p05": 232.55509880992835,
+      "eleven_p50": 265.0469851020026,
+      "eleven_p95": 302.1438725264053,
+      "eleven_standard_deviation": 21.307624801709938,
+      "mean_player_standard_deviation": 3.7554899354186304
+    }
+  }
+}
