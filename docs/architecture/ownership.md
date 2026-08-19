@@ -21,7 +21,7 @@ without saying what they are accountable for producing.
 | --- | --- | --- |
 | **data / data mining**<br>Data & Predictive Modeling | How do we produce the best available, leakage-safe, calibrated future information for the optimizer? | `data/`, `features/`, `prediction/` |
 | **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`, `live/`; core CI, dependency enforcement, and the current `application/` pilot |
-| **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | the future `platform/`, runtime registries and adapters, installed CLI, API, workers, persistence adapters, deployment, and observability |
+| **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | `platform/`, runtime registries and adapters, installed CLI, API, workers, persistence adapters, deployment, and observability |
 | **shared — all three** | — | `contracts/` (when it exists), `data/schema.py`, `optimization/config.py`, `backtest/` |
 
 The middle column is the useful half when a piece of work does not obviously belong to a

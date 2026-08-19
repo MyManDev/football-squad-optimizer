@@ -31,13 +31,13 @@ contracts
                             experiments
                               live
                                 application
-                                  platform (future)
+                                  platform
                                     entry points
 ```
 
-`application` now exists and is enforced as the highest package layer in `pyproject.toml`.
-`contracts` and `platform` do not exist yet. They are in the order so that when they are built
-there is no argument about where they go: `contracts` depends on nothing; `application` may
+`application` and `platform` now exist and are enforced as the two highest package layers in
+`pyproject.toml`. `contracts` does not exist yet; it is in the order so that when it is built
+there is no argument about where it goes. `contracts` depends on nothing; `application` may
 reach everything below it; and `platform` may consume application contracts without allowing
 HTTP, persistence, queue, authentication, or deployment concerns to flow back into them.
 `entry points` means CLI, API, workers, schedulers, and script shells; it is an architectural
@@ -133,6 +133,7 @@ root_package = "squadopt"
 name = "Layered architecture"
 type = "layers"
 layers = [
+    "platform",
     "application",
     "live",
     "experiments",
@@ -153,9 +154,9 @@ layers = [
 ```
 
 The excerpt abbreviates the fully qualified names used by `pyproject.toml`, which is the
-executable source of truth. The future `squadopt.platform` layer is added above
-`squadopt.application` in the same PR that creates the package; no empty placeholder package
-is needed before then. The five baseline violations are expressed as
+executable source of truth. `squadopt.platform` is listed above `squadopt.application`; its
+first package contract is the versioned run context and manifest. The five baseline
+violations are expressed as
 `ignore_imports` entries, one per statement, each carrying the issue that will remove it — not
 as a blanket exemption for the package pair, so a *new* bad import between the same two
 packages still fails.

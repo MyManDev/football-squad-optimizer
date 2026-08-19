@@ -2,8 +2,8 @@
 
 How the research engine becomes an executable platform without HTTP, persistence, job
 queues, authentication, or deployment concerns leaking into the engine. This document fixes
-the boundary before the platform package exists; implementation PRs consume it rather than
-re-deciding it.
+the boundary; implementation PRs consume it rather than re-deciding it. The package begins
+with transport-neutral run contracts and grows only through those reviewed PRs.
 
 Companion documents: [dependency rules](dependency_rules.md) define the full package order,
 [ownership](ownership.md) assigns review authority, and
@@ -86,7 +86,7 @@ remain with the application owner until the handover recorded in
 
 ## Platform modules and their responsibilities
 
-The names below describe boundaries, not a commitment to create every package at once.
+The names below describe boundaries, not a commitment to create every module at once.
 Each arrives through its own reviewed PR when the preceding contract exists.
 
 ### Runtime context and run registry
@@ -99,6 +99,13 @@ Every serious execution receives one identity and records at least:
 - prediction, uncertainty, scenario, optimizer, and planner identities where applicable;
 - deterministic seed and runtime budget;
 - output artifact identities and terminal failure, if any.
+
+The initial `run_context_v1` contract records the operational run id and creation time together
+with the repository commit, configuration fingerprint, named input fingerprints, component
+versions, and deterministic seed. Its composite reproducibility fingerprint deliberately
+excludes the run id and creation time, so retries remain distinct attempts with the same
+reproducibility identity. `run_manifest_v1` is the strict, deterministic JSON envelope for
+that context; lifecycle status, budgets, outputs, and failures arrive with the run repository.
 
 The existing season-tick JSONL log is an event stream, not this registry. The registry links
 the whole execution and its artifacts; logging records what happened during it.

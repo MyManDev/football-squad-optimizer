@@ -67,6 +67,7 @@ include_external_packages = false
 name = "Layered architecture"
 type = "layers"
 layers = [
+    "squadopt.platform",
     "squadopt.application",
     "squadopt.live",
     "squadopt.experiments",
