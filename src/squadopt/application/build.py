@@ -407,8 +407,16 @@ def ledger_view(root: Path, season: str) -> LedgerView:
         decided_gameweeks=len(rows),
         settled_gameweeks=len(settled),
         total_projected_score=float(sum(row.projected_score for row in rows)),
+        total_projected_score_settled=(
+            None if not settled else float(sum(row.projected_score for row in settled))
+        ),
         total_realized_score=(
             None if not settled else float(sum(row.realized_score or 0.0 for row in settled))
+        ),
+        total_projection_error=(
+            None
+            if not settled
+            else float(sum((row.realized_score or 0.0) - row.projected_score for row in settled))
         ),
         total_realized_net_score=(
             None if not settled else float(sum(row.realized_net_score or 0.0 for row in settled))

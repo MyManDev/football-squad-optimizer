@@ -129,6 +129,9 @@ def test_the_ledger_view_totals_settled_and_unsettled_rows_separately(
     assert row.realized_score is not None and row.projection_error is not None
     assert row.projection_error == pytest.approx(row.realized_score - row.projected_score)
     assert after.total_realized_score == pytest.approx(row.realized_score)
+    assert after.total_projected_score_settled == pytest.approx(row.projected_score)
+    assert after.total_projection_error == pytest.approx(row.projection_error)
+    assert before.total_projection_error is None
     view = recommendation_view_from_ledger(load_entry(root, SEASON, 1))
     assert view.settled is True and view.outcome_realized_score == pytest.approx(row.realized_score)
 

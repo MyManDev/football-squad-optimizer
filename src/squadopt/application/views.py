@@ -188,7 +188,11 @@ class LedgerView(_View):
     decided_gameweeks: int
     settled_gameweeks: int
     total_projected_score: float
+    total_projected_score_settled: float | None
+    """Projected score summed over the settled gameweeks only (comparable with realized)."""
     total_realized_score: float | None
+    total_projection_error: float | None
+    """Realized minus projected over the settled gameweeks; the page shows it, never computes it."""
     total_realized_net_score: float | None
     total_transfer_hit_points: float
     chips_played: tuple[str, ...]

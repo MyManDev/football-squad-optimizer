@@ -111,6 +111,18 @@
         "total_projected_score": {
           "type": "number"
         },
+        "total_projected_score_settled": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_projection_error": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "total_realized_net_score": {
           "type": [
             "number",
@@ -134,6 +146,8 @@
         "season",
         "settled_gameweeks",
         "total_projected_score",
+        "total_projected_score_settled",
+        "total_projection_error",
         "total_realized_net_score",
         "total_realized_score",
         "total_transfer_hit_points"
