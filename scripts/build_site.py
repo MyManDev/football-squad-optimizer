@@ -14,15 +14,21 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from scripts.run_season_tick import DEFAULT_HANDOFF_ROOT, DEFAULT_LOG_ROOT, _plan
-
-from squadopt.application import UI_VIEW_SCHEMA_PATH, build_site, write_ui_view_schema
+from squadopt.application import (
+    UI_VIEW_SCHEMA_PATH,
+    TickRequest,
+    build_site,
+    plan_season_tick,
+    write_ui_view_schema,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.live import LedgerError
 from squadopt.live.tick import TickConfig
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_HANDOFF_ROOT = REPOSITORY_ROOT / "data" / "handoffs"
+DEFAULT_LOG_ROOT = REPOSITORY_ROOT / "data" / "logs"
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -58,15 +64,17 @@ def main() -> int:
     season = arguments.season
     try:
         if not arguments.no_status:
-            plan = _plan(
-                argparse.Namespace(
+            plan = plan_season_tick(
+                TickRequest(
                     snapshot_root=arguments.snapshot_root,
                     ledger_root=arguments.ledger_root,
+                    archive_root=REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl",
                     handoff_root=arguments.handoff_root,
+                    summary_root=REPOSITORY_ROOT / "docs",
+                    now_utc=now_utc,
                     season=arguments.season,
+                    config=TickConfig(),
                 ),
-                now_utc,
-                TickConfig(),
             )
             season = season or plan.season
         if season is None:

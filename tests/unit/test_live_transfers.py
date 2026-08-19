@@ -17,6 +17,7 @@ import pandas as pd
 import pytest
 import scripts.run_gameweek_ops as ops
 
+import squadopt.application.commands as command_services
 from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
@@ -191,7 +192,11 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         },
     )
     monkeypatch.setattr(ops, "build_panel", lambda root: _panel())
-    monkeypatch.setattr(ops, "IN_SEASON_CONTROL_MODEL_VERSIONS", (IN_SEASON_VERSION,))
+    monkeypatch.setattr(
+        command_services,
+        "IN_SEASON_CONTROL_MODEL_VERSIONS",
+        (IN_SEASON_VERSION,),
+    )
     return {
         "snapshot_root": snapshot_root,
         "ledger_root": tmp_path / "ledger",
@@ -458,7 +463,7 @@ def test_an_unpromoted_in_season_model_version_is_refused_at_verification(
     monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], capsys: pytest.CaptureFixture[str]
 ) -> None:
     _decide_gw1(monkeypatch, world)
-    monkeypatch.setattr(ops, "IN_SEASON_CONTROL_MODEL_VERSIONS", ())
+    monkeypatch.setattr(command_services, "IN_SEASON_CONTROL_MODEL_VERSIONS", ())
 
     exit_code = _decide_gw2(monkeypatch, world, _handoff(world))
 
