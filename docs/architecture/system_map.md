@@ -10,6 +10,10 @@ measures against, [ownership](ownership.md) says who may change what, and
 [ADR 0001](decisions/0001-modular-monolith.md) records why the shape is one package rather
 than several.
 
+This is the historical `b031ef1` measurement recorded at the bottom of the document. The
+`application` package was added later; its current seam and the future layer above it are in
+[platform and runtime boundary](platform_runtime.md).
+
 ## Shape
 
 One installed package, `squadopt`, built from `src/` by setuptools. Fifteen subpackages plus
@@ -130,7 +134,7 @@ concepts. They belong in `evaluation`, which sits below both.
   that arrow is preserved. But `tests/` imports `scripts/` at 12 sites, several reaching
   private members (for example `tests/unit/test_risk_reporting.py:5`), and `scripts/` is
   outside both ruff's `src` setting and mypy's `files`, so 51 entry-point modules are
-  unchecked by two of the four gates. That is a tooling gap for the architecture/CI owner,
+  unchecked by two of the five gates. That is a tooling gap for the core-architecture owner,
   not a package-layering gap.
 - **`data/identity.py`** has no importers inside `src/squadopt` at all — only `scripts/` and
   `tests/`. Either it is a public utility in the wrong place or it is effectively unused.

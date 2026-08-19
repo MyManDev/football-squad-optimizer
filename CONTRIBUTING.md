@@ -7,6 +7,7 @@ The working agreements live under [`docs/architecture/`](docs/architecture/). St
 | What is in the package, and what depends on what? | [system map](docs/architecture/system_map.md) |
 | May this module import that one? | [dependency rules](docs/architecture/dependency_rules.md) |
 | Who approves this change? | [ownership](docs/architecture/ownership.md) |
+| Where does runtime/platform work begin? | [platform and runtime boundary](docs/architecture/platform_runtime.md) |
 | Which branch do I target, and what must pass? | [branching](docs/architecture/branching.md) |
 | How do I scope and open the PR? | [PR discipline](docs/architecture/pr_discipline.md) |
 | Why is it built this way? | [decisions](docs/architecture/decisions/) |
