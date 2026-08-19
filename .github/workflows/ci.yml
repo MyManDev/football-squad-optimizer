@@ -104,10 +104,21 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Playwright browser cache
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
+
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 8
+        run: npx playwright install --with-deps chromium
+
       - name: Playwright smoke
-        run: |
-          npx playwright install --with-deps chromium
-          npm run e2e
+        timeout-minutes: 8
+        run: npm run e2e
 
       - name: Upload site
         uses: actions/upload-artifact@v4
