@@ -272,6 +272,19 @@ development seasons, and what that invalidates. The full argument, and the two o
 decisions it sits beside, are in
 [the opponent rating handoff](opponent_rating_handoff.md).
 
+**Settled since, for the strength columns.** A live capture taken 2026-08-16, five days
+before the season's first kickoff, leaves `strength_attack_*` and `strength_defence_*` at
+zero for all twenty clubs and fills only a coarse one-to-five `strength_overall_*`. A
+finished season's archive carries the same fields populated on a thousand-point scale. The
+archive's team-strength columns are not pre-season values.
+
+**Being measured, for the difficulty column.** Difficulty *is* published before a season, so
+it may legitimately be a pre-match feature; whether the archived copy equals the pre-season
+one is now a live measurement rather than an argument.
+[The pre-registration](preseason_difficulty_prereg.md) fixes the comparison and the
+thresholds, and [the record](preseason_fixture_difficulty.md) pins the pre-kickoff capture
+with its checksums.
+
 ### 9. Aligning `form_window` with the feature configuration (resolved)
 
 The experiment contract defines `form_window` as a single scalar: "the number of

@@ -1,0 +1,6372 @@
+{
+  "captured_at_utc": "2026-08-16T08:12:59Z",
+  "checksums": {
+    "bootstrap-static.json": "a41605225fa6f8e2a62a7386c2039fa991c42b13061340186db7fa84dea3b9cb",
+    "fixtures.json": "9e7484118381f8202830906ba993c176475d8ca1796571f5dd78cbfc2d73bd3e"
+  },
+  "compared_against": null,
+  "contract_version": "preseason_difficulty_record_v1",
+  "created_utc": "2026-08-19T15:08:27+00:00",
+  "diagnostics": {
+    "clubs": 20,
+    "difficulty_distribution": {
+      "2": 209,
+      "3": 342,
+      "4": 171,
+      "5": 38
+    },
+    "fixture_sides": 760,
+    "fixtures": 380,
+    "gameweeks": 38,
+    "hours_before_first_kickoff": 130.7836111111111,
+    "sides_without_a_rating": 0,
+    "team_strength_fields_populated": {
+      "strength": 0,
+      "strength_attack_away": 0,
+      "strength_attack_home": 0,
+      "strength_defence_away": 0,
+      "strength_defence_home": 0,
+      "strength_overall_away": 20,
+      "strength_overall_home": 20
+    }
+  },
+  "difficulty": [
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 1,
+      "gameweek": 1,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 1,
+      "gameweek": 1,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 2,
+      "gameweek": 1,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 2,
+      "gameweek": 1,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 3,
+      "gameweek": 1,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 3,
+      "gameweek": 1,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 4,
+      "gameweek": 1,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 4,
+      "gameweek": 1,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 5,
+      "gameweek": 1,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 5,
+      "gameweek": 1,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 6,
+      "gameweek": 1,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 6,
+      "gameweek": 1,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 7,
+      "gameweek": 1,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 7,
+      "gameweek": 1,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 8,
+      "gameweek": 1,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 8,
+      "gameweek": 1,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 9,
+      "gameweek": 1,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 9,
+      "gameweek": 1,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 10,
+      "gameweek": 1,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 10,
+      "gameweek": 1,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 11,
+      "gameweek": 2,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 11,
+      "gameweek": 2,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 12,
+      "gameweek": 2,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 12,
+      "gameweek": 2,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 13,
+      "gameweek": 2,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 13,
+      "gameweek": 2,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 14,
+      "gameweek": 2,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 14,
+      "gameweek": 2,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 15,
+      "gameweek": 2,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 15,
+      "gameweek": 2,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 16,
+      "gameweek": 2,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 16,
+      "gameweek": 2,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 17,
+      "gameweek": 2,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 17,
+      "gameweek": 2,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 18,
+      "gameweek": 2,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 18,
+      "gameweek": 2,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 19,
+      "gameweek": 2,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 19,
+      "gameweek": 2,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 20,
+      "gameweek": 2,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 20,
+      "gameweek": 2,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 21,
+      "gameweek": 3,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 21,
+      "gameweek": 3,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 22,
+      "gameweek": 3,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 22,
+      "gameweek": 3,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 23,
+      "gameweek": 3,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 23,
+      "gameweek": 3,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 24,
+      "gameweek": 3,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 24,
+      "gameweek": 3,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 25,
+      "gameweek": 3,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 25,
+      "gameweek": 3,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 26,
+      "gameweek": 3,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 26,
+      "gameweek": 3,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 27,
+      "gameweek": 3,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 27,
+      "gameweek": 3,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 28,
+      "gameweek": 3,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 28,
+      "gameweek": 3,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 29,
+      "gameweek": 3,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 29,
+      "gameweek": 3,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 30,
+      "gameweek": 3,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 30,
+      "gameweek": 3,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 31,
+      "gameweek": 4,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 31,
+      "gameweek": 4,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 32,
+      "gameweek": 4,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 32,
+      "gameweek": 4,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 33,
+      "gameweek": 4,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 33,
+      "gameweek": 4,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 34,
+      "gameweek": 4,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 34,
+      "gameweek": 4,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 35,
+      "gameweek": 4,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 35,
+      "gameweek": 4,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 36,
+      "gameweek": 4,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 36,
+      "gameweek": 4,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 37,
+      "gameweek": 4,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 37,
+      "gameweek": 4,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 38,
+      "gameweek": 4,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 38,
+      "gameweek": 4,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 39,
+      "gameweek": 4,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 39,
+      "gameweek": 4,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 40,
+      "gameweek": 4,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 40,
+      "gameweek": 4,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 41,
+      "gameweek": 5,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 41,
+      "gameweek": 5,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 42,
+      "gameweek": 5,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 42,
+      "gameweek": 5,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 43,
+      "gameweek": 5,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 43,
+      "gameweek": 5,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 44,
+      "gameweek": 5,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 44,
+      "gameweek": 5,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 45,
+      "gameweek": 5,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 45,
+      "gameweek": 5,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 46,
+      "gameweek": 5,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 46,
+      "gameweek": 5,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 47,
+      "gameweek": 5,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 47,
+      "gameweek": 5,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 48,
+      "gameweek": 5,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 48,
+      "gameweek": 5,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 49,
+      "gameweek": 5,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 49,
+      "gameweek": 5,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 50,
+      "gameweek": 5,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 50,
+      "gameweek": 5,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 51,
+      "gameweek": 6,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 51,
+      "gameweek": 6,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 52,
+      "gameweek": 6,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 52,
+      "gameweek": 6,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 53,
+      "gameweek": 6,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 53,
+      "gameweek": 6,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 54,
+      "gameweek": 6,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 54,
+      "gameweek": 6,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 55,
+      "gameweek": 6,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 55,
+      "gameweek": 6,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 56,
+      "gameweek": 6,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 56,
+      "gameweek": 6,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 57,
+      "gameweek": 6,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 57,
+      "gameweek": 6,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 58,
+      "gameweek": 6,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 58,
+      "gameweek": 6,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 59,
+      "gameweek": 6,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 59,
+      "gameweek": 6,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 60,
+      "gameweek": 6,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 60,
+      "gameweek": 6,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 61,
+      "gameweek": 7,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 61,
+      "gameweek": 7,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 62,
+      "gameweek": 7,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 62,
+      "gameweek": 7,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 63,
+      "gameweek": 7,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 63,
+      "gameweek": 7,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 64,
+      "gameweek": 7,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 64,
+      "gameweek": 7,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 65,
+      "gameweek": 7,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 65,
+      "gameweek": 7,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 66,
+      "gameweek": 7,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 66,
+      "gameweek": 7,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 67,
+      "gameweek": 7,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 67,
+      "gameweek": 7,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 68,
+      "gameweek": 7,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 68,
+      "gameweek": 7,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 69,
+      "gameweek": 7,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 69,
+      "gameweek": 7,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 70,
+      "gameweek": 7,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 70,
+      "gameweek": 7,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 71,
+      "gameweek": 8,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 71,
+      "gameweek": 8,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 72,
+      "gameweek": 8,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 72,
+      "gameweek": 8,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 73,
+      "gameweek": 8,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 73,
+      "gameweek": 8,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 74,
+      "gameweek": 8,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 74,
+      "gameweek": 8,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 75,
+      "gameweek": 8,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 75,
+      "gameweek": 8,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 76,
+      "gameweek": 8,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 76,
+      "gameweek": 8,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 77,
+      "gameweek": 8,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 77,
+      "gameweek": 8,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 78,
+      "gameweek": 8,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 78,
+      "gameweek": 8,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 79,
+      "gameweek": 8,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 79,
+      "gameweek": 8,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 80,
+      "gameweek": 8,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 80,
+      "gameweek": 8,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 81,
+      "gameweek": 9,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 81,
+      "gameweek": 9,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 82,
+      "gameweek": 9,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 82,
+      "gameweek": 9,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 83,
+      "gameweek": 9,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 83,
+      "gameweek": 9,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 84,
+      "gameweek": 9,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 84,
+      "gameweek": 9,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 85,
+      "gameweek": 9,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 85,
+      "gameweek": 9,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 86,
+      "gameweek": 9,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 86,
+      "gameweek": 9,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 87,
+      "gameweek": 9,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 87,
+      "gameweek": 9,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 88,
+      "gameweek": 9,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 88,
+      "gameweek": 9,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 89,
+      "gameweek": 9,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 89,
+      "gameweek": 9,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 90,
+      "gameweek": 9,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 90,
+      "gameweek": 9,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 91,
+      "gameweek": 10,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 91,
+      "gameweek": 10,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 92,
+      "gameweek": 10,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 92,
+      "gameweek": 10,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 93,
+      "gameweek": 10,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 93,
+      "gameweek": 10,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 94,
+      "gameweek": 10,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 94,
+      "gameweek": 10,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 95,
+      "gameweek": 10,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 95,
+      "gameweek": 10,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 96,
+      "gameweek": 10,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 96,
+      "gameweek": 10,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 97,
+      "gameweek": 10,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 97,
+      "gameweek": 10,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 98,
+      "gameweek": 10,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 98,
+      "gameweek": 10,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 99,
+      "gameweek": 10,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 99,
+      "gameweek": 10,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 100,
+      "gameweek": 10,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 100,
+      "gameweek": 10,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 101,
+      "gameweek": 11,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 101,
+      "gameweek": 11,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 102,
+      "gameweek": 11,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 102,
+      "gameweek": 11,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 103,
+      "gameweek": 11,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 103,
+      "gameweek": 11,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 104,
+      "gameweek": 11,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 104,
+      "gameweek": 11,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 105,
+      "gameweek": 11,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 105,
+      "gameweek": 11,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 106,
+      "gameweek": 11,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 106,
+      "gameweek": 11,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 107,
+      "gameweek": 11,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 107,
+      "gameweek": 11,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 108,
+      "gameweek": 11,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 108,
+      "gameweek": 11,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 109,
+      "gameweek": 11,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 109,
+      "gameweek": 11,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 110,
+      "gameweek": 11,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 110,
+      "gameweek": 11,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 111,
+      "gameweek": 12,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 111,
+      "gameweek": 12,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 112,
+      "gameweek": 12,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 112,
+      "gameweek": 12,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 113,
+      "gameweek": 12,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 113,
+      "gameweek": 12,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 114,
+      "gameweek": 12,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 114,
+      "gameweek": 12,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 115,
+      "gameweek": 12,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 115,
+      "gameweek": 12,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 116,
+      "gameweek": 12,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 116,
+      "gameweek": 12,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 117,
+      "gameweek": 12,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 117,
+      "gameweek": 12,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 118,
+      "gameweek": 12,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 118,
+      "gameweek": 12,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 119,
+      "gameweek": 12,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 119,
+      "gameweek": 12,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 120,
+      "gameweek": 12,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 120,
+      "gameweek": 12,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 121,
+      "gameweek": 13,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 121,
+      "gameweek": 13,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 122,
+      "gameweek": 13,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 122,
+      "gameweek": 13,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 123,
+      "gameweek": 13,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 123,
+      "gameweek": 13,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 124,
+      "gameweek": 13,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 124,
+      "gameweek": 13,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 125,
+      "gameweek": 13,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 125,
+      "gameweek": 13,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 126,
+      "gameweek": 13,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 126,
+      "gameweek": 13,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 127,
+      "gameweek": 13,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 127,
+      "gameweek": 13,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 128,
+      "gameweek": 13,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 128,
+      "gameweek": 13,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 129,
+      "gameweek": 13,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 129,
+      "gameweek": 13,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 130,
+      "gameweek": 13,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 130,
+      "gameweek": 13,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 131,
+      "gameweek": 14,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 131,
+      "gameweek": 14,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 132,
+      "gameweek": 14,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 132,
+      "gameweek": 14,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 133,
+      "gameweek": 14,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 133,
+      "gameweek": 14,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 134,
+      "gameweek": 14,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 134,
+      "gameweek": 14,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 135,
+      "gameweek": 14,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 135,
+      "gameweek": 14,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 136,
+      "gameweek": 14,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 136,
+      "gameweek": 14,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 137,
+      "gameweek": 14,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 137,
+      "gameweek": 14,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 138,
+      "gameweek": 14,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 138,
+      "gameweek": 14,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 139,
+      "gameweek": 14,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 139,
+      "gameweek": 14,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 140,
+      "gameweek": 14,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 140,
+      "gameweek": 14,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 141,
+      "gameweek": 15,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 141,
+      "gameweek": 15,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 142,
+      "gameweek": 15,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 142,
+      "gameweek": 15,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 143,
+      "gameweek": 15,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 143,
+      "gameweek": 15,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 144,
+      "gameweek": 15,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 144,
+      "gameweek": 15,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 145,
+      "gameweek": 15,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 145,
+      "gameweek": 15,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 146,
+      "gameweek": 15,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 146,
+      "gameweek": 15,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 147,
+      "gameweek": 15,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 147,
+      "gameweek": 15,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 148,
+      "gameweek": 15,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 148,
+      "gameweek": 15,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 149,
+      "gameweek": 15,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 149,
+      "gameweek": 15,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 150,
+      "gameweek": 15,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 150,
+      "gameweek": 15,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 151,
+      "gameweek": 16,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 151,
+      "gameweek": 16,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 152,
+      "gameweek": 16,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 152,
+      "gameweek": 16,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 153,
+      "gameweek": 16,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 153,
+      "gameweek": 16,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 154,
+      "gameweek": 16,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 154,
+      "gameweek": 16,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 155,
+      "gameweek": 16,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 155,
+      "gameweek": 16,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 156,
+      "gameweek": 16,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 156,
+      "gameweek": 16,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 157,
+      "gameweek": 16,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 157,
+      "gameweek": 16,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 158,
+      "gameweek": 16,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 158,
+      "gameweek": 16,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 159,
+      "gameweek": 16,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 159,
+      "gameweek": 16,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 160,
+      "gameweek": 16,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 160,
+      "gameweek": 16,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 161,
+      "gameweek": 17,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 161,
+      "gameweek": 17,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 162,
+      "gameweek": 17,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 162,
+      "gameweek": 17,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 163,
+      "gameweek": 17,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 163,
+      "gameweek": 17,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 164,
+      "gameweek": 17,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 164,
+      "gameweek": 17,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 165,
+      "gameweek": 17,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 165,
+      "gameweek": 17,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 166,
+      "gameweek": 17,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 166,
+      "gameweek": 17,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 167,
+      "gameweek": 17,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 167,
+      "gameweek": 17,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 168,
+      "gameweek": 17,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 168,
+      "gameweek": 17,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 169,
+      "gameweek": 17,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 169,
+      "gameweek": 17,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 170,
+      "gameweek": 17,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 170,
+      "gameweek": 17,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 171,
+      "gameweek": 18,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 171,
+      "gameweek": 18,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 172,
+      "gameweek": 18,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 172,
+      "gameweek": 18,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 173,
+      "gameweek": 18,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 173,
+      "gameweek": 18,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 174,
+      "gameweek": 18,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 174,
+      "gameweek": 18,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 175,
+      "gameweek": 18,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 175,
+      "gameweek": 18,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 176,
+      "gameweek": 18,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 176,
+      "gameweek": 18,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 177,
+      "gameweek": 18,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 177,
+      "gameweek": 18,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 178,
+      "gameweek": 18,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 178,
+      "gameweek": 18,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 179,
+      "gameweek": 18,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 179,
+      "gameweek": 18,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 180,
+      "gameweek": 18,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 180,
+      "gameweek": 18,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 181,
+      "gameweek": 19,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 181,
+      "gameweek": 19,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 182,
+      "gameweek": 19,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 182,
+      "gameweek": 19,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 183,
+      "gameweek": 19,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 183,
+      "gameweek": 19,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 184,
+      "gameweek": 19,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 184,
+      "gameweek": 19,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 185,
+      "gameweek": 19,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 185,
+      "gameweek": 19,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 186,
+      "gameweek": 19,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 186,
+      "gameweek": 19,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 187,
+      "gameweek": 19,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 187,
+      "gameweek": 19,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 188,
+      "gameweek": 19,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 188,
+      "gameweek": 19,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 189,
+      "gameweek": 19,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 189,
+      "gameweek": 19,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 190,
+      "gameweek": 19,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 190,
+      "gameweek": 19,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 191,
+      "gameweek": 20,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 191,
+      "gameweek": 20,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 192,
+      "gameweek": 20,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 192,
+      "gameweek": 20,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 193,
+      "gameweek": 20,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 193,
+      "gameweek": 20,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 194,
+      "gameweek": 20,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 194,
+      "gameweek": 20,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 195,
+      "gameweek": 20,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 195,
+      "gameweek": 20,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 196,
+      "gameweek": 20,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 196,
+      "gameweek": 20,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 197,
+      "gameweek": 20,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 197,
+      "gameweek": 20,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 198,
+      "gameweek": 20,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 198,
+      "gameweek": 20,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 199,
+      "gameweek": 20,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 199,
+      "gameweek": 20,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 200,
+      "gameweek": 20,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 200,
+      "gameweek": 20,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 201,
+      "gameweek": 21,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 201,
+      "gameweek": 21,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 202,
+      "gameweek": 21,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 202,
+      "gameweek": 21,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 203,
+      "gameweek": 21,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 203,
+      "gameweek": 21,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 204,
+      "gameweek": 21,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 204,
+      "gameweek": 21,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 205,
+      "gameweek": 21,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 205,
+      "gameweek": 21,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 206,
+      "gameweek": 21,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 206,
+      "gameweek": 21,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 207,
+      "gameweek": 21,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 207,
+      "gameweek": 21,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 208,
+      "gameweek": 21,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 208,
+      "gameweek": 21,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 209,
+      "gameweek": 21,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 209,
+      "gameweek": 21,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 210,
+      "gameweek": 21,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 210,
+      "gameweek": 21,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 211,
+      "gameweek": 22,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 211,
+      "gameweek": 22,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 212,
+      "gameweek": 22,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 212,
+      "gameweek": 22,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 213,
+      "gameweek": 22,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 213,
+      "gameweek": 22,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 214,
+      "gameweek": 22,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 214,
+      "gameweek": 22,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 215,
+      "gameweek": 22,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 215,
+      "gameweek": 22,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 216,
+      "gameweek": 22,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 216,
+      "gameweek": 22,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 217,
+      "gameweek": 22,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 217,
+      "gameweek": 22,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 218,
+      "gameweek": 22,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 218,
+      "gameweek": 22,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 219,
+      "gameweek": 22,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 219,
+      "gameweek": 22,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 220,
+      "gameweek": 22,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 220,
+      "gameweek": 22,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 221,
+      "gameweek": 23,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 221,
+      "gameweek": 23,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 222,
+      "gameweek": 23,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 222,
+      "gameweek": 23,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 223,
+      "gameweek": 23,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 223,
+      "gameweek": 23,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 224,
+      "gameweek": 23,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 224,
+      "gameweek": 23,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 225,
+      "gameweek": 23,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 225,
+      "gameweek": 23,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 226,
+      "gameweek": 23,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 226,
+      "gameweek": 23,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 227,
+      "gameweek": 23,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 227,
+      "gameweek": 23,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 228,
+      "gameweek": 23,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 228,
+      "gameweek": 23,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 229,
+      "gameweek": 23,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 229,
+      "gameweek": 23,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 230,
+      "gameweek": 23,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 230,
+      "gameweek": 23,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 231,
+      "gameweek": 24,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 231,
+      "gameweek": 24,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 232,
+      "gameweek": 24,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 232,
+      "gameweek": 24,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 233,
+      "gameweek": 24,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 233,
+      "gameweek": 24,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 234,
+      "gameweek": 24,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 234,
+      "gameweek": 24,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 235,
+      "gameweek": 24,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 235,
+      "gameweek": 24,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 236,
+      "gameweek": 24,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 236,
+      "gameweek": 24,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 237,
+      "gameweek": 24,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 237,
+      "gameweek": 24,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 238,
+      "gameweek": 24,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 238,
+      "gameweek": 24,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 239,
+      "gameweek": 24,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 239,
+      "gameweek": 24,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 240,
+      "gameweek": 24,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 240,
+      "gameweek": 24,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 241,
+      "gameweek": 25,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 241,
+      "gameweek": 25,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 242,
+      "gameweek": 25,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 242,
+      "gameweek": 25,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 243,
+      "gameweek": 25,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 243,
+      "gameweek": 25,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 244,
+      "gameweek": 25,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 244,
+      "gameweek": 25,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 245,
+      "gameweek": 25,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 245,
+      "gameweek": 25,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 246,
+      "gameweek": 25,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 246,
+      "gameweek": 25,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 247,
+      "gameweek": 25,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 247,
+      "gameweek": 25,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 248,
+      "gameweek": 25,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 248,
+      "gameweek": 25,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 249,
+      "gameweek": 25,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 249,
+      "gameweek": 25,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 250,
+      "gameweek": 25,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 250,
+      "gameweek": 25,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 251,
+      "gameweek": 26,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 251,
+      "gameweek": 26,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 252,
+      "gameweek": 26,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 252,
+      "gameweek": 26,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 253,
+      "gameweek": 26,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 253,
+      "gameweek": 26,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 254,
+      "gameweek": 26,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 254,
+      "gameweek": 26,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 255,
+      "gameweek": 26,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 255,
+      "gameweek": 26,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 256,
+      "gameweek": 26,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 256,
+      "gameweek": 26,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 257,
+      "gameweek": 26,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 257,
+      "gameweek": 26,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 258,
+      "gameweek": 26,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 258,
+      "gameweek": 26,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 259,
+      "gameweek": 26,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 259,
+      "gameweek": 26,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 260,
+      "gameweek": 26,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 260,
+      "gameweek": 26,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 261,
+      "gameweek": 27,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 261,
+      "gameweek": 27,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 262,
+      "gameweek": 27,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 262,
+      "gameweek": 27,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 263,
+      "gameweek": 27,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 263,
+      "gameweek": 27,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 264,
+      "gameweek": 27,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 264,
+      "gameweek": 27,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 265,
+      "gameweek": 27,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 265,
+      "gameweek": 27,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 266,
+      "gameweek": 27,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 266,
+      "gameweek": 27,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 267,
+      "gameweek": 27,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 267,
+      "gameweek": 27,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 268,
+      "gameweek": 27,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 268,
+      "gameweek": 27,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 269,
+      "gameweek": 27,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 269,
+      "gameweek": 27,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 270,
+      "gameweek": 27,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 270,
+      "gameweek": 27,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 271,
+      "gameweek": 28,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 271,
+      "gameweek": 28,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 272,
+      "gameweek": 28,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 272,
+      "gameweek": 28,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 273,
+      "gameweek": 28,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 273,
+      "gameweek": 28,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 274,
+      "gameweek": 28,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 274,
+      "gameweek": 28,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 275,
+      "gameweek": 28,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 275,
+      "gameweek": 28,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 276,
+      "gameweek": 28,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 276,
+      "gameweek": 28,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 277,
+      "gameweek": 28,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 277,
+      "gameweek": 28,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 278,
+      "gameweek": 28,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 278,
+      "gameweek": 28,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 279,
+      "gameweek": 28,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 279,
+      "gameweek": 28,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 280,
+      "gameweek": 28,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 280,
+      "gameweek": 28,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 281,
+      "gameweek": 29,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 281,
+      "gameweek": 29,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 282,
+      "gameweek": 29,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 282,
+      "gameweek": 29,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 283,
+      "gameweek": 29,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 283,
+      "gameweek": 29,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 284,
+      "gameweek": 29,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 284,
+      "gameweek": 29,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 285,
+      "gameweek": 29,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 285,
+      "gameweek": 29,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 286,
+      "gameweek": 29,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 286,
+      "gameweek": 29,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 287,
+      "gameweek": 29,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 287,
+      "gameweek": 29,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 288,
+      "gameweek": 29,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 288,
+      "gameweek": 29,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 289,
+      "gameweek": 29,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 289,
+      "gameweek": 29,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 290,
+      "gameweek": 29,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 290,
+      "gameweek": 29,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 291,
+      "gameweek": 30,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 291,
+      "gameweek": 30,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 292,
+      "gameweek": 30,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 292,
+      "gameweek": 30,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 293,
+      "gameweek": 30,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 293,
+      "gameweek": 30,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 294,
+      "gameweek": 30,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 294,
+      "gameweek": 30,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 295,
+      "gameweek": 30,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 295,
+      "gameweek": 30,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 296,
+      "gameweek": 30,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 296,
+      "gameweek": 30,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 297,
+      "gameweek": 30,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 297,
+      "gameweek": 30,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 298,
+      "gameweek": 30,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 298,
+      "gameweek": 30,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 299,
+      "gameweek": 30,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 299,
+      "gameweek": 30,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 300,
+      "gameweek": 30,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 300,
+      "gameweek": 30,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 301,
+      "gameweek": 31,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 301,
+      "gameweek": 31,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 302,
+      "gameweek": 31,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 302,
+      "gameweek": 31,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 303,
+      "gameweek": 31,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 303,
+      "gameweek": 31,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 304,
+      "gameweek": 31,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 304,
+      "gameweek": 31,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 305,
+      "gameweek": 31,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 305,
+      "gameweek": 31,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 306,
+      "gameweek": 31,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 306,
+      "gameweek": 31,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 307,
+      "gameweek": 31,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 307,
+      "gameweek": 31,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 308,
+      "gameweek": 31,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 308,
+      "gameweek": 31,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 309,
+      "gameweek": 31,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 309,
+      "gameweek": 31,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 310,
+      "gameweek": 31,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 310,
+      "gameweek": 31,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 311,
+      "gameweek": 32,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 311,
+      "gameweek": 32,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 312,
+      "gameweek": 32,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 312,
+      "gameweek": 32,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 313,
+      "gameweek": 32,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 313,
+      "gameweek": 32,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 314,
+      "gameweek": 32,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 314,
+      "gameweek": 32,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 315,
+      "gameweek": 32,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 315,
+      "gameweek": 32,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 316,
+      "gameweek": 32,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 316,
+      "gameweek": 32,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 317,
+      "gameweek": 32,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 317,
+      "gameweek": 32,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 318,
+      "gameweek": 32,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 318,
+      "gameweek": 32,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 319,
+      "gameweek": 32,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 319,
+      "gameweek": 32,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 320,
+      "gameweek": 32,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 320,
+      "gameweek": 32,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 321,
+      "gameweek": 33,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 321,
+      "gameweek": 33,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 322,
+      "gameweek": 33,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 322,
+      "gameweek": 33,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 323,
+      "gameweek": 33,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 323,
+      "gameweek": 33,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 324,
+      "gameweek": 33,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 324,
+      "gameweek": 33,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 325,
+      "gameweek": 33,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 325,
+      "gameweek": 33,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 326,
+      "gameweek": 33,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 326,
+      "gameweek": 33,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 327,
+      "gameweek": 33,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 327,
+      "gameweek": 33,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 328,
+      "gameweek": 33,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 328,
+      "gameweek": 33,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 329,
+      "gameweek": 33,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 329,
+      "gameweek": 33,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 330,
+      "gameweek": 33,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 330,
+      "gameweek": 33,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 331,
+      "gameweek": 34,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 331,
+      "gameweek": 34,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 332,
+      "gameweek": 34,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 332,
+      "gameweek": 34,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 333,
+      "gameweek": 34,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 333,
+      "gameweek": 34,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 334,
+      "gameweek": 34,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 334,
+      "gameweek": 34,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 335,
+      "gameweek": 34,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 335,
+      "gameweek": 34,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 336,
+      "gameweek": 34,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 336,
+      "gameweek": 34,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 337,
+      "gameweek": 34,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 337,
+      "gameweek": 34,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 338,
+      "gameweek": 34,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 338,
+      "gameweek": 34,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 339,
+      "gameweek": 34,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 339,
+      "gameweek": 34,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 340,
+      "gameweek": 34,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 340,
+      "gameweek": 34,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 341,
+      "gameweek": 35,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 341,
+      "gameweek": 35,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 342,
+      "gameweek": 35,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 342,
+      "gameweek": 35,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 343,
+      "gameweek": 35,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 343,
+      "gameweek": 35,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 344,
+      "gameweek": 35,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 344,
+      "gameweek": 35,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 345,
+      "gameweek": 35,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 345,
+      "gameweek": 35,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 346,
+      "gameweek": 35,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 346,
+      "gameweek": 35,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 347,
+      "gameweek": 35,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 347,
+      "gameweek": 35,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 348,
+      "gameweek": 35,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 348,
+      "gameweek": 35,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 349,
+      "gameweek": 35,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 349,
+      "gameweek": 35,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 350,
+      "gameweek": 35,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 350,
+      "gameweek": 35,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 351,
+      "gameweek": 36,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 351,
+      "gameweek": 36,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 352,
+      "gameweek": 36,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 352,
+      "gameweek": 36,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 353,
+      "gameweek": 36,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 353,
+      "gameweek": 36,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 354,
+      "gameweek": 36,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 354,
+      "gameweek": 36,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 355,
+      "gameweek": 36,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 355,
+      "gameweek": 36,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 356,
+      "gameweek": 36,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 356,
+      "gameweek": 36,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 357,
+      "gameweek": 36,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 357,
+      "gameweek": 36,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 358,
+      "gameweek": 36,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 358,
+      "gameweek": 36,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 359,
+      "gameweek": 36,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 359,
+      "gameweek": 36,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 360,
+      "gameweek": 36,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 360,
+      "gameweek": 36,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 361,
+      "gameweek": 37,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 361,
+      "gameweek": 37,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 362,
+      "gameweek": 37,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 362,
+      "gameweek": 37,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 363,
+      "gameweek": 37,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 363,
+      "gameweek": 37,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 364,
+      "gameweek": 37,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 364,
+      "gameweek": 37,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 365,
+      "gameweek": 37,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 365,
+      "gameweek": 37,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 366,
+      "gameweek": 37,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 366,
+      "gameweek": 37,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 367,
+      "gameweek": 37,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 43
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 367,
+      "gameweek": 37,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 368,
+      "gameweek": 37,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 368,
+      "gameweek": 37,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 369,
+      "gameweek": 37,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 369,
+      "gameweek": 37,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 370,
+      "gameweek": 37,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 370,
+      "gameweek": 37,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 371,
+      "gameweek": 38,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 3
+    },
+    {
+      "fixture_difficulty": 5,
+      "fixture_id": 371,
+      "gameweek": 38,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 36
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 372,
+      "gameweek": 38,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 7
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 372,
+      "gameweek": 38,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 6
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 373,
+      "gameweek": 38,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 8
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 373,
+      "gameweek": 38,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 94
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 374,
+      "gameweek": 38,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 9
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 374,
+      "gameweek": 38,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 17
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 375,
+      "gameweek": 38,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 31
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 375,
+      "gameweek": 38,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 2
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 376,
+      "gameweek": 38,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 88
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 376,
+      "gameweek": 38,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 4
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 377,
+      "gameweek": 38,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 40
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 377,
+      "gameweek": 38,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 11
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 378,
+      "gameweek": 38,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 14
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 378,
+      "gameweek": 38,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 91
+    },
+    {
+      "fixture_difficulty": 2,
+      "fixture_id": 379,
+      "gameweek": 38,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 1
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 379,
+      "gameweek": 38,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 54
+    },
+    {
+      "fixture_difficulty": 4,
+      "fixture_id": 380,
+      "gameweek": 38,
+      "is_home": true,
+      "season": "2026-27",
+      "team_id": 56
+    },
+    {
+      "fixture_difficulty": 3,
+      "fixture_id": 380,
+      "gameweek": 38,
+      "is_home": false,
+      "season": "2026-27",
+      "team_id": 43
+    }
+  ],
+  "drift": null,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "fingerprint": "e44ade0095e51f7c6d5c4239f8faae27ec2b74b10bf416b144838e811e0d934b",
+  "first_deadline_utc": "2026-08-21T17:30:00Z",
+  "first_kickoff_utc": "2026-08-21T19:00:00+00:00",
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 0,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "b19a631c8843585f4b3c1dcf03bcc986a94c58f7",
+    "working_tree_dirty": true
+  },
+  "season": "2026-27",
+  "snapshot_id": "fpl-live-20260816T081259Z-e44ade0095e5",
+  "source": "fpl-live",
+  "team_strength": [
+    {
+      "name": "Man Utd",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 4.0,
+      "strength_overall_home": 4.0,
+      "team_id": 1
+    },
+    {
+      "name": "Leeds",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 2.0,
+      "team_id": 2
+    },
+    {
+      "name": "Arsenal",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 5.0,
+      "strength_overall_home": 4.0,
+      "team_id": 3
+    },
+    {
+      "name": "Newcastle",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 2.0,
+      "team_id": 4
+    },
+    {
+      "name": "Spurs",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 3.0,
+      "team_id": 6
+    },
+    {
+      "name": "Aston Villa",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 4.0,
+      "strength_overall_home": 3.0,
+      "team_id": 7
+    },
+    {
+      "name": "Chelsea",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 4.0,
+      "strength_overall_home": 4.0,
+      "team_id": 8
+    },
+    {
+      "name": "Coventry City",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 2.0,
+      "strength_overall_home": 2.0,
+      "team_id": 9
+    },
+    {
+      "name": "Everton",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 3.0,
+      "team_id": 11
+    },
+    {
+      "name": "Liverpool",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 4.0,
+      "strength_overall_home": 4.0,
+      "team_id": 14
+    },
+    {
+      "name": "Nott'm Forest",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 3.0,
+      "team_id": 17
+    },
+    {
+      "name": "Crystal Palace",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 3.0,
+      "team_id": 31
+    },
+    {
+      "name": "Brighton",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 2.0,
+      "team_id": 36
+    },
+    {
+      "name": "Ipswich Town",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 2.0,
+      "strength_overall_home": 2.0,
+      "team_id": 40
+    },
+    {
+      "name": "Man City",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 5.0,
+      "strength_overall_home": 4.0,
+      "team_id": 43
+    },
+    {
+      "name": "Fulham",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 2.0,
+      "team_id": 54
+    },
+    {
+      "name": "Sunderland",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 2.0,
+      "team_id": 56
+    },
+    {
+      "name": "Hull City",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 2.0,
+      "strength_overall_home": 2.0,
+      "team_id": 88
+    },
+    {
+      "name": "Bournemouth",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 3.0,
+      "team_id": 91
+    },
+    {
+      "name": "Brentford",
+      "strength": null,
+      "strength_attack_away": 0.0,
+      "strength_attack_home": 0.0,
+      "strength_defence_away": 0.0,
+      "strength_defence_home": 0.0,
+      "strength_overall_away": 3.0,
+      "strength_overall_home": 3.0,
+      "team_id": 94
+    }
+  ]
+}

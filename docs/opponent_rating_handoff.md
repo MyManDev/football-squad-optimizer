@@ -108,6 +108,31 @@ What we need from you, in order of value:
    provide one for earlier seasons. A pre-season snapshot that reproduces even part of that
    +1.74 per gameweek would be the largest available win, and it needs no model at all.
 
+### Direct evidence, added 2026-08-19
+
+The correlation argument above is circumstantial. This is not. A live capture taken
+2026-08-16, five days before the 2026-27 season's first kickoff, publishes **fixture
+difficulty for all 380 fixtures** — and publishes almost no **team strength**:
+
+| Source | `strength` | `strength_overall_home` | `strength_attack_home` |
+| --- | --- | --- | --- |
+| Live capture, 2026-08-16 (pre-season) | null | **4** (a 1–5 scale) | **0** |
+| Archive `2026-27/teams.csv` today | null | 4 | 0 |
+| Archive `2024-25/teams.csv` (finished) | 5 | **1350** | **1390** |
+| Archive `2023-24/teams.csv` (finished) | 5 | 1350 | 1370 |
+
+Before a season the platform fills only a coarse one-to-five overall rating and leaves attack
+and defence at zero for all twenty clubs. A finished season's archive carries those same
+fields populated on a thousand-point scale. **The archive's team-strength columns are
+therefore demonstrably not pre-season values** — whatever moment they describe, it is not
+August.
+
+That settles the strength columns outright. It does not settle `fixture_difficulty`, which
+*is* published pre-season and so could legitimately be a pre-match feature; whether the
+archived copy equals the pre-season one is the open question, and it is now being measured
+rather than argued. `docs/preseason_difficulty_prereg.md` records the capture, the
+comparison and the thresholds, all fixed before the season started.
+
 This is filed as a data-contract question rather than a patch on purpose: `data/` and
 `features/` are yours, and a silent shift of that column would change every recorded
 measurement that read it.
