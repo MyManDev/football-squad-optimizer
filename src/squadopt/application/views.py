@@ -63,12 +63,14 @@ class PlayerView(_View):
 
     player_id: int
     name: str
+    short_name: str
+    """A display name that fits a chip: the surname with its particle (``van Dijk``)."""
     team: str
     position: str
     price_tenths: int
     expected_points: float
     role: str
-    """``starter`` | ``bench`` | ``out`` | ``in``."""
+    """``starter`` | ``bench`` | ``out`` | ``in`` | ``pool``."""
     is_captain: bool = False
     bench_order: int | None = None
 
@@ -179,6 +181,39 @@ class LedgerRowView(_View):
     chip: str | None
     unavailable_player_count: int
     settled: bool
+    cumulative_projected_score: float
+    """Projected score summed over this and every earlier decided gameweek."""
+    cumulative_realized_score: float | None
+    """Realized score summed over the settled gameweeks up to this one; None until one settles."""
+
+
+@dataclass(frozen=True, slots=True)
+class PoolPlayerView(_View):
+    """One player of the projected pool, ranked within his position by expected points."""
+
+    player_id: int
+    name: str
+    short_name: str
+    team: str
+    position: str
+    price_tenths: int
+    expected_points: float
+    rank_in_position: int
+    selected: bool
+    """In the frozen squad (starter or bench)."""
+    role: str
+    """``starter`` | ``bench`` | ``pool``."""
+
+
+@dataclass(frozen=True, slots=True)
+class PoolView(_View):
+    """Why these players: the top of the projected pool per position, chosen or not."""
+
+    season: str
+    gameweek: int
+    pool_size: int
+    per_position: int
+    players: tuple[PoolPlayerView, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -266,6 +301,44 @@ class ViewEnvelope:
 def utc_now_iso(now: datetime | None = None) -> str:
     stamp = now or datetime.now(UTC)
     return stamp.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+_PARTICLES: Final = frozenset(
+    {
+        "van",
+        "de",
+        "da",
+        "di",
+        "del",
+        "della",
+        "der",
+        "le",
+        "la",
+        "el",
+        "dos",
+        "du",
+        "von",
+        "ter",
+        "ten",
+        "den",
+    }
+)
+
+
+def short_name(name: str) -> str:
+    """The surname, keeping a lowercase particle before it (``Virgil van Dijk`` -> ``van Dijk``)."""
+
+    tokens = [t for t in str(name).split() if t]
+    if len(tokens) <= 1:
+        return str(name).strip()
+    tail = tokens[-1]
+    particles: list[str] = []
+    for token in reversed(tokens[:-1]):
+        if token.lower() in _PARTICLES:
+            particles.insert(0, token)
+        else:
+            break
+    return " ".join([*particles, tail])
 
 
 def positions_in_order(players: Sequence[PlayerView]) -> tuple[PlayerView, ...]:

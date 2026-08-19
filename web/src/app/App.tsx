@@ -11,6 +11,9 @@ const ThisWeekPage = lazy(() =>
 const HistoryPage = lazy(() =>
   import("../features/history/pages/HistoryPage").then((m) => ({ default: m.HistoryPage })),
 );
+const WhyPage = lazy(() =>
+  import("../features/why/pages/WhyPage").then((m) => ({ default: m.WhyPage })),
+);
 const StatusPage = lazy(() =>
   import("../features/status/pages/StatusPage").then((m) => ({ default: m.StatusPage })),
 );
@@ -28,6 +31,7 @@ export function App({ basename = import.meta.env.BASE_URL }: { basename?: string
             <Routes>
               <Route path="/" element={<ThisWeekPage />} />
               <Route path="/gw/:season/:gameweek" element={<ThisWeekPage />} />
+              <Route path="/why/:season/:gameweek" element={<WhyPage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="*" element={<EmptyState title="There is no page here." />} />

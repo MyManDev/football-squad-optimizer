@@ -7,7 +7,7 @@
  * generated for are refused: the page shows why instead of rendering the wrong shape.
  */
 
-import type { LedgerView, RecommendationView, SiteIndex, StatusView } from "./schema";
+import type { LedgerView, PoolView, RecommendationView, SiteIndex, StatusView } from "./schema";
 
 export const UI_VIEW_CONTRACT_VERSION = "ui_view_v1";
 
@@ -25,6 +25,7 @@ export interface Loaded<T> {
 export interface DataClient {
   getIndex(): Promise<Loaded<SiteIndex>>;
   getRecommendation(season: string, gameweek: number): Promise<Loaded<RecommendationView>>;
+  getPool(season: string, gameweek: number): Promise<Loaded<PoolView>>;
   getLedger(season: string): Promise<Loaded<LedgerView>>;
   getStatus(season: string): Promise<Loaded<StatusView>>;
 }
@@ -49,8 +50,8 @@ export class NotFoundError extends Error {
   }
 }
 
-export function gameweekPath(season: string, gameweek: number): string {
-  return `${season}/gw${String(gameweek).padStart(2, "0")}/recommendation.json`;
+export function gameweekPath(season: string, gameweek: number, file = "recommendation"): string {
+  return `${season}/gw${String(gameweek).padStart(2, "0")}/${file}.json`;
 }
 
 function unwrap<T>(envelope: ViewEnvelope<T>): Loaded<T> {
@@ -80,6 +81,10 @@ export class StaticDataClient implements DataClient {
 
   getRecommendation(season: string, gameweek: number): Promise<Loaded<RecommendationView>> {
     return this.read<RecommendationView>(gameweekPath(season, gameweek));
+  }
+
+  getPool(season: string, gameweek: number): Promise<Loaded<PoolView>> {
+    return this.read<PoolView>(gameweekPath(season, gameweek, "pool"));
   }
 
   getLedger(season: string): Promise<Loaded<LedgerView>> {

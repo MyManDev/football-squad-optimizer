@@ -8,6 +8,8 @@
       {
         "captain_player_id": 223094,
         "chip": null,
+        "cumulative_projected_score": 55.79162729878535,
+        "cumulative_realized_score": null,
         "deadline_utc": "2026-08-21T17:30:00Z",
         "decision_kind": "opening",
         "gameweek": 1,
