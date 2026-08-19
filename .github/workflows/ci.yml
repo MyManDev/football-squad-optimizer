@@ -114,10 +114,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
 
+      # The GitHub Ubuntu image already ships Chrome's shared libraries, so the browser
+      # alone is enough; `--with-deps` runs apt-get, which has hung for 8+ minutes here.
       - name: Install Chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        timeout-minutes: 8
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 6
+        run: npx playwright install chromium
 
       - name: Playwright smoke
         timeout-minutes: 8
