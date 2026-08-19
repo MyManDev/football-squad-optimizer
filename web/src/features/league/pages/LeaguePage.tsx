@@ -1,12 +1,13 @@
 import { Link } from "react-router";
 
-import { useIndex, useLedger } from "../../../data/queries";
-import type { LedgerRowView } from "../../../data/schema";
+import { useIndex, useLeague, useLedger } from "../../../data/queries";
+import type { LeagueView, LedgerRowView, PlayerView } from "../../../data/schema";
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
-import { points, signedPoints, utcShort } from "../../../lib/format";
+import { percent, points, signedPoints, utcShort } from "../../../lib/format";
+import { AverageChart } from "../components/AverageChart";
 import { CumulativeChart } from "../components/CumulativeChart";
 import styles from "./LeaguePage.module.css";
 
@@ -14,6 +15,7 @@ export function LeaguePage() {
   const index = useIndex();
   const season = index.data?.payload.seasons[0];
   const ledger = useLedger(season);
+  const league = useLeague(season);
   if (index.isPending || (season && ledger.isPending)) {
     return <EmptyState title="Loading the season…" />;
   }
@@ -77,20 +79,16 @@ export function LeaguePage() {
         </Card>
       ) : null}
 
-      <Card tone="muted" title="Against the rest of the league">
-        <p className={styles.para}>
-          The capture already carries what the comparison needs — every gameweek&apos;s average and
-          highest entry score, and how widely each player is owned — but no measurement has been
-          published from it yet. When it is, this card carries the honest version: our realized
-          points against the game&apos;s average week by week, and how much of our squad is the
-          template everyone else also owns.
-        </p>
-        <p className={styles.sub}>
-          Until then the only claim this project makes about the league is the one its measurements
-          support: on four development seasons the season chain scores around the published average,
-          with no measured edge. Nothing on this page says otherwise.
-        </p>
-      </Card>
+      {league.data ? (
+        <AgainstTheLeague view={league.data.payload} />
+      ) : (
+        <Card tone="muted" title="Against the rest of the league">
+          <p className={styles.para}>
+            The comparison is built from the capture the decision used; this site build did not
+            include one, so nothing about the league is claimed here.
+          </p>
+        </Card>
+      )}
 
       {view.rows.length === 0 ? (
         <EmptyState title="No decision recorded yet.">
@@ -137,6 +135,69 @@ export function LeaguePage() {
         substitutions).
       </p>
     </div>
+  );
+}
+
+function AgainstTheLeague({ view }: { view: LeagueView }) {
+  const ownership = view.ownership;
+  const byId = new Map<number, PlayerView>(
+    (ownership?.squad ?? []).map((player) => [player.player_id, player]),
+  );
+  const owned = (id: number | null): string => {
+    if (id === null) return "—";
+    const percentOwned = ownership?.ownership_percent[String(id)];
+    const player = byId.get(id);
+    return percentOwned === undefined
+      ? "—"
+      : `${player?.short_name ?? id} ${percentOwned.toFixed(1)}%`;
+  };
+  return (
+    <>
+      <Card
+        title="Against the rest of the league"
+        aside={`the game's own weekly summary · capture ${view.source_snapshot_id.slice(0, 24)}…`}
+      >
+        <p className={styles.para}>{view.verdict}</p>
+        {view.scored_gameweeks > 0 ? (
+          <AverageChart weeks={view.weeks} />
+        ) : (
+          <p className={styles.sub}>
+            The chart starts with the first scored gameweek: the game publishes an average only once
+            a gameweek finishes, so there is nothing to draw yet.
+          </p>
+        )}
+      </Card>
+      {ownership && (
+        <Card
+          title="How much of this squad is the template"
+          aside={`gameweek ${ownership.gameweek}`}
+        >
+          <StatRow>
+            <Stat
+              label="mean starter ownership"
+              value={percent(ownership.mean_starter_ownership / 100, 1)}
+              note="the average share of the field that owns one of our starters"
+            />
+            <Stat
+              label="effective ownership"
+              value={percent(ownership.effective_ownership / 100, 0)}
+              note="starters plus the captain again — the exposure we share with the field"
+            />
+            <Stat
+              label="differentials"
+              value={`${ownership.differentials.length}`}
+              note={`starters owned by ${ownership.differential_threshold_percent}% or less`}
+            />
+          </StatRow>
+          <p className={styles.sub}>
+            Most owned: {owned(ownership.most_owned_starter)} · least owned:{" "}
+            {owned(ownership.least_owned_starter)}. Ownership is the capture&apos;s
+            selected_by_percent at decision time; it moves after the deadline and this page does not
+            follow it.
+          </p>
+        </Card>
+      )}
+    </>
   );
 }
 

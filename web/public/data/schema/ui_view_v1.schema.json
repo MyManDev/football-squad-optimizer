@@ -1,5 +1,134 @@
 {
   "$defs": {
+    "LeagueView": {
+      "additionalProperties": false,
+      "properties": {
+        "captured_at_utc": {
+          "type": "string"
+        },
+        "league_total_average_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "our_total_realized_net_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ownership": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OwnershipView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scored_gameweeks": {
+          "type": "integer"
+        },
+        "season": {
+          "type": "string"
+        },
+        "source_snapshot_id": {
+          "type": "string"
+        },
+        "total_difference_to_average": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "verdict": {
+          "type": "string"
+        },
+        "weeks": {
+          "items": {
+            "$ref": "#/$defs/LeagueWeekView"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "captured_at_utc",
+        "league_total_average_score",
+        "our_total_realized_net_score",
+        "ownership",
+        "scored_gameweeks",
+        "season",
+        "source_snapshot_id",
+        "total_difference_to_average",
+        "verdict",
+        "weeks"
+      ],
+      "type": "object"
+    },
+    "LeagueWeekView": {
+      "additionalProperties": false,
+      "properties": {
+        "average_entry_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "deadline_utc": {
+          "type": "string"
+        },
+        "difference_to_average": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "finished": {
+          "type": "boolean"
+        },
+        "gameweek": {
+          "type": "integer"
+        },
+        "highest_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "our_projected_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "our_realized_net_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "our_realized_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "average_entry_score",
+        "deadline_utc",
+        "difference_to_average",
+        "finished",
+        "gameweek",
+        "highest_score",
+        "our_projected_score",
+        "our_realized_net_score",
+        "our_realized_score"
+      ],
+      "type": "object"
+    },
     "LedgerRowView": {
       "additionalProperties": false,
       "properties": {
@@ -162,6 +291,65 @@
         "total_realized_net_score",
         "total_realized_score",
         "total_transfer_hit_points"
+      ],
+      "type": "object"
+    },
+    "OwnershipView": {
+      "additionalProperties": false,
+      "properties": {
+        "differential_threshold_percent": {
+          "type": "number"
+        },
+        "differentials": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "effective_ownership": {
+          "type": "number"
+        },
+        "gameweek": {
+          "type": "integer"
+        },
+        "least_owned_starter": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mean_starter_ownership": {
+          "type": "number"
+        },
+        "most_owned_starter": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "ownership_percent": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "type": "object"
+        },
+        "squad": {
+          "items": {
+            "$ref": "#/$defs/PlayerView"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "differential_threshold_percent",
+        "differentials",
+        "effective_ownership",
+        "gameweek",
+        "least_owned_starter",
+        "mean_starter_ownership",
+        "most_owned_starter",
+        "ownership_percent",
+        "squad"
       ],
       "type": "object"
     },
@@ -936,6 +1124,9 @@
               "$ref": "#/$defs/PoolView"
             },
             {
+              "$ref": "#/$defs/LeagueView"
+            },
+            {
               "$ref": "#/$defs/LedgerView"
             },
             {
@@ -974,6 +1165,9 @@
         },
         {
           "$ref": "#/$defs/PoolView"
+        },
+        {
+          "$ref": "#/$defs/LeagueView"
         },
         {
           "$ref": "#/$defs/LedgerView"

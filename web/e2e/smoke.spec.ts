@@ -25,6 +25,9 @@ test("league shows the season and the cumulative chart", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("League analysis");
   // One decision so far: the chart states why it is not drawn yet.
   await expect(page.getByText(/One gameweek is a point, not a line/)).toBeVisible();
+  // The league comparison is real data from the capture, with nothing scored yet.
+  await expect(page.getByText(/No gameweek has been scored yet/)).toBeVisible();
+  await expect(page.getByText(/How much of this squad is the template/)).toBeVisible();
   await expect(page.getByRole("table")).toBeVisible();
 });
 

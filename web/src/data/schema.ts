@@ -6,7 +6,7 @@
 export interface SquadOptUIViewContract {
   contract_version: "ui_view_v1";
   generated_at_utc: string;
-  payload: RecommendationView | PoolView | LedgerView | StatusView | SiteIndex;
+  payload: RecommendationView | PoolView | LeagueView | LedgerView | StatusView | SiteIndex;
 }
 export interface RecommendationView {
   bench: PlayerView[];
@@ -119,6 +119,42 @@ export interface PoolPlayerView {
   selected: boolean;
   short_name: string;
   team: string;
+}
+export interface LeagueView {
+  captured_at_utc: string;
+  league_total_average_score: number | null;
+  our_total_realized_net_score: number | null;
+  ownership: OwnershipView | null;
+  scored_gameweeks: number;
+  season: string;
+  source_snapshot_id: string;
+  total_difference_to_average: number | null;
+  verdict: string;
+  weeks: LeagueWeekView[];
+}
+export interface OwnershipView {
+  differential_threshold_percent: number;
+  differentials: number[];
+  effective_ownership: number;
+  gameweek: number;
+  least_owned_starter: number | null;
+  mean_starter_ownership: number;
+  most_owned_starter: number | null;
+  ownership_percent: {
+    [k: string]: number;
+  };
+  squad: PlayerView[];
+}
+export interface LeagueWeekView {
+  average_entry_score: number | null;
+  deadline_utc: string;
+  difference_to_average: number | null;
+  finished: boolean;
+  gameweek: number;
+  highest_score: number | null;
+  our_projected_score: number | null;
+  our_realized_net_score: number | null;
+  our_realized_score: number | null;
 }
 export interface LedgerView {
   chips_played: string[];
