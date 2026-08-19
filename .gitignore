@@ -241,3 +241,8 @@ data/logs/
 
 # Reproducible local experiment outputs (reports are generated, not source data)
 artifacts/
+# web frontend
+web/node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/

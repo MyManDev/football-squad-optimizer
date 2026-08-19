@@ -1,0 +1,74 @@
+{
+  "contract_version": "ui_view_v1",
+  "generated_at_utc": "2026-08-19T10:00:00Z",
+  "payload": {
+    "actions": [
+      {
+        "gameweek": 1,
+        "handoff_path": null,
+        "kind": "wait",
+        "reason": "gameweek 1 is already decided; nothing to do until its outcome",
+        "snapshot_id": null
+      }
+    ],
+    "decided_gameweeks": [
+      1
+    ],
+    "hours_to_deadline": 55.5,
+    "is_idle": true,
+    "latest_capture": "fpl-live-20260816T081259Z-e44ade0095e5",
+    "next_deadline_utc": "2026-08-21T17:30:00Z",
+    "next_gameweek": 1,
+    "now_utc": "2026-08-19T10:00:00Z",
+    "recent_events": [
+      {
+        "fields": {
+          "dry_run": true,
+          "exit_code": 0,
+          "performed": 0
+        },
+        "level": "INFO",
+        "message": "tick.done",
+        "run_id": "20260818T173036Z-3ee16b",
+        "ts": "2026-08-18T17:30:36.133+00:00"
+      },
+      {
+        "fields": {
+          "actions": [
+            {
+              "gameweek": 1,
+              "kind": "capture",
+              "reason": "gameweek 1 deadline in 2.0 h and no capture from inside the window is held",
+              "snapshot_id": null
+            }
+          ],
+          "diagnostics": {
+            "hours_to_deadline": 2.0,
+            "latest_capture": "fpl-live-20260816T081259Z-e44ade0095e5",
+            "next_deadline_utc": "2026-08-21T17:30:00Z",
+            "next_gameweek": 1
+          },
+          "now_utc": "2026-08-21T15:30:00Z",
+          "season": "2026-27"
+        },
+        "level": "INFO",
+        "message": "tick.plan",
+        "run_id": "20260818T173036Z-3ee16b",
+        "ts": "2026-08-18T17:30:36.133+00:00"
+      },
+      {
+        "fields": {
+          "dry_run": true,
+          "now_utc": "2026-08-21T15:30:00Z"
+        },
+        "level": "INFO",
+        "message": "tick.start",
+        "run_id": "20260818T173036Z-3ee16b",
+        "ts": "2026-08-18T17:30:36.109+00:00"
+      }
+    ],
+    "season": "2026-27",
+    "settled_gameweeks": [],
+    "tick_contract_version": "season_tick_v1"
+  }
+}

@@ -1,0 +1,885 @@
+{
+  "$defs": {
+    "LedgerRowView": {
+      "additionalProperties": false,
+      "properties": {
+        "captain_player_id": {
+          "type": "integer"
+        },
+        "chip": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "deadline_utc": {
+          "type": "string"
+        },
+        "decision_kind": {
+          "enum": [
+            "opening",
+            "transfer"
+          ],
+          "type": "string"
+        },
+        "gameweek": {
+          "type": "integer"
+        },
+        "projected_score": {
+          "type": "number"
+        },
+        "projection_error": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "realized_net_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "realized_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "settled": {
+          "type": "boolean"
+        },
+        "snapshot_id": {
+          "type": "string"
+        },
+        "solver_status": {
+          "type": "string"
+        },
+        "transfer_count": {
+          "type": "integer"
+        },
+        "transfer_hit_points": {
+          "type": "number"
+        },
+        "unavailable_player_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "captain_player_id",
+        "chip",
+        "deadline_utc",
+        "decision_kind",
+        "gameweek",
+        "projected_score",
+        "projection_error",
+        "realized_net_score",
+        "realized_score",
+        "settled",
+        "snapshot_id",
+        "solver_status",
+        "transfer_count",
+        "transfer_hit_points",
+        "unavailable_player_count"
+      ],
+      "type": "object"
+    },
+    "LedgerView": {
+      "additionalProperties": false,
+      "properties": {
+        "chips_played": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "decided_gameweeks": {
+          "type": "integer"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LedgerRowView"
+          },
+          "type": "array"
+        },
+        "season": {
+          "type": "string"
+        },
+        "settled_gameweeks": {
+          "type": "integer"
+        },
+        "total_projected_score": {
+          "type": "number"
+        },
+        "total_projected_score_settled": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_projection_error": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_realized_net_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_realized_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "total_transfer_hit_points": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "chips_played",
+        "decided_gameweeks",
+        "rows",
+        "season",
+        "settled_gameweeks",
+        "total_projected_score",
+        "total_projected_score_settled",
+        "total_projection_error",
+        "total_realized_net_score",
+        "total_realized_score",
+        "total_transfer_hit_points"
+      ],
+      "type": "object"
+    },
+    "PlayerView": {
+      "additionalProperties": false,
+      "properties": {
+        "bench_order": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "expected_points": {
+          "type": "number"
+        },
+        "is_captain": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "player_id": {
+          "type": "integer"
+        },
+        "position": {
+          "enum": [
+            "GK",
+            "DEF",
+            "MID",
+            "FWD",
+            "UNK"
+          ],
+          "type": "string"
+        },
+        "price_tenths": {
+          "type": "integer"
+        },
+        "role": {
+          "enum": [
+            "starter",
+            "bench",
+            "out",
+            "in"
+          ],
+          "type": "string"
+        },
+        "team": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "bench_order",
+        "expected_points",
+        "is_captain",
+        "name",
+        "player_id",
+        "position",
+        "price_tenths",
+        "role",
+        "team"
+      ],
+      "type": "object"
+    },
+    "RecommendationView": {
+      "additionalProperties": false,
+      "properties": {
+        "bench": {
+          "items": {
+            "$ref": "#/$defs/PlayerView"
+          },
+          "type": "array"
+        },
+        "captain_player_id": {
+          "type": "integer"
+        },
+        "captured_at_utc": {
+          "type": "string"
+        },
+        "deadline_utc": {
+          "type": "string"
+        },
+        "decision_kind": {
+          "enum": [
+            "opening",
+            "transfer"
+          ],
+          "type": "string"
+        },
+        "feature_contract_version": {
+          "type": "string"
+        },
+        "gameweek": {
+          "type": "integer"
+        },
+        "metadata": {
+          "type": "object"
+        },
+        "model_name": {
+          "type": "string"
+        },
+        "model_version": {
+          "type": "string"
+        },
+        "outcome_net_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "outcome_realized_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "prediction_fingerprint": {
+          "type": "string"
+        },
+        "projected_score": {
+          "type": "number"
+        },
+        "report_contract_version": {
+          "type": "string"
+        },
+        "risk": {
+          "$ref": "#/$defs/RiskView"
+        },
+        "season": {
+          "type": "string"
+        },
+        "settled": {
+          "type": "boolean"
+        },
+        "snapshot_id": {
+          "type": "string"
+        },
+        "solver_proved_optimal": {
+          "type": "boolean"
+        },
+        "solver_status": {
+          "type": "string"
+        },
+        "squad": {
+          "items": {
+            "$ref": "#/$defs/PlayerView"
+          },
+          "type": "array"
+        },
+        "starting_xi": {
+          "items": {
+            "$ref": "#/$defs/PlayerView"
+          },
+          "type": "array"
+        },
+        "total_cost_tenths": {
+          "type": "integer"
+        },
+        "transfers": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransferView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unavailable_player_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bench",
+        "captain_player_id",
+        "captured_at_utc",
+        "deadline_utc",
+        "decision_kind",
+        "feature_contract_version",
+        "gameweek",
+        "metadata",
+        "model_name",
+        "model_version",
+        "outcome_net_score",
+        "outcome_realized_score",
+        "prediction_fingerprint",
+        "projected_score",
+        "report_contract_version",
+        "risk",
+        "season",
+        "settled",
+        "snapshot_id",
+        "solver_proved_optimal",
+        "solver_status",
+        "squad",
+        "starting_xi",
+        "total_cost_tenths",
+        "transfers",
+        "unavailable_player_count"
+      ],
+      "type": "object"
+    },
+    "RiskView": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "location_shift_points": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lower_quantile_probability": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lower_quantile_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mean_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mean_worst_fraction_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "points_threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "probability_below_threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "probability_below_threshold_interval": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "residual_source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rivals": {
+          "items": {
+            "$ref": "#/$defs/RivalComparisonView"
+          },
+          "type": "array"
+        },
+        "scenario_count": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "stated_limits": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "status": {
+          "enum": [
+            "available",
+            "unavailable",
+            "not_requested"
+          ],
+          "type": "string"
+        },
+        "worst_fraction": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "blockers",
+        "location_shift_points",
+        "lower_quantile_probability",
+        "lower_quantile_score",
+        "mean_score",
+        "mean_worst_fraction_score",
+        "points_threshold",
+        "probability_below_threshold",
+        "probability_below_threshold_interval",
+        "reason",
+        "residual_source",
+        "rivals",
+        "scenario_count",
+        "stated_limits",
+        "status",
+        "worst_fraction"
+      ],
+      "type": "object"
+    },
+    "RivalComparisonView": {
+      "additionalProperties": false,
+      "properties": {
+        "mean_difference": {
+          "type": "number"
+        },
+        "probability_ahead": {
+          "type": "number"
+        },
+        "probability_ahead_interval": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "rival": {
+          "type": "string"
+        },
+        "shared_starters": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "mean_difference",
+        "probability_ahead",
+        "probability_ahead_interval",
+        "rival",
+        "shared_starters"
+      ],
+      "type": "object"
+    },
+    "RunLogEventView": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "type": "object"
+        },
+        "level": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "ts": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "fields",
+        "level",
+        "message",
+        "run_id",
+        "ts"
+      ],
+      "type": "object"
+    },
+    "SiteIndex": {
+      "additionalProperties": false,
+      "properties": {
+        "files": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "gameweeks": {
+          "additionalProperties": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "generated_at_utc": {
+          "type": "string"
+        },
+        "latest": {
+          "additionalProperties": false,
+          "properties": {
+            "gameweek": {
+              "type": "integer"
+            },
+            "path": {
+              "type": "string"
+            },
+            "season": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "gameweek",
+            "path",
+            "season"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "schema_path": {
+          "type": "string"
+        },
+        "seasons": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "files",
+        "gameweeks",
+        "generated_at_utc",
+        "latest",
+        "schema_path",
+        "seasons"
+      ],
+      "type": "object"
+    },
+    "StatusView": {
+      "additionalProperties": false,
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/TickActionView"
+          },
+          "type": "array"
+        },
+        "decided_gameweeks": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "hours_to_deadline": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "is_idle": {
+          "type": "boolean"
+        },
+        "latest_capture": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "next_deadline_utc": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "next_gameweek": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "now_utc": {
+          "type": "string"
+        },
+        "recent_events": {
+          "items": {
+            "$ref": "#/$defs/RunLogEventView"
+          },
+          "type": "array"
+        },
+        "season": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "settled_gameweeks": {
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "tick_contract_version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actions",
+        "decided_gameweeks",
+        "hours_to_deadline",
+        "is_idle",
+        "latest_capture",
+        "next_deadline_utc",
+        "next_gameweek",
+        "now_utc",
+        "recent_events",
+        "season",
+        "settled_gameweeks",
+        "tick_contract_version"
+      ],
+      "type": "object"
+    },
+    "TickActionView": {
+      "additionalProperties": false,
+      "properties": {
+        "gameweek": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "handoff_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "capture",
+            "decide",
+            "settle",
+            "wait"
+          ],
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "gameweek",
+        "handoff_path",
+        "kind",
+        "reason",
+        "snapshot_id"
+      ],
+      "type": "object"
+    },
+    "TransferView": {
+      "additionalProperties": false,
+      "properties": {
+        "bank_after_tenths": {
+          "type": "integer"
+        },
+        "bank_before_tenths": {
+          "type": "integer"
+        },
+        "chip": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "chips_available": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "free_transfers_after": {
+          "type": "integer"
+        },
+        "free_transfers_before": {
+          "type": "integer"
+        },
+        "max_free_transfers": {
+          "type": "integer"
+        },
+        "paid_transfer_count": {
+          "type": "integer"
+        },
+        "planner_solver_status": {
+          "type": "string"
+        },
+        "previous_gameweek": {
+          "type": "integer"
+        },
+        "squad_sell_value_tenths": {
+          "type": "integer"
+        },
+        "transfer_count": {
+          "type": "integer"
+        },
+        "transfer_hit_cost_points": {
+          "type": "number"
+        },
+        "transfer_hit_points": {
+          "type": "number"
+        },
+        "transfers_in": {
+          "items": {
+            "$ref": "#/$defs/PlayerView"
+          },
+          "type": "array"
+        },
+        "transfers_out": {
+          "items": {
+            "$ref": "#/$defs/PlayerView"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "bank_after_tenths",
+        "bank_before_tenths",
+        "chip",
+        "chips_available",
+        "free_transfers_after",
+        "free_transfers_before",
+        "max_free_transfers",
+        "paid_transfer_count",
+        "planner_solver_status",
+        "previous_gameweek",
+        "squad_sell_value_tenths",
+        "transfer_count",
+        "transfer_hit_cost_points",
+        "transfer_hit_points",
+        "transfers_in",
+        "transfers_out"
+      ],
+      "type": "object"
+    },
+    "ViewEnvelope": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "ui_view_v1",
+          "type": "string"
+        },
+        "generated_at_utc": {
+          "type": "string"
+        },
+        "payload": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RecommendationView"
+            },
+            {
+              "$ref": "#/$defs/LedgerView"
+            },
+            {
+              "$ref": "#/$defs/StatusView"
+            },
+            {
+              "$ref": "#/$defs/SiteIndex"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contract_version",
+        "generated_at_utc",
+        "payload"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://squadopt.dev/contracts/ui_view_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Every JSON file the site writes is a ViewEnvelope whose payload is one of the view models. Produced by squadopt.application; the frontend renders, never computes.",
+  "properties": {
+    "contract_version": {
+      "const": "ui_view_v1",
+      "type": "string"
+    },
+    "generated_at_utc": {
+      "type": "string"
+    },
+    "payload": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/RecommendationView"
+        },
+        {
+          "$ref": "#/$defs/LedgerView"
+        },
+        {
+          "$ref": "#/$defs/StatusView"
+        },
+        {
+          "$ref": "#/$defs/SiteIndex"
+        }
+      ]
+    }
+  },
+  "required": [
+    "contract_version",
+    "generated_at_utc",
+    "payload"
+  ],
+  "title": "SquadOpt UI view contract",
+  "type": "object"
+}
