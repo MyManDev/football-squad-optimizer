@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "import-linter>=2.0,<3",
+    "jsonschema>=4.23,<5",
     "mypy>=1.14,<3",
     "pandas-stubs>=2.2.3,<3.1",
     "pytest>=8.3,<10",
@@ -66,6 +67,7 @@ include_external_packages = false
 name = "Layered architecture"
 type = "layers"
 layers = [
+    "squadopt.application",
     "squadopt.live",
     "squadopt.experiments",
     "squadopt.backtest",
