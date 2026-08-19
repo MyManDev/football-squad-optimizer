@@ -1,0 +1,273 @@
+{
+  "config": {
+    "bootstrap_resamples": 2000,
+    "deterministic_seed": 0,
+    "dixon_coles": {
+      "half_life_days": 180.0,
+      "maximum_iterations": 400,
+      "rho_grid": [
+        -0.25,
+        -0.24,
+        -0.23,
+        -0.22,
+        -0.21,
+        -0.2,
+        -0.19,
+        -0.18,
+        -0.16999999999999998,
+        -0.16,
+        -0.15,
+        -0.14,
+        -0.13,
+        -0.12,
+        -0.10999999999999999,
+        -0.1,
+        -0.09,
+        -0.07999999999999999,
+        -0.07,
+        -0.06,
+        -0.04999999999999999,
+        -0.04000000000000001,
+        -0.03,
+        -0.01999999999999999,
+        -0.010000000000000009,
+        0.0,
+        0.010000000000000009,
+        0.020000000000000018,
+        0.030000000000000027,
+        0.03999999999999998,
+        0.04999999999999999,
+        0.06,
+        0.07,
+        0.08000000000000002,
+        0.09000000000000002,
+        0.10000000000000003,
+        0.10999999999999999,
+        0.12,
+        0.13,
+        0.14,
+        0.15
+      ],
+      "ridge": 2.0
+    },
+    "evaluated_seasons": [
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "first_evaluated_gameweek": 6,
+    "half_life_grid": [
+      60.0,
+      120.0,
+      180.0,
+      300.0,
+      500.0
+    ],
+    "ridge_grid": [
+      0.5,
+      1.0,
+      2.0,
+      5.0
+    ],
+    "seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ]
+  },
+  "contract_version": "team_rating_study_v1",
+  "created_utc": "2026-08-19T12:46:21+00:00",
+  "diagnostics": {
+    "evaluated_seasons": [
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "first_evaluated_gameweek": 6,
+    "locked_holdout_accessed": false,
+    "refits": 98,
+    "seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "selected_half_life_days": {
+      "2022-23": 500.0,
+      "2023-24": 180.0,
+      "2024-25": 180.0
+    },
+    "selected_ridge": {
+      "2022-23": 2.0,
+      "2023-24": 5.0,
+      "2024-25": 5.0
+    }
+  },
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "example_rating": {
+    "gameweek": 6,
+    "home_advantage": 0.1420535270138652,
+    "matches_used": 810,
+    "promoted_attack_prior": -0.26784104126268127,
+    "promoted_defence_prior": -0.38116581912530406,
+    "rho": -0.01999999999999999,
+    "season": "2022-23"
+  },
+  "intervals": {
+    "brier_improvement": [
+      0.000580845597438184,
+      0.006225947931247352
+    ],
+    "log_likelihood_improvement": [
+      0.0756058531934994,
+      0.13230951345219932
+    ]
+  },
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "pooled": {
+    "brier_improvement": 0.003468003176206993,
+    "log_likelihood_improvement": 0.10201710325947375,
+    "published_attacking_correlation": 0.021259216869510694,
+    "published_defensive_correlation": 0.04726209454903677,
+    "rating_attacking_correlation": 0.06314531041075251,
+    "rating_defensive_correlation": 0.06741548378662421
+  },
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 0,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "16db6cfcc67e68bcf2191f8fc3114db64629509b",
+    "working_tree_dirty": true
+  },
+  "reliability": [
+    {
+      "bin_high": 0.1,
+      "bin_low": 0.0,
+      "mean_predicted": 0.07098128298060563,
+      "mean_published": 0.16097989916685998,
+      "realized": 0.08379888268156424,
+      "rows": 179.0
+    },
+    {
+      "bin_high": 0.2,
+      "bin_low": 0.1,
+      "mean_predicted": 0.1538415278675604,
+      "mean_published": 0.22252562754032187,
+      "realized": 0.17168141592920355,
+      "rows": 565.0
+    },
+    {
+      "bin_high": 0.30000000000000004,
+      "bin_low": 0.2,
+      "mean_predicted": 0.24864520739685433,
+      "mean_published": 0.28790717150777473,
+      "realized": 0.24398073836276082,
+      "rows": 623.0
+    },
+    {
+      "bin_high": 0.4,
+      "bin_low": 0.30000000000000004,
+      "mean_predicted": 0.34337664191213746,
+      "mean_published": 0.33620482981917876,
+      "realized": 0.3248730964467005,
+      "rows": 394.0
+    },
+    {
+      "bin_high": 0.5,
+      "bin_low": 0.4,
+      "mean_predicted": 0.43817249233261235,
+      "mean_published": 0.36924356646433226,
+      "realized": 0.39226519337016574,
+      "rows": 181.0
+    },
+    {
+      "bin_high": 0.6000000000000001,
+      "bin_low": 0.5,
+      "mean_predicted": 0.5343360302526432,
+      "mean_published": 0.3885470452984315,
+      "realized": 0.325,
+      "rows": 40.0
+    }
+  ],
+  "seasons": [
+    {
+      "baseline_log_likelihood": -3.1250190894261096,
+      "fixtures": 330,
+      "mean_clean_sheet_probability": 0.2641420064694147,
+      "published_attacking_correlation": 0.015518880059627434,
+      "published_clean_sheet_brier": 0.19465168379793957,
+      "published_defensive_correlation": 0.03685985203441326,
+      "rating_attacking_correlation": 0.07503458356552566,
+      "rating_clean_sheet_brier": 0.19528468593051085,
+      "rating_defensive_correlation": 0.05916971216378292,
+      "rating_log_likelihood": -3.053668431791665,
+      "realized_clean_sheet_rate": 0.27575757575757576,
+      "refits": 32,
+      "season": "2022-23",
+      "uncalibrated_clean_sheet_brier": 0.194854236576377
+    },
+    {
+      "baseline_log_likelihood": -3.246683927446188,
+      "fixtures": 331,
+      "mean_clean_sheet_probability": 0.24714517245263684,
+      "published_attacking_correlation": 0.017809266842787965,
+      "published_clean_sheet_brier": 0.16871521043727108,
+      "published_defensive_correlation": 0.06393215456861963,
+      "rating_attacking_correlation": 0.05990315787791627,
+      "rating_clean_sheet_brier": 0.15740981782510624,
+      "rating_defensive_correlation": 0.09033688657239054,
+      "rating_log_likelihood": -3.1161456823376033,
+      "realized_clean_sheet_rate": 0.2084592145015106,
+      "refits": 33,
+      "season": "2023-24",
+      "uncalibrated_clean_sheet_brier": 0.15794067977841075
+    },
+    {
+      "baseline_log_likelihood": -3.1014372143565763,
+      "fixtures": 330,
+      "mean_clean_sheet_probability": 0.23115349683207836,
+      "published_attacking_correlation": 0.030449503706116685,
+      "published_clean_sheet_brier": 0.17233563571812205,
+      "published_defensive_correlation": 0.04099427704407743,
+      "rating_attacking_correlation": 0.05449818978881559,
+      "rating_clean_sheet_brier": 0.17262776633405202,
+      "rating_defensive_correlation": 0.052739852623699186,
+      "rating_log_likelihood": -2.997361235023757,
+      "realized_clean_sheet_rate": 0.23636363636363636,
+      "refits": 33,
+      "season": "2024-25",
+      "uncalibrated_clean_sheet_brier": 0.17273100642972453
+    }
+  ],
+  "verdict": {
+    "clean_sheet_seasons_better": 1,
+    "clean_sheets_passes": false,
+    "goals_interval_excludes_zero": true,
+    "goals_passes": true,
+    "goals_sign_consistent": true,
+    "passes": false,
+    "players_passes": true
+  }
+}
