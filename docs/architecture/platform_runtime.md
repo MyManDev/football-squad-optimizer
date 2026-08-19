@@ -150,6 +150,30 @@ A common runner surrounds an application call with lifecycle and provenance:
 CLI, API, workers, and schedulers call this runner. They do not each implement their own
 version of the workflow.
 
+`RuntimeRequest` binds a validated operation name, `RunContext`, and declared input files.
+Every `RuntimeInputArtifact` names exactly one `RunContext.input_fingerprints` entry; the
+request must resolve the complete mapping and preflight verifies each file checksum against
+that declared digest before any run state is published.
+An entry point adapts a public application service to a zero-argument callable returning a
+`RuntimeOperationResult`: its transport-neutral application value plus declared output files.
+This keeps application request types below the platform boundary and keeps private `scripts/`
+functions out of the runtime.
+
+`RuntimeRunner` preflights every input inside the artifact root before publishing run state,
+writes the immutable manifest, registers input lineage, invokes the application operation, and
+registers its output lineage. Application and output-registration exceptions become a typed
+failed `RuntimeResult` with the failing phase, error type, message, timestamps, and elapsed
+runtime. Input or manifest preparation failures are raised because the application operation
+has not started. Interrupts and other `BaseException` values are never converted into ordinary
+failures.
+
+The optional `RuntimeEventSink` is structurally implemented by the existing live `RunLog`.
+The runner refuses a sink whose `run_id` differs from `RunContext.run_id`, then emits
+`runtime.started`, `runtime.completed`, or `runtime.failed`. A manifest, artifact lineage, and
+structured event stream therefore identify the same execution. The terminal result remains a
+returned contract until a later run repository persists lifecycle state; the JSONL stream is
+still not treated as that repository.
+
 ### Persistence
 
 Repository protocols separate runtime behavior from storage. The first implementation is
