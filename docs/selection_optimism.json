@@ -1,0 +1,63 @@
+{
+  "bench_weight": 0.0,
+  "captain_mean_residual": -3.8630385487528347,
+  "contract_version": "selection_optimism_profile_v1",
+  "created_utc": "2026-08-16T06:19:47+00:00",
+  "diagnostics": {
+    "development_seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "roster_observations": 101447,
+    "scoring_note": "captain contributes once here; doubling amplifies the gap in squad scores",
+    "starter_observations": 1617
+  },
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "fold_count": 147,
+  "form_window": 6,
+  "locked_holdout_accessed": false,
+  "mean_projected_xi_score": 91.17154195011338,
+  "mean_realized_xi_score": 54.795918367346935,
+  "measurement_only": true,
+  "position_starter_mean_residuals": {
+    "DEF": -3.0526893135173387,
+    "FWD": -2.7263888888888888,
+    "GK": -2.63843537414966,
+    "MID": -3.061208151382824
+  },
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "1580edfaf80180c4e7ea2ada3a62463c01f570d0",
+    "working_tree_dirty": false
+  },
+  "rank_bucket_mean_residuals": {
+    "rank_06_15": -2.4642290249433105,
+    "rank_16_plus": 0.05837280957951224,
+    "top_05": -3.5323356009070292
+  },
+  "roster_mean_residual": -0.004195776760706373,
+  "selection_gap_per_starter": -2.951493771785985,
+  "starter_mean_residual": -2.9556895485466916
+}

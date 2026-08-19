@@ -1,0 +1,367 @@
+{
+  "contract_version": "scenario_calibration_audit_v1",
+  "created_utc": "2026-08-16T05:40:24+00:00",
+  "decision_level": {
+    "fold_count": 37,
+    "mean_pit": 0.06567567567567567,
+    "mean_score_bias": 34.4829924839369,
+    "pit_above_90_rate": 0.0,
+    "pit_below_10_rate": 0.7837837837837838,
+    "predicted_bad_week_probability": 0.0008108108108108108,
+    "realized_bad_week_frequency": 0.13513513513513514,
+    "realized_below_scenario_quantile_rate": 0.7837837837837838,
+    "target_rate": 0.1
+  },
+  "diagnostics": {
+    "bench_weight": 0.0,
+    "decision_rule": "risk_neutral_deterministic_squad",
+    "fold_count": 37,
+    "form_window": 6,
+    "objective_configuration_fingerprint": "caa12d77757511768c0406ae5cd5b6b6711368589c1461af86319b94bc54ca03",
+    "scenario_count": 100
+  },
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "locked_holdout_accessed": false,
+  "lower_quantile": 0.1,
+  "measurement_only": true,
+  "player_level": {
+    "coverage_by_position": {
+      "DEF": 0.7847490347490348,
+      "FWD": 0.8523166023166023,
+      "GK": 0.8728155339805825,
+      "MID": 0.7828185328185329
+    },
+    "interval_nominal": 0.8999999999999999
+  },
+  "points_threshold": 40.0,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "a673fddca65b2717473236940373afe9ae841399",
+    "working_tree_dirty": false
+  },
+  "residual_input": {
+    "candidate_label": "deterministic_baseline_control",
+    "path": "artifacts/codex-worktrees/control-residual-export/artifacts/residuals/control_residuals.csv",
+    "preflight_passed": true,
+    "rows": 101447,
+    "table_sha256": "1ed41f94f245b06d012293a895cdee755a5b1803cb19bcc3795e4a414767a22f"
+  },
+  "rows": [
+    {
+      "fold_id": "2024-25-gw02",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 58.0,
+      "scenario_lower_quantile_score": 111.13300979472963,
+      "scenario_mean_score": 133.12019552148666
+    },
+    {
+      "fold_id": "2024-25-gw03",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 81.0,
+      "scenario_lower_quantile_score": 98.20722044445066,
+      "scenario_mean_score": 113.87933960733616
+    },
+    {
+      "fold_id": "2024-25-gw04",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 48.0,
+      "scenario_lower_quantile_score": 86.0943759876096,
+      "scenario_mean_score": 108.38808117273778
+    },
+    {
+      "fold_id": "2024-25-gw05",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.03,
+      "realized_score": 70.0,
+      "scenario_lower_quantile_score": 77.47871703750783,
+      "scenario_mean_score": 97.48165806042815
+    },
+    {
+      "fold_id": "2024-25-gw06",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 36.0,
+      "scenario_lower_quantile_score": 78.62588023210928,
+      "scenario_mean_score": 97.08719347196775
+    },
+    {
+      "fold_id": "2024-25-gw07",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.01,
+      "realized_score": 53.0,
+      "scenario_lower_quantile_score": 68.56104865061184,
+      "scenario_mean_score": 86.25692980748032
+    },
+    {
+      "fold_id": "2024-25-gw08",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 28.0,
+      "scenario_lower_quantile_score": 71.27774088303286,
+      "scenario_mean_score": 86.86945630116861
+    },
+    {
+      "fold_id": "2024-25-gw09",
+      "probability_below_threshold": 0.01,
+      "probability_integral_transform": 0.11,
+      "realized_score": 61.0,
+      "scenario_lower_quantile_score": 60.581081450922355,
+      "scenario_mean_score": 78.66930300870034
+    },
+    {
+      "fold_id": "2024-25-gw10",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.01,
+      "realized_score": 43.0,
+      "scenario_lower_quantile_score": 59.94431104840098,
+      "scenario_mean_score": 78.46102251698684
+    },
+    {
+      "fold_id": "2024-25-gw11",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.01,
+      "realized_score": 48.0,
+      "scenario_lower_quantile_score": 62.97285531193444,
+      "scenario_mean_score": 80.0000346567674
+    },
+    {
+      "fold_id": "2024-25-gw12",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.15,
+      "realized_score": 69.0,
+      "scenario_lower_quantile_score": 61.767819107953656,
+      "scenario_mean_score": 84.49553048783983
+    },
+    {
+      "fold_id": "2024-25-gw13",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.23,
+      "realized_score": 73.0,
+      "scenario_lower_quantile_score": 67.18356295274603,
+      "scenario_mean_score": 85.44710646356506
+    },
+    {
+      "fold_id": "2024-25-gw14",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.05,
+      "realized_score": 62.0,
+      "scenario_lower_quantile_score": 70.8021872258594,
+      "scenario_mean_score": 86.82915398493179
+    },
+    {
+      "fold_id": "2024-25-gw15",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.04,
+      "realized_score": 50.0,
+      "scenario_lower_quantile_score": 59.10967700151532,
+      "scenario_mean_score": 75.32397189863123
+    },
+    {
+      "fold_id": "2024-25-gw16",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.14,
+      "realized_score": 74.0,
+      "scenario_lower_quantile_score": 72.43355748415513,
+      "scenario_mean_score": 90.67365060578184
+    },
+    {
+      "fold_id": "2024-25-gw17",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.61,
+      "realized_score": 94.0,
+      "scenario_lower_quantile_score": 76.11229555549309,
+      "scenario_mean_score": 94.18191725058863
+    },
+    {
+      "fold_id": "2024-25-gw18",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.04,
+      "realized_score": 70.0,
+      "scenario_lower_quantile_score": 77.21364197218439,
+      "scenario_mean_score": 96.44815680995903
+    },
+    {
+      "fold_id": "2024-25-gw19",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 56.0,
+      "scenario_lower_quantile_score": 79.45292062178223,
+      "scenario_mean_score": 97.19025721725426
+    },
+    {
+      "fold_id": "2024-25-gw20",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.01,
+      "realized_score": 62.0,
+      "scenario_lower_quantile_score": 77.23571965223229,
+      "scenario_mean_score": 96.8195683478661
+    },
+    {
+      "fold_id": "2024-25-gw21",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 49.0,
+      "scenario_lower_quantile_score": 81.91134766158785,
+      "scenario_mean_score": 97.95771228965363
+    },
+    {
+      "fold_id": "2024-25-gw22",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 45.0,
+      "scenario_lower_quantile_score": 74.22491763369582,
+      "scenario_mean_score": 97.25022426552466
+    },
+    {
+      "fold_id": "2024-25-gw23",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.07,
+      "realized_score": 67.0,
+      "scenario_lower_quantile_score": 73.76272845583716,
+      "scenario_mean_score": 92.50091921969586
+    },
+    {
+      "fold_id": "2024-25-gw24",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.16,
+      "realized_score": 76.0,
+      "scenario_lower_quantile_score": 69.12533404022928,
+      "scenario_mean_score": 88.96234458814668
+    },
+    {
+      "fold_id": "2024-25-gw25",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.54,
+      "realized_score": 93.0,
+      "scenario_lower_quantile_score": 73.12906273349023,
+      "scenario_mean_score": 92.55810376064437
+    },
+    {
+      "fold_id": "2024-25-gw26",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.1,
+      "realized_score": 78.0,
+      "scenario_lower_quantile_score": 77.98901680184706,
+      "scenario_mean_score": 96.90964632626215
+    },
+    {
+      "fold_id": "2024-25-gw27",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 52.0,
+      "scenario_lower_quantile_score": 84.44184201203588,
+      "scenario_mean_score": 102.52180690074881
+    },
+    {
+      "fold_id": "2024-25-gw28",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 53.0,
+      "scenario_lower_quantile_score": 79.40881391288693,
+      "scenario_mean_score": 99.6551297767346
+    },
+    {
+      "fold_id": "2024-25-gw29",
+      "probability_below_threshold": 0.01,
+      "probability_integral_transform": 0.01,
+      "realized_score": 43.0,
+      "scenario_lower_quantile_score": 53.47623553477036,
+      "scenario_mean_score": 70.66244529317376
+    },
+    {
+      "fold_id": "2024-25-gw30",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 39.0,
+      "scenario_lower_quantile_score": 80.4014654104795,
+      "scenario_mean_score": 96.21864563352192
+    },
+    {
+      "fold_id": "2024-25-gw31",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 36.0,
+      "scenario_lower_quantile_score": 70.61235127728314,
+      "scenario_mean_score": 91.33038806371592
+    },
+    {
+      "fold_id": "2024-25-gw32",
+      "probability_below_threshold": 0.01,
+      "probability_integral_transform": 0.02,
+      "realized_score": 50.0,
+      "scenario_lower_quantile_score": 59.31076780699028,
+      "scenario_mean_score": 82.55742962284351
+    },
+    {
+      "fold_id": "2024-25-gw33",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 42.0,
+      "scenario_lower_quantile_score": 63.08249873353026,
+      "scenario_mean_score": 83.13183860939125
+    },
+    {
+      "fold_id": "2024-25-gw34",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.08,
+      "realized_score": 64.0,
+      "scenario_lower_quantile_score": 64.7588530291936,
+      "scenario_mean_score": 78.85361020558496
+    },
+    {
+      "fold_id": "2024-25-gw35",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 28.0,
+      "scenario_lower_quantile_score": 65.45551510187045,
+      "scenario_mean_score": 85.3280117895276
+    },
+    {
+      "fold_id": "2024-25-gw36",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.01,
+      "realized_score": 57.0,
+      "scenario_lower_quantile_score": 67.8632922050736,
+      "scenario_mean_score": 83.00062281071179
+    },
+    {
+      "fold_id": "2024-25-gw37",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 45.0,
+      "scenario_lower_quantile_score": 65.45013127423452,
+      "scenario_mean_score": 87.00830498921458
+    },
+    {
+      "fold_id": "2024-25-gw38",
+      "probability_below_threshold": 0.0,
+      "probability_integral_transform": 0.0,
+      "realized_score": 48.0,
+      "scenario_lower_quantile_score": 66.38113778301958,
+      "scenario_mean_score": 82.84101056909148
+    }
+  ]
+}

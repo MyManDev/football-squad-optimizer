@@ -216,3 +216,34 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project data
+#   Small synthetic sample data under data/sample/ is committed on purpose and is
+#   reproducible from scripts/generate_sample_data.py. Everything else under data/
+#   stays local: third-party historical dumps have unverified licensing and the
+#   repository is not a data store.
+data/raw/
+data/external/
+data/interim/
+data/processed/
+
+# Captured pre-deadline snapshots of the live season. These hold real third-party
+# data, so they stay local for the same reason data/raw/ does: the source permits
+# private use and forbids redistribution. Reproducibility comes from the snapshot
+# being immutable and checksummed on disk, not from committing it.
+data/snapshots/
+# The season ledger and projection handoffs derive from those captures (per-player
+# rows, prices, projections) and stay local for the same reason; the committed record
+# is the generated summary under docs/ (season_ledger_<season>.md).
+data/ledger/
+data/handoffs/
+data/logs/
+
+# Reproducible local experiment outputs (reports are generated, not source data)
+artifacts/
+# web frontend
+web/node_modules/
+!web/src/lib/
+web/dist/
+web/playwright-report/
+web/test-results/

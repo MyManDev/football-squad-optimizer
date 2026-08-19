@@ -1,0 +1,134 @@
+{
+  "bench_weights": [
+    0.0,
+    0.1,
+    0.25
+  ],
+  "contract_version": "opening_decision_backtest_v1",
+  "created_utc": "2026-08-16T06:33:36+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "locked_holdout_accessed": false,
+  "mean_realized_by_bench_weight": {
+    "0.00": 60.0,
+    "0.10": 61.0,
+    "0.25": 60.5
+  },
+  "measurement_only": true,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "90977213177d0a8d23284acbccdf6f447dcc9ee2",
+    "working_tree_dirty": true
+  },
+  "rows": [
+    {
+      "bench_weight": 0.0,
+      "prior_record_share": 0.6064981949458483,
+      "projected_gw1_score": 64.1800038483862,
+      "realized_gw1_score": 65.0,
+      "season": "2021-22"
+    },
+    {
+      "bench_weight": 0.1,
+      "prior_record_share": 0.6064981949458483,
+      "projected_gw1_score": 64.1800038483862,
+      "realized_gw1_score": 65.0,
+      "season": "2021-22"
+    },
+    {
+      "bench_weight": 0.25,
+      "prior_record_share": 0.6064981949458483,
+      "projected_gw1_score": 63.534781840664195,
+      "realized_gw1_score": 72.0,
+      "season": "2021-22"
+    },
+    {
+      "bench_weight": 0.0,
+      "prior_record_share": 0.6474694589877836,
+      "projected_gw1_score": 65.25865223083676,
+      "realized_gw1_score": 49.0,
+      "season": "2022-23"
+    },
+    {
+      "bench_weight": 0.1,
+      "prior_record_share": 0.6474694589877836,
+      "projected_gw1_score": 65.25865223083676,
+      "realized_gw1_score": 49.0,
+      "season": "2022-23"
+    },
+    {
+      "bench_weight": 0.25,
+      "prior_record_share": 0.6474694589877836,
+      "projected_gw1_score": 64.48202411154278,
+      "realized_gw1_score": 48.0,
+      "season": "2022-23"
+    },
+    {
+      "bench_weight": 0.0,
+      "prior_record_share": 0.6155015197568389,
+      "projected_gw1_score": 63.03185558093042,
+      "realized_gw1_score": 64.0,
+      "season": "2023-24"
+    },
+    {
+      "bench_weight": 0.1,
+      "prior_record_share": 0.6155015197568389,
+      "projected_gw1_score": 62.72677508444405,
+      "realized_gw1_score": 68.0,
+      "season": "2023-24"
+    },
+    {
+      "bench_weight": 0.25,
+      "prior_record_share": 0.6155015197568389,
+      "projected_gw1_score": 62.20633088286221,
+      "realized_gw1_score": 65.0,
+      "season": "2023-24"
+    },
+    {
+      "bench_weight": 0.0,
+      "prior_record_share": 0.6737012987012987,
+      "projected_gw1_score": 57.2703358320285,
+      "realized_gw1_score": 62.0,
+      "season": "2024-25"
+    },
+    {
+      "bench_weight": 0.1,
+      "prior_record_share": 0.6737012987012987,
+      "projected_gw1_score": 57.2703358320285,
+      "realized_gw1_score": 62.0,
+      "season": "2024-25"
+    },
+    {
+      "bench_weight": 0.25,
+      "prior_record_share": 0.6737012987012987,
+      "projected_gw1_score": 57.05123470843299,
+      "realized_gw1_score": 57.0,
+      "season": "2024-25"
+    }
+  ],
+  "seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ]
+}

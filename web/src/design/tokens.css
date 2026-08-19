@@ -1,0 +1,154 @@
+/* SquadOpt design tokens — direction B "Ledger" (light-first, one teal accent).
+   Every colour a component uses is a token; the dark palette redefines tokens only. */
+
+:root {
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SFMono-Regular", monospace;
+
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.125rem;
+  --step-2: 1.375rem;
+  --step-3: 1.75rem;
+  --step-4: 2.25rem;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-s: 6px;
+  --radius-m: 8px;
+  --radius-pill: 999px;
+
+  --color-bg: #f6f7f5;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef1ee;
+  --color-line: #d9dfda;
+  --color-text: #182320;
+  --color-text-muted: #5f6b66;
+  --color-text-faint: #8a948f;
+  --color-accent: #0f766e;
+  --color-accent-text: #ffffff;
+  --color-pitch: #e6efe9;
+  --color-pitch-line: #c8d8cf;
+  --color-chip: #ffffff;
+  --color-chip-text: #182320;
+  --color-chip-muted: #6b7772;
+  --color-good: #1f7a4d;
+  --color-warn: #a16207;
+  --color-bad: #b42318;
+  --color-focus: #0f766e;
+
+  --shadow-1: 0 1px 0 rgba(24, 35, 32, 0.08);
+  --measure: 62ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #121715;
+    --color-surface: #182019;
+    --color-surface-2: #1f2a23;
+    --color-line: #2c3a31;
+    --color-text: #e8efe9;
+    --color-text-muted: #a3b3aa;
+    --color-text-faint: #7d8c84;
+    --color-accent: #4fd1c5;
+    --color-accent-text: #0b1a17;
+    --color-pitch: #16281f;
+    --color-pitch-line: #244635;
+    --color-chip: #1f2a23;
+    --color-chip-text: #e8efe9;
+    --color-chip-muted: #93a49b;
+    --color-good: #5ec98f;
+    --color-warn: #e0b04a;
+    --color-bad: #f0796d;
+    --color-focus: #4fd1c5;
+    --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.35);
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #121715;
+  --color-surface: #182019;
+  --color-surface-2: #1f2a23;
+  --color-line: #2c3a31;
+  --color-text: #e8efe9;
+  --color-text-muted: #a3b3aa;
+  --color-text-faint: #7d8c84;
+  --color-accent: #4fd1c5;
+  --color-accent-text: #0b1a17;
+  --color-pitch: #16281f;
+  --color-pitch-line: #244635;
+  --color-chip: #1f2a23;
+  --color-chip-text: #e8efe9;
+  --color-chip-muted: #93a49b;
+  --color-good: #5ec98f;
+  --color-warn: #e0b04a;
+  --color-bad: #f0796d;
+  --color-focus: #4fd1c5;
+  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

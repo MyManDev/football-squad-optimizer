@@ -1,0 +1,73 @@
+# Measurements Index
+
+One line per committed real-data measurement artifact: what it is, what it found, and
+where it came from. Every artifact is recommendation/measurement-only — nothing here
+promoted a model, changed the operational control, or read the 2025-26 locked holdout.
+Regenerated artifacts must keep passing `scripts.run_measurement_preflight`.
+
+## Deterministic policy
+
+| Artifact | Finding | PR |
+| --- | --- | --- |
+| `baseline_bayesopt` | First real BO run: best observed `fw10-bw0` at 56.50 mean realized points (147 folds) | #57 |
+| `baseline_policy_grid` | Exhaustive 56-cell ground truth; fw10 column holds ranks 1–7; **BO regret 0.0000**, optimum found at iteration 3 | #61 |
+| `fw10_screening` + `fw10_frozen_candidate` | Official screening DoE froze `fw10-bw0` as the eligible challenger; holdout plan in `fw10_holdout_plan.md` (run deferred) | #65 |
+| `fw10_season_robustness` | Challenger-vs-control delta per development season, in isolation | #74 |
+| `selection_optimism` | Winner's curse located: roster residuals unbiased (−0.004), selected starters −2.96, captains −3.86, top-5 ranked −3.53 | #73 |
+| `shrinkage_grid` | Does decision-side position-mean shrinkage improve realized squads? (`position_mean_shrinkage_v1`) | #74+ |
+
+## Scenario and risk
+
+| Artifact | Finding | PR |
+| --- | --- | --- |
+| `scenario_bayesopt` | First 3-factor search; best `fw6-bw0-ra0` at 57.11; risk aversion's mean cost measured | #60 |
+| `scenario_bayesopt_deterministic` | Same recommendation under a deterministic work budget (`det=2.0`); trace machine-independent | #64 |
+| `risk_frontier` | **Every ra>0 worsens mean AND floor** (q10 −10..−28); premium buys negative protection | #67 |
+| `scenario_calibration_audit` | Cause found: +34.5 decision-level location bias; realized scores in the scenarios' extreme lower tail (PIT 0.07) | #68 |
+| `scenario_calibration_audit_{development,online,dev_dgw,online_dgw}` (+correction note) | Decision-level **selection-optimism shift** (−36.3 at squad level from `selection_optimism_profile_v1`; or online from earlier folds) fixes the location: mean PIT 0.07 → 0.55/0.51, bias +34.5 → −1.8/+2.7; squad-level spread slightly narrow both ways (PIT tails 0.14/0.14 vs 0.10) — see `_disp` row; double-gameweek scale 1.45 and rival comparison (same scenarios, shared players cancel) added; live risk applies the shift by default and states its limits | — |
+| `scenario_calibration_audit_{development,online}_disp` (note section) | Squad-level dispersion: online RMS of location-corrected standardized gaps settles at **1.15** (spread ~15% narrow); widening by it moves every tail rate toward nominal or leaves it (development shift: PIT>0.90 0.14→0.08, realized<q10 0.16→0.14; online shift: PIT<0.10 0.22→0.16, q10 0.24→0.19) but at 37 folds the intervals include 0.10 before and after — **live default stays 1.0**, `--risk-dispersion-scale` exposes the candidate and the report states the raw-spread limit | — |
+| `rank_objective_rehearsal` (+note) | First rehearsal of the rank-probability objective (`rank_probability_objective_v1`) against the fold's own template squad, 37 folds x 100 scenarios: **honest negative** — claimed P(ahead) ~0.5 at every budget vs realized 0.33-0.41 [90% intervals topping out at 0.48-0.54], 0.51 vs 0.22 among proven-optimal folds; realized cost above expected cost everywhere; 7/33 ties at budget 0; only the tightest budget mostly proven (0.82 -> 0.00 unconstrained), so the menu is not monotone. Mechanism verified, claim not yet honest. **Second pass** (`_heldout`, contract v2: claim read on 100 held-out scenarios, ties stated, three provable phases + rival hint): winner's curse measured at ~0.10 (in-sample 0.51–0.55 vs held-out 0.40–0.45) and removed from the claim; claim now inside the realized interval at 3 of 4 budgets (realized strict-ahead 0.30–0.35, level 3–16%); menu monotone again; realized cost still ~+3 vs expected ~+1 — the cost side needs the same correction. Still a measurement instrument, not on the live path | — |
+| `scenario_calibration_audit_located_k10/_k2` | Honest negative result: per-player location component does not fix the bias — the curse is selection-time, not player-persistent | #70 |
+
+## Uncertainty and recalibration
+
+| Artifact | Finding | PR |
+| --- | --- | --- |
+| `control_uncertainty_calibration` | Player-adaptive holds 0.90 coverage at ~11.5% narrower intervals; fully development-internal | #62 |
+| `control_residual_export` (record) | Control-regime `oos_residual_export_v1`: exactly 147 folds / 101,447 rows; preflight-clean | #59 |
+| `candidate_residual_export` (record) | Calendar-aware `learned-rate-v2` half of the pair; control regenerated at the same commit and byte-identical across three commits | #80 |
+| `time_aware_recalibration` | Held-out coverage **unchanged** on single gameweeks (0.9019 both) at **7.2% narrower** intervals; both regimes **undercover doubles** (0.83 / 0.80 vs nominal 0.90) | #82 |
+| `issue43_handoff_acceptance` + `issue43_stage_a_review` (records) | Handoff accepted item by item with independent re-runs at `93a87d6`: control export hash reproduces across machines, **candidate export does not** (BLAS-level last-bit differences; content identical to 4 dp); declaration fingerprints reproduce byte for byte; optimization-side Stage A review done, reading (a) confirmed, v2 clean enough to freeze; freeze pending the third owner | — |
+| `issue38_calibration_decision` (record) | Operational calibration stays bound to the control's residuals; #38 closes with the #43 verdict either way; the shared double-gameweek undercoverage (0.83/0.80 vs 0.90) is a calibration fact — a fixture-group conformal axis is this layer's next measured step | — |
+| `fixture_group_conformal` (+note) | The #38 follow-up on the control's export, chronological split (88 calibrate / 59 held-out folds): a position-by-fixture-group axis lifts **double-gameweek coverage 0.849 → 0.901** (nominal 0.90; width 7.2 → 10.1 on 1,265 double rows) while singles narrow (7.25 → 6.90) and stay above nominal; overall coverage unchanged, mean width down; no cell needed the fallback — the evidence a `projection_uncertainty_v2` declaration rests on | — |
+| `control_uncertainty_calibration_v2` + `projection_uncertainty_v2_declaration` (record) | The declaration the #38 decision asked for: `UncertaintyConfig(grouping="position_fixture_group")` is `projection_uncertainty_v2` (position × single/double_plus, blanks zero, calendar required, v1 untouched and its fingerprint reproduced); on the control, 2024-25 held out: overall 0.910/6.89 (v1 0.910/6.85), doubles 0.863 at width 9.83 (364 rows), every cell self-fitted; **operational default since 2026-08-18**: the risk-screening and control-calibration runners default to v2 with the archive calendar attached (`calendar_from_archive`), the live risk layer widens doubles from the capture's calendar (`--risk-double-gameweek-scale` 1.45), `UncertaintyConfig()` itself stays v1 so recorded artifacts reproduce; GW1 replay byte-identical | — |
+| `recalibration_dry_run` (+note) | Preflight-gated time-aware pipeline proven on real fw05-vs-fw10 regimes; fw10 tighter at unchanged coverage | #63 |
+
+## Planning
+
+| Artifact | Finding | PR |
+| --- | --- | --- |
+| `multi_gw_rehearsal` | Planner vs myopic on real windows: +1.17 net points/window under naive projections | #66 |
+| `planner_doe` | Horizon length is the live control (H2 +4.83 / H4 −3.67); hit cost matters only below 4; discount dead | #71 |
+| `projection_horizon_run` (record) | First real multi-gameweek handoff; an opening capture yields a **flat** horizon because the published calendar has no blanks or doubles | #83 |
+| `horizon_decay` | Projection MAE grows only **+7.8% over three gameweeks** (~2.6%/GW); doubles decay faster (+10.6%) than singles (+7.5%) — so the H4 planner loss is mostly **not** projection staleness | #85 |
+| `planner_horizon_seasons` (+note) | Four seasons / 23 windows per horizon: H2's +4.83 was one season (4-season mean −0.57); no horizon beats myopic beyond noise (SE 1.7–3.4); H4 −4.87 loses on **selection, not hits** (planner pays fewer hits than myopic), concentrated in windows with **no** calendar structure → information staleness at the top of the ranking, not calendar handling; wall-clock-capped, recommendation-quality | — |
+| `export_precision` | Unrounded, **all 58,855 non-zero rows move** under a 1e-15 perturbation — why two owners hashed the same export differently; **9 dp moves none**, so the export now writes nine decimals | #94 |
+| `candidate_runtime` | Checklist item 15: learned candidate **590 s** over 147 folds (4.02 s/fold) against the control's **11.7 s** — about fifty times the cost, projection-only, no solver | — |
+| `planner_horizon_rolling` (+note) | 66 windows/horizon, four seasons, deterministic budget: **re-planning weekly removes the selection loss (H4 −7.94 → +0.35) but replaces it with a hit bill** (rolling H4 pays 14.5 hit pts/window vs 5.8 myopic; advantage −8.32 [−11.1, −6.3]); rolling H3 −2.30 [−4.2, −0.4]; one-shot H4 −5.15 [−7.0, −0.9]; no horizon beats the weekly baseline in either mode — churn is structural under naive calendar scaling; next: transfer discipline / discount in rolling mode, then chips | — |
+| `season_chain` (+note) | Four seasons walked as one chain each (37 decisions, state carried, game sell rule, chips once per window): **chips are worth ~70–90 net/season and mostly the wildcard** (WC +60–65 hits avoided, BB +11–17, TC +3–11; chips-on vs off +69 [+0.56, +2.99]/week, reserve rule +88); a finite horizon **burns BB/TC in GW2–4** — the double-gameweek reservation rule adds +18 (myopic) / +66 (rolling); **rolling H3 loses −156/season without chips, −110 with, −44 with reservation** [−2.93, +0.16]/week — churn does not become chips (265 vs 142 hit pts); two planner fixes (deferred equal-value chips, pinned wildcard FT accounting) | — |
+| `season_chain_value` | Chip **holding value** (BB 20 / TC 18 / WC 12 pts, planner-side option value) vs the calendar rule at lookahead 1: **+97 vs +88 per season** over no chips [+1.24, +3.86]/week; TC timed onto the biggest double (20 pts realized in 3/4 seasons), WC held to larger rebuilds (+76 vs 63), BB still burned in GW2 by inflated opening projections — combine holding values with the calendar rule for BB next | — |
+| `transfer_discipline` (+note, +`_rolling`) | Planner hit cost {4,6,8} × transfer cap {none,2,1} × banked-FT value {0,1,2} on the season chain: at **lookahead 1 no discipline is robustly better** than the rule (main effects −13…−28; seasons flip sign; banked value alone is significantly negative); at **lookahead 3 a one-transfer cap adds +140/season** in every season [+2.18, +5.78]/week — the capped rolling planner (2016) is level with the weekly control (2008; +0.22/wk [−1.14, +1.39]) and +33 over the capped weekly control: the first positive evidence for a horizon, conditional on the cap | — |
+| `season_chain_hybrid`, `season_chain_blind` (+`transfer_discipline_blind_rolling`) | Hybrid chip policy (BB reserved for doubles, TC/WC held) **+102/season** over no chips [+1.50, +4.15] vs reserve +88 / value +97 — within ~15 of each other; **calendar-blind control** (no fixture-count scaling): weekly control loses **58 net/season**, chip value halves (reserve +48, value +52), rolling cap-1 still +122 → the live GW2+ handoff must be calendar-aware | — |
+| `season_chain_freehit`, `transfer_discipline_value_rolling` | Free hit (planner contract v2) on the chain: played at the seasons' big blank/double weeks (GW25/32) for **+9 (reserve) / +17 (hybrid) per season**, once negative; all four chips **+103 / +114** over no chips. Rolling cap-1 with holding-value chips **1968** — below capped rolling under the calendar rule (2016) and the weekly control (2018): the capped rolling planner draws with the weekly control, it does not lead | — |
+| `chip_bayesopt` (+note) | Bayesian search (`deterministic_policy_bo_v1`, 20 evaluations, season-robust objective mean − 1 sd) over chip holding values and the planning hit cost on the lookahead-1 hybrid season chain: candidate `3xc=20, wildcard=24, bboost=0, freehit=0, hit cost 7` — nets 2097/2122/1952/2044 (mean **2053.8**) vs the recorded hybrid reference 2035.0, **ahead in all four seasons** (+12/+33/+19/+11); most of the robust gain is variance reduction from hit cost 7-8 (spread ~60 vs ~130 at cost 4), `wildcard_hold=24` sits on the grid edge, `bboost_hold` inert under hybrid; a candidate for the next season chain, no promotion | — |
+| `season_chain_tuned` | The chip-BO candidate as the chain's `tuned` mode vs `hybrid` and `off` on four seasons (L1): reproduces the search's nets exactly (2097/2122/1952/2044); tuned − hybrid **+0.51/week, 90% block-bootstrap [−1.14, +2.13]**, positive-week share 0.43, +18.8/season from fewer hits (60 vs 172 hit points) — the four season signs agree, the weekly evidence does not leave zero; against off, tuned +3.62 [+1.88, +5.57] and hybrid +3.11 [+1.82, +4.69]: the chips are the effect, the tuning is not | — |
+| `chip_bayesopt_wide`, `chip_bayesopt_value` (note follow-up) | Wider `wildcard_hold` grid (0..40) under hybrid moves the robust optimum to `3xc=5, wildcard=28, freehit=20, hit cost 8` (mean 2072.5, spread 98, robust 1974.6 — higher mean, lower robust than the first run; wildcard 40 lost three times); value mode: `3xc=10, wildcard=32, freehit=20, hit cost 7` mean 2064.8, spread **46.6**, robust **2018.2** (best of the three searches, ahead of the hybrid reference in all four seasons, +30 mean). Only the hit cost (7–8), freehit_hold at the grid top and wildcard 28–32 recur; the surface is flat within the season spread — no promotion | — |
+| `residual_signal_scan` | Enrichment fields the archive holds but no model reads, strictly lagged against the control residuals (101,447 rows): **recent luck** (returns − xGI, last 6) is monotone with a **1.07-point** residual spread — hot players are over-predicted by 0.74; **recently moved** players (594 rows) are under-predicted by **+0.62** with the model *widening* the raw gap (ratio 2.14); the source's own `xP` adds +0.48 in its top quartile; xGI/90 itself 0.32 (non-monotone); ownership ~nothing (0.10) | — |
+| `opponent_strength_signal` | Control residuals still move with opponent strength: **+0.162** attacking (monotone), **+0.322** defensive; effect is *larger* after the model than before it (1.24x / 1.06x) — unspent signal | #87 |
+
+## Process references
+
+`handoff_acceptance_checklist.md` · `candidate_declaration_review.md` ·
+`gw1_blocker_report_template.md` · `fw10_holdout_plan.md` · `opening_week_runbook.md` ·
+`artifact_preflight_spec.md` · `projection_horizon_contract.md`

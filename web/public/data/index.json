@@ -1,0 +1,28 @@
+{
+  "contract_version": "ui_view_v1",
+  "generated_at_utc": "2026-08-19T10:00:00Z",
+  "payload": {
+    "files": [
+      "2026-27/gw01/pool.json",
+      "2026-27/gw01/recommendation.json",
+      "2026-27/ledger.json",
+      "2026-27/status.json",
+      "schema/ui_view_v1.schema.json"
+    ],
+    "gameweeks": {
+      "2026-27": [
+        1
+      ]
+    },
+    "generated_at_utc": "2026-08-19T10:00:00Z",
+    "latest": {
+      "gameweek": 1,
+      "path": "2026-27/gw01/recommendation.json",
+      "season": "2026-27"
+    },
+    "schema_path": "schema/ui_view_v1.schema.json",
+    "seasons": [
+      "2026-27"
+    ]
+  }
+}
