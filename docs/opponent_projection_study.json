@@ -3663,7 +3663,7 @@
     ]
   },
   "contract_version": "opponent_projection_study_v1",
-  "created_utc": "2026-08-19T13:02:52+00:00",
+  "created_utc": "2026-08-19T13:15:28+00:00",
   "diagnostics": {
     "control": "deterministic_baseline_control",
     "development_seasons": [
@@ -3768,7 +3768,7 @@
       "2024-25",
       "2025-26"
     ],
-    "repository_commit": "9d5501c778f465a78c6a4b9659d6fe15b439927b",
+    "repository_commit": "edb783b03662aea13f1cc87058377f084dffd245",
     "working_tree_dirty": false
   },
   "verdict": {
