@@ -1,0 +1,19 @@
+.empty {
+  border: 1px dashed var(--color-line);
+  border-radius: var(--radius-m);
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  color: var(--color-text);
+}
+
+.body {
+  margin-top: var(--space-2);
+  max-width: var(--measure);
+  margin-inline: auto;
+}

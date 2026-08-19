@@ -62,3 +62,53 @@ jobs:
 
       - name: Pytest (full suite is the merge gate)
         run: python -m pytest -q -p no:cacheprovider --durations=15
+
+  web:
+    name: web (node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Types match the committed contract
+        run: |
+          npm run gen:types
+          git diff --exit-code -- src/data/schema.ts
+
+      - name: Lint and format
+        run: |
+          npm run lint
+          npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build
+
+      - name: Playwright smoke
+        run: |
+          npx playwright install --with-deps chromium
+          npm run e2e
+
+      - name: Upload site
+        uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: web/dist
+          retention-days: 7
