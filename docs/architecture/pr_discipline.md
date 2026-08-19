@@ -74,25 +74,33 @@ touching them:
 
 1. Runs the full suite, including the replay determinism tests in
    `tests/unit/test_live_recommendation.py`.
-2. Runs **`test_the_recorded_gw1_replay_fingerprint_holds`**, which pins the opening-gameweek
-   replay to recorded literals. If the fingerprint moved, either the change altered a live
-   decision — say so explicitly in the PR and get the owner's agreement — or it is a bug.
+2. Runs **`test_the_recorded_gw1_replay_decision_holds`**
+   (`tests/unit/test_live_recommendation.py`), which pins the opening-gameweek decision to
+   recorded literals — the projection digest, the fifteen squad ids, the starting eleven, the
+   bench, the captain, the cost and the score. If it moves, either the change altered a live
+   decision — say so explicitly in the PR, get the live-path owner's agreement, and update the
+   literals in the same commit — or it is a bug.
 3. Respects the freeze window in [ownership](ownership.md): no merges within 24 hours either
    side of a deadline.
 
 ### About the replay check
 
 An earlier version of this agreement required verifying three replay hashes
-(`2007677d`, `b367c98d`, `6b2c6024`) on every live-path PR. **Those values do not exist
-anywhere in this repository** — not in `src/`, `scripts/`, `tests/`, `docs/` or `README.md`. The
-only trace of the claim is a narrative aside in `../measurements_index.md` asserting the GW1
-replay is byte-identical, with no hash, no command and no artifact. The determinism tests that
-do exist compare two in-process runs and pin no literal, so they would pass even if every
-number changed.
+(`2007677d`, `b367c98d`, `6b2c6024`) on every live-path PR, and **those values existed nowhere
+in this repository** — they were local Windows-only digests recorded in a pull-request body and
+never committed. The determinism tests that existed compared two in-process runs and pinned no
+literal, so they would have passed even if every number changed.
 
-A gate nobody can evaluate is worse than no gate, because it reads as protection. The pinned
-fingerprint test replaces it, and it lands in its own companion PR — so until that PR merges,
-this section describes the intent and step 1 is the enforceable part.
+That is closed. The pinned test named above landed in #113, and #116 then had to move its
+literal for a real reason: the first Linux CI run showed the digest was platform-dependent,
+because `to_csv` defaulted its line terminator to `os.linesep`. The gate caught a determinism
+defect on its first outing, which is the argument for having it.
+
+**This section is itself the standing example of the failure it describes.** Between the plan
+and the implementation the test was renamed, and step 2 above kept pointing at
+`test_the_recorded_gw1_replay_fingerprint_holds`, which never existed — so for a while this
+document named an unrunnable gate while explaining why unrunnable gates are worse than none.
+If you change the name of a pinned test, change it here in the same commit.
 
 ## Working zones, and how to not collide
 
