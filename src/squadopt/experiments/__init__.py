@@ -40,6 +40,13 @@ from squadopt.experiments.multi_gw_rehearsal import (
     MultiGwRehearsalConfig,
     RehearsalWindowResult,
 )
+from squadopt.experiments.opening_newcomers import (
+    OPENING_NEWCOMER_STUDY_CONTRACT_VERSION,
+    OpeningNewcomerStudy,
+    OpeningStudyConfig,
+    run_opening_newcomer_study,
+    study_to_markdown,
+)
 from squadopt.experiments.policy_grid import (
     POLICY_GRID_CONTRACT_VERSION,
     PolicyGridCell,
@@ -123,6 +130,7 @@ __all__ = [
     "DEFAULT_HOLDOUT_SEASONS",
     "MULTI_GW_REHEARSAL_CONTRACT_VERSION",
     "NAIVE_PROJECTION_RULE",
+    "OPENING_NEWCOMER_STUDY_CONTRACT_VERSION",
     "PINNED_RISK_AVERSION",
     "POLICY_GRID_CONTRACT_VERSION",
     "POLICY_OBJECTIVE_CONTRACT_VERSION",
@@ -151,6 +159,8 @@ __all__ = [
     "MainEffect",
     "MultiGwRehearsal",
     "MultiGwRehearsalConfig",
+    "OpeningNewcomerStudy",
+    "OpeningStudyConfig",
     "PairedComparison",
     "PolicyGridCell",
     "PolicyGridResult",
@@ -188,10 +198,12 @@ __all__ = [
     "measure_selection_optimism",
     "rehearse_rank_objective",
     "run_frozen_holdout",
+    "run_opening_newcomer_study",
     "run_screening_experiment",
     "screening_result_to_dict",
     "screening_result_to_markdown",
     "season_aware_moving_block_interval",
     "shrink_projections",
+    "study_to_markdown",
     "summarize_search_efficiency",
 ]
