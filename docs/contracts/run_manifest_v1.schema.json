@@ -1,0 +1,87 @@
+{
+  "$id": "https://squadopt.dev/contracts/run_manifest_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Immutable identity and reproducibility inputs for one platform run.",
+  "properties": {
+    "context": {
+      "additionalProperties": false,
+      "properties": {
+        "component_versions": {
+          "additionalProperties": {
+            "minLength": 1,
+            "pattern": "^\\S(?:.*\\S)?$",
+            "type": "string"
+          },
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "type": "object"
+        },
+        "configuration_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "contract_version": {
+          "const": "run_context_v1",
+          "type": "string"
+        },
+        "created_at_utc": {
+          "format": "date-time",
+          "pattern": "Z$",
+          "type": "string"
+        },
+        "deterministic_seed": {
+          "maximum": 9223372036854775807,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "input_fingerprints": {
+          "additionalProperties": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9._-]{0,63}$"
+          },
+          "type": "object"
+        },
+        "repository_commit": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        },
+        "reproducibility_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "run_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "component_versions",
+        "configuration_fingerprint",
+        "contract_version",
+        "created_at_utc",
+        "deterministic_seed",
+        "input_fingerprints",
+        "repository_commit",
+        "reproducibility_fingerprint",
+        "run_id"
+      ],
+      "type": "object"
+    },
+    "contract_version": {
+      "const": "run_manifest_v1",
+      "type": "string"
+    }
+  },
+  "required": [
+    "context",
+    "contract_version"
+  ],
+  "title": "SquadOpt run manifest",
+  "type": "object"
+}
