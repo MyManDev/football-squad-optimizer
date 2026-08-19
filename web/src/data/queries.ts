@@ -3,7 +3,14 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import type { DataClient, Loaded } from "./client";
 import { StaticDataClient } from "./client";
-import type { LedgerView, PoolView, RecommendationView, SiteIndex, StatusView } from "./schema";
+import type {
+  LeagueView,
+  LedgerView,
+  PoolView,
+  RecommendationView,
+  SiteIndex,
+  StatusView,
+} from "./schema";
 
 export const DataClientContext = createContext<DataClient>(new StaticDataClient());
 
@@ -49,6 +56,16 @@ export function useLedger(season: string | undefined): UseQueryResult<Loaded<Led
   return useQuery({
     queryKey: ["ledger", season],
     queryFn: () => client.getLedger(season as string),
+    enabled: season !== undefined,
+    staleTime: STALE,
+  });
+}
+
+export function useLeague(season: string | undefined): UseQueryResult<Loaded<LeagueView>> {
+  const client = useDataClient();
+  return useQuery({
+    queryKey: ["league", season],
+    queryFn: () => client.getLeague(season as string),
     enabled: season !== undefined,
     staleTime: STALE,
   });

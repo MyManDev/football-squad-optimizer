@@ -3,6 +3,7 @@
     data/index.json                              SiteIndex
     data/schema/ui_view_v1.schema.json           the contract
     data/<season>/status.json                    StatusView (when a plan is supplied)
+    data/<season>/league.json                    LeagueView (when a capture is supplied)
     data/<season>/ledger.json                    LedgerView
     data/<season>/gw<NN>/recommendation.json     RecommendationView
     data/<season>/gw<NN>/pool.json               PoolView (why these players)
@@ -27,6 +28,7 @@ from squadopt.application.build import (
     status_view,
 )
 from squadopt.application.contract import UI_VIEW_CONTRACT_VERSION, ui_view_schema
+from squadopt.application.league import league_view, ownership_view
 from squadopt.application.views import (
     JsonValue,
     LedgerView,
@@ -35,6 +37,7 @@ from squadopt.application.views import (
     ViewEnvelope,
     utc_now_iso,
 )
+from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.live.ledger import LedgerEntry, load_ledger
 from squadopt.live.tick import LedgerState, TickPlan
 
@@ -51,6 +54,7 @@ class SiteBuildReport:
     decided_gameweeks: tuple[int, ...]
     settled_gameweeks: tuple[int, ...]
     status_written: bool
+    league_written: bool
 
 
 def _write_json(path: Path, payload: dict[str, JsonValue]) -> None:
@@ -76,9 +80,14 @@ def build_site(
     out_dir: Path,
     plan: TickPlan | None = None,
     runlog_root: Path | None = None,
+    snapshot: CapturedSnapshot | None = None,
     now: datetime | None = None,
 ) -> SiteBuildReport:
     """Render the season's ledger (and, if given, a tick plan) as the site's data tree.
+
+    ``snapshot`` is the capture the league comparison reads (the game's own weekly
+    average and each player's ownership); without it ``league.json`` is not written and
+    the page says the comparison has not been published.
 
     ``plan`` is a ``TickPlan`` the caller already made from the captures and ledger
     (``plan_tick``); the site never plans on its own so building a site can never change
@@ -101,6 +110,22 @@ def build_site(
 
     ledger: LedgerView = ledger_view(Path(ledger_root), season)
     emit(f"{season}/ledger.json", ledger.to_dict())
+
+    league_written = False
+    if snapshot is not None:
+        latest_entry = entries[-1] if entries else None
+        ownership = None
+        if latest_entry is not None:
+            latest_view = recommendation_view_from_ledger(latest_entry)
+            ownership = ownership_view(
+                snapshot,
+                gameweek=latest_view.gameweek,
+                starters=latest_view.starting_xi,
+                bench=latest_view.bench,
+                captain_player_id=latest_view.captain_player_id,
+            )
+        emit(f"{season}/league.json", league_view(snapshot, ledger, ownership=ownership).to_dict())
+        league_written = True
 
     status_written = False
     if plan is not None:
@@ -142,4 +167,5 @@ def build_site(
         decided_gameweeks=gameweeks,
         settled_gameweeks=tuple(row.gameweek for row in ledger.rows if row.settled),
         status_written=status_written,
+        league_written=league_written,
     )

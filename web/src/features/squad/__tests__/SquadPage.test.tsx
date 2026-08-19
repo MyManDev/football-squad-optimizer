@@ -29,6 +29,9 @@ const client: DataClient = {
   getLedger: async () => {
     throw new Error("not used");
   },
+  getLeague: async () => {
+    throw new Error("not used");
+  },
   getStatus: async () => {
     throw new Error("not used");
   },
