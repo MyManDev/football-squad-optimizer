@@ -15,6 +15,10 @@ dependencies = [
     "ortools>=9.15.6755,<9.16",
     "pandas>=2.2.3,<3.1",
     "scikit-learn>=1.6,<2",
+    # Already present transitively through scikit-learn, and now imported directly by the
+    # team-rating study for its bounded quasi-Newton fit, so it is declared rather than
+    # borrowed.
+    "scipy>=1.14,<2",
 ]
 
 [project.optional-dependencies]
@@ -54,6 +58,13 @@ python_version = "3.13"
 strict = true
 mypy_path = "src"
 files = ["src/squadopt"]
+
+# SciPy ships no type information and `scipy-stubs` is a separate, partial third-party
+# package; the two call sites here are wrapped in typed helpers, so the untyped import is
+# contained rather than spread.
+[[tool.mypy.overrides]]
+module = ["scipy.*"]
+ignore_missing_imports = true
 
 [tool.importlinter]
 root_package = "squadopt"

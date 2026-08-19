@@ -117,6 +117,15 @@ from squadopt.experiments.selection_optimism import (
     measure_selection_optimism,
 )
 from squadopt.experiments.statistics import season_aware_moving_block_interval
+from squadopt.experiments.team_rating import (
+    TEAM_RATING_STUDY_CONTRACT_VERSION,
+    DixonColesConfig,
+    TeamRating,
+    TeamRatingStudy,
+    TeamRatingStudyConfig,
+    fit_dixon_coles,
+    run_team_rating_study,
+)
 
 __all__ = [
     "CALENDAR_BLIND_PROJECTION_RULE",
@@ -145,9 +154,11 @@ __all__ = [
     "SEASON_CHAIN_CONTRACT_VERSION",
     "SELECTION_OPTIMISM_CONTRACT_VERSION",
     "SHRINKAGE_RULE_VERSION",
+    "TEAM_RATING_STUDY_CONTRACT_VERSION",
     "BaselinePolicyObjective",
     "CandidateAssessment",
     "ChipWindowRule",
+    "DixonColesConfig",
     "ExperimentCandidate",
     "ExperimentConfigurationError",
     "ExperimentError",
@@ -184,11 +195,15 @@ __all__ = [
     "SeasonChainResult",
     "SeasonChainWeek",
     "SelectionOptimismResult",
+    "TeamRating",
+    "TeamRatingStudy",
+    "TeamRatingStudyConfig",
     "audit_scenario_calibration",
     "build_control_residual_table",
     "control_model_version",
     "control_residual_manifest",
     "evaluate_policy_grid",
+    "fit_dixon_coles",
     "freeze_screening_candidate",
     "frozen_candidate_from_dict",
     "frozen_candidate_to_dict",
@@ -200,6 +215,7 @@ __all__ = [
     "run_frozen_holdout",
     "run_opening_newcomer_study",
     "run_screening_experiment",
+    "run_team_rating_study",
     "screening_result_to_dict",
     "screening_result_to_markdown",
     "season_aware_moving_block_interval",
