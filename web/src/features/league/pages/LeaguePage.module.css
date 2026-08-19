@@ -71,3 +71,14 @@
     font-size: var(--step-3);
   }
 }
+
+.lede {
+  margin: var(--space-2) 0 0;
+  max-width: var(--measure);
+  color: var(--color-text-muted);
+}
+
+.para {
+  margin: 0;
+  max-width: var(--measure);
+}

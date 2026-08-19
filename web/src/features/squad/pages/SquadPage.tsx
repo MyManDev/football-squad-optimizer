@@ -18,9 +18,9 @@ import {
   utcShort,
 } from "../../../lib/format";
 import { Pitch } from "../components/Pitch";
-import styles from "./ThisWeekPage.module.css";
+import styles from "./SquadPage.module.css";
 
-/** A clock that ticks every `intervalMs`; the countdown text is derived during render. */
+/** A clock that ticks; the countdown text is derived during render. */
 function useNow(intervalMs: number): Date {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -30,7 +30,7 @@ function useNow(intervalMs: number): Date {
   return now;
 }
 
-export function ThisWeekPage() {
+export function SquadPage() {
   const params = useParams();
   const index = useIndex();
   const latest = index.data?.payload.latest ?? null;
@@ -47,7 +47,7 @@ export function ThisWeekPage() {
   if (!season || !gameweek) {
     return (
       <EmptyState title="No decision recorded yet.">
-        The first gameweek is decided about two hours before its deadline; the page fills in once
+        The first gameweek is decided about two hours before its deadline; this page fills in once
         the ledger holds an entry.
       </EmptyState>
     );
@@ -68,11 +68,11 @@ export function ThisWeekPage() {
   }
   if (!recommendation.data) return null;
   return (
-    <Decision view={recommendation.data.payload} generatedAt={recommendation.data.generatedAtUtc} />
+    <Squad view={recommendation.data.payload} generatedAt={recommendation.data.generatedAtUtc} />
   );
 }
 
-function Decision({ view, generatedAt }: { view: RecommendationView; generatedAt: string }) {
+function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: string }) {
   const now = useNow(30_000);
   const remaining = countdown(view.deadline_utc, now);
   const risk = view.risk;
@@ -86,7 +86,7 @@ function Decision({ view, generatedAt }: { view: RecommendationView; generatedAt
             {view.decision_kind === "opening" ? "opening squad" : "transfer decision"}
           </div>
           <h1 className={styles.title}>Gameweek {view.gameweek}</h1>
-          <Link className={styles.whyLink} to={`/why/${view.season}/${view.gameweek}`}>
+          <Link className={styles.whyLink} to="/rivals">
             Why these players →
           </Link>
         </div>
@@ -152,12 +152,21 @@ function Decision({ view, generatedAt }: { view: RecommendationView; generatedAt
             <span className={styles.muted}>Captain not in the starting eleven.</span>
           )}
         </Card>
-        <Card title="Transfers">
-          {view.transfers ? (
-            <TransfersBlock view={view} />
-          ) : (
-            <span className={styles.muted}>Opening squad — no transfers, no chip.</span>
-          )}
+        <Card title="Bench" aside="in substitution order">
+          <div className={styles.bench}>
+            {view.bench.map((p) => (
+              <div key={p.player_id} className={styles.benchRow}>
+                <span className={`${styles.benchOrder} num`}>{p.bench_order}</span>
+                <span className={styles.benchName}>
+                  <strong>{p.name}</strong>
+                  <span className={styles.muted}>
+                    {p.team} · {p.position} · {pounds(p.price_tenths)}
+                  </span>
+                </span>
+                <span className={`${styles.benchXp} num`}>{points(p.expected_points)}</span>
+              </div>
+            ))}
+          </div>
         </Card>
       </div>
 
@@ -206,17 +215,6 @@ function Decision({ view, generatedAt }: { view: RecommendationView; generatedAt
             />
           </StatRow>
         )}
-        {risk.rivals.length > 0 && (
-          <ul className={styles.list}>
-            {risk.rivals.map((r) => (
-              <li key={r.rival}>
-                vs {r.rival}: P(ahead) {percent(r.probability_ahead)} [
-                {percent(r.probability_ahead_interval[0])},{" "}
-                {percent(r.probability_ahead_interval[1])}], {r.shared_starters} shared starters
-              </li>
-            ))}
-          </ul>
-        )}
         {risk.stated_limits.length > 0 && (
           <ul className={styles.list}>
             {risk.stated_limits.map((line) => (
@@ -224,23 +222,11 @@ function Decision({ view, generatedAt }: { view: RecommendationView; generatedAt
             ))}
           </ul>
         )}
-      </Card>
-
-      <Card title="Bench" aside="in substitution order">
-        <div className={styles.bench}>
-          {view.bench.map((p) => (
-            <div key={p.player_id} className={styles.benchRow}>
-              <span className={`${styles.benchOrder} num`}>{p.bench_order}</span>
-              <span className={styles.benchName}>
-                <strong>{p.name}</strong>
-                <span className={styles.muted}>
-                  {p.team} · {p.position} · {pounds(p.price_tenths)}
-                </span>
-              </span>
-              <span className={`${styles.benchXp} num`}>{points(p.expected_points)}</span>
-            </div>
-          ))}
-        </div>
+        {risk.rivals.length > 0 && (
+          <p className={styles.muted}>
+            <Link to="/rivals">Rival comparisons →</Link>
+          </p>
+        )}
       </Card>
 
       <footer className={styles.provenance}>
@@ -258,39 +244,6 @@ function Decision({ view, generatedAt }: { view: RecommendationView; generatedAt
             : ""}
         </span>
       </footer>
-    </div>
-  );
-}
-
-function TransfersBlock({ view }: { view: RecommendationView }) {
-  const t = view.transfers;
-  if (!t) return null;
-  return (
-    <div className={styles.transfers}>
-      <div className={styles.muted}>
-        {t.transfer_count} transfer{t.transfer_count === 1 ? "" : "s"} · {t.paid_transfer_count}{" "}
-        paid ({points(t.transfer_hit_points, 0)} pts) · FT {t.free_transfers_before}→
-        {t.free_transfers_after} · bank {pounds(t.bank_before_tenths)}→{pounds(t.bank_after_tenths)}
-        {t.chip ? ` · chip: ${t.chip}` : ""}
-      </div>
-      <div className={styles.transferCols}>
-        <div>
-          <div className={styles.kicker}>out</div>
-          {t.transfers_out.map((p) => (
-            <div key={p.player_id}>
-              {p.name} <span className={styles.muted}>{pounds(p.price_tenths)}</span>
-            </div>
-          ))}
-        </div>
-        <div>
-          <div className={styles.kicker}>in</div>
-          {t.transfers_in.map((p) => (
-            <div key={p.player_id}>
-              {p.name} <span className={styles.muted}>{pounds(p.price_tenths)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
