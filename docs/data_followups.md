@@ -251,6 +251,27 @@ is what item 9 below requires of any wider feature bank.
 
 These are not data-layer decisions. Each needs agreement before implementation.
 
+### Is the archive's `fixture_difficulty` a pre-match value? (open, 2026-08-19)
+
+`features/fixtures.py` attaches `mean_fixture_difficulty` and
+`minimum_fixture_difficulty` unshifted, on the ground that the fixture list and its
+difficulty are published before the deadline. True of the live platform; not
+established for the archive, which stores one value per club per venue per season
+with no capture timestamp.
+
+Measured while running `opponent_projection_study`: the value is constant within a
+season in all four development seasons, so it cannot carry fixture-level hindsight.
+But a rating written before a season should track the *previous* season's table more
+closely than the coming one's, and 2024-25 does the reverse — **+0.940 against its own
+season, +0.372 against the one before**. 2023-24 is marginal (+0.894 / +0.845);
+2022-23 behaves correctly (+0.731 / +0.850).
+
+The fixture *count* is unaffected, and the count is where the measured +58 points a
+season lives. What needs a decision is whether the difficulty column is admissible on
+development seasons, and what that invalidates. The full argument, and the two other
+decisions it sits beside, are in
+[the opponent rating handoff](opponent_rating_handoff.md).
+
 ### 9. Aligning `form_window` with the feature configuration (resolved)
 
 The experiment contract defines `form_window` as a single scalar: "the number of
