@@ -1,0 +1,42 @@
+# Review authority per zone — derived from docs/architecture/ownership.md (PR #111).
+# Ownership means who must approve a change, not exclusive access. Shared boundaries
+# need one approving review from each of the other two roles. Later rules win, so the
+# shared surfaces come last. GitHub handles: data / data mining = @SpeedyV5,
+# optimization / evaluation = @ErtugrulS32175, architecture / CI = @tunayaslan.
+# During the handover the architecture/CI zone lists both @tunayaslan and
+# @ErtugrulS32175 (the operational surface stays with optimization/evaluation until the
+# opening gameweek is captured, decided and settled).
+
+# --- data / data mining
+/src/squadopt/data/                @SpeedyV5
+/src/squadopt/features/            @SpeedyV5
+/src/squadopt/prediction/          @SpeedyV5
+
+# --- optimization / evaluation
+/src/squadopt/optimization/        @ErtugrulS32175
+/src/squadopt/evaluation/          @ErtugrulS32175
+/src/squadopt/uncertainty/         @ErtugrulS32175
+/src/squadopt/scenarios/           @ErtugrulS32175
+/src/squadopt/risk/                @ErtugrulS32175
+/src/squadopt/planning/            @ErtugrulS32175
+/src/squadopt/bayesopt/            @ErtugrulS32175
+/src/squadopt/preflight/           @ErtugrulS32175
+/src/squadopt/recalibration/       @ErtugrulS32175
+/src/squadopt/experiments/         @ErtugrulS32175
+/src/squadopt/live/                @ErtugrulS32175
+
+# --- architecture / CI (handover in progress)
+/.github/                          @tunayaslan @ErtugrulS32175
+/pyproject.toml                    @tunayaslan @ErtugrulS32175
+/constraints.txt                   @tunayaslan @ErtugrulS32175
+/src/squadopt/__init__.py          @tunayaslan @ErtugrulS32175
+/src/squadopt/integration.py       @tunayaslan @ErtugrulS32175
+/src/squadopt/application/         @tunayaslan @ErtugrulS32175
+/scripts/_experiment_cli.py        @tunayaslan @ErtugrulS32175
+/docs/architecture/                @tunayaslan @ErtugrulS32175
+
+# --- shared boundaries: all three roles
+/src/squadopt/contracts/           @SpeedyV5 @ErtugrulS32175 @tunayaslan
+/src/squadopt/data/schema.py       @SpeedyV5 @ErtugrulS32175 @tunayaslan
+/src/squadopt/optimization/config.py  @SpeedyV5 @ErtugrulS32175 @tunayaslan
+/src/squadopt/backtest/            @SpeedyV5 @ErtugrulS32175 @tunayaslan
