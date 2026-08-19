@@ -392,3 +392,61 @@ def test_a_player_with_no_run_of_his_own_borrows_one_from_his_position() -> None
     assert sources["own_history"] >= 1
     for gameweek in target.gameweeks:
         assert np.isfinite(path.week(gameweek).to_numpy(dtype="float64")).all()
+
+
+# --- the window as one ScenarioSet ---------------------------------------------
+
+
+def test_the_window_reads_back_as_one_scenario_set() -> None:
+    from squadopt.optimization import OptimizationConfig
+    from squadopt.scenarios.rank import RankObjectiveConfig, optimize_rank_probability_squad
+    from squadopt.scenarios.rivals import template_rival_from_ownership
+
+    path = _three_week_path()
+    window = path.as_window_scenario_set()
+    assert window.target.gameweek == FIRST_GAMEWEEK
+    assert window.diagnostics["window_horizon"] == 3
+    assert window.diagnostics["scenario_points_are_window_totals"] is True
+    # The matrix is the window total, and the projection is the weekly sum, so the set is
+    # centred the way every consumer assumes.
+    np.testing.assert_allclose(
+        window.scenario_points.to_numpy(dtype="float64"),
+        path.window_points().to_numpy(dtype="float64"),
+    )
+    projected = window.projections.table["expected_points"].to_numpy(dtype="float64")
+    weekly_sum = sum(
+        path.projections[gameweek].table["expected_points"].to_numpy(dtype="float64")
+        for gameweek in path.target.gameweeks
+    )
+    np.testing.assert_allclose(projected, weekly_sum)
+    for block in window.source_fold_ids:
+        assert block.count("+") == 2
+
+    # And a single-week consumer runs on it unchanged: the rank objective prices a rival
+    # over the whole window without knowing the window exists.
+    pool = window.projections.table.loc[:, ["player_id", "position"]].copy()
+    pool["ownership"] = window.projections.table["expected_points"]
+    rival = template_rival_from_ownership(pool)
+    result = optimize_rank_probability_squad(
+        window,
+        rival,
+        OptimizationConfig(solver_time_limit_seconds=20.0),
+        RankObjectiveConfig(),
+    )
+    assert result.has_solution
+    assert result.probability_ahead is not None
+    assert 0.0 <= result.probability_ahead <= 1.0
+
+
+def test_a_window_of_one_is_exactly_the_first_week() -> None:
+    history = _residual_history()
+    path = generate_scenario_paths(
+        {FIRST_GAMEWEEK: _snapshot()},
+        history,
+        ScenarioPathTarget(SEASON, FIRST_GAMEWEEK, 1),
+        CONFIG,
+    )
+    window = path.as_window_scenario_set()
+    single = path.as_scenario_set(FIRST_GAMEWEEK)
+    assert window.scenario_fingerprint == single.scenario_fingerprint
+    assert_frame_equal(window.scenario_points, single.scenario_points)

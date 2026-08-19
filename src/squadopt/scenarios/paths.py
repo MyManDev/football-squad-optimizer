@@ -55,7 +55,7 @@ import numpy as np
 import pandas as pd
 
 from squadopt.data.schema import POSITIONS
-from squadopt.prediction import PredictionSnapshot
+from squadopt.prediction import PredictionSnapshot, prepare_optimizer_projection
 from squadopt.scenarios.decomposition import decompose_residual_components
 from squadopt.scenarios.generator import (
     _centered,
@@ -165,6 +165,69 @@ class ScenarioPathSet:
         for frame in frames[1:]:
             total = total.add(frame, fill_value=0.0)
         return total
+
+    def as_window_scenario_set(self) -> ScenarioSet:
+        """The whole window as one :class:`ScenarioSet`, so single-week consumers work on it.
+
+        The scenario matrix is :meth:`window_points` — each row one path, each cell a
+        player's total across the window — and the projection is the per-week expectations
+        summed, so the set is centred the same way a single week's is. Every consumer of a
+        ``ScenarioSet`` (risk metrics, the rank objective, fixed-decision comparison) then
+        prices the window without knowing it is one: a rival's window score, a squad's
+        P(ahead) over the window, all fall out of the same arithmetic.
+
+        The window is deliberately presented *at the first gameweek's deadline*: its target
+        names the first week, because that is the moment the decision is made, and each
+        scenario's source block is recorded as the run of folds joined by ``+``. At a
+        horizon of one this is exactly :meth:`as_scenario_set` for the first week.
+        """
+
+        if self.target.horizon == 1:
+            return self.as_scenario_set(self.target.first_gameweek)
+        first = self.projections[self.target.first_gameweek]
+        expected = None
+        for gameweek in self.target.gameweeks:
+            week = self.projections[gameweek].table.loc[:, ["player_id", "expected_points"]]
+            expected = (
+                week
+                if expected is None
+                else expected.assign(
+                    expected_points=expected["expected_points"].to_numpy()
+                    + week["expected_points"].to_numpy()
+                )
+            )
+        assert expected is not None
+        snapshot = prepare_optimizer_projection(
+            first.table.loc[:, ["player_id", "name", "team_id", "position", "price_tenths"]],
+            expected,
+            first.provenance,
+        )
+        points = self.window_points()
+        source_fold_ids = tuple("+".join(block) for block in self.source_fold_blocks)
+        target = self.target.week_target(self.target.first_gameweek)
+        return ScenarioSet(
+            projections=snapshot,
+            target=target,
+            config=self.config,
+            scenario_ids=self.scenario_ids,
+            source_fold_ids=source_fold_ids,
+            scenario_points=points,
+            scenario_fingerprint=_scenario_fingerprint(
+                snapshot.validated_copy(),
+                target,
+                self.config,
+                self.scenario_ids,
+                source_fold_ids,
+                points,
+            ),
+            diagnostics={
+                **dict(self.diagnostics),
+                "window_id": self.target.window_id,
+                "window_horizon": self.target.horizon,
+                "window_gameweeks": list(self.target.gameweeks),
+                "scenario_points_are_window_totals": True,
+            },
+        )
 
     def as_scenario_set(self, gameweek: int) -> ScenarioSet:
         """One week as a :class:`ScenarioSet`, so the risk and rank layers work unchanged."""
