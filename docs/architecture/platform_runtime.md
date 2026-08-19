@@ -119,6 +119,19 @@ schema version, and creation time. It records the direction:
 input artifacts -> run -> output artifacts
 ```
 
+`artifact_record_v1` is the portable record for that edge. `FileArtifactRegistry` stores one
+immutable JSON document per artifact under `records/<artifact_id>.json`; the artifact bytes
+remain under a separately configured artifact root. Stored locations are canonical POSIX paths
+relative to that root, never machine-specific absolute paths. The artifact id deterministically
+binds the run id, input/output role, kind, location, SHA-256 checksum, and schema version.
+
+Registration reads the raw bytes, computes their checksum, and is idempotent for an exact retry.
+Reusing the same run/role/kind/location slot with different bytes or a different schema is
+refused. `get_artifact()` validates record structure and identity, `verify_checksum()` re-reads
+the registered file before replay or consumption, and `lineage()` returns deterministically
+ordered input and output edges for a run. Record publication is atomic and never overwrites an
+existing identity.
+
 Existing snapshot, ledger, residual-export, measurement, and UI-view checksums remain their
 domain contracts. The registry references and verifies them; it does not replace their
 validation with a weaker generic check.
