@@ -8,6 +8,7 @@ import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
+import { useLanguage } from "../../../i18n/context";
 import {
   countdown,
   local,
@@ -31,6 +32,8 @@ function useNow(intervalMs: number): Date {
 }
 
 export function SquadPage() {
+  const { messages } = useLanguage();
+  const copy = messages.squad;
   const params = useParams();
   const index = useIndex();
   const latest = index.data?.payload.latest ?? null;
@@ -39,17 +42,14 @@ export function SquadPage() {
   const recommendation = useRecommendation(season, gameweek);
 
   if (index.isPending || (season && gameweek && recommendation.isPending)) {
-    return <EmptyState title="Loading the latest decision…" />;
+    return <EmptyState title={copy.loading} />;
   }
   if (index.isError) {
-    return <EmptyState title="The site data could not be read.">{String(index.error)}</EmptyState>;
+    return <EmptyState title={copy.dataError}>{String(index.error)}</EmptyState>;
   }
   if (!season || !gameweek) {
     return (
-      <EmptyState title="No decision recorded yet.">
-        The first gameweek is decided about two hours before its deadline; this page fills in once
-        the ledger holds an entry.
-      </EmptyState>
+      <EmptyState title={messages.common.noDecisionRecorded}>{copy.noDecisionBody}</EmptyState>
     );
   }
   if (recommendation.isError) {
@@ -58,8 +58,8 @@ export function SquadPage() {
       <EmptyState
         title={
           error instanceof NotFoundError
-            ? "No decision for this gameweek."
-            : "This decision could not be shown."
+            ? messages.common.noDecisionForGameweek
+            : copy.decisionError
         }
       >
         {String(error.message)}
@@ -73,8 +73,10 @@ export function SquadPage() {
 }
 
 function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: string }) {
+  const { language, locale, messages } = useLanguage();
+  const copy = messages.squad;
   const now = useNow(30_000);
-  const remaining = countdown(view.deadline_utc, now);
+  const remaining = countdown(view.deadline_utc, now, language);
   const risk = view.risk;
   const captain = view.starting_xi.find((p) => p.is_captain);
   return (
@@ -83,76 +85,76 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
         <div>
           <div className={styles.kicker}>
             {view.season} ·{" "}
-            {view.decision_kind === "opening" ? "opening squad" : "transfer decision"}
+            {view.decision_kind === "opening" ? copy.openingSquad : copy.transferDecision}
           </div>
-          <h1 className={styles.title}>Gameweek {view.gameweek}</h1>
+          <h1 className={styles.title}>{messages.common.gameweek(view.gameweek)}</h1>
           <Link className={styles.whyLink} to="/rivals">
-            Why these players →
+            {copy.why}
           </Link>
         </div>
         <div className={styles.deadline}>
-          <div className={styles.kicker}>deadline {remaining === "closed" ? "" : "in"}</div>
+          <div className={styles.kicker}>
+            {remaining === messages.common.closed ? copy.deadline : copy.deadlineIn}
+          </div>
           <div className={`${styles.countdown} num`}>{remaining || "—"}</div>
           <div className={styles.kicker} title={view.deadline_utc}>
-            {local(view.deadline_utc)}
+            {local(view.deadline_utc, locale)}
           </div>
         </div>
       </header>
 
       <StatRow>
         <Stat
-          label="projected score"
-          value={points(view.projected_score)}
+          label={copy.projectedScore}
+          value={points(view.projected_score, 1, locale)}
           note={
             risk.status === "available" && risk.lower_quantile_score !== null
-              ? `lower ${percent(risk.lower_quantile_probability ?? 0)} tail ${points(risk.lower_quantile_score)}`
-              : "lower tail: not evaluated"
+              ? copy.lowerTail(
+                  percent(risk.lower_quantile_probability ?? 0, 0, locale),
+                  points(risk.lower_quantile_score, 1, locale),
+                )
+              : copy.lowerTailUnavailable
           }
         />
         <Stat
-          label={view.decision_kind === "opening" ? "squad cost" : "squad sell value"}
+          label={view.decision_kind === "opening" ? copy.squadCost : copy.squadSellValue}
           value={pounds(view.total_cost_tenths)}
           note={
             view.transfers
-              ? `bank ${pounds(view.transfers.bank_after_tenths)} · ${view.transfers.free_transfers_after} FT left`
-              : "budget £100.0m"
+              ? copy.bankAndFt(
+                  pounds(view.transfers.bank_after_tenths),
+                  view.transfers.free_transfers_after,
+                )
+              : copy.budget
           }
         />
         <Stat
-          label="solver"
+          label={copy.solver}
           value={view.solver_status}
           tone={view.solver_proved_optimal ? "accent" : "muted"}
-          note={
-            view.solver_proved_optimal
-              ? "proved optimal, single thread"
-              : "not proved — reported, not recommended"
-          }
+          note={view.solver_proved_optimal ? copy.provedOptimal : copy.notProved}
         />
       </StatRow>
 
-      <Card
-        tone="pitch"
-        title="Starting XI"
-        aside={`${view.starting_xi.length} starters · captain counted twice`}
-      >
+      <Card tone="pitch" title={copy.startingXi} aside={copy.starterCount(view.starting_xi.length)}>
         <Pitch starters={view.starting_xi} />
       </Card>
 
       <div className={styles.twoUp}>
-        <Card title="Captain">
+        <Card title={copy.captain}>
           {captain ? (
             <div className={styles.captainLine}>
               <strong>{captain.name}</strong>
               <span className={styles.muted}>
-                {captain.team} · {captain.position} · {points(captain.expected_points)} xP, counted
-                twice
+                {captain.team} · {captain.position} · {points(captain.expected_points, 1, locale)}{" "}
+                xP, {copy.countedTwice}
               </span>
             </div>
           ) : (
-            <span className={styles.muted}>Captain not in the starting eleven.</span>
+            <span className={styles.muted}>{copy.noCaptain}</span>
           )}
         </Card>
-        <Card title="Bench" aside="in substitution order">
+        <Card title={copy.bench} aside={copy.substitutionOrder}>
           <div className={styles.bench}>
             {view.bench.map((p) => (
               <div key={p.player_id} className={styles.benchRow}>
@@ -163,7 +165,9 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
                     {p.team} · {p.position} · {pounds(p.price_tenths)}
                   </span>
                 </span>
-                <span className={`${styles.benchXp} num`}>{points(p.expected_points)}</span>
+                <span className={`${styles.benchXp} num`}>
+                  {points(p.expected_points, 1, locale)}
+                </span>
               </div>
             ))}
           </div>
@@ -172,10 +176,10 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
 
       <Card
         tone="muted"
-        title="What these numbers do not say"
+        title={copy.limitsTitle}
         aside={
           <Badge tone={risk.status === "available" ? "good" : "neutral"}>
-            risk {risk.status.replace("_", " ")}
+            {copy.risk} {copy.riskStatus[risk.status]}
           </Badge>
         }
       >
@@ -183,35 +187,37 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
         {risk.status === "available" && (
           <StatRow>
             <Stat
-              label={`P(score < ${risk.points_threshold ?? "?"})`}
+              label={`P(${copy.score} < ${risk.points_threshold ?? "?"})`}
               value={
                 risk.probability_below_threshold !== null
-                  ? percent(risk.probability_below_threshold)
+                  ? percent(risk.probability_below_threshold, 0, locale)
                   : "—"
               }
               note={
                 risk.probability_below_threshold_interval
-                  ? `90% [${percent(risk.probability_below_threshold_interval[0])}, ${percent(risk.probability_below_threshold_interval[1])}]`
+                  ? `90% [${percent(risk.probability_below_threshold_interval[0], 0, locale)}, ${percent(risk.probability_below_threshold_interval[1], 0, locale)}]`
                   : undefined
               }
             />
             <Stat
-              label="mean of scenarios"
-              value={risk.mean_score !== null ? points(risk.mean_score) : "—"}
+              label={copy.scenarioMean}
+              value={risk.mean_score !== null ? points(risk.mean_score, 1, locale) : "—"}
               note={
                 risk.location_shift_points !== null
-                  ? `shifted ${points(risk.location_shift_points)} for selection optimism`
+                  ? copy.shiftedForOptimism(points(risk.location_shift_points, 1, locale))
                   : undefined
               }
             />
             <Stat
-              label={`mean worst ${percent(risk.worst_fraction ?? 0)}`}
+              label={copy.meanWorst(percent(risk.worst_fraction ?? 0, 0, locale))}
               value={
                 risk.mean_worst_fraction_score !== null
-                  ? points(risk.mean_worst_fraction_score)
+                  ? points(risk.mean_worst_fraction_score, 1, locale)
                   : "—"
               }
-              note={risk.scenario_count !== null ? `${risk.scenario_count} scenarios` : undefined}
+              note={
+                risk.scenario_count !== null ? copy.scenarioCount(risk.scenario_count) : undefined
+              }
             />
           </StatRow>
         )}
@@ -224,23 +230,23 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
         )}
         {risk.rivals.length > 0 && (
           <p className={styles.muted}>
-            <Link to="/rivals">Rival comparisons →</Link>
+            <Link to="/rivals">{copy.rivalComparisons}</Link>
           </p>
         )}
       </Card>
 
       <footer className={styles.provenance}>
         <span>
-          captured {utcShort(view.captured_at_utc)} · {view.snapshot_id}
+          {copy.captured} {utcShort(view.captured_at_utc, locale)} · {view.snapshot_id}
         </span>
         <span>
-          {view.model_name}@{view.model_version} · {view.feature_contract_version} · projection{" "}
-          {shortDigest(view.prediction_fingerprint)}
+          {view.model_name}@{view.model_version} · {view.feature_contract_version} ·{" "}
+          {copy.projection} {shortDigest(view.prediction_fingerprint)}
         </span>
         <span>
-          {view.report_contract_version} · page generated {utcShort(generatedAt)}
+          {view.report_contract_version} · {copy.generated} {utcShort(generatedAt, locale)}
           {view.settled && view.outcome_realized_score !== null
-            ? ` · settled: ${points(view.outcome_realized_score)} realized`
+            ? ` · ${copy.settledRealized(points(view.outcome_realized_score, 1, locale))}`
             : ""}
         </span>
       </footer>

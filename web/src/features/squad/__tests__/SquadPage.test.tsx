@@ -57,21 +57,21 @@ describe("SquadPage", () => {
   it("renders the latest decision from the site index", async () => {
     renderAt("/");
     expect(
-      await screen.findByRole("heading", { level: 1, name: /Gameweek 1/ }),
+      await screen.findByRole("heading", { level: 1, name: /Oyun haftası 1/ }),
     ).toBeInTheDocument();
     const payload = recommendationFixture.payload as RecommendationView;
     const captain = payload.starting_xi.find((p) => p.is_captain);
     expect(captain).toBeDefined();
     expect(screen.getAllByText(captain!.name).length).toBeGreaterThan(0);
-    expect(screen.getByText(/What these numbers do not say/)).toBeInTheDocument();
+    expect(screen.getByText(/Bu sayılar neyi söylemiyor/)).toBeInTheDocument();
     expect(screen.getByText(payload.risk.reason)).toBeInTheDocument();
     expect(screen.getByText(new RegExp(payload.snapshot_id))).toBeInTheDocument();
-    expect(screen.getByRole("list", { name: "Starting eleven by position" })).toBeInTheDocument();
-    expect(screen.getByText(/in substitution order/)).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeInTheDocument();
+    expect(screen.getByText(/oyuna giriş sırasıyla/)).toBeInTheDocument();
   });
 
   it("says plainly when a gameweek has no decision", async () => {
     renderAt("/gw/2026-27/7");
-    expect(await screen.findByText(/No decision for this gameweek/)).toBeInTheDocument();
+    expect(await screen.findByText(/Bu oyun haftası için karar yok/)).toBeInTheDocument();
   });
 });

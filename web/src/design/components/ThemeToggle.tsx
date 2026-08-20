@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { useLanguage } from "../../i18n/context";
 import styles from "./ThemeToggle.module.css";
 
 type Theme = "system" | "light" | "dark";
@@ -20,10 +21,10 @@ function apply(theme: Theme) {
   else root.setAttribute("data-theme", theme);
 }
 
-const LABEL: Record<Theme, string> = { system: "Auto", light: "Light", dark: "Dark" };
 const NEXT: Record<Theme, Theme> = { system: "dark", dark: "light", light: "system" };
 
 export function ThemeToggle() {
+  const { messages } = useLanguage();
   const [theme, setTheme] = useState<Theme>(readStored);
   useEffect(() => {
     apply(theme);
@@ -33,15 +34,20 @@ export function ThemeToggle() {
       /* storage may be unavailable; the choice still applies for this view */
     }
   }, [theme]);
+  const labels: Record<Theme, string> = {
+    system: messages.theme.system,
+    light: messages.theme.light,
+    dark: messages.theme.dark,
+  };
   return (
     <button
       type="button"
       className={styles.button}
       onClick={() => setTheme(NEXT[theme])}
-      aria-label={`Theme: ${LABEL[theme]}. Switch to ${LABEL[NEXT[theme]]}.`}
-      title={`Theme: ${LABEL[theme]}`}
+      aria-label={messages.theme.switchTo(labels[theme], labels[NEXT[theme]])}
+      title={`${messages.theme.label}: ${labels[theme]}`}
     >
-      {LABEL[theme]}
+      {labels[theme]}
     </button>
   );
 }

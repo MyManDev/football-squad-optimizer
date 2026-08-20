@@ -4,6 +4,8 @@ import { BrowserRouter, Route, Routes } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
 import { PageShell } from "../design/components/PageShell";
+import { useLanguage } from "../i18n/context";
+import { LanguageProvider } from "../i18n/LanguageProvider";
 
 const SquadPage = lazy(() =>
   import("../features/squad/pages/SquadPage").then((m) => ({ default: m.SquadPage })),
@@ -30,10 +32,19 @@ const queryClient = new QueryClient({
 
 export function App({ basename = import.meta.env.BASE_URL }: { basename?: string }) {
   return (
+    <LanguageProvider>
+      <LocalizedApp basename={basename} />
+    </LanguageProvider>
+  );
+}
+
+function LocalizedApp({ basename }: { basename: string }) {
+  const { messages } = useLanguage();
+  return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={basename}>
         <PageShell>
-          <Suspense fallback={<EmptyState title="Loading…" />}>
+          <Suspense fallback={<EmptyState title={messages.common.loading} />}>
             <Routes>
               <Route path="/" element={<SquadPage />} />
               <Route path="/gw/:season/:gameweek" element={<SquadPage />} />
@@ -45,7 +56,7 @@ export function App({ basename = import.meta.env.BASE_URL }: { basename?: string
               <Route path="/status" element={<StatusPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/analysis/:slug" element={<AnalysisPage />} />
-              <Route path="*" element={<EmptyState title="There is no page here." />} />
+              <Route path="*" element={<EmptyState title={messages.shell.notFound} />} />
             </Routes>
           </Suspense>
         </PageShell>
