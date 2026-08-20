@@ -155,6 +155,12 @@ from squadopt.experiments.team_rating import (
     fit_dixon_coles,
     run_team_rating_study,
 )
+from squadopt.experiments.terminal_value import (
+    TERMINAL_VALUE_STUDY_CONTRACT_VERSION,
+    TerminalValueConfig,
+    TerminalValueStudy,
+    run_terminal_value_study,
+)
 
 __all__ = [
     "CALENDAR_BLIND_PROJECTION_RULE",
@@ -189,6 +195,7 @@ __all__ = [
     "SELECTION_OPTIMISM_CONTRACT_VERSION",
     "SHRINKAGE_RULE_VERSION",
     "TEAM_RATING_STUDY_CONTRACT_VERSION",
+    "TERMINAL_VALUE_STUDY_CONTRACT_VERSION",
     "BaselinePolicyObjective",
     "CandidateAssessment",
     "CandidatePlan",
@@ -241,6 +248,8 @@ __all__ = [
     "TeamRating",
     "TeamRatingStudy",
     "TeamRatingStudyConfig",
+    "TerminalValueConfig",
+    "TerminalValueStudy",
     "audit_scenario_calibration",
     "build_control_residual_table",
     "build_preseason_record",
@@ -264,6 +273,7 @@ __all__ = [
     "run_schedule_signal_study",
     "run_screening_experiment",
     "run_team_rating_study",
+    "run_terminal_value_study",
     "screening_result_to_dict",
     "screening_result_to_markdown",
     "season_aware_moving_block_interval",
