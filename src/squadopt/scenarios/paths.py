@@ -3,11 +3,17 @@
 Every recommendation this system is meant to make over one, three or five weeks rests on a
 distribution nothing here could produce. ``generate_scenarios`` simulates *one* deadline:
 :class:`ScenarioTarget` carries a season and a gameweek and nothing else. Ask it for a
-three-week statement and the only honest answer is three independent copies of one week,
-which is wrong in the direction that matters — a player who does not play in week one is
-unusually likely not to play in week two, a club in form tends to stay in form for a while,
-and a window's spread is therefore wider than independence implies at the bottom and
-narrower at the top.
+three-week statement and the only honest answer is three independent copies of one week —
+and the weeks are not independent. A player who does not play in week one is unusually
+likely not to play in week two, and a club in form tends to stay in form for a while.
+
+Which way that moves a window's spread is a measurement, not an intuition, and the intuition
+is wrong here. Measured on the control's own residuals over 2024-25 gameweeks 20 to 22, a
+path is **0.983x** as wide as three independent weeks, not wider: a player who beats his
+projection one week tends to fall back the next, and that mean reversion cancels part of what
+independent draws add up. See `docs/scenario_path_dependence.md`. The effect is small, and the
+point is not its size or its sign — it is that independence asserts a dependence structure the
+data does not have, while a path uses the one it does.
 
 This module keeps the same hierarchical decomposition and replaces independent draws with a
 **block bootstrap over consecutive gameweeks**. One scenario is a *path*: a run of
@@ -20,9 +26,11 @@ the length of the block at every level.
   persist — which is the piece that matters most, because not playing is sticky.
 
 Blocks never cross a season boundary and are always gameweek-contiguous. A club or a player
-whose history offers no contiguous run of the requested length falls back one level (player →
-position → pooled) for the whole path rather than silently splicing unrelated weeks together,
-and the fallback is counted in the diagnostics rather than hidden.
+whose history offers no contiguous run of the requested length borrows a run from another
+player of the same position — never a splice of unrelated weeks — and the borrowing is counted
+in the diagnostics rather than hidden. A run always follows *one* player: in a position pool,
+which holds every player of that position in every fold, "the next row" is a different player,
+so a run is the same player at the next fold or it is not a run.
 
 One property of block bootstrapping is worth stating rather than discovering. With a horizon
 of ``H`` the first week of a path can never be drawn from the last ``H-1`` folds of a season,
@@ -47,7 +55,7 @@ import numpy as np
 import pandas as pd
 
 from squadopt.data.schema import POSITIONS
-from squadopt.prediction import PredictionSnapshot
+from squadopt.prediction import PredictionSnapshot, prepare_optimizer_projection
 from squadopt.scenarios.decomposition import decompose_residual_components
 from squadopt.scenarios.generator import (
     _centered,
@@ -158,6 +166,69 @@ class ScenarioPathSet:
             total = total.add(frame, fill_value=0.0)
         return total
 
+    def as_window_scenario_set(self) -> ScenarioSet:
+        """The whole window as one :class:`ScenarioSet`, so single-week consumers work on it.
+
+        The scenario matrix is :meth:`window_points` — each row one path, each cell a
+        player's total across the window — and the projection is the per-week expectations
+        summed, so the set is centred the same way a single week's is. Every consumer of a
+        ``ScenarioSet`` (risk metrics, the rank objective, fixed-decision comparison) then
+        prices the window without knowing it is one: a rival's window score, a squad's
+        P(ahead) over the window, all fall out of the same arithmetic.
+
+        The window is deliberately presented *at the first gameweek's deadline*: its target
+        names the first week, because that is the moment the decision is made, and each
+        scenario's source block is recorded as the run of folds joined by ``+``. At a
+        horizon of one this is exactly :meth:`as_scenario_set` for the first week.
+        """
+
+        if self.target.horizon == 1:
+            return self.as_scenario_set(self.target.first_gameweek)
+        first = self.projections[self.target.first_gameweek]
+        expected = None
+        for gameweek in self.target.gameweeks:
+            week = self.projections[gameweek].table.loc[:, ["player_id", "expected_points"]]
+            expected = (
+                week
+                if expected is None
+                else expected.assign(
+                    expected_points=expected["expected_points"].to_numpy()
+                    + week["expected_points"].to_numpy()
+                )
+            )
+        assert expected is not None
+        snapshot = prepare_optimizer_projection(
+            first.table.loc[:, ["player_id", "name", "team_id", "position", "price_tenths"]],
+            expected,
+            first.provenance,
+        )
+        points = self.window_points()
+        source_fold_ids = tuple("+".join(block) for block in self.source_fold_blocks)
+        target = self.target.week_target(self.target.first_gameweek)
+        return ScenarioSet(
+            projections=snapshot,
+            target=target,
+            config=self.config,
+            scenario_ids=self.scenario_ids,
+            source_fold_ids=source_fold_ids,
+            scenario_points=points,
+            scenario_fingerprint=_scenario_fingerprint(
+                snapshot.validated_copy(),
+                target,
+                self.config,
+                self.scenario_ids,
+                source_fold_ids,
+                points,
+            ),
+            diagnostics={
+                **dict(self.diagnostics),
+                "window_id": self.target.window_id,
+                "window_horizon": self.target.horizon,
+                "window_gameweeks": list(self.target.gameweeks),
+                "scenario_points_are_window_totals": True,
+            },
+        )
+
     def as_scenario_set(self, gameweek: int) -> ScenarioSet:
         """One week as a :class:`ScenarioSet`, so the risk and rank layers work unchanged."""
 
@@ -232,29 +303,56 @@ def contiguous_starts(seasons: np.ndarray, gameweeks: np.ndarray, horizon: int) 
     return np.asarray(valid, dtype="int64")
 
 
-def _player_blocks(
-    fold_positions: np.ndarray, seasons: np.ndarray, gameweeks: np.ndarray, horizon: int
+def source_runs(
+    player_ids: np.ndarray,
+    fold_positions: np.ndarray,
+    seasons: np.ndarray,
+    gameweeks: np.ndarray,
+    horizon: int,
 ) -> np.ndarray:
-    """Which of one source's observations begin a contiguous run of the right length.
+    """Every run of ``horizon`` consecutive weeks one *player* supplies inside a pool.
 
-    ``fold_positions`` are the global fold indices this source appears at, in order. A run
-    counts only when the source is present in every week of it, which is what makes an absence
-    persist: a player missing week two cannot supply a three-week block starting at week one.
+    A pool is a flat array of standardised residuals, and its rows are not one per week:
+    a position pool holds every player of that position in every fold. A run therefore
+    cannot be "this row and the next two" — it has to be *the same player* at the next
+    two folds, which is the only reading under which following a run preserves anything.
+
+    Rows are enumerated in the pool's own order, so at a horizon of one the result is
+    ``[[0], [1], ...]`` and drawing a run is drawing a row. That is what keeps the
+    horizon-one path bit-for-bit identical to the single-gameweek generator.
     """
 
+    total = len(fold_positions)
+    if horizon < 1:
+        raise ScenarioValidationError("horizon must be a positive integer.")
     if horizon == 1:
-        return np.arange(len(fold_positions), dtype="int64")
-    valid: list[int] = []
-    for start in range(len(fold_positions) - horizon + 1):
-        indices = fold_positions[start : start + horizon]
-        same_season = all(seasons[index] == seasons[indices[0]] for index in indices)
-        consecutive = all(
-            int(gameweeks[indices[step + 1]]) == int(gameweeks[indices[step]]) + 1
-            for step in range(horizon - 1)
-        )
-        if same_season and consecutive:
-            valid.append(start)
-    return np.asarray(valid, dtype="int64")
+        return np.arange(total, dtype="int64").reshape(-1, 1)
+    located: dict[tuple[object, int], int] = {
+        (player_ids[row], int(fold_positions[row])): row for row in range(total)
+    }
+    runs: list[list[int]] = []
+    for row in range(total):
+        origin = int(fold_positions[row])
+        block = [row]
+        for step in range(1, horizon):
+            following = origin + step
+            if following >= len(gameweeks):
+                break
+            if seasons[following] != seasons[origin]:
+                break
+            if int(gameweeks[following]) != int(gameweeks[origin]) + step:
+                break
+            found = located.get((player_ids[row], following))
+            if found is None:
+                # The player is absent that week. That absence is information, and a run
+                # spliced over it would erase exactly the persistence being modelled.
+                break
+            block.append(found)
+        if len(block) == horizon:
+            runs.append(block)
+    if not runs:
+        return np.zeros((0, horizon), dtype="int64")
+    return np.asarray(runs, dtype="int64")
 
 
 # --- generation ----------------------------------------------------------------
@@ -419,7 +517,6 @@ def generate_scenario_paths(
         seasons=seasons,
         gameweeks=gameweeks,
         horizon=target.horizon,
-        block_positions=block_positions,
     )
 
     double_players = 0
@@ -524,19 +621,21 @@ def _idiosyncratic_paths(
     seasons: np.ndarray,
     gameweeks: np.ndarray,
     horizon: int,
-    block_positions: np.ndarray,
 ) -> tuple[np.ndarray, dict[str, int], dict[str, float], dict[str, int]]:
-    """Draw each player a run of idiosyncratic shocks from one source, in order.
+    """Draw each player a run of idiosyncratic shocks, following one source player through it.
 
     The draw order and pool sizes match ``_idiosyncratic_draws`` exactly at horizon one, so
     the two generators agree bit for bit there.
     """
 
     values = decomposed["idiosyncratic_component"].to_numpy(dtype="float64")
-    pooled_standardized, pooled_scale = _standardized(values)
-    pooled_positions = np.asarray(
+    all_players = decomposed["player_id"].to_numpy()
+    all_folds = np.asarray(
         [fold_position[str(value)] for value in decomposed["fold_id"]], dtype="int64"
     )
+    pooled_standardized, pooled_scale = _standardized(values)
+    pooled_runs = source_runs(all_players, all_folds, seasons, gameweeks, horizon)
+
     position_state: dict[str, tuple[np.ndarray, np.ndarray, float]] = {}
     for position in POSITIONS:
         mask = (decomposed["position"] == position).to_numpy()
@@ -544,14 +643,17 @@ def _idiosyncratic_paths(
             decomposed.loc[mask, "idiosyncratic_component"].to_numpy(dtype="float64")
         )
         if scale <= _SCALE_EPSILON:
-            standardized, scale = pooled_standardized, pooled_scale
-            position_state[position] = (standardized, pooled_positions, scale)
-        else:
-            position_state[position] = (standardized, pooled_positions[mask], scale)
+            position_state[position] = (pooled_standardized, pooled_runs, pooled_scale)
+            continue
+        position_state[position] = (
+            standardized,
+            source_runs(all_players[mask], all_folds[mask], seasons, gameweeks, horizon),
+            scale,
+        )
 
     draws = np.zeros((config.scenario_count, horizon, len(projections)), dtype="float64")
     source_counts = {"player": 0, "position": 0, "pooled": 0}
-    block_sources = {"contiguous": 0, "position_fallback": 0, "pooled_fallback": 0}
+    block_sources = {"own_history": 0, "position_fallback": 0, "pooled_fallback": 0}
     scales: dict[str, float] = {}
     for column, row in enumerate(projections.itertuples(index=False)):
         player_id = row.player_id
@@ -560,49 +662,48 @@ def _idiosyncratic_paths(
         player_values = decomposed.loc[player_mask, "idiosyncratic_component"].to_numpy(
             dtype="float64"
         )
-        player_positions = pooled_positions[player_mask]
-        position_pool, position_fold_positions, position_scale = position_state[target_position]
+        position_pool, position_runs, position_scale = position_state[target_position]
         if player_values.size >= config.min_player_observations:
             player_pool, player_scale = _standardized(player_values)
+            player_runs = source_runs(
+                all_players[player_mask], all_folds[player_mask], seasons, gameweeks, horizon
+            )
             if player_scale <= _SCALE_EPSILON and position_scale > _SCALE_EPSILON:
-                player_pool = position_pool
-                player_positions = position_fold_positions
+                player_pool, player_runs = position_pool, position_runs
             strength = config.player_scale_shrinkage
             effective_variance = (
                 player_values.size * player_scale**2 + strength * position_scale**2
             ) / (player_values.size + strength)
             effective_scale = float(np.sqrt(max(0.0, effective_variance)))
-            pool, pool_positions, source = player_pool, player_positions, "player"
+            pool, runs, source = player_pool, player_runs, "player"
         elif position_scale > _SCALE_EPSILON:
-            pool, pool_positions = position_pool, position_fold_positions
+            pool, runs = position_pool, position_runs
             effective_scale = position_scale
             source = "position"
         else:
-            pool, pool_positions = pooled_standardized, pooled_positions
+            pool, runs = pooled_standardized, pooled_runs
             effective_scale = pooled_scale
             source = "pooled"
 
-        eligible = _player_blocks(pool_positions, seasons, gameweeks, horizon)
-        block_kind = "contiguous"
-        if eligible.size == 0:
-            # This source never played the requested run of weeks. Falling back a level is
-            # honest; splicing unrelated weeks into one path would not be.
-            fallback_pool, fallback_positions = position_pool, position_fold_positions
-            eligible = _player_blocks(fallback_positions, seasons, gameweeks, horizon)
+        block_kind = "own_history"
+        if runs.shape[0] == 0:
+            # This source never played the requested run of weeks. Borrowing a run from
+            # another player of the same position keeps the persistence the block exists
+            # for; splicing unrelated weeks together would not.
+            pool, runs = position_pool, position_runs
             block_kind = "position_fallback"
-            if eligible.size == 0:
-                fallback_pool, fallback_positions = pooled_standardized, pooled_positions
-                eligible = _player_blocks(fallback_positions, seasons, gameweeks, horizon)
+            if runs.shape[0] == 0:
+                pool, runs = pooled_standardized, pooled_runs
                 block_kind = "pooled_fallback"
-            if eligible.size == 0:
+            if runs.shape[0] == 0:
                 raise ScenarioValidationError(
-                    f"No source offers {horizon} consecutive gameweeks for player {player_id!r}."
+                    f"No source supplies {horizon} consecutive gameweeks for any player, so "
+                    f"no path of that length can be drawn for player {player_id!r}."
                 )
-            pool, pool_positions = fallback_pool, fallback_positions
-        chosen = rng.integers(0, len(eligible), size=config.scenario_count)
-        offsets = eligible[chosen]
+        chosen = rng.integers(0, runs.shape[0], size=config.scenario_count)
+        selected = runs[chosen]
         for step in range(horizon):
-            draws[:, step, column] = pool[offsets + step] * effective_scale
+            draws[:, step, column] = pool[selected[:, step]] * effective_scale
         source_counts[source] += 1
         block_sources[block_kind] += 1
         scales[str(player_id)] = effective_scale
@@ -615,4 +716,5 @@ __all__ = [
     "ScenarioPathTarget",
     "contiguous_starts",
     "generate_scenario_paths",
+    "source_runs",
 ]

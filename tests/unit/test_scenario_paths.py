@@ -65,7 +65,10 @@ def _snapshot(
 
 
 def _residual_history(
-    *, gameweeks: tuple[int, ...] = (2, 3, 4, 5, 6, 7), trending: bool = True
+    *,
+    gameweeks: tuple[int, ...] = (2, 3, 4, 5, 6, 7),
+    trending: bool = True,
+    alternating: bool = False,
 ) -> pd.DataFrame:
     """A history with a team effect, a player effect, and optionally a league-wide trend.
 
@@ -77,7 +80,12 @@ def _residual_history(
     position_effect = {"GK": -0.3, "DEF": -0.1, "MID": 0.1, "FWD": 0.3}
     records: list[dict[str, object]] = []
     for gameweek in gameweeks:
-        common = (float(gameweek) - 4.0) if trending else 0.0
+        if alternating:
+            # Negatively autocorrelated: a good week is followed by a bad one, which is the
+            # shape the control's real residuals turn out to have.
+            common = 3.0 if gameweek % 2 == 0 else -3.0
+        else:
+            common = (float(gameweek) - 4.0) if trending else 0.0
         for row in projection.table.itertuples(index=False):
             team_effect = ((int(row.team_id) * 3 + gameweek) % 7 - 3) * 0.7
             player_effect = ((int(row.player_id) + gameweek * 2) % 5 - 2) * 0.2
@@ -170,8 +178,8 @@ def test_every_scenario_draws_one_contiguous_run_of_folds() -> None:
         assert len({fold.rsplit("-gw", 1)[0] for fold in block}) == 1
 
 
-def _three_week_path(*, trending: bool = True):
-    history = _residual_history(trending=trending)
+def _three_week_path(*, trending: bool = True, alternating: bool = False):
+    history = _residual_history(trending=trending, alternating=alternating)
     target = ScenarioPathTarget(SEASON, FIRST_GAMEWEEK, 3)
     return generate_scenario_paths(
         {gameweek: _snapshot(gameweek) for gameweek in target.gameweeks},
@@ -245,15 +253,27 @@ def test_the_diagnostics_expose_the_block_edge_effect() -> None:
     assert stationary_spread < trending_spread / 5.0
 
 
-def test_a_window_is_wider_than_independent_weeks_would_be() -> None:
-    """The point of a path: persistence widens the tails a three-week sum can reach."""
+def _window_spread_against_independence(path) -> float:
+    """The window's own spread over the spread its weeks would have if independent."""
 
-    path = _three_week_path()
     total = path.window_points().to_numpy(dtype="float64")
     weekly = [path.week(gameweek).to_numpy(dtype="float64") for gameweek in path.target.gameweeks]
     independent = float(np.sqrt(sum(week.std(axis=0) ** 2 for week in weekly)).mean())
-    observed = float(total.std(axis=0).mean())
-    assert observed > independent
+    return float(total.std(axis=0).mean()) / independent
+
+
+def test_a_path_transmits_the_dependence_its_history_actually_has() -> None:
+    """Both directions, because the real data runs the opposite way to the intuition.
+
+    A trending history is positively autocorrelated and a path over it is wider than
+    independent weeks; an alternating history is negatively autocorrelated and a path over it
+    is narrower. On the control's real residuals the measured ratio is 0.983 — see
+    `docs/scenario_path_dependence.md` — so a test that only asserted "wider" would have been
+    encoding an assumption rather than the machinery.
+    """
+
+    assert _window_spread_against_independence(_three_week_path()) > 1.0
+    assert _window_spread_against_independence(_three_week_path(alternating=True)) < 1.0
 
 
 def test_a_week_reads_back_as_an_ordinary_scenario_set() -> None:
@@ -342,4 +362,91 @@ def test_the_diagnostics_say_how_the_blocks_were_sourced() -> None:
     assert diagnostics["contiguous_block_starts"] >= 1
     sources = dict(diagnostics["idiosyncratic_block_sources"])
     assert sum(sources.values()) == len(path.projections[FIRST_GAMEWEEK].table)
-    assert set(sources) == {"contiguous", "position_fallback", "pooled_fallback"}
+    assert set(sources) == {"own_history", "position_fallback", "pooled_fallback"}
+
+
+def test_a_player_with_no_run_of_his_own_borrows_one_from_his_position() -> None:
+    """The case real data hit first: a position pool's next row is a different player.
+
+    A pool is not one row per week, so a run has to be the same player at the next fold.
+    Before that was true, any player short of his own contiguous run made generation fail.
+    """
+
+    history = _residual_history()
+    snapshot = _snapshot()
+    intermittent = snapshot.table["player_id"].iloc[0]
+    # He has three observations, so he clears min_player_observations and is fitted on his
+    # own pool -- but they fall in weeks 2, 4 and 6, so no run of three exists for him.
+    keep = (history["player_id"] != intermittent) | history["gameweek"].isin((2, 4, 6))
+    history = history.loc[keep].reset_index(drop=True)
+
+    target = ScenarioPathTarget(SEASON, FIRST_GAMEWEEK, 3)
+    path = generate_scenario_paths(
+        {gameweek: _snapshot(gameweek) for gameweek in target.gameweeks},
+        history,
+        target,
+        CONFIG,
+    )
+    sources = dict(path.diagnostics["idiosyncratic_block_sources"])
+    assert sources["position_fallback"] >= 1
+    assert sources["own_history"] >= 1
+    for gameweek in target.gameweeks:
+        assert np.isfinite(path.week(gameweek).to_numpy(dtype="float64")).all()
+
+
+# --- the window as one ScenarioSet ---------------------------------------------
+
+
+def test_the_window_reads_back_as_one_scenario_set() -> None:
+    from squadopt.optimization import OptimizationConfig
+    from squadopt.scenarios.rank import RankObjectiveConfig, optimize_rank_probability_squad
+    from squadopt.scenarios.rivals import template_rival_from_ownership
+
+    path = _three_week_path()
+    window = path.as_window_scenario_set()
+    assert window.target.gameweek == FIRST_GAMEWEEK
+    assert window.diagnostics["window_horizon"] == 3
+    assert window.diagnostics["scenario_points_are_window_totals"] is True
+    # The matrix is the window total, and the projection is the weekly sum, so the set is
+    # centred the way every consumer assumes.
+    np.testing.assert_allclose(
+        window.scenario_points.to_numpy(dtype="float64"),
+        path.window_points().to_numpy(dtype="float64"),
+    )
+    projected = window.projections.table["expected_points"].to_numpy(dtype="float64")
+    weekly_sum = sum(
+        path.projections[gameweek].table["expected_points"].to_numpy(dtype="float64")
+        for gameweek in path.target.gameweeks
+    )
+    np.testing.assert_allclose(projected, weekly_sum)
+    for block in window.source_fold_ids:
+        assert block.count("+") == 2
+
+    # And a single-week consumer runs on it unchanged: the rank objective prices a rival
+    # over the whole window without knowing the window exists.
+    pool = window.projections.table.loc[:, ["player_id", "position"]].copy()
+    pool["ownership"] = window.projections.table["expected_points"]
+    rival = template_rival_from_ownership(pool)
+    result = optimize_rank_probability_squad(
+        window,
+        rival,
+        OptimizationConfig(solver_time_limit_seconds=20.0),
+        RankObjectiveConfig(),
+    )
+    assert result.has_solution
+    assert result.probability_ahead is not None
+    assert 0.0 <= result.probability_ahead <= 1.0
+
+
+def test_a_window_of_one_is_exactly_the_first_week() -> None:
+    history = _residual_history()
+    path = generate_scenario_paths(
+        {FIRST_GAMEWEEK: _snapshot()},
+        history,
+        ScenarioPathTarget(SEASON, FIRST_GAMEWEEK, 1),
+        CONFIG,
+    )
+    window = path.as_window_scenario_set()
+    single = path.as_scenario_set(FIRST_GAMEWEEK)
+    assert window.scenario_fingerprint == single.scenario_fingerprint
+    assert_frame_equal(window.scenario_points, single.scenario_points)
