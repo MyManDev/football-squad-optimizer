@@ -1,10 +1,27 @@
 """Runtime platform contracts above the transport-neutral application layer.
 
 This package may consume ``squadopt.application`` and every lower engine layer. Nothing
-below it imports platform code. Concrete HTTP, database, queue and deployment adapters
-arrive later and remain on this side of the boundary.
+below it imports platform code. The concrete HTTP adapter lives above this package in
+``squadopt.api``; database, queue and deployment adapters remain future work on the same
+side of the boundary.
 """
 
+from squadopt.platform.api_contract import (
+    BACKEND_API_CONTRACT_VERSION,
+    BACKEND_API_SCHEMA_PATH,
+    BACKEND_API_VERSION,
+    ApiCommandRequest,
+    ApiError,
+    ApiErrorResponse,
+    ApiOperation,
+    ApiRunResponse,
+    ApiRunStatus,
+    ApiServiceInfo,
+    BackendApiContractError,
+    backend_api_schema,
+    serialize_api_document,
+    write_backend_api_schema,
+)
 from squadopt.platform.artifacts import (
     ARTIFACT_RECORD_CONTRACT_VERSION,
     ARTIFACT_RECORD_DIRECTORY,
@@ -41,6 +58,13 @@ from squadopt.platform.manifest import (
     write_run_manifest,
     write_run_manifest_schema,
 )
+from squadopt.platform.queries import (
+    JsonDocument,
+    PublishedViewError,
+    PublishedViewIntegrityError,
+    PublishedViewNotFoundError,
+    PublishedViewStore,
+)
 from squadopt.platform.runtime import (
     RuntimeArtifact,
     RuntimeContractError,
@@ -60,9 +84,19 @@ __all__ = [
     "ARTIFACT_RECORD_CONTRACT_VERSION",
     "ARTIFACT_RECORD_DIRECTORY",
     "ARTIFACT_RECORD_SCHEMA_PATH",
+    "BACKEND_API_CONTRACT_VERSION",
+    "BACKEND_API_SCHEMA_PATH",
+    "BACKEND_API_VERSION",
     "RUN_CONTEXT_CONTRACT_VERSION",
     "RUN_MANIFEST_CONTRACT_VERSION",
     "RUN_MANIFEST_SCHEMA_PATH",
+    "ApiCommandRequest",
+    "ApiError",
+    "ApiErrorResponse",
+    "ApiOperation",
+    "ApiRunResponse",
+    "ApiRunStatus",
+    "ApiServiceInfo",
     "ArtifactIntegrityError",
     "ArtifactLineage",
     "ArtifactNotFoundError",
@@ -70,7 +104,13 @@ __all__ = [
     "ArtifactRecordError",
     "ArtifactRegistryError",
     "ArtifactRole",
+    "BackendApiContractError",
     "FileArtifactRegistry",
+    "JsonDocument",
+    "PublishedViewError",
+    "PublishedViewIntegrityError",
+    "PublishedViewNotFoundError",
+    "PublishedViewStore",
     "RunContext",
     "RunContextError",
     "RunManifestError",
@@ -88,15 +128,18 @@ __all__ = [
     "RuntimeStatus",
     "artifact_checksum",
     "artifact_record_schema",
+    "backend_api_schema",
     "build_artifact_id",
     "parse_artifact_record",
     "parse_run_manifest",
     "read_run_manifest",
     "run_manifest_document",
     "run_manifest_schema",
+    "serialize_api_document",
     "serialize_artifact_record",
     "serialize_run_manifest",
     "write_artifact_record_schema",
+    "write_backend_api_schema",
     "write_run_manifest",
     "write_run_manifest_schema",
 ]

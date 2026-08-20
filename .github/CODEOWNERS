@@ -35,6 +35,10 @@
 /scripts/_experiment_cli.py        @tunayaslan @ErtugrulS32175
 /docs/architecture/                @tunayaslan @ErtugrulS32175
 
+# --- platform / backend
+/src/squadopt/platform/            @tunayaslan
+/src/squadopt/api/                 @tunayaslan
+
 # --- shared boundaries: all three roles
 /src/squadopt/contracts/           @SpeedyV5 @ErtugrulS32175 @tunayaslan
 /src/squadopt/data/schema.py       @SpeedyV5 @ErtugrulS32175 @tunayaslan

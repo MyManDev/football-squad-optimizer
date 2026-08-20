@@ -251,7 +251,7 @@ is what item 9 below requires of any wider feature bank.
 
 These are not data-layer decisions. Each needs agreement before implementation.
 
-### Is the archive's `fixture_difficulty` a pre-match value? (open, 2026-08-19)
+### Is the archive's `fixture_difficulty` a pre-match value? (**resolved: no**, 2026-08-19)
 
 `features/fixtures.py` attaches `mean_fixture_difficulty` and
 `minimum_fixture_difficulty` unshifted, on the ground that the fixture list and its
@@ -284,6 +284,43 @@ one is now a live measurement rather than an argument.
 [The pre-registration](preseason_difficulty_prereg.md) fixes the comparison and the
 thresholds, and [the record](preseason_fixture_difficulty.md) pins the pre-kickoff capture
 with its checksums.
+
+**Ruled, on structure rather than correlation.** The column is **not admissible** as a
+pre-match feature on development seasons. The correlation argument above is circumstantial;
+this is not:
+
+- The archived difficulty integer sits in the same CSV row as that fixture's final score,
+  with `finished=True` and a populated `stats` blob. There is one `fixtures.csv` per season
+  and no version history, so the row was written after the match was played — verified
+  380/380 rows across three seasons.
+- `2024-25/teams.csv` and `2025-26/teams.csv` carry that season's **final league table** in
+  `position`, 20/20 clubs, cross-checked against the table recomputed from the same file's
+  own scores. `players_raw.csv`'s latest `news_added` lands within days of each season's
+  final kickoff, in all six completed seasons.
+- The 2024-25 values track the outcome rather than the expectation: Nott'm Forest 4 at both
+  venues (finished 7th), Man Utd 3 home / 2 away (15th), Leicester and Southampton 1/1 at
+  `strength=975` — below the 1000 baseline every other season's promoted club sits at
+  (finished 18th and 20th).
+- Decisively: **the semantics are not uniform across seasons.** 2022-23 behaves like a
+  pre-season rating (Newcastle 3/4 despite finishing 4th); 2024-25 does not. Choosing which
+  seasons to trust would require exactly the hindsight the rule exists to avoid, so the
+  column is inadmissible on all of them rather than on some.
+
+**What it invalidates: nothing operational.** No prediction module mentions the column —
+the deterministic control, the Ridge reference and the learned-rate candidate all exclude
+it, and `rate_input_columns` names only the per-90, appearance and minutes-per-appearance
+features plus `fixture_count` and `home_fixture_count`. Its only consumers are three
+measurement studies, which read the **raw** `fixture_difficulty` rather than the aggregated
+feature. So no recorded gate result, promotion decision or live decision depends on it. The
+one result made unusable is the +1.74 realized points per gameweek from the published
+rating — already flagged as the number most likely to be contamination. The fixture
+**count** is unaffected, and that is where the measured +58 a season lives.
+
+**Enforced, not just documented.** `attach_fixture_features` now refuses to attach the two
+aggregated difficulty columns from fixture rows with no `captured_at_utc`, and offers no
+option that attaches them anyway; the three callers that never read them state
+`unproven_difficulty="omit"` explicitly. `data_contract.md` records why the per-column
+classification could not express this.
 
 ### 9. Aligning `form_window` with the feature configuration (resolved)
 

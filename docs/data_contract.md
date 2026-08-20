@@ -96,6 +96,21 @@ wrongly deny the optimizer the price it must actually pay.
 | Class | Constant | Columns |
 | --- | --- | --- |
 | Pre-match | `PRE_MATCH_COLUMNS` | `season`, `gameweek`, `player_id`, `name`, `team_id`, `position`, `price_tenths`, `opponent_team_id`, `is_home`, `fixture_difficulty` |
+
+`fixture_difficulty` is the one entry whose pre-match claim depends on the **source**, and
+the classification cannot say so because it is per column: `is_outcome_column` is given a
+name, never a row. A live capture proves the instant it was read; the archive publishes no
+capture instant, and its single per-season file was written after the season finished — the
+difficulty integer shares a row with that fixture's final score, and the same directory's
+`teams.csv` carries the final table. So the archived value is not what the platform
+published in August, and it is not admissible as a pre-match feature on development seasons.
+
+The claim is therefore enforced where the source *is* visible:
+`attach_fixture_features` refuses to attach `mean_fixture_difficulty` and
+`minimum_fixture_difficulty` from fixture rows with no `captured_at_utc`, and offers no
+option that attaches them anyway. The raw `fixture_difficulty` column stays on the fixture
+table, which is where the provenance studies that examine the archived value read it from.
+The fixture **counts** are unaffected: a calendar cannot be contaminated this way.
 | Outcome | `OUTCOME_COLUMNS` | `minutes`, `total_points`, `goals_scored`, `assists`, `clean_sheets`, `goals_conceded`, `saves`, `bonus`, `yellow_cards`, `red_cards`, `starts`, `expected_goals`, `expected_assists`, `expected_goal_involvements` |
 | Unverified | `AMBIGUOUS_TIMING_COLUMNS` | `selected_by_percent`, `availability_status` |
 

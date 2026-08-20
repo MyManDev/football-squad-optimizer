@@ -67,8 +67,8 @@ class RunLog:
         self.run_id = run_id
         self.log_path = log_path
 
-    def event(self, name: str, level: int = logging.INFO, **fields: object) -> None:
-        self.logger.log(level, name, extra={"fields": fields})
+    def event(self, name: str, **fields: object) -> None:
+        self.logger.info(name, extra={"fields": fields})
 
     def failure(self, name: str, **fields: object) -> None:
         """Record a handled failure with the active exception's traceback."""

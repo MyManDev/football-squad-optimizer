@@ -30,6 +30,7 @@ def _picks(**overrides: object) -> EntryPicks:
         "free_transfers": 1,
         "chips_used": {"wildcard": (1,)},
         "purchase_prices": {1001: 55},
+        "purchase_prices_known": True,
     }
     base.update(overrides)
     return EntryPicks(**base)  # type: ignore[arg-type]
@@ -104,3 +105,31 @@ def test_a_provider_is_any_object_with_picks() -> None:
 
     provider: EntryPicksProvider = Fake()
     assert provider.picks(9, "2026-27", 3).gameweek == 3
+
+
+def test_purchase_prices_present_but_flagged_unknown_are_refused() -> None:
+    """A consumer could not tell whether to trust them, so the pair is contradictory."""
+
+    with pytest.raises(EntryError, match="flagged unknown"):
+        _picks(purchase_prices={1: 50}, purchase_prices_known=False)
+
+
+def test_known_purchase_prices_carry_the_flag() -> None:
+    picks = _picks(purchase_prices={1: 50}, purchase_prices_known=True)
+    assert picks.purchase_prices_known is True
+    assert picks.free_transfers_known is True  # the default states the optimistic case
+
+
+def test_capture_built_picks_state_their_two_unknowns() -> None:
+    """The shape the data side will build: floor-of-one transfers, current-price selling."""
+
+    picks = _picks(
+        free_transfers=1,
+        free_transfers_known=False,
+        purchase_prices={},
+        purchase_prices_known=False,
+    )
+    assert picks.free_transfers == 1
+    assert picks.free_transfers_known is False
+    assert picks.purchase_prices_known is False
+    assert dict(picks.purchase_prices) == {}

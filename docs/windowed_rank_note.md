@@ -64,3 +64,40 @@ seeing 1.00 everywhere.
 - Wall clock: a full window selection fits comfortably inside the five-minute live budget
   once the pool rule is applied; the first full-pool attempt did not, and the pool rule
   (best-per-position + cheapest-per-position + the rival's eleven) is now part of the flow.
+
+
+---
+
+## Update, 2026-08-20: the edge term is in, and it does what was gated — no more
+
+`rival_edge_prereg.md` declared the gate before the change existed; the change landed the
+same day (the `rival_edge_points` parameter at all four places a rival is scored — the rank
+solver, the fixed-decision comparison, the goal menu, and the plan selector's window
+scores; zero-edge identity is proven bit-for-bit by test).
+
+Re-run with the measured edge (+7.19 a week):
+
+| Horizon | Claimed (no edge) | Claimed (edge) | Realized |
+| ---: | ---: | ---: | ---: |
+| 1 | 0.89 | **0.77** | 0.60 |
+| 3 | 0.97 | **0.87** | 0.00 |
+| 5 | 0.99 | **0.89** | 0.00 |
+
+The gate asked for deflation — the claims must move toward the realized outcomes and the
+horizon-one gap must not widen — and that passed. What it deliberately did not ask for is
+calibration, and the numbers say why: 0.87 against a realized 0.00 is still fiction. A
+constant per-week edge removes the part of the inflation the crowd's *average* advantage
+explains; it cannot remove the part that comes from my own squad's selection optimism on
+the same scenarios, from the edge's week-to-week variance, or from five windows being five
+windows. Windowed crowd-relative claims therefore still ship as *diagnostics*, not
+probabilities, and the product rule from the first half of this note stands unchanged.
+
+What the edge did unlock is the thing the mode selector needed: the competitive modes now
+**separate on the plan menu**. Yesterday every chip plan sat at P≈1.00 against the
+under-priced crowd and the tie-break decided everything; with the edge in, Garantici and
+Agresif pick the single-chip `bboost_gw21` (P(success) 1.00, with the 3xc placements
+falling to 0.97–0.98 and `no_chips` to 0.92), while Aşırı Agresif pays for both chips
+(`planner_choice`) because only the biggest swing clears a five-point margin against an
+edged crowd. Saf Puan ignores the rival by construction and keeps `planner_choice`. One
+window, so this is an observation, not evidence — but it is the first time the four modes
+have disagreed for their stated reasons.

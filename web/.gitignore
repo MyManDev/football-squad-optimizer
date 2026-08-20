@@ -1,3 +1,6 @@
+# Generated measurement-browser assets
+/public/analysis/
+
 # Logs
 logs
 *.log
