@@ -26,11 +26,8 @@ Both branches are protected. Required on `develop`:
 
 `main` additionally allows no direct pushes at all: it moves by release merge only.
 
-`delete_branch_on_merge` should be on and **is not** — `gh api repos/:owner/:repo` reports
-`false`, and stale heads keep accumulating. Because pull requests are squash-merged, git cannot
-prove a branch was merged even when its content is in `develop`, so do not prune with
-`git branch --merged`: it reports almost nothing as merged and the reachability test is
-misleading rather than conservative. Prune by whether the pull request is closed.
+`delete_branch_on_merge` should be on. Whether it is, and what follows when it is not, is
+read from the settings rather than from this page — see [Verification](#verification).
 
 ## The gates
 
@@ -92,8 +89,9 @@ produced the committed artifacts" untrue without failing anything.
 ## Branch names
 
 `feature/*`, `fix/*`, `docs/*`, `chore/*`, `test/*`. Commits follow Conventional Commits with
-the PR number appended by the squash merge — the convention every one of the 90 commits already
-follows, now written down.
+the PR number appended by the squash merge — the convention the history already follows, now
+written down. Check it against the log (`git log --oneline`) rather than against a commit count
+recorded here.
 
 ## Verification
 
@@ -102,18 +100,39 @@ gh api repos/:owner/:repo --jq '{default_branch, delete_branch_on_merge}'
 gh api repos/:owner/:repo/branches/develop/protection
 ```
 
-Measured on 2026-08-19, `develop` protection is **partly** what this document asks for:
+Read the answer rather than a copy of it. An earlier draft of this section pasted the six
+measured values into a table, which is the same mistake the rest of this pull request exists to
+undo: a number committed to a document is right on the day it is written and silently wrong
+afterwards, and nothing fails when it drifts. What is worth writing down is how to interpret
+whatever the command prints.
 
-| Setting | Asked | Actual |
-| --- | --- | --- |
-| required status checks | the five gates | `gates (py3.11)`, `gates (py3.13)` — the `web` job is not required |
-| `strict` (branch up to date) | yes | `true` |
-| approving reviews | one, and one per other role on shared boundaries | **`0`** |
-| `require_code_owner_reviews` | implied by the ownership table | **`false`** |
-| `enforce_admins` | yes | **`false`** |
-| `delete_branch_on_merge` | on | **`false`** |
+**The rule.** Every requirement listed under [Protection](#protection) is asked of the settings.
+Where the settings do not supply one, the requirement still stands as an agreement — it is
+simply unenforced, and an unenforced agreement is kept by people or not at all.
 
-So `.github/CODEOWNERS` is advisory: it neither requests nor requires a review, and the
-ownership table it was derived from is not mechanically enforced. Twenty-one pull requests
-merged on 2026-08-19 with zero required approvals. Closing that is a protection-settings
-change, not a code change, and it belongs to the core-architecture owner.
+**How to tell which regime you are in.** Two fields decide whether the ownership table has any
+mechanical force:
+
+- `required_pull_request_reviews.required_approving_review_count` — if this is `0`, a pull
+  request can merge with no review at all, and GitHub reporting a branch as `CLEAN` means only
+  that nothing blocks the button, **not** that anyone approved it.
+- `required_pull_request_reviews.require_code_owner_reviews` — if this is `false`,
+  `.github/CODEOWNERS` neither requests nor requires a review, so the shared-boundary rule
+  (one approval from each of the other two roles) is convention rather than a gate.
+
+While both hold, treat a shared-boundary merge as needing sign-off you have to go and ask for,
+and record it in the pull request so the agreement leaves a trace the settings do not.
+
+Two further readings worth knowing. `required_status_checks.contexts` lists which checks
+actually block: a job that runs on every pull request but is absent from that list can be red
+without stopping a merge. And `delete_branch_on_merge` governs cleanup — while it is off, stale
+heads accumulate, and because pull requests are squash-merged git cannot prove a branch was
+merged even when its content is in `develop`. Do not prune with `git branch --merged`: it
+reports almost nothing as merged, so the reachability test misleads rather than errs on the safe
+side. Prune by whether the pull request is closed.
+
+Closing any of these gaps is a protection-settings change, not a code change, and it belongs to
+the core-architecture owner.
+
+For the record, as history rather than as current state: on 2026-08-19 twenty-one pull requests
+merged with zero required approvals, which is what prompted this section to be written down.

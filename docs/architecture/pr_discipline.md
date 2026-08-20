@@ -6,8 +6,9 @@ without three people colliding in the same files.
 This is the working agreement. For the layer rules it enforces see
 [dependency rules](dependency_rules.md); for who approves what, [ownership](ownership.md); for
 the branch and gate mechanics, [branching](branching.md). The acceptance standard for a handoff
-is unchanged and lives in `../handoff_acceptance_checklist.md` — 17 items with an explicit
-acceptance rule. This document does not restate it.
+is unchanged and lives in `../handoff_acceptance_checklist.md`, an itemised list with an
+explicit acceptance rule. This document neither restates it nor counts it; the file is the
+count.
 
 ## One topic per pull request
 
