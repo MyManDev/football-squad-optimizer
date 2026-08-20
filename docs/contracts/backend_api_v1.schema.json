@@ -1,0 +1,513 @@
+{
+  "$defs": {
+    "ApiCommandRequest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/DecideCommandRequest"
+        },
+        {
+          "$ref": "#/$defs/SettleCommandRequest"
+        },
+        {
+          "$ref": "#/$defs/TickCommandRequest"
+        }
+      ]
+    },
+    "ApiError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "pattern": "^[A-Z][A-Z0-9_]{1,63}$",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "message": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "run_id": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "run_id",
+        "details"
+      ],
+      "type": "object"
+    },
+    "ApiErrorResponse": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "backend_api_v1",
+          "type": "string"
+        },
+        "error": {
+          "$ref": "#/$defs/ApiError"
+        }
+      },
+      "required": [
+        "contract_version",
+        "error"
+      ],
+      "type": "object"
+    },
+    "ApiRunResponse": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "completed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "failed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "$ref": "#/$defs/ApiError"
+              },
+              "result": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "contract_version": {
+          "const": "backend_api_v1",
+          "type": "string"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ApiError"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "finished_at_utc": {
+          "format": "date-time",
+          "pattern": "Z$",
+          "type": "string"
+        },
+        "operation": {
+          "enum": [
+            "gameweek.decide",
+            "gameweek.settle",
+            "season.tick"
+          ],
+          "type": "string"
+        },
+        "output_artifact_ids": {
+          "items": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "reproducibility_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "request_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_id": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "runtime_seconds": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "started_at_utc": {
+          "format": "date-time",
+          "pattern": "Z$",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_version",
+        "run_id",
+        "operation",
+        "status",
+        "request_fingerprint",
+        "reproducibility_fingerprint",
+        "started_at_utc",
+        "finished_at_utc",
+        "runtime_seconds",
+        "output_artifact_ids",
+        "result",
+        "error"
+      ],
+      "type": "object"
+    },
+    "ApiServiceInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "api_version": {
+          "const": "v1",
+          "type": "string"
+        },
+        "contract_version": {
+          "const": "backend_api_v1",
+          "type": "string"
+        },
+        "service": {
+          "const": "squadopt",
+          "type": "string"
+        },
+        "status": {
+          "const": "ok",
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_version",
+        "service",
+        "status",
+        "api_version"
+      ],
+      "type": "object"
+    },
+    "DecideCommandRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "chip": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contract_version": {
+          "const": "backend_api_v1",
+          "type": "string"
+        },
+        "gameweek": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "idempotency_key": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "live",
+            "replay"
+          ],
+          "type": "string"
+        },
+        "operation": {
+          "const": "gameweek.decide",
+          "type": "string"
+        },
+        "projection_artifact_id": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "request_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "season": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]{4}-[0-9]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "snapshot_id": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contract_version",
+        "idempotency_key",
+        "request_fingerprint",
+        "season",
+        "operation",
+        "gameweek",
+        "snapshot_id",
+        "projection_artifact_id",
+        "chip",
+        "mode"
+      ],
+      "type": "object"
+    },
+    "DecideRequestBody": {
+      "additionalProperties": false,
+      "properties": {
+        "chip": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9._-]{0,63}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode": {
+          "enum": [
+            "live",
+            "replay"
+          ],
+          "type": "string"
+        },
+        "projection_artifact_id": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "snapshot_id": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    },
+    "SettleCommandRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "backend_api_v1",
+          "type": "string"
+        },
+        "gameweek": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "idempotency_key": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+          "type": "string"
+        },
+        "operation": {
+          "const": "gameweek.settle",
+          "type": "string"
+        },
+        "request_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "season": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]{4}-[0-9]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "snapshot_id": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contract_version",
+        "idempotency_key",
+        "request_fingerprint",
+        "season",
+        "operation",
+        "gameweek",
+        "snapshot_id"
+      ],
+      "type": "object"
+    },
+    "SettleRequestBody": {
+      "additionalProperties": false,
+      "properties": {
+        "snapshot_id": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "TickCommandRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "backend_api_v1",
+          "type": "string"
+        },
+        "dry_run": {
+          "type": "boolean"
+        },
+        "idempotency_key": {
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$",
+          "type": "string"
+        },
+        "operation": {
+          "const": "season.tick",
+          "type": "string"
+        },
+        "request_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "season": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9]{4}-[0-9]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "contract_version",
+        "idempotency_key",
+        "request_fingerprint",
+        "season",
+        "operation",
+        "dry_run"
+      ],
+      "type": "object"
+    },
+    "TickRequestBody": {
+      "additionalProperties": false,
+      "properties": {
+        "dry_run": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "type": "object"
+    }
+  },
+  "$id": "https://squadopt.dev/contracts/backend_api_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Normalized commands and service/run/error responses. Read endpoints reuse ui_view_v1 without another envelope.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ApiCommandRequest"
+    },
+    {
+      "$ref": "#/$defs/ApiRunResponse"
+    },
+    {
+      "$ref": "#/$defs/ApiErrorResponse"
+    },
+    {
+      "$ref": "#/$defs/ApiServiceInfo"
+    }
+  ],
+  "title": "SquadOpt backend API contract"
+}

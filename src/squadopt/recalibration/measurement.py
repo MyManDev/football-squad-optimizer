@@ -268,7 +268,11 @@ def measure_calendar_recalibration(
         raise RecalibrationValidationError("config must be a RecalibrationConfig.")
     validated = validate_residual_regimes(residuals, settings)
     try:
-        enriched = attach_fixture_features(validated, fixtures, team_codes)
+        # "omit": this measurement groups by fixture *count*, which the archive can
+        # prove; it never reads the difficulty summaries.
+        enriched = attach_fixture_features(
+            validated, fixtures, team_codes, unproven_difficulty="omit"
+        )
     except (DataError, FeatureConfigurationError) as error:
         raise RecalibrationValidationError(
             f"Fixture context could not be attached to residual regimes: {error}"

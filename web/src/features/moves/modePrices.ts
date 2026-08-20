@@ -1,5 +1,7 @@
 import modePriceList from "../../../../docs/mode_price_list.json";
 
+import type { Messages } from "../../i18n/messages";
+
 export type PlayMode = "saf-puan" | "garantici" | "agresif" | "asiri-agresif";
 
 interface PriceCell {
@@ -24,12 +26,14 @@ const budgetZero = {
   garantici: artifact.grid.garantici["0.0"],
 };
 
-function wholePercent(value: number): string {
-  return `${Math.round(value * 100)}%`;
+function wholePercent(value: number, locale: string): string {
+  return new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 }).format(
+    value,
+  );
 }
 
-function decimal(value: number): string {
-  return value.toFixed(1).replace(".", ",");
+function decimal(value: number, locale: string): string {
+  return value.toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
 export interface PlayModeOption {
@@ -39,35 +43,40 @@ export interface PlayModeOption {
   value: PlayMode;
 }
 
-export const PLAY_MODES: readonly PlayModeOption[] = [
-  {
-    value: "saf-puan",
-    label: "Saf Puan",
-    description: "Rakipten bağımsız en yüksek beklenen puanı hedefler.",
-    price: "Rakip bütçesi yok",
-  },
-  {
-    value: "garantici",
-    label: "Garantici",
-    description: "Lig içinde geride kalma ihtimalini azaltmayı hedefler.",
-    price: `P(geride) ${wholePercent(budgetZero.agresif.behind)} → ${wholePercent(budgetZero.garantici.behind)}`,
-  },
-  {
-    value: "agresif",
-    label: "Agresif",
-    description: "Rakibin önüne geçmeye odaklanan dengeli rekabet modu.",
-    price: `P(geride) ${wholePercent(budgetZero.agresif.behind)} · maliyet ${decimal(budgetZero.agresif.mean_realized_cost)} puan`,
-  },
-  {
-    value: "asiri-agresif",
-    label: "Aşırı Agresif",
-    description: "Beş puandan büyük fark yaratabilecek daha sert kararları arar.",
-    price: `P(5+ önde) ${wholePercent(budgetZero.asiriAgresif.ahead_by_more_than_five)} · maliyet ${decimal(budgetZero.asiriAgresif.mean_realized_cost)} puan`,
-  },
-];
+export function getPlayModes(
+  copy: Messages["decision"]["modes"],
+  locale: string,
+): readonly PlayModeOption[] {
+  return [
+    {
+      value: "saf-puan",
+      label: copy.pure,
+      description: copy.pureDescription,
+      price: copy.purePrice,
+    },
+    {
+      value: "garantici",
+      label: copy.safe,
+      description: copy.safeDescription,
+      price: `${copy.behind} ${wholePercent(budgetZero.agresif.behind, locale)} → ${wholePercent(budgetZero.garantici.behind, locale)}`,
+    },
+    {
+      value: "agresif",
+      label: copy.aggressive,
+      description: copy.aggressiveDescription,
+      price: `${copy.behind} ${wholePercent(budgetZero.agresif.behind, locale)} · ${copy.cost} ${decimal(budgetZero.agresif.mean_realized_cost, locale)} ${copy.points}`,
+    },
+    {
+      value: "asiri-agresif",
+      label: copy.extreme,
+      description: copy.extremeDescription,
+      price: `${copy.aheadFive} ${wholePercent(budgetZero.asiriAgresif.ahead_by_more_than_five, locale)} · ${copy.cost} ${decimal(budgetZero.asiriAgresif.mean_realized_cost, locale)} ${copy.points}`,
+    },
+  ];
+}
 
 export const MODE_PRICE_FOLDS = budgetZero.garantici.folds;
 
 export function isPlayMode(value: string | null): value is PlayMode {
-  return PLAY_MODES.some((mode) => mode.value === value);
+  return ["saf-puan", "garantici", "agresif", "asiri-agresif"].includes(value ?? "");
 }

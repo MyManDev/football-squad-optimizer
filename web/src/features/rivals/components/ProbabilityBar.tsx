@@ -1,4 +1,5 @@
 import { percent } from "../../../lib/format";
+import { useLanguage } from "../../../i18n/context";
 import styles from "./ProbabilityBar.module.css";
 
 /**
@@ -15,13 +16,16 @@ export function ProbabilityBar({
   interval?: [number, number] | null;
   label: string;
 }) {
+  const { locale, messages } = useLanguage();
   const [low, high] = interval ?? [probability, probability];
   return (
     <div
       className={styles.wrap}
       role="img"
-      aria-label={`${label}: ${percent(probability)}${
-        interval ? `, 90% interval ${percent(low)} to ${percent(high)}` : ""
+      aria-label={`${label}: ${percent(probability, 0, locale)}${
+        interval
+          ? `, ${messages.rivals.interval(percent(low, 0, locale), percent(high, 0, locale))}`
+          : ""
       }`}
     >
       <div className={styles.track}>

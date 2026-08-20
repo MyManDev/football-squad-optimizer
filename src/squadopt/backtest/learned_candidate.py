@@ -192,6 +192,11 @@ def _diagnostics(
         "rate_training_rows": model.training_rows,
         "rate_ridge_alpha": learned.ridge_alpha,
         "rate_input_columns": list(learned.input_columns),
+        # The fingerprint above hashes the coefficients, which makes two folds
+        # distinguishable and tells a reader nothing about direction. The signs are
+        # reported alongside it because a negative coefficient on a newly added input is a
+        # finding in its own right, and no aggregate metric surfaces it.
+        "rate_coefficients": dict(model.standardised_coefficients),
     }
 
 

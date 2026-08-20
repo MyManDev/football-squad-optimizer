@@ -211,10 +211,13 @@ network read remains traceable but inherently external.
 
 ### Persistence
 
-Repository protocols separate runtime behavior from storage. The first implementation is
-file-backed so the contract is exercised before a database schema freezes it. PostgreSQL may
-later hold application state and metadata; large historical, residual, scenario, and model
-artifacts remain file/Parquet or object-storage concerns.
+The first implementation is file-backed so the contract is exercised before a database schema
+freezes it. The current runner still names that concrete adapter; a database implementation
+must first extract the narrow repository behavior it already consumes. PostgreSQL then holds
+transactional application state and query metadata, while large historical, residual,
+scenario, and model artifacts remain Parquet/object-storage concerns. The schema, publication
+order, and migration triggers are fixed in
+[ADR 0005](decisions/0005-persistence-boundaries.md).
 
 Core and application code never contain SQL. Concrete persistence adapters live at or above
 the platform boundary.
@@ -223,6 +226,9 @@ the platform boundary.
 
 FastAPI, background jobs, cache, authentication, deployment, and observability are later
 adapters over a stable runtime. Their order matters:
+
+The versioned routes, normalized commands, read-model reuse, idempotency semantics, and public
+errors are fixed in the [backend HTTP boundary](backend.md) before a framework is installed.
 
 - no HTTP implementation before request/response and runtime contracts;
 - no queue implementation before the job lifecycle contract;
@@ -286,9 +292,10 @@ small contracts needed for one reviewable outcome instead of opening a PR per cl
 3. `feature/runtime-orchestration` — the shared execution lifecycle around public application
    services and its integration tests.
 
-The runtime contracts are followed by `feature/application-command-services`, which supplies
-the public decide, settle, and tick seams, and then `feature/unified-cli`, which exercises all
-four preceding deliveries through an installed command. The remaining independent deliveries
-are `docs/persistence-adr` and `feature/backend-api-contract`. PostgreSQL, FastAPI
-implementation, workers, Redis, authentication, deployment, and scaling are later stages,
-not implicit contents of the first platform PR.
+The runtime contracts were followed by `feature/application-command-services`, which supplied
+the public decide, settle, and tick seams, and then `feature/unified-cli`, which exercised all
+four preceding deliveries through an installed command. The independent persistence decision
+is now [ADR 0005](decisions/0005-persistence-boundaries.md), and
+`feature/backend-api-contract` fixes the HTTP boundary and `backend_api_v1` documents before a
+framework is installed. PostgreSQL, FastAPI implementation, workers, Redis, authentication,
+and scaling remain later stages rather than implicit contents of these contract PRs.

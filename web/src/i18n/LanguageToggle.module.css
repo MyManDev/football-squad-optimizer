@@ -1,0 +1,26 @@
+.toggle {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+}
+
+.toggle button {
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toggle button[aria-pressed="true"] {
+  background: var(--color-text);
+  color: var(--color-bg);
+}

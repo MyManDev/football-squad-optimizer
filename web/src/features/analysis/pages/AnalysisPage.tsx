@@ -6,6 +6,7 @@ import { Link, useParams } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
 import { EmptyState } from "../../../design/components/EmptyState";
+import { useLanguage } from "../../../i18n/context";
 import {
   analysisAsset,
   fetchAnalysisIndex,
@@ -14,13 +15,6 @@ import {
   type MeasurementType,
 } from "../data";
 import styles from "./AnalysisPage.module.css";
-
-const TYPE_LABELS: Record<MeasurementType, string> = {
-  passed: "kapı geçti",
-  negative: "temiz negatif",
-  descriptive: "betimleyici",
-  prereg: "prereg",
-};
 
 const TYPE_TONES: Record<MeasurementType, "good" | "bad" | "neutral" | "accent"> = {
   passed: "good",
@@ -31,9 +25,9 @@ const TYPE_TONES: Record<MeasurementType, "good" | "bad" | "neutral" | "accent">
 
 const EMPTY_ENTRIES: MeasurementEntry[] = [];
 
-function shortDate(value: string | null): string {
-  if (!value) return "tarih kaydı yok";
-  return new Intl.DateTimeFormat("tr-TR", {
+function shortDate(value: string | null, locale: string, noDate: string): string {
+  if (!value) return noDate;
+  return new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -41,12 +35,15 @@ function shortDate(value: string | null): string {
 }
 
 function MeasurementCard({ entry }: { entry: MeasurementEntry }) {
+  const { locale, messages } = useLanguage();
   return (
     <article className={styles.card}>
       <div className={styles.cardMeta}>
-        <Badge tone={TYPE_TONES[entry.type]}>{TYPE_LABELS[entry.type]}</Badge>
+        <Badge tone={TYPE_TONES[entry.type]}>{messages.analysis.types[entry.type]}</Badge>
         <span>{entry.phase}</span>
-        <time dateTime={entry.date ?? undefined}>{shortDate(entry.date)}</time>
+        <time dateTime={entry.date ?? undefined}>
+          {shortDate(entry.date, locale, messages.analysis.noDate)}
+        </time>
       </div>
       <h2 className={styles.cardTitle}>
         <Link to={`/analysis/${entry.slug}`}>{entry.title}</Link>
@@ -57,6 +54,8 @@ function MeasurementCard({ entry }: { entry: MeasurementEntry }) {
 }
 
 function MeasurementDocument({ entries, slug }: { entries: MeasurementEntry[]; slug: string }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.analysis;
   const entry = entries.find((candidate) => candidate.slug === slug);
   const documentQuery = useQuery({
     queryKey: ["analysis-document", entry?.markdown_path],
@@ -65,30 +64,28 @@ function MeasurementDocument({ entries, slug }: { entries: MeasurementEntry[]; s
   });
 
   if (!entry) {
-    return (
-      <EmptyState title="Ölçüm bulunamadı.">İndekste bu kimlikle bir artefakt yok.</EmptyState>
-    );
+    return <EmptyState title={copy.notFoundTitle}>{copy.notFoundBody}</EmptyState>;
   }
-  if (documentQuery.isPending) return <EmptyState title="Ölçüm yükleniyor…" />;
+  if (documentQuery.isPending) return <EmptyState title={copy.loadingDocument} />;
   if (documentQuery.isError) {
-    return <EmptyState title="Ölçüm açılamadı.">{String(documentQuery.error)}</EmptyState>;
+    return <EmptyState title={copy.documentError}>{String(documentQuery.error)}</EmptyState>;
   }
 
   const rendered = DOMPurify.sanitize(marked.parse(documentQuery.data, { async: false }) as string);
   return (
     <div className={styles.documentPage}>
       <div className={styles.documentActions}>
-        <Link to="/analysis">← Analiz Merkezi</Link>
+        <Link to="/analysis">{copy.back}</Link>
         {entry.json_path ? (
           <a href={analysisAsset(entry.json_path)} target="_blank" rel="noreferrer">
-            Ham JSON
+            {messages.common.rawJson}
           </a>
         ) : null}
       </div>
       <div className={styles.cardMeta}>
-        <Badge tone={TYPE_TONES[entry.type]}>{TYPE_LABELS[entry.type]}</Badge>
+        <Badge tone={TYPE_TONES[entry.type]}>{copy.types[entry.type]}</Badge>
         <span>{entry.phase}</span>
-        <time dateTime={entry.date ?? undefined}>{shortDate(entry.date)}</time>
+        <time dateTime={entry.date ?? undefined}>{shortDate(entry.date, locale, copy.noDate)}</time>
       </div>
       <article className={styles.markdown} dangerouslySetInnerHTML={{ __html: rendered }} />
     </div>
@@ -96,6 +93,8 @@ function MeasurementDocument({ entries, slug }: { entries: MeasurementEntry[]; s
 }
 
 export function AnalysisPage() {
+  const { messages } = useLanguage();
+  const copy = messages.analysis;
   const { slug } = useParams();
   const indexQuery = useQuery({ queryKey: ["analysis-index"], queryFn: fetchAnalysisIndex });
   const [tab, setTab] = useState<"all" | "negative">("all");
@@ -120,38 +119,35 @@ export function AnalysisPage() {
     [entries, from, phase, tab, to, type],
   );
 
-  if (indexQuery.isPending) return <EmptyState title="Ölçüm indeksi yükleniyor…" />;
+  if (indexQuery.isPending) return <EmptyState title={copy.loadingIndex} />;
   if (indexQuery.isError) {
-    return <EmptyState title="Analiz Merkezi açılamadı.">{String(indexQuery.error)}</EmptyState>;
+    return <EmptyState title={copy.indexError}>{String(indexQuery.error)}</EmptyState>;
   }
   if (slug) return <MeasurementDocument entries={entries} slug={slug} />;
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <div className={styles.kicker}>kanıt, kararın yanında</div>
-        <h1>Analiz Merkezi</h1>
-        <p>
-          Geçen kapılar kadar temiz negatifler de burada kalır. İçerikler İngilizce kaynak
-          belgelerin değişmeden sunulan kopyalarıdır.
-        </p>
+        <div className={styles.kicker}>{copy.kicker}</div>
+        <h1>{copy.title}</h1>
+        <p>{copy.lede}</p>
       </header>
 
-      <div className={styles.tabs} aria-label="Ölçüm görünümü">
+      <div className={styles.tabs} aria-label={copy.viewLabel}>
         <button type="button" aria-pressed={tab === "all"} onClick={() => setTab("all")}>
-          Tüm ölçümler
+          {copy.all}
         </button>
         <button type="button" aria-pressed={tab === "negative"} onClick={() => setTab("negative")}>
-          Negatifler
+          {copy.negatives}
         </button>
       </div>
 
-      <section className={styles.filters} aria-label="Ölçüm filtreleri">
+      <section className={styles.filters} aria-label={copy.filters}>
         <label>
-          Tür
+          {copy.type}
           <select value={type} onChange={(event) => setType(event.target.value as typeof type)}>
-            <option value="all">Tümü</option>
-            {Object.entries(TYPE_LABELS).map(([value, label]) => (
+            <option value="all">{copy.allOption}</option>
+            {Object.entries(copy.types).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
@@ -159,9 +155,9 @@ export function AnalysisPage() {
           </select>
         </label>
         <label>
-          Faz
+          {copy.phase}
           <select value={phase} onChange={(event) => setPhase(event.target.value)}>
-            <option value="all">Tümü</option>
+            <option value="all">{copy.allOption}</option>
             {phases.map((value) => (
               <option key={value} value={value}>
                 {value}
@@ -170,17 +166,17 @@ export function AnalysisPage() {
           </select>
         </label>
         <label>
-          Başlangıç tarihi
+          {copy.from}
           <input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
         </label>
         <label>
-          Bitiş tarihi
+          {copy.to}
           <input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
         </label>
       </section>
 
       <p className={styles.count} aria-live="polite">
-        {filtered.length} / {entries.length} ölçüm gösteriliyor
+        {copy.count(filtered.length, entries.length)}
       </p>
       {filtered.length ? (
         <div className={styles.grid}>
@@ -189,7 +185,7 @@ export function AnalysisPage() {
           ))}
         </div>
       ) : (
-        <EmptyState title="Bu filtrelerle ölçüm yok." />
+        <EmptyState title={copy.empty} />
       )}
     </div>
   );
