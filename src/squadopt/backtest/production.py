@@ -133,7 +133,13 @@ def _season_features(
         features[column] = features[column].astype("float64")
     season_fixtures = fixtures.loc[fixtures["season"].astype("string") == season]
     season_codes = team_codes.loc[team_codes["season"].astype("string") == season]
-    return attach_fixture_features(features, season_fixtures, season_codes)
+    # "omit": the archive publishes no capture instant, so its difficulty is not a
+    # pre-match value. No model in this pipeline reads those two columns — the declared
+    # rate inputs are the per-90, appearance and minutes-per-appearance features plus the
+    # calendar counts — so omitting them changes no projected number.
+    return attach_fixture_features(
+        features, season_fixtures, season_codes, unproven_difficulty="omit"
+    )
 
 
 def build_production_prediction_snapshot(

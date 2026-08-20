@@ -83,6 +83,13 @@ class RankObjectiveConfig:
 
     margin_points: float = 0.0
     """Be ahead by more than this many points to count a scenario as won."""
+    rival_edge_points: float = 0.0
+    """Points added to the rival's score in every scenario before comparison.
+
+    The scenario generator centres every player on the projection, so a rival who
+    systematically outscores the projection - the ownership template does, by a measured
+    +7.19 a week - is under-priced and P(ahead) inflates. This constant restores the
+    rival's measured edge. Zero (the default) is the historical behaviour, bit for bit."""
     expected_points_budget: float | None = None
     """When set with a reference, the squad's scenario-mean score may fall at most this
     far below the reference (the risk-neutral squad's mean): the price of the goal."""
@@ -106,6 +113,10 @@ class RankObjectiveConfig:
         ):
             raise ScenarioConfigurationError("margin_points must be a finite number.")
         object.__setattr__(self, "margin_points", float(margin))
+        edge = self.rival_edge_points
+        if isinstance(edge, bool) or not isinstance(edge, int | float) or not math.isfinite(edge):
+            raise ScenarioConfigurationError("rival_edge_points must be a finite number.")
+        object.__setattr__(self, "rival_edge_points", float(edge))
         budget = self.expected_points_budget
         if budget is not None:
             if isinstance(budget, bool) or not isinstance(budget, int | float):
@@ -195,14 +206,16 @@ def optimize_rank_probability_squad(
     matrix = verified.scenario_points.loc[:, player_ids].to_numpy(dtype="float64", copy=True)
     scale = optimization_config.expected_points_scale
     scaled_rows = [[scale_expected_points(v, scale) for v in row] for row in matrix.tolist()]
-    rival_raw = _rival_scores(matrix, column, rival)
+    rival_raw = _rival_scores(matrix, column, rival) + settings.rival_edge_points
     # The rival's scenario scores are summed from the same per-player scaled integers as
     # mine, so an identical squad scores identically to the last unit; scaling the float
     # sum instead would let rounding noise decide "ahead".
     rival_columns = [column[p] for p in rival.starter_ids]
     rival_captain_column = column[rival.captain_id]
+    edge_scaled = scale_expected_points(settings.rival_edge_points, scale)
     rival_scaled = [
-        sum(row[i] for i in rival_columns) + row[rival_captain_column] for row in scaled_rows
+        sum(row[i] for i in rival_columns) + row[rival_captain_column] + edge_scaled
+        for row in scaled_rows
     ]
     margin_scaled = scale_expected_points(settings.margin_points, scale)
     total_scenarios = len(scaled_rows)
@@ -298,6 +311,7 @@ def optimize_rank_probability_squad(
         "claim_scenario_count": len(claim_rows),
         "claim_scenarios": settings.claim_scenarios,
         "margin_points": settings.margin_points,
+        "rival_edge_points": settings.rival_edge_points,
         "expected_points_budget": settings.expected_points_budget,
         "reference_expected_points": reference_expected_points,
         "rival_label": rival.label,
@@ -458,7 +472,9 @@ def optimize_rank_probability_squad(
         diagnostics=diagnostics.copy(),
     )
     comparison = (
-        compare_fixed_decisions(optimization_result, rival, verified)
+        compare_fixed_decisions(
+            optimization_result, rival, verified, rival_edge_points=settings.rival_edge_points
+        )
         if settings.claim_scenarios == "in_sample"
         else None
     )
@@ -497,6 +513,7 @@ def goal_menu(
     budgets: Sequence[float | None] = (0.0, 1.0, 2.0, 4.0, 8.0, None),
     *,
     margin_points: float = 0.0,
+    rival_edge_points: float = 0.0,
 ) -> tuple[tuple[GoalMenuEntry, RankOptimizationResult], ...]:
     """Sweep the expected-points budget and return the menu against one rival.
 
@@ -525,7 +542,11 @@ def goal_menu(
             verified,
             rival,
             optimization_config,
-            RankObjectiveConfig(margin_points=margin_points, expected_points_budget=budget),
+            RankObjectiveConfig(
+                margin_points=margin_points,
+                expected_points_budget=budget,
+                rival_edge_points=rival_edge_points,
+            ),
             reference_expected_points=reference_mean,
         )
         if result.has_solution:

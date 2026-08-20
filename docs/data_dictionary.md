@@ -154,7 +154,7 @@ each is classified for timing.
 | --- | --- | --- | --- | --- |
 | `opponent_team_id` | int/string | deadline | Low | Fixture context for the target gameweek. |
 | `is_home` | boolean | deadline | Low | Must not enter a contract column; the optimizer rejects `bool` there. |
-| `fixture_difficulty` | numeric | deadline | Low | Only if the source's rating is genuinely pre-match. |
+| `fixture_difficulty` | numeric | deadline | Low | Pre-match on a capture that proves its instant; **not** on the archive, whose file was written after the season. See `data_contract.md`. |
 | `goals_scored` | numeric | post-match | High | Shift before rolling. |
 | `assists` | numeric | post-match | High | Shift before rolling. |
 | `clean_sheets` | numeric | post-match | High | Position-dependent usefulness. |

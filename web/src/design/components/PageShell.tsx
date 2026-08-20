@@ -9,6 +9,7 @@ const NAV = [
   { to: "/moves", label: "Suggested moves", end: false },
   { to: "/rivals", label: "Rivals", end: false },
   { to: "/league", label: "League", end: false },
+  { to: "/analysis", label: "Analiz", end: false },
 ];
 
 export function PageShell({ children }: { children: ReactNode }) {
