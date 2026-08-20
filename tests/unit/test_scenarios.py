@@ -25,12 +25,14 @@ from squadopt.scenarios import (
     ScenarioOptimizationConfig,
     ScenarioTarget,
     ScenarioValidationError,
+    compare_fixed_decisions,
     evaluate_fixed_decision,
     generate_scenarios,
     optimize_scenario_aware_squad,
     scenario_result_to_dict,
     scenario_result_to_markdown,
 )
+from squadopt.scenarios.evaluation import RivalSquad
 
 TARGET = ScenarioTarget(SEASON, 8)
 SMALL_CONFIG = ScenarioConfig(
@@ -619,3 +621,100 @@ def test_a_held_out_claim_is_read_from_scenarios_the_squad_never_saw() -> None:
     # The lexicographic phases are recorded.
     assert held_out.diagnostics["secondary_attempted"] is True
     assert held_out.diagnostics["claim_scenarios"] == "held_out_half"
+
+
+# --- the rival-side edge term ---------------------------------------------------
+
+
+def test_a_zero_edge_comparison_is_bit_for_bit_the_historical_one() -> None:
+    """The gate's identity clause: the default must not move anything."""
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    base = compare_fixed_decisions(decision, rival, scenarios)
+    explicit = compare_fixed_decisions(decision, rival, scenarios, rival_edge_points=0.0)
+    assert explicit.probability_ahead == base.probability_ahead
+    assert explicit.mean_difference == base.mean_difference
+    assert explicit.difference_quantiles == base.difference_quantiles
+    assert explicit.diagnostics["rival_edge_points"] == 0.0
+
+
+def test_the_edge_shifts_the_difference_by_exactly_itself() -> None:
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    base = compare_fixed_decisions(decision, rival, scenarios)
+    edged = compare_fixed_decisions(decision, rival, scenarios, rival_edge_points=7.19)
+    assert edged.mean_difference == pytest.approx(base.mean_difference - 7.19)
+    assert edged.probability_ahead <= base.probability_ahead
+    assert edged.diagnostics["rival_edge_points"] == pytest.approx(7.19)
+
+
+def test_a_non_finite_edge_is_refused() -> None:
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    with pytest.raises(ScenarioValidationError, match="finite"):
+        compare_fixed_decisions(decision, rival, scenarios, rival_edge_points=float("nan"))
+
+
+def test_a_zero_edge_rank_solve_is_bit_for_bit_the_historical_one() -> None:
+    from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    base = optimize_rank_probability_squad(scenarios, rival, OptimizationConfig())
+    explicit = optimize_rank_probability_squad(
+        scenarios, rival, OptimizationConfig(), RankObjectiveConfig(rival_edge_points=0.0)
+    )
+    assert explicit.probability_ahead == base.probability_ahead
+    assert explicit.scenario_mean_score == base.scenario_mean_score
+    assert (
+        explicit.optimization_result.starting_xi["player_id"].tolist()
+        == base.optimization_result.starting_xi["player_id"].tolist()
+    )
+    assert explicit.optimization_result.diagnostics["rival_edge_points"] == 0.0
+
+
+def test_an_edged_rival_is_harder_to_finish_ahead_of() -> None:
+    from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    base = optimize_rank_probability_squad(scenarios, rival, OptimizationConfig())
+    edged = optimize_rank_probability_squad(
+        scenarios, rival, OptimizationConfig(), RankObjectiveConfig(rival_edge_points=1_000.0)
+    )
+    assert base.probability_ahead is not None and edged.probability_ahead is not None
+    # A thousand-point edge is out of reach for any squad: nothing finishes ahead.
+    assert edged.probability_ahead == 0.0
+    assert edged.probability_ahead <= base.probability_ahead
+    assert edged.optimization_result.diagnostics["rival_edge_points"] == pytest.approx(1000.0)

@@ -174,6 +174,7 @@ def _execute_action(
                 in_season_projection=(
                     Path(action.handoff_path) if action.handoff_path is not None else None
                 ),
+                mode="live",
             ),
             panel_builder=panel_builder,
         )

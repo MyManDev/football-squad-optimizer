@@ -188,12 +188,20 @@ def score_candidate_on_paths(candidate: CandidatePlan, paths: ScenarioPathSet) -
     return total
 
 
-def rival_window_scores(rival: RivalSquad, paths: ScenarioPathSet) -> np.ndarray:
-    """The fixed rival's window score per scenario, captain doubled, no chips."""
+def rival_window_scores(
+    rival: RivalSquad, paths: ScenarioPathSet, *, rival_edge_points_per_week: float = 0.0
+) -> np.ndarray:
+    """The fixed rival's window score per scenario, captain doubled, no chips.
+
+    ``rival_edge_points_per_week`` is added once per week of the window: the measured
+    amount the rival outscores the projection the scenarios are centred on (+7.19 for the
+    ownership template). Zero keeps the historical behaviour exactly.
+    """
 
     total: np.ndarray | None = None
     for gameweek in paths.target.gameweeks:
         scores = _week_scores(paths.week(gameweek), list(rival.starter_ids), rival.captain_id)
+        scores = scores + float(rival_edge_points_per_week)
         total = scores if total is None else total + scores
     assert total is not None
     return total
@@ -205,6 +213,7 @@ def select_plan(
     rival: RivalSquad | None,
     *,
     modes: Mapping[str, Mapping[str, object]] = MODES,
+    rival_edge_points_per_week: float = 0.0,
 ) -> PlanSelection:
     """Score every candidate under every mode and name each mode's winner.
 
@@ -218,7 +227,11 @@ def select_plan(
     candidate_scores = {
         candidate.label: score_candidate_on_paths(candidate, paths) for candidate in candidates
     }
-    rival_scores = rival_window_scores(rival, paths) if rival is not None else None
+    rival_scores = (
+        rival_window_scores(rival, paths, rival_edge_points_per_week=rival_edge_points_per_week)
+        if rival is not None
+        else None
+    )
     verdicts: list[ModeVerdict] = []
     recommended: dict[str, str] = {}
     for mode_name, mode in modes.items():
@@ -285,6 +298,7 @@ def select_plan(
             "candidates": [candidate.label for candidate in candidates],
             "rival_label": rival.label if rival is not None else None,
             "rival_held_fixed": True,
+            "rival_edge_points_per_week": float(rival_edge_points_per_week),
             "chips_note": (
                 "A chip consumed inside the window is unavailable after it; candidates "
                 "record their consumption so the recommendation is read next to its cost."

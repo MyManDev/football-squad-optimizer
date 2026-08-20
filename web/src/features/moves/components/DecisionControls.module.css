@@ -1,0 +1,185 @@
+.intro,
+.sourceNote {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(0, 0.7fr) minmax(360px, 1.6fr) minmax(200px, 0.7fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fieldset legend,
+.leagueField > span {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+.windowOptions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-1);
+}
+
+.windowOption,
+.modeOption {
+  position: relative;
+  cursor: pointer;
+}
+
+.windowOption input,
+.modeOption input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.windowOption span {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+.windowOption input:checked + span {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  color: var(--color-text);
+}
+
+.windowOption:focus-within span,
+.modeOption:focus-within .modeBody {
+  outline: 3px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  outline-offset: 2px;
+}
+
+.modeOptions {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.modeBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface);
+}
+
+.modeOption input:checked + .modeBody {
+  border-color: var(--color-accent);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.modeHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.price {
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.description {
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.leagueField {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.leagueField input {
+  min-height: 44px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+
+.leagueField small {
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+}
+
+.diagnostic {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: var(--measure);
+  padding: var(--space-3);
+  border-left: 3px solid var(--color-warn);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--color-warn) 8%, var(--color-surface-2));
+  font-size: var(--step--1);
+}
+
+.sourceNote code {
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 900px) {
+  .controls {
+    grid-template-columns: 1fr 1.5fr;
+  }
+
+  .leagueField {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .leagueField {
+    grid-column: auto;
+  }
+
+  .modeHead {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .price {
+    text-align: left;
+  }
+
+  .diagnostic {
+    flex-direction: column;
+  }
+}
