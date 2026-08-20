@@ -4,33 +4,26 @@ Where work lands, what must pass before it lands, and what `main` is for.
 
 ## The trunk
 
-**`develop` is the trunk. `main` is the release pointer.**
+**`develop` is the trunk. `main` is release history.**
 
 Every pull request targets `develop`. `main` advances only on a deliberate release merge from
-`develop` — it is the stable ref for the live season, so that "what is running" and "what is
-being built" are two different questions with two different answers.
-
-This is a decision, not a description. Today `main` still sits at the initial commit while all
-90 commits live on `develop`, and `main` is GitHub's default branch — so a fresh clone lands on
-an empty repository. The first release merge fixes that. Until it happens, treat `main` as
-unusable rather than as a baseline.
+`develop`. The live static site is the latest successful immutable `site-...` deployment tag,
+so production may deliberately lag `main`; the deployment Actions summary answers "what is
+running", while `main` answers "what is releasable". GitHub's default branch is `develop`.
 
 ## Protection
 
-Both branches are protected. Required on `develop`:
+Both branches are protected. Current required checks on `develop` are the two Python gate
+contexts, `gates (py3.11)` and `gates (py3.13)`, with strict up-to-date branches. Each context
+runs the five Python gates below. The web job also runs in CI but is not currently a protected
+required context.
 
-- the five gates below, as required status checks;
-- one approving review, and for shared boundaries one from each of the other two roles per
-  [ownership](ownership.md);
-- no force-push, no deletion;
-- branches up to date with `develop` before merge.
+The required approving review count is zero, matching the team's check-then-squash workflow.
+Force-push and branch deletion are disabled. `main` uses the same two required contexts and
+normal changes reach it through a deliberate release pull request from `develop`.
 
-`main` additionally allows no direct pushes at all: it moves by release merge only.
-
-`delete_branch_on_merge` is on. Without it stale heads accumulate — 88 of them exist today,
-because pull requests are squash-merged and git therefore cannot prove the branch was merged
-even when its content is in `develop`. Do not try to prune them with
-`git branch --merged`; it will report almost nothing as merged. Prune by whether the PR is
+`delete_branch_on_merge` is deliberately false. Feature branches are retained after squash
+merge under the current team policy; do not prune them merely because their pull request
 closed.
 
 ## The gates
@@ -78,15 +71,9 @@ for the core-architecture owner. The numbers above are the first test-suite timi
 this repository; regenerate them with `pytest --durations=15` rather than trusting this table
 after the suite grows.
 
-**The interpreter versions disagree.** `requires-python = ">=3.11"`, ruff's
-`target-version = "py311"`, mypy's `python_version = "3.13"`, and the development venv runs
-3.11.0. Type checking therefore assumes a newer language than the code runs on. Pick one, or
-run a matrix, and make the three settings agree either way.
-
-There is also no lockfile or constraints file anywhere, and every lock line in `.gitignore` is
-commented out, so dependency ranges resolve freely — `mypy>=1.14,<3` currently resolves to
-2.3.0 and `pandas>=2.2.3,<3.1` to 3.0.5. CI without pinning will drift and produce failures
-nobody changed.
+**Interpreter coverage is deliberate.** `requires-python = ">=3.11"` and ruff target Python
+3.11, while mypy models Python 3.13. CI therefore runs both Python 3.11 (declared dependency
+ranges) and 3.13 (the pinned measurement environment in `constraints.txt`).
 
 ## Branch names
 
@@ -101,5 +88,5 @@ gh api repos/:owner/:repo --jq '{default_branch, delete_branch_on_merge}'
 gh api repos/:owner/:repo/branches/develop/protection
 ```
 
-Both should reflect what this document says. Today neither does — no protection exists on
-either branch, and `delete_branch_on_merge` is false. That is the gap Stage 1 closes.
+Both should reflect the settings above. This document records the state verified on
+2026-08-20; rerun the commands before changing repository governance.
