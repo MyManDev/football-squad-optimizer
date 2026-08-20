@@ -10,10 +10,9 @@ Every pull request targets `develop`. `main` advances only on a deliberate relea
 `develop` — it is the stable ref for the live season, so that "what is running" and "what is
 being built" are two different questions with two different answers.
 
-This is a decision, not a description. Today `main` still sits at the initial commit while all
-90 commits live on `develop`, and `main` is GitHub's default branch — so a fresh clone lands on
-an empty repository. The first release merge fixes that. Until it happens, treat `main` as
-unusable rather than as a baseline.
+This is now a description as well as a decision. The first release merge happened in #130,
+tagged `v2026-27.gw01`, so `main` carries the opening-season pointer instead of an empty tree.
+GitHub's default branch is `develop`, which is where work lands.
 
 ## Protection
 
@@ -27,11 +26,8 @@ Both branches are protected. Required on `develop`:
 
 `main` additionally allows no direct pushes at all: it moves by release merge only.
 
-`delete_branch_on_merge` is on. Without it stale heads accumulate — 88 of them exist today,
-because pull requests are squash-merged and git therefore cannot prove the branch was merged
-even when its content is in `develop`. Do not try to prune them with
-`git branch --merged`; it will report almost nothing as merged. Prune by whether the PR is
-closed.
+`delete_branch_on_merge` should be on. Whether it is, and what follows when it is not, is
+read from the settings rather than from this page — see [Verification](#verification).
 
 ## The gates
 
@@ -83,16 +79,19 @@ after the suite grows.
 3.11.0. Type checking therefore assumes a newer language than the code runs on. Pick one, or
 run a matrix, and make the three settings agree either way.
 
-There is also no lockfile or constraints file anywhere, and every lock line in `.gitignore` is
-commented out, so dependency ranges resolve freely — `mypy>=1.14,<3` currently resolves to
-2.3.0 and `pandas>=2.2.3,<3.1` to 3.0.5. CI without pinning will drift and produce failures
-nobody changed.
+`constraints.txt` now pins the measurement environment and the 3.13 CI job installs against
+it, so that half is closed. One gap remains: a dependency added to `pyproject.toml` is not
+automatically added to `constraints.txt`, and `scipy` arrived that way in #139 — declared as a
+runtime dependency, pinned in `constraints.txt`, but the two are kept in step by hand. A
+declared dependency missing from the pinned environment would make "the environment that
+produced the committed artifacts" untrue without failing anything.
 
 ## Branch names
 
 `feature/*`, `fix/*`, `docs/*`, `chore/*`, `test/*`. Commits follow Conventional Commits with
-the PR number appended by the squash merge — the convention every one of the 90 commits already
-follows, now written down.
+the PR number appended by the squash merge — the convention the history already follows, now
+written down. Check it against the log (`git log --oneline`) rather than against a commit count
+recorded here.
 
 ## Verification
 
@@ -101,5 +100,39 @@ gh api repos/:owner/:repo --jq '{default_branch, delete_branch_on_merge}'
 gh api repos/:owner/:repo/branches/develop/protection
 ```
 
-Both should reflect what this document says. Today neither does — no protection exists on
-either branch, and `delete_branch_on_merge` is false. That is the gap Stage 1 closes.
+Read the answer rather than a copy of it. An earlier draft of this section pasted the six
+measured values into a table, which is the same mistake the rest of this pull request exists to
+undo: a number committed to a document is right on the day it is written and silently wrong
+afterwards, and nothing fails when it drifts. What is worth writing down is how to interpret
+whatever the command prints.
+
+**The rule.** Every requirement listed under [Protection](#protection) is asked of the settings.
+Where the settings do not supply one, the requirement still stands as an agreement — it is
+simply unenforced, and an unenforced agreement is kept by people or not at all.
+
+**How to tell which regime you are in.** Two fields decide whether the ownership table has any
+mechanical force:
+
+- `required_pull_request_reviews.required_approving_review_count` — if this is `0`, a pull
+  request can merge with no review at all, and GitHub reporting a branch as `CLEAN` means only
+  that nothing blocks the button, **not** that anyone approved it.
+- `required_pull_request_reviews.require_code_owner_reviews` — if this is `false`,
+  `.github/CODEOWNERS` neither requests nor requires a review, so the shared-boundary rule
+  (one approval from each of the other two roles) is convention rather than a gate.
+
+While both hold, treat a shared-boundary merge as needing sign-off you have to go and ask for,
+and record it in the pull request so the agreement leaves a trace the settings do not.
+
+Two further readings worth knowing. `required_status_checks.contexts` lists which checks
+actually block: a job that runs on every pull request but is absent from that list can be red
+without stopping a merge. And `delete_branch_on_merge` governs cleanup — while it is off, stale
+heads accumulate, and because pull requests are squash-merged git cannot prove a branch was
+merged even when its content is in `develop`. Do not prune with `git branch --merged`: it
+reports almost nothing as merged, so the reachability test misleads rather than errs on the safe
+side. Prune by whether the pull request is closed.
+
+Closing any of these gaps is a protection-settings change, not a code change, and it belongs to
+the core-architecture owner.
+
+For the record, as history rather than as current state: on 2026-08-19 twenty-one pull requests
+merged with zero required approvals, which is what prompted this section to be written down.
