@@ -28,6 +28,10 @@ Use **Cloudflare Pages Direct Upload**. The `web` CI job remains the sole builde
 `web/dist` as the `site` GitHub artifact. A dependent deployment job downloads that exact
 artifact and passes it to Wrangler; it must not run `npm build` again.
 
+Use the Free plan while the application remains static and within its published limits. Static
+asset requests are free and unlimited; Pages Functions are not part of this decision and would
+consume Workers quotas if introduced later.
+
 - A `main` deployment is production.
 - A `develop` deployment is a long-lived preview.
 - Every pull request gets an isolated `pr-N` preview branch and URL.

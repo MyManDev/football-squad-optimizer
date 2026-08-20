@@ -199,6 +199,7 @@ jobs:
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Smoke deployed site
+        id: smoke_pages
         if: steps.deploy_pages.outcome == 'success'
         continue-on-error: true
         env:
@@ -211,8 +212,10 @@ jobs:
           DEPLOYMENT_URL: ${{ steps.deploy_pages.outputs.deployment-url }}
           PREVIEW_URL: ${{ steps.deploy_pages.outputs.pages-deployment-alias-url }}
           DEPLOY_OUTCOME: ${{ steps.deploy_pages.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke_pages.outcome }}
         run: |
           echo "## Cloudflare Pages deployment" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Result: $DEPLOY_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Upload: $DEPLOY_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smoke: $SMOKE_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
           echo "- Deployment: $DEPLOYMENT_URL" >> "$GITHUB_STEP_SUMMARY"
           echo "- Branch alias: $PREVIEW_URL" >> "$GITHUB_STEP_SUMMARY"

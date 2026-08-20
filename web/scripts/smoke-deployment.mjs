@@ -9,7 +9,7 @@ const checks = [
   { path: "/moves", kind: "html" },
   { path: "/rivals", kind: "html" },
   { path: "/league", kind: "html" },
-  { path: "/data/index.json", kind: "json" },
+  { path: "/data/index.json", kind: "json", revalidates: true },
 ];
 
 const delay = (milliseconds) =>
@@ -35,6 +35,13 @@ async function checkEndpoint(check) {
         const body = await response.text();
         if (!body.toLowerCase().includes("<!doctype html")) {
           throw new Error("response is not the SPA document");
+        }
+      }
+
+      if (check.revalidates) {
+        const cacheControl = response.headers.get("cache-control") ?? "";
+        if (!cacheControl.includes("max-age=0") || !cacheControl.includes("must-revalidate")) {
+          throw new Error(`unexpected Cache-Control: ${cacheControl || "<missing>"}`);
         }
       }
 

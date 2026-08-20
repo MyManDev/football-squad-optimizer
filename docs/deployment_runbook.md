@@ -3,6 +3,12 @@
 The site is deployed to Cloudflare Pages by the `deploy (cloudflare pages)` job in CI. It
 downloads the `site` artifact produced by `web (node 22)`; it never rebuilds the site.
 
+The current static site fits the Cloudflare Pages Free plan: static asset requests are free and
+unlimited, while the plan allows 500 deployments per month, 20,000 files per site, and 25 MiB
+per file. Revisit the plan before adding Pages Functions or if those deployment/file limits
+become material. See the official [Pages limits][pages-limits] and
+[Functions pricing][functions-pricing].
+
 ## One-time setup
 
 1. In Cloudflare, create a **Direct Upload** Pages project and set its production branch to
@@ -14,6 +20,8 @@ downloads the `site` artifact produced by `web (node 22)`; it never rebuilds the
    ```
 
    Record the chosen project name. `squadopt` is the suggested name if it is available.
+   Direct Upload projects cannot later be converted to Git integration; that is intentional
+   because GitHub Actions is the builder and deployer in this design.
 
 2. Create a Cloudflare API token scoped to the selected account with **Account → Cloudflare
    Pages → Edit**. Do not grant zone or Worker permissions.
@@ -48,8 +56,8 @@ cd web
 npm run smoke:deployment -- https://deployment.example
 ```
 
-All five requests must return HTTP 200; the four routes must return the SPA document and the
-data endpoint must parse as JSON.
+All five requests must return HTTP 200; the four routes must return the SPA document, the data
+endpoint must parse as JSON, and its response must carry the short-lived revalidation policy.
 
 ## Manual GW1 fallback
 
@@ -78,3 +86,6 @@ After the 15:30Z tick, regenerate and commit `web/public/data`, let CI build the
 the settled release to `main`. Confirm the production deployment and smoke result before the
 17:30Z deadline. If Cloudflare deployment fails, use the successful `main` CI artifact with the
 manual fallback; never substitute an untested local build.
+
+[functions-pricing]: https://developers.cloudflare.com/pages/functions/pricing/
+[pages-limits]: https://developers.cloudflare.com/pages/platform/limits/
