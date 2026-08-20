@@ -1,4 +1,5 @@
 import type { LeagueWeekView } from "../../../data/schema";
+import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import styles from "./AverageChart.module.css";
 
@@ -11,6 +12,7 @@ const PAD = { top: 12, right: 16, bottom: 26, left: 40 };
  * game has scored are drawn; an unscored week is a gap, not a zero.
  */
 export function AverageChart({ weeks }: { weeks: LeagueWeekView[] }) {
+  const { locale, messages } = useLanguage();
   const scored = weeks.filter(
     (w) => w.average_entry_score !== null && w.our_realized_net_score !== null,
   );
@@ -34,7 +36,7 @@ export function AverageChart({ weeks }: { weeks: LeagueWeekView[] }) {
         viewBox={`0 0 ${W} ${H}`}
         className={styles.svg}
         role="img"
-        aria-label={`Our net score against the game's average over ${scored.length} scored gameweeks`}
+        aria-label={messages.league.averageLabel(scored.length)}
       >
         {[0, 0.5, 1].map((f) => (
           <g key={f}>
@@ -86,14 +88,15 @@ export function AverageChart({ weeks }: { weeks: LeagueWeekView[] }) {
       </svg>
       <figcaption className={styles.legend}>
         <span>
-          <i className={styles.swatchOurs} /> our net score
+          <i className={styles.swatchOurs} /> {messages.league.ourNet}
         </span>
         <span>
-          <i className={styles.swatchAverage} /> the game&apos;s average
+          <i className={styles.swatchAverage} /> {messages.league.gameAverage}
         </span>
         <span className={styles.muted}>
-          last scored week: {points(scored[scored.length - 1].difference_to_average as number, 0)}{" "}
-          against it
+          {messages.league.lastWeek(
+            points(scored[scored.length - 1].difference_to_average as number, 0, locale),
+          )}
         </span>
       </figcaption>
     </figure>

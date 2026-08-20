@@ -1,12 +1,14 @@
 import type { PlayerView } from "../../../data/schema";
+import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import styles from "./Pitch.module.css";
 
 const ROWS: Array<PlayerView["position"]> = ["GK", "DEF", "MID", "FWD"];
 
 export function Pitch({ starters }: { starters: PlayerView[] }) {
+  const { messages } = useLanguage();
   return (
-    <div className={styles.pitch} role="list" aria-label="Starting eleven by position">
+    <div className={styles.pitch} role="list" aria-label={messages.squad.pitchLabel}>
       {ROWS.map((position) => {
         const row = starters.filter((p) => p.position === position);
         if (row.length === 0) return null;
@@ -23,10 +25,15 @@ export function Pitch({ starters }: { starters: PlayerView[] }) {
 }
 
 export function PlayerChip({ player }: { player: PlayerView }) {
+  const { locale, messages } = useLanguage();
   return (
     <div className={styles.chip}>
       {player.is_captain && (
-        <span className={styles.captain} aria-label="captain" title="Captain">
+        <span
+          className={styles.captain}
+          aria-label={messages.squad.captainLabel}
+          title={messages.squad.captain}
+        >
           C
         </span>
       )}
@@ -35,7 +42,7 @@ export function PlayerChip({ player }: { player: PlayerView }) {
       </div>
       <div className={styles.meta}>
         <span>{player.team}</span>
-        <span className={styles.xp}>{points(player.expected_points)}</span>
+        <span className={styles.xp}>{points(player.expected_points, 1, locale)}</span>
       </div>
     </div>
   );

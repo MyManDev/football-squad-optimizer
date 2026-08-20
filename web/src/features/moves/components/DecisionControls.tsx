@@ -2,7 +2,8 @@ import { useSearchParams } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
-import { MODE_PRICE_FOLDS, PLAY_MODES, isPlayMode, type PlayMode } from "../modePrices";
+import { useLanguage } from "../../../i18n/context";
+import { MODE_PRICE_FOLDS, getPlayModes, isPlayMode, type PlayMode } from "../modePrices";
 import styles from "./DecisionControls.module.css";
 
 const WINDOWS = [1, 3, 5] as const;
@@ -13,6 +14,9 @@ function isWindowSize(value: string | null): value is `${WindowSize}` {
 }
 
 export function DecisionControls() {
+  const { locale, messages } = useLanguage();
+  const copy = messages.decision;
+  const playModes = getPlayModes(copy.modes, locale);
   const [searchParams, setSearchParams] = useSearchParams();
   const rawMode = searchParams.get("mode");
   const rawWindow = searchParams.get("window");
@@ -28,15 +32,12 @@ export function DecisionControls() {
   const competitive = mode !== "saf-puan";
 
   return (
-    <Card title="Karar görünümü" aside={<Badge tone="accent">URL&apos;de paylaşılabilir</Badge>}>
-      <p className={styles.intro}>
-        Pencere ve oyun modu, öneriyi hangi açıdan okumak istediğini kaydeder. Bu ekran mevcut
-        ledger kararını gösterir; seçim değiştirmek henüz yeni bir optimizasyon çalıştırmaz.
-      </p>
+    <Card title={copy.title} aside={<Badge tone="accent">{copy.shareable}</Badge>}>
+      <p className={styles.intro}>{copy.intro}</p>
 
       <div className={styles.controls}>
         <fieldset className={styles.fieldset}>
-          <legend>Planlama penceresi</legend>
+          <legend>{copy.horizon}</legend>
           <div className={styles.windowOptions}>
             {WINDOWS.map((window) => (
               <label className={styles.windowOption} key={window}>
@@ -47,16 +48,16 @@ export function DecisionControls() {
                   checked={windowSize === window}
                   onChange={() => update("window", String(window))}
                 />
-                <span>{window} hafta</span>
+                <span>{copy.week(window)}</span>
               </label>
             ))}
           </div>
         </fieldset>
 
         <fieldset className={styles.fieldset}>
-          <legend>Oyun modu</legend>
+          <legend>{copy.mode}</legend>
           <div className={styles.modeOptions}>
-            {PLAY_MODES.map((option) => (
+            {playModes.map((option) => (
               <label className={styles.modeOption} key={option.value}>
                 <input
                   type="radio"
@@ -78,26 +79,25 @@ export function DecisionControls() {
         </fieldset>
 
         <label className={styles.leagueField}>
-          <span>Lig numarası</span>
-          <input type="text" inputMode="numeric" placeholder="Lig başlayınca bağlanır" disabled />
-          <small>Gerçek lig bağlantısı GW2 capture&apos;ıyla açılacak.</small>
+          <span>{copy.leagueId}</span>
+          <input type="text" inputMode="numeric" placeholder={copy.leaguePlaceholder} disabled />
+          <small>{copy.leagueHelp}</small>
         </label>
       </div>
 
       {competitive ? (
         <div className={styles.diagnostic} role="note">
-          <Badge tone="warn">diagnostik</Badge>
+          <Badge tone="warn">{copy.diagnostic}</Badge>
           <span>
-            <strong>Lig-içi {windowSize} haftalık sonuç bir olasılık değildir.</strong> Senaryolar
-            kalabalığın ölçülen +7,19 puan/hafta üstünlüğünü yalnız kısmen fiyatlıyor; bu nedenle
-            rekabetçi pencere yalnız yön gösterir.
+            <strong>{copy.diagnosticTitle(windowSize)}</strong> {copy.diagnosticBody}
           </span>
         </div>
       ) : null}
 
       <p className={styles.sourceNote}>
-        Fiyat etiketleri <code>mode_price_list</code> ölçümünün 0 puan bütçe hücresinden, sentetik
-        risk-neutral rakibe karşı {MODE_PRICE_FOLDS} fold üzerinden gelir.
+        {copy.sourceBefore}
+        <code>mode_price_list</code>
+        {copy.sourceAfter(MODE_PRICE_FOLDS)}
       </p>
     </Card>
   );

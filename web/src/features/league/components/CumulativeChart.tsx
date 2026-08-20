@@ -1,4 +1,5 @@
 import type { LedgerRowView } from "../../../data/schema";
+import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import styles from "./CumulativeChart.module.css";
 
@@ -12,6 +13,7 @@ const PAD = { top: 12, right: 16, bottom: 28, left: 44 };
  * component scales and draws, it does not sum.
  */
 export function CumulativeChart({ rows }: { rows: LedgerRowView[] }) {
+  const { locale, messages } = useLanguage();
   if (rows.length === 0) return null;
   const projected = rows.map((r) => r.cumulative_projected_score);
   const realized = rows
@@ -37,7 +39,9 @@ export function CumulativeChart({ rows }: { rows: LedgerRowView[] }) {
         viewBox={`0 0 ${W} ${H}`}
         className={styles.svg}
         role="img"
-        aria-label={`Cumulative projected (${points(last.cumulative_projected_score, 0)}) versus realized points by gameweek`}
+        aria-label={messages.league.cumulativeLabel(
+          points(last.cumulative_projected_score, 0, locale),
+        )}
       >
         {ticks.map((t) => (
           <g key={t}>
@@ -81,11 +85,11 @@ export function CumulativeChart({ rows }: { rows: LedgerRowView[] }) {
       </svg>
       <figcaption className={styles.legend}>
         <span>
-          <i className={styles.swatchProjected} /> projected, cumulative
+          <i className={styles.swatchProjected} /> {messages.league.projectedCumulative}
         </span>
         <span>
-          <i className={styles.swatchRealized} /> realized, cumulative
-          {realizedPts.length === 0 ? " (after the first settle)" : ""}
+          <i className={styles.swatchRealized} /> {messages.league.realizedCumulative}
+          {realizedPts.length === 0 ? messages.league.afterSettle : ""}
         </span>
       </figcaption>
     </figure>
