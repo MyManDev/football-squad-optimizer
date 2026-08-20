@@ -244,7 +244,10 @@ def test_the_runner_captures_and_decides_the_opening_gameweek_in_one_tick(
     assert _tick(monkeypatch, world) == 0
     out = capsys.readouterr().out
     assert world["captures"] == 1
-    assert (world["ledger_root"] / SEASON / "gw01" / "decision.json").is_file()
+    decision_path = world["ledger_root"] / SEASON / "gw01" / "decision.json"
+    assert decision_path.is_file()
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    assert decision["metadata"]["mode"] == "live"
     assert "re-planned after capture" in out and "tick done: 2 action(s)" in out
 
     # The same tick again changes nothing.
