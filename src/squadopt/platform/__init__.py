@@ -1,8 +1,9 @@
 """Runtime platform contracts above the transport-neutral application layer.
 
 This package may consume ``squadopt.application`` and every lower engine layer. Nothing
-below it imports platform code. Concrete HTTP, database, queue and deployment adapters
-arrive later and remain on this side of the boundary.
+below it imports platform code. The concrete HTTP adapter lives above this package in
+``squadopt.api``; database, queue and deployment adapters remain future work on the same
+side of the boundary.
 """
 
 from squadopt.platform.api_contract import (
@@ -57,6 +58,13 @@ from squadopt.platform.manifest import (
     write_run_manifest,
     write_run_manifest_schema,
 )
+from squadopt.platform.queries import (
+    JsonDocument,
+    PublishedViewError,
+    PublishedViewIntegrityError,
+    PublishedViewNotFoundError,
+    PublishedViewStore,
+)
 from squadopt.platform.runtime import (
     RuntimeArtifact,
     RuntimeContractError,
@@ -98,6 +106,11 @@ __all__ = [
     "ArtifactRole",
     "BackendApiContractError",
     "FileArtifactRegistry",
+    "JsonDocument",
+    "PublishedViewError",
+    "PublishedViewIntegrityError",
+    "PublishedViewNotFoundError",
+    "PublishedViewStore",
     "RunContext",
     "RunContextError",
     "RunManifestError",

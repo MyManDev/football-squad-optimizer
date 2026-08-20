@@ -1,10 +1,18 @@
 # Pinned versions of the environment that produced the committed measurement artifacts
 # (2026-08-18, Python 3.13). The 3.13 CI job installs with `pip install -c constraints.txt
-# -e ".[dev]"`; the 3.11 job installs the declared ranges (numpy 2.5 has no 3.11 wheels).
+# -e ".[api,dev]"`; the 3.11 job installs the declared ranges (numpy 2.5 has no 3.11 wheels).
 # A bump is a deliberate PR that re-runs the gates, not a drift.
 absl-py==2.5.0
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.14.2
 click==8.4.2
+fastapi==0.141.1
 grimp==3.15
+h11==0.16.0
+httpcore2==2.12.0
+httpx2==2.12.0
+idna==3.19
 immutabledict==4.3.1
 import-linter==2.13
 iniconfig==2.3.0
@@ -18,11 +26,18 @@ pandas-stubs==3.0.5.260730
 pandas==3.0.5
 pluggy==1.6.0
 protobuf==6.33.6
+pydantic==2.13.4
+pydantic-core==2.46.4
 pytest==9.1.1
 python-dateutil==2.9.0.post0
 ruff==0.16.2
 scikit-learn==1.9.0
 scipy==1.18.0
+starlette==1.6.0
 threadpoolctl==3.6.0
+truststore==0.10.4
+typing-inspection==0.4.4
 typing_extensions==4.16.0
+types-jsonschema==4.26.0.20260518
 tzdata==2026.3
+uvicorn==0.52.4

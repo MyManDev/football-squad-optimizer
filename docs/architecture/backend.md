@@ -1,7 +1,7 @@
 # Backend HTTP Boundary
 
-The versioned HTTP surface above the application/runtime contracts. This document defines the
-target; `feature/backend-api-contract` does not install FastAPI or start a server.
+The versioned HTTP surface above the application/runtime contracts. The transport-neutral
+contract landed first; `squadopt.api` now implements its initial read-only FastAPI surface.
 
 Companion contracts:
 
@@ -18,7 +18,7 @@ Companion contracts:
 React / API client
         |
         v
-HTTP adapter (FastAPI later)
+HTTP adapter (`squadopt.api` / FastAPI)
         |
         v
 platform runtime and query adapters
@@ -34,9 +34,30 @@ HTTP handlers may compose public `squadopt.platform` services. Platform code may
 `squadopt.application` commands and views. Neither layer may import private functions from
 `scripts/` or reproduce prediction, optimization, planning, live-ledger, or evaluation logic.
 
-FastAPI, Pydantic transport models, Uvicorn, authentication, database drivers, queues, caches,
-and cloud SDKs remain outside `application` and the research engine. FastAPI will be an
-optional installation extra so research-only users do not install a web stack.
+FastAPI, Uvicorn, authentication, database drivers, queues, caches, and cloud SDKs remain
+outside `application` and the research engine. FastAPI, Uvicorn, and the runtime JSON Schema
+validator are in the optional `api` installation extra, so research-only users do not install
+a web stack. Transport models continue to use the framework-neutral platform contracts rather
+than a duplicate set of Pydantic response classes.
+
+## Running the read-only adapter
+
+Install the optional dependencies and start the ASGI app from the repository root:
+
+```console
+python -m pip install -e ".[api]"
+python -m uvicorn squadopt.api:app --host 127.0.0.1 --port 8000
+```
+
+`create_app(data_root=...)` is the deployment configuration seam. Its default is
+`web/public/data`; the path is server-owned and can never be supplied by an HTTP request. The
+file-backed adapter maps fixed routes to fixed relative filenames, resolves each target below
+the configured root, rejects non-finite JSON, and validates the exact route-specific
+`ui_view_v1` payload before returning it. Read responses use `Cache-Control: no-cache`.
+
+The Cloudflare Pages deployment remains a static React deployment and does not run this Python
+process. Hosting the API, adding CORS for a separate frontend origin, or moving reads to a
+database requires a later deployment decision; none is silently added here.
 
 ## Version and media type
 
@@ -170,9 +191,9 @@ it according to the domain result it actually received.
 These features require their own contracts, tests, and operational decisions. They are not
 implicit consequences of adding FastAPI.
 
-## Implementation acceptance
+## Read-only implementation guarantees
 
-The following FastAPI PR must demonstrate:
+The FastAPI implementation demonstrates:
 
 1. API dependencies are optional and do not enter the core dependency set.
 2. `/health` and `/api/v1/info` return schema-valid `ApiServiceInfo` without touching the solver.

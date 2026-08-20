@@ -25,13 +25,21 @@ dependencies = [
 squadopt = "squadopt.platform.cli:main"
 
 [project.optional-dependencies]
+api = [
+    "fastapi>=0.141,<1",
+    "jsonschema>=4.23,<5",
+    "uvicorn>=0.52,<1",
+]
 dev = [
+    "fastapi>=0.141,<1",
+    "httpx2>=2.12,<3",
     "import-linter>=2.0,<3",
     "jsonschema>=4.23,<5",
     "mypy>=1.14,<3",
     "pandas-stubs>=2.2.3,<3.1",
     "pytest>=8.3,<10",
     "ruff>=0.11,<1",
+    "types-jsonschema>=4.26,<5",
 ]
 
 [tool.setuptools.packages.find]
@@ -81,6 +89,7 @@ include_external_packages = false
 name = "Layered architecture"
 type = "layers"
 layers = [
+    "squadopt.api",
     "squadopt.platform",
     "squadopt.application",
     "squadopt.live",
@@ -106,3 +115,26 @@ ignore_imports = [
     "squadopt.backtest.production_benchmark -> squadopt.experiments",
     "squadopt.backtest.production_benchmark -> squadopt.experiments.config",
 ]
+
+[[tool.importlinter.contracts]]
+name = "HTTP adapter uses only public boundaries"
+type = "forbidden"
+source_modules = ["squadopt.api"]
+forbidden_modules = [
+    "squadopt.live",
+    "squadopt.experiments",
+    "squadopt.backtest",
+    "squadopt.recalibration",
+    "squadopt.preflight",
+    "squadopt.bayesopt",
+    "squadopt.planning",
+    "squadopt.risk",
+    "squadopt.scenarios",
+    "squadopt.uncertainty",
+    "squadopt.evaluation",
+    "squadopt.optimization",
+    "squadopt.prediction",
+    "squadopt.features",
+    "squadopt.data",
+]
+allow_indirect_imports = true
