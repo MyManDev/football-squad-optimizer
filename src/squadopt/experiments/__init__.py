@@ -155,6 +155,12 @@ from squadopt.experiments.team_rating import (
     fit_dixon_coles,
     run_team_rating_study,
 )
+from squadopt.experiments.team_rating_cs import (
+    CS_REMEASURE_CONTRACT_VERSION,
+    CsRemeasureConfig,
+    CsRemeasureStudy,
+    run_cs_remeasure,
+)
 from squadopt.experiments.terminal_value import (
     TERMINAL_VALUE_STUDY_CONTRACT_VERSION,
     TerminalValueConfig,
@@ -168,6 +174,7 @@ __all__ = [
     "CONTROL_CANDIDATE_LABEL",
     "CONTROL_MODEL_NAME",
     "CONTROL_TRAINING_CONTRACT_VERSION",
+    "CS_REMEASURE_CONTRACT_VERSION",
     "DEFAULT_BENCH_WEIGHTS",
     "DEFAULT_DEVELOPMENT_SEASONS",
     "DEFAULT_FORM_WINDOWS",
@@ -200,6 +207,8 @@ __all__ = [
     "CandidateAssessment",
     "CandidatePlan",
     "ChipWindowRule",
+    "CsRemeasureConfig",
+    "CsRemeasureStudy",
     "DifficultyDrift",
     "DixonColesConfig",
     "ExperimentCandidate",
@@ -267,6 +276,7 @@ __all__ = [
     "measure_risk_frontier",
     "measure_selection_optimism",
     "rehearse_rank_objective",
+    "run_cs_remeasure",
     "run_frozen_holdout",
     "run_opening_newcomer_study",
     "run_opponent_projection_study",
