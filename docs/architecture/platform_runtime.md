@@ -211,10 +211,13 @@ network read remains traceable but inherently external.
 
 ### Persistence
 
-Repository protocols separate runtime behavior from storage. The first implementation is
-file-backed so the contract is exercised before a database schema freezes it. PostgreSQL may
-later hold application state and metadata; large historical, residual, scenario, and model
-artifacts remain file/Parquet or object-storage concerns.
+The first implementation is file-backed so the contract is exercised before a database schema
+freezes it. The current runner still names that concrete adapter; a database implementation
+must first extract the narrow repository behavior it already consumes. PostgreSQL then holds
+transactional application state and query metadata, while large historical, residual,
+scenario, and model artifacts remain Parquet/object-storage concerns. The schema, publication
+order, and migration triggers are fixed in
+[ADR 0005](decisions/0005-persistence-boundaries.md).
 
 Core and application code never contain SQL. Concrete persistence adapters live at or above
 the platform boundary.
