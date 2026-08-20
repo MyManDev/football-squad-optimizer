@@ -176,6 +176,39 @@ structured event stream therefore identify the same execution. The terminal resu
 returned contract until a later run repository persists lifecycle state; the JSONL stream is
 still not treated as that repository.
 
+### Installed CLI
+
+The package installs one `squadopt` entry point with three operational commands:
+
+```console
+squadopt gameweek decide
+squadopt gameweek settle --gameweek NN
+squadopt season tick
+```
+
+The CLI contains parsing, path resolution, console rendering, and exit-code translation only.
+It calls the public application services through `RuntimeRunner`; it does not import private
+functions from `scripts/`. Relative paths are resolved beneath `--workspace-root` (the current
+directory by default), and every registered path must remain inside that portable artifact
+boundary. Recorded locations always use POSIX separators even on Windows.
+
+Each invocation writes its canonical command request beneath `data/runtime/requests`, a
+`run_manifest_v1` beneath `data/runtime/runs`, and input/output lineage beneath
+`data/runtime/registry`. The same run id is used for `data/logs/<operation>/*.jsonl`.
+`--repository-commit` and `SQUADOPT_REPOSITORY_COMMIT` support installed environments without
+a Git checkout; otherwise the CLI resolves `git rev-parse HEAD` without a shell. Exit 0 means
+completed, 1 is a stated domain/preparation failure, and 2 is an unexpected runtime failure.
+
+The old `scripts.run_gameweek_ops`, `scripts.run_season_tick`, and manual capture module remain
+thin compatibility shells for one release. They delegate to this CLI or the public platform
+capture adapter and are not alternate implementations.
+
+A tick that contacts the live FPL endpoint registers the newly captured response as an output,
+not as a pre-existing reproducibility input: a changing external response cannot honestly be
+replayed before it has been captured. Any decision made after that step consumes the immutable,
+checksummed snapshot. Replay guarantees therefore begin at the captured bytes, while the first
+network read remains traceable but inherently external.
+
 ### Persistence
 
 Repository protocols separate runtime behavior from storage. The first implementation is
@@ -253,7 +286,9 @@ small contracts needed for one reviewable outcome instead of opening a PR per cl
 3. `feature/runtime-orchestration` — the shared execution lifecycle around public application
    services and its integration tests.
 
-After those contracts are exercised, the next independent deliveries are
-`feature/unified-cli`, `docs/persistence-adr`, and `feature/backend-api-contract`. PostgreSQL,
-FastAPI implementation, workers, Redis, authentication, deployment, and scaling are later
-stages, not implicit contents of the first platform PR.
+The runtime contracts are followed by `feature/application-command-services`, which supplies
+the public decide, settle, and tick seams, and then `feature/unified-cli`, which exercises all
+four preceding deliveries through an installed command. The remaining independent deliveries
+are `docs/persistence-adr` and `feature/backend-api-contract`. PostgreSQL, FastAPI
+implementation, workers, Redis, authentication, deployment, and scaling are later stages,
+not implicit contents of the first platform PR.

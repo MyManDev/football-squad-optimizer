@@ -12,10 +12,10 @@ Current state going in: one stored capture (`fpl-live-20260816T081259Z-e44ade009
 
 ## 15:30Z — capture (T−2h)
 
-```powershell
+```console
 git checkout v2026-27.gw01
-.venv\Scripts\python -m pytest -q          # green, or stop
-.venv\Scripts\python -m scripts.capture_deadline_snapshot
+python -m pytest -q          # green, or stop
+python -m scripts.capture_deadline_snapshot
 ```
 
 Note the printed `snapshot_id`. If the source hiccups, re-capture later — both are kept,
@@ -23,8 +23,8 @@ the later one wins by default.
 
 **A2 first drift reading** (one command, the whole measurement):
 
-```powershell
-.venv\Scripts\python -m scripts.record_preseason_difficulty --compare <new-snapshot-id>
+```console
+python -m scripts.record_preseason_difficulty --compare <new-snapshot-id>
 ```
 
 Expected under H0: `0 of 760 fixture sides changed`. Any other number is the season's
@@ -33,8 +33,8 @@ record it, do not interpret it beyond the prereg.
 
 ## ~15:45Z — decide
 
-```powershell
-.venv\Scripts\python -m scripts.run_gameweek_ops --phase decide
+```console
+squadopt gameweek decide
 ```
 
 - Exit 1 = nothing was recorded; read the failure, fix the *input* (usually: re-capture),
@@ -46,10 +46,11 @@ record it, do not interpret it beyond the prereg.
 
 ## After the deadline (17:30Z+) — site and replay
 
-```powershell
-.venv\Scripts\python -m scripts.build_site --out web\public
-git add data\ledger web\public && git commit   # message: the gw01 decision record
-.venv\Scripts\python -m scripts.recommend_current_squad --snapshot-id <id> --output artifacts\live\gw1_replay.txt
+```console
+python -m scripts.build_site --out web/public
+git add data/ledger web/public
+git commit -m "live: record the gw01 decision"
+python -m scripts.recommend_current_squad --snapshot-id <id> --output artifacts/live/gw1_replay.txt
 ```
 
 Replay must reproduce the report from the same commit — one spot-check, then done.
@@ -60,9 +61,9 @@ diagnostics (`windowed_rank_note.md`).
 
 ## Monday-ish — settle (after the gameweek finishes)
 
-```powershell
-.venv\Scripts\python -m scripts.capture_deadline_snapshot   # realized event_points
-.venv\Scripts\python -m scripts.run_gameweek_ops --phase settle --gameweek 1
+```console
+python -m scripts.capture_deadline_snapshot   # realized event_points
+squadopt gameweek settle --gameweek 1
 ```
 
 ## Do-not list for Friday

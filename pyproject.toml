@@ -21,6 +21,9 @@ dependencies = [
     "scipy>=1.14,<2",
 ]
 
+[project.scripts]
+squadopt = "squadopt.platform.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "import-linter>=2.0,<3",

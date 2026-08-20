@@ -9,6 +9,7 @@ published, and successful calls return typed descriptions of the files they wrot
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import pandas as pd
 
@@ -66,6 +67,7 @@ class DecideRequest:
     season: str | None = None
     in_season_projection: Path | None = None
     chip: str | None = None
+    mode: Literal["live", "replay"] | None = None
 
     def __post_init__(self) -> None:
         for name in ("snapshot_root", "ledger_root", "archive_root"):
@@ -78,6 +80,8 @@ class DecideRequest:
             or self.gameweek < 1
         ):
             raise DataError("gameweek must be a positive integer when supplied.")
+        if self.mode not in {None, "live", "replay"}:
+            raise DataError("mode must be 'live' or 'replay' when supplied.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -296,7 +300,7 @@ def decide(
     snapshot_id, snapshot = _resolve_snapshot(request.snapshot_root, request.snapshot_id)
     season = request.season or infer_season(snapshot)
     inputs = read_inputs(snapshot, season=season, gameweek=request.gameweek)
-    mode = "replay" if request.snapshot_id else "live"
+    mode = request.mode or ("replay" if request.snapshot_id else "live")
 
     rules = read_season_rules(snapshot, season=season)
     metadata: dict[str, object] = {
