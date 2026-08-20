@@ -10,7 +10,7 @@ export function LanguageToggle() {
           key={value}
           type="button"
           aria-pressed={language === value}
-          aria-label={messages.language[value]}
+          aria-label={`${value.toUpperCase()} — ${messages.language[value]}`}
           onClick={() => setLanguage(value)}
         >
           {value.toUpperCase()}

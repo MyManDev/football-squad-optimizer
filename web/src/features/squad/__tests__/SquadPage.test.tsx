@@ -9,45 +9,56 @@ import type { DataClient, Loaded } from "../../../data/client";
 import { NotFoundError } from "../../../data/client";
 import { DataClientContext } from "../../../data/queries";
 import type { RecommendationView, SiteIndex } from "../../../data/schema";
+import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import type { Language } from "../../../i18n/messages";
 import { SquadPage } from "../pages/SquadPage";
 
 function loaded<T>(payload: T): Loaded<T> {
   return { payload, generatedAtUtc: "2026-08-19T10:00:00Z" };
 }
 
-const client: DataClient = {
-  getIndex: async () => loaded(indexFixture.payload as SiteIndex),
-  getRecommendation: async (season, gameweek) => {
-    if (season === "2026-27" && gameweek === 1) {
-      return loaded(recommendationFixture.payload as RecommendationView);
-    }
-    throw new NotFoundError(`${season}/gw${gameweek}`);
-  },
-  getPool: async () => {
-    throw new Error("not used");
-  },
-  getLedger: async () => {
-    throw new Error("not used");
-  },
-  getLeague: async () => {
-    throw new Error("not used");
-  },
-  getStatus: async () => {
-    throw new Error("not used");
-  },
-};
+function makeClient(deadlineUtc?: string): DataClient {
+  return {
+    getIndex: async () => loaded(indexFixture.payload as SiteIndex),
+    getRecommendation: async (season, gameweek) => {
+      if (season === "2026-27" && gameweek === 1) {
+        const payload = recommendationFixture.payload as RecommendationView;
+        return loaded({ ...payload, deadline_utc: deadlineUtc ?? payload.deadline_utc });
+      }
+      throw new NotFoundError(`${season}/gw${gameweek}`);
+    },
+    getPool: async () => {
+      throw new Error("not used");
+    },
+    getLedger: async () => {
+      throw new Error("not used");
+    },
+    getLeague: async () => {
+      throw new Error("not used");
+    },
+    getStatus: async () => {
+      throw new Error("not used");
+    },
+  };
+}
 
-function renderAt(path: string) {
+function renderAt(
+  path: string,
+  { deadlineUtc, language = "tr" }: { deadlineUtc?: string; language?: Language } = {},
+) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const client = makeClient(deadlineUtc);
   return render(
     <QueryClientProvider client={queryClient}>
       <DataClientContext.Provider value={client}>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route path="/" element={<SquadPage />} />
-            <Route path="/gw/:season/:gameweek" element={<SquadPage />} />
-          </Routes>
-        </MemoryRouter>
+        <LanguageProvider initialLanguage={language}>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route path="/" element={<SquadPage />} />
+              <Route path="/gw/:season/:gameweek" element={<SquadPage />} />
+            </Routes>
+          </MemoryRouter>
+        </LanguageProvider>
       </DataClientContext.Provider>
     </QueryClientProvider>,
   );
@@ -74,4 +85,17 @@ describe("SquadPage", () => {
     renderAt("/gw/2026-27/7");
     expect(await screen.findByText(/Bu oyun haftası için karar yok/)).toBeInTheDocument();
   });
+
+  it.each([
+    { language: "tr", deadlineUtc: "2099-08-21T17:30:00Z", label: "son tarihe" },
+    { language: "en", deadlineUtc: "2099-08-21T17:30:00Z", label: "deadline in" },
+    { language: "tr", deadlineUtc: "2000-08-21T17:30:00Z", label: "son tarih" },
+    { language: "en", deadlineUtc: "2000-08-21T17:30:00Z", label: "deadline" },
+  ] as const)(
+    "renders $label from countdown state in $language",
+    async ({ deadlineUtc, label, language }) => {
+      renderAt("/", { deadlineUtc, language });
+      expect(await screen.findByText(label)).toBeInTheDocument();
+    },
+  );
 });

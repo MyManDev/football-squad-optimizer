@@ -18,7 +18,11 @@ export function signedPoints(value: number, digits = 1, locale = "en-GB"): strin
 }
 
 export function percent(probability: number, digits = 0, locale = "en-GB"): string {
-  return `${points(probability * 100, digits, locale)}%`;
+  return new Intl.NumberFormat(locale, {
+    style: "percent",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(probability);
 }
 
 export function utcShort(iso: string, locale = "en-GB"): string {
@@ -48,21 +52,28 @@ export function local(iso: string, locale = "en-GB"): string {
   });
 }
 
-export function countdown(
-  toIso: string,
-  now: Date = new Date(),
-  language: "tr" | "en" = "en",
-): string {
+export interface CountdownLabels {
+  closed: string;
+  day: string;
+}
+
+export interface CountdownResult {
+  isClosed: boolean;
+  text: string;
+}
+
+export function countdown(toIso: string, now: Date, labels: CountdownLabels): CountdownResult {
   const target = new Date(toIso).getTime();
-  if (Number.isNaN(target)) return "";
+  if (Number.isNaN(target)) return { isClosed: false, text: "" };
   const delta = Math.floor((target - now.getTime()) / 1000);
-  if (delta <= 0) return language === "tr" ? "kapandı" : "closed";
+  if (delta <= 0) return { isClosed: true, text: labels.closed };
   const days = Math.floor(delta / 86_400);
   const hours = Math.floor((delta % 86_400) / 3_600);
   const minutes = Math.floor((delta % 3_600) / 60);
   const hh = String(hours).padStart(2, "0");
   const mm = String(minutes).padStart(2, "0");
-  return days > 0 ? `${days}${language === "tr" ? "g" : "d"} ${hh}:${mm}` : `${hh}:${mm}`;
+  const text = days > 0 ? `${days}${labels.day} ${hh}:${mm}` : `${hh}:${mm}`;
+  return { isClosed: false, text };
 }
 
 export function shortDigest(value: string, length = 12): string {
