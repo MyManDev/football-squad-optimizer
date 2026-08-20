@@ -5,18 +5,37 @@ commands for this specific Friday*, written the day before so nothing is improvi
 15:30Z. Deadline **17:30Z**; first kickoff 19:00Z. The tree is frozen (Thu 17:30Z →
 Sat 17:30Z), which is fine: everything below *runs* code, none of it changes code.
 
-Current state going in: one stored capture (`fpl-live-20260816T081259Z-e44ade0095e5`,
-2026-08-16 — five days stale by Friday, superseded below), ledger empty, release tag
-`v2026-27.gw01` on `main`. Run everything from `main` at that tag, per the runbook's
-"all green or the live run does not happen from that tree".
+Current state going in: two stored captures — `fpl-live-20260813T201143Z-55789a780186`
+(2026-08-13) and `fpl-live-20260820T170525Z-545aaf5df705` (2026-08-20, taken as a
+pre-deadline health check and as a fallback), both superseded by the capture below. Ledger
+empty. The capture named in an earlier draft of this sheet,
+`fpl-live-20260816T081259Z-e44ade0095e5`, does not exist and never did; `--list` is the
+authority on what is stored.
+
+**Run from `develop`, not from the release tag.** `v2026-27.gw01` and `main` do not contain
+`src/squadopt/platform/cli.py`, so the `squadopt` command this sheet invokes below does not
+exist in those trees — checking the tag out and then running `squadopt gameweek decide` fails
+at the third command. `develop` is the only tree that has it, and the runbook this sheet
+defers to says so in as many words: "Every command runs from the repository root on a clean,
+tested `develop`." Record the commit before starting and treat it as the release for this
+tick, per the runbook's "all green or the live run does not happen from that tree". Neither
+`v2026-27.gw01` nor any other tag is moved.
 
 ## 15:30Z — capture (T−2h)
 
 ```console
-git checkout v2026-27.gw01
+git switch develop
+git pull --ff-only
+git rev-parse HEAD           # record this; it is the tree the tick ran from
+python -m pip install -e .   # the squadopt entry point, without -c constraints.txt
 python -m pytest -q          # green, or stop
 python -m scripts.capture_deadline_snapshot
 ```
+
+`constraints.txt` pins the 3.13 measurement environment, so passing it to `pip install` on a
+3.11 interpreter fails to resolve. If the entry point cannot be installed for any reason,
+`python -m scripts.run_gameweek_ops --phase decide` is the pre-CLI equivalent and exists in
+every tree.
 
 Note the printed `snapshot_id`. If the source hiccups, re-capture later — both are kept,
 the later one wins by default.
