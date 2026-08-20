@@ -41,7 +41,7 @@ describe("DecisionControls", () => {
     const query = screen.getByLabelText("Current URL query").textContent ?? "";
     expect(new URLSearchParams(query).get("window")).toBe("3");
     expect(new URLSearchParams(query).get("mode")).toBe("garantici");
-    expect(screen.getByText("P(geride) 46% → 27%")).toBeInTheDocument();
+    expect(screen.getByText("P(geride) %46 → %27")).toBeInTheDocument();
   });
 
   it("marks crowd-relative windows as diagnostic rather than probability", () => {
@@ -51,6 +51,6 @@ describe("DecisionControls", () => {
     expect(screen.getByRole("radio", { name: /Aşırı Agresif/ })).toBeChecked();
     expect(screen.getByText("diagnostik")).toBeInTheDocument();
     expect(screen.getByText(/Lig-içi 5 haftalık sonuç bir olasılık değildir/)).toBeInTheDocument();
-    expect(screen.getByText(/P\(5\+ önde\) 19%/)).toBeInTheDocument();
+    expect(screen.getByText(/P\(5\+ önde\) %19/)).toBeInTheDocument();
   });
 });

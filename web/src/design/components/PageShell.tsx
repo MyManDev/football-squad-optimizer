@@ -1,29 +1,37 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router";
 
+import { LanguageToggle } from "../../i18n/LanguageToggle";
+import { useLanguage } from "../../i18n/context";
 import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
 const NAV = [
-  { to: "/", label: "Squad", end: true },
-  { to: "/moves", label: "Suggested moves", end: false },
-  { to: "/rivals", label: "Rivals", end: false },
-  { to: "/league", label: "League", end: false },
-  { to: "/analysis", label: "Analiz", end: false },
-];
+  { to: "/", key: "squad", end: true },
+  { to: "/moves", key: "moves", end: false },
+  { to: "/rivals", key: "rivals", end: false },
+  { to: "/league", key: "league", end: false },
+  { to: "/analysis", key: "analysis", end: false },
+] as const;
+
+type NavKey = (typeof NAV)[number]["key"];
+
+const navLabel = (messages: ReturnType<typeof useLanguage>["messages"], key: NavKey) =>
+  messages.shell[key];
 
 export function PageShell({ children }: { children: ReactNode }) {
+  const { messages } = useLanguage();
   return (
     <div className={styles.shell}>
       <a className="visually-hidden" href="#main">
-        Skip to content
+        {messages.shell.skip}
       </a>
       <header className={styles.header}>
         <div className={styles.brand}>
           <span className={styles.wordmark}>SquadOpt</span>
-          <span className={styles.tagline}>a decision, and what it rests on</span>
+          <span className={styles.tagline}>{messages.shell.tagline}</span>
         </div>
-        <nav aria-label="Primary" className={styles.nav}>
+        <nav aria-label={messages.shell.primary} className={styles.nav}>
           {NAV.map((item) => (
             <NavLink
               key={item.to}
@@ -31,22 +39,22 @@ export function PageShell({ children }: { children: ReactNode }) {
               end={item.end}
               className={({ isActive }) => (isActive ? styles.navActive : styles.navLink)}
             >
-              {item.label}
+              {navLabel(messages, item.key)}
             </NavLink>
           ))}
         </nav>
-        <ThemeToggle />
+        <div className={styles.preferences}>
+          <LanguageToggle />
+          <ThemeToggle />
+        </div>
       </header>
       <main id="main" className={styles.main}>
         {children}
       </main>
       <footer className={styles.footer}>
-        <span>
-          Every number on these pages was produced by the SquadOpt live path and frozen in its
-          ledger; the page renders, it does not compute.
-        </span>
+        <span>{messages.shell.footer}</span>
         <NavLink to="/status" className={styles.footerLink}>
-          Operations status
+          {messages.shell.operations}
         </NavLink>
       </footer>
     </div>
