@@ -1,0 +1,133 @@
+{
+  "by_phase": {
+    "early_25_plus_weeks_left": {
+      "baseline_mae": 104.68248198102094,
+      "gp_mae": 113.8997699433729,
+      "rows": 940
+    },
+    "late_under_10_weeks_left": {
+      "baseline_mae": 61.31964625212011,
+      "gp_mae": 100.35026760570715,
+      "rows": 720
+    },
+    "mid_10_to_24_weeks_left": {
+      "baseline_mae": 82.02638520536846,
+      "gp_mae": 104.27336301783131,
+      "rows": 1200
+    }
+  },
+  "config": {
+    "chain_directories": [
+      "season_chain",
+      "season_chain_blind",
+      "season_chain_fh",
+      "season_chain_hybrid",
+      "season_chain_value",
+      "chain_tuned"
+    ],
+    "deterministic_seed": 0,
+    "max_rows_per_fit": 4000,
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ]
+  },
+  "contract_version": "terminal_value_gp_v1",
+  "created_utc": "2026-08-20T07:15:27+00:00",
+  "diagnostics": {
+    "chain_directories": [
+      "season_chain",
+      "season_chain_blind",
+      "season_chain_fh",
+      "season_chain_hybrid",
+      "season_chain_value",
+      "chain_tuned"
+    ],
+    "chains_read": 80,
+    "feature_columns": [
+      "remaining_weeks",
+      "bank_tenths",
+      "squad_sell_value_tenths",
+      "free_transfers",
+      "has_bboost",
+      "has_3xc",
+      "has_wildcard",
+      "has_freehit"
+    ],
+    "holding_value_points": {
+      "3xc": 18.0,
+      "bboost": 20.0,
+      "freehit": 20.0,
+      "wildcard": 12.0
+    },
+    "locked_holdout_accessed": false,
+    "promotion_available": false,
+    "promotion_note": "Nothing consumes the fitted value. A passing gate earns the next step - a terminal-value term in the planner's objective, measured against the holding-value control on the season chain - under its own declaration."
+  },
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "kernel": "0.729**2 * RBF(length_scale=[0.441, 1.2, 1.38, 30.1, 9.92, 10.2, 20.1, 12.8]) + WhiteKernel(noise_level=0.0128)",
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "pooled_baseline_mae": 84.25990930424067,
+  "pooled_gp_mae": 106.44965456093611,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 0,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "98febaef6f0ce8fef452993c3c22589654804150",
+    "working_tree_dirty": true
+  },
+  "rows": 2860,
+  "seasons": [
+    {
+      "baseline_mean_absolute_error": 79.96521425858833,
+      "gp_mean_absolute_error": 95.99823537291923,
+      "rows": 720,
+      "season": "2021-22"
+    },
+    {
+      "baseline_mean_absolute_error": 58.070039890740205,
+      "gp_mean_absolute_error": 93.19416472589887,
+      "rows": 700,
+      "season": "2022-23"
+    },
+    {
+      "baseline_mean_absolute_error": 91.59287702849686,
+      "gp_mean_absolute_error": 117.19661959622508,
+      "rows": 720,
+      "season": "2023-24"
+    },
+    {
+      "baseline_mean_absolute_error": 106.68400966654008,
+      "gp_mean_absolute_error": 119.04139049772796,
+      "rows": 720,
+      "season": "2024-25"
+    }
+  ],
+  "verdict": {
+    "passes": false,
+    "pooled_improvement": -22.189745256695446,
+    "seasons_better": 0,
+    "seasons_total": 4
+  }
+}
