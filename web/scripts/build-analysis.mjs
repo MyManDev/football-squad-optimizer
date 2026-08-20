@@ -84,11 +84,7 @@ function classify(slug, finding) {
   ) {
     return "negative";
   }
-  if (
-    ["gate passes", "operational default", "promoted"].some((signal) =>
-      text.includes(signal),
-    )
-  ) {
+  if (["gate passes", "operational default", "promoted"].some((signal) => text.includes(signal))) {
     return "passed";
   }
   return "descriptive";
