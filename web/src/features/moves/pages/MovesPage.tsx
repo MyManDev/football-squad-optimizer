@@ -8,6 +8,7 @@ import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
 import { local, points, pounds } from "../../../lib/format";
+import { DecisionControls } from "../components/DecisionControls";
 import styles from "./MovesPage.module.css";
 
 export function MovesPage() {
@@ -58,6 +59,8 @@ function Moves({ view }: { view: RecommendationView }) {
         </div>
         {t?.chip ? <Badge tone="accent">chip: {t.chip}</Badge> : null}
       </header>
+
+      <DecisionControls />
 
       {!t ? (
         <EmptyState title="Opening squad — no transfers to make.">
