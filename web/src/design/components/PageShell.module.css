@@ -2,6 +2,7 @@
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow-x: clip;
 }
 
 .header {
@@ -102,5 +103,6 @@
     order: 3;
     width: 100%;
     margin-left: 0;
+    flex-wrap: wrap;
   }
 }

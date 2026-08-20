@@ -239,6 +239,7 @@ data/snapshots/
 data/ledger/
 data/handoffs/
 data/logs/
+data/runtime/
 
 # Reproducible local experiment outputs (reports are generated, not source data)
 artifacts/

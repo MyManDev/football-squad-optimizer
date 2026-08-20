@@ -176,12 +176,48 @@ structured event stream therefore identify the same execution. The terminal resu
 returned contract until a later run repository persists lifecycle state; the JSONL stream is
 still not treated as that repository.
 
+### Installed CLI
+
+The package installs one `squadopt` entry point with three operational commands:
+
+```console
+squadopt gameweek decide
+squadopt gameweek settle --gameweek NN
+squadopt season tick
+```
+
+The CLI contains parsing, path resolution, console rendering, and exit-code translation only.
+It calls the public application services through `RuntimeRunner`; it does not import private
+functions from `scripts/`. Relative paths are resolved beneath `--workspace-root` (the current
+directory by default), and every registered path must remain inside that portable artifact
+boundary. Recorded locations always use POSIX separators even on Windows.
+
+Each invocation writes its canonical command request beneath `data/runtime/requests`, a
+`run_manifest_v1` beneath `data/runtime/runs`, and input/output lineage beneath
+`data/runtime/registry`. The same run id is used for `data/logs/<operation>/*.jsonl`.
+`--repository-commit` and `SQUADOPT_REPOSITORY_COMMIT` support installed environments without
+a Git checkout; otherwise the CLI resolves `git rev-parse HEAD` without a shell. Exit 0 means
+completed, 1 is a stated domain/preparation failure, and 2 is an unexpected runtime failure.
+
+The old `scripts.run_gameweek_ops`, `scripts.run_season_tick`, and manual capture module remain
+thin compatibility shells for one release. They delegate to this CLI or the public platform
+capture adapter and are not alternate implementations.
+
+A tick that contacts the live FPL endpoint registers the newly captured response as an output,
+not as a pre-existing reproducibility input: a changing external response cannot honestly be
+replayed before it has been captured. Any decision made after that step consumes the immutable,
+checksummed snapshot. Replay guarantees therefore begin at the captured bytes, while the first
+network read remains traceable but inherently external.
+
 ### Persistence
 
-Repository protocols separate runtime behavior from storage. The first implementation is
-file-backed so the contract is exercised before a database schema freezes it. PostgreSQL may
-later hold application state and metadata; large historical, residual, scenario, and model
-artifacts remain file/Parquet or object-storage concerns.
+The first implementation is file-backed so the contract is exercised before a database schema
+freezes it. The current runner still names that concrete adapter; a database implementation
+must first extract the narrow repository behavior it already consumes. PostgreSQL then holds
+transactional application state and query metadata, while large historical, residual,
+scenario, and model artifacts remain Parquet/object-storage concerns. The schema, publication
+order, and migration triggers are fixed in
+[ADR 0005](decisions/0005-persistence-boundaries.md).
 
 Core and application code never contain SQL. Concrete persistence adapters live at or above
 the platform boundary.
@@ -190,6 +226,9 @@ the platform boundary.
 
 FastAPI, background jobs, cache, authentication, deployment, and observability are later
 adapters over a stable runtime. Their order matters:
+
+The versioned routes, normalized commands, read-model reuse, idempotency semantics, and public
+errors are fixed in the [backend HTTP boundary](backend.md) before a framework is installed.
 
 - no HTTP implementation before request/response and runtime contracts;
 - no queue implementation before the job lifecycle contract;
@@ -253,7 +292,10 @@ small contracts needed for one reviewable outcome instead of opening a PR per cl
 3. `feature/runtime-orchestration` — the shared execution lifecycle around public application
    services and its integration tests.
 
-After those contracts are exercised, the next independent deliveries are
-`feature/unified-cli`, `docs/persistence-adr`, and `feature/backend-api-contract`. PostgreSQL,
-FastAPI implementation, workers, Redis, authentication, deployment, and scaling are later
-stages, not implicit contents of the first platform PR.
+The runtime contracts were followed by `feature/application-command-services`, which supplied
+the public decide, settle, and tick seams, and then `feature/unified-cli`, which exercised all
+four preceding deliveries through an installed command. The independent persistence decision
+is now [ADR 0005](decisions/0005-persistence-boundaries.md), and
+`feature/backend-api-contract` fixes the HTTP boundary and `backend_api_v1` documents before a
+framework is installed. PostgreSQL, FastAPI implementation, workers, Redis, authentication,
+and scaling remain later stages rather than implicit contents of these contract PRs.

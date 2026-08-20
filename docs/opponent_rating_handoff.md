@@ -174,10 +174,19 @@ proof that those two can disagree.
 
 The deeper fix, and the one that addresses the mechanism directly. The rolling form feature
 currently measures "points per 90 earned, against whoever happened to be played". Divide each
-past gameweek's points by the difficulty multiplier of the fixture it was earned against
+past gameweek's points by a difficulty multiplier for the fixture it was earned against
 *before* rolling, and the feature measures the player rather than his schedule. Then the
 upcoming fixture's multiplier is applied once, at projection time, with nothing to double
 count.
+
+**Correction (2026-08-20): the multiplier cannot be the archive's difficulty column.** As
+originally written, this route read as normalising by `fixture_difficulty` — which the
+Decision 1 ruling has since established is not a pre-match value on archive rows, and which
+`attach_fixture_features` now refuses by default. The multiplier is the **fitted
+Dixon-Coles rating's** expected-goals term for that fixture, computed from matches already
+played at that gameweek's deadline — the per-fold signal `build_opponent_signal.py` (#154)
+records at `(season, gameweek, club_code)` grain is exactly this object, and it is the
+input Route B should consume. Nothing else about the route changes.
 
 This is the textbook shape and it is also the more expensive change: it moves
 `FEATURE_GENERATION_CONTRACT_VERSION` (`form_window_v1`), which every recorded measurement's

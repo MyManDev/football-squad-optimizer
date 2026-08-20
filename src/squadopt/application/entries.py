@@ -51,9 +51,19 @@ class EntryPicks:
     captain: int
     bank_tenths: int
     free_transfers: int
+    free_transfers_known: bool = True
+    """False when the source does not publish the banked count and ``free_transfers`` is
+    the rule-implied floor of one. The public endpoints never state it, so a capture-built
+    picks object carries ``1`` here with this flag down — and anything that plans transfers
+    on it must surface that the second free transfer, if banked, is invisible."""
     chips_used: Mapping[str, tuple[int, ...]] = field(default_factory=dict)
     """Chip name -> the gameweeks it was played (what the planner's windows need)."""
     purchase_prices: Mapping[int, int] = field(default_factory=dict)
+    purchase_prices_known: bool = False
+    """False when selling prices cannot be derived. The public endpoints do not publish
+    purchase prices, so a held squad built from such picks values every player at his
+    *current* price — which overstates the budget whenever a player has risen since he was
+    bought. A consumer that spends real budget on these numbers must say so to the user."""
     source_snapshot_id: str | None = None
 
     def __post_init__(self) -> None:
@@ -71,6 +81,11 @@ class EntryPicks:
             raise EntryError("The captain must be in the starting eleven.")
         if self.bank_tenths < 0 or self.free_transfers < 0:
             raise EntryError("bank_tenths and free_transfers cannot be negative.")
+        if self.purchase_prices and not self.purchase_prices_known:
+            raise EntryError(
+                "purchase_prices are present but flagged unknown; a consumer could not "
+                "tell whether to trust them."
+            )
 
 
 class EntryPicksProvider(Protocol):
@@ -125,6 +140,14 @@ def held_squad_from_picks(picks: EntryPicks, *, current_prices: Mapping[int, int
 
     ``current_prices`` are the capture's prices (element id -> tenths); purchase prices
     fall back to them when the entry endpoints do not publish what was paid.
+
+    That fallback is not free, and the picks object now says so:
+    ``picks.purchase_prices_known`` is False on capture-built picks because the public
+    endpoints publish no purchase prices, so every selling price here is the *current*
+    price — an overstatement of the real budget for any player who has risen since he was
+    bought. The planner will spend that phantom budget. Any surface that shows a plan built
+    from such a squad must carry the caveat; this function stays honest by construction
+    only when its caller does.
     """
 
     missing = [p for p in picks.squad if p not in current_prices]

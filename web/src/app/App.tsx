@@ -20,6 +20,9 @@ const LeaguePage = lazy(() =>
 const StatusPage = lazy(() =>
   import("../features/status/pages/StatusPage").then((m) => ({ default: m.StatusPage })),
 );
+const AnalysisPage = lazy(() =>
+  import("../features/analysis/pages/AnalysisPage").then((m) => ({ default: m.AnalysisPage })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -40,6 +43,8 @@ export function App({ basename = import.meta.env.BASE_URL }: { basename?: string
               <Route path="/rivals/:season/:gameweek" element={<RivalsPage />} />
               <Route path="/league" element={<LeaguePage />} />
               <Route path="/status" element={<StatusPage />} />
+              <Route path="/analysis" element={<AnalysisPage />} />
+              <Route path="/analysis/:slug" element={<AnalysisPage />} />
               <Route path="*" element={<EmptyState title="There is no page here." />} />
             </Routes>
           </Suspense>

@@ -350,3 +350,26 @@ def test_a_model_with_mismatched_widths_is_refused() -> None:
             training_rows=10,
             ridge_alpha=1.0,
         )
+
+
+# --- the fitted signs are reportable ----------------------------------------
+
+
+def test_the_coefficients_are_paired_with_the_columns_they_belong_to() -> None:
+    """A coefficient vector is only readable next to its column names."""
+
+    model = _model()
+
+    paired = model.standardised_coefficients
+
+    assert tuple(paired) == model.input_columns
+    assert tuple(paired.values()) == model.coefficients
+
+
+def test_the_reported_coefficients_cannot_be_edited_through_the_mapping() -> None:
+    """The model is frozen; its reported view must not be a way around that."""
+
+    model = _model()
+
+    with pytest.raises(TypeError):
+        model.standardised_coefficients["fixture_count"] = 99.0  # type: ignore[index]
