@@ -54,6 +54,13 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--scenario-count", type=int, default=100)
     parser.add_argument("--seed", type=int, default=11)
     parser.add_argument("--solver-time-limit", type=float, default=60.0)
+    parser.add_argument(
+        "--rival-edge",
+        type=float,
+        default=0.0,
+        help="Points per week added to the rival's scenario scores; the crowd's measured "
+        "edge over the projection is +7.19 (template_rival_strength).",
+    )
     parser.add_argument("--pool-per-position", type=int, default=20)
     parser.add_argument("--cheap-per-position", type=int, default=8)
     parser.add_argument(
@@ -150,8 +157,12 @@ def main() -> int:
                 ),
             )
             window = paths.as_window_scenario_set()
+            # The edge is per week; the window's rival score carries one edge per week.
             result = optimize_rank_probability_squad(
-                window, rival, optimization, RankObjectiveConfig()
+                window,
+                rival,
+                optimization,
+                RankObjectiveConfig(rival_edge_points=float(arguments.rival_edge) * horizon),
             )
             if not result.has_solution or result.probability_ahead is None:
                 LOGGER.info("%s h=%d: no solution", fold_id, horizon)
@@ -220,6 +231,7 @@ def main() -> int:
         "origins": origins,
         "horizons": horizons,
         "scenario_count": int(arguments.scenario_count),
+        "rival_edge_points_per_week": float(arguments.rival_edge),
         "by_horizon": {str(k): v for k, v in by_horizon.items()},
         "rows": rows,
         "projection_note": (
@@ -249,6 +261,9 @@ def _to_markdown(document: dict[str, object]) -> str:
         "rank objective on the window's joint path totals via `as_window_scenario_set` — "
         "the same solver that prices a single week, unchanged.",
         f"- {document['projection_note']}",
+        f"- Rival edge: **{float(str(document.get('rival_edge_points_per_week', 0.0))):+.2f} "
+        "points per week** added to the rival's scenario scores (zero = the crowd priced at "
+        "the projection, the historical behaviour).",
         "- Descriptive measurement: no gate, nothing promoted, locked holdout untouched.",
         "",
         "| Horizon | Windows | Mean claimed P(ahead) | Realized ahead share | Shared starters |",

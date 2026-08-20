@@ -201,6 +201,8 @@ def compare_fixed_decisions(
     rival: RivalSquad,
     scenarios: ScenarioSet,
     config: ScenarioEvaluationConfig | None = None,
+    *,
+    rival_edge_points: float = 0.0,
 ) -> ScenarioComparisonResult:
     """Score my decision and a rival's squad in the same scenarios and read the gap.
 
@@ -238,9 +240,14 @@ def compare_fixed_decisions(
         )
     matrix = verified.scenario_points.to_numpy(dtype="float64", copy=False)
     mine = matrix[:, [column[p] for p in my_starters]].sum(axis=1) + matrix[:, column[my_captain]]
+    if isinstance(rival_edge_points, bool) or not isinstance(rival_edge_points, int | float):
+        raise ScenarioValidationError("rival_edge_points must be a finite number.")
+    if not math.isfinite(float(rival_edge_points)):
+        raise ScenarioValidationError("rival_edge_points must be a finite number.")
     theirs = (
         matrix[:, [column[p] for p in rival.starter_ids]].sum(axis=1)
         + matrix[:, column[rival.captain_id]]
+        + float(rival_edge_points)
     )
     difference = mine - theirs
     ahead = int((difference > 0.0).sum())
@@ -262,6 +269,7 @@ def compare_fixed_decisions(
             "scenario_fingerprint": verified.scenario_fingerprint,
             "decision_fingerprint": _decision_fingerprint(optimization_result),
             "rival_captain_shared": rival.captain_id == my_captain,
+            "rival_edge_points": float(rival_edge_points),
             "location_shift_applied": False,
             "location_shift_note": (
                 "the selection-optimism shift is not applied to the difference: both squads "

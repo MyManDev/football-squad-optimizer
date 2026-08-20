@@ -61,6 +61,13 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--pool-per-position", type=int, default=15)
     parser.add_argument("--cheap-per-position", type=int, default=5)
     parser.add_argument(
+        "--rival-edge",
+        type=float,
+        default=0.0,
+        help="Points per week added to the rival's scenario scores; the crowd's measured "
+        "edge over the projection is +7.19 (template_rival_strength).",
+    )
+    parser.add_argument(
         "--json-output",
         type=Path,
         default=REPOSITORY_ROOT / "docs" / "mode_plan_selection.json",
@@ -188,7 +195,9 @@ def main() -> int:
             deterministic_seed=int(arguments.seed),
         ),
     )
-    selection = select_plan(candidates, paths, rival)
+    selection = select_plan(
+        candidates, paths, rival, rival_edge_points_per_week=float(arguments.rival_edge)
+    )
     elapsed = perf_counter() - started
 
     document = {
@@ -198,6 +207,7 @@ def main() -> int:
         "origin": origin,
         "horizon": horizon,
         "scenario_count": int(arguments.scenario_count),
+        "rival_edge_points_per_week": float(arguments.rival_edge),
         "pool_players": len(pool),
         "wall_clock_seconds": elapsed,
         "selection": selection_to_dict(selection),
@@ -231,7 +241,9 @@ def _to_markdown(document: dict[str, object]) -> str:
         f"- Wall clock for the whole flow: **{float(str(document['wall_clock_seconds'])):.0f} "
         "seconds** (menu generation, path generation, scoring, selection).",
         f"- {document['projection_note']}",
-        "- The rival is the ownership template at the origin, held fixed across the window.",
+        "- The rival is the ownership template at the origin, held fixed across the window, "
+        f"with **{float(str(document.get('rival_edge_points_per_week', 0.0))):+.2f} points per "
+        "week** of measured edge added to its scenario scores.",
         "- Descriptive measurement: no gate, nothing promoted, locked holdout untouched.",
         "",
         "## What each mode picked",

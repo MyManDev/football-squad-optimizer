@@ -2,25 +2,25 @@
   "by_horizon": {
     "1": {
       "cells": 5,
-      "mean_claimed": 0.8859999999999999,
-      "mean_shared_starters": 4.0,
+      "mean_claimed": 0.768,
+      "mean_shared_starters": 3.6,
       "realized_ahead_share": 0.6
     },
     "3": {
       "cells": 5,
-      "mean_claimed": 0.97,
+      "mean_claimed": 0.8720000000000001,
       "mean_shared_starters": 3.6,
       "realized_ahead_share": 0.0
     },
     "5": {
       "cells": 5,
-      "mean_claimed": 0.992,
+      "mean_claimed": 0.8939999999999999,
       "mean_shared_starters": 3.6,
       "realized_ahead_share": 0.0
     }
   },
   "contract_version": "windowed_rank_v1",
-  "created_utc": "2026-08-19T20:54:52+00:00",
+  "created_utc": "2026-08-20T06:19:35+00:00",
   "environment": {
     "logical_cpu_count": 32,
     "ortools": "9.15.6755",
@@ -59,12 +59,13 @@
       "2024-25",
       "2025-26"
     ],
-    "repository_commit": "7ee71238c8b460d504fef44a59d73f6a933b6651",
+    "repository_commit": "a64b8e66501c24587cb0776ab294be52d59de757",
     "working_tree_dirty": true
   },
+  "rival_edge_points_per_week": 7.19,
   "rows": [
     {
-      "claimed_probability_ahead": 0.74,
+      "claimed_probability_ahead": 0.58,
       "horizon": 1,
       "origin": 8,
       "realized_ahead": true,
@@ -75,7 +76,7 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.87,
+      "claimed_probability_ahead": 0.63,
       "horizon": 3,
       "origin": 8,
       "realized_ahead": false,
@@ -86,7 +87,7 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.96,
+      "claimed_probability_ahead": 0.56,
       "horizon": 5,
       "origin": 8,
       "realized_ahead": false,
@@ -97,7 +98,7 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.89,
+      "claimed_probability_ahead": 0.82,
       "horizon": 1,
       "origin": 14,
       "realized_ahead": false,
@@ -108,7 +109,7 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.99,
+      "claimed_probability_ahead": 0.9,
       "horizon": 3,
       "origin": 14,
       "realized_ahead": false,
@@ -119,7 +120,7 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 1.0,
+      "claimed_probability_ahead": 0.98,
       "horizon": 5,
       "origin": 14,
       "realized_ahead": false,
@@ -127,10 +128,10 @@
       "rival_realized_score": 289.0,
       "scenario_mean_score": 461.65999122170143,
       "shared_starters": 3,
-      "solver_status": "OPTIMAL"
+      "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.92,
+      "claimed_probability_ahead": 0.81,
       "horizon": 1,
       "origin": 20,
       "realized_ahead": true,
@@ -141,7 +142,7 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.99,
+      "claimed_probability_ahead": 0.93,
       "horizon": 3,
       "origin": 20,
       "realized_ahead": false,
@@ -152,7 +153,7 @@
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 1.0,
+      "claimed_probability_ahead": 0.98,
       "horizon": 5,
       "origin": 20,
       "realized_ahead": false,
@@ -160,21 +161,21 @@
       "rival_realized_score": 380.0,
       "scenario_mean_score": 509.90668122018417,
       "shared_starters": 4,
-      "solver_status": "OPTIMAL"
+      "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 0.93,
+      "claimed_probability_ahead": 0.81,
       "horizon": 1,
       "origin": 26,
       "realized_ahead": false,
-      "realized_score": 67.0,
+      "realized_score": 60.0,
       "rival_realized_score": 74.0,
-      "scenario_mean_score": 100.83504062936863,
+      "scenario_mean_score": 100.88407317417763,
       "shared_starters": 4,
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 1.0,
+      "claimed_probability_ahead": 0.93,
       "horizon": 3,
       "origin": 26,
       "realized_ahead": false,
@@ -182,10 +183,10 @@
       "rival_realized_score": 196.0,
       "scenario_mean_score": 308.2435295945377,
       "shared_starters": 4,
-      "solver_status": "OPTIMAL"
+      "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 1.0,
+      "claimed_probability_ahead": 0.96,
       "horizon": 5,
       "origin": 26,
       "realized_ahead": false,
@@ -193,32 +194,32 @@
       "rival_realized_score": 257.0,
       "scenario_mean_score": 510.4250720682258,
       "shared_starters": 4,
-      "solver_status": "OPTIMAL"
-    },
-    {
-      "claimed_probability_ahead": 0.95,
-      "horizon": 1,
-      "origin": 32,
-      "realized_ahead": true,
-      "realized_score": 67.0,
-      "rival_realized_score": 51.0,
-      "scenario_mean_score": 80.19928417273742,
-      "shared_starters": 4,
       "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 1.0,
+      "claimed_probability_ahead": 0.82,
+      "horizon": 1,
+      "origin": 32,
+      "realized_ahead": true,
+      "realized_score": 59.0,
+      "rival_realized_score": 51.0,
+      "scenario_mean_score": 81.56127848831822,
+      "shared_starters": 2,
+      "solver_status": "FEASIBLE"
+    },
+    {
+      "claimed_probability_ahead": 0.97,
       "horizon": 3,
       "origin": 32,
       "realized_ahead": false,
-      "realized_score": 106.0,
+      "realized_score": 119.0,
       "rival_realized_score": 156.0,
-      "scenario_mean_score": 248.93261926602173,
+      "scenario_mean_score": 250.2694409717953,
       "shared_starters": 2,
-      "solver_status": "OPTIMAL"
+      "solver_status": "FEASIBLE"
     },
     {
-      "claimed_probability_ahead": 1.0,
+      "claimed_probability_ahead": 0.99,
       "horizon": 5,
       "origin": 32,
       "realized_ahead": false,
@@ -226,7 +227,7 @@
       "rival_realized_score": 249.0,
       "scenario_mean_score": 413.79827169412266,
       "shared_starters": 2,
-      "solver_status": "OPTIMAL"
+      "solver_status": "FEASIBLE"
     }
   ],
   "scenario_count": 100,

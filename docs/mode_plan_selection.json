@@ -1,6 +1,6 @@
 {
   "contract_version": "mode_plan_selection_v1",
-  "created_utc": "2026-08-19T21:03:05+00:00",
+  "created_utc": "2026-08-20T06:31:20+00:00",
   "environment": {
     "logical_cpu_count": 32,
     "ortools": "9.15.6755",
@@ -30,9 +30,10 @@
       "2024-25",
       "2025-26"
     ],
-    "repository_commit": "7ee71238c8b460d504fef44a59d73f6a933b6651",
+    "repository_commit": "a64b8e66501c24587cb0776ab294be52d59de757",
     "working_tree_dirty": true
   },
+  "rival_edge_points_per_week": 7.19,
   "scenario_count": 200,
   "season": "2024-25",
   "selection": {
@@ -123,15 +124,16 @@
       ],
       "chips_note": "A chip consumed inside the window is unavailable after it; candidates record their consumption so the recommendation is read next to its cost.",
       "horizon": 3,
+      "rival_edge_points_per_week": 7.19,
       "rival_held_fixed": true,
       "rival_label": "ownership-template",
       "scenario_count": 200,
       "window_id": "2024-25-gw20-gw22"
     },
     "recommended": {
-      "agresif": "3xc_gw20",
-      "asiri_agresif": "3xc_gw20",
-      "garantici": "3xc_gw20",
+      "agresif": "bboost_gw21",
+      "asiri_agresif": "planner_choice",
+      "garantici": "bboost_gw21",
       "saf_puan": "planner_choice"
     },
     "verdicts": [
@@ -225,11 +227,11 @@
       {
         "candidate": "no_chips",
         "chips_consumed": [],
-        "expected_rival_gap": 52.72774290888154,
+        "expected_rival_gap": 31.157742908881545,
         "expected_window_score": 304.1217389252464,
         "mode": "garantici",
-        "probability_behind": 0.01,
-        "probability_success": 0.99
+        "probability_behind": 0.085,
+        "probability_success": 0.915
       },
       {
         "candidate": "planner_choice",
@@ -237,7 +239,7 @@
           "3xc",
           "bboost"
         ],
-        "expected_rival_gap": 90.19752759333285,
+        "expected_rival_gap": 68.62752759333286,
         "expected_window_score": 341.5915236096978,
         "mode": "garantici",
         "probability_behind": 0.0,
@@ -248,18 +250,18 @@
         "chips_consumed": [
           "bboost"
         ],
-        "expected_rival_gap": 75.43002057689421,
+        "expected_rival_gap": 53.86002057689422,
         "expected_window_score": 326.8240165932591,
         "mode": "garantici",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
+        "probability_behind": 0.015,
+        "probability_success": 0.985
       },
       {
         "candidate": "bboost_gw21",
         "chips_consumed": [
           "bboost"
         ],
-        "expected_rival_gap": 76.1022773251831,
+        "expected_rival_gap": 54.532277325183095,
         "expected_window_score": 327.496273341548,
         "mode": "garantici",
         "probability_behind": 0.0,
@@ -270,148 +272,148 @@
         "chips_consumed": [
           "bboost"
         ],
-        "expected_rival_gap": 75.11004517034529,
+        "expected_rival_gap": 53.540045170345294,
         "expected_window_score": 326.50404118671014,
         "mode": "garantici",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
+        "probability_behind": 0.005,
+        "probability_success": 0.995
       },
       {
         "candidate": "3xc_gw20",
         "chips_consumed": [
           "3xc"
         ],
-        "expected_rival_gap": 66.77352554656616,
+        "expected_rival_gap": 45.203525546566176,
         "expected_window_score": 318.16752156293103,
         "mode": "garantici",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
+        "probability_behind": 0.025,
+        "probability_success": 0.975
       },
       {
         "candidate": "3xc_gw21",
         "chips_consumed": [
           "3xc"
         ],
-        "expected_rival_gap": 66.56617504570445,
+        "expected_rival_gap": 44.99617504570446,
         "expected_window_score": 317.9601710620693,
         "mode": "garantici",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
+        "probability_behind": 0.025,
+        "probability_success": 0.975
       },
       {
         "candidate": "3xc_gw22",
         "chips_consumed": [
           "3xc"
         ],
-        "expected_rival_gap": 66.8229931770313,
+        "expected_rival_gap": 45.252993177031314,
         "expected_window_score": 318.21698919339616,
         "mode": "garantici",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
-      },
-      {
-        "candidate": "no_chips",
-        "chips_consumed": [],
-        "expected_rival_gap": 52.72774290888154,
-        "expected_window_score": 304.1217389252464,
-        "mode": "agresif",
-        "probability_behind": 0.01,
-        "probability_success": 0.99
-      },
-      {
-        "candidate": "planner_choice",
-        "chips_consumed": [
-          "3xc",
-          "bboost"
-        ],
-        "expected_rival_gap": 90.19752759333285,
-        "expected_window_score": 341.5915236096978,
-        "mode": "agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
-      },
-      {
-        "candidate": "bboost_gw20",
-        "chips_consumed": [
-          "bboost"
-        ],
-        "expected_rival_gap": 75.43002057689421,
-        "expected_window_score": 326.8240165932591,
-        "mode": "agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
-      },
-      {
-        "candidate": "bboost_gw21",
-        "chips_consumed": [
-          "bboost"
-        ],
-        "expected_rival_gap": 76.1022773251831,
-        "expected_window_score": 327.496273341548,
-        "mode": "agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
-      },
-      {
-        "candidate": "bboost_gw22",
-        "chips_consumed": [
-          "bboost"
-        ],
-        "expected_rival_gap": 75.11004517034529,
-        "expected_window_score": 326.50404118671014,
-        "mode": "agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
-      },
-      {
-        "candidate": "3xc_gw20",
-        "chips_consumed": [
-          "3xc"
-        ],
-        "expected_rival_gap": 66.77352554656616,
-        "expected_window_score": 318.16752156293103,
-        "mode": "agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
-      },
-      {
-        "candidate": "3xc_gw21",
-        "chips_consumed": [
-          "3xc"
-        ],
-        "expected_rival_gap": 66.56617504570445,
-        "expected_window_score": 317.9601710620693,
-        "mode": "agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
-      },
-      {
-        "candidate": "3xc_gw22",
-        "chips_consumed": [
-          "3xc"
-        ],
-        "expected_rival_gap": 66.8229931770313,
-        "expected_window_score": 318.21698919339616,
-        "mode": "agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
-      },
-      {
-        "candidate": "no_chips",
-        "chips_consumed": [],
-        "expected_rival_gap": 52.72774290888154,
-        "expected_window_score": 304.1217389252464,
-        "mode": "asiri_agresif",
-        "probability_behind": 0.01,
+        "probability_behind": 0.02,
         "probability_success": 0.98
       },
       {
+        "candidate": "no_chips",
+        "chips_consumed": [],
+        "expected_rival_gap": 31.157742908881545,
+        "expected_window_score": 304.1217389252464,
+        "mode": "agresif",
+        "probability_behind": 0.085,
+        "probability_success": 0.915
+      },
+      {
         "candidate": "planner_choice",
         "chips_consumed": [
           "3xc",
           "bboost"
         ],
-        "expected_rival_gap": 90.19752759333285,
+        "expected_rival_gap": 68.62752759333286,
+        "expected_window_score": 341.5915236096978,
+        "mode": "agresif",
+        "probability_behind": 0.0,
+        "probability_success": 1.0
+      },
+      {
+        "candidate": "bboost_gw20",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 53.86002057689422,
+        "expected_window_score": 326.8240165932591,
+        "mode": "agresif",
+        "probability_behind": 0.015,
+        "probability_success": 0.985
+      },
+      {
+        "candidate": "bboost_gw21",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 54.532277325183095,
+        "expected_window_score": 327.496273341548,
+        "mode": "agresif",
+        "probability_behind": 0.0,
+        "probability_success": 1.0
+      },
+      {
+        "candidate": "bboost_gw22",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 53.540045170345294,
+        "expected_window_score": 326.50404118671014,
+        "mode": "agresif",
+        "probability_behind": 0.005,
+        "probability_success": 0.995
+      },
+      {
+        "candidate": "3xc_gw20",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 45.203525546566176,
+        "expected_window_score": 318.16752156293103,
+        "mode": "agresif",
+        "probability_behind": 0.025,
+        "probability_success": 0.975
+      },
+      {
+        "candidate": "3xc_gw21",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 44.99617504570446,
+        "expected_window_score": 317.9601710620693,
+        "mode": "agresif",
+        "probability_behind": 0.025,
+        "probability_success": 0.975
+      },
+      {
+        "candidate": "3xc_gw22",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 45.252993177031314,
+        "expected_window_score": 318.21698919339616,
+        "mode": "agresif",
+        "probability_behind": 0.02,
+        "probability_success": 0.98
+      },
+      {
+        "candidate": "no_chips",
+        "chips_consumed": [],
+        "expected_rival_gap": 31.157742908881545,
+        "expected_window_score": 304.1217389252464,
+        "mode": "asiri_agresif",
+        "probability_behind": 0.085,
+        "probability_success": 0.855
+      },
+      {
+        "candidate": "planner_choice",
+        "chips_consumed": [
+          "3xc",
+          "bboost"
+        ],
+        "expected_rival_gap": 68.62752759333286,
         "expected_window_score": 341.5915236096978,
         "mode": "asiri_agresif",
         "probability_behind": 0.0,
@@ -422,68 +424,68 @@
         "chips_consumed": [
           "bboost"
         ],
-        "expected_rival_gap": 75.43002057689421,
+        "expected_rival_gap": 53.86002057689422,
         "expected_window_score": 326.8240165932591,
         "mode": "asiri_agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
+        "probability_behind": 0.015,
+        "probability_success": 0.975
       },
       {
         "candidate": "bboost_gw21",
         "chips_consumed": [
           "bboost"
         ],
-        "expected_rival_gap": 76.1022773251831,
+        "expected_rival_gap": 54.532277325183095,
         "expected_window_score": 327.496273341548,
         "mode": "asiri_agresif",
         "probability_behind": 0.0,
-        "probability_success": 1.0
+        "probability_success": 0.985
       },
       {
         "candidate": "bboost_gw22",
         "chips_consumed": [
           "bboost"
         ],
-        "expected_rival_gap": 75.11004517034529,
+        "expected_rival_gap": 53.540045170345294,
         "expected_window_score": 326.50404118671014,
         "mode": "asiri_agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
+        "probability_behind": 0.005,
+        "probability_success": 0.985
       },
       {
         "candidate": "3xc_gw20",
         "chips_consumed": [
           "3xc"
         ],
-        "expected_rival_gap": 66.77352554656616,
+        "expected_rival_gap": 45.203525546566176,
         "expected_window_score": 318.16752156293103,
         "mode": "asiri_agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
+        "probability_behind": 0.025,
+        "probability_success": 0.96
       },
       {
         "candidate": "3xc_gw21",
         "chips_consumed": [
           "3xc"
         ],
-        "expected_rival_gap": 66.56617504570445,
+        "expected_rival_gap": 44.99617504570446,
         "expected_window_score": 317.9601710620693,
         "mode": "asiri_agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
+        "probability_behind": 0.025,
+        "probability_success": 0.97
       },
       {
         "candidate": "3xc_gw22",
         "chips_consumed": [
           "3xc"
         ],
-        "expected_rival_gap": 66.8229931770313,
+        "expected_rival_gap": 45.252993177031314,
         "expected_window_score": 318.21698919339616,
         "mode": "asiri_agresif",
-        "probability_behind": 0.0,
-        "probability_success": 1.0
+        "probability_behind": 0.02,
+        "probability_success": 0.97
       }
     ]
   },
-  "wall_clock_seconds": 37.670908000000054
+  "wall_clock_seconds": 78.46822330000577
 }
