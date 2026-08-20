@@ -20,6 +20,8 @@ describe("format", () => {
     expect(countdown("2026-08-19T11:05:00Z", now)).toBe("01:05");
     expect(countdown("2026-08-19T09:00:00Z", now)).toBe("closed");
     expect(countdown("not a date", now)).toBe("");
+    expect(countdown("2026-08-21T17:30:00Z", now, "tr")).toBe("2g 07:30");
+    expect(countdown("2026-08-19T09:00:00Z", now, "tr")).toBe("kapandı");
   });
   it("shortens digests", () => {
     expect(shortDigest("abcdefghijklmnop", 8)).toBe("abcdefgh…");

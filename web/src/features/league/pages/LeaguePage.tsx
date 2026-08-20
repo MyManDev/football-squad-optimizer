@@ -6,117 +6,109 @@ import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
+import { useLanguage } from "../../../i18n/context";
 import { percent, points, signedPoints, utcShort } from "../../../lib/format";
 import { AverageChart } from "../components/AverageChart";
 import { CumulativeChart } from "../components/CumulativeChart";
 import styles from "./LeaguePage.module.css";
 
 export function LeaguePage() {
+  const { locale, messages } = useLanguage();
+  const copy = messages.league;
   const index = useIndex();
   const season = index.data?.payload.seasons[0];
   const ledger = useLedger(season);
   const league = useLeague(season);
   if (index.isPending || (season && ledger.isPending)) {
-    return <EmptyState title="Loading the season…" />;
+    return <EmptyState title={copy.loading} />;
   }
   if (index.isError || ledger.isError) {
-    return (
-      <EmptyState title="The ledger could not be read.">
-        {String(index.error ?? ledger.error)}
-      </EmptyState>
-    );
+    return <EmptyState title={copy.ledgerError}>{String(index.error ?? ledger.error)}</EmptyState>;
   }
-  if (!season || !ledger.data) return <EmptyState title="No season yet." />;
+  if (!season || !ledger.data) return <EmptyState title={copy.noSeason} />;
   const view = ledger.data.payload;
   return (
     <div className={styles.page}>
       <header className={styles.head}>
         <div>
-          <div className={styles.kicker}>season {view.season}</div>
-          <h1 className={styles.title}>League analysis</h1>
-          <p className={styles.lede}>
-            How this season is going, and how that compares with everyone else playing the same
-            game.
-          </p>
+          <div className={styles.kicker}>
+            {copy.season} {view.season}
+          </div>
+          <h1 className={styles.title}>{copy.title}</h1>
+          <p className={styles.lede}>{copy.lede}</p>
         </div>
       </header>
 
       <StatRow>
         <Stat
-          label="decided · settled"
+          label={copy.decidedSettled}
           value={`${view.decided_gameweeks} · ${view.settled_gameweeks}`}
-          note="gameweeks with a frozen decision · with an outcome"
+          note={copy.decidedSettledNote}
         />
         <Stat
-          label="realized vs projected"
+          label={copy.realizedProjected}
           value={
-            view.total_projection_error !== null ? signedPoints(view.total_projection_error) : "—"
+            view.total_projection_error !== null
+              ? signedPoints(view.total_projection_error, 1, locale)
+              : "—"
           }
           note={
             view.total_realized_score !== null
-              ? `${points(view.total_realized_score, 0)} realized on settled weeks`
-              : "shown once a gameweek settles"
+              ? copy.realizedWeeks(points(view.total_realized_score, 0, locale))
+              : copy.shownWhenSettled
           }
           tone={view.total_realized_score === null ? "muted" : "default"}
         />
         <Stat
-          label="hits · chips"
-          value={`${points(view.total_transfer_hit_points, 0)} · ${view.chips_played.length}`}
-          note={view.chips_played.length ? view.chips_played.join(", ") : "no chip played yet"}
+          label={copy.hitsChips}
+          value={`${points(view.total_transfer_hit_points, 0, locale)} · ${view.chips_played.length}`}
+          note={view.chips_played.length ? view.chips_played.join(", ") : copy.noChip}
         />
       </StatRow>
 
       {view.rows.length > 1 ? (
-        <Card title="Projected vs realized, cumulative" aside="points">
+        <Card title={copy.cumulative} aside={copy.points}>
           <CumulativeChart rows={view.rows} />
         </Card>
       ) : view.rows.length === 1 ? (
-        <Card tone="muted" title="Projected vs realized, cumulative" aside="from gameweek 2">
-          <p className={styles.sub}>
-            One gameweek is a point, not a line. The chart starts once a second decision exists; the
-            realized line starts once the first gameweek settles.
-          </p>
+        <Card tone="muted" title={copy.cumulative} aside={copy.fromGw2}>
+          <p className={styles.sub}>{copy.onePoint}</p>
         </Card>
       ) : null}
 
       {league.data ? (
         <AgainstTheLeague view={league.data.payload} />
       ) : (
-        <Card tone="muted" title="Against the rest of the league">
-          <p className={styles.para}>
-            The comparison is built from the capture the decision used; this site build did not
-            include one, so nothing about the league is claimed here.
-          </p>
+        <Card tone="muted" title={copy.againstLeague}>
+          <p className={styles.para}>{copy.comparisonMissing}</p>
         </Card>
       )}
 
       {view.rows.length === 0 ? (
-        <EmptyState title="No decision recorded yet.">
-          The first row appears once gameweek 1 is decided.
-        </EmptyState>
+        <EmptyState title={messages.common.noDecisionRecorded}>{copy.firstRow}</EmptyState>
       ) : (
-        <Card title="Our season" aside="each row is a frozen, checksummed ledger entry">
+        <Card title={copy.ourSeason} aside={copy.ledgerAside}>
           <div className={styles.tableWrap}>
             <table className={styles.table}>
-              <caption className="visually-hidden">Season ledger, one row per gameweek</caption>
+              <caption className="visually-hidden">{copy.ledgerCaption}</caption>
               <thead>
                 <tr>
-                  <th scope="col">GW</th>
-                  <th scope="col">decision</th>
+                  <th scope="col">{messages.common.gameweekShort(0).replace("0", "")}</th>
+                  <th scope="col">{copy.decision}</th>
                   <th scope="col" className={styles.right}>
-                    projected
+                    {copy.projected}
                   </th>
                   <th scope="col" className={styles.right}>
-                    realized
+                    {copy.realized}
                   </th>
                   <th scope="col" className={styles.right}>
-                    error
+                    {copy.error}
                   </th>
                   <th scope="col" className={styles.right}>
-                    hits
+                    {copy.hits}
                   </th>
-                  <th scope="col">chip</th>
-                  <th scope="col">state</th>
+                  <th scope="col">{copy.chip}</th>
+                  <th scope="col">{copy.state}</th>
                 </tr>
               </thead>
               <tbody>
@@ -129,16 +121,14 @@ export function LeaguePage() {
         </Card>
       )}
 
-      <p className={styles.note}>
-        Realized points come from the settle step and are never edited by hand; a projection error
-        is realized minus projected for the frozen XI (captain counted twice, no automatic
-        substitutions).
-      </p>
+      <p className={styles.note}>{copy.note}</p>
     </div>
   );
 }
 
 function AgainstTheLeague({ view }: { view: LeagueView }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.league;
   const ownership = view.ownership;
   const byId = new Map<number, PlayerView>(
     (ownership?.squad ?? []).map((player) => [player.player_id, player]),
@@ -149,51 +139,40 @@ function AgainstTheLeague({ view }: { view: LeagueView }) {
     const player = byId.get(id);
     return percentOwned === undefined
       ? "—"
-      : `${player?.short_name ?? id} ${percentOwned.toFixed(1)}%`;
+      : `${player?.short_name ?? id} ${percent(percentOwned / 100, 1, locale)}`;
   };
   return (
     <>
-      <Card
-        title="Against the rest of the league"
-        aside={`the game's own weekly summary · capture ${view.source_snapshot_id.slice(0, 24)}…`}
-      >
+      <Card title={copy.againstLeague} aside={copy.weeklySummary(view.source_snapshot_id)}>
         <p className={styles.para}>{view.verdict}</p>
         {view.scored_gameweeks > 0 ? (
           <AverageChart weeks={view.weeks} />
         ) : (
-          <p className={styles.sub}>
-            The chart starts with the first scored gameweek: the game publishes an average only once
-            a gameweek finishes, so there is nothing to draw yet.
-          </p>
+          <p className={styles.sub}>{copy.chartStarts}</p>
         )}
       </Card>
       {ownership && (
-        <Card
-          title="How much of this squad is the template"
-          aside={`gameweek ${ownership.gameweek}`}
-        >
+        <Card title={copy.templateTitle} aside={copy.gameweekAside(ownership.gameweek)}>
           <StatRow>
             <Stat
-              label="mean starter ownership"
-              value={percent(ownership.mean_starter_ownership / 100, 1)}
-              note="the average share of the field that owns one of our starters"
+              label={copy.meanOwnership}
+              value={percent(ownership.mean_starter_ownership / 100, 1, locale)}
+              note={copy.meanOwnershipNote}
             />
             <Stat
-              label="effective ownership"
-              value={percent(ownership.effective_ownership / 100, 0)}
-              note="starters plus the captain again — the exposure we share with the field"
+              label={copy.effectiveOwnership}
+              value={percent(ownership.effective_ownership / 100, 0, locale)}
+              note={copy.effectiveOwnershipNote}
             />
             <Stat
-              label="differentials"
+              label={copy.differentials}
               value={`${ownership.differentials.length}`}
-              note={`starters owned by ${ownership.differential_threshold_percent}% or less`}
+              note={copy.differentialNote(ownership.differential_threshold_percent)}
             />
           </StatRow>
           <p className={styles.sub}>
-            Most owned: {owned(ownership.most_owned_starter)} · least owned:{" "}
-            {owned(ownership.least_owned_starter)}. Ownership is the capture&apos;s
-            selected_by_percent at decision time; it moves after the deadline and this page does not
-            follow it.
+            {copy.mostOwned}: {owned(ownership.most_owned_starter)} · {copy.leastOwned}:{" "}
+            {owned(ownership.least_owned_starter)}. {copy.ownershipNote}
           </p>
         </Card>
       )}
@@ -202,6 +181,8 @@ function AgainstTheLeague({ view }: { view: LeagueView }) {
 }
 
 function Row({ row, season }: { row: LedgerRowView; season: string }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.league;
   return (
     <tr>
       <td className="num">
@@ -210,23 +191,25 @@ function Row({ row, season }: { row: LedgerRowView; season: string }) {
       <td>
         <div>
           {row.decision_kind === "opening"
-            ? "Opening squad"
-            : `${row.transfer_count} transfer${row.transfer_count === 1 ? "" : "s"}`}
+            ? copy.openingSquad
+            : copy.transferCount(row.transfer_count)}
         </div>
         <div className={styles.sub}>
-          deadline {utcShort(row.deadline_utc)} · {row.solver_status}
+          {copy.deadline} {utcShort(row.deadline_utc, locale)} · {row.solver_status}
         </div>
       </td>
-      <td className={`${styles.right} num`}>{points(row.projected_score)}</td>
+      <td className={`${styles.right} num`}>{points(row.projected_score, 1, locale)}</td>
       <td className={`${styles.right} num`}>
-        {row.realized_score !== null ? points(row.realized_score, 0) : "—"}
+        {row.realized_score !== null ? points(row.realized_score, 0, locale) : "—"}
       </td>
       <td className={`${styles.right} num`}>
-        {row.projection_error !== null ? signedPoints(row.projection_error) : "—"}
+        {row.projection_error !== null ? signedPoints(row.projection_error, 1, locale) : "—"}
       </td>
-      <td className={`${styles.right} num`}>{points(row.transfer_hit_points, 0)}</td>
+      <td className={`${styles.right} num`}>{points(row.transfer_hit_points, 0, locale)}</td>
       <td>{row.chip ?? "—"}</td>
-      <td>{row.settled ? <Badge tone="good">settled</Badge> : <Badge>decided</Badge>}</td>
+      <td>
+        {row.settled ? <Badge tone="good">{copy.settled}</Badge> : <Badge>{copy.decided}</Badge>}
+      </td>
     </tr>
   );
 }
