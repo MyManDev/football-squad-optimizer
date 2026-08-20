@@ -41,6 +41,8 @@ def _compatibility_paths(arguments: list[str]) -> list[str]:
         str(workspace),
         "--runtime-root",
         str(runtime),
+        "--log-root",
+        str(runtime.parent / "logs"),
         "--archive-root",
         str(REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"),
         "--summary-root",
