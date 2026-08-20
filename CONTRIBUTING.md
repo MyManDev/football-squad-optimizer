@@ -40,7 +40,7 @@ Python 3.11 or newer:
 ```powershell
 python -m venv .venv
 .venv\Scripts\python -m pip install --upgrade pip
-.venv\Scripts\python -m pip install -e ".[dev]"
+.venv\Scripts\python -m pip install -e ".[api,dev]"
 ```
 
 The test suite is entirely synthetic and offline — it needs neither the historical archive nor
