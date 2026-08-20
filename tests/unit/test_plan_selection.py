@@ -219,3 +219,47 @@ def test_the_mode_table_is_the_declared_one() -> None:
     assert MODES["saf_puan"]["rival_aware"] is False
     assert MODES["garantici"]["level_counts"] is True
     assert MODES["asiri_agresif"]["margin"] == 5.0
+
+
+def test_a_zero_edge_selection_is_the_historical_one() -> None:
+    paths = _paths()
+    rival = RivalSquad("crowd", tuple(PLAYERS[:11]), 1)
+    strong = CandidatePlan(label="strong", plan=_plan(starters=PLAYERS[:11], captain=1).plan)
+    base = select_plan([strong], paths, rival)  # type: ignore[arg-type]
+    explicit = select_plan(
+        [strong],
+        paths,
+        rival,
+        rival_edge_points_per_week=0.0,  # type: ignore[arg-type]
+    )
+    assert base.verdicts == explicit.verdicts
+    assert explicit.diagnostics["rival_edge_points_per_week"] == 0.0
+
+
+def test_the_edge_is_charged_once_per_week_of_the_window() -> None:
+    paths = _paths()
+    rival = RivalSquad("crowd", tuple(PLAYERS[:11]), 1)
+    base = rival_window_scores(rival, paths)  # type: ignore[arg-type]
+    edged = rival_window_scores(
+        rival,
+        paths,
+        rival_edge_points_per_week=7.19,  # type: ignore[arg-type]
+    )
+    np.testing.assert_allclose(edged - base, np.full(100, 7.19 * len(GAMEWEEKS)))
+
+
+def test_an_edged_crowd_deflates_every_competitive_success_probability() -> None:
+    paths = _paths()
+    rival = RivalSquad("crowd", tuple(PLAYERS[:11]), 1)
+    strong = CandidatePlan(label="strong", plan=_plan(starters=PLAYERS[:11], captain=2).plan)
+    base = select_plan([strong], paths, rival)  # type: ignore[arg-type]
+    edged = select_plan(
+        [strong],
+        paths,
+        rival,
+        rival_edge_points_per_week=50.0,  # type: ignore[arg-type]
+    )
+    for before, after in zip(base.verdicts, edged.verdicts, strict=True):
+        if before.probability_success is not None:
+            assert after.probability_success <= before.probability_success
+            assert after.probability_behind >= before.probability_behind
