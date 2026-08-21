@@ -5,12 +5,16 @@ commands for this specific Friday*, written the day before so nothing is improvi
 15:30Z. Deadline **17:30Z**; first kickoff 19:00Z. The tree is frozen (Thu 17:30Z →
 Sat 17:30Z), which is fine: everything below *runs* code, none of it changes code.
 
-Current state going in: two stored captures — `fpl-live-20260813T201143Z-55789a780186`
-(2026-08-13) and `fpl-live-20260820T170525Z-545aaf5df705` (2026-08-20, taken as a
-pre-deadline health check and as a fallback), both superseded by the capture below. Ledger
-empty. The capture named in an earlier draft of this sheet,
-`fpl-live-20260816T081259Z-e44ade0095e5`, does not exist and never did; `--list` is the
-authority on what is stored.
+Current state going in: the capture store (`data/snapshots/`) is machine-local and not
+tracked by git, so no sheet can enumerate it for every machine — on the morning, run
+`python -m scripts.capture_deadline_snapshot --list` on the machine that will run the tick
+and treat that output as the authority. On the operating machine it currently shows one
+snapshot, `fpl-live-20260816T081259Z-e44ade0095e5` (2026-08-16 — five days stale by Friday,
+superseded by the 15:30Z capture below). A 2026-08-20 health-check capture on the data
+owner's machine (`fpl-live-20260820T170525Z-545aaf5df705`) confirmed the source responds
+and the schema is unchanged; it is not on the operating machine and is not needed there.
+Ledger empty. The tick's capture window opens at T−3h (14:30Z; `capture_window_hours = 3.0`
+in `live/tick.py`) — 15:30Z below is the chosen time inside that window, not its edge.
 
 **Run from `develop`, not from the release tag.** `v2026-27.gw01` and `main` do not contain
 `src/squadopt/platform/cli.py`, so the `squadopt` command this sheet invokes below does not
