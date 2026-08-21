@@ -1,0 +1,513 @@
+name: Deploy Pages
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Immutable annotated site tag (for example site-2026-27-gw01-decision)
+        required: true
+        type: string
+
+# CI never receives Cloudflare credentials. This trusted default-branch workflow treats a PR
+# artifact as data, and only the two deployment jobs can enter the protected environment.
+permissions: {}
+
+jobs:
+  qualify_preview:
+    name: qualify web preview
+    if: >-
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      eligible: ${{ steps.qualify.outputs.eligible }}
+      base_sha: ${{ steps.qualify.outputs.base_sha }}
+      head_sha: ${{ steps.qualify.outputs.head_sha }}
+      pr_number: ${{ steps.qualify.outputs.pr_number }}
+      reason: ${{ steps.qualify.outputs.reason }}
+    steps:
+      - name: Verify same-repository web change
+        id: qualify
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const run = context.payload.workflow_run;
+            const skip = (reason) => {
+              core.setOutput("eligible", "false");
+              core.setOutput("reason", reason);
+              core.notice(`Pages preview skipped: ${reason}`);
+            };
+
+            if (run.head_repository?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              skip("fork pull requests are not deployed");
+              return;
+            }
+            if (run.pull_requests?.length !== 1) {
+              skip("the successful CI run does not identify exactly one pull request");
+              return;
+            }
+
+            const payloadPull = run.pull_requests[0];
+            const number = payloadPull.number;
+            const { data: pull } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
+            if (pull.state !== "open" || pull.base.ref !== "develop") {
+              skip("the pull request is no longer open against develop");
+              return;
+            }
+            if (pull.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              skip("fork pull requests are not deployed");
+              return;
+            }
+            if (pull.head.sha !== run.head_sha) {
+              skip("a newer pull-request commit superseded this CI run");
+              return;
+            }
+            if (payloadPull.head?.sha !== run.head_sha || pull.base.sha !== payloadPull.base?.sha) {
+              skip("the pull request base changed after this CI run started");
+              return;
+            }
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              ...context.repo,
+              pull_number: number,
+              per_page: 100,
+            });
+            const isWebPath = (path) => typeof path === "string" && path.startsWith("web/");
+            const touchesWeb = files.some(
+              (file) => isWebPath(file.filename) || isWebPath(file.previous_filename),
+            );
+            if (!touchesWeb) {
+              skip("no changed or renamed file is under web/");
+              return;
+            }
+
+            core.setOutput("eligible", "true");
+            core.setOutput("base_sha", pull.base.sha);
+            core.setOutput("head_sha", run.head_sha);
+            core.setOutput("pr_number", String(number));
+            core.setOutput("reason", "same-repository web pull request with successful current CI");
+
+  preview:
+    name: preview PR ${{ needs.qualify_preview.outputs.pr_number }}
+    needs: qualify_preview
+    if: needs.qualify_preview.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: cloudflare-pages
+    concurrency:
+      group: cloudflare-pages-squadopt
+      queue: max
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check deployment configuration
+        id: config
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        shell: bash
+        run: |
+          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" || -z "$CLOUDFLARE_PAGES_PROJECT" ]]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Cloudflare Pages preview is not configured."
+            echo "## Pages preview configuration missing" >> "$GITHUB_STEP_SUMMARY"
+            echo "The cloudflare-pages environment is not configured; see docs/deployment_runbook.md." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout trusted deployment tooling
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Download exact tested site artifact
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: site
+          path: ${{ runner.temp }}/site
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Reject executable or malformed preview artifacts
+        if: steps.config.outputs.configured == 'true'
+        run: node trusted/web/scripts/check-deployment-assets.mjs "$RUNNER_TEMP/site"
+
+      - name: Revalidate current pull-request head
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          EXPECTED_BASE_SHA: ${{ needs.qualify_preview.outputs.base_sha }}
+          EXPECTED_HEAD_SHA: ${{ needs.qualify_preview.outputs.head_sha }}
+          PR_NUMBER: ${{ needs.qualify_preview.outputs.pr_number }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const number = Number(process.env.PR_NUMBER);
+            const expectedBase = process.env.EXPECTED_BASE_SHA;
+            const expectedHead = process.env.EXPECTED_HEAD_SHA;
+            const { data: pull } = await github.rest.pulls.get({
+              ...context.repo,
+              pull_number: number,
+            });
+            const expectedRepo = `${context.repo.owner}/${context.repo.repo}`;
+            if (
+              pull.state !== "open" ||
+              pull.base.ref !== "develop" ||
+              pull.base.sha !== expectedBase ||
+              pull.head.repo?.full_name !== expectedRepo ||
+              pull.head.sha !== expectedHead
+            ) {
+              core.setFailed("The pull request changed while its preview was queued; rerun current CI.");
+            }
+
+      - name: Enforce deployment budget
+        id: budget
+        if: steps.config.outputs.configured == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          DEPLOYMENT_MODE: preview
+        run: node trusted/web/scripts/cloudflare-deployment-budget.mjs
+
+      - name: Report preview budget stop
+        if: steps.budget.outputs.decision == 'blocked'
+        env:
+          TODAY_COUNT: ${{ steps.budget.outputs.today_count }}
+        run: |
+          echo "::warning::Pages preview skipped after $TODAY_COUNT deployments today; two production slots remain reserved."
+          echo "## Pages preview skipped by circuit breaker" >> "$GITHUB_STEP_SUMMARY"
+          echo "UTC deployment count: $TODAY_COUNT; preview cap: 8; total cap: 10." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Deploy tested preview artifact
+        id: deploy
+        if: steps.budget.outputs.decision == 'deploy'
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.123.0"
+          command: >-
+            pages deploy ${{ runner.temp }}/site
+            --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+            --branch=pr-${{ needs.qualify_preview.outputs.pr_number }}
+            --commit-hash=${{ needs.qualify_preview.outputs.head_sha }}
+            --commit-message=preview:pr-${{ needs.qualify_preview.outputs.pr_number }}
+            --commit-dirty=false
+
+      - name: Verify preview deployment identity
+        id: verify
+        if: steps.deploy.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          CLOUDFLARE_DEPLOYMENT_ID: ${{ steps.deploy.outputs.pages-deployment-id }}
+          ACTION_PAGES_ENVIRONMENT: ${{ steps.deploy.outputs.pages-environment }}
+          EXPECTED_DEPLOYMENT_MODE: preview
+          EXPECTED_DEPLOYMENT_BRANCH: pr-${{ needs.qualify_preview.outputs.pr_number }}
+          EXPECTED_DEPLOYMENT_COMMIT_SHA: ${{ needs.qualify_preview.outputs.head_sha }}
+          EXPECTED_DEPLOYMENT_ALIAS: ${{ format('https://pr-{0}.{1}', needs.qualify_preview.outputs.pr_number, steps.budget.outputs.pages_subdomain) }}
+        run: node trusted/web/scripts/verify-cloudflare-deployment.mjs
+
+      - name: Smoke preview alias
+        id: smoke
+        if: steps.verify.outcome == 'success'
+        env:
+          DEPLOYMENT_URL: ${{ format('https://pr-{0}.{1}', needs.qualify_preview.outputs.pr_number, steps.budget.outputs.pages_subdomain) }}
+        run: node trusted/web/scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
+
+      - name: Report preview result
+        if: always() && steps.config.outputs.configured == 'true'
+        env:
+          BUDGET_DECISION: ${{ steps.budget.outputs.decision }}
+          BASE_SHA: ${{ needs.qualify_preview.outputs.base_sha }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+          PREVIEW_URL: ${{ format('https://pr-{0}.{1}', needs.qualify_preview.outputs.pr_number, steps.budget.outputs.pages_subdomain) }}
+          PR_NUMBER: ${{ needs.qualify_preview.outputs.pr_number }}
+          SOURCE_SHA: ${{ needs.qualify_preview.outputs.head_sha }}
+          UPLOAD_OUTCOME: ${{ steps.deploy.outcome }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          TODAY_COUNT: ${{ steps.budget.outputs.today_count }}
+        run: |
+          echo "## Cloudflare Pages preview" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Pull request: #$PR_NUMBER" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tested PR/base: \`$SOURCE_SHA\` / \`$BASE_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Budget: $BUDGET_DECISION ($TODAY_COUNT deployments before this run)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Upload: ${UPLOAD_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Identity: ${VERIFY_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smoke: ${SMOKE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deployment: ${DEPLOYMENT_URL:-not-created}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Preview alias: ${PREVIEW_URL:-not-created}" >> "$GITHUB_STEP_SUMMARY"
+
+  reject_untrusted_dispatch:
+    name: reject non-default dispatch
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref != format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "::error::Production deployment must be dispatched from the default branch."
+          exit 1
+
+  production_meta:
+    name: verify production source
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      ci_run_id: ${{ steps.release.outputs.ci_run_id }}
+      commit_sha: ${{ steps.release.outputs.commit_sha }}
+      release_tag: ${{ steps.release.outputs.release_tag }}
+    steps:
+      - name: Resolve immutable tag and successful main CI
+        id: release
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const tagName = process.env.RELEASE_TAG;
+            const pattern = /^site-\d{4}-\d{2}-gw\d{2}-(decision|settled|fix\d+)$/;
+            if (!pattern.test(tagName)) {
+              core.setFailed("Expected an immutable tag such as site-2026-27-gw01-decision or -settled.");
+              return;
+            }
+
+            let ref;
+            try {
+              ({ data: ref } = await github.rest.git.getRef({ ...context.repo, ref: `tags/${tagName}` }));
+            } catch (error) {
+              core.setFailed(`Tag ${tagName} does not exist.`);
+              return;
+            }
+            if (ref.object.type !== "tag") {
+              core.setFailed(`Tag ${tagName} must be annotated, not lightweight.`);
+              return;
+            }
+
+            let object = ref.object;
+            for (let depth = 0; object.type === "tag" && depth < 5; depth += 1) {
+              const { data: tag } = await github.rest.git.getTag({ ...context.repo, tag_sha: object.sha });
+              object = tag.object;
+            }
+            if (object.type !== "commit") {
+              core.setFailed(`Tag ${tagName} does not resolve to a commit.`);
+              return;
+            }
+            const commitSha = object.sha;
+
+            const { data: comparison } = await github.rest.repos.compareCommits({
+              ...context.repo,
+              base: commitSha,
+              head: "main",
+            });
+            if (!["ahead", "identical"].includes(comparison.status)) {
+              core.setFailed(`Tagged commit ${commitSha} is not reachable from main.`);
+              return;
+            }
+
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              ...context.repo,
+              workflow_id: "ci.yml",
+              head_sha: commitSha,
+              event: "push",
+              status: "success",
+              per_page: 100,
+            });
+            const candidates = runs
+              .filter(
+                (run) =>
+                  run.head_sha === commitSha &&
+                  run.head_branch === "main" &&
+                  run.event === "push" &&
+                  run.conclusion === "success" &&
+                  run.path.endsWith("/ci.yml"),
+              )
+              .sort((left, right) => right.id - left.id);
+            if (candidates.length === 0) {
+              core.setFailed(`No successful main-push CI run exists for ${tagName} (${commitSha}).`);
+              return;
+            }
+
+            const run = candidates[0];
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...context.repo,
+              run_id: run.id,
+              per_page: 100,
+            });
+            const sites = artifacts.filter((artifact) => artifact.name === "site" && !artifact.expired);
+            if (sites.length !== 1) {
+              core.setFailed(`CI run ${run.id} must contain exactly one unexpired site artifact.`);
+              return;
+            }
+
+            core.setOutput("ci_run_id", String(run.id));
+            core.setOutput("commit_sha", commitSha);
+            core.setOutput("release_tag", tagName);
+            core.summary
+              .addHeading("Verified production source")
+              .addRaw(`Tag: \`${tagName}\`  \nCommit: \`${commitSha}\`  \nCI run: ${run.id}`)
+              .write();
+
+  production:
+    name: production ${{ needs.production_meta.outputs.release_tag }}
+    needs: production_meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: cloudflare-pages
+    concurrency:
+      group: cloudflare-pages-squadopt
+      queue: max
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Require deployment configuration
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        shell: bash
+        run: |
+          if [[ -z "$CLOUDFLARE_API_TOKEN" || -z "$CLOUDFLARE_ACCOUNT_ID" || -z "$CLOUDFLARE_PAGES_PROJECT" ]]; then
+            echo "::error::Configure the cloudflare-pages environment as documented in docs/deployment_runbook.md."
+            exit 1
+          fi
+
+      - name: Checkout trusted deployment tooling
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Download exact tested site artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: site
+          path: ${{ runner.temp }}/site
+          run-id: ${{ needs.production_meta.outputs.ci_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify static artifact
+        run: node trusted/web/scripts/check-deployment-assets.mjs "$RUNNER_TEMP/site"
+
+      - name: Enforce deployment budget
+        id: budget
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          DEPLOYMENT_MODE: production
+        run: node trusted/web/scripts/cloudflare-deployment-budget.mjs
+
+      - name: Stop production at the hard daily cap
+        if: steps.budget.outputs.decision == 'blocked'
+        env:
+          TODAY_COUNT: ${{ steps.budget.outputs.today_count }}
+        run: |
+          echo "::error::Production was not deployed: the project already has $TODAY_COUNT deployments today (hard cap 10 UTC)."
+          echo "## Production blocked by circuit breaker" >> "$GITHUB_STEP_SUMMARY"
+          echo "No upload occurred. Investigate unexpected deployments; do not silently bypass the cap." >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
+      - name: Deploy exact production artifact
+        id: deploy
+        if: steps.budget.outputs.decision == 'deploy'
+        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.123.0"
+          command: >-
+            pages deploy ${{ runner.temp }}/site
+            --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+            --branch=main
+            --commit-hash=${{ needs.production_meta.outputs.commit_sha }}
+            --commit-message=release:${{ needs.production_meta.outputs.release_tag }}
+            --commit-dirty=false
+
+      - name: Verify production deployment identity
+        id: verify
+        if: steps.deploy.outcome == 'success'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+          CLOUDFLARE_DEPLOYMENT_ID: ${{ steps.deploy.outputs.pages-deployment-id }}
+          ACTION_PAGES_ENVIRONMENT: ${{ steps.deploy.outputs.pages-environment }}
+          EXPECTED_DEPLOYMENT_MODE: production
+          EXPECTED_DEPLOYMENT_BRANCH: main
+          EXPECTED_DEPLOYMENT_COMMIT_SHA: ${{ needs.production_meta.outputs.commit_sha }}
+          EXPECTED_DEPLOYMENT_ALIAS: ${{ format('https://{0}', steps.budget.outputs.pages_subdomain) }}
+        run: node trusted/web/scripts/verify-cloudflare-deployment.mjs
+
+      - name: Smoke production alias
+        id: smoke
+        if: steps.verify.outcome == 'success'
+        env:
+          DEPLOYMENT_URL: ${{ format('https://{0}', steps.budget.outputs.pages_subdomain) }}
+        run: node trusted/web/scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
+
+      - name: Report production result
+        if: always()
+        env:
+          BUDGET_DECISION: ${{ steps.budget.outputs.decision }}
+          CI_RUN_ID: ${{ needs.production_meta.outputs.ci_run_id }}
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+          PRODUCTION_URL: ${{ format('https://{0}', steps.budget.outputs.pages_subdomain) }}
+          RELEASE_TAG: ${{ needs.production_meta.outputs.release_tag }}
+          SOURCE_SHA: ${{ needs.production_meta.outputs.commit_sha }}
+          UPLOAD_OUTCOME: ${{ steps.deploy.outcome }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          TODAY_COUNT: ${{ steps.budget.outputs.today_count }}
+        run: |
+          echo "## Cloudflare Pages production" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release tag: \`$RELEASE_TAG\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Source: \`$SOURCE_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- CI artifact run: $CI_RUN_ID" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Budget: ${BUDGET_DECISION:-not-checked} (${TODAY_COUNT:-unknown} deployments before this run)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Upload: ${UPLOAD_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Identity: ${VERIFY_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Smoke: ${SMOKE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deployment: ${DEPLOYMENT_URL:-not-created}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Production alias: ${PRODUCTION_URL:-not-created}" >> "$GITHUB_STEP_SUMMARY"

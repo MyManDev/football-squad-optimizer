@@ -16,6 +16,8 @@
     "gen:types": "json2ts ../docs/contracts/ui_view_v1.schema.json --output src/data/schema.ts --bannerComment \"/* Generated from docs/contracts/ui_view_v1.schema.json by npm run gen:types - do not edit. */\"",
     "build:analysis": "node scripts/build-analysis.mjs",
     "build:data": "python -m scripts.build_site --out public",
+    "check:deployment": "node scripts/check-deployment-assets.mjs",
+    "smoke:deployment": "node scripts/smoke-deployment.mjs",
     "size": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
