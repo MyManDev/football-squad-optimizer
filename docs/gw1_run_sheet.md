@@ -10,17 +10,23 @@ Git later through separate review branches and never by committing from the deta
 the 17:30Z deadline. From GW2 onward, `deployment_runbook.md` is authoritative: publish the
 decision view before the deadline and publish a second settled view after results arrive.
 
-Current state going in: one stored capture (`fpl-live-20260816T081259Z-e44ade0095e5`,
-2026-08-16 — five days stale by Friday, superseded below), ledger empty, and historical
-release tag `v2026-27.gw01` on `main`.
+Current state going in: the capture store (`data/snapshots/`) is machine-local and not
+tracked by git, so no sheet can enumerate it for every machine — on the morning, run
+`python -m scripts.capture_deadline_snapshot --list` on the machine that will run the tick
+and treat that output as the authority. On the operating machine it currently shows one
+snapshot, `fpl-live-20260816T081259Z-e44ade0095e5` (2026-08-16 — five days stale by Friday,
+superseded by the 15:30Z capture below). A 2026-08-20 health-check capture on the data
+owner's machine (`fpl-live-20260820T170525Z-545aaf5df705`) confirmed the source responds
+and the schema is unchanged; it is not on the operating machine and is not needed there.
+Ledger empty. The tick's capture window opens at T−3h (14:30Z; `capture_window_hours = 3.0`
+in `live/tick.py`) — 15:30Z below is the chosen time inside that window, not its edge.
 
-**Release-owner prerequisite before Friday:** `v2026-27.gw01` predates the finalized unified
-CLI, the A2 measurement, and the current published-view contract. Do not move it and do not run
-this sheet from it. First complete a deliberate develop-to-main release whose main-push CI is
-green, then create the new immutable annotated execution tag `run-2026-27-gw01` on that exact
-main SHA. Before pushing the tag, verify that the tree contains
-`src/squadopt/platform/cli.py`, `scripts/record_preseason_difficulty.py`, and the current
-`scripts/build_site.py`:
+**Which tree runs the tick.** The historical release tag `v2026-27.gw01` and the `main` it
+sits on predate the unified CLI (`src/squadopt/platform/cli.py` is absent there), so the
+`squadopt` command this sheet invokes does not exist in those trees. Do not move that tag and
+do not run from it. The Friday-morning release below fixes this properly: a deliberate
+develop-to-main release whose main-push CI is green, then the immutable annotated execution
+tag `run-2026-27-gw01` on that exact main SHA. Before pushing the tag, verify the tree:
 
 ```console
 git switch main
@@ -31,19 +37,28 @@ git tag -a run-2026-27-gw01 -m "Freeze the GW01 operational tree"
 git push origin run-2026-27-gw01
 ```
 
-The tag is created only after the exact `main` push CI is green. If that tag is absent, this
-run sheet is not ready for the live tick; do not silently fall back to the older release tree.
-Run everything below from the new tag, per the runbook's "all green or the live run does not
-happen from that tree" rule.
+The tag is created only after the exact `main` push CI is green. **Fallback, stated now
+rather than improvised at 15:30Z:** if the tag does not exist when the capture window opens,
+run from `develop` at a recorded commit — the runbook's own words are "Every command runs
+from the repository root on a clean, tested `develop`", and it is the only other tree that
+carries the CLI. Record in the ledger PR which tree ran. What is not allowed is the third
+option: silently falling back to the older release tree, which cannot run this sheet at all.
 
 ## 15:30Z — capture (T−2h)
 
 ```console
-git switch --detach run-2026-27-gw01
+git switch --detach run-2026-27-gw01   # fallback: git switch develop && git pull --ff-only
+git rev-parse HEAD           # record this; it is the tree the tick ran from
+python -m pip install -e .   # the squadopt entry point, without -c constraints.txt
 python -m pytest -q          # green, or stop
 squadopt --help              # installed unified CLI from this tree, or stop
 python -m scripts.capture_deadline_snapshot
 ```
+
+`constraints.txt` pins the 3.13 measurement environment, so passing it to `pip install` on a
+3.11 interpreter fails to resolve. If the entry point cannot be installed for any reason,
+`python -m scripts.run_gameweek_ops --phase decide` is the pre-CLI equivalent and exists in
+every tree.
 
 Note the printed `snapshot_id`. If the source hiccups, re-capture later — both are kept,
 the later one wins by default.
@@ -82,8 +97,9 @@ git -C ../squadopt-gw01-decision add web/public/data
 git -C ../squadopt-gw01-decision commit -m "site: publish the gw01 decision view"
 ```
 
-The live checkout remains detached at `run-2026-27-gw01`; do not commit from it. Replay must
-reproduce the report from that same immutable execution commit — one spot-check, then done.
+The live checkout stays on the recorded execution commit (the tag, or the recorded `develop`
+commit under the fallback); do not commit from it. Replay must reproduce the report from that
+same commit — one spot-check, then done.
 Raw `data/ledger` remains local as required by the opening-week runbook; do not add it to this
 branch. Push `feature/gw01-decision-site`, send the generated view through the normal
 develop-to-main release path, create the immutable annotated tag
