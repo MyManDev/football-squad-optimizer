@@ -4,30 +4,31 @@ Where work lands, what must pass before it lands, and what `main` is for.
 
 ## The trunk
 
-**`develop` is the trunk. `main` is the release pointer.**
+**`develop` is the trunk. `main` is release history.**
 
 Every pull request targets `develop`. `main` advances only on a deliberate release merge from
-`develop` — it is the stable ref for the live season, so that "what is running" and "what is
-being built" are two different questions with two different answers.
-
-This is now a description as well as a decision. The first release merge happened in #130,
-tagged `v2026-27.gw01`, so `main` carries the opening-season pointer instead of an empty tree.
-GitHub's default branch is `develop`, which is where work lands.
+`develop`. The first release merge happened in #130, tagged `v2026-27.gw01`, so `main`
+carries the opening-season pointer instead of an empty tree. The live static site is the
+latest successful immutable `site-...` deployment tag, so production may deliberately lag
+`main`; the deployment Actions summary answers "what is running", while `main` answers
+"what is releasable". GitHub's default branch is `develop`, which is where work lands.
 
 ## Protection
 
-Both branches are protected. Required on `develop`:
+Both branches are protected. Current required checks on `develop` are the two Python gate
+contexts, `gates (py3.11)` and `gates (py3.13)`, with strict up-to-date branches. Each context
+runs the five Python gates below. The web job also runs in CI but is not currently a protected
+required context.
 
-- the five gates below, as required status checks;
-- one approving review, and for shared boundaries one from each of the other two roles per
-  [ownership](ownership.md);
-- no force-push, no deletion;
-- branches up to date with `develop` before merge.
+The required approving review count is zero, matching the team's check-then-squash workflow.
+Force-push and branch deletion are disabled. `main` uses the same two required contexts and
+normal changes reach it through a deliberate release pull request from `develop`.
 
 `main` additionally allows no direct pushes at all: it moves by release merge only.
 
-`delete_branch_on_merge` should be on. Whether it is, and what follows when it is not, is
-read from the settings rather than from this page — see [Verification](#verification).
+`delete_branch_on_merge` is deliberately false. Feature branches are retained after squash
+merge under the current team policy; do not prune them merely because their pull request
+closed.
 
 ## The gates
 
@@ -74,17 +75,15 @@ for the core-architecture owner. The numbers above are the first test-suite timi
 this repository; regenerate them with `pytest --durations=15` rather than trusting this table
 after the suite grows.
 
-**The interpreter versions disagree.** `requires-python = ">=3.11"`, ruff's
-`target-version = "py311"`, mypy's `python_version = "3.13"`, and the development venv runs
-3.11.0. Type checking therefore assumes a newer language than the code runs on. Pick one, or
-run a matrix, and make the three settings agree either way.
+**Interpreter coverage is deliberate.** `requires-python = ">=3.11"` and ruff target Python
+3.11, while mypy models Python 3.13. CI therefore runs both Python 3.11 (declared dependency
+ranges) and 3.13 (the pinned measurement environment in `constraints.txt`).
 
-`constraints.txt` now pins the measurement environment and the 3.13 CI job installs against
-it, so that half is closed. One gap remains: a dependency added to `pyproject.toml` is not
-automatically added to `constraints.txt`, and `scipy` arrived that way in #139 — declared as a
-runtime dependency, pinned in `constraints.txt`, but the two are kept in step by hand. A
-declared dependency missing from the pinned environment would make "the environment that
-produced the committed artifacts" untrue without failing anything.
+One gap remains: a dependency added to `pyproject.toml` is not automatically added to
+`constraints.txt`, and `scipy` arrived that way in #139 — declared as a runtime dependency,
+pinned in `constraints.txt`, but the two are kept in step by hand. A declared dependency
+missing from the pinned environment would make "the environment that produced the committed
+artifacts" untrue without failing anything.
 
 ## Branch names
 
