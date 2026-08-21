@@ -49,16 +49,19 @@ option: silently falling back to the older release tree, which cannot run this s
 ```console
 git switch --detach run-2026-27-gw01   # fallback: git switch develop && git pull --ff-only
 git rev-parse HEAD           # record this; it is the tree the tick ran from
-python -m pip install -e .   # the squadopt entry point, without -c constraints.txt
+python -m pip install -e ".[api,dev]"   # the extras CI installs; see note below
 python -m pytest -q          # green, or stop
 squadopt --help              # installed unified CLI from this tree, or stop
 python -m scripts.capture_deadline_snapshot
 ```
 
-`constraints.txt` pins the 3.13 measurement environment, so passing it to `pip install` on a
-3.11 interpreter fails to resolve. If the entry point cannot be installed for any reason,
-`python -m scripts.run_gameweek_ops --phase decide` is the pre-CLI equivalent and exists in
-every tree.
+The extras matter: a plain `pip install -e .` omits `fastapi`, and `pytest` then fails at
+collection on `tests/integration/test_backend_api.py` — found in the Friday-morning
+pre-flight, not invented. Install what CI installs (`.[api,dev]`). On a 3.13 interpreter
+add `-c constraints.txt` for the pinned measurement environment; on 3.11 the constraints
+fail to resolve, so install without them. If the entry point cannot be installed for any
+reason, `python -m scripts.run_gameweek_ops --phase decide` is the pre-CLI equivalent and
+exists in every tree.
 
 Note the printed `snapshot_id`. If the source hiccups, re-capture later — both are kept,
 the later one wins by default.
