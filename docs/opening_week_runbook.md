@@ -5,7 +5,8 @@
 The first deadline of 2026-27 is the system's first live decision. This runbook fixes
 the deadline-day sequence, the checks that decide whether the recommendation may be
 acted on, and the honest states that are expected — so nothing is improvised against
-the clock. Every command runs from the repository root on a clean, tested `develop`.
+the clock. Every live command runs from the repository root on the immutable, tested
+execution tag on `main`; development continues separately on `develop`.
 
 ## Timeline
 
@@ -196,8 +197,9 @@ persistence for them.
 ### Running a deadline by hand
 
 Until a scheduler exists, one person runs the tick about two hours before the deadline,
-from a checkout of the release tag the season runs from (`main`, tagged
-`v2026-27.gw01` for the opening):
+from a checkout of the immutable execution tag on `main`. For the opening, that is
+`run-2026-27-gw01`; the older `v2026-27.gw01` release pointer predates the finalized CLI and
+published-view contract and must not be moved or used for this run:
 
 ```console
 squadopt season tick --dry-run   # read the plan first
@@ -228,6 +230,11 @@ git add web/public/data && git commit -m "site: gameweek NN"
 `web/public/data` is generated (about 50 KB): regenerate it, never edit it. Everything
 it contains comes from the frozen ledger entry and the capture the tick used, so the
 site can say nothing the decision did not.
+
+Publish the exact CI-built artifact by following `deployment_runbook.md`. GW1's dated run
+sheet deliberately publishes after the deadline as a one-off exception. From GW2 onward, the
+decision view must be merged, tagged, manually deployed, and smoke-tested before the deadline;
+after settle, regenerate and publish a second phase-qualified `...-settled` site tag.
 
 ## Contingencies
 
