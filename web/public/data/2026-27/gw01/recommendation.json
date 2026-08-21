@@ -1,6 +1,6 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-19T13:00:00Z",
+  "generated_at_utc": "2026-08-21T15:03:34Z",
   "payload": {
     "bench": [
       {
@@ -53,14 +53,14 @@
       }
     ],
     "captain_player_id": 223094,
-    "captured_at_utc": "2026-08-16T08:12:59Z",
+    "captured_at_utc": "2026-08-21T14:36:19Z",
     "deadline_utc": "2026-08-21T17:30:00Z",
     "decision_kind": "opening",
     "feature_contract_version": "opening-carry-over-features-v1",
     "gameweek": 1,
     "metadata": {
       "awards_defensive_contribution": true,
-      "mode": "replay",
+      "mode": "live",
       "ops_phase": "decide",
       "season_rules_contract_version": "season_rules_v1",
       "season_rules_fingerprint": "6aa14f8bb484b30bcad88f10b1f4b5b78d47e19ea3fc0e9046f7a11a34214b65"
@@ -69,8 +69,8 @@
     "model_version": "opening-carry-over-v1",
     "outcome_net_score": null,
     "outcome_realized_score": null,
-    "prediction_fingerprint": "d01436198219f8bf097c5b5d0eceabe99d5d478404d03cbfa656afdc75bc9dc5",
-    "projected_score": 55.79162729878535,
+    "prediction_fingerprint": "7a056a4b2c52630c2c4c5835aa8c1a52031a8c69abf99df152d46f6baa8563df",
+    "projected_score": 56.077499304365105,
     "report_contract_version": "live_recommendation_v3",
     "risk": {
       "blockers": [],
@@ -94,7 +94,7 @@
     },
     "season": "2026-27",
     "settled": false,
-    "snapshot_id": "fpl-live-20260816T081259Z-e44ade0095e5",
+    "snapshot_id": "fpl-live-20260821T143619Z-11bc603a8e1c",
     "solver_proved_optimal": true,
     "solver_status": "OPTIMAL",
     "squad": [
@@ -136,15 +136,15 @@
       },
       {
         "bench_order": null,
-        "expected_points": 3.94392523364486,
+        "expected_points": 4.081081081081081,
         "is_captain": false,
-        "name": "Maxence Lacroix",
-        "player_id": 437499,
+        "name": "Nordi Mukiele",
+        "player_id": 200834,
         "position": "DEF",
-        "price_tenths": 60,
+        "price_tenths": 55,
         "role": "starter",
-        "short_name": "Lacroix",
-        "team": "Chelsea"
+        "short_name": "Mukiele",
+        "team": "Sunderland"
       },
       {
         "bench_order": null,
@@ -172,6 +172,18 @@
       },
       {
         "bench_order": null,
+        "expected_points": 4.4375,
+        "is_captain": false,
+        "name": "Bryan Mbeumo",
+        "player_id": 446008,
+        "position": "MID",
+        "price_tenths": 80,
+        "role": "starter",
+        "short_name": "Mbeumo",
+        "team": "Man Utd"
+      },
+      {
+        "bench_order": null,
         "expected_points": 4.304166666666667,
         "is_captain": false,
         "name": "Morgan Rogers",
@@ -181,18 +193,6 @@
         "role": "starter",
         "short_name": "Rogers",
         "team": "Chelsea"
-      },
-      {
-        "bench_order": null,
-        "expected_points": 4.288783841856467,
-        "is_captain": false,
-        "name": "Declan Rice",
-        "player_id": 204480,
-        "position": "MID",
-        "price_tenths": 75,
-        "role": "starter",
-        "short_name": "Rice",
-        "team": "Arsenal"
       },
       {
         "bench_order": null,
@@ -318,15 +318,15 @@
       },
       {
         "bench_order": null,
-        "expected_points": 3.94392523364486,
+        "expected_points": 4.081081081081081,
         "is_captain": false,
-        "name": "Maxence Lacroix",
-        "player_id": 437499,
+        "name": "Nordi Mukiele",
+        "player_id": 200834,
         "position": "DEF",
-        "price_tenths": 60,
+        "price_tenths": 55,
         "role": "starter",
-        "short_name": "Lacroix",
-        "team": "Chelsea"
+        "short_name": "Mukiele",
+        "team": "Sunderland"
       },
       {
         "bench_order": null,
@@ -354,6 +354,18 @@
       },
       {
         "bench_order": null,
+        "expected_points": 4.4375,
+        "is_captain": false,
+        "name": "Bryan Mbeumo",
+        "player_id": 446008,
+        "position": "MID",
+        "price_tenths": 80,
+        "role": "starter",
+        "short_name": "Mbeumo",
+        "team": "Man Utd"
+      },
+      {
+        "bench_order": null,
         "expected_points": 4.304166666666667,
         "is_captain": false,
         "name": "Morgan Rogers",
@@ -363,18 +375,6 @@
         "role": "starter",
         "short_name": "Rogers",
         "team": "Chelsea"
-      },
-      {
-        "bench_order": null,
-        "expected_points": 4.288783841856467,
-        "is_captain": false,
-        "name": "Declan Rice",
-        "player_id": 204480,
-        "position": "MID",
-        "price_tenths": 75,
-        "role": "starter",
-        "short_name": "Rice",
-        "team": "Arsenal"
       },
       {
         "bench_order": null,
@@ -415,6 +415,6 @@
     ],
     "total_cost_tenths": 1000,
     "transfers": null,
-    "unavailable_player_count": 68
+    "unavailable_player_count": 96
   }
 }
