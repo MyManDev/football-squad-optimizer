@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "npm run build:analysis && tsc -b && vite build",
     "preview": "vite preview",
     "lint": "oxlint src e2e",
     "typecheck": "tsc -b",
@@ -14,11 +14,16 @@
     "test": "vitest",
     "e2e": "playwright test",
     "gen:types": "json2ts ../docs/contracts/ui_view_v1.schema.json --output src/data/schema.ts --bannerComment \"/* Generated from docs/contracts/ui_view_v1.schema.json by npm run gen:types - do not edit. */\"",
+    "build:analysis": "node scripts/build-analysis.mjs",
     "build:data": "python -m scripts.build_site --out public",
+    "check:deployment": "node scripts/check-deployment-assets.mjs",
+    "smoke:deployment": "node scripts/smoke-deployment.mjs",
     "size": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
+    "dompurify": "^3.4.14",
+    "marked": "^16.4.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router": "^8.3.0"

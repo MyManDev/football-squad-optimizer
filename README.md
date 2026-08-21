@@ -33,12 +33,23 @@ the optimizer.
 
 ## Requirements and installation
 
-Python 3.11 or newer is required. Create a repository-local environment on Windows:
+Python 3.11 or newer is required. Create and activate a repository-local environment,
+then install the package and its development tools (the activation command differs by shell):
 
-```powershell
+```console
 python -m venv .venv
-.venv\Scripts\python -m pip install --upgrade pip
-.venv\Scripts\python -m pip install -e ".[dev]"
+python -m pip install --upgrade pip
+python -m pip install -e ".[api,dev]"
+```
+
+The editable install provides the cross-platform `squadopt` command. Live operations use
+`squadopt gameweek decide`, `squadopt gameweek settle --gameweek NN`, or
+`squadopt season tick`; see the [opening-week runbook](docs/opening_week_runbook.md).
+Research-only installations may omit the `api` extra. To serve the read-only backend from
+the repository root, run:
+
+```console
+python -m uvicorn squadopt.api:app --host 127.0.0.1 --port 8000
 ```
 
 ## Canonical player schema

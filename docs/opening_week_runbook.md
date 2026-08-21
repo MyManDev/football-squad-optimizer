@@ -5,16 +5,17 @@
 The first deadline of 2026-27 is the system's first live decision. This runbook fixes
 the deadline-day sequence, the checks that decide whether the recommendation may be
 acted on, and the honest states that are expected — so nothing is improvised against
-the clock. Every command runs from the repository root on a clean, tested `develop`.
+the clock. Every live command runs from the repository root on the immutable, tested
+execution tag on `main`; development continues separately on `develop`.
 
 ## Timeline
 
 ### T−1 day: readiness check
 
-```powershell
-.venv\Scripts\python -m pytest
-.venv\Scripts\python -m ruff check --no-cache src tests scripts
-.venv\Scripts\python -m mypy --strict src
+```console
+python -m pytest
+python -m ruff check --no-cache src tests scripts
+python -m mypy --strict src
 ```
 
 All green or the live run does not happen from that tree. Confirm the operational
@@ -23,8 +24,8 @@ control is `form_window=5, bench_weight=0.1, risk_aversion=0`).
 
 ### T−2h .. T−30min: capture
 
-```powershell
-.venv\Scripts\python -m scripts.capture_deadline_snapshot
+```console
+python -m scripts.capture_deadline_snapshot
 ```
 
 - The capture is immutable and checksummed; note the printed `snapshot_id`.
@@ -33,8 +34,8 @@ control is `form_window=5, bench_weight=0.1, risk_aversion=0`).
 
 ### After capture: decide (recommend + machine verification + ledger)
 
-```powershell
-.venv\Scripts\python -m scripts.run_gameweek_ops --phase decide
+```console
+squadopt gameweek decide
 ```
 
 Omitted arguments resolve honestly: the most recent capture, the earliest deadline
@@ -82,16 +83,16 @@ and `manifest.json` (per-file SHA-256) under `data/ledger/<season>/gw01/`. Note 
 repository commit alongside it. The replay path (`--snapshot-id <id>`) must reproduce
 the same report from the same commit — spot-check it once after the deadline:
 
-```powershell
-.venv\Scripts\python -m scripts.recommend_current_squad --snapshot-id <id> --output artifacts\live\gw1_replay.txt
+```console
+python -m scripts.recommend_current_squad --snapshot-id <id> --output artifacts/live/gw1_replay.txt
 ```
 
 ### After the gameweek finishes: settle
 
 Capture again (the later bootstrap carries realized `event_points`), then:
 
-```powershell
-.venv\Scripts\python -m scripts.run_gameweek_ops --phase settle --gameweek 1
+```console
+squadopt gameweek settle --gameweek 1
 ```
 
 This scores the frozen decision (starting XI plus captain double), records the
@@ -105,10 +106,10 @@ Every deadline after the opening one starts from the squad the ledger holds — 
 previous gameweek's recorded decision — and decides **transfers**, not a fresh squad.
 The machine is the same script:
 
-```powershell
-.venv\Scripts\python -m scripts.capture_deadline_snapshot
-.venv\Scripts\python -m scripts.run_gameweek_ops --phase decide --gameweek 2 `
-    --in-season-projection handoffs\2026-27-gw02.json
+```console
+python -m scripts.capture_deadline_snapshot
+squadopt gameweek decide --gameweek 2 \
+    --in-season-projection data/handoffs/2026-27-gw02.json
 ```
 
 What it needs, and refuses without:
@@ -154,14 +155,14 @@ Settle is unchanged in use; the outcome nets the hits and counts a bench boost's
 or a triple captain's third captain score, and the season summary shows transfers,
 hits, chip, and net per gameweek.
 
-## The season on a schedule: `run_season_tick`
+## The season on a schedule: `squadopt season tick`
 
 Every step above can be chosen by the clock instead of by a person. One command,
 safe to run every hour by hand, cron, or a workflow:
 
-```powershell
-.venv\Scripts\python -m scripts.run_season_tick            # do what is due
-.venv\Scripts\python -m scripts.run_season_tick --dry-run  # say what is due, change nothing
+```console
+squadopt season tick            # do what is due
+squadopt season tick --dry-run  # say what is due, change nothing
 ```
 
 It reads the captures held and the ledger and does, in order, whichever is due:
@@ -174,15 +175,16 @@ names the path; **settle** when the latest capture marks a decided gameweek fini
 After a capture it re-plans once, so a deadline capture is decided in the same tick.
 Everything is idempotent — a second tick in the same state does nothing — and every
 step is the same code as the manual commands; the tick only chooses the moment. It
-never plays a chip: run `run_gameweek_ops --phase decide --chip ...` by hand before the
+never plays a chip: run `squadopt gameweek decide --chip ...` by hand before the
 tick would decide, and the tick then finds the decision recorded.
 
-Every tick writes a structured run log — one JSON object per event (`tick.start`,
-`tick.plan`, `tick.action.start/done/failed`, `ledger.decision.recorded`,
-`ledger.outcome.recorded`, `tick.done`, or `tick.failed` / `tick.crashed` with the
-traceback), tagged with a `run_id` — appended to `data/logs/season_tick/<date>.jsonl`
-(`--log-root`, `-` disables the file). Exit codes: 0 done, 1 a known failure (data or
-ledger error, stated), 2 an unexpected crash (never silent). Ledger writes are
+Every tick writes a structured run log — one JSON object per event (`runtime.started`,
+`tick.plan`, `tick.action.start/done/failed`, and `runtime.completed` or
+`runtime.failed`) — tagged with the same `run_id` as its immutable manifest and artifact
+lineage. Logs append to `data/logs/season_tick/<date>.jsonl`; `--log-root -` disables the
+file. Manifests and lineage live under `data/runtime/`, which is local and git-ignored.
+Exit codes: 0 done, 1 a known data/ledger failure, 2 an unexpected runtime failure.
+Ledger writes are
 crash-safe (staging directory, verified, one rename) and one writer per gameweek is
 enforced with a lock file, so a tick that dies mid-write leaves nothing a later tick
 refuses.
@@ -191,6 +193,48 @@ A missed deadline (closed with no decision) is reported, not decided late. Wirin
 tick to a scheduler (GitHub Actions cron, a small host) is the CI/app side's step; the
 ledger and captures stay local by design, so a scheduled runner needs its own private
 persistence for them.
+
+### Running a deadline by hand
+
+Until a scheduler exists, one person runs the tick about two hours before the deadline,
+from a checkout of the immutable execution tag on `main`. For the opening, that is
+`run-2026-27-gw01`; the older `v2026-27.gw01` release pointer predates the finalized CLI and
+published-view contract and must not be moved or used for this run:
+
+```console
+squadopt season tick --dry-run   # read the plan first
+squadopt season tick             # then do what is due
+```
+
+A healthy opening looks like this: the dry run says `-> capture GW1: gameweek 1 deadline
+in 2.0 h and no capture from inside the window is held`; the real run captures,
+re-plans, decides, prints the report, and ends `tick done: 2 action(s) performed`. A
+second run in the same state does nothing and says so. If it prints `wait`, read the
+reason — a decided gameweek waits for its outcome, and a gameweek 2 onward waits for the
+producer's handoff, naming the path it expects.
+
+Afterwards, three things are true and worth checking: `data/ledger/<season>/gw<NN>/`
+holds `decision.json`, `projections.csv`, `report.txt` and `manifest.json`;
+`data/logs/season_tick/<date>.jsonl` ends with `runtime.completed`; and the exit code was 0.
+
+### After a decision: refresh the site
+
+The web app renders a generated JSON tree, not the ledger itself, so a new decision is
+not visible until the tree is rebuilt:
+
+```console
+python -m scripts.build_site --season 2026-27 --out web/public
+git add web/public/data && git commit -m "site: gameweek NN"
+```
+
+`web/public/data` is generated (about 50 KB): regenerate it, never edit it. Everything
+it contains comes from the frozen ledger entry and the capture the tick used, so the
+site can say nothing the decision did not.
+
+Publish the exact CI-built artifact by following `deployment_runbook.md`. GW1's dated run
+sheet deliberately publishes after the deadline as a one-off exception. From GW2 onward, the
+decision view must be merged, tagged, manually deployed, and smoke-tested before the deadline;
+after settle, regenerate and publish a second phase-qualified `...-settled` site tag.
 
 ## Contingencies
 

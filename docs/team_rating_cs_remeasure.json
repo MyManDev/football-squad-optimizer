@@ -1,0 +1,113 @@
+{
+  "config": {
+    "evaluated_seasons": [
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "first_evaluated_gameweek": 6,
+    "half_life_grid": [
+      60.0,
+      120.0,
+      180.0,
+      300.0,
+      500.0
+    ],
+    "ridge_grid": [
+      0.5,
+      1.0,
+      2.0,
+      5.0
+    ],
+    "seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ]
+  },
+  "contract_version": "team_rating_cs_remeasure_v1",
+  "created_utc": "2026-08-20T08:03:28+00:00",
+  "diagnostics": {
+    "baseline": "previous_season_table_logistic",
+    "locked_holdout_accessed": false,
+    "selected_half_life_days": {
+      "2022-23": 500.0,
+      "2023-24": 180.0,
+      "2024-25": 180.0
+    },
+    "selected_ridge": {
+      "2022-23": 2.0,
+      "2023-24": 5.0,
+      "2024-25": 5.0
+    }
+  },
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "pooled_constant_brier": 0.183031351159479,
+  "pooled_rating_brier": 0.17510742336322305,
+  "pooled_table_brier": 0.18168076371100092,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 0,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "7104494bf83646c2ccdfdeb246cfcfc69edd3e25",
+    "working_tree_dirty": true
+  },
+  "seasons": [
+    {
+      "constant_baseline_brier": 0.19783303953664066,
+      "fixture_sides": 660,
+      "rating_brier": 0.19528468593051085,
+      "rating_defensive_ordering": 0.1745153847141528,
+      "season": "2022-23",
+      "table_baseline_brier": 0.19745185034654145,
+      "table_defensive_ordering": 0.15199895961532572
+    },
+    {
+      "constant_baseline_brier": 0.16931476824381936,
+      "fixture_sides": 662,
+      "rating_brier": 0.15740981782510624,
+      "rating_defensive_ordering": 0.23923303568353857,
+      "season": "2023-24",
+      "table_baseline_brier": 0.16968306705236477,
+      "table_defensive_ordering": 0.12475442933732092
+    },
+    {
+      "constant_baseline_brier": 0.181946245697977,
+      "fixture_sides": 660,
+      "rating_brier": 0.17262776633405202,
+      "rating_defensive_ordering": 0.21728363495799474,
+      "season": "2024-25",
+      "table_baseline_brier": 0.1779073737340965,
+      "table_defensive_ordering": 0.12228864580735717
+    }
+  ],
+  "verdict": {
+    "note": "This is the measurable form of #139's failed clause, dated and gated per docs/team_rating_cs_prereg.md; it does not reopen #139's verdict.",
+    "passes": true,
+    "pooled_improvement": 0.006573340347777873,
+    "seasons_better": 3,
+    "seasons_total": 3
+  }
+}

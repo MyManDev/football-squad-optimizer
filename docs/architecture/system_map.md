@@ -10,13 +10,13 @@ measures against, [ownership](ownership.md) says who may change what, and
 [ADR 0001](decisions/0001-modular-monolith.md) records why the shape is one package rather
 than several.
 
-This is the historical `b031ef1` measurement recorded at the bottom of the document. The
-`application` package was added later; its current seam and the future layer above it are in
+Re-measured against `587279a`. The `application` and `platform` packages arrived after the
+first version of this document; their seam is in
 [platform and runtime boundary](platform_runtime.md).
 
 ## Shape
 
-One installed package, `squadopt`, built from `src/` by setuptools. Fifteen subpackages plus
+One installed package, `squadopt`, built from `src/` by setuptools. Seventeen subpackages plus
 one top-level module:
 
 | Layer role | Packages |
@@ -30,15 +30,22 @@ one top-level module:
 | Search and gates | `bayesopt`, `preflight`, `recalibration` |
 | Measurement | `backtest`, `experiments` |
 | Operations | `live` |
+| Workflows | `application` |
+| Runtime and registries | `platform` |
 | Convenience wiring | `integration.py`, `squadopt/__init__.py` |
 
-Outside the package: 51 files in `scripts/` (11,346 lines) that are the only entry points,
-and 106 test files under `tests/` holding 1,969 collected tests.
+Outside the package: 53 files in `scripts/` and a `web/` frontend, which is not a Python
+package and is therefore outside the import contract entirely — see
+[platform and runtime boundary](platform_runtime.md).
 
-Two packages named in [dependency rules](dependency_rules.md) do **not exist yet**:
-`contracts` (the shared vocabulary that ends the reverse dependency below) and `application`
-(the workflow layer that would let scripts become thin shells). They are named here so the
-target is written down before anyone builds it.
+`application` and `platform` now exist and sit at the top of the enforced order.
+`application` holds the workflows the scripts used to inline — `run_gameweek_ops.py` lost 297
+lines and `run_season_tick.py` 180 when they moved. `platform` holds run context, the manifest
+contract and the artifact registry.
+
+One package named in [dependency rules](dependency_rules.md) still does **not exist**:
+`contracts`, the shared vocabulary that would end the reverse dependency below. It is named
+there so the target is written down before anyone builds it.
 
 ## Measured import graph
 
@@ -47,27 +54,30 @@ Statement counts, not symbol counts. One `from squadopt.x import a, b, c` counts
 | Package | Imports |
 | --- | --- |
 | `<root>` | `optimization` (3), `data` (1), `evaluation` (1) |
+| `application` | `live` (10), `data` (9), `optimization` (1) |
 | `backtest` | `features` (17), `prediction` (15), `evaluation` (6), `data` (4), `optimization` (4), `experiments` (2), `bayesopt` (1), `preflight` (1) |
 | `bayesopt` | none |
 | `data` | `optimization` (2) |
 | `evaluation` | `optimization` (3) |
-| `experiments` | `optimization` (10), `prediction` (9), `evaluation` (8), `features` (8), `backtest` (7), `bayesopt` (4), `scenarios` (3), `data` (2), `planning` (2), `preflight` (1) |
+| `experiments` | `optimization` (13), `features` (10), `prediction` (10), `data` (8), `evaluation` (8), `backtest` (7), `bayesopt` (4), `scenarios` (3), `planning` (2), `preflight` (1) |
 | `features` | `data` (6) |
 | `live` | `data` (23), `prediction` (7), `optimization` (4), `planning` (4), `features` (2), `scenarios` (2) |
 | `optimization` | none |
 | `planning` | `optimization` (8) |
+| `platform` | none |
 | `prediction` | `features` (12), `data` (9), `optimization` (1) |
 | `preflight` | `data` (2) |
 | `recalibration` | `data` (4), `features` (2), `scenarios` (1) |
 | `risk` | `optimization` (6), `uncertainty` (3), `evaluation` (1) |
-| `scenarios` | `optimization` (10), `prediction` (2), `data` (1) |
+| `scenarios` | `optimization` (10), `prediction` (3), `data` (2) |
 | `uncertainty` | `data` (5), `evaluation` (3) |
 
 Three readings worth keeping:
 
-- **`optimization` and `bayesopt` are leaves.** Neither imports any other subpackage.
-  `optimization` is the solver core everything else composes; `bayesopt` is a search
-  procedure that knows nothing about football.
+- **`optimization`, `bayesopt` and `platform` are leaves.** None imports any other
+  subpackage. `optimization` is the solver core everything else composes; `bayesopt` is a
+  search procedure that knows nothing about football; `platform` is deliberately ignorant of
+  the engine, which is what makes it a runtime rather than a second core.
 - **`live` is the widest consumer** (42 imports across 6 packages) and imports nothing that
   is not below it. The operational path is already layered correctly.
 - **`risk` and `uncertainty` have almost no consumers inside the package** — only
@@ -153,5 +163,6 @@ grep over top-level lines would miss.
 The three pairs and five statements above are the whole result. Anything else appearing means
 this document is out of date, not that the walk is wrong.
 
-Last measured against `b031ef1` ("chore: move the season-chain runner helpers into the package
-and mark slow tests", PR #110).
+Last measured against `587279a` (PR #144): 17 subpackages, 153 modules, and the same three
+pairs and five statements as at `b031ef1`. The baseline did not grow across twenty-one merged
+pull requests and two new packages, which is the contract doing its job.

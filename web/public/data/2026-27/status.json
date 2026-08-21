@@ -1,6 +1,6 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-19T10:00:00Z",
+  "generated_at_utc": "2026-08-19T13:00:00Z",
   "payload": {
     "actions": [
       {
@@ -14,12 +14,12 @@
     "decided_gameweeks": [
       1
     ],
-    "hours_to_deadline": 55.5,
+    "hours_to_deadline": 52.5,
     "is_idle": true,
     "latest_capture": "fpl-live-20260816T081259Z-e44ade0095e5",
     "next_deadline_utc": "2026-08-21T17:30:00Z",
     "next_gameweek": 1,
-    "now_utc": "2026-08-19T10:00:00Z",
+    "now_utc": "2026-08-19T13:00:00Z",
     "recent_events": [
       {
         "fields": {

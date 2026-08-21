@@ -1,0 +1,202 @@
+.page,
+.documentPage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.header {
+  max-width: var(--measure);
+}
+
+.header h1 {
+  margin: var(--space-1) 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--step-4);
+  line-height: 1.05;
+}
+
+.header p,
+.card p,
+.count {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.kicker {
+  color: var(--color-text-faint);
+  font-size: var(--step--1);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.tabs button {
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: var(--space-3) var(--space-2);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tabs button[aria-pressed="true"] {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+}
+
+.filters label {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+
+.filters select,
+.filters input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+  color: var(--color-text);
+  background: var(--color-surface-2);
+  font: inherit;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.card {
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+}
+
+.cardMeta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--color-text-faint);
+  font-size: var(--step--1);
+}
+
+.cardTitle {
+  margin: var(--space-3) 0 var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  line-height: 1.2;
+}
+
+.cardTitle a {
+  color: var(--color-text);
+  text-decoration-color: var(--color-line);
+  text-underline-offset: 3px;
+}
+
+.documentActions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.markdown {
+  overflow-wrap: anywhere;
+}
+
+.markdown > * {
+  max-width: var(--measure);
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+  font-family: var(--font-display);
+  line-height: 1.15;
+}
+
+.markdown h1 {
+  font-size: var(--step-4);
+}
+
+.markdown h2 {
+  margin-top: var(--space-7);
+  font-size: var(--step-3);
+}
+
+.markdown pre,
+.markdown code {
+  font-family: var(--font-mono);
+}
+
+.markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: var(--space-4);
+  border-radius: var(--radius-s);
+  background: var(--color-surface-2);
+}
+
+.markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown th,
+.markdown td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.markdown th {
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 800px) {
+  .filters,
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .filters,
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -12,13 +12,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import scripts.run_gameweek_ops as ops
 import scripts.run_season_tick as tick_script
 import tests.unit.test_live_transfers as world_module
 
+import squadopt.application.commands as command_services
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import (
+    CONTROL_MODEL_NAME,
     HeldSnapshot,
     LedgerState,
     TickConfig,
@@ -182,8 +183,12 @@ def test_timing_config_is_validated() -> None:
 
 @pytest.fixture(name="world")
 def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-    monkeypatch.setattr(ops, "build_panel", lambda root: world_module._panel())
-    monkeypatch.setattr(ops, "IN_SEASON_CONTROL_MODEL_VERSIONS", (world_module.IN_SEASON_VERSION,))
+    monkeypatch.setattr(tick_script, "build_panel", lambda root: world_module._panel())
+    monkeypatch.setattr(
+        command_services,
+        "IN_SEASON_CONTROL_MODEL_VERSIONS",
+        (world_module.IN_SEASON_VERSION,),
+    )
     state: dict[str, Any] = {
         "snapshot_root": tmp_path / "snapshots",
         "ledger_root": tmp_path / "ledger",
@@ -239,7 +244,10 @@ def test_the_runner_captures_and_decides_the_opening_gameweek_in_one_tick(
     assert _tick(monkeypatch, world) == 0
     out = capsys.readouterr().out
     assert world["captures"] == 1
-    assert (world["ledger_root"] / SEASON / "gw01" / "decision.json").is_file()
+    decision_path = world["ledger_root"] / SEASON / "gw01" / "decision.json"
+    assert decision_path.is_file()
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    assert decision["metadata"]["mode"] == "live"
     assert "re-planned after capture" in out and "tick done: 2 action(s)" in out
 
     # The same tick again changes nothing.
@@ -310,7 +318,7 @@ def test_the_runner_decides_the_second_gameweek_only_with_a_handoff(
             season=SEASON,
             gameweek=2,
             source_snapshot_id=latest_id,
-            model_name=ops.CONTROL_MODEL_NAME,
+            model_name=CONTROL_MODEL_NAME,
             model_version=world_module.IN_SEASON_VERSION,
             feature_contract_version="synthetic-in-season-features-v0",
             expected_points=expected,

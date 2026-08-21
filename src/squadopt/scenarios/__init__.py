@@ -26,6 +26,12 @@ from squadopt.scenarios.models import (
     ScenarioValidationError,
 )
 from squadopt.scenarios.optimization import optimize_scenario_aware_squad
+from squadopt.scenarios.paths import (
+    SCENARIO_PATH_CONTRACT_VERSION,
+    ScenarioPathSet,
+    ScenarioPathTarget,
+    generate_scenario_paths,
+)
 from squadopt.scenarios.rank import (
     CLAIM_SCENARIO_MODES,
     RANK_OBJECTIVE_CONTRACT_VERSION,
@@ -39,6 +45,11 @@ from squadopt.scenarios.reporting import (
     scenario_result_to_dict,
     scenario_result_to_markdown,
 )
+from squadopt.scenarios.rivals import (
+    TEMPLATE_RIVAL_CONTRACT_VERSION,
+    template_rival_diagnostics,
+    template_rival_from_ownership,
+)
 
 __all__ = [
     "CLAIM_SCENARIO_MODES",
@@ -47,6 +58,8 @@ __all__ = [
     "SCENARIO_CONTRACT_VERSION",
     "SCENARIO_EVALUATION_CONTRACT_VERSION",
     "SCENARIO_OPTIMIZATION_CONTRACT_VERSION",
+    "SCENARIO_PATH_CONTRACT_VERSION",
+    "TEMPLATE_RIVAL_CONTRACT_VERSION",
     "GoalMenuEntry",
     "RankObjectiveConfig",
     "RankOptimizationResult",
@@ -59,18 +72,23 @@ __all__ = [
     "ScenarioEvaluationResult",
     "ScenarioOptimizationConfig",
     "ScenarioOptimizationResult",
+    "ScenarioPathSet",
+    "ScenarioPathTarget",
     "ScenarioRiskMetrics",
     "ScenarioSet",
     "ScenarioTarget",
     "ScenarioValidationError",
     "compare_fixed_decisions",
     "evaluate_fixed_decision",
+    "generate_scenario_paths",
     "generate_scenarios",
     "goal_menu",
     "optimize_rank_probability_squad",
     "optimize_scenario_aware_squad",
     "scenario_result_to_dict",
     "scenario_result_to_markdown",
+    "template_rival_diagnostics",
+    "template_rival_from_ownership",
     "validate_residual_history",
     "wilson_interval",
 ]

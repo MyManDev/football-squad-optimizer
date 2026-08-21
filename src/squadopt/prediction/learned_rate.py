@@ -130,6 +130,23 @@ class LearnedRateModel:
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
     @property
+    def standardised_coefficients(self) -> Mapping[str, float]:
+        """Pair each declared input with its fitted coefficient.
+
+        The coefficients are on the standardised scale the fit used — each input centred
+        on its minutes-weighted mean and divided by its minutes-weighted deviation — which
+        is the scale on which they are comparable to one another. A sign here is a sign on
+        the original column too, because every scale is positive by construction.
+
+        Exposed because the sign is a finding. A model can improve prediction error while
+        the coefficient on a newly added input comes out negative, which says the input is
+        arriving second-hand through a column the fit already has, and no aggregate metric
+        shows that.
+        """
+
+        return MappingProxyType(dict(zip(self.input_columns, self.coefficients, strict=True)))
+
+    @property
     def model_fingerprint(self) -> str:
         """Fingerprint the fitted state, so two folds' models are distinguishable."""
 

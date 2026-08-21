@@ -7,7 +7,14 @@
  * generated for are refused: the page shows why instead of rendering the wrong shape.
  */
 
-import type { LedgerView, PoolView, RecommendationView, SiteIndex, StatusView } from "./schema";
+import type {
+  LeagueView,
+  LedgerView,
+  PoolView,
+  RecommendationView,
+  SiteIndex,
+  StatusView,
+} from "./schema";
 
 export const UI_VIEW_CONTRACT_VERSION = "ui_view_v1";
 
@@ -27,6 +34,7 @@ export interface DataClient {
   getRecommendation(season: string, gameweek: number): Promise<Loaded<RecommendationView>>;
   getPool(season: string, gameweek: number): Promise<Loaded<PoolView>>;
   getLedger(season: string): Promise<Loaded<LedgerView>>;
+  getLeague(season: string): Promise<Loaded<LeagueView>>;
   getStatus(season: string): Promise<Loaded<StatusView>>;
 }
 
@@ -89,6 +97,10 @@ export class StaticDataClient implements DataClient {
 
   getLedger(season: string): Promise<Loaded<LedgerView>> {
     return this.read<LedgerView>(`${season}/ledger.json`);
+  }
+
+  getLeague(season: string): Promise<Loaded<LeagueView>> {
+    return this.read<LeagueView>(`${season}/league.json`);
   }
 
   getStatus(season: string): Promise<Loaded<StatusView>> {

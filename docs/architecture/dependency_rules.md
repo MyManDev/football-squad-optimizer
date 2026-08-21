@@ -31,17 +31,25 @@ contracts
                             experiments
                               live
                                 application
-                                  platform (future)
-                                    entry points
+                                  platform
+                                    api / entry points
 ```
 
-`application` now exists and is enforced as the highest package layer in `pyproject.toml`.
-`contracts` and `platform` do not exist yet. They are in the order so that when they are built
-there is no argument about where they go: `contracts` depends on nothing; `application` may
-reach everything below it; and `platform` may consume application contracts without allowing
-HTTP, persistence, queue, authentication, or deployment concerns to flow back into them.
-`entry points` means CLI, API, workers, schedulers, and script shells; it is an architectural
-role rather than one proposed package.
+`application`, `platform`, and the optional `api` adapter now exist and are enforced as the
+three highest package layers in `pyproject.toml`. `contracts` does not exist yet; it is in the
+order so that when it is built there is no argument about where it goes. `contracts` depends
+on nothing; `application` may reach everything below it; and `platform` may consume
+application contracts without allowing HTTP, persistence, queue, authentication, or
+deployment concerns to flow back into them. `api` is the concrete FastAPI entry point and may
+consume `platform` and `application` public contracts. Other entry points mean CLI, workers,
+schedulers, and script shells; that remains an architectural role rather than one proposed
+package.
+
+The general layers contract permits a high layer to import any lower layer. The API has a
+second, stricter contract: `squadopt.api` may reach engine packages only indirectly through
+the public `platform` and `application` boundaries. A new direct API import from `live`,
+`optimization`, `prediction`, `planning`, `scenarios`, or any other engine package fails
+`lint-imports`.
 
 ### Why this order and not the obvious one
 
@@ -133,6 +141,8 @@ root_package = "squadopt"
 name = "Layered architecture"
 type = "layers"
 layers = [
+    "api",
+    "platform",
     "application",
     "live",
     "experiments",
@@ -153,11 +163,17 @@ layers = [
 ```
 
 The excerpt abbreviates the fully qualified names used by `pyproject.toml`, which is the
-executable source of truth. The future `squadopt.platform` layer is added above
-`squadopt.application` in the same PR that creates the package; no empty placeholder package
-is needed before then. The five baseline violations are expressed as
+executable source of truth. `squadopt.api` is listed above `squadopt.platform`, which is listed
+above `squadopt.application`; the API therefore cannot be imported back into runtime or
+application code. The platform's first package contract is the versioned run context and
+manifest. The five baseline violations are expressed as
 `ignore_imports` entries, one per statement, each carrying the issue that will remove it — not
 as a blanket exemption for the package pair, so a *new* bad import between the same two
 packages still fails.
+
+A separate forbidden-import contract lists `squadopt.api` as its source, every engine package
+below `application` as forbidden, and permits indirect imports. That last setting is
+deliberate: application services may compose the engine, while HTTP modules may not bypass
+those services.
 
 Last measured against `b031ef1` (PR #110).

@@ -1,0 +1,32 @@
+{
+  "artifact_type": "opponent_signal",
+  "attacking_signal_mean": 1.4165791160862338,
+  "club_gameweeks_in_calendar": 3620,
+  "club_gameweeks_signalled": 3604,
+  "club_gameweeks_without_a_signal": 16,
+  "columns": [
+    "season",
+    "gameweek",
+    "club",
+    "rating_attacking_signal",
+    "rating_defensive_signal",
+    "fixtures_in_gameweek"
+  ],
+  "contract_version": "opponent_signal_v1",
+  "defensive_signal_mean": 0.27145262198836523,
+  "gate_evidence": false,
+  "grain": "season/gameweek/club",
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "opening_gameweek_cells": 16,
+  "seasons": [
+    "2020-21",
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "seasons_using_default_rating_config": [
+    "2020-21"
+  ]
+}
