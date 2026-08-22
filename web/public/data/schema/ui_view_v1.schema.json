@@ -362,6 +362,12 @@
             "null"
           ]
         },
+        "event_points": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "expected_points": {
           "type": "number"
         },
@@ -406,6 +412,7 @@
       },
       "required": [
         "bench_order",
+        "event_points",
         "expected_points",
         "is_captain",
         "name",
@@ -517,6 +524,9 @@
           },
           "type": "array"
         },
+        "captain_multiplier": {
+          "type": "integer"
+        },
         "captain_player_id": {
           "type": "integer"
         },
@@ -618,6 +628,7 @@
       },
       "required": [
         "bench",
+        "captain_multiplier",
         "captain_player_id",
         "captured_at_utc",
         "deadline_utc",

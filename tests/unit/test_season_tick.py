@@ -230,6 +230,8 @@ def _tick(monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], *extra: str) -
         str(world["handoff_root"]),
         "--summary-output",
         str(world["summary"]),
+        "--log-root",
+        str(world["summary"].parent / "logs"),
         "--now",
         world["clock"],
         *extra,

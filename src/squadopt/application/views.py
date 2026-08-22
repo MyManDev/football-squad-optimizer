@@ -73,6 +73,8 @@ class PlayerView(_View):
     """``starter`` | ``bench`` | ``out`` | ``in`` | ``pool``."""
     is_captain: bool = False
     bench_order: int | None = None
+    event_points: float | None = None
+    """Realized points once the gameweek is settled; null until then."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +161,8 @@ class RecommendationView(_View):
     outcome_realized_score: float | None
     outcome_net_score: float | None
     settled: bool
+    captain_multiplier: int = 2
+    """What the captain's points count as: 3 under a triple captain, otherwise 2."""
     metadata: Mapping[str, JsonValue] = field(default_factory=dict)
 
 

@@ -8,6 +8,7 @@ agree with the ledger path on everything the ledger stores.
 """
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -96,6 +97,7 @@ def _player(
     is_captain: bool = False,
     bench_order: int | None = None,
     price_override: int | None = None,
+    event_points: float | None = None,
 ) -> PlayerView:
     row = index.get(int(player_id))
     if row is None:
@@ -112,6 +114,7 @@ def _player(
             role=role,
             is_captain=is_captain,
             bench_order=bench_order,
+            event_points=event_points,
         )
     return PlayerView(
         player_id=int(player_id),
@@ -126,6 +129,7 @@ def _player(
         role=role,
         is_captain=is_captain,
         bench_order=bench_order,
+        event_points=event_points,
     )
 
 
@@ -134,12 +138,24 @@ def _players_from_ids(
     starters: Sequence[int],
     bench: Sequence[int],
     captain: int,
+    realized: Mapping[int, float] | None = None,
 ) -> tuple[tuple[PlayerView, ...], tuple[PlayerView, ...], tuple[PlayerView, ...]]:
+    points = dict(realized) if realized is not None else {}
     xi = positions_in_order(
-        [_player(index, p, role="starter", is_captain=(int(p) == int(captain))) for p in starters]
+        [
+            _player(
+                index,
+                p,
+                role="starter",
+                is_captain=(int(p) == int(captain)),
+                event_points=points.get(int(p)),
+            )
+            for p in starters
+        ]
     )
     bench_views = tuple(
-        _player(index, p, role="bench", bench_order=order) for order, p in enumerate(bench, 1)
+        _player(index, p, role="bench", bench_order=order, event_points=points.get(int(p)))
+        for order, p in enumerate(bench, 1)
     )
     return (*xi, *bench_views), xi, bench_views
 
@@ -271,12 +287,18 @@ def recommendation_view_from_ledger(
     starters = _ints(decision["starting_xi_player_ids"])
     bench_ids = _ints(decision["bench_player_ids"])
     captain = int(str(decision["captain_player_id"]))
-    squad, xi, bench = _players_from_ids(index, starters, bench_ids, captain)
     transfers_block = decision.get("transfers")
     transfers = (
         _transfer_view(transfers_block, index) if isinstance(transfers_block, Mapping) else None
     )
     outcome = dict(entry.outcome) if entry.outcome is not None else None
+    realized: dict[int, float] | None = None
+    if outcome is not None:
+        by_player = outcome.get("realized_points_by_player")
+        if isinstance(by_player, Mapping):
+            realized = {int(str(key)): float(str(value)) for key, value in by_player.items()}
+    chip = transfers_block.get("chip") if isinstance(transfers_block, Mapping) else None
+    squad, xi, bench = _players_from_ids(index, starters, bench_ids, captain, realized)
     return RecommendationView(
         season=str(decision["season"]),
         gameweek=int(str(decision["gameweek"])),
@@ -305,6 +327,7 @@ def recommendation_view_from_ledger(
         ),
         outcome_net_score=(None if outcome is None else float(str(outcome["realized_net_score"]))),
         settled=outcome is not None,
+        captain_multiplier=3 if chip == "3xc" else 2,
         metadata=_mapping(jsonable(decision.get("metadata", {}))),
     )
 
@@ -319,7 +342,12 @@ def recommendation_view(
     starters = [int(v) for v in recommendation.starting_xi["player_id"].tolist()]
     bench_ids = [int(v) for v in recommendation.bench["player_id"].tolist()]
     captain = int(recommendation.captain["player_id"])
-    squad, xi, bench = _players_from_ids(index, starters, bench_ids, captain)
+    realized: dict[int, float] | None = None
+    if outcome is not None:
+        by_player = outcome.get("realized_points_by_player")
+        if isinstance(by_player, Mapping):
+            realized = {int(str(key)): float(str(value)) for key, value in by_player.items()}
+    squad, xi, bench = _players_from_ids(index, starters, bench_ids, captain, realized)
     transfers = None
     if recommendation.transfers is not None:
         block = recommendation.transfers.as_record()
@@ -368,6 +396,12 @@ def recommendation_view(
         ),
         outcome_net_score=None if outcome is None else float(str(outcome["realized_net_score"])),
         settled=outcome is not None,
+        captain_multiplier=(
+            3
+            if recommendation.transfers is not None
+            and recommendation.transfers.as_record().get("chip") == "3xc"
+            else 2
+        ),
         metadata={},
     )
 
@@ -448,6 +482,34 @@ def ledger_view(root: Path, season: str) -> LedgerView:
     )
 
 
+_LOCAL_PATH = re.compile(r"(?:[A-Za-z]:[\\/]|/(?:home|Users|tmp|var|private)/)[^\s\"']+")
+
+
+def _scrub_text(value: str) -> str:
+    """Replace any absolute local path with its last two components.
+
+    Published views leave the operator's machine: an absolute path carries a username
+    and a directory layout the page has no use for, and a test-polluted log line would
+    otherwise ship them to the world. The tail keeps the message diagnosable.
+    """
+
+    def tail(match: re.Match[str]) -> str:
+        parts = [part for part in re.split(r"[\\/]+", match.group(0)) if part]
+        return ".../" + "/".join(parts[-2:]) if len(parts) > 2 else match.group(0)
+
+    return _LOCAL_PATH.sub(tail, value)
+
+
+def _scrub_value(value: JsonValue) -> JsonValue:
+    if isinstance(value, str):
+        return _scrub_text(value)
+    if isinstance(value, Mapping):
+        return {key: _scrub_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_scrub_value(item) for item in value]
+    return value
+
+
 def _recent_events(
     runlog_root: Path | None, component: str, limit: int
 ) -> tuple[RunLogEventView, ...]:
@@ -471,9 +533,13 @@ def _recent_events(
                 RunLogEventView(
                     ts=str(record.get("ts", "")),
                     level=str(record.get("level", "")),
-                    message=str(record.get("message", "")),
+                    message=_scrub_text(str(record.get("message", ""))),
                     run_id=str(record.get("run_id", "")),
-                    fields=_mapping(jsonable(fields)) if isinstance(fields, Mapping) else {},
+                    fields=(
+                        _mapping(_scrub_value(jsonable(fields)))
+                        if isinstance(fields, Mapping)
+                        else {}
+                    ),
                 )
             )
             if len(events) >= limit:
@@ -518,10 +584,12 @@ def status_view(
         actions=tuple(
             TickActionView(
                 kind=str(action.kind),
-                reason=action.reason,
+                reason=_scrub_text(action.reason),
                 gameweek=action.gameweek,
                 snapshot_id=action.snapshot_id,
-                handoff_path=action.handoff_path,
+                handoff_path=(
+                    None if action.handoff_path is None else _scrub_text(action.handoff_path)
+                ),
             )
             for action in plan.actions
         ),
