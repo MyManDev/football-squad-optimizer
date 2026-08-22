@@ -61,7 +61,7 @@ PROJECTION_HANDOFF_CONTRACT_VERSION: Final = "projection_handoff_v1"
 # until an in-season control clears its gates: pinning a version here is the promotion
 # decision, made in a reviewed change, and until then a mid-season decision is refused at
 # verification rather than made from an unpromoted model.
-IN_SEASON_CONTROL_MODEL_VERSIONS: Final[tuple[str, ...]] = ()
+IN_SEASON_CONTROL_MODEL_VERSIONS: Final[tuple[str, ...]] = ("in-season-carry-over-v1",)
 
 
 @dataclass(frozen=True, slots=True)
@@ -394,11 +394,23 @@ def _project_in_season(
     players = inputs.players
     codes = [int(value) for value in players["player_id"].tolist()]
     missing = tuple(sorted(code for code in codes if code not in handoff.expected_points))
+    if missing:
+        # A roster player without a number would be carried at 0.0 and therefore never
+        # selected — a silent quality loss no downstream check can see, because the
+        # selected-player verification only inspects players that were picked. The
+        # producer reads the same capture, so full coverage is always achievable and a
+        # gap is a producer defect, surfaced here where it first becomes wrong.
+        shown = ", ".join(str(code) for code in missing[:5])
+        raise DataSourceError(
+            f"Projection handoff omits {len(missing)} roster player(s) (first: {shown}). "
+            "Every player in this capture's roster needs a number; a missing one would "
+            "silently price the player at zero and exclude them from selection."
+        )
     unknown = sorted(set(handoff.expected_points) - set(codes))
     table = players.loc[:, ["player_id", "name", "team_id", "position", "price_tenths"]].copy(
         deep=True
     )
-    table["expected_points"] = [float(handoff.expected_points.get(code, 0.0)) for code in codes]
+    table["expected_points"] = [float(handoff.expected_points[code]) for code in codes]
     adjusted = apply_availability(table, inputs.availability, config=availability_config)
     return Projection(
         table=adjusted.table,
@@ -406,7 +418,7 @@ def _project_in_season(
         diagnostics={
             **dict(adjusted.diagnostics),
             "players": len(adjusted.table),
-            "players_without_projection": len(missing),
+            "players_without_projection": 0,
             "handoff_players_not_on_roster": len(unknown),
             "model_name": handoff.model_name,
             "model_version": handoff.model_version,
@@ -416,5 +428,4 @@ def _project_in_season(
             "projection_source": "in_season_handoff",
             **{f"handoff_{key}": value for key, value in handoff.diagnostics.items()},
         },
-        unprojected_players=missing,
     )
