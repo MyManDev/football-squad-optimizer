@@ -73,10 +73,13 @@ export function SquadPage() {
 }
 
 function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: string }) {
-  const { language, locale, messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.squad;
   const now = useNow(30_000);
-  const remaining = countdown(view.deadline_utc, now, language);
+  const remaining = countdown(view.deadline_utc, now, {
+    closed: messages.common.closed,
+    day: messages.common.dayShort,
+  });
   const risk = view.risk;
   const captain = view.starting_xi.find((p) => p.is_captain);
   return (
@@ -94,9 +97,9 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
         </div>
         <div className={styles.deadline}>
           <div className={styles.kicker}>
-            {remaining === messages.common.closed ? copy.deadline : copy.deadlineIn}
+            {remaining.isClosed ? copy.deadline : copy.deadlineIn}
           </div>
-          <div className={`${styles.countdown} num`}>{remaining || "—"}</div>
+          <div className={`${styles.countdown} num`}>{remaining.text || "—"}</div>
           <div className={styles.kicker} title={view.deadline_utc}>
             {local(view.deadline_utc, locale)}
           </div>

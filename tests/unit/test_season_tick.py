@@ -15,7 +15,6 @@ import pytest
 import scripts.run_season_tick as tick_script
 import tests.unit.test_live_transfers as world_module
 
-import squadopt.application.commands as command_services
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import (
@@ -184,11 +183,8 @@ def test_timing_config_is_validated() -> None:
 @pytest.fixture(name="world")
 def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(tick_script, "build_panel", lambda root: world_module._panel())
-    monkeypatch.setattr(
-        command_services,
-        "IN_SEASON_CONTROL_MODEL_VERSIONS",
-        (world_module.IN_SEASON_VERSION,),
-    )
+    # The world's handoff carries the really pinned in-season version; no monkeypatch,
+    # so the runner exercises the real allowlist.
     state: dict[str, Any] = {
         "snapshot_root": tmp_path / "snapshots",
         "ledger_root": tmp_path / "ledger",
@@ -230,6 +226,8 @@ def _tick(monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], *extra: str) -
         str(world["handoff_root"]),
         "--summary-output",
         str(world["summary"]),
+        "--log-root",
+        str(world["summary"].parent / "logs"),
         "--now",
         world["clock"],
         *extra,

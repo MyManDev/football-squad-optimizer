@@ -37,7 +37,7 @@ from squadopt.live import (
     render,
 )
 from squadopt.live.recommendation import Projection
-from squadopt.live.tick import HeldSnapshot, LedgerState, plan_tick
+from squadopt.live.tick import HeldSnapshot, LedgerState, TickAction, TickPlan, plan_tick
 
 SEASON = ledger_world.SEASON
 
@@ -314,3 +314,50 @@ def test_jsonable_refuses_what_a_page_could_not_show() -> None:
     assert jsonable({"a": (1, 2), "b": Path("x") / "y"}) == {"a": [1, 2], "b": "x/y"}
     with pytest.raises(ViewError, match="Non-finite"):
         jsonable(float("nan"))
+
+
+def test_published_status_carries_no_absolute_local_path(tmp_path: Path) -> None:
+    """A published view leaves the machine: usernames and directory layouts must not.
+
+    Found live: pytest-polluted log lines shipped Windows user paths to the public status
+    page. The view now scrubs absolute paths down to their last two components, in
+    event messages, event fields (however nested), action reasons and handoff paths.
+    """
+
+    logs = tmp_path / "logs" / "season_tick"
+    logs.mkdir(parents=True)
+    polluted = {
+        "ts": "2026-08-22T05:00:00+00:00",
+        "level": "INFO",
+        "message": r"written to C:\Users\someone\AppData\Local\Temp\x\ledger",
+        "run_id": "r1",
+        "fields": {
+            "directory": "C:/Users/someone/AppData/Local/Temp/pytest-1/gw02",
+            "actions": [{"reason": "no handoff at /Users/someone/tmp/h/2026-27-gw02.json"}],
+        },
+    }
+    (logs / "2026-08-22.jsonl").write_text(json.dumps(polluted) + "\n", encoding="utf-8")
+
+    plan = TickPlan(
+        now_utc="2026-08-22T05:00:00Z",
+        season=SEASON,
+        actions=(
+            TickAction(
+                kind="wait",
+                gameweek=2,
+                reason=r"capture held, but no projection handoff at C:\Users\someone\h\gw02.json",
+                snapshot_id=None,
+                handoff_path=r"C:\Users\someone\h\2026-27-gw02.json",
+            ),
+        ),
+        diagnostics={"next_gameweek": 2},
+    )
+    view = status_view(
+        plan,
+        ledger=LedgerState(decided=frozenset(), settled=frozenset()),
+        runlog_root=tmp_path / "logs",
+    )
+    rendered = json.dumps(view.to_dict())
+    assert "Users" not in rendered and "someone" not in rendered
+    assert ".../h/2026-27-gw02.json" in rendered
+    assert ".../pytest-1/gw02" in rendered

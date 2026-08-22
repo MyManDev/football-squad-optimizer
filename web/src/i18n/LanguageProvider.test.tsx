@@ -43,7 +43,7 @@ describe("LanguageProvider", () => {
       </LanguageProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "English" }));
+    await user.click(screen.getByRole("button", { name: /EN.*English/ }));
     expect(screen.getByLabelText("active language")).toHaveTextContent("en:Suggested moves");
     expect(document.documentElement).toHaveAttribute("lang", "en");
     expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("en");
@@ -55,5 +55,18 @@ describe("LanguageProvider", () => {
       </LanguageProvider>,
     );
     expect(screen.getByLabelText("active language")).toHaveTextContent("en:Suggested moves");
+  });
+
+  it("falls back to Turkish when the stored language is invalid", () => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, "invalid-language");
+
+    render(
+      <LanguageProvider>
+        <Probe />
+      </LanguageProvider>,
+    );
+
+    expect(screen.getByLabelText("active language")).toHaveTextContent("tr:Önerilen hamleler");
+    expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("tr");
   });
 });
