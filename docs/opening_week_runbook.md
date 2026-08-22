@@ -108,9 +108,18 @@ The machine is the same script:
 
 ```console
 python -m scripts.capture_deadline_snapshot
+python -m scripts.build_projection_handoff          # writes the path decide reads
 squadopt gameweek decide --gameweek 2 \
     --in-season-projection data/handoffs/2026-27-gw02.json
 ```
+
+**The order matters, and the middle step cannot be done earlier in the week.** The handoff
+names the capture it was projected from, and the live path refuses one built from a different
+capture, so the producer runs *after* the deadline capture and *before* decide. It reads that
+capture for both the roster and the season so far, resolves the season and the target deadline
+from the capture rather than from an argument, and writes `data/handoffs/<season>-gwNN.json` —
+the same path decide and the tick look for. Add `--dry-run` to see the projection's routes and
+the identity it will claim without writing anything.
 
 What it needs, and refuses without:
 
@@ -130,7 +139,14 @@ What it needs, and refuses without:
   version to be in `IN_SEASON_CONTROL_MODEL_VERSIONS` (`squadopt.live`); the list is
   empty until an in-season control clears its gates, and pinning a version there is the
   promotion decision, made in a reviewed change. Until then a GW2+ decision is refused
-  at verification, not made from an unpromoted model.
+  at verification, not made from an unpromoted model. The producer prints whether the
+  version it claims is in that list, so this refusal is visible before decide is run rather
+  than after.
+- **Every rostered player carried.** The handoff must price every player in the capture's
+  roster, and the producer fails rather than emit a partial one. The reason is that a gap is
+  not self-announcing: an unpriced player is worth zero to the optimizer and therefore never
+  selected, while the check on the far side only inspects players that *were* picked, so it
+  cannot see the loss it appears to cover.
 
 The decision is the transfer planner with a **one-week horizon** — the weekly baseline
 the planner measurements kept as control — under the season's published rules read
