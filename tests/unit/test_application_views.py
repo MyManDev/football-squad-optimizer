@@ -117,6 +117,8 @@ def test_the_ledger_view_totals_settled_and_unsettled_rows_separately(
     recommendation, projection, root, _ = world
     record_decision(root, recommendation, projection, report_text="report")
     before = ledger_view(root, SEASON)
+    before_view = recommendation_view_from_ledger(load_entry(root, SEASON, 1))
+    assert before_view.settled is False and before_view.captain_multiplier == 2
     _validate(before.to_dict(), "LedgerView")
     assert before.decided_gameweeks == 1 and before.settled_gameweeks == 0
     assert before.total_realized_score is None and before.rows[0].settled is False
@@ -135,6 +137,15 @@ def test_the_ledger_view_totals_settled_and_unsettled_rows_separately(
     assert before.total_projection_error is None
     view = recommendation_view_from_ledger(load_entry(root, SEASON, 1))
     assert view.settled is True and view.outcome_realized_score == pytest.approx(row.realized_score)
+    _validate(view.to_dict(), "RecommendationView")
+    # The settled view carries each selected player's realized points and the captain's
+    # multiplier, so the page can show projection vs outcome without recomputing either.
+    assert all(p.event_points == pytest.approx(3.0) for p in view.starting_xi)
+    assert all(p.event_points == pytest.approx(3.0) for p in view.bench)
+    assert view.captain_multiplier == 2
+    assert [p.event_points for p in before_view.starting_xi] == [None] * len(
+        before_view.starting_xi
+    )
 
 
 def test_the_status_view_reports_the_plan_and_the_recent_run_log(

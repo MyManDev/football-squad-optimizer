@@ -1,6 +1,6 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-21T15:03:34Z",
+  "generated_at_utc": "2026-08-22T05:23:54Z",
   "payload": {
     "files": [
       "2026-27/gw01/pool.json",
@@ -15,7 +15,7 @@
         1
       ]
     },
-    "generated_at_utc": "2026-08-21T15:03:34Z",
+    "generated_at_utc": "2026-08-22T05:23:54Z",
     "latest": {
       "gameweek": 1,
       "path": "2026-27/gw01/recommendation.json",
