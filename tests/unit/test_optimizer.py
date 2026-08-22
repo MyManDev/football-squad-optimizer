@@ -257,3 +257,15 @@ def test_preserves_extra_input_columns(
 
     assert "source_note" in result.selected_squad.columns
     assert set(result.selected_squad["source_note"]) == {"synthetic"}
+
+
+def test_bench_is_ordered_keeper_first_then_by_descending_expectation(
+    baseline_result: OptimizationResult,
+) -> None:
+    """The bench is an ordered decision: automatic substitutions walk it top to bottom."""
+
+    bench = baseline_result.bench
+    assert len(bench) == 4
+    assert bench.iloc[0]["position"] == "GK"
+    outfield_points = [float(v) for v in bench.iloc[1:]["expected_points"]]
+    assert outfield_points == sorted(outfield_points, reverse=True)

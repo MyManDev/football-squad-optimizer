@@ -4,6 +4,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import type { Language } from "../../../i18n/messages";
 import type { AnalysisIndex } from "../data";
 import { AnalysisPage } from "./AnalysisPage";
 
@@ -38,16 +40,18 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderPage(path = "/analysis") {
+function renderPage(path = "/analysis", language: Language = "tr") {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/analysis" element={<AnalysisPage />} />
-          <Route path="/analysis/:slug" element={<AnalysisPage />} />
-        </Routes>
-      </MemoryRouter>
+      <LanguageProvider initialLanguage={language}>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/analysis" element={<AnalysisPage />} />
+            <Route path="/analysis/:slug" element={<AnalysisPage />} />
+          </Routes>
+        </MemoryRouter>
+      </LanguageProvider>
     </QueryClientProvider>,
   );
 }
@@ -94,4 +98,16 @@ describe("AnalysisPage", () => {
       "/analysis/negative.json",
     );
   });
+
+  it.each(["tr", "en"] as const)(
+    "keeps the English markdown source unchanged in the %s frame",
+    async (language) => {
+      mockAssets();
+      renderPage("/analysis/negative", language);
+
+      expect(await screen.findByRole("heading", { name: "Table report" })).toBeInTheDocument();
+      expect(screen.getByRole("cell", { name: "control" })).toBeInTheDocument();
+      expect(screen.queryByRole("cell", { name: "kontrol" })).not.toBeInTheDocument();
+    },
+  );
 });

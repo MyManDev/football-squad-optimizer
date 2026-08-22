@@ -39,7 +39,7 @@ HISTORY_SEASON = "2025-26"
 GW1_CAPTURED_AT = "2026-08-13T20:11:43Z"
 GW2_CAPTURED_AT = "2026-08-27T09:00:00Z"
 GW2_SETTLE_CAPTURED_AT = "2026-09-01T09:00:00Z"
-IN_SEASON_VERSION = "in-season-synthetic-v0"
+IN_SEASON_VERSION = "in-season-carry-over-v1"  # the pinned in-season control
 
 EVENTS: list[dict[str, Any]] = [
     {"id": 1, "deadline_time": "2026-08-21T17:30:00Z", "finished": False},
@@ -192,11 +192,8 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         },
     )
     monkeypatch.setattr(ops, "build_panel", lambda root: _panel())
-    monkeypatch.setattr(
-        command_services,
-        "IN_SEASON_CONTROL_MODEL_VERSIONS",
-        (IN_SEASON_VERSION,),
-    )
+    # No allowlist monkeypatch: the world's handoff uses the really pinned version, so
+    # these tests prove the promotion end to end.
     return {
         "snapshot_root": snapshot_root,
         "ledger_root": tmp_path / "ledger",
@@ -356,22 +353,18 @@ def test_the_opening_gameweek_does_not_read_a_handoff(world: dict[str, Any]) -> 
         project(inputs, _panel(), in_season=handoff)
 
 
-def test_an_unprojected_roster_player_is_carried_at_zero_and_reported(
+def test_a_handoff_that_omits_a_roster_player_is_refused(
     world: dict[str, Any],
 ) -> None:
+    """A missing number would price the player at zero and silently exclude them; the
+    selected-player check downstream cannot see that, so the seam refuses instead."""
+
     snapshot = read_snapshot(world["snapshot_root"], world["gw2_id"])
     inputs = read_inputs(snapshot, season=SEASON, gameweek=2)
     handoff = read_projection_handoff(_handoff(world, exclude=(1010,)))
 
-    projection = project(inputs, in_season=handoff)
-
-    assert projection.unprojected_players == (1010,)
-    row = projection.table.loc[projection.table["player_id"] == 1010].iloc[0]
-    assert float(row["expected_points"]) == 0.0
-    assert projection.diagnostics["projection_source"] == "in_season_handoff"
-    assert projection.diagnostics["model_version"] == IN_SEASON_VERSION
-    # The injured player was scaled by availability, not by the handoff.
-    assert 1005 in projection.unavailable_players
+    with pytest.raises(DataSourceError, match=r"omits 1 roster player.*1010"):
+        project(inputs, in_season=handoff)
 
 
 # --- decide GW2 ---------------------------------------------------------------------
