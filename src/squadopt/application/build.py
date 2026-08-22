@@ -8,6 +8,7 @@ agree with the ledger path on everything the ledger stores.
 """
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
@@ -481,6 +482,34 @@ def ledger_view(root: Path, season: str) -> LedgerView:
     )
 
 
+_LOCAL_PATH = re.compile(r"(?:[A-Za-z]:[\\/]|/(?:home|Users|tmp|var|private)/)[^\s\"']+")
+
+
+def _scrub_text(value: str) -> str:
+    """Replace any absolute local path with its last two components.
+
+    Published views leave the operator's machine: an absolute path carries a username
+    and a directory layout the page has no use for, and a test-polluted log line would
+    otherwise ship them to the world. The tail keeps the message diagnosable.
+    """
+
+    def tail(match: re.Match[str]) -> str:
+        parts = [part for part in re.split(r"[\\/]+", match.group(0)) if part]
+        return ".../" + "/".join(parts[-2:]) if len(parts) > 2 else match.group(0)
+
+    return _LOCAL_PATH.sub(tail, value)
+
+
+def _scrub_value(value: JsonValue) -> JsonValue:
+    if isinstance(value, str):
+        return _scrub_text(value)
+    if isinstance(value, Mapping):
+        return {key: _scrub_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_scrub_value(item) for item in value]
+    return value
+
+
 def _recent_events(
     runlog_root: Path | None, component: str, limit: int
 ) -> tuple[RunLogEventView, ...]:
@@ -504,9 +533,13 @@ def _recent_events(
                 RunLogEventView(
                     ts=str(record.get("ts", "")),
                     level=str(record.get("level", "")),
-                    message=str(record.get("message", "")),
+                    message=_scrub_text(str(record.get("message", ""))),
                     run_id=str(record.get("run_id", "")),
-                    fields=_mapping(jsonable(fields)) if isinstance(fields, Mapping) else {},
+                    fields=(
+                        _mapping(_scrub_value(jsonable(fields)))
+                        if isinstance(fields, Mapping)
+                        else {}
+                    ),
                 )
             )
             if len(events) >= limit:
@@ -551,10 +584,12 @@ def status_view(
         actions=tuple(
             TickActionView(
                 kind=str(action.kind),
-                reason=action.reason,
+                reason=_scrub_text(action.reason),
                 gameweek=action.gameweek,
                 snapshot_id=action.snapshot_id,
-                handoff_path=action.handoff_path,
+                handoff_path=(
+                    None if action.handoff_path is None else _scrub_text(action.handoff_path)
+                ),
             )
             for action in plan.actions
         ),
