@@ -1,36 +1,259 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-19T13:00:00Z",
+  "generated_at_utc": "2026-08-22T07:13:31Z",
   "payload": {
     "actions": [
       {
-        "gameweek": 1,
+        "gameweek": 2,
         "handoff_path": null,
         "kind": "wait",
-        "reason": "gameweek 1 is already decided; nothing to do until its outcome",
+        "reason": "gameweek 2 deadline in 154.3 h; capture opens 3 h before it",
         "snapshot_id": null
       }
     ],
     "decided_gameweeks": [
       1
     ],
-    "hours_to_deadline": 52.5,
+    "hours_to_deadline": 154.27,
     "is_idle": true,
-    "latest_capture": "fpl-live-20260816T081259Z-e44ade0095e5",
-    "next_deadline_utc": "2026-08-21T17:30:00Z",
-    "next_gameweek": 1,
-    "now_utc": "2026-08-19T13:00:00Z",
+    "latest_capture": "fpl-live-20260821T143619Z-11bc603a8e1c",
+    "next_deadline_utc": "2026-08-28T17:30:00Z",
+    "next_gameweek": 2,
+    "now_utc": "2026-08-22T07:13:31Z",
     "recent_events": [
       {
         "fields": {
-          "dry_run": true,
+          "dry_run": false,
           "exit_code": 0,
-          "performed": 0
+          "performed": 1
         },
         "level": "INFO",
         "message": "tick.done",
-        "run_id": "20260818T173036Z-3ee16b",
-        "ts": "2026-08-18T17:30:36.133+00:00"
+        "run_id": "20260820T080902Z-7ab8d1",
+        "ts": "2026-08-20T08:09:03.134+00:00"
+      },
+      {
+        "fields": {
+          "gameweek": 2,
+          "kind": "decide",
+          "snapshot_id": "fpl-live-20260828T150000Z-c6cda6c23347"
+        },
+        "level": "INFO",
+        "message": "tick.action.done",
+        "run_id": "20260820T080902Z-7ab8d1",
+        "ts": "2026-08-20T08:09:03.133+00:00"
+      },
+      {
+        "fields": {
+          "gameweek": 2,
+          "kind": "decide",
+          "snapshot_id": "fpl-live-20260828T150000Z-c6cda6c23347"
+        },
+        "level": "INFO",
+        "message": "tick.action.start",
+        "run_id": "20260820T080902Z-7ab8d1",
+        "ts": "2026-08-20T08:09:02.941+00:00"
+      },
+      {
+        "fields": {
+          "actions": [
+            {
+              "gameweek": 2,
+              "kind": "decide",
+              "reason": "capture fpl-live-20260828T150000Z-c6cda6c23347 is inside the window and the projection handoff is present",
+              "snapshot_id": "fpl-live-20260828T150000Z-c6cda6c23347"
+            }
+          ],
+          "diagnostics": {
+            "hours_to_deadline": 1.5,
+            "latest_capture": "fpl-live-20260828T150000Z-c6cda6c23347",
+            "next_deadline_utc": "2026-08-28T17:30:00Z",
+            "next_gameweek": 2
+          },
+          "now_utc": "2026-08-28T16:00:00Z",
+          "replanned": false,
+          "season": "2026-27"
+        },
+        "level": "INFO",
+        "message": "tick.plan",
+        "run_id": "20260820T080902Z-7ab8d1",
+        "ts": "2026-08-20T08:09:02.941+00:00"
+      },
+      {
+        "fields": {
+          "dry_run": false,
+          "now_utc": "2026-08-28T16:00:00Z"
+        },
+        "level": "INFO",
+        "message": "tick.start",
+        "run_id": "20260820T080902Z-7ab8d1",
+        "ts": "2026-08-20T08:09:02.937+00:00"
+      },
+      {
+        "fields": {
+          "dry_run": false,
+          "exit_code": 0,
+          "performed": 1
+        },
+        "level": "INFO",
+        "message": "tick.done",
+        "run_id": "20260820T080902Z-e0b3ee",
+        "ts": "2026-08-20T08:09:02.935+00:00"
+      },
+      {
+        "fields": {
+          "gameweek": 2,
+          "kind": "capture",
+          "snapshot_id": null
+        },
+        "level": "INFO",
+        "message": "tick.action.done",
+        "run_id": "20260820T080902Z-e0b3ee",
+        "ts": "2026-08-20T08:09:02.914+00:00"
+      },
+      {
+        "fields": {
+          "gameweek": 2,
+          "kind": "capture",
+          "snapshot_id": null
+        },
+        "level": "INFO",
+        "message": "tick.action.start",
+        "run_id": "20260820T080902Z-e0b3ee",
+        "ts": "2026-08-20T08:09:02.910+00:00"
+      },
+      {
+        "fields": {
+          "actions": [
+            {
+              "gameweek": 2,
+              "kind": "capture",
+              "reason": "gameweek 2 deadline in 2.5 h and no capture from inside the window is held",
+              "snapshot_id": null
+            }
+          ],
+          "diagnostics": {
+            "hours_to_deadline": 2.5,
+            "latest_capture": "fpl-live-20260824T180000Z-69537f8452dc",
+            "next_deadline_utc": "2026-08-28T17:30:00Z",
+            "next_gameweek": 2
+          },
+          "now_utc": "2026-08-28T15:00:00Z",
+          "replanned": false,
+          "season": "2026-27"
+        },
+        "level": "INFO",
+        "message": "tick.plan",
+        "run_id": "20260820T080902Z-e0b3ee",
+        "ts": "2026-08-20T08:09:02.910+00:00"
+      },
+      {
+        "fields": {
+          "dry_run": false,
+          "now_utc": "2026-08-28T15:00:00Z"
+        },
+        "level": "INFO",
+        "message": "tick.start",
+        "run_id": "20260820T080902Z-e0b3ee",
+        "ts": "2026-08-20T08:09:02.906+00:00"
+      },
+      {
+        "fields": {
+          "dry_run": false,
+          "exit_code": 0,
+          "performed": 2
+        },
+        "level": "INFO",
+        "message": "tick.done",
+        "run_id": "20260820T080902Z-af7807",
+        "ts": "2026-08-20T08:09:02.904+00:00"
+      },
+      {
+        "fields": {
+          "gameweek": 1,
+          "kind": "settle",
+          "snapshot_id": "fpl-live-20260824T180000Z-69537f8452dc"
+        },
+        "level": "INFO",
+        "message": "tick.action.done",
+        "run_id": "20260820T080902Z-af7807",
+        "ts": "2026-08-20T08:09:02.904+00:00"
+      },
+      {
+        "fields": {
+          "gameweek": 1,
+          "realized_net_score": 36.0,
+          "season": "2026-27",
+          "source_snapshot_id": "fpl-live-20260824T180000Z-69537f8452dc"
+        },
+        "level": "INFO",
+        "message": "ledger.outcome.recorded",
+        "run_id": "20260820T080902Z-af7807",
+        "ts": "2026-08-20T08:09:02.899+00:00"
+      },
+      {
+        "fields": {
+          "gameweek": 1,
+          "kind": "settle",
+          "snapshot_id": "fpl-live-20260824T180000Z-69537f8452dc"
+        },
+        "level": "INFO",
+        "message": "tick.action.start",
+        "run_id": "20260820T080902Z-af7807",
+        "ts": "2026-08-20T08:09:02.889+00:00"
+      },
+      {
+        "fields": {
+          "actions": [
+            {
+              "gameweek": 1,
+              "kind": "settle",
+              "reason": "gameweek 1 is finished in the latest capture and its decision has no outcome",
+              "snapshot_id": "fpl-live-20260824T180000Z-69537f8452dc"
+            },
+            {
+              "gameweek": 2,
+              "kind": "wait",
+              "reason": "gameweek 2 deadline in 95.5 h; capture opens 3 h before it",
+              "snapshot_id": null
+            }
+          ],
+          "diagnostics": {
+            "hours_to_deadline": 95.5,
+            "latest_capture": "fpl-live-20260824T180000Z-69537f8452dc",
+            "next_deadline_utc": "2026-08-28T17:30:00Z",
+            "next_gameweek": 2
+          },
+          "now_utc": "2026-08-24T18:00:00Z",
+          "replanned": true,
+          "season": "2026-27"
+        },
+        "level": "INFO",
+        "message": "tick.plan",
+        "run_id": "20260820T080902Z-af7807",
+        "ts": "2026-08-20T08:09:02.889+00:00"
+      },
+      {
+        "fields": {
+          "gameweek": 1,
+          "kind": "capture",
+          "snapshot_id": null
+        },
+        "level": "INFO",
+        "message": "tick.action.done",
+        "run_id": "20260820T080902Z-af7807",
+        "ts": "2026-08-20T08:09:02.884+00:00"
+      },
+      {
+        "fields": {
+          "gameweek": 1,
+          "kind": "capture",
+          "snapshot_id": null
+        },
+        "level": "INFO",
+        "message": "tick.action.start",
+        "run_id": "20260820T080902Z-af7807",
+        "ts": "2026-08-20T08:09:02.880+00:00"
       },
       {
         "fields": {
@@ -38,33 +261,51 @@
             {
               "gameweek": 1,
               "kind": "capture",
-              "reason": "gameweek 1 deadline in 2.0 h and no capture from inside the window is held",
+              "reason": "gameweek 1 was decided, is not marked finished in the latest capture (fpl-live-20260821T153000Z-ee91d9ee2583), and that capture is 74.5 h old",
+              "snapshot_id": null
+            },
+            {
+              "gameweek": 2,
+              "kind": "wait",
+              "reason": "gameweek 2 deadline in 95.5 h; capture opens 3 h before it",
               "snapshot_id": null
             }
           ],
           "diagnostics": {
-            "hours_to_deadline": 2.0,
-            "latest_capture": "fpl-live-20260816T081259Z-e44ade0095e5",
-            "next_deadline_utc": "2026-08-21T17:30:00Z",
-            "next_gameweek": 1
+            "hours_to_deadline": 95.5,
+            "latest_capture": "fpl-live-20260821T153000Z-ee91d9ee2583",
+            "next_deadline_utc": "2026-08-28T17:30:00Z",
+            "next_gameweek": 2
           },
-          "now_utc": "2026-08-21T15:30:00Z",
+          "now_utc": "2026-08-24T18:00:00Z",
+          "replanned": false,
           "season": "2026-27"
         },
         "level": "INFO",
         "message": "tick.plan",
-        "run_id": "20260818T173036Z-3ee16b",
-        "ts": "2026-08-18T17:30:36.133+00:00"
+        "run_id": "20260820T080902Z-af7807",
+        "ts": "2026-08-20T08:09:02.880+00:00"
       },
       {
         "fields": {
-          "dry_run": true,
-          "now_utc": "2026-08-21T15:30:00Z"
+          "dry_run": false,
+          "now_utc": "2026-08-24T18:00:00Z"
         },
         "level": "INFO",
         "message": "tick.start",
-        "run_id": "20260818T173036Z-3ee16b",
-        "ts": "2026-08-18T17:30:36.109+00:00"
+        "run_id": "20260820T080902Z-af7807",
+        "ts": "2026-08-20T08:09:02.875+00:00"
+      },
+      {
+        "fields": {
+          "dry_run": false,
+          "exit_code": 0,
+          "performed": 2
+        },
+        "level": "INFO",
+        "message": "tick.done",
+        "run_id": "20260820T080902Z-2cdbc7",
+        "ts": "2026-08-20T08:09:02.873+00:00"
       }
     ],
     "season": "2026-27",

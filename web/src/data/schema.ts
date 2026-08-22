@@ -10,6 +10,7 @@ export interface SquadOptUIViewContract {
 }
 export interface RecommendationView {
   bench: PlayerView[];
+  captain_multiplier: number;
   captain_player_id: number;
   captured_at_utc: string;
   deadline_utc: string;
@@ -40,6 +41,7 @@ export interface RecommendationView {
 }
 export interface PlayerView {
   bench_order: number | null;
+  event_points: number | null;
   expected_points: number;
   is_captain: boolean;
   name: string;

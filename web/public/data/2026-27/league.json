@@ -1,41 +1,44 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-19T13:00:00Z",
+  "generated_at_utc": "2026-08-22T07:13:31Z",
   "payload": {
-    "captured_at_utc": "2026-08-16T08:12:59Z",
+    "captured_at_utc": "2026-08-21T14:36:19Z",
     "league_total_average_score": null,
     "our_total_realized_net_score": null,
     "ownership": {
       "differential_threshold_percent": 10.0,
       "differentials": [
+        204936,
         494521,
+        200834,
         499604
       ],
-      "effective_ownership": 295.2,
+      "effective_ownership": 285.8,
       "gameweek": 1,
-      "least_owned_starter": 499604,
-      "mean_starter_ownership": 20.172727272727272,
+      "least_owned_starter": 200834,
+      "mean_starter_ownership": 19.672727272727272,
       "most_owned_starter": 223094,
       "ownership_percent": {
-        "178301": 12.5,
-        "204480": 21.4,
-        "204936": 11.1,
-        "216616": 2.9,
-        "223094": 73.3,
-        "244723": 6.9,
-        "244850": 26.4,
-        "437499": 11.0,
-        "437730": 28.3,
-        "484420": 12.7,
+        "178301": 10.5,
+        "200834": 2.6,
+        "204936": 8.3,
+        "216616": 3.5,
+        "223094": 69.4,
+        "244723": 6.5,
+        "244850": 24.8,
+        "437730": 26.3,
+        "446008": 37.9,
+        "484420": 10.7,
         "490145": 1.7,
-        "494521": 4.9,
-        "499604": 3.2,
-        "67089": 22.3,
-        "97032": 17.1
+        "494521": 4.5,
+        "499604": 2.8,
+        "67089": 20.2,
+        "97032": 18.6
       },
       "squad": [
         {
           "bench_order": null,
+          "event_points": null,
           "expected_points": 4.090909090909092,
           "is_captain": false,
           "name": "Gianluigi Donnarumma",
@@ -48,6 +51,7 @@
         },
         {
           "bench_order": null,
+          "event_points": null,
           "expected_points": 4.45945945945946,
           "is_captain": false,
           "name": "Adrien Truffert",
@@ -60,6 +64,7 @@
         },
         {
           "bench_order": null,
+          "event_points": null,
           "expected_points": 4.177634408602151,
           "is_captain": false,
           "name": "Virgil van Dijk",
@@ -72,18 +77,20 @@
         },
         {
           "bench_order": null,
-          "expected_points": 3.94392523364486,
+          "event_points": null,
+          "expected_points": 4.081081081081081,
           "is_captain": false,
-          "name": "Maxence Lacroix",
-          "player_id": 437499,
+          "name": "Nordi Mukiele",
+          "player_id": 200834,
           "position": "DEF",
-          "price_tenths": 60,
+          "price_tenths": 55,
           "role": "starter",
-          "short_name": "Lacroix",
-          "team": "Chelsea"
+          "short_name": "Mukiele",
+          "team": "Sunderland"
         },
         {
           "bench_order": null,
+          "event_points": null,
           "expected_points": 4.785714285714286,
           "is_captain": false,
           "name": "Rayan Vitor Simplício Rocha",
@@ -96,6 +103,7 @@
         },
         {
           "bench_order": null,
+          "event_points": null,
           "expected_points": 4.741020793950851,
           "is_captain": false,
           "name": "Antoine Semenyo",
@@ -108,6 +116,20 @@
         },
         {
           "bench_order": null,
+          "event_points": null,
+          "expected_points": 4.4375,
+          "is_captain": false,
+          "name": "Bryan Mbeumo",
+          "player_id": 446008,
+          "position": "MID",
+          "price_tenths": 80,
+          "role": "starter",
+          "short_name": "Mbeumo",
+          "team": "Man Utd"
+        },
+        {
+          "bench_order": null,
+          "event_points": null,
           "expected_points": 4.304166666666667,
           "is_captain": false,
           "name": "Morgan Rogers",
@@ -120,18 +142,7 @@
         },
         {
           "bench_order": null,
-          "expected_points": 4.288783841856467,
-          "is_captain": false,
-          "name": "Declan Rice",
-          "player_id": 204480,
-          "position": "MID",
-          "price_tenths": 75,
-          "role": "starter",
-          "short_name": "Rice",
-          "team": "Arsenal"
-        },
-        {
-          "bench_order": null,
+          "event_points": null,
           "expected_points": 3.868421052631579,
           "is_captain": false,
           "name": "Enzo Le Fée",
@@ -144,6 +155,7 @@
         },
         {
           "bench_order": null,
+          "event_points": null,
           "expected_points": 6.166051660516605,
           "is_captain": true,
           "name": "Erling Haaland",
@@ -156,6 +168,7 @@
         },
         {
           "bench_order": null,
+          "event_points": null,
           "expected_points": 4.799489144316731,
           "is_captain": false,
           "name": "Ollie Watkins",
@@ -168,6 +181,7 @@
         },
         {
           "bench_order": 1,
+          "event_points": null,
           "expected_points": 2.009486847779215,
           "is_captain": false,
           "name": "Martin Dubravka",
@@ -180,6 +194,7 @@
         },
         {
           "bench_order": 2,
+          "event_points": null,
           "expected_points": 1.5165198237885464,
           "is_captain": false,
           "name": "Dara O'Shea",
@@ -192,6 +207,7 @@
         },
         {
           "bench_order": 3,
+          "event_points": null,
           "expected_points": 3.417677642980936,
           "is_captain": false,
           "name": "Tyrick Mitchell",
@@ -204,6 +220,7 @@
         },
         {
           "bench_order": 4,
+          "event_points": null,
           "expected_points": 1.347325408618128,
           "is_captain": false,
           "name": "Dane Scarlett",
@@ -218,7 +235,7 @@
     },
     "scored_gameweeks": 0,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20260816T081259Z-e44ade0095e5",
+    "source_snapshot_id": "fpl-live-20260821T143619Z-11bc603a8e1c",
     "total_difference_to_average": null,
     "verdict": "No gameweek has been scored yet, so there is nothing to compare: the game publishes an average only once a gameweek finishes.",
     "weeks": [
@@ -229,7 +246,7 @@
         "finished": false,
         "gameweek": 1,
         "highest_score": null,
-        "our_projected_score": 55.79162729878535,
+        "our_projected_score": 56.077499304365105,
         "our_realized_net_score": null,
         "our_realized_score": null
       },
@@ -279,7 +296,7 @@
       },
       {
         "average_entry_score": null,
-        "deadline_utc": "2026-10-10T12:30:00Z",
+        "deadline_utc": "2026-10-10T10:00:00Z",
         "difference_to_average": null,
         "finished": false,
         "gameweek": 6,
@@ -290,7 +307,7 @@
       },
       {
         "average_entry_score": null,
-        "deadline_utc": "2026-10-17T12:30:00Z",
+        "deadline_utc": "2026-10-17T10:00:00Z",
         "difference_to_average": null,
         "finished": false,
         "gameweek": 7,
@@ -301,7 +318,7 @@
       },
       {
         "average_entry_score": null,
-        "deadline_utc": "2026-10-24T12:30:00Z",
+        "deadline_utc": "2026-10-23T17:30:00Z",
         "difference_to_average": null,
         "finished": false,
         "gameweek": 8,
@@ -312,7 +329,7 @@
       },
       {
         "average_entry_score": null,
-        "deadline_utc": "2026-10-31T13:30:00Z",
+        "deadline_utc": "2026-10-31T11:00:00Z",
         "difference_to_average": null,
         "finished": false,
         "gameweek": 9,

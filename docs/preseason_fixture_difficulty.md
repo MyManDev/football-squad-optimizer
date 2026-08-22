@@ -30,3 +30,10 @@ Team strength is a separate field from fixture difficulty, and before a season i
 
 That asymmetry is evidence in its own right. A completed season's archive carries populated attack and defence numbers on a thousand-point scale; before a season the same fields are zero and only a coarse one-to-five overall rating exists. Whatever the archive's strength columns are, they are not what was published in August.
 
+## Drift against a later reading
+
+- 760 fixture sides compared, 0 not found in the later table.
+- **0 changed** (0.0%), mean absolute change 0.00.
+
+The published difficulty has not moved since it was recorded.
+

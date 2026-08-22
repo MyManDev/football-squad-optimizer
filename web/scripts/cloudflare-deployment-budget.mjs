@@ -104,7 +104,7 @@ export async function listDeployments({ accountId, project, apiToken, fetchImpl 
       `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/pages/projects/${encodeURIComponent(project)}/deployments`,
     );
     url.searchParams.set("page", String(page));
-    url.searchParams.set("per_page", "100");
+    url.searchParams.set("per_page", "25");
 
     const response = await fetchImpl(url, {
       headers: { authorization: `Bearer ${apiToken}` },

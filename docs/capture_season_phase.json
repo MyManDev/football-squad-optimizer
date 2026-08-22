@@ -1,0 +1,108 @@
+{
+  "artifact_type": "capture_season_phase",
+  "captures": [
+    {
+      "agreement_with_2025-26": {
+        "identical_fraction": 0.9847,
+        "players_compared": 459,
+        "players_identical": 452
+      },
+      "captured_at_utc": "2026-08-13T20:11:43Z",
+      "first_kickoff_utc": "2026-08-21T19:00:00Z",
+      "opening_deadline_utc": "2026-08-21T17:30:00Z",
+      "phase": "prior_season",
+      "snapshot_id": "fpl-live-20260813T201143Z-55789a780186"
+    },
+    {
+      "agreement_with_2025-26": {
+        "identical_fraction": 0.9848,
+        "players_compared": 461,
+        "players_identical": 454
+      },
+      "captured_at_utc": "2026-08-20T17:05:25Z",
+      "first_kickoff_utc": "2026-08-21T19:00:00Z",
+      "opening_deadline_utc": "2026-08-21T17:30:00Z",
+      "phase": "prior_season",
+      "snapshot_id": "fpl-live-20260820T170525Z-545aaf5df705"
+    },
+    {
+      "agreement_with_2025-26": {
+        "identical_fraction": 0.1193,
+        "players_compared": 461,
+        "players_identical": 55
+      },
+      "captured_at_utc": "2026-08-22T04:10:36Z",
+      "first_kickoff_utc": "2026-08-21T19:00:00Z",
+      "opening_deadline_utc": "2026-08-21T17:30:00Z",
+      "phase": "current_season",
+      "reset_evidence": {
+        "counterexamples": 0,
+        "largest_minute_drops": [
+          {
+            "capture_minutes": 0,
+            "capture_points": 0,
+            "player_id": 457569,
+            "prior_season_minutes": 3420,
+            "prior_season_points": 124
+          },
+          {
+            "capture_minutes": 0,
+            "capture_points": 0,
+            "player_id": 489639,
+            "prior_season_minutes": 3420,
+            "prior_season_points": 130
+          },
+          {
+            "capture_minutes": 0,
+            "capture_points": 0,
+            "player_id": 111234,
+            "prior_season_minutes": 3420,
+            "prior_season_points": 135
+          },
+          {
+            "capture_minutes": 0,
+            "capture_points": 0,
+            "player_id": 80201,
+            "prior_season_minutes": 3420,
+            "prior_season_points": 122
+          },
+          {
+            "capture_minutes": 0,
+            "capture_points": 0,
+            "player_id": 97032,
+            "prior_season_minutes": 3420,
+            "prior_season_points": 175
+          }
+        ],
+        "players_compared": 461,
+        "players_whose_minutes_fell": 404,
+        "still_identical": 55,
+        "still_identical_with_no_prior_record": 55
+      },
+      "snapshot_id": "fpl-live-20260822T041036Z-3b0de5aea3e3"
+    }
+  ],
+  "captures_measured": 3,
+  "comparison_season": "2025-26",
+  "contract_version": "capture_season_phase_v1",
+  "gate_evidence": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "phases_present": [
+    "current_season",
+    "prior_season"
+  ],
+  "season_relative_fields": [
+    "minutes",
+    "total_points",
+    "starts",
+    "goals_scored",
+    "assists",
+    "clean_sheets",
+    "goals_conceded",
+    "saves",
+    "bonus",
+    "bps",
+    "own_goals"
+  ]
+}

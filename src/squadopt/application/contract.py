@@ -66,6 +66,7 @@ def ui_view_schema() -> dict[str, Any]:
             "role": {"type": "string", "enum": ["starter", "bench", "out", "in", "pool"]},
             "is_captain": _BOOL,
             "bench_order": _nullable(_INT),
+            "event_points": _nullable(_NUM),
         }
     )
     pool_player = _obj(
@@ -167,6 +168,7 @@ def ui_view_schema() -> dict[str, Any]:
             "outcome_realized_score": _nullable(_NUM),
             "outcome_net_score": _nullable(_NUM),
             "settled": _BOOL,
+            "captain_multiplier": _INT,
             "metadata": _free_object(),
         }
     )
