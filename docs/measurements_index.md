@@ -13,6 +13,7 @@ Regenerated artifacts must keep passing `scripts.run_measurement_preflight`.
 | `baseline_policy_grid` | Exhaustive 56-cell ground truth; fw10 column holds ranks 1–7; **BO regret 0.0000**, optimum found at iteration 3 | #61 |
 | `fw10_screening` + `fw10_frozen_candidate` | Official screening DoE froze `fw10-bw0` as the eligible challenger; holdout plan in `fw10_holdout_plan.md` (run deferred) | #65 |
 | `fw10_season_robustness` | Challenger-vs-control delta per development season, in isolation | #74 |
+| `fw10_holdout` + `fw10_holdout_note` | **The locked holdout, spent.** `fw10-bw0` **not promoted**; `fw05-bw0p1` remains the operational control. Paired mean **+1.405** on 37 folds of 2025-26, 90% interval **[−2.622, 4.000]** — the effect-size gate passed (≥0.5) and the confidence gate failed (lower bound below zero). Development was +2.728 [0.762, 4.544] over 147 folds, so the challenger did not reverse; one season's interval is simply wide. `development_seasons_accessed: false`. Per the pre-registered plan the fw10 hypothesis is closed: no re-runs, no threshold changes. Limitations, including the holdout's prior exposure and a pre-run coverage read, are in the note | #168 |
 | `selection_optimism` | Winner's curse located: roster residuals unbiased (−0.004), selected starters −2.96, captains −3.86, top-5 ranked −3.53 | #73 |
 | `shrinkage_grid` | Does decision-side position-mean shrinkage improve realized squads? (`position_mean_shrinkage_v1`) | #74+ |
 
