@@ -4,9 +4,9 @@
     "bootstrap-static.json": "a41605225fa6f8e2a62a7386c2039fa991c42b13061340186db7fa84dea3b9cb",
     "fixtures.json": "9e7484118381f8202830906ba993c176475d8ca1796571f5dd78cbfc2d73bd3e"
   },
-  "compared_against": null,
+  "compared_against": "fpl-live-20260821T143619Z-11bc603a8e1c",
   "contract_version": "preseason_difficulty_record_v1",
-  "created_utc": "2026-08-19T15:08:27+00:00",
+  "created_utc": "2026-08-21T14:36:39+00:00",
   "diagnostics": {
     "clubs": 20,
     "difficulty_distribution": {
@@ -6112,7 +6112,16 @@
       "team_id": 43
     }
   ],
-  "drift": null,
+  "drift": {
+    "changed_clubs": {},
+    "changed_rows": 0,
+    "changed_share": 0.0,
+    "compared_rows": 760,
+    "examples": [],
+    "mean_absolute_change": 0.0,
+    "missing_rows": 0,
+    "unchanged": true
+  },
   "environment": {
     "logical_cpu_count": 32,
     "ortools": "9.15.6755",
@@ -6141,8 +6150,8 @@
       "2024-25",
       "2025-26"
     ],
-    "repository_commit": "b19a631c8843585f4b3c1dcf03bcc986a94c58f7",
-    "working_tree_dirty": true
+    "repository_commit": "7c86b28d9f94f1304bf3926e25e940d98aaa812f",
+    "working_tree_dirty": false
   },
   "season": "2026-27",
   "snapshot_id": "fpl-live-20260816T081259Z-e44ade0095e5",
