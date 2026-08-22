@@ -5,7 +5,6 @@ test can pin is everything derived and everything refused.
 """
 
 import pytest
-
 from scripts.publish_gameweek_site import KINDS, PublishError, PublishNames, next_steps
 
 
