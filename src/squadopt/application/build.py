@@ -96,6 +96,7 @@ def _player(
     is_captain: bool = False,
     bench_order: int | None = None,
     price_override: int | None = None,
+    event_points: float | None = None,
 ) -> PlayerView:
     row = index.get(int(player_id))
     if row is None:
@@ -112,6 +113,7 @@ def _player(
             role=role,
             is_captain=is_captain,
             bench_order=bench_order,
+            event_points=event_points,
         )
     return PlayerView(
         player_id=int(player_id),
@@ -126,6 +128,7 @@ def _player(
         role=role,
         is_captain=is_captain,
         bench_order=bench_order,
+        event_points=event_points,
     )
 
 
@@ -134,12 +137,24 @@ def _players_from_ids(
     starters: Sequence[int],
     bench: Sequence[int],
     captain: int,
+    realized: Mapping[int, float] | None = None,
 ) -> tuple[tuple[PlayerView, ...], tuple[PlayerView, ...], tuple[PlayerView, ...]]:
+    points = dict(realized) if realized is not None else {}
     xi = positions_in_order(
-        [_player(index, p, role="starter", is_captain=(int(p) == int(captain))) for p in starters]
+        [
+            _player(
+                index,
+                p,
+                role="starter",
+                is_captain=(int(p) == int(captain)),
+                event_points=points.get(int(p)),
+            )
+            for p in starters
+        ]
     )
     bench_views = tuple(
-        _player(index, p, role="bench", bench_order=order) for order, p in enumerate(bench, 1)
+        _player(index, p, role="bench", bench_order=order, event_points=points.get(int(p)))
+        for order, p in enumerate(bench, 1)
     )
     return (*xi, *bench_views), xi, bench_views
 
@@ -271,12 +286,18 @@ def recommendation_view_from_ledger(
     starters = _ints(decision["starting_xi_player_ids"])
     bench_ids = _ints(decision["bench_player_ids"])
     captain = int(str(decision["captain_player_id"]))
-    squad, xi, bench = _players_from_ids(index, starters, bench_ids, captain)
     transfers_block = decision.get("transfers")
     transfers = (
         _transfer_view(transfers_block, index) if isinstance(transfers_block, Mapping) else None
     )
     outcome = dict(entry.outcome) if entry.outcome is not None else None
+    realized: dict[int, float] | None = None
+    if outcome is not None:
+        by_player = outcome.get("realized_points_by_player")
+        if isinstance(by_player, Mapping):
+            realized = {int(str(key)): float(str(value)) for key, value in by_player.items()}
+    chip = transfers_block.get("chip") if isinstance(transfers_block, Mapping) else None
+    squad, xi, bench = _players_from_ids(index, starters, bench_ids, captain, realized)
     return RecommendationView(
         season=str(decision["season"]),
         gameweek=int(str(decision["gameweek"])),
@@ -305,6 +326,7 @@ def recommendation_view_from_ledger(
         ),
         outcome_net_score=(None if outcome is None else float(str(outcome["realized_net_score"]))),
         settled=outcome is not None,
+        captain_multiplier=3 if chip == "3xc" else 2,
         metadata=_mapping(jsonable(decision.get("metadata", {}))),
     )
 
@@ -319,7 +341,12 @@ def recommendation_view(
     starters = [int(v) for v in recommendation.starting_xi["player_id"].tolist()]
     bench_ids = [int(v) for v in recommendation.bench["player_id"].tolist()]
     captain = int(recommendation.captain["player_id"])
-    squad, xi, bench = _players_from_ids(index, starters, bench_ids, captain)
+    realized: dict[int, float] | None = None
+    if outcome is not None:
+        by_player = outcome.get("realized_points_by_player")
+        if isinstance(by_player, Mapping):
+            realized = {int(str(key)): float(str(value)) for key, value in by_player.items()}
+    squad, xi, bench = _players_from_ids(index, starters, bench_ids, captain, realized)
     transfers = None
     if recommendation.transfers is not None:
         block = recommendation.transfers.as_record()
@@ -368,6 +395,12 @@ def recommendation_view(
         ),
         outcome_net_score=None if outcome is None else float(str(outcome["realized_net_score"])),
         settled=outcome is not None,
+        captain_multiplier=(
+            3
+            if recommendation.transfers is not None
+            and recommendation.transfers.as_record().get("chip") == "3xc"
+            else 2
+        ),
         metadata={},
     )
 
