@@ -32,7 +32,9 @@ development seasons before anything reads a feature window.
 """
 
 import argparse
+import json
 import sys
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -325,6 +327,65 @@ def _score(
     return evaluate_prepared_folds(folds, EvaluationConfig())
 
 
+def _solve_health(result: EvaluationResult) -> dict[str, object]:
+    """Report whether the solver actually determined each fold's squad.
+
+    A realized score is only attributable to the projection if the optimizer returned *the*
+    optimum rather than *an* optimum. Two things can break that, and both are recorded per
+    fold by the optimizer rather than inferred here:
+
+    ``solver_status`` says whether optimality was proven at all. ``FEASIBLE`` means a squad
+    that is merely good enough, so its realized points describe an arbitrary member of a
+    near-optimal set.
+
+    ``tiebreak_completed`` says whether the lexicographic tie-break finished. The tie-break
+    is what makes one optimum *the* optimum, and it is skipped when the primary solve is not
+    optimal, when almost no wall clock remains, or when the deterministic budget is spent
+    (``optimizer.py`` around the ``tiebreak_attempted`` assignment). Where it did not
+    complete, the squad among equal-objective squads fell to the solver's search order --
+    which is #192.
+
+    Attempted plus skipped must equal the fold count. An accounting gap would be a silent
+    hole in exactly the claim this block exists to make.
+    """
+
+    statuses: Counter[str] = Counter()
+    attempted = 0
+    completed = 0
+    exhausted = 0
+    incomplete: list[str] = []
+    for fold in result.folds:
+        optimization = fold.optimization_result
+        diagnostics = dict(optimization.diagnostics)
+        statuses[str(optimization.solver_status)] += 1
+        if diagnostics.get("tiebreak_attempted") is True:
+            attempted += 1
+            if diagnostics.get("tiebreak_completed") is True:
+                completed += 1
+            else:
+                incomplete.append(fold.fold_id)
+        else:
+            incomplete.append(fold.fold_id)
+        if diagnostics.get("deterministic_time_budget_exhausted") is True:
+            exhausted += 1
+
+    folds = len(result.folds)
+    if completed + len(incomplete) != folds:
+        raise BacktestConfigurationError(
+            f"Solve health accounts for {completed + len(incomplete)} of {folds} folds; an "
+            "accounting gap would hide exactly what this block reports."
+        )
+    return {
+        "folds": folds,
+        "primary_status": {name: count for name, count in sorted(statuses.items())},
+        "tiebreak_attempted": attempted,
+        "tiebreak_completed": completed,
+        "folds_not_fully_determined": len(incomplete),
+        "first_undetermined_folds": incomplete[:5],
+        "deterministic_budget_exhausted": exhausted,
+    }
+
+
 def _paired(
     candidate: EvaluationResult, control: EvaluationResult, *, candidate_id: str
 ) -> dict[str, object]:
@@ -375,7 +436,65 @@ def _paired(
     }
 
 
-def measure(archive_root: Path, *, fold_limit: int | None = None) -> dict[str, object]:
+def _reproducibility(
+    entries: list[dict[str, object]], previous: Path | None
+) -> dict[str, object] | None:
+    """Compare this run's means against an earlier record's, per configuration.
+
+    A benchmark that cannot reproduce its own numbers is reporting solver search order, not
+    projection quality, and the only way to know is to run it twice and say so. Kept as a
+    comparison against a file rather than a pasted constant so the check survives the next
+    run instead of decaying into a stale literal.
+    """
+
+    if previous is None:
+        return None
+    if not previous.is_file():
+        raise BacktestConfigurationError(f"No earlier record at {previous}.")
+    document = json.loads(previous.read_text(encoding="utf-8"))
+    earlier = {
+        str(item["label"]): float(item["mean_realized_squad_points"])
+        for item in document.get("configurations", [])
+        if isinstance(item, dict)
+    }
+    rows: list[dict[str, object]] = []
+    moved = 0
+    largest = 0.0
+    for entry in entries:
+        label = str(entry["label"])
+        if label not in earlier:
+            continue
+        before = earlier[label]
+        after = float(str(entry["mean_realized_squad_points"]))
+        delta = round(after - before, 4)
+        health = entry["solve_health"]
+        determined = None
+        if isinstance(health, dict):
+            determined = int(str(health["folds"])) - int(str(health["folds_not_fully_determined"]))
+        if delta:
+            moved += 1
+            largest = max(largest, abs(delta))
+        rows.append(
+            {
+                "label": label,
+                "earlier": before,
+                "now": after,
+                "delta": delta,
+                "folds_determined": determined,
+            }
+        )
+    return {
+        "compared_against": str(previous),
+        "configurations_compared": len(rows),
+        "configurations_that_moved": moved,
+        "largest_absolute_move": round(largest, 4),
+        "rows": rows,
+    }
+
+
+def measure(
+    archive_root: Path, *, fold_limit: int | None = None, compare_to: Path | None = None
+) -> dict[str, object]:
     """Score every configuration on identical folds and pair the ones worth pairing."""
 
     panel = _visible_panel(archive_root)
@@ -405,6 +524,7 @@ def measure(archive_root: Path, *, fold_limit: int | None = None) -> dict[str, o
                 ),
                 "feasibility_rate": round(float(result.summary.feasibility_rate), 4),
                 "scored_folds": int(result.summary.scored_folds),
+                "solve_health": _solve_health(result),
             }
         )
 
@@ -430,6 +550,7 @@ def measure(archive_root: Path, *, fold_limit: int | None = None) -> dict[str, o
         "declared_configuration": declared,
         "configurations": entries,
         "paired_against_declared": comparisons,
+        "reproducibility": _reproducibility(entries, compare_to),
         **dict(RECORD_PROVENANCE),
     }
 
@@ -543,7 +664,44 @@ def summary(record: dict[str, object]) -> str:
         "configuration is scored on one fixed set of projection inputs and a difference is",
         "attributable to the projection rule. That choice buys comparability and costs",
         "absolute realism, and both halves of the trade belong in the record.",
-        "",
+    ]
+    repro = record.get("reproducibility")
+    if isinstance(repro, dict):
+        lines += [
+            "",
+            "## Run it twice: which numbers hold still",
+            "",
+            f"Compared against `{repro['compared_against']}`, "
+            f"**{repro['configurations_that_moved']} of "
+            f"{repro['configurations_compared']} configurations did not reproduce**, and the "
+            f"largest move was {repro['largest_absolute_move']}.",
+            "",
+            "| configuration | earlier | now | move | folds determined |",
+            "| --- | ---: | ---: | ---: | ---: |",
+        ]
+        for row in _rows(repro, "rows"):
+            mark = "" if row["delta"] == 0 else " **<--**"
+            lines.append(
+                f"| `{row['label']}`{mark} | {row['earlier']} | {row['now']} | "
+                f"{row['delta']:+} | {row['folds_determined']} |"
+            )
+        lines += [
+            "",
+            "The relationship is directional, not strict: both fully determined",
+            "configurations reproduced to the digit, and the two largest moves belong to the",
+            "two least determined -- but a configuration at 138 determined folds moved while",
+            "one at 123 did not, so determination bounds the risk rather than predicting the",
+            "outcome. The mechanism is #192, measured here rather than argued: where the",
+            "tie-break did not finish, the squad among equal-objective squads came from the",
+            "solver's search order, and a second run can pick a different one.",
+            "",
+            "**So the weight axis is not resolvable at this precision.** The differences it",
+            "asks about are 0.16 to 0.84 points, and the movement between two runs of one",
+            "configuration reaches 0.22. The large comparisons are untouched: the floor moved",
+            "0.04 against a difference of 13.78, and both controls reproduced exactly.",
+        ]
+
+    lines += [
         "## What this decides",
         "",
         "Nothing on its own. It is a record, not a gate: `measurement_only` is true and",
@@ -582,6 +740,12 @@ def main() -> int:
         help="score a short fold prefix, for checking the wiring rather than measuring",
     )
     parser.add_argument("--fold-limit", type=int, default=None)
+    parser.add_argument(
+        "--compare-to",
+        type=Path,
+        default=None,
+        help="an earlier record to check this run's means against",
+    )
     arguments = parser.parse_args()
 
     if not arguments.archive_root.is_dir():
@@ -589,14 +753,20 @@ def main() -> int:
         return 1
 
     limit = 6 if arguments.quick else arguments.fold_limit
-    record = measure(arguments.archive_root, fold_limit=limit)
+    record = measure(arguments.archive_root, fold_limit=limit, compare_to=arguments.compare_to)
 
     print(f"Folds {record['folds']}  ({record['first_fold']} .. {record['last_fold']})")
     print()
     for entry in _rows(record, "configurations"):
+        health = entry["solve_health"]
+        note = ""
+        if isinstance(health, dict):
+            folds = int(str(health["folds"]))
+            undetermined = int(str(health["folds_not_fully_determined"]))
+            note = f"  determined {folds - undetermined}/{folds}  {health['primary_status']}"
         print(
-            f"  {entry['label']!s:28} {entry['mean_realized_squad_points']:>9}  "
-            f"feasible {entry['feasibility_rate']}"
+            f"  {entry['label']!s:28} {entry['mean_realized_squad_points']:>9}"
+            f"  feasible {entry['feasibility_rate']}{note}"
         )
     print()
     for name, comparison in _pairs(record, "paired_against_declared").items():

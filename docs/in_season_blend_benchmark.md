@@ -16,12 +16,12 @@ which used its own bench weights.
 | --- | --- | ---: | ---: |
 | `control-fw05` | archive_fed_control | 53.7755 | 1.0 |
 | `control-fw10` | archive_fed_control | 55.9796 | 1.0 |
-| `carry-over-only` | floor | 43.1497 | 1.0 |
+| `carry-over-only` | floor | 43.1905 | 1.0 |
 | `blend-m90-g6` | in_season_blend | 56.4694 | 1.0 |
 | `blend-m270-g6-declared` **← declared** | in_season_blend | 56.966 | 1.0 |
 | `blend-m540-g6` | in_season_blend | 56.585 | 1.0 |
-| `blend-m1080-g6` | in_season_blend | 56.932 | 1.0 |
-| `blend-m270-g3` | in_season_blend | 56.7755 | 1.0 |
+| `blend-m1080-g6` | in_season_blend | 56.7143 | 1.0 |
+| `blend-m270-g3` | in_season_blend | 56.8095 | 1.0 |
 | `blend-m270-g12` | in_season_blend | 56.1293 | 1.0 |
 
 ## The declared configuration against each other one
@@ -30,12 +30,12 @@ Paired per fold, 90% season-aware moving-block interval.
 
 | against | mean difference | interval | seasons positive |
 | --- | ---: | --- | ---: |
-| `blend-m1080-g6` | +0.034 | [-0.9184, 1.7143] | 1/4 |
+| `blend-m1080-g6` | +0.2517 | [-0.7551, 1.9184] | 2/4 |
 | `blend-m270-g12` | +0.8367 | [-0.3878, 1.8844] | 2/4 |
-| `blend-m270-g3` | +0.1905 | [-0.8027, 1.0612] | 2/4 |
+| `blend-m270-g3` | +0.1565 | [-0.8299, 1.0272] | 2/4 |
 | `blend-m540-g6` | +0.381 | [-0.3946, 1.0884] | 4/4 |
 | `blend-m90-g6` | +0.4966 | [-0.449, 1.1565] | 3/4 |
-| `carry-over-only` | +13.8163 | [11.7483, 16.8983] | 4/4 |
+| `carry-over-only` | +13.7755 | [11.6803, 16.8639] | 4/4 |
 | `control-fw05` | +3.1905 | [1.4014, 5.7143] | 4/4 |
 | `control-fw10` | +0.9864 | [-0.7554, 3.6259] | 3/4 |
 
@@ -70,6 +70,34 @@ configuration is scored on one fixed set of projection inputs and a difference i
 attributable to the projection rule. That choice buys comparability and costs
 absolute realism, and both halves of the trade belong in the record.
 
+## Run it twice: which numbers hold still
+
+Compared against `docs/in_season_blend_benchmark.json (#193)`, **3 of 9 configurations did not reproduce**, and the largest move was 0.2177.
+
+| configuration | earlier | now | move | folds determined |
+| --- | ---: | ---: | ---: | ---: |
+| `control-fw05` | 53.7755 | 53.7755 | +0.0 | 147 |
+| `control-fw10` | 55.9796 | 55.9796 | +0.0 | 147 |
+| `carry-over-only` **<--** | 43.1497 | 43.1905 | +0.0408 | 70 |
+| `blend-m90-g6` | 56.4694 | 56.4694 | +0.0 | 145 |
+| `blend-m270-g6-declared` | 56.966 | 56.966 | +0.0 | 138 |
+| `blend-m540-g6` | 56.585 | 56.585 | +0.0 | 123 |
+| `blend-m1080-g6` **<--** | 56.932 | 56.7143 | -0.2177 | 77 |
+| `blend-m270-g3` **<--** | 56.7755 | 56.8095 | +0.034 | 138 |
+| `blend-m270-g12` | 56.1293 | 56.1293 | +0.0 | 136 |
+
+The relationship is directional, not strict: both fully determined
+configurations reproduced to the digit, and the two largest moves belong to the
+two least determined -- but a configuration at 138 determined folds moved while
+one at 123 did not, so determination bounds the risk rather than predicting the
+outcome. The mechanism is #192, measured here rather than argued: where the
+tie-break did not finish, the squad among equal-objective squads came from the
+solver's search order, and a second run can pick a different one.
+
+**So the weight axis is not resolvable at this precision.** The differences it
+asks about are 0.16 to 0.84 points, and the movement between two runs of one
+configuration reaches 0.22. The large comparisons are untouched: the floor moved
+0.04 against a difference of 13.78, and both controls reproduced exactly.
 ## What this decides
 
 Nothing on its own. It is a record, not a gate: `measurement_only` is true and
