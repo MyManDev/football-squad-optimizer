@@ -222,3 +222,97 @@ def test_the_written_record_carries_every_provenance_flag() -> None:
     assert "**dict(RECORD_PROVENANCE)" in source
     for key in benchmark.RECORD_PROVENANCE:
         assert f'"{key}"' in source
+
+
+# --- solve health: was the squad determined, or did a tie fall to search order? ------
+
+
+class _Optimization:
+    def __init__(self, status: str, diagnostics: dict[str, object]) -> None:
+        self.solver_status = status
+        self.diagnostics = diagnostics
+
+
+class _HealthFold:
+    def __init__(self, fold_id: str, status: str, **diagnostics: object) -> None:
+        self.fold_id = fold_id
+        self.optimization_result = _Optimization(status, dict(diagnostics))
+
+
+def _health(folds: list[_HealthFold]) -> dict[str, object]:
+    return benchmark._solve_health(_Result(folds))  # type: ignore[arg-type]
+
+
+def _determined(fold_id: str) -> _HealthFold:
+    return _HealthFold(fold_id, "OPTIMAL", tiebreak_attempted=True, tiebreak_completed=True)
+
+
+def test_a_fully_determined_run_reports_no_undetermined_folds() -> None:
+    health = _health([_determined(f"2021-22-gw{n:02d}") for n in range(2, 8)])
+
+    assert health["folds"] == 6
+    assert health["tiebreak_attempted"] == 6
+    assert health["tiebreak_completed"] == 6
+    assert health["folds_not_fully_determined"] == 0
+
+
+def test_a_tiebreak_that_did_not_finish_counts_as_undetermined() -> None:
+    """The squad among equal-objective squads then fell to the solver's search order."""
+
+    folds = [
+        _determined("2021-22-gw02"),
+        _HealthFold("2021-22-gw03", "OPTIMAL", tiebreak_attempted=True, tiebreak_completed=False),
+    ]
+
+    health = _health(folds)
+
+    assert health["tiebreak_attempted"] == 2
+    assert health["tiebreak_completed"] == 1
+    assert health["folds_not_fully_determined"] == 1
+    assert health["first_undetermined_folds"] == ["2021-22-gw03"]
+
+
+def test_a_skipped_tiebreak_counts_as_undetermined_too() -> None:
+    """Not attempted is not better than not finished; both leave the squad unpinned."""
+
+    folds = [
+        _determined("2021-22-gw02"),
+        _HealthFold("2021-22-gw03", "FEASIBLE", tiebreak_attempted=False),
+    ]
+
+    health = _health(folds)
+
+    assert health["tiebreak_attempted"] == 1
+    assert health["folds_not_fully_determined"] == 1
+
+
+def test_the_primary_status_distribution_is_reported() -> None:
+    """FEASIBLE means an arbitrary member of a near-optimal set, so it must be visible."""
+
+    folds = [
+        _determined("2021-22-gw02"),
+        _HealthFold("2021-22-gw03", "FEASIBLE", tiebreak_attempted=False),
+        _HealthFold("2021-22-gw04", "FEASIBLE", tiebreak_attempted=False),
+    ]
+
+    health = _health(folds)
+
+    assert health["primary_status"] == {"FEASIBLE": 2, "OPTIMAL": 1}
+
+
+def test_the_exhausted_deterministic_budget_is_counted() -> None:
+    """The condition that excuses an incomplete solve has to be visible beside it."""
+
+    folds = [
+        _HealthFold(
+            "2021-22-gw02",
+            "FEASIBLE",
+            tiebreak_attempted=False,
+            deterministic_time_budget_exhausted=True,
+        ),
+        _determined("2021-22-gw03"),
+    ]
+
+    health = _health(folds)
+
+    assert health["deterministic_budget_exhausted"] == 1
