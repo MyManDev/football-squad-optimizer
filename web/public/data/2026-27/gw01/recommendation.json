@@ -1,10 +1,11 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-21T15:03:34Z",
+  "generated_at_utc": "2026-08-22T07:13:31Z",
   "payload": {
     "bench": [
       {
         "bench_order": 1,
+        "event_points": null,
         "expected_points": 2.009486847779215,
         "is_captain": false,
         "name": "Martin Dubravka",
@@ -17,6 +18,7 @@
       },
       {
         "bench_order": 2,
+        "event_points": null,
         "expected_points": 1.5165198237885464,
         "is_captain": false,
         "name": "Dara O'Shea",
@@ -29,6 +31,7 @@
       },
       {
         "bench_order": 3,
+        "event_points": null,
         "expected_points": 3.417677642980936,
         "is_captain": false,
         "name": "Tyrick Mitchell",
@@ -41,6 +44,7 @@
       },
       {
         "bench_order": 4,
+        "event_points": null,
         "expected_points": 1.347325408618128,
         "is_captain": false,
         "name": "Dane Scarlett",
@@ -52,6 +56,7 @@
         "team": "Spurs"
       }
     ],
+    "captain_multiplier": 2,
     "captain_player_id": 223094,
     "captured_at_utc": "2026-08-21T14:36:19Z",
     "deadline_utc": "2026-08-21T17:30:00Z",
@@ -100,6 +105,7 @@
     "squad": [
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.090909090909092,
         "is_captain": false,
         "name": "Gianluigi Donnarumma",
@@ -112,6 +118,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.45945945945946,
         "is_captain": false,
         "name": "Adrien Truffert",
@@ -124,6 +131,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.177634408602151,
         "is_captain": false,
         "name": "Virgil van Dijk",
@@ -136,6 +144,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.081081081081081,
         "is_captain": false,
         "name": "Nordi Mukiele",
@@ -148,6 +157,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.785714285714286,
         "is_captain": false,
         "name": "Rayan Vitor Simplício Rocha",
@@ -160,6 +170,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.741020793950851,
         "is_captain": false,
         "name": "Antoine Semenyo",
@@ -172,6 +183,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.4375,
         "is_captain": false,
         "name": "Bryan Mbeumo",
@@ -184,6 +196,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.304166666666667,
         "is_captain": false,
         "name": "Morgan Rogers",
@@ -196,6 +209,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 3.868421052631579,
         "is_captain": false,
         "name": "Enzo Le Fée",
@@ -208,6 +222,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 6.166051660516605,
         "is_captain": true,
         "name": "Erling Haaland",
@@ -220,6 +235,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.799489144316731,
         "is_captain": false,
         "name": "Ollie Watkins",
@@ -232,6 +248,7 @@
       },
       {
         "bench_order": 1,
+        "event_points": null,
         "expected_points": 2.009486847779215,
         "is_captain": false,
         "name": "Martin Dubravka",
@@ -244,6 +261,7 @@
       },
       {
         "bench_order": 2,
+        "event_points": null,
         "expected_points": 1.5165198237885464,
         "is_captain": false,
         "name": "Dara O'Shea",
@@ -256,6 +274,7 @@
       },
       {
         "bench_order": 3,
+        "event_points": null,
         "expected_points": 3.417677642980936,
         "is_captain": false,
         "name": "Tyrick Mitchell",
@@ -268,6 +287,7 @@
       },
       {
         "bench_order": 4,
+        "event_points": null,
         "expected_points": 1.347325408618128,
         "is_captain": false,
         "name": "Dane Scarlett",
@@ -282,6 +302,7 @@
     "starting_xi": [
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.090909090909092,
         "is_captain": false,
         "name": "Gianluigi Donnarumma",
@@ -294,6 +315,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.45945945945946,
         "is_captain": false,
         "name": "Adrien Truffert",
@@ -306,6 +328,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.177634408602151,
         "is_captain": false,
         "name": "Virgil van Dijk",
@@ -318,6 +341,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.081081081081081,
         "is_captain": false,
         "name": "Nordi Mukiele",
@@ -330,6 +354,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.785714285714286,
         "is_captain": false,
         "name": "Rayan Vitor Simplício Rocha",
@@ -342,6 +367,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.741020793950851,
         "is_captain": false,
         "name": "Antoine Semenyo",
@@ -354,6 +380,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.4375,
         "is_captain": false,
         "name": "Bryan Mbeumo",
@@ -366,6 +393,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.304166666666667,
         "is_captain": false,
         "name": "Morgan Rogers",
@@ -378,6 +406,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 3.868421052631579,
         "is_captain": false,
         "name": "Enzo Le Fée",
@@ -390,6 +419,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 6.166051660516605,
         "is_captain": true,
         "name": "Erling Haaland",
@@ -402,6 +432,7 @@
       },
       {
         "bench_order": null,
+        "event_points": null,
         "expected_points": 4.799489144316731,
         "is_captain": false,
         "name": "Ollie Watkins",

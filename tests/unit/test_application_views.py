@@ -37,7 +37,7 @@ from squadopt.live import (
     render,
 )
 from squadopt.live.recommendation import Projection
-from squadopt.live.tick import HeldSnapshot, LedgerState, plan_tick
+from squadopt.live.tick import HeldSnapshot, LedgerState, TickAction, TickPlan, plan_tick
 
 SEASON = ledger_world.SEASON
 
@@ -117,6 +117,8 @@ def test_the_ledger_view_totals_settled_and_unsettled_rows_separately(
     recommendation, projection, root, _ = world
     record_decision(root, recommendation, projection, report_text="report")
     before = ledger_view(root, SEASON)
+    before_view = recommendation_view_from_ledger(load_entry(root, SEASON, 1))
+    assert before_view.settled is False and before_view.captain_multiplier == 2
     _validate(before.to_dict(), "LedgerView")
     assert before.decided_gameweeks == 1 and before.settled_gameweeks == 0
     assert before.total_realized_score is None and before.rows[0].settled is False
@@ -135,6 +137,15 @@ def test_the_ledger_view_totals_settled_and_unsettled_rows_separately(
     assert before.total_projection_error is None
     view = recommendation_view_from_ledger(load_entry(root, SEASON, 1))
     assert view.settled is True and view.outcome_realized_score == pytest.approx(row.realized_score)
+    _validate(view.to_dict(), "RecommendationView")
+    # The settled view carries each selected player's realized points and the captain's
+    # multiplier, so the page can show projection vs outcome without recomputing either.
+    assert all(p.event_points == pytest.approx(3.0) for p in view.starting_xi)
+    assert all(p.event_points == pytest.approx(3.0) for p in view.bench)
+    assert view.captain_multiplier == 2
+    assert [p.event_points for p in before_view.starting_xi] == [None] * len(
+        before_view.starting_xi
+    )
 
 
 def test_the_status_view_reports_the_plan_and_the_recent_run_log(
@@ -303,3 +314,50 @@ def test_jsonable_refuses_what_a_page_could_not_show() -> None:
     assert jsonable({"a": (1, 2), "b": Path("x") / "y"}) == {"a": [1, 2], "b": "x/y"}
     with pytest.raises(ViewError, match="Non-finite"):
         jsonable(float("nan"))
+
+
+def test_published_status_carries_no_absolute_local_path(tmp_path: Path) -> None:
+    """A published view leaves the machine: usernames and directory layouts must not.
+
+    Found live: pytest-polluted log lines shipped Windows user paths to the public status
+    page. The view now scrubs absolute paths down to their last two components, in
+    event messages, event fields (however nested), action reasons and handoff paths.
+    """
+
+    logs = tmp_path / "logs" / "season_tick"
+    logs.mkdir(parents=True)
+    polluted = {
+        "ts": "2026-08-22T05:00:00+00:00",
+        "level": "INFO",
+        "message": r"written to C:\Users\someone\AppData\Local\Temp\x\ledger",
+        "run_id": "r1",
+        "fields": {
+            "directory": "C:/Users/someone/AppData/Local/Temp/pytest-1/gw02",
+            "actions": [{"reason": "no handoff at /Users/someone/tmp/h/2026-27-gw02.json"}],
+        },
+    }
+    (logs / "2026-08-22.jsonl").write_text(json.dumps(polluted) + "\n", encoding="utf-8")
+
+    plan = TickPlan(
+        now_utc="2026-08-22T05:00:00Z",
+        season=SEASON,
+        actions=(
+            TickAction(
+                kind="wait",
+                gameweek=2,
+                reason=r"capture held, but no projection handoff at C:\Users\someone\h\gw02.json",
+                snapshot_id=None,
+                handoff_path=r"C:\Users\someone\h\2026-27-gw02.json",
+            ),
+        ),
+        diagnostics={"next_gameweek": 2},
+    )
+    view = status_view(
+        plan,
+        ledger=LedgerState(decided=frozenset(), settled=frozenset()),
+        runlog_root=tmp_path / "logs",
+    )
+    rendered = json.dumps(view.to_dict())
+    assert "Users" not in rendered and "someone" not in rendered
+    assert ".../h/2026-27-gw02.json" in rendered
+    assert ".../pytest-1/gw02" in rendered
