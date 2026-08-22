@@ -502,6 +502,164 @@ def fixture_snapshot(
     return validate_fixture_snapshot(frame)
 
 
+# --- season-relative element fields ------------------------------------------
+#
+# The element records carry cumulative counters -- minutes, total_points, starts and
+# the rest -- and the number in them is not a property of the payload alone. Measured
+# on the real captures (docs/capture_season_phase.md): in a capture taken before the
+# opening deadline, 454 of 461 players carry *the previous season's* totals exactly,
+# and after the season's first kick-off the platform resets them and begins the new
+# season. Raya reads 3330 minutes and 162 points in the 2026-08-20 capture and 90
+# minutes and 6 points afterwards; Saliba, who did not play, drops from 2614 and 137
+# to zero.
+#
+# So the meaning of these fields flips at one instant, nothing in the payload states
+# which side of it the capture sits on, and both readings are plausible numbers. That
+# is a silent-wrong-answer shape, which is why they are named here and reached through
+# one guarded entry point rather than read wherever they are wanted.
+SEASON_RELATIVE_ELEMENT_FIELDS: Final = (
+    "minutes",
+    "total_points",
+    "starts",
+    "goals_scored",
+    "assists",
+    "clean_sheets",
+    "goals_conceded",
+    "saves",
+    "bonus",
+    "bps",
+    "own_goals",
+)
+
+# What a capture's cumulative counters describe.
+#
+# `unobserved_transition` is not squeamishness. The reset happens somewhere between
+# the opening deadline and the first kick-off, and no capture exists inside that
+# ninety-minute window, so which of the two boundaries triggers it has not been
+# observed. Both readings are plausible there and neither is measured, so that window
+# refuses instead of guessing.
+SEASON_PHASES: Final = ("prior_season", "unobserved_transition", "current_season")
+
+
+@dataclass(frozen=True, slots=True)
+class CaptureSeasonPhase:
+    """Which season a capture's cumulative counters belong to, and the evidence."""
+
+    phase: str
+    captured_at_utc: str
+    opening_deadline_utc: str
+    first_kickoff_utc: str
+
+    def __post_init__(self) -> None:
+        if self.phase not in SEASON_PHASES:
+            raise InvalidValueError(
+                f"Unknown capture season phase {self.phase!r}; expected one of "
+                f"{list(SEASON_PHASES)!r}."
+            )
+
+    @property
+    def describes_current_season(self) -> bool:
+        """Whether the counters may be read as this season's played history."""
+
+        return self.phase == "current_season"
+
+
+def _first_kickoff_utc(fixtures: bytes) -> str:
+    """Return the earliest published kick-off, which is when the counters reset."""
+
+    records = _array_records(fixtures, "Fixtures")
+    kickoffs = [
+        normalize_utc_timestamp(record.get("kickoff_time"), label="Fixture kickoff_time")
+        for record in records
+        if record.get("kickoff_time") is not None
+    ]
+    if not kickoffs:
+        raise DataSourceError(
+            "The fixtures payload publishes no kick-off time, so the instant the "
+            "season's cumulative counters reset cannot be established."
+        )
+    return min(kickoffs)
+
+
+def capture_season_phase(
+    bootstrap: bytes, fixtures: bytes, *, captured_at_utc: str
+) -> CaptureSeasonPhase:
+    """Decide which season a capture's cumulative counters describe.
+
+    Derived from the capture's own two payloads rather than accepted from the caller.
+    A caller that could state the phase could state it wrongly, and the whole point of
+    naming these fields is that a wrong answer here is not visible downstream.
+    """
+
+    captured = normalize_utc_timestamp(captured_at_utc, label="captured_at_utc")
+    deadlines = gameweek_deadlines(bootstrap)
+    if not deadlines:
+        raise DataSourceError("The bootstrap payload publishes no gameweek deadlines.")
+    opening = deadlines[0].deadline_utc
+    kickoff = _first_kickoff_utc(fixtures)
+    moment = as_instant(captured)
+    if moment < as_instant(opening):
+        phase = "prior_season"
+    elif moment < as_instant(kickoff):
+        phase = "unobserved_transition"
+    else:
+        phase = "current_season"
+    return CaptureSeasonPhase(
+        phase=phase,
+        captured_at_utc=captured,
+        opening_deadline_utc=opening,
+        first_kickoff_utc=kickoff,
+    )
+
+
+def in_season_totals(bootstrap: bytes, fixtures: bytes, *, captured_at_utc: str) -> pd.DataFrame:
+    """Return this season's played history per player, or refuse to guess.
+
+    Keyed on the persistent ``player_id`` so it joins the canonical contract rather
+    than the platform's per-season integer. Only squad-eligible players are returned,
+    on the same grounds :func:`player_snapshot` uses.
+
+    The refusal is the feature. Before the season's counters reset these numbers are
+    the *previous* season's, and returning them as in-season history would put a full
+    prior campaign's minutes into a second-gameweek feature without anything looking
+    wrong.
+    """
+
+    phase = capture_season_phase(bootstrap, fixtures, captured_at_utc=captured_at_utc)
+    if not phase.describes_current_season:
+        raise DataSourceError(
+            f"A capture taken at {phase.captured_at_utc} is {phase.phase!r}: its "
+            "cumulative counters do not describe the current season, so it carries no "
+            "in-season history. The counters reset between the opening deadline "
+            f"({phase.opening_deadline_utc}) and the first kick-off "
+            f"({phase.first_kickoff_utc}); capture after the first kick-off."
+        )
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _ELEMENT_FIELDS, "Element")
+    _require_fields(records, SEASON_RELATIVE_ELEMENT_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        row: dict[str, object] = {"player_id": _integer(record, "code", "Element")}
+        for field_name in SEASON_RELATIVE_ELEMENT_FIELDS:
+            row[field_name] = _integer(record, field_name, "Element")
+        rows.append(row)
+    if not rows:
+        raise DataSourceError("The bootstrap payload contains no squad-eligible players.")
+
+    table = pd.DataFrame.from_records(rows)
+    duplicates = table.loc[table["player_id"].duplicated(), "player_id"].tolist()
+    if duplicates:
+        raise DuplicateRecordsError(
+            f"Bootstrap payload repeats player codes: {format_examples(duplicates)}."
+        )
+    ordered = ("player_id", *SEASON_RELATIVE_ELEMENT_FIELDS)
+    return table.loc[:, list(ordered)].sort_values("player_id").reset_index(drop=True)
+
+
 def player_snapshot(bootstrap: bytes) -> pd.DataFrame:
     """Build the deadline-known player table from a captured bootstrap payload.
 

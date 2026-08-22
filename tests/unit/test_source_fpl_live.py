@@ -56,6 +56,20 @@ def _element(**overrides: Any) -> dict[str, Any]:
         "news": "",
         "news_added": None,
         "selected_by_percent": "41.2",
+        # Cumulative counters. Present in the real payload, and season-relative: before
+        # the opening kick-off they carry the previous season's totals. Included here so
+        # the builder matches what the source actually serves.
+        "minutes": 2700,
+        "total_points": 180,
+        "starts": 30,
+        "goals_scored": 12,
+        "assists": 9,
+        "clean_sheets": 11,
+        "goals_conceded": 28,
+        "saves": 0,
+        "bonus": 21,
+        "bps": 640,
+        "own_goals": 0,
     }
     record.update(overrides)
     return record
