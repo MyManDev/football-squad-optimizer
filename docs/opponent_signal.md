@@ -1,6 +1,9 @@
 # Opponent Signal
 
 - Contract: `opponent_signal_v1`
+- Frame fingerprint: `8d977552f638a53c9be3cd7960a3009344cd04c9538bcdf416727f81e3342624`
+  A declaration binds its input to this value rather than describing it, so a frame
+  that changed would produce a different candidate rather than the same one quietly.
 - Grain: `season/gameweek/club`
 - Seasons: 2020-21, 2021-22, 2022-23, 2023-24, 2024-25
 

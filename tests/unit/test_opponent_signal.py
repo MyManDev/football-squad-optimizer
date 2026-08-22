@@ -18,6 +18,7 @@ from scripts.build_opponent_signal import (
     OPPONENT_SIGNAL_CONTRACT_VERSION,
     SIGNAL_COLUMNS,
     build_opponent_signal,
+    signal_fingerprint,
     signal_markdown,
     signal_record,
 )
@@ -187,3 +188,63 @@ def test_the_locked_holdout_cannot_be_requested() -> None:
 
     with pytest.raises(ExperimentConfigurationError, match="locked holdout"):
         build_opponent_signal(_matches(), ("2024-25", "2025-26"))
+
+
+# --- the fingerprint a declaration binds its input to ------------------------
+
+
+def test_the_same_frame_fingerprints_the_same_way() -> None:
+    """A declaration that bound a value which moved between runs would bind nothing."""
+
+    first, _ = _signal()
+    second, _ = _signal()
+
+    assert signal_fingerprint(first) == signal_fingerprint(second)
+
+
+def test_row_order_does_not_change_the_fingerprint() -> None:
+    """A frame differing only in row order is the same input and must read as one."""
+
+    table, _ = _signal()
+    shuffled = table.sample(frac=1.0, random_state=7).reset_index(drop=True)
+
+    assert signal_fingerprint(shuffled) == signal_fingerprint(table)
+
+
+def test_a_changed_signal_changes_the_fingerprint() -> None:
+    """The converse: without it the two tests above would pass on a constant."""
+
+    table, _ = _signal()
+    altered = table.copy(deep=True)
+    altered.loc[0, "rating_attacking_signal"] = float(altered.loc[0, "rating_attacking_signal"]) + 1
+
+    assert signal_fingerprint(altered) != signal_fingerprint(table)
+
+
+def test_a_changed_fixture_count_changes_the_fingerprint() -> None:
+    """Every column here is part of the input, so none may move without moving the digest."""
+
+    table, _ = _signal()
+    altered = table.copy(deep=True)
+    altered.loc[0, "fixtures_in_gameweek"] = int(altered.loc[0, "fixtures_in_gameweek"]) + 1
+
+    assert signal_fingerprint(altered) != signal_fingerprint(table)
+
+
+def test_the_record_carries_the_fingerprint() -> None:
+    """A declaration reads it from the record, so it has to be in the record."""
+
+    table, coverage = _signal()
+
+    record = signal_record(table, coverage, SEASONS)  # type: ignore[arg-type]
+
+    assert record["frame_fingerprint"] == signal_fingerprint(table)
+    assert len(str(record["frame_fingerprint"])) == 64
+
+
+def test_the_summary_shows_the_fingerprint() -> None:
+    table, coverage = _signal()
+
+    text = signal_markdown(signal_record(table, coverage, SEASONS))  # type: ignore[arg-type]
+
+    assert signal_fingerprint(table) in text
