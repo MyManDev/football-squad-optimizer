@@ -40,7 +40,7 @@
   --color-line: #27453a;
   --color-text: #eef4ef;
   --color-text-muted: #9fb5a8;
-  --color-text-faint: #6f8a7c;
+  --color-text-faint: #9fb5a8;
   --color-accent: #f2c14e;
   --color-accent-text: #17210f;
   --color-pitch: #123c2b;
@@ -65,7 +65,7 @@
     --color-line: #d3dcd4;
     --color-text: #12241c;
     --color-text-muted: #546b5e;
-    --color-text-faint: #7d9186;
+    --color-text-faint: #546b5e;
     --color-accent: #8a6a12;
     --color-accent-text: #ffffff;
     --color-pitch: #dfeadf;
@@ -88,7 +88,7 @@
   --color-line: #d3dcd4;
   --color-text: #12241c;
   --color-text-muted: #546b5e;
-  --color-text-faint: #7d9186;
+  --color-text-faint: #546b5e;
   --color-accent: #8a6a12;
   --color-accent-text: #ffffff;
   --color-pitch: #dfeadf;
@@ -151,6 +151,22 @@ a:hover {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+a.visually-hidden:focus-visible {
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 10;
+  width: auto;
+  height: auto;
+  padding: var(--space-2) var(--space-3);
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  border-radius: var(--radius-s);
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 @media (prefers-reduced-motion: reduce) {
