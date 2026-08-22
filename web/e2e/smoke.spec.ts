@@ -39,7 +39,7 @@ test("status is reachable from the footer", async ({ page }) => {
 
 test("language selection switches the full frame and persists across routes", async ({ page }) => {
   await page.goto("/moves?mode=garantici&window=3");
-  await page.getByRole("button", { name: "English" }).click();
+  await page.getByRole("button", { name: /EN.*English/ }).click();
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Suggested moves");
   await expect(page.getByRole("radio", { name: /3 weeks/ })).toBeChecked();
