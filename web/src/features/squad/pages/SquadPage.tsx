@@ -9,6 +9,7 @@ import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
 import { useLanguage } from "../../../i18n/context";
+import { riskText } from "../../../i18n/reasons";
 import {
   countdown,
   local,
@@ -210,7 +211,9 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
           </Badge>
         }
       >
-        <p className={styles.limit}>{risk.reason}</p>
+        <p className={styles.limit}>
+          {riskText(messages, risk.status, risk.blockers, risk.reason)}
+        </p>
         {risk.status === "available" && (
           <StatRow>
             <Stat

@@ -7,6 +7,7 @@ import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
 import { useLanguage } from "../../../i18n/context";
+import { verdictText } from "../../../i18n/reasons";
 import { percent, points, signedPoints, utcShort } from "../../../lib/format";
 import { AverageChart } from "../components/AverageChart";
 import { CumulativeChart } from "../components/CumulativeChart";
@@ -154,7 +155,9 @@ function AgainstTheLeague({ view }: { view: LeagueView }) {
   return (
     <>
       <Card title={copy.againstLeague} aside={copy.weeklySummary(view.source_snapshot_id)}>
-        <p className={styles.para}>{view.verdict}</p>
+        <p className={styles.para}>
+          {verdictText(messages, view.verdict_code, view.verdict_params, view.verdict)}
+        </p>
         {view.scored_gameweeks > 0 ? (
           <AverageChart weeks={view.weeks} />
         ) : (

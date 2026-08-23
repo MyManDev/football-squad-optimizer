@@ -14,7 +14,7 @@ and the view carries ``None`` rather than a zero that reads like evidence.
 
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from squadopt.application.views import LedgerView, PlayerView, _View
 from squadopt.data.snapshots import CapturedSnapshot
@@ -80,6 +80,9 @@ class LeagueView(_View):
     ownership: OwnershipView | None
     verdict: str
     """One sentence a reader can quote, written from what is actually known."""
+    verdict_code: str = ""
+    """``no_scored_gameweeks`` | ``standing``; a page translates it, the sentence stays."""
+    verdict_params: Mapping[str, object] = field(default_factory=dict)
 
 
 def _bootstrap(snapshot: CapturedSnapshot) -> dict[str, object]:
@@ -173,6 +176,23 @@ def ownership_view(
     )
 
 
+def _verdict_code(
+    scored: int, difference: float | None, ownership: OwnershipView | None
+) -> tuple[str, dict[str, object]]:
+    """The verdict as a stable code with parameters, beside the English sentence."""
+
+    if scored == 0 or difference is None:
+        return "no_scored_gameweeks", {}
+    params: dict[str, object] = {
+        "difference": round(float(difference), 1),
+        "scored": int(scored),
+        "caveat": "noise" if scored < 5 else "few" if scored < 20 else "none",
+    }
+    if ownership is not None:
+        params["mean_starter_ownership"] = round(float(ownership.mean_starter_ownership), 1)
+    return "standing", params
+
+
 def _verdict(scored: int, difference: float | None, ownership: OwnershipView | None) -> str:
     if scored == 0 or difference is None:
         return (
@@ -247,6 +267,8 @@ def league_view(
         total_difference_to_average=difference_total,
         ownership=ownership,
         verdict=_verdict(scored, difference_total, ownership),
+        verdict_code=_verdict_code(scored, difference_total, ownership)[0],
+        verdict_params=_verdict_code(scored, difference_total, ownership)[1],
     )
 
 
