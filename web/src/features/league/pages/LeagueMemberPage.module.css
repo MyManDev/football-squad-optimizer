@@ -1,0 +1,149 @@
+.page,
+.adviceSection,
+.systemPage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.assumptionList {
+  margin: 0;
+  padding-left: 1.2rem;
+  color: var(--color-text-muted);
+}
+
+.comparison {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-2);
+  font-weight: 600;
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: var(--space-2);
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+
+.kicker,
+.muted,
+.diagnostic {
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-4);
+  font-weight: 600;
+  line-height: 1.05;
+}
+
+.lede,
+.notice,
+.honesty,
+.diagnostic {
+  margin: var(--space-2) 0 0;
+  max-width: var(--measure);
+}
+
+.notice,
+.diagnostic {
+  color: var(--color-text-muted);
+}
+
+.honesty {
+  margin: 0 0 var(--space-3);
+}
+
+.bench,
+.moves {
+  display: flex;
+  flex-direction: column;
+}
+
+.benchRow {
+  display: grid;
+  grid-template-columns: 2rem minmax(8rem, 1fr) minmax(8rem, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.benchRow:first-child,
+.move:first-child {
+  border-top: none;
+}
+
+.benchPoints {
+  text-align: right;
+}
+
+.move {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.movePlayers,
+.moveNumbers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.moveNumbers {
+  align-items: flex-end;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  text-align: right;
+}
+
+.move .muted {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .title {
+    font-size: var(--step-3);
+  }
+
+  .benchRow {
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  }
+
+  .benchRow .muted {
+    grid-column: 2 / -1;
+  }
+
+  .move {
+    grid-template-columns: 1fr;
+  }
+
+  .moveNumbers {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .move .muted {
+    grid-column: 1;
+  }
+}

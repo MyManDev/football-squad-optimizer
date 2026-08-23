@@ -58,6 +58,13 @@
   max-width: var(--measure);
 }
 
+.settledNote {
+  margin: var(--space-3) 0 0;
+  max-width: var(--measure);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
 .list {
   margin: 0;
   padding-left: 1.2em;

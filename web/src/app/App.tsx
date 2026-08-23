@@ -19,6 +19,16 @@ const RivalsPage = lazy(() =>
 const LeaguePage = lazy(() =>
   import("../features/league/pages/LeaguePage").then((m) => ({ default: m.LeaguePage })),
 );
+const LeagueMembersPage = lazy(() =>
+  import("../features/league/pages/LeagueMembersPage").then((m) => ({
+    default: m.LeagueMembersPage,
+  })),
+);
+const LeagueMemberPage = lazy(() =>
+  import("../features/league/pages/LeagueMemberPage").then((m) => ({
+    default: m.LeagueMemberPage,
+  })),
+);
 const StatusPage = lazy(() =>
   import("../features/status/pages/StatusPage").then((m) => ({ default: m.StatusPage })),
 );
@@ -53,6 +63,8 @@ function LocalizedApp({ basename }: { basename: string }) {
               <Route path="/rivals" element={<RivalsPage />} />
               <Route path="/rivals/:season/:gameweek" element={<RivalsPage />} />
               <Route path="/league" element={<LeaguePage />} />
+              <Route path="/league/members" element={<LeagueMembersPage />} />
+              <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/analysis/:slug" element={<AnalysisPage />} />

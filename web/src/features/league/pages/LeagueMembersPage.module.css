@@ -1,0 +1,99 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.kicker,
+.sub {
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-4);
+  font-weight: 600;
+  line-height: 1.05;
+}
+
+.lede,
+.notice {
+  margin: var(--space-2) 0 0;
+  max-width: var(--measure);
+  color: var(--color-text-muted);
+}
+
+.notice {
+  margin: 0;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  font-size: var(--step--1);
+}
+
+.table th,
+.table td {
+  padding: 10px 8px;
+  border-top: 1px solid var(--color-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table thead th {
+  border-top: none;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.systemRow {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.systemRow td:first-child {
+  border-left: 3px solid var(--color-accent);
+}
+
+.right {
+  text-align: right !important;
+}
+
+.memberLink {
+  display: block;
+  font-weight: 600;
+}
+
+.sub {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+@media (max-width: 640px) {
+  .head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .title {
+    font-size: var(--step-3);
+  }
+}

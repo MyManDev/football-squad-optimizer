@@ -1,7 +1,19 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const ROUTES = ["/", "/moves", "/rivals", "/league", "/analysis", "/status"] as const;
+import { installLeagueMocks } from "./leagueMocks";
+
+const ROUTES = [
+  "/",
+  "/moves",
+  "/rivals",
+  "/league",
+  "/league/members",
+  "/league/members/35249001?mode=agresif&window=3",
+  "/league/members/squadopt",
+  "/analysis",
+  "/status",
+] as const;
 const BLOCKING_IMPACTS = new Set(["critical", "serious"]);
 
 async function waitForPage(page: import("@playwright/test").Page) {
@@ -11,6 +23,8 @@ async function waitForPage(page: import("@playwright/test").Page) {
 for (const language of ["tr", "en"] as const) {
   for (const theme of ["dark", "light"] as const) {
     test(`axe has no critical or serious violations in ${language} ${theme}`, async ({ page }) => {
+      test.setTimeout(60_000);
+      await installLeagueMocks(page);
       await page.addInitScript(
         ({ selectedLanguage, selectedTheme }) => {
           localStorage.setItem("squadopt.language", selectedLanguage);
