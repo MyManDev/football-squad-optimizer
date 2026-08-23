@@ -70,6 +70,7 @@ from squadopt.live.risk import (
     LiveRiskStatus,
     LiveRiskValidationError,
     evaluate_live_risk,
+    load_residual_history,
     risk_not_requested,
 )
 from squadopt.live.rules import (
@@ -166,6 +167,7 @@ __all__ = [
     "ledger_summary",
     "load_entry",
     "load_ledger",
+    "load_residual_history",
     "make_projection_horizon_builder",
     "measure_live_calibration",
     "plan_tick",

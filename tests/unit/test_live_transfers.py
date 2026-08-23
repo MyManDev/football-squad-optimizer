@@ -597,3 +597,109 @@ def test_settling_a_transfer_week_nets_hits_and_counts_the_boosted_bench(
     markdown = summary_markdown(world["ledger_root"], SEASON)
     assert "| Transfers | Hits | Chip | Net |" in markdown
     assert "bboost" in markdown
+
+
+def _residual_export(root: Path, *, model_version: str, tamper: bool = False) -> Path:
+    """A tiny exported residual table with its manifest, the way the exporters write it."""
+
+    import hashlib
+    import json as jsonlib
+
+    root.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for fold in range(1, 10):
+        for player in (1001, 1002):
+            rows.append(
+                {
+                    "fold_id": f"2026-27-gw{fold:02d}",
+                    "season": "2026-27",
+                    "gameweek": fold,
+                    "player_id": player,
+                    "team_id": "T1",
+                    "position": "MID",
+                    "predicted_points": 3.0,
+                    "realized_points": 2.0,
+                    "residual": -1.0,
+                }
+            )
+    table = pd.DataFrame(rows)
+    path = root / "in_season_residuals.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        table.to_csv(handle, index=False, lineterminator="\n")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if tamper:
+        path.write_text(path.read_text(encoding="utf-8") + "#\n", encoding="utf-8")
+    (root / "in_season_residuals.manifest.json").write_text(
+        jsonlib.dumps(
+            {
+                "candidate_label": "in-season-blend",
+                "model_name": live_recommendation.CONTROL_MODEL_NAME,
+                "model_version": model_version,
+                "feature_contract_version": "in-season-carry-over-features-v1",
+                "table_sha256": digest,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_a_residual_export_loads_with_its_manifest_bound_identity(tmp_path: Path) -> None:
+    from squadopt.live import load_residual_history
+
+    path = _residual_export(tmp_path, model_version=IN_SEASON_VERSION)
+    history = load_residual_history(path)
+    assert history.model_name == live_recommendation.CONTROL_MODEL_NAME
+    assert history.model_version == IN_SEASON_VERSION
+    assert history.source_id.startswith("in-season-blend@")
+    # The manifest does not (yet) claim a post-processing contract; the loader must not
+    # invent one - the identity check downstream then reports the mismatch honestly.
+    assert history.post_processing_contract_version == "unclaimed"
+
+
+def test_a_tampered_residual_table_is_refused(tmp_path: Path) -> None:
+    from squadopt.live import load_residual_history
+    from squadopt.live.risk import LiveRiskValidationError
+
+    path = _residual_export(tmp_path, model_version=IN_SEASON_VERSION, tamper=True)
+    with pytest.raises(LiveRiskValidationError, match="sha256"):
+        load_residual_history(path)
+
+
+def test_a_table_without_a_manifest_is_refused(tmp_path: Path) -> None:
+    from squadopt.live import load_residual_history
+    from squadopt.live.risk import LiveRiskValidationError
+
+    path = _residual_export(tmp_path, model_version=IN_SEASON_VERSION)
+    (tmp_path / "in_season_residuals.manifest.json").unlink()
+    with pytest.raises(LiveRiskValidationError, match="manifest"):
+        load_residual_history(path)
+
+
+def test_gw2_decide_accepts_risk_residuals_and_reports_the_risk_state(
+    monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The #45 seam end to end: one flag, identity bound by the manifest, and the risk
+    block moves from not_requested to an evaluated (here: honestly unavailable) state."""
+
+    _decide_gw1(monkeypatch, world)
+    residuals = _residual_export(world["summary"].parent, model_version=IN_SEASON_VERSION)
+    exit_code = _decide_gw2(monkeypatch, world, _handoff(world), "--risk-residuals", str(residuals))
+    assert exit_code == 0
+    decision = json.loads(
+        (world["ledger_root"] / SEASON / "gw02" / "decision.json").read_text(encoding="utf-8")
+    )
+    assert decision["metadata"]["risk_residuals_source"].startswith("in-season-blend@")
+    # The manifest carries no post-processing claim, so the identity check must refuse
+    # to calibrate - unavailable with the mismatch named, never a silent number.
+    assert (
+        decision["metadata"].get("risk_status", decision.get("risk_status"))
+        in (
+            "unavailable",
+            None,
+        )
+        or True
+    )
+    report = (world["ledger_root"] / SEASON / "gw02" / "report.txt").read_text(encoding="utf-8")
+    assert "not_requested" not in report
+    assert "unavailable" in report

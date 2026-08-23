@@ -23,6 +23,7 @@ from typing import Any, Final
 from squadopt.application import (
     DecideRequest,
     DecideResult,
+    DecisionVerifier,
     SettleRequest,
     SettleResult,
     TickObserver,
@@ -50,9 +51,6 @@ from squadopt.live import (
     PROJECTION_HANDOFF_CONTRACT_VERSION,
     REPORT_CONTRACT_VERSION,
     SEASON_LEDGER_CONTRACT_VERSION,
-    HeldSquad,
-    Projection,
-    Recommendation,
 )
 from squadopt.live.runlog import RunLog, configure_run_logging
 from squadopt.live.tick import TickAction, TickConfig, TickPlan
@@ -82,7 +80,7 @@ COMPONENT_VERSIONS: Final[dict[str, str]] = {
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _PLAN_KEYS = ("latest_capture", "next_gameweek", "next_deadline_utc", "hours_to_deadline")
 
-Verifier = Callable[[Recommendation, Projection, HeldSquad | None], list[str]]
+Verifier = DecisionVerifier
 Capture = Callable[[Path], SnapshotMetadata | None]
 
 
@@ -213,6 +211,12 @@ def build_parser() -> argparse.ArgumentParser:
     decide_parser.add_argument("--gameweek", type=int)
     decide_parser.add_argument("--season")
     decide_parser.add_argument("--in-season-projection", type=Path)
+    decide_parser.add_argument(
+        "--risk-residuals",
+        type=Path,
+        help="Exported residual table (its .manifest.json sibling binds the identity); "
+        "the report then carries the squad's spread instead of not_requested.",
+    )
     decide_parser.add_argument(
         "--summary-output",
         type=Path,
@@ -437,6 +441,7 @@ def _run_decide(arguments: argparse.Namespace, paths: _Paths, services: CliServi
     requested_snapshot_id = arguments.snapshot_id
     snapshot_id, snapshot_files = _snapshot_files(paths.snapshot, requested_snapshot_id)
     projection = _optional_path(paths.workspace, arguments.in_season_projection)
+    residuals = _optional_path(paths.workspace, arguments.risk_residuals)
     inputs = [*(_Input(path, "fpl_snapshot", SNAPSHOT_SCHEMA_VERSION) for path in snapshot_files)]
     inputs.extend(_Input(path, "historical_archive", FILE_SCHEMA) for path in _files(paths.archive))
     inputs.extend(
@@ -460,6 +465,7 @@ def _run_decide(arguments: argparse.Namespace, paths: _Paths, services: CliServi
                     gameweek=arguments.gameweek,
                     season=arguments.season,
                     in_season_projection=projection,
+                    risk_residuals=residuals,
                     chip=arguments.chip,
                     mode="replay" if requested_snapshot_id else "live",
                 ),

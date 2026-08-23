@@ -9,7 +9,7 @@ published, and successful calls return typed descriptions of the files they wrot
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 
 import pandas as pd
 
@@ -30,6 +30,7 @@ from squadopt.live import (
     extract_event_points,
     held_squad_from_ledger,
     infer_season,
+    load_residual_history,
     project,
     read_inputs,
     read_projection_handoff,
@@ -66,6 +67,7 @@ class DecideRequest:
     gameweek: int | None = None
     season: str | None = None
     in_season_projection: Path | None = None
+    risk_residuals: Path | None = None
     chip: str | None = None
     mode: Literal["live", "replay"] | None = None
 
@@ -74,6 +76,8 @@ class DecideRequest:
             object.__setattr__(self, name, Path(getattr(self, name)))
         if self.in_season_projection is not None:
             object.__setattr__(self, "in_season_projection", Path(self.in_season_projection))
+        if self.risk_residuals is not None:
+            object.__setattr__(self, "risk_residuals", Path(self.risk_residuals))
         if self.gameweek is not None and (
             isinstance(self.gameweek, bool)
             or not isinstance(self.gameweek, int)
@@ -158,10 +162,23 @@ def _resolve_snapshot(root: Path, requested: str | None) -> tuple[str, CapturedS
     return snapshot_id, read_snapshot(root, snapshot_id)
 
 
+class DecisionVerifier(Protocol):
+    def __call__(
+        self,
+        recommendation: Recommendation,
+        projection: Projection,
+        held: HeldSquad | None = None,
+        *,
+        risk_requested: bool = False,
+    ) -> list[str]: ...
+
+
 def verify_decision(
     recommendation: Recommendation,
     projection: Projection,
     held: HeldSquad | None = None,
+    *,
+    risk_requested: bool = False,
 ) -> list[str]:
     """Apply every runbook publication check and return all failure reasons."""
 
@@ -227,11 +244,17 @@ def verify_decision(
             f"Availability rule violated: unavailable players {selected_unavailable!r} "
             "were selected."
         )
-    if recommendation.risk.status is not LiveRiskStatus.NOT_REQUESTED:
+    if risk_requested:
+        if recommendation.risk.status is LiveRiskStatus.NOT_REQUESTED:
+            failures.append(
+                "Risk residuals were supplied but the recommendation carries no risk "
+                "state; the request was silently dropped somewhere."
+            )
+    elif recommendation.risk.status is not LiveRiskStatus.NOT_REQUESTED:
         failures.append(
             f"Risk diagnostics status is {recommendation.risk.status.value!r}; "
-            "gameweek operations decide without a risk overlay, so anything else "
-            "means an unexpected input reached the recommendation."
+            "no risk residuals were requested, so an unexpected input reached the "
+            "recommendation."
         )
     unprojected = set(projection.unprojected_players)
     selected_unprojected = sorted(squad_ids & unprojected)
@@ -293,7 +316,7 @@ def decide(
     request: DecideRequest,
     *,
     panel_builder: PanelBuilder = build_panel,
-    verifier: Callable[[Recommendation, Projection, HeldSquad | None], list[str]] = verify_decision,
+    verifier: DecisionVerifier = verify_decision,
 ) -> DecideResult:
     """Calculate, verify, and immutably record one gameweek decision."""
 
@@ -334,14 +357,26 @@ def decide(
             before_gameweek=inputs.deadline.gameweek,
             budget_tenths=OptimizationConfig().budget_tenths,
         )
+        risk_history = None
+        if request.risk_residuals is not None:
+            risk_history = load_residual_history(request.risk_residuals)
+            metadata["risk_residuals_path"] = str(request.risk_residuals)
+            metadata["risk_residuals_source"] = risk_history.source_id
         recommendation = build_transfer_recommendation(
-            inputs, projection, held, rules, chip=request.chip
+            inputs,
+            projection,
+            held,
+            rules,
+            chip=request.chip,
+            risk_history=risk_history,
         )
         metadata["projection_handoff_fingerprint"] = handoff.fingerprint
         metadata["projection_handoff_path"] = str(request.in_season_projection)
         metadata["held_squad_decided_gameweek"] = held.decided_gameweek
 
-    failures = verifier(recommendation, projection, held)
+    failures = verifier(
+        recommendation, projection, held, risk_requested=request.risk_residuals is not None
+    )
     if failures:
         raise DecisionVerificationError(failures)
 
