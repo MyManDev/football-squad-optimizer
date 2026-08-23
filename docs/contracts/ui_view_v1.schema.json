@@ -46,6 +46,12 @@
         "verdict": {
           "type": "string"
         },
+        "verdict_code": {
+          "type": "string"
+        },
+        "verdict_params": {
+          "type": "object"
+        },
         "weeks": {
           "items": {
             "$ref": "#/$defs/LeagueWeekView"
@@ -63,6 +69,8 @@
         "source_snapshot_id",
         "total_difference_to_average",
         "verdict",
+        "verdict_code",
+        "verdict_params",
         "weeks"
       ],
       "type": "object"
@@ -1016,6 +1024,12 @@
         "reason": {
           "type": "string"
         },
+        "reason_code": {
+          "type": "string"
+        },
+        "reason_params": {
+          "type": "object"
+        },
         "snapshot_id": {
           "type": [
             "string",
@@ -1028,6 +1042,8 @@
         "handoff_path",
         "kind",
         "reason",
+        "reason_code",
+        "reason_params",
         "snapshot_id"
       ],
       "type": "object"

@@ -1,5 +1,7 @@
 export type Language = "tr" | "en";
 
+export type ReasonParams = Record<string, string | number | undefined>;
+
 const en = {
   common: {
     loading: "Loading…",
@@ -350,6 +352,55 @@ const en = {
     linkBody:
       "The member surface is prepared mock-first; every row will link to that entry's public post-deadline squad and suggested moves.",
     linkLabel: "Open league members →",
+  },
+  reasonCodes: {
+    no_capture: () => "no capture is held; the calendar is unknown",
+    settle_due: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} is finished in the latest capture and its decision has no outcome`,
+    recapture_for_outcome: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} was decided but is not marked finished; the capture is ${p.capture_age_hours} h old`,
+    await_outcome: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} awaits its outcome; next look after ${p.recapture_hours} h`,
+    deadline_missed: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} closed with no decision recorded; nothing can be decided for it now`,
+    no_open_deadline: () => "no deadline is open in the latest capture's calendar",
+    already_decided: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} is already decided; nothing to do until its outcome`,
+    before_window: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} deadline in ${p.hours_left} h; capture opens ${p.window_hours} h before it`,
+    capture_window_open: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} deadline in ${p.hours_left} h and no capture from inside the window is held`,
+    decide_opening: (p: ReasonParams) =>
+      `opening gameweek ${p.gameweek}: the capture is inside the window`,
+    decide_ready: (p: ReasonParams) =>
+      `gameweek ${p.gameweek}: capture and projection handoff are both ready`,
+    handoff_missing: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} deadline in ${p.hours_left} h, capture held, but the projection handoff is missing`,
+  },
+  riskReasons: {
+    not_requested: "No residual history was supplied; distributional risk was not evaluated.",
+    available: "Risk metrics are supported by matched historical residual evidence.",
+    model_mismatch: "The residual history was produced by a different model contract.",
+    unsupported_opening_gameweek: "Midseason residuals do not support opening-gameweek risk.",
+    insufficient_history: "The eligible residual history is too short to calibrate.",
+  },
+  verdictCodes: {
+    no_scored_gameweeks: () =>
+      "No gameweek has been scored yet, so there is nothing to compare: the game publishes an average only once a gameweek finishes.",
+    standing: (p: ReasonParams) => {
+      const caveat =
+        p.caveat === "noise"
+          ? " - one gameweek is noise, not evidence"
+          : p.caveat === "few"
+            ? " - still fewer weeks than a season's variation needs"
+            : "";
+      const own =
+        p.mean_starter_ownership !== undefined
+          ? `; the starting eleven averages ${p.mean_starter_ownership}% ownership`
+          : "";
+      const sign = Number(p.difference) >= 0 ? "+" : "";
+      return `${sign}${p.difference} points against the game's average over ${p.scored} scored ${Number(p.scored) === 1 ? "gameweek" : "gameweeks"}${caveat}${own}.`;
+    },
   },
   status: {
     loading: "Loading the tick status…",
@@ -759,6 +810,54 @@ const tr: MessageSchema<typeof en> = {
     linkBody:
       "Üye yüzeyi mock-first hazırlandı; her satır üyenin son tarih sonrası public kadrosuna ve önerilen hamlelerine bağlanacak.",
     linkLabel: "Lig üyelerini aç →",
+  },
+  reasonCodes: {
+    no_capture: () => "elde capture yok; takvim bilinmiyor",
+    settle_due: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} son capture'da bitmiş görünüyor ve kararının sonucu işlenmemiş`,
+    recapture_for_outcome: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} karara bağlandı ama bitmiş işaretli değil; capture ${p.capture_age_hours} saatlik`,
+    await_outcome: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} sonucunu bekliyor; ${p.recapture_hours} saat sonra tekrar bakılacak`,
+    deadline_missed: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} kararsız kapandı; artık bu hafta için karar verilemez`,
+    no_open_deadline: () => "son capture'ın takviminde açık bir deadline yok",
+    already_decided: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} zaten karara bağlandı; sonucu gelene kadar yapılacak iş yok`,
+    before_window: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} deadline'ına ${p.hours_left} saat var; capture penceresi ${p.window_hours} saat önce açılır`,
+    capture_window_open: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} deadline'ına ${p.hours_left} saat var ve pencere içinden capture alınmadı`,
+    decide_opening: (p: ReasonParams) => `açılış haftası ${p.gameweek}: capture pencere içinde`,
+    decide_ready: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek}: capture ve projeksiyon devri hazır`,
+    handoff_missing: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} deadline'ına ${p.hours_left} saat var; capture hazır ama projeksiyon devri eksik`,
+  },
+  riskReasons: {
+    not_requested: "Artık geçmişi verilmedi; dağılımsal risk değerlendirilmedi.",
+    available: "Risk metrikleri, eşleşen tarihsel artık kanıtına dayanıyor.",
+    model_mismatch: "Artık geçmişi farklı bir model sözleşmesinden üretilmiş.",
+    unsupported_opening_gameweek: "Sezon içi artıklar açılış haftası riskini desteklemez.",
+    insufficient_history: "Uygun artık geçmişi kalibrasyon için çok kısa.",
+  },
+  verdictCodes: {
+    no_scored_gameweeks: () =>
+      "Henüz skorlanmış oyun haftası yok, karşılaştıracak bir şey de yok: oyun, ortalamayı ancak bir hafta bitince yayınlıyor.",
+    standing: (p: ReasonParams) => {
+      const caveat =
+        p.caveat === "noise"
+          ? " - tek hafta gürültüdür, kanıt değil"
+          : p.caveat === "few"
+            ? " - bir sezonun oynaklığı için hâlâ az hafta"
+            : "";
+      const own =
+        p.mean_starter_ownership !== undefined
+          ? `; ilk on birin ortalama sahipliği %${p.mean_starter_ownership}`
+          : "";
+      const sign = Number(p.difference) >= 0 ? "+" : "";
+      return `Skorlanan ${p.scored} haftada oyun ortalamasına karşı ${sign}${p.difference} puan${caveat}${own}.`;
+    },
   },
   status: {
     loading: "Tick durumu yükleniyor…",

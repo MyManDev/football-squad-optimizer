@@ -246,6 +246,8 @@ def ui_view_schema() -> dict[str, Any]:
             "total_difference_to_average": _nullable(_NUM),
             "ownership": _nullable(_ref("OwnershipView")),
             "verdict": _STR,
+            "verdict_code": _STR,
+            "verdict_params": _free_object(),
         }
     )
     tick_action = _obj(
@@ -255,6 +257,8 @@ def ui_view_schema() -> dict[str, Any]:
             "gameweek": _nullable(_INT),
             "snapshot_id": _nullable(_STR),
             "handoff_path": _nullable(_STR),
+            "reason_code": _STR,
+            "reason_params": _free_object(),
         }
     )
     run_log_event = _obj(

@@ -585,6 +585,8 @@ def status_view(
             TickActionView(
                 kind=str(action.kind),
                 reason=_scrub_text(action.reason),
+                reason_code=action.reason_code,
+                reason_params=_mapping(_scrub_value(jsonable(dict(action.reason_params)))),
                 gameweek=action.gameweek,
                 snapshot_id=action.snapshot_id,
                 handoff_path=(

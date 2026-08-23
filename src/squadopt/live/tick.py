@@ -83,6 +83,10 @@ class TickAction:
     gameweek: int | None = None
     snapshot_id: str | None = None
     handoff_path: str | None = None
+    reason_code: str = ""
+    """A stable identifier for the reason, so a page can translate it; the English
+    sentence stays the source of record and the fallback."""
+    reason_params: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -142,7 +146,13 @@ def plan_tick(
         return TickPlan(
             now_utc=now_text,
             season=season,
-            actions=(TickAction("capture", "no capture is held; the calendar is unknown"),),
+            actions=(
+                TickAction(
+                    "capture",
+                    "no capture is held; the calendar is unknown",
+                    reason_code="no_capture",
+                ),
+            ),
             diagnostics=diagnostics,
         )
 
@@ -173,6 +183,8 @@ def plan_tick(
                     "settle",
                     f"gameweek {gameweek} is finished in the latest capture and its "
                     "decision has no outcome",
+                    reason_code="settle_due",
+                    reason_params={"gameweek": gameweek},
                     gameweek=gameweek,
                     snapshot_id=latest_held.snapshot_id,
                 )
@@ -186,6 +198,11 @@ def plan_tick(
                             f"gameweek {gameweek} was decided, is not marked finished in "
                             f"the latest capture ({latest_held.snapshot_id}), and that "
                             f"capture is {_hours(now - latest_at):.1f} h old",
+                            reason_code="recapture_for_outcome",
+                            reason_params={
+                                "gameweek": gameweek,
+                                "capture_age_hours": round(_hours(now - latest_at), 1),
+                            },
                             gameweek=gameweek,
                         )
                     )
@@ -197,6 +214,12 @@ def plan_tick(
                         f"gameweek {gameweek} awaits its outcome; the latest capture is "
                         f"{_hours(now - latest_at):.1f} h old, next look after "
                         f"{settings.settle_recapture_hours:g} h",
+                        reason_code="await_outcome",
+                        reason_params={
+                            "gameweek": gameweek,
+                            "capture_age_hours": round(_hours(now - latest_at), 1),
+                            "recapture_hours": settings.settle_recapture_hours,
+                        },
                         gameweek=gameweek,
                     )
                 )
@@ -213,6 +236,11 @@ def plan_tick(
                     "wait",
                     f"gameweek {gameweek} deadline {published.deadline_utc} closed with no "
                     "decision recorded (missed); nothing can be decided for it now",
+                    reason_code="deadline_missed",
+                    reason_params={
+                        "gameweek": gameweek,
+                        "deadline_utc": published.deadline_utc,
+                    },
                     gameweek=gameweek,
                 )
             )
@@ -223,7 +251,13 @@ def plan_tick(
     except DataSourceError:
         upcoming = None
     if upcoming is None:
-        actions.append(TickAction("wait", "no deadline is open in the latest capture's calendar"))
+        actions.append(
+            TickAction(
+                "wait",
+                "no deadline is open in the latest capture's calendar",
+                reason_code="no_open_deadline",
+            )
+        )
         diagnostics["next_gameweek"] = None
     else:
         gameweek = upcoming.gameweek
@@ -241,6 +275,8 @@ def plan_tick(
                 TickAction(
                     "wait",
                     f"gameweek {gameweek} is already decided; nothing to do until its outcome",
+                    reason_code="already_decided",
+                    reason_params={"gameweek": gameweek},
                     gameweek=gameweek,
                 )
             )
@@ -250,6 +286,12 @@ def plan_tick(
                     "wait",
                     f"gameweek {gameweek} deadline in {hours_left:.1f} h; capture opens "
                     f"{settings.capture_window_hours:g} h before it",
+                    reason_code="before_window",
+                    reason_params={
+                        "gameweek": gameweek,
+                        "hours_left": round(hours_left, 1),
+                        "window_hours": settings.capture_window_hours,
+                    },
                     gameweek=gameweek,
                 )
             )
@@ -260,6 +302,11 @@ def plan_tick(
                         "capture",
                         f"gameweek {gameweek} deadline in {hours_left:.1f} h and no capture "
                         "from inside the window is held",
+                        reason_code="capture_window_open",
+                        reason_params={
+                            "gameweek": gameweek,
+                            "hours_left": round(hours_left, 1),
+                        },
                         gameweek=gameweek,
                     )
                 )
@@ -270,6 +317,8 @@ def plan_tick(
                     TickAction(
                         "decide",
                         f"opening gameweek: capture {snapshot.snapshot_id} is inside the window",
+                        reason_code="decide_opening",
+                        reason_params={"gameweek": gameweek},
                         gameweek=gameweek,
                         snapshot_id=snapshot.snapshot_id,
                     )
@@ -282,6 +331,8 @@ def plan_tick(
                             "decide",
                             f"capture {snapshot.snapshot_id} is inside the window and the "
                             f"projection handoff is present",
+                            reason_code="decide_ready",
+                            reason_params={"gameweek": gameweek},
                             gameweek=gameweek,
                             snapshot_id=snapshot.snapshot_id,
                             handoff_path=str(handoff),
@@ -293,6 +344,11 @@ def plan_tick(
                             "wait",
                             f"gameweek {gameweek} deadline in {hours_left:.1f} h, capture "
                             f"held, but no projection handoff at {handoff}",
+                            reason_code="handoff_missing",
+                            reason_params={
+                                "gameweek": gameweek,
+                                "hours_left": round(hours_left, 1),
+                            },
                             gameweek=gameweek,
                             snapshot_id=snapshot.snapshot_id,
                             handoff_path=str(handoff),
