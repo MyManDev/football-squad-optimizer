@@ -248,7 +248,20 @@ def ui_view_schema() -> dict[str, Any]:
             "verdict": _STR,
             "verdict_code": _STR,
             "verdict_params": _free_object(),
-        }
+        },
+        # The code fields are additive: documents from older builders stay valid.
+        required=[
+            "season",
+            "source_snapshot_id",
+            "captured_at_utc",
+            "weeks",
+            "scored_gameweeks",
+            "our_total_realized_net_score",
+            "league_total_average_score",
+            "total_difference_to_average",
+            "ownership",
+            "verdict",
+        ],
     )
     tick_action = _obj(
         {
@@ -259,7 +272,9 @@ def ui_view_schema() -> dict[str, Any]:
             "handoff_path": _nullable(_STR),
             "reason_code": _STR,
             "reason_params": _free_object(),
-        }
+        },
+        # The code fields are additive: documents from older builders stay valid.
+        required=["kind", "reason", "gameweek", "snapshot_id", "handoff_path"],
     )
     run_log_event = _obj(
         {"ts": _STR, "level": _STR, "message": _STR, "run_id": _STR, "fields": _free_object()}

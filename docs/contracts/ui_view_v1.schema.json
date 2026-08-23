@@ -60,18 +60,16 @@
         }
       },
       "required": [
-        "captured_at_utc",
-        "league_total_average_score",
-        "our_total_realized_net_score",
-        "ownership",
-        "scored_gameweeks",
         "season",
         "source_snapshot_id",
+        "captured_at_utc",
+        "weeks",
+        "scored_gameweeks",
+        "our_total_realized_net_score",
+        "league_total_average_score",
         "total_difference_to_average",
-        "verdict",
-        "verdict_code",
-        "verdict_params",
-        "weeks"
+        "ownership",
+        "verdict"
       ],
       "type": "object"
     },
@@ -1038,13 +1036,11 @@
         }
       },
       "required": [
-        "gameweek",
-        "handoff_path",
         "kind",
         "reason",
-        "reason_code",
-        "reason_params",
-        "snapshot_id"
+        "gameweek",
+        "snapshot_id",
+        "handoff_path"
       ],
       "type": "object"
     },

@@ -8,19 +8,19 @@ import type { Messages, ReasonParams } from "./messages";
 
 export function reasonText(
   messages: Messages,
-  code: string,
-  params: Record<string, unknown>,
+  code: string | undefined,
+  params: Record<string, unknown> | undefined,
   fallback: string,
 ): string {
   const table = messages.reasonCodes as unknown as Record<string, (values: ReasonParams) => string>;
   const build = code ? table[code] : undefined;
-  return build ? build(params as ReasonParams) : fallback;
+  return build ? build((params ?? {}) as ReasonParams) : fallback;
 }
 
 export function verdictText(
   messages: Messages,
-  code: string,
-  params: Record<string, unknown>,
+  code: string | undefined,
+  params: Record<string, unknown> | undefined,
   fallback: string,
 ): string {
   const table = messages.verdictCodes as unknown as Record<
@@ -28,7 +28,7 @@ export function verdictText(
     (values: ReasonParams) => string
   >;
   const build = code ? table[code] : undefined;
-  return build ? build(params as ReasonParams) : fallback;
+  return build ? build((params ?? {}) as ReasonParams) : fallback;
 }
 
 export function riskText(
