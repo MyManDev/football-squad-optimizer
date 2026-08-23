@@ -66,6 +66,16 @@ export function LeaguePage() {
         />
       </StatRow>
 
+      <Card
+        title={messages.leagueMembers.linkTitle}
+        aside={messages.leagueMembers.leagueNumber(352490)}
+      >
+        <p className={styles.para}>{messages.leagueMembers.linkBody}</p>
+        <p className={styles.para}>
+          <Link to="/league/members">{messages.leagueMembers.linkLabel}</Link>
+        </p>
+      </Card>
+
       {view.rows.length > 1 ? (
         <Card title={copy.cumulative} aside={copy.points}>
           <CumulativeChart rows={view.rows} />

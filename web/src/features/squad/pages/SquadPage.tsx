@@ -139,8 +139,32 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
         />
       </StatRow>
 
+      {view.settled && view.outcome_realized_score !== null ? (
+        <Card title={copy.settledTitle} aside={<Badge tone="good">{copy.settledAside}</Badge>}>
+          <StatRow>
+            <Stat label={copy.settledProjected} value={points(view.projected_score, 1, locale)} />
+            <Stat
+              label={copy.settledRealizedLabel}
+              value={points(view.outcome_realized_score, 0, locale)}
+            />
+            <Stat
+              label={copy.settledNet}
+              value={
+                view.outcome_net_score === null ? "—" : points(view.outcome_net_score, 0, locale)
+              }
+              note={copy.settledNetNote}
+            />
+          </StatRow>
+          <p className={styles.settledNote}>{copy.settledNote}</p>
+        </Card>
+      ) : null}
+
       <Card tone="pitch" title={copy.startingXi} aside={copy.starterCount(view.starting_xi.length)}>
-        <Pitch starters={view.starting_xi} />
+        <Pitch
+          starters={view.starting_xi}
+          showOutcomes={view.settled}
+          captainMultiplier={view.captain_multiplier}
+        />
       </Card>
 
       <div className={styles.twoUp}>
@@ -150,7 +174,7 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
               <strong>{captain.name}</strong>
               <span className={styles.muted}>
                 {captain.team} · {captain.position} · {points(captain.expected_points, 1, locale)}{" "}
-                xP, {copy.countedTwice}
+                xP, {copy.captainMultiplier(view.captain_multiplier)}
               </span>
             </div>
           ) : (

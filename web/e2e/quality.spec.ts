@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { installLeagueMocks } from "./leagueMocks";
+
 const PAGES = [
   { link: "Kadro", heading: /Oyun haftası/, path: "/" },
   { link: "Önerilen hamleler", heading: "Önerilen hamleler", path: "/moves" },
@@ -7,6 +9,10 @@ const PAGES = [
   { link: "Lig", heading: "Lig analizi", path: "/league" },
   { link: "Analiz", heading: "Analiz Merkezi", path: "/analysis" },
 ] as const;
+
+test.beforeEach(async ({ page }) => {
+  await installLeagueMocks(page);
+});
 
 test("the five primary pages are navigable without browser errors", async ({ page }) => {
   const errors: string[] = [];
@@ -67,6 +73,22 @@ test("long Turkish content does not overflow a 390px viewport", async ({ page })
   await page.addInitScript(() => localStorage.setItem("squadopt.language", "tr"));
 
   for (const destination of PAGES) {
+    await page.goto(destination.path);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(destination.heading);
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(dimensions.scrollWidth, `${destination.path} overflows at 390px`).toBeLessThanOrEqual(
+      dimensions.clientWidth,
+    );
+  }
+
+  for (const destination of [
+    { heading: "Lig üyeleri", path: "/league/members" },
+    { heading: "North Stand Notes", path: "/league/members/35249001?mode=agresif&window=3" },
+    { heading: "Oyun haftası 1", path: "/league/members/squadopt" },
+  ] as const) {
     await page.goto(destination.path);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(destination.heading);
     const dimensions = await page.evaluate(() => ({
