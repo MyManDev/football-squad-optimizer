@@ -57,13 +57,7 @@ GRANDFATHERED_BY_RULE_4: tuple[str, ...] = (
 # Growing it turns a governance rule back into a suggestion, which is the state this test
 # exists to leave behind. These are measurements this side did not run, so the findings are not
 # ours to phrase and the rows are not ours to write; the tuple is the record of what is owed.
-UNLISTED_AT_THE_TIME_OF_WRITING: tuple[str, ...] = (
-    "mode_rehearsal_asiri_agresif.json",
-    "mode_rehearsal_garantici.json",
-    "template_rival_strength_2021-22.json",
-    "template_rival_strength_2022-23.json",
-    "template_rival_strength_2023-24.json",
-)
+UNLISTED_AT_THE_TIME_OF_WRITING: tuple[str, ...] = ()
 
 EXEMPT: tuple[str, ...] = GRANDFATHERED_BY_RULE_4 + UNLISTED_AT_THE_TIME_OF_WRITING
 
