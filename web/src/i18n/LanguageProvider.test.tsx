@@ -29,7 +29,7 @@ describe("LanguageProvider", () => {
       </LanguageProvider>,
     );
 
-    expect(screen.getByLabelText("active language")).toHaveTextContent("tr:Önerilen hamleler");
+    expect(screen.getByLabelText("active language")).toHaveTextContent("tr:Önerilen Hamleler");
     expect(document.documentElement).toHaveAttribute("lang", "tr");
     expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("tr");
   });
@@ -44,7 +44,7 @@ describe("LanguageProvider", () => {
     );
 
     await user.click(screen.getByRole("button", { name: /EN.*English/ }));
-    expect(screen.getByLabelText("active language")).toHaveTextContent("en:Suggested moves");
+    expect(screen.getByLabelText("active language")).toHaveTextContent("en:Suggested Moves");
     expect(document.documentElement).toHaveAttribute("lang", "en");
     expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("en");
 
@@ -54,7 +54,7 @@ describe("LanguageProvider", () => {
         <Probe />
       </LanguageProvider>,
     );
-    expect(screen.getByLabelText("active language")).toHaveTextContent("en:Suggested moves");
+    expect(screen.getByLabelText("active language")).toHaveTextContent("en:Suggested Moves");
   });
 
   it("falls back to Turkish when the stored language is invalid", () => {
@@ -66,7 +66,7 @@ describe("LanguageProvider", () => {
       </LanguageProvider>,
     );
 
-    expect(screen.getByLabelText("active language")).toHaveTextContent("tr:Önerilen hamleler");
+    expect(screen.getByLabelText("active language")).toHaveTextContent("tr:Önerilen Hamleler");
     expect(window.localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe("tr");
   });
 });

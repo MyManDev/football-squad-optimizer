@@ -4,9 +4,9 @@ import { installLeagueMocks } from "./leagueMocks";
 
 const PAGES = [
   { link: "Kadro", heading: /Oyun haftası/, path: "/" },
-  { link: "Önerilen hamleler", heading: "Önerilen hamleler", path: "/moves" },
-  { link: "Rakipler", heading: "Rakip analizi", path: "/rivals" },
-  { link: "Lig", heading: "Lig analizi", path: "/league" },
+  { link: "Önerilen Hamleler", heading: "Önerilen Hamleler", path: "/moves" },
+  { link: "Rakipler", heading: "Rakip Analizi", path: "/rivals" },
+  { link: "Lig", heading: "Lig Analizi", path: "/league" },
   { link: "Analiz", heading: "Analiz Merkezi", path: "/analysis" },
 ] as const;
 
@@ -85,7 +85,7 @@ test("long Turkish content does not overflow a 390px viewport", async ({ page })
   }
 
   for (const destination of [
-    { heading: "Lig üyeleri", path: "/league/members" },
+    { heading: "Lig Üyeleri", path: "/league/members" },
     { heading: "North Stand Notes", path: "/league/members/35249001?mode=agresif&window=3" },
     { heading: "Oyun haftası 1", path: "/league/members/squadopt" },
   ] as const) {

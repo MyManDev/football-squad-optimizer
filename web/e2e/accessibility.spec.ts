@@ -80,5 +80,5 @@ test("skip link and primary navigation expose visible keyboard focus", async ({ 
   await expect(squad).toHaveCSS("outline-style", "solid");
 
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Önerilen hamleler" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Önerilen Hamleler" })).toBeFocused();
 });
