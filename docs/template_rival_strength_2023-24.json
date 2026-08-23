@@ -1,0 +1,383 @@
+{
+  "contract_version": "ownership_template_rival_v1",
+  "created_utc": "2026-08-23T06:36:12+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "8949846aec0a30b5303fb8594729c88fd8d42928",
+    "working_tree_dirty": true
+  },
+  "rows": [
+    {
+      "captain_shared": false,
+      "difference": 10.0,
+      "fold_id": "2023-24-gw02",
+      "gameweek": 2,
+      "risk_neutral_realized": 33.0,
+      "shared_starters": 2,
+      "template_realized": 43.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 6.0,
+      "fold_id": "2023-24-gw03",
+      "gameweek": 3,
+      "risk_neutral_realized": 33.0,
+      "shared_starters": 2,
+      "template_realized": 39.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 36.0,
+      "fold_id": "2023-24-gw04",
+      "gameweek": 4,
+      "risk_neutral_realized": 38.0,
+      "shared_starters": 1,
+      "template_realized": 74.0
+    },
+    {
+      "captain_shared": true,
+      "difference": 1.0,
+      "fold_id": "2023-24-gw05",
+      "gameweek": 5,
+      "risk_neutral_realized": 42.0,
+      "shared_starters": 4,
+      "template_realized": 43.0
+    },
+    {
+      "captain_shared": true,
+      "difference": 40.0,
+      "fold_id": "2023-24-gw06",
+      "gameweek": 6,
+      "risk_neutral_realized": 40.0,
+      "shared_starters": 3,
+      "template_realized": 80.0
+    },
+    {
+      "captain_shared": false,
+      "difference": -7.0,
+      "fold_id": "2023-24-gw07",
+      "gameweek": 7,
+      "risk_neutral_realized": 56.0,
+      "shared_starters": 5,
+      "template_realized": 49.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 3.0,
+      "fold_id": "2023-24-gw08",
+      "gameweek": 8,
+      "risk_neutral_realized": 38.0,
+      "shared_starters": 6,
+      "template_realized": 41.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 0.0,
+      "fold_id": "2023-24-gw09",
+      "gameweek": 9,
+      "risk_neutral_realized": 86.0,
+      "shared_starters": 5,
+      "template_realized": 86.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 37.0,
+      "fold_id": "2023-24-gw10",
+      "gameweek": 10,
+      "risk_neutral_realized": 44.0,
+      "shared_starters": 5,
+      "template_realized": 81.0
+    },
+    {
+      "captain_shared": false,
+      "difference": -14.0,
+      "fold_id": "2023-24-gw11",
+      "gameweek": 11,
+      "risk_neutral_realized": 43.0,
+      "shared_starters": 5,
+      "template_realized": 29.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 29.0,
+      "fold_id": "2023-24-gw12",
+      "gameweek": 12,
+      "risk_neutral_realized": 52.0,
+      "shared_starters": 4,
+      "template_realized": 81.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 1.0,
+      "fold_id": "2023-24-gw13",
+      "gameweek": 13,
+      "risk_neutral_realized": 45.0,
+      "shared_starters": 2,
+      "template_realized": 46.0
+    },
+    {
+      "captain_shared": true,
+      "difference": 20.0,
+      "fold_id": "2023-24-gw14",
+      "gameweek": 14,
+      "risk_neutral_realized": 54.0,
+      "shared_starters": 3,
+      "template_realized": 74.0
+    },
+    {
+      "captain_shared": true,
+      "difference": -11.0,
+      "fold_id": "2023-24-gw15",
+      "gameweek": 15,
+      "risk_neutral_realized": 36.0,
+      "shared_starters": 2,
+      "template_realized": 25.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 0.0,
+      "fold_id": "2023-24-gw16",
+      "gameweek": 16,
+      "risk_neutral_realized": 42.0,
+      "shared_starters": 2,
+      "template_realized": 42.0
+    },
+    {
+      "captain_shared": false,
+      "difference": -1.0,
+      "fold_id": "2023-24-gw17",
+      "gameweek": 17,
+      "risk_neutral_realized": 35.0,
+      "shared_starters": 3,
+      "template_realized": 34.0
+    },
+    {
+      "captain_shared": false,
+      "difference": -23.0,
+      "fold_id": "2023-24-gw18",
+      "gameweek": 18,
+      "risk_neutral_realized": 59.0,
+      "shared_starters": 3,
+      "template_realized": 36.0
+    },
+    {
+      "captain_shared": false,
+      "difference": -11.0,
+      "fold_id": "2023-24-gw19",
+      "gameweek": 19,
+      "risk_neutral_realized": 49.0,
+      "shared_starters": 2,
+      "template_realized": 38.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 37.0,
+      "fold_id": "2023-24-gw20",
+      "gameweek": 20,
+      "risk_neutral_realized": 33.0,
+      "shared_starters": 2,
+      "template_realized": 70.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 0.0,
+      "fold_id": "2023-24-gw21",
+      "gameweek": 21,
+      "risk_neutral_realized": 37.0,
+      "shared_starters": 3,
+      "template_realized": 37.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 6.0,
+      "fold_id": "2023-24-gw22",
+      "gameweek": 22,
+      "risk_neutral_realized": 56.0,
+      "shared_starters": 2,
+      "template_realized": 62.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 19.0,
+      "fold_id": "2023-24-gw23",
+      "gameweek": 23,
+      "risk_neutral_realized": 46.0,
+      "shared_starters": 1,
+      "template_realized": 65.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 50.0,
+      "fold_id": "2023-24-gw24",
+      "gameweek": 24,
+      "risk_neutral_realized": 30.0,
+      "shared_starters": 4,
+      "template_realized": 80.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 17.0,
+      "fold_id": "2023-24-gw25",
+      "gameweek": 25,
+      "risk_neutral_realized": 58.0,
+      "shared_starters": 4,
+      "template_realized": 75.0
+    },
+    {
+      "captain_shared": false,
+      "difference": -18.0,
+      "fold_id": "2023-24-gw26",
+      "gameweek": 26,
+      "risk_neutral_realized": 66.0,
+      "shared_starters": 4,
+      "template_realized": 48.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 4.0,
+      "fold_id": "2023-24-gw27",
+      "gameweek": 27,
+      "risk_neutral_realized": 76.0,
+      "shared_starters": 3,
+      "template_realized": 80.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 19.0,
+      "fold_id": "2023-24-gw28",
+      "gameweek": 28,
+      "risk_neutral_realized": 34.0,
+      "shared_starters": 3,
+      "template_realized": 53.0
+    },
+    {
+      "captain_shared": true,
+      "difference": -8.0,
+      "fold_id": "2023-24-gw29",
+      "gameweek": 29,
+      "risk_neutral_realized": 28.0,
+      "shared_starters": 6,
+      "template_realized": 20.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 14.0,
+      "fold_id": "2023-24-gw30",
+      "gameweek": 30,
+      "risk_neutral_realized": 44.0,
+      "shared_starters": 4,
+      "template_realized": 58.0
+    },
+    {
+      "captain_shared": false,
+      "difference": -9.0,
+      "fold_id": "2023-24-gw31",
+      "gameweek": 31,
+      "risk_neutral_realized": 65.0,
+      "shared_starters": 3,
+      "template_realized": 56.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 20.0,
+      "fold_id": "2023-24-gw32",
+      "gameweek": 32,
+      "risk_neutral_realized": 48.0,
+      "shared_starters": 3,
+      "template_realized": 68.0
+    },
+    {
+      "captain_shared": false,
+      "difference": -30.0,
+      "fold_id": "2023-24-gw33",
+      "gameweek": 33,
+      "risk_neutral_realized": 89.0,
+      "shared_starters": 4,
+      "template_realized": 59.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 0.0,
+      "fold_id": "2023-24-gw34",
+      "gameweek": 34,
+      "risk_neutral_realized": 73.0,
+      "shared_starters": 1,
+      "template_realized": 73.0
+    },
+    {
+      "captain_shared": false,
+      "difference": -25.0,
+      "fold_id": "2023-24-gw35",
+      "gameweek": 35,
+      "risk_neutral_realized": 82.0,
+      "shared_starters": 3,
+      "template_realized": 57.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 44.0,
+      "fold_id": "2023-24-gw36",
+      "gameweek": 36,
+      "risk_neutral_realized": 59.0,
+      "shared_starters": 3,
+      "template_realized": 103.0
+    },
+    {
+      "captain_shared": false,
+      "difference": -17.0,
+      "fold_id": "2023-24-gw37",
+      "gameweek": 37,
+      "risk_neutral_realized": 111.0,
+      "shared_starters": 4,
+      "template_realized": 94.0
+    },
+    {
+      "captain_shared": false,
+      "difference": 6.0,
+      "fold_id": "2023-24-gw38",
+      "gameweek": 38,
+      "risk_neutral_realized": 51.0,
+      "shared_starters": 3,
+      "template_realized": 57.0
+    }
+  ],
+  "season": "2023-24",
+  "skipped": [],
+  "summary": {
+    "captain_shared_share": 0.13513513513513514,
+    "difference_interval_90": [
+      1.2432432432432432,
+      12.054054054054054
+    ],
+    "folds": 37,
+    "level_share": 0.10810810810810811,
+    "mean_difference": 6.621621621621622,
+    "mean_shared_starters": 3.2162162162162162,
+    "risk_neutral_mean": 51.648648648648646,
+    "template_ahead_share": 0.5675675675675675,
+    "template_mean": 58.270270270270274
+  }
+}
