@@ -25,7 +25,7 @@ describe("league member surfaces", () => {
   it("renders member standings, the public-data notice and an example badge", () => {
     renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />);
 
-    expect(screen.getByRole("heading", { level: 1, name: "Lig üyeleri" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Lig Üyeleri" })).toBeInTheDocument();
     expect(screen.getByText("örnek veri")).toBeInTheDocument();
     expect(screen.getByText(/son tarihinden sonra herkese açık FPL verisidir/)).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(12);

@@ -9,7 +9,7 @@ test("the real settled contract fills the scorecard and player rows at 390px", a
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
 
-  await expect(page.getByText("Projeksiyon ve gerçekleşen")).toBeVisible();
+  await expect(page.getByText("Projeksiyon ve Gerçekleşen")).toBeVisible();
   await expect(page.getByText("×2 C", { exact: true })).toBeVisible();
   await expect(page.getByText(/^xP /).first()).toBeVisible();
   await expect(page.getByText(/^gerçekleşen /).first()).toBeVisible();

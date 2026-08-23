@@ -37,7 +37,7 @@ describe("DecisionControls", () => {
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Saf Puan/ })).toBeChecked();
     expect(screen.queryByText("diagnostik")).not.toBeInTheDocument();
-    expect(screen.getByText("Rakip bütçesi yok")).toBeInTheDocument();
+    expect(screen.getByText("Rakip Bütçesi Yok")).toBeInTheDocument();
   });
 
   it("keeps the selected mode and window in the shareable URL", async () => {
@@ -69,6 +69,6 @@ describe("DecisionControls", () => {
     expect(screen.getByDisplayValue("agresif")).toBeChecked();
     expect(screen.getByText(/~1,8 beklenen puan maliyeti/)).toBeInTheDocument();
     expect(container.textContent).not.toContain("%");
-    expect(screen.queryByLabelText("Lig numarası")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Lig Numarası")).not.toBeInTheDocument();
   });
 });

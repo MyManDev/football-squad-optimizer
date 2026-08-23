@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 
 test("member list links to point-labelled advice and preserves its URL state", async ({ page }) => {
   await page.goto("/league/members");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig üyeleri");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Üyeleri");
   await expect(page.getByText("örnek veri")).toBeVisible();
   await expect(page.getByText("SquadOpt · sistem takımı")).toBeVisible();
 

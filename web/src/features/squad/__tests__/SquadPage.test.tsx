@@ -114,7 +114,7 @@ describe("SquadPage", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Oyun haftası 1" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Projeksiyon ve gerçekleşen")).not.toBeInTheDocument();
+    expect(screen.queryByText("Projeksiyon ve Gerçekleşen")).not.toBeInTheDocument();
     expect(screen.queryByText(/event puanı/)).not.toBeInTheDocument();
   });
 
@@ -123,7 +123,7 @@ describe("SquadPage", () => {
       viewOverride: settledRecommendationFixture,
     });
 
-    expect(await screen.findByText("Projeksiyon ve gerçekleşen")).toBeInTheDocument();
+    expect(await screen.findByText("Projeksiyon ve Gerçekleşen")).toBeInTheDocument();
     expect(screen.getByText("gerçekleşen")).toBeInTheDocument();
     expect(
       screen.getAllByText(String(settledRecommendationFixture.outcome_realized_score)).length,
