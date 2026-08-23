@@ -1,18 +1,22 @@
 """ADR 0003 rule 1, enforced instead of remembered.
 
 The rule reads: **"Every committed artifact has a row in `measurements_index.md`. No row, no
-commit."** Nothing checked it, and when it was measured the repository was at 56 of 78 — the
-rule had been decaying quietly for weeks, which is what happens to a rule with no test.
+commit."** Nothing checked it -- searching `tests/` for `measurements_index` returned nothing --
+and 22 of the 78 committed artifacts were named nowhere in the index.
 
-The exemption tuple below is the debt that existed when the check was written. It works the
-way ``ignore_imports`` in ``pyproject.toml`` works, and it carries the same obligation:
+That headline number is not the violation, though, and this file is careful about the
+difference. ADR 0003 rule 4 grandfathers the 54 artifacts that existed when the ADR landed
+(commit ``c530b74``, 2026-08-18) and says plainly that "the rule applies from here". Splitting
+the 22 against that commit gives:
 
-    **It may only shrink. If this test fails, add the row — do not add the file here.**
+- 3 that were mine, now written (see the index rows for ``issue43_candidate_declaration``,
+  ``learned_benchmark_development`` and ``production_gate_judgement``);
+- 14 grandfathered by rule 4, which owe nothing;
+- **5 committed after the ADR with no row, which is the actual breach of rule 1.**
 
-Growing the list turns a governance rule back into a suggestion, which is exactly the state
-this test exists to leave behind. The exemptions belong to measurements this side did not run,
-so the rows are theirs to write; the list is the record of what is owed, not permission to owe
-more.
+Both remaining groups are declared below, separately, because they mean different things: one is
+a closed historical set and the other is debt. Merging them into a single "known exceptions"
+tuple would have let the second hide inside the first.
 """
 
 import re
@@ -21,13 +25,14 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 DOCS = REPOSITORY_ROOT / "docs"
 INDEX = DOCS / "measurements_index.md"
+ADR = DOCS / "architecture" / "decisions" / "0003-measurement-artifacts.md"
 
-# Committed artifacts that predate this check and have no row yet. May only shrink.
-# Every entry is a measurement this side did not run, so its finding is not ours to write.
-UNLISTED_AT_THE_TIME_OF_WRITING: tuple[str, ...] = (
+# Artifacts that already existed when ADR 0003 landed and that rule 4 grandfathers: "No
+# retroactive purge... The rule applies from here." A closed set -- the commit it is defined
+# against cannot gain members -- so nothing may ever be added here. Rows would still be an
+# improvement; they are simply not owed.
+GRANDFATHERED_BY_RULE_4: tuple[str, ...] = (
     "baseline_benchmark.json",
-    "mode_rehearsal_asiri_agresif.json",
-    "mode_rehearsal_garantici.json",
     "opening_backtest.json",
     "rank_objective_rehearsal_heldout.json",
     "risk_frontier_shrunk.json",
@@ -40,11 +45,27 @@ UNLISTED_AT_THE_TIME_OF_WRITING: tuple[str, ...] = (
     "scenario_calibration_audit_online_dgw.json",
     "scenario_calibration_audit_online_disp.json",
     "scenario_calibration_audit_shrunk.json",
+    "transfer_discipline_rolling.json",
+)
+
+# Committed after ADR 0003 with no row: rule 1 is owed here, and this tuple is the debt.
+# It works the way ``ignore_imports`` in ``pyproject.toml`` works and carries the same
+# obligation:
+#
+#     **It may only shrink. If this test fails, add the row -- do not add the file here.**
+#
+# Growing it turns a governance rule back into a suggestion, which is the state this test
+# exists to leave behind. These are measurements this side did not run, so the findings are not
+# ours to phrase and the rows are not ours to write; the tuple is the record of what is owed.
+UNLISTED_AT_THE_TIME_OF_WRITING: tuple[str, ...] = (
+    "mode_rehearsal_asiri_agresif.json",
+    "mode_rehearsal_garantici.json",
     "template_rival_strength_2021-22.json",
     "template_rival_strength_2022-23.json",
     "template_rival_strength_2023-24.json",
-    "transfer_discipline_rolling.json",
 )
+
+EXEMPT: tuple[str, ...] = GRANDFATHERED_BY_RULE_4 + UNLISTED_AT_THE_TIME_OF_WRITING
 
 
 def _committed_artifacts() -> list[str]:
@@ -80,9 +101,9 @@ def unlisted_artifacts() -> list[str]:
 
 
 def test_every_committed_artifact_is_named_in_the_index() -> None:
-    """ADR 0003 rule 1. The exemption tuple may only shrink -- add the row, not the file."""
+    """ADR 0003 rule 1. The debt tuple may only shrink -- add the row, not the file."""
 
-    outstanding = sorted(set(unlisted_artifacts()) - set(UNLISTED_AT_THE_TIME_OF_WRITING))
+    outstanding = sorted(set(unlisted_artifacts()) - set(EXEMPT))
 
     assert not outstanding, (
         "These committed artifacts have no row in docs/measurements_index.md, which ADR 0003 "
@@ -92,29 +113,54 @@ def test_every_committed_artifact_is_named_in_the_index() -> None:
     )
 
 
+def test_the_grandfathering_this_file_leans_on_is_still_in_the_adr() -> None:
+    """The larger exemption is only legitimate while rule 4 says so.
+
+    If rule 4 were ever withdrawn, 14 artifacts would silently stay excused by a tuple whose
+    justification no longer existed. The exemption should fail with the rule, not outlive it.
+
+    Whitespace is collapsed first because the sentence is wrapped in the source and a literal
+    search for it silently found nothing -- a check that fails for the wrong reason is only
+    marginally better than one that passes for the wrong reason.
+    """
+
+    text = " ".join(ADR.read_text(encoding="utf-8").split())
+
+    assert "artifacts are grandfathered" in text
+    assert "No retroactive purge" in text
+    assert "The rule applies from here." in text
+
+
+def test_the_two_exemptions_are_kept_apart() -> None:
+    """Grandfathered is not debt, and debt must not be able to hide inside it."""
+
+    assert not set(GRANDFATHERED_BY_RULE_4) & set(UNLISTED_AT_THE_TIME_OF_WRITING)
+    assert len(EXEMPT) == len(set(EXEMPT))
+
+
 def test_the_exemption_list_does_not_outlive_its_files() -> None:
     """A stale exemption is a claim about a file that is no longer there.
 
-    Left unchecked the tuple would slowly become fiction, and a fictional exemption hides the
-    fact that the debt was paid.
+    Left unchecked either tuple would slowly become fiction, and a fictional exemption hides
+    the fact that the debt was paid.
     """
 
     present = set(_committed_artifacts())
-    stale = sorted(name for name in UNLISTED_AT_THE_TIME_OF_WRITING if name not in present)
+    stale = sorted(name for name in EXEMPT if name not in present)
 
     assert not stale, (
-        f"These files are exempt but no longer committed: {stale!r}. Remove them from "
-        "UNLISTED_AT_THE_TIME_OF_WRITING; the list shrinking is the point."
+        f"These files are exempt but no longer committed: {stale!r}. Remove them; the lists "
+        "shrinking is the point."
     )
 
 
 def test_an_exempt_artifact_is_not_also_listed() -> None:
-    """Once a row exists the exemption must go, or the list stops meaning anything."""
+    """Once a row exists the exemption must go, or the lists stop meaning anything."""
 
     named = _names_in_index()
-    both = sorted(name for name in UNLISTED_AT_THE_TIME_OF_WRITING if Path(name).stem in named)
+    both = sorted(name for name in EXEMPT if Path(name).stem in named)
 
-    assert not both, f"These artifacts now have a row and must leave the exemption list: {both!r}."
+    assert not both, f"These artifacts now have a row and must leave the exemption lists: {both!r}."
 
 
 # --- the check itself has to be able to fail ---------------------------------
