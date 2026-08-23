@@ -898,3 +898,71 @@ def test_an_unknown_required_player_is_refused() -> None:
     snapshot = _snapshot()
     with pytest.raises(InvalidConfigurationError, match="required_player_ids"):
         optimize_squad(snapshot.table, OptimizationConfig(), required_player_ids=(999_999_999,))
+
+
+def test_crowd_overlap_is_captain_weighted_and_the_scaled_identity_is_structural() -> None:
+    """overlap_scaled_edge_prereg: shared starter 1, shared captain 2, denominator 12;
+    and a positive scaling never moves the degenerate claim off the negative-edge share."""
+
+    import numpy as np
+
+    from squadopt.scenarios.evaluation import (
+        anchored_probability_ahead,
+        crowd_overlap,
+        rival_edge_draws,
+    )
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    xi = [int(v) for v in decision.starting_xi["player_id"]]
+    captain = int(decision.captain["player_id"])
+
+    mirror = RivalSquad("mirror", tuple(xi), captain)
+    assert crowd_overlap(decision, mirror) == pytest.approx(1.0)
+    other_captain = next(p for p in xi if p != captain)
+    shifted = RivalSquad("shifted-captain", tuple(xi), other_captain)
+    assert crowd_overlap(decision, shifted) == pytest.approx(11.0 / 12.0)
+
+    samples = (-9.0, -2.0, 5.0, 14.0)
+    unscaled = anchored_probability_ahead(
+        decision, decision, scenarios, edge_samples=samples, edge_weeks=2, edge_seed=23
+    )
+    scaled = anchored_probability_ahead(
+        decision,
+        decision,
+        scenarios,
+        edge_samples=samples,
+        edge_weeks=2,
+        edge_seed=23,
+        overlap_scaling_crowd=shifted,
+    )
+    drawn = rival_edge_draws(samples, scenarios=len(scenarios.scenario_points), weeks=2, seed=23)
+    assert unscaled.probability_ahead == pytest.approx(float(np.mean(drawn < 0.0)))
+    assert scaled.probability_ahead == unscaled.probability_ahead
+    assert scaled.diagnostics["edge_scale"] == pytest.approx(1.0 - 11.0 / 12.0)
+
+
+def test_full_overlap_removes_the_edge_entirely() -> None:
+    from squadopt.scenarios.evaluation import anchored_probability_ahead
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    mirror = RivalSquad(
+        "mirror",
+        tuple(int(v) for v in decision.starting_xi["player_id"]),
+        int(decision.captain["player_id"]),
+    )
+    claim = anchored_probability_ahead(
+        decision,
+        decision,
+        scenarios,
+        edge_samples=(50.0,),
+        edge_weeks=1,
+        edge_seed=1,
+        overlap_scaling_crowd=mirror,
+    )
+    # Candidate == anchor == crowd: no differential, no edge faced - a level pair.
+    assert claim.diagnostics["edge_scale"] == 0.0
+    assert claim.probability_ahead == 0.0
