@@ -1,9 +1,19 @@
 # Measurements Index
 
 One line per committed real-data measurement artifact: what it is, what it found, and
-where it came from. Every artifact is recommendation/measurement-only — nothing here
-promoted a model, changed the operational control, or read the 2025-26 locked holdout.
+where it came from. Every artifact here is measurement-only in the sense that matters —
+**nothing in this index promoted a model or changed the operational control.**
+
+One artifact **did** read the locked 2025-26 holdout: `fw10_holdout`, once, under the
+pre-registered protocol in `fw10_holdout_plan.md`, with three owner approvals recorded
+first. It did not promote its challenger. That is stated here rather than left to the row,
+because the blanket claim this paragraph used to make — that nothing here had read the
+holdout — stopped being true the moment the run was recorded, and a header a reader trusts
+must not contradict its own table.
+
 Regenerated artifacts must keep passing `scripts.run_measurement_preflight`.
+`tests/unit/test_measurements_index.py` holds the rule that every committed artifact appears
+here (ADR 0003, rule 1).
 
 ## Deterministic policy
 
@@ -14,6 +24,9 @@ Regenerated artifacts must keep passing `scripts.run_measurement_preflight`.
 | `fw10_screening` + `fw10_frozen_candidate` | Official screening DoE froze `fw10-bw0` as the eligible challenger; holdout plan in `fw10_holdout_plan.md` (run deferred) | #65 |
 | `fw10_season_robustness` | Challenger-vs-control delta per development season, in isolation | #74 |
 | `fw10_holdout` + `fw10_holdout_note` | **The locked holdout, spent.** `fw10-bw0` **not promoted**; `fw05-bw0p1` remains the operational control. Paired mean **+1.405** on 37 folds of 2025-26, 90% interval **[−2.622, 4.000]** — the effect-size gate passed (≥0.5) and the confidence gate failed (lower bound below zero). Development was +2.728 [0.762, 4.544] over 147 folds, so the challenger did not reverse; one season's interval is simply wide. `development_seasons_accessed: false`. Per the pre-registered plan the fw10 hypothesis is closed: no re-runs, no threshold changes. Limitations, including the holdout's prior exposure and a pre-run coverage read, are in the note | #168 |
+| `issue43_candidate_declaration` | The #43 candidate frozen before its run: `learned_rate_calendar_candidate_v1`, one changed component (`expected_points_rate`), 14 components named frozen. Declaration fingerprint `f72962a1…`, benchmark configuration `b64a3ab9…`, both computed from the typed objects the run would use. `formal_run_completed: false` — this freezes a run rather than reporting one | #43 |
+| `learned_benchmark_development` | Learned rate against the deterministic baseline over 147 development folds: **53.78 → 56.89 mean realized points, +3.12**, winning 80 folds, losing 57, tied 10, and changing the captain on 97. Explicitly **not** a promotion — `automatic_promotion: false`, and the record says a separate gate must be defined first. The Ridge arm is an integration reference, not a rival model; opening gameweeks and the holdout are outside it | — |
+| `production_gate_judgement` | The development gate the two-stage production candidate **did not clear**: verdict `no_promotion_control_retained`. Three of four gates passed — against the baseline +4.4898 [2.5643, 6.6939] and a positive mean against the ridge reference (+0.6463) — but the **ridge lower bound of −1.6194 failed**, so the candidate is not distinguishable from the reference. Means over 147 feasible folds: baseline 53.26, production 57.75, ridge 57.10. This is why the live path still projects with the operational control | — |
 | `selection_optimism` | Winner's curse located: roster residuals unbiased (−0.004), selected starters −2.96, captains −3.86, top-5 ranked −3.53 | #73 |
 | `shrinkage_grid` | Does decision-side position-mean shrinkage improve realized squads? (`position_mean_shrinkage_v1`) | #74+ |
 
