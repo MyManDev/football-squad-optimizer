@@ -196,6 +196,39 @@ class ScenarioComparisonResult:
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
 
+def rival_edge_draws(
+    samples: tuple[float, ...],
+    *,
+    scenarios: int,
+    weeks: int,
+    seed: int,
+) -> np.ndarray:
+    """One resampled window edge per scenario: the sum of ``weeks`` iid draws.
+
+    ``samples`` are measured weekly edges (the crowd's realized advantage over the
+    projection, week by week); resampling the empirical series keeps the location and
+    the spread the measurement saw, with no distributional fit. Independence across
+    weeks is itself measured (lag-1 autocorrelation 0.07 on 2024-25, negative on the
+    other seasons), so a window's edge is a plain sum. Deterministic under ``seed``.
+    """
+
+    if not isinstance(seed, int) or isinstance(seed, bool):
+        raise ScenarioValidationError("seed must be an integer.")
+    if not isinstance(weeks, int) or isinstance(weeks, bool) or weeks < 1:
+        raise ScenarioValidationError("weeks must be a positive integer.")
+    if not isinstance(scenarios, int) or isinstance(scenarios, bool) or scenarios < 1:
+        raise ScenarioValidationError("scenarios must be a positive integer.")
+    if not samples:
+        raise ScenarioValidationError("samples must be non-empty.")
+    values = np.asarray(samples, dtype="float64")
+    if not np.isfinite(values).all():
+        raise ScenarioValidationError("Every edge sample must be finite.")
+    generator = np.random.default_rng(seed)
+    indices = generator.integers(0, len(values), size=(scenarios, weeks))
+    result: np.ndarray = values[indices].sum(axis=1)
+    return result
+
+
 def compare_fixed_decisions(
     optimization_result: OptimizationResult,
     rival: RivalSquad,
@@ -203,6 +236,9 @@ def compare_fixed_decisions(
     config: ScenarioEvaluationConfig | None = None,
     *,
     rival_edge_points: float = 0.0,
+    rival_edge_samples: tuple[float, ...] = (),
+    rival_edge_weeks: int = 1,
+    rival_edge_seed: int = 0,
 ) -> ScenarioComparisonResult:
     """Score my decision and a rival's squad in the same scenarios and read the gap.
 
@@ -244,10 +280,24 @@ def compare_fixed_decisions(
         raise ScenarioValidationError("rival_edge_points must be a finite number.")
     if not math.isfinite(float(rival_edge_points)):
         raise ScenarioValidationError("rival_edge_points must be a finite number.")
+    if rival_edge_samples and float(rival_edge_points) != 0.0:
+        raise ScenarioValidationError(
+            "rival_edge_samples carry the measured location already; combining them "
+            "with a non-zero rival_edge_points would count the edge twice."
+        )
+    if rival_edge_samples:
+        edge = rival_edge_draws(
+            tuple(float(v) for v in rival_edge_samples),
+            scenarios=matrix.shape[0],
+            weeks=rival_edge_weeks,
+            seed=rival_edge_seed,
+        )
+    else:
+        edge = np.full(matrix.shape[0], float(rival_edge_points))
     theirs = (
         matrix[:, [column[p] for p in rival.starter_ids]].sum(axis=1)
         + matrix[:, column[rival.captain_id]]
-        + float(rival_edge_points)
+        + edge
     )
     difference = mine - theirs
     ahead = int((difference > 0.0).sum())

@@ -718,3 +718,110 @@ def test_an_edged_rival_is_harder_to_finish_ahead_of() -> None:
     assert edged.probability_ahead == 0.0
     assert edged.probability_ahead <= base.probability_ahead
     assert edged.optimization_result.diagnostics["rival_edge_points"] == pytest.approx(1000.0)
+
+
+def test_empty_samples_are_bit_for_bit_the_constant_path() -> None:
+    """The amended prereg's fallback clause: () consumes no randomness, changes nothing."""
+
+    from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    base = optimize_rank_probability_squad(
+        scenarios, rival, OptimizationConfig(), RankObjectiveConfig(rival_edge_points=3.0)
+    )
+    explicit = optimize_rank_probability_squad(
+        scenarios,
+        rival,
+        OptimizationConfig(),
+        RankObjectiveConfig(rival_edge_points=3.0, rival_edge_samples=(), rival_edge_seed=99),
+    )
+    assert explicit.probability_ahead == base.probability_ahead
+    assert explicit.scenario_mean_score == base.scenario_mean_score
+    assert explicit.optimization_result.diagnostics["rival_edge_drawn_sd"] == 0.0
+
+
+def test_sampled_edges_are_deterministic_and_carry_the_measured_spread() -> None:
+    from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    samples = (-10.0, 0.0, 10.0, 20.0)
+    config = RankObjectiveConfig(rival_edge_samples=samples, rival_edge_weeks=3, rival_edge_seed=5)
+    first = optimize_rank_probability_squad(scenarios, rival, OptimizationConfig(), config)
+    second = optimize_rank_probability_squad(scenarios, rival, OptimizationConfig(), config)
+    assert first.probability_ahead == second.probability_ahead
+    diag = first.optimization_result.diagnostics
+    assert diag["rival_edge_samples"] == len(samples)
+    assert diag["rival_edge_weeks"] == 3
+    assert diag["rival_edge_drawn_sd"] > 0.0
+    other = optimize_rank_probability_squad(
+        scenarios,
+        rival,
+        OptimizationConfig(),
+        RankObjectiveConfig(rival_edge_samples=samples, rival_edge_weeks=3, rival_edge_seed=6),
+    )
+    assert (
+        other.optimization_result.diagnostics["rival_edge_drawn_mean"]
+        != diag["rival_edge_drawn_mean"]
+    )
+
+
+def test_an_identical_squad_differs_from_the_rival_by_exactly_the_drawn_edge() -> None:
+    """The gate's shared-draw clause, now with the edge random: players still cancel."""
+
+    import numpy as np
+
+    from squadopt.scenarios.evaluation import rival_edge_draws
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    xi = decision.starting_xi["player_id"].tolist()
+    captain = decision.captain["player_id"]
+    rival = RivalSquad("mirror", tuple(xi), captain)
+    samples = (4.0, 8.0, 12.0)
+    result = compare_fixed_decisions(
+        decision,
+        rival,
+        scenarios,
+        rival_edge_samples=samples,
+        rival_edge_weeks=2,
+        rival_edge_seed=11,
+    )
+    drawn = rival_edge_draws(samples, scenarios=len(scenarios.scenario_points), weeks=2, seed=11)
+    # Mine minus theirs must be exactly minus the drawn edge in every scenario: the
+    # players cancelled, only the edge remains.
+    assert result.mean_difference == pytest.approx(-float(np.mean(drawn)))
+    assert result.probability_ahead == 0.0
+
+
+def test_samples_with_a_constant_edge_are_refused_everywhere() -> None:
+    from squadopt.scenarios import RankObjectiveConfig
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    with pytest.raises(Exception, match="twice"):
+        RankObjectiveConfig(rival_edge_points=1.0, rival_edge_samples=(1.0,))
+    with pytest.raises(Exception, match="twice"):
+        compare_fixed_decisions(
+            decision, rival, scenarios, rival_edge_points=1.0, rival_edge_samples=(1.0,)
+        )
