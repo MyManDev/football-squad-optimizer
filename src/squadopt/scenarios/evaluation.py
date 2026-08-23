@@ -215,6 +215,23 @@ class AnchoredClaim:
     diagnostics: Mapping[str, object]
 
 
+def crowd_overlap(result: OptimizationResult, crowd: "RivalSquad") -> float:
+    """Captain-weighted starter share against the crowd's eleven, as declared.
+
+    Shared starters count one, a shared captain counts two, denominator twelve —
+    `overlap_scaled_edge_prereg.md` fixes this once; it is not a knob.
+    """
+
+    if not isinstance(result, OptimizationResult) or result.captain is None:
+        raise ScenarioValidationError("result must be a feasible OptimizationResult.")
+    crowd_ids = {int(str(p)) for p in crowd.starter_ids}
+    starters = {int(v) for v in result.starting_xi["player_id"]}
+    weight = float(len(starters & crowd_ids))
+    if int(result.captain["player_id"]) == int(str(crowd.captain_id)):
+        weight += 1.0
+    return weight / 12.0
+
+
 def anchored_probability_ahead(
     candidate: OptimizationResult,
     anchor: OptimizationResult,
@@ -223,6 +240,7 @@ def anchored_probability_ahead(
     edge_samples: tuple[float, ...],
     edge_weeks: int,
     edge_seed: int,
+    overlap_scaling_crowd: "RivalSquad | None" = None,
 ) -> AnchoredClaim:
     """The anchored claim: P((candidate - anchor)_scenario > edge_draw).
 
@@ -259,7 +277,14 @@ def anchored_probability_ahead(
     edge = rival_edge_draws(
         edge_samples, scenarios=matrix.shape[0], weeks=edge_weeks, seed=edge_seed
     )
-    wins = differential - edge > 0.0
+    scale = 1.0
+    if overlap_scaling_crowd is not None:
+        # The crowd's edge is carried by its players: a candidate holding them inherits
+        # that share, so the edge it still faces is scaled by its non-overlap
+        # (overlap_scaled_edge_prereg). None (the default) is the anchored construction,
+        # bit for bit.
+        scale = 1.0 - crowd_overlap(candidate, overlap_scaling_crowd)
+    wins = differential - edge * scale > 0.0
     ahead = int(wins.sum())
     count = int(matrix.shape[0])
     return AnchoredClaim(
@@ -275,6 +300,7 @@ def anchored_probability_ahead(
                 "edge_samples": len(edge_samples),
                 "edge_weeks": int(edge_weeks),
                 "edge_seed": int(edge_seed),
+                "edge_scale": float(scale),
             }
         ),
     )
