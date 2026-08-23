@@ -506,7 +506,12 @@ def _optimize_squad_with_objective_points(
         relative_gap = absolute_gap / max(1.0, abs(objective_value))
 
     result_solver = primary_solver
-    remaining_time = deadline - perf_counter()
+    # The tie-break gets at least the primary's own declared budget rather than only
+    # its leftover: a secondary solve cut off mid-search returns a FEASIBLE-but-arbitrary
+    # optimum, which is the machine-load nondeterminism #192 measured. Reusing the
+    # existing budget field adds no configuration surface, so the frozen declaration
+    # fingerprints (#43, Route A) are untouched.
+    remaining_time = max(deadline - perf_counter(), config.solver_time_limit_seconds)
     remaining_deterministic_time = _remaining_deterministic_time(
         config.solver_deterministic_time_limit,
         primary_deterministic_time,
@@ -521,6 +526,12 @@ def _optimize_squad_with_objective_points(
         and deterministic_budget_available
     ):
         base_diagnostics["tiebreak_attempted"] = True
+        # Hint the secondary solve with the primary's solution: a known-feasible,
+        # objective-optimal start turns most tie-break solves into a fast proof
+        # instead of a fresh search that the budget then cuts off arbitrarily (#192).
+        for variables in (artifacts.squad_vars, artifacts.starter_vars, artifacts.captain_vars):
+            for variable in variables:
+                artifacts.model.add_hint(variable, primary_solver.value(variable))
         _add_tiebreak_objective(
             artifacts.model,
             artifacts.squad_vars,
