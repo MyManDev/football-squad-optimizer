@@ -857,3 +857,44 @@ def test_samples_with_a_constant_edge_are_refused_everywhere() -> None:
         compare_fixed_decisions(
             decision, rival, scenarios, rival_edge_points=1.0, rival_edge_samples=(1.0,)
         )
+
+
+def test_the_anchored_claim_degenerates_exactly_for_the_anchor_itself() -> None:
+    """anchored_differential_prereg clause 1: same squad, zero scenario term, and the
+    claim equals the share of negative resampled window edges on the same draw vector."""
+
+    import numpy as np
+
+    from squadopt.scenarios.evaluation import anchored_probability_ahead, rival_edge_draws
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    samples = (-12.0, -3.0, 4.0, 9.0, 21.0)
+    claim = anchored_probability_ahead(
+        decision, decision, scenarios, edge_samples=samples, edge_weeks=3, edge_seed=17
+    )
+    drawn = rival_edge_draws(samples, scenarios=len(scenarios.scenario_points), weeks=3, seed=17)
+    assert claim.scenario_differential_mean == 0.0
+    assert claim.probability_ahead == pytest.approx(float(np.mean(drawn < 0.0)))
+
+
+def test_a_required_player_is_in_the_squad_and_the_default_changes_nothing() -> None:
+    snapshot = _snapshot()
+    base = optimize_squad(snapshot.table, OptimizationConfig())
+    cheapest = int(snapshot.table.sort_values(["price_tenths", "player_id"]).iloc[0]["player_id"])
+    forced = optimize_squad(snapshot.table, OptimizationConfig(), required_player_ids=(cheapest,))
+    assert forced.has_solution
+    assert cheapest in {int(v) for v in forced.selected_squad["player_id"]}
+    explicit = optimize_squad(snapshot.table, OptimizationConfig(), required_player_ids=())
+    assert {int(v) for v in explicit.selected_squad["player_id"]} == {
+        int(v) for v in base.selected_squad["player_id"]
+    } or explicit.objective_value == base.objective_value
+
+
+def test_an_unknown_required_player_is_refused() -> None:
+    from squadopt.optimization import InvalidConfigurationError
+
+    snapshot = _snapshot()
+    with pytest.raises(InvalidConfigurationError, match="required_player_ids"):
+        optimize_squad(snapshot.table, OptimizationConfig(), required_player_ids=(999_999_999,))
