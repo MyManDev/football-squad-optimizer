@@ -416,6 +416,7 @@ def _optimize_squad_with_objective_points(
     *,
     objective_points: Mapping[object, object] | None,
     objective_contract: str,
+    required_player_ids: tuple[int, ...] = (),
 ) -> OptimizationResult:
     """Solve the shared squad model with a validated private objective override."""
 
@@ -423,11 +424,27 @@ def _optimize_squad_with_objective_points(
         raise InvalidConfigurationError("config must be an OptimizationConfig instance.")
     if not isinstance(objective_contract, str) or not objective_contract.strip():
         raise InvalidConfigurationError("objective_contract must be a non-empty string.")
+    if not isinstance(required_player_ids, tuple) or any(
+        isinstance(v, bool) or not isinstance(v, int) for v in required_player_ids
+    ):
+        raise InvalidConfigurationError("required_player_ids must be a tuple of integers.")
 
     validated = validate_players(players, config)
     ordered_players = sort_players_by_id(validated)
+    if required_player_ids:
+        known = {int(v) for v in ordered_players["player_id"].tolist()}
+        unknown = sorted(set(required_player_ids) - known)
+        if unknown:
+            raise InvalidConfigurationError(
+                f"required_player_ids not in the pool: {unknown[:10]!r}."
+            )
     ordered_objective_points = _validated_objective_points(ordered_players, objective_points)
     artifacts = _build_model(ordered_players, config, ordered_objective_points)
+    if required_player_ids:
+        required = set(required_player_ids)
+        for index, player_id in enumerate(ordered_players["player_id"].tolist()):
+            if int(player_id) in required:
+                artifacts.model.add(artifacts.squad_vars[index] == 1)
     started_at = perf_counter()
     deadline = started_at + config.solver_time_limit_seconds
 
@@ -608,12 +625,22 @@ def _optimize_squad_with_objective_points(
 def optimize_squad(
     players: pd.DataFrame,
     config: OptimizationConfig,
+    *,
+    required_player_ids: tuple[int, ...] = (),
 ) -> OptimizationResult:
-    """Select a squad, starting XI, bench, and captain for one gameweek."""
+    """Select a squad, starting XI, bench, and captain for one gameweek.
+
+    ``required_player_ids`` forces those players into the selected squad (not
+    necessarily the eleven): the constraint a candidate like "highest projection with
+    the crowd's core held" needs. Unknown ids are refused; an infeasible requirement
+    is reported by the solver as any other infeasibility. Empty (the default) is the
+    historical model, bit for bit.
+    """
 
     return _optimize_squad_with_objective_points(
         players,
         config,
         objective_points=None,
         objective_contract="expected_points_v1",
+        required_player_ids=required_player_ids,
     )

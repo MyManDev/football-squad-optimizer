@@ -196,6 +196,90 @@ class ScenarioComparisonResult:
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
 
+@dataclass(frozen=True, slots=True)
+class AnchoredClaim:
+    """A windowed P(ahead of the crowd), built through the risk-neutral anchor.
+
+    ``candidate - crowd`` is decomposed as ``(candidate - anchor)`` under the scenario
+    draws plus ``(anchor - crowd)`` resampled from the measured weekly edge series —
+    the scenario-implied gap to the crowd, which `rival_calibration.md` proved to be a
+    location fiction, never enters (`anchored_differential_prereg.md`).
+    """
+
+    probability_ahead: float
+    probability_ahead_interval: tuple[float, float]
+    scenario_differential_mean: float
+    edge_draw_mean: float
+    edge_draw_sd: float
+    scenario_count: int
+    diagnostics: Mapping[str, object]
+
+
+def anchored_probability_ahead(
+    candidate: OptimizationResult,
+    anchor: OptimizationResult,
+    scenarios: ScenarioSet,
+    *,
+    edge_samples: tuple[float, ...],
+    edge_weeks: int,
+    edge_seed: int,
+) -> AnchoredClaim:
+    """The anchored claim: P((candidate - anchor)_scenario > edge_draw).
+
+    The anchor is the fold's risk-neutral squad. For ``candidate == anchor`` the
+    scenario term vanishes exactly (same players cancel per scenario) and the claim
+    degenerates to the share of negative resampled window edges — the identity the
+    pre-registration's first clause pins.
+    """
+
+    for name, result in (("candidate", candidate), ("anchor", anchor)):
+        if not isinstance(result, OptimizationResult):
+            raise ScenarioValidationError(f"{name} must be an OptimizationResult.")
+        if not result.has_solution or result.captain is None:
+            raise ScenarioValidationError(f"{name} must be a feasible decision.")
+    verified = scenarios.validated_copy()
+    player_ids = verified.projections.table["player_id"].tolist()
+    column = {player_id: index for index, player_id in enumerate(player_ids)}
+    matrix = verified.scenario_points.to_numpy(dtype="float64", copy=False)
+
+    def squad_scores(result: OptimizationResult) -> np.ndarray:
+        starters = result.starting_xi["player_id"].tolist()
+        assert result.captain is not None
+        captain = result.captain["player_id"]
+        missing = [p for p in [*starters, captain] if p not in column]
+        if missing:
+            raise ScenarioValidationError(
+                f"Scenario players must cover the squad; missing={missing[:10]!r}."
+            )
+        scores: np.ndarray = matrix[:, [column[p] for p in starters]].sum(axis=1)
+        total: np.ndarray = scores + matrix[:, column[captain]]
+        return total
+
+    differential = squad_scores(candidate) - squad_scores(anchor)
+    edge = rival_edge_draws(
+        edge_samples, scenarios=matrix.shape[0], weeks=edge_weeks, seed=edge_seed
+    )
+    wins = differential - edge > 0.0
+    ahead = int(wins.sum())
+    count = int(matrix.shape[0])
+    return AnchoredClaim(
+        probability_ahead=ahead / count,
+        probability_ahead_interval=wilson_interval(ahead, count),
+        scenario_differential_mean=float(differential.mean()),
+        edge_draw_mean=float(edge.mean()),
+        edge_draw_sd=float(edge.std()),
+        scenario_count=count,
+        diagnostics=MappingProxyType(
+            {
+                "construction": "anchored_differential_v1",
+                "edge_samples": len(edge_samples),
+                "edge_weeks": int(edge_weeks),
+                "edge_seed": int(edge_seed),
+            }
+        ),
+    )
+
+
 def rival_edge_draws(
     samples: tuple[float, ...],
     *,
