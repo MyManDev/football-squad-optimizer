@@ -22,7 +22,8 @@ HEADER = (
     "from the frozen ledger entry. Errors are realized-XI minus projected; negative\n"
     "means the projection was optimistic. Captain share is the captain's doubled\n"
     "points as a fraction of the realized XI score.\n\n"
-    "| GW | model version | projected | realized XI | net | error | captain pts (x2) | captain share |\n"
+    "| GW | model version | projected | realized XI | net | error "
+    "| captain pts (x2) | captain share |\n"
     "| ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |\n"
 )
 
