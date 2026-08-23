@@ -18,33 +18,28 @@ exactly the shadow family's one-directional under-claim. The two families with l
 no overlap were calibrated, which is why the mechanism below touches only the edge's
 weight and nothing else.
 
-## The mechanism
+## The mechanism — corrected before any code exists, 2026-08-23 (same day)
+
+The first draft's verbatim formula block was internally inconsistent: its threshold
+collapsed to zero for the degenerate pair, contradicting the draft's own clause 1. Caught
+by re-deriving before implementing; corrected here while no code and no number exist. The
+gate below is untouched.
 
 One factor on the resampled edge draw, everything else unchanged from the anchored
 construction:
 
 ```
-claim = P( (candidate − anchor)_scenario  >  edge_draw × (1 − overlap) + anchor_overlap_correction )
+claim = P( (candidate − anchor)_scenario  >  edge_draw × (1 − candidate_overlap) )
 ```
 
-where ``overlap`` is the candidate's shared-player weight with the crowd's eleven —
-declared as **captain-weighted starter share**: shared starters count 1, a shared
-captain counts 2, denominator 12 — and ``anchor_overlap_correction`` re-centres for the
-anchor's own overlap so the degenerate identity is preserved *exactly*:
-``anchor_overlap_correction = −edge_draw × anchor_overlap``, i.e. the scaled construction
-uses ``edge_draw × (anchor_overlap − candidate_overlap)`` added to the unscaled anchored
-claim's threshold. Written out once, verbatim, so the implementation cannot drift:
-
-```
-threshold_per_scenario = edge_draw × (1 − candidate_overlap) − edge_draw × (1 − anchor_overlap)
-                       = edge_draw × (anchor_overlap − candidate_overlap)
-claim = P( (candidate − anchor)_scenario − edge_draw × (candidate_overlap − anchor_overlap) ... )
-```
-
-Equivalently: the candidate's differential against the crowd keeps the anchored shape,
-and the edge each squad faces is scaled by how little of the crowd it holds. For
-``candidate == anchor`` the scaling term vanishes identically — clause 1 stays exact by
-construction, not by tolerance.
+Why this form is forced by the two calibrated families rather than chosen: the edge
+series is measured as crowd-minus-anchor realized points, so a candidate with zero
+overlap (the contrarian family, calibrated at −0.003..−0.017) must face the full draw —
+factor one, exactly the anchored construction it was calibrated under. The degenerate
+pair keeps clause 1 *structurally*: the scenario term is identically zero and a positive
+scaling never changes the sign of a draw, so the claim remains the share of negative
+window edges no matter the anchor's own overlap. The shadow family (overlap ≈ 0.7–0.8)
+faces a quarter of the edge, which is the failure's measured direction and size.
 
 ## Declared before measurement
 
