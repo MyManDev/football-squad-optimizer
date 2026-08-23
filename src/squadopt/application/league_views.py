@@ -1,0 +1,248 @@
+"""Render per-member league views: the JSON tree the site's league pages read.
+
+The web side (Package 5) reads ``data/league/members.json``, ``entry-{id}.json`` and
+``advice-{id}.json`` under the provisional contract its ``PROVISIONAL_CONTRACT.md``
+records; this module is the producing half. It consumes the `EntryPicksProvider` seam —
+today a test double, after #127 the capture-built provider — and turns each member's
+held squad into a transfer recommendation with the same function that decides our own
+gameweek.
+
+Two rules are load-bearing and tested rather than asserted:
+
+- **Independence.** A member's advice is computed from that member's picks and the
+  shared projection only. Nothing here reads the ledger, the system's own squad, or any
+  other member's state — the system cannot protect its rank by advising anyone worse,
+  and the invariance test pins that as bit-for-bit fact.
+- **One failure does not sink the batch.** A member whose picks cannot be read or whose
+  plan cannot be solved is recorded as failed with the reason, and the rest render.
+"""
+
+import json
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+
+from squadopt.application.entries import (
+    EntryError,
+    EntryPicks,
+    EntryPicksProvider,
+    EntryRegistration,
+    held_squad_from_picks,
+)
+from squadopt.data.errors import DataError
+from squadopt.live import (
+    Projection,
+    RecommendationInputs,
+    SeasonRules,
+    build_transfer_recommendation,
+)
+
+LEAGUE_VIEW_CONTRACT_VERSION = "provisional_league_ui_v1"
+
+
+@dataclass(frozen=True, slots=True)
+class MemberViewResult:
+    """What one member's render produced, or why it did not."""
+
+    entry_id: int
+    label: str
+    rendered: bool
+    reason: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class LeagueViewsReport:
+    league_id: int
+    season: str
+    gameweek: int
+    members: tuple[MemberViewResult, ...]
+    files: tuple[str, ...]
+
+    @property
+    def rendered_count(self) -> int:
+        return sum(1 for member in self.members if member.rendered)
+
+
+def _envelope(payload: Mapping[str, object], *, generated_at_utc: str) -> dict[str, object]:
+    return {
+        "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
+        "generated_at_utc": generated_at_utc,
+        "source_kind": "live",
+        "payload": dict(payload),
+    }
+
+
+def _advice_player(row: "pd.Series[Any]") -> dict[str, object]:
+    name = str(row["name"])
+    return {
+        "player_id": int(str(row["player_id"])),
+        "name": name,
+        "short_name": name.rsplit(" ", 1)[-1],
+        "position": str(row["position"]),
+        "team": str(row["team_id"]),
+    }
+
+
+def _member_advice(
+    picks: EntryPicks,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+) -> dict[str, object]:
+    """One member's advice payload — from their squad and the shared projection only."""
+
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    held = held_squad_from_picks(picks, current_prices=prices)
+    recommendation = build_transfer_recommendation(inputs, projection, held, rules)
+    transfers = recommendation.transfers
+    moves: list[dict[str, object]] = []
+    if transfers is not None:
+        by_id = {int(str(row["player_id"])): row for _, row in recommendation.squad.iterrows()}
+        pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
+        record = transfers.as_record()
+        outs_raw = record.get("transfers_out", [])
+        ins_raw = record.get("transfers_in", [])
+        outs = [int(str(v)) for v in outs_raw] if isinstance(outs_raw, list | tuple) else []
+        ins = [int(str(v)) for v in ins_raw] if isinstance(ins_raw, list | tuple) else []
+        for index in range(max(len(outs), len(ins))):
+            player_out = outs[index] if index < len(outs) else None
+            player_in = ins[index] if index < len(ins) else None
+            delta = 0.0
+            if player_in is not None and player_in in by_id:
+                delta += float(str(by_id[player_in]["expected_points"]))
+            if player_out is not None and player_out in pool_by_id:
+                delta -= float(str(pool_by_id[player_out]["expected_points"]))
+            moves.append(
+                {
+                    "move_id": f"gw{picks.gameweek + 1:02d}-{index + 1}",
+                    "player_out": (
+                        _advice_player(pool_by_id[player_out])
+                        if player_out is not None and player_out in pool_by_id
+                        else None
+                    ),
+                    "player_in": (
+                        _advice_player(by_id[player_in])
+                        if player_in is not None and player_in in by_id
+                        else None
+                    ),
+                    "expected_points_delta": delta,
+                    "expected_points_cost": float(str(record.get("transfer_hit_points", 0.0))),
+                    "reason_code": "window_value",
+                }
+            )
+    missing: list[str] = []
+    if not picks.free_transfers_known:
+        missing.append("free_transfers")
+    if not picks.purchase_prices_known:
+        missing.append("purchase_prices")
+    return {
+        "season": picks.season,
+        "gameweek": picks.gameweek + 1,
+        "entry_id": picks.entry_id,
+        "mode": "saf_puan",
+        "window": 1,
+        "source_snapshot_id": picks.source_snapshot_id,
+        "moves": moves,
+        "data_quality": "partial" if missing else "complete",
+        "missing_fields": missing,
+    }
+
+
+def build_league_views(
+    provider: EntryPicksProvider,
+    registrations: tuple[EntryRegistration, ...],
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    *,
+    league_id: int,
+    league_name: str,
+    out_dir: Path,
+    now: datetime | None = None,
+) -> LeagueViewsReport:
+    """Render every registered member's squad and advice under ``out_dir``.
+
+    The system's own squad is deliberately not an input: member advice must be
+    invariant to it (the test pins this bit-for-bit), and the system's row on the
+    members page is rendered by the site from its own ledger views, not here.
+    """
+
+    generated = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    season = inputs.season
+    gameweek = int(inputs.deadline.gameweek)
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    written: list[str] = []
+    results: list[MemberViewResult] = []
+    member_rows: list[dict[str, object]] = []
+    for registration in registrations:
+        entry_id = int(registration.entry_id)
+        try:
+            picks = provider.picks(entry_id, season, gameweek - 1)
+            advice = _member_advice(picks, inputs, projection, rules)
+        except (EntryError, DataError) as error:
+            results.append(MemberViewResult(entry_id, registration.label, False, reason=str(error)))
+            member_rows.append(
+                {
+                    "member_kind": "human",
+                    "entry_id": entry_id,
+                    "manager_name": registration.label,
+                    "team_name": None,
+                    "rank": 0,
+                    "gameweek_points": None,
+                    "total_points": None,
+                    "movement": "unknown",
+                    "movement_places": None,
+                    "data_quality": "empty",
+                }
+            )
+            continue
+        path = out / f"advice-{entry_id}.json"
+        path.write_text(
+            json.dumps(_envelope(advice, generated_at_utc=generated), indent=2),
+            encoding="utf-8",
+        )
+        written.append(path.name)
+        results.append(MemberViewResult(entry_id, registration.label, True))
+        member_rows.append(
+            {
+                "member_kind": "human",
+                "entry_id": entry_id,
+                "manager_name": registration.label,
+                "team_name": None,
+                "rank": 0,
+                "gameweek_points": None,
+                "total_points": None,
+                "movement": "unknown",
+                "movement_places": None,
+                "data_quality": advice["data_quality"],
+            }
+        )
+    members_payload = {
+        "league_id": int(league_id),
+        "league_name": str(league_name),
+        "season": season,
+        "gameweek": gameweek,
+        "public_after_deadline": True,
+        "members": member_rows,
+    }
+    members_path = out / "members.json"
+    members_path.write_text(
+        json.dumps(_envelope(members_payload, generated_at_utc=generated), indent=2),
+        encoding="utf-8",
+    )
+    written.append(members_path.name)
+    return LeagueViewsReport(
+        league_id=int(league_id),
+        season=season,
+        gameweek=gameweek,
+        members=tuple(results),
+        files=tuple(sorted(written)),
+    )
