@@ -194,6 +194,11 @@ def build_transfer_recommendation(
     *,
     optimization: OptimizationConfig | None = None,
     chip: str | None = None,
+    risk_history: LiveResidualHistory | None = None,
+    risk_scenario_config: ScenarioConfig | None = None,
+    risk_evaluation_config: ScenarioEvaluationConfig | None = None,
+    risk_fixture_counts: Mapping[int, int] | None = None,
+    risk_rivals: Sequence[RivalSquad] = (),
 ) -> Recommendation:
     """Decide a mid-season deadline from the held squad and return it with provenance.
 
@@ -213,6 +218,31 @@ def build_transfer_recommendation(
             "A live decision requires an OPTIMAL result."
         )
     week = plan.weeks[0]
+    risk = risk_not_requested()
+    if risk_history is not None:
+        # The risk layer evaluates a fixed squad; the planner's chosen week is exactly
+        # that, packaged in the result container the scenario evaluators expect.
+        week_result = OptimizationResult(
+            solver_status=plan.solver_status,
+            selected_squad=week.selected_squad,
+            starting_xi=week.starting_xi,
+            bench=week.bench,
+            captain=week.captain,
+            total_cost_tenths=int(decision.squad_sell_value_tenths),
+            projected_score=float(week.projected_score),
+            objective_value=None,
+            diagnostics={},
+        )
+        risk = evaluate_live_risk(
+            inputs,
+            projection,
+            week_result,
+            risk_history,
+            scenario_config=risk_scenario_config,
+            evaluation_config=risk_evaluation_config,
+            fixture_counts=risk_fixture_counts,
+            rivals=risk_rivals,
+        )
     return Recommendation(
         contract_version=REPORT_CONTRACT_VERSION,
         snapshot_id=inputs.snapshot_id,
@@ -239,7 +269,7 @@ def build_transfer_recommendation(
             "bench_weight": settings.bench_weight,
             "decision_kind": "transfer",
         },
-        risk=risk_not_requested(),
+        risk=risk,
         transfers=decision,
     )
 

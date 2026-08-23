@@ -1,9 +1,11 @@
 """Structured risk evidence for one already-optimized live recommendation."""
 
 import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
+from pathlib import Path
 from types import MappingProxyType
 from typing import Final
 
@@ -194,6 +196,58 @@ DEVELOPMENT_SELECTION_OPTIMISM: Final = SelectionOptimism(
     captain_points=3.863,
     source="selection_optimism_profile_v1 (control, 147 development folds, fw06)",
 )
+
+
+def load_residual_history(table_path: Path) -> LiveResidualHistory:
+    """Read an exported residual table with its sibling manifest — identity bound, not typed.
+
+    The exporters write ``<name>.csv`` beside ``<name>.manifest.json`` carrying the model
+    identity and the table's sha256. Reading both here means the operator passes one path
+    and can mistype nothing: a missing manifest refuses, a checksum mismatch refuses, and
+    an identity the manifest does not carry (``post_processing_contract_version`` today)
+    becomes the sentinel ``unclaimed``, which the identity check reports as a mismatch — the
+    block honestly unavailable until the exporter makes that claim explicitly.
+    """
+
+    table_path = Path(table_path)
+    if not table_path.is_file():
+        raise LiveRiskValidationError(f"Residual table does not exist: {table_path}.")
+    manifest_path = table_path.parent / f"{table_path.stem}.manifest.json"
+    if not manifest_path.is_file():
+        raise LiveRiskValidationError(
+            f"Residual manifest does not exist beside the table: {manifest_path}. The "
+            "exporters write it; a table without its manifest has no identity."
+        )
+    recorded = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(recorded, Mapping):
+        raise LiveRiskValidationError("Residual manifest must be a JSON object.")
+    digest = hashlib.sha256(table_path.read_bytes()).hexdigest()
+    stated = str(recorded.get("table_sha256", ""))
+    if stated and stated != digest:
+        raise LiveRiskValidationError(
+            "Residual table does not match its manifest's sha256; the file changed after "
+            "export and its identity can no longer be trusted."
+        )
+    suffix = table_path.suffix.lower()
+    if suffix == ".csv":
+        table = pd.read_csv(table_path)
+    elif suffix in {".parquet", ".pq"}:
+        table = pd.read_parquet(table_path)
+    else:
+        raise LiveRiskValidationError("Residual table must be CSV or Parquet.")
+    source = str(recorded.get("candidate_label", "")) or table_path.stem
+    if stated:
+        source = f"{source}@{stated[:12]}"
+    return LiveResidualHistory(
+        table,
+        model_name=str(recorded.get("model_name", "")),
+        model_version=str(recorded.get("model_version", "")),
+        feature_contract_version=str(recorded.get("feature_contract_version", "")),
+        post_processing_contract_version=(
+            str(recorded.get("post_processing_contract_version", "")).strip() or "unclaimed"
+        ),
+        source_id=source,
+    )
 
 
 def risk_not_requested() -> LiveRiskDiagnostics:
