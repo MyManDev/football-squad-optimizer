@@ -18,24 +18,47 @@ between our score and the rival's (shared players, shared gameweek shocks), whic
 exactly what decides close weeks in a mini-league where squads overlap heavily
 (`template_rival_strength.md` measured the crowd sharing most of its eleven with ours).
 
+## Amendment, 2026-08-23, before any calibration run exists
+
+The first draft of this section misdescribed the code: `_rival_scores`
+(`scenarios/rank.py`) already scores the rival's eleven through the same scenario matrix
+as ours — shared draws, shared players cancelling, covariance priced. Reading the code
+before building is what caught it. What the model actually lacks is measured, not
+guessed: the crowd's weekly edge over the projection is not the constant +7.19 the edge
+term adds but a random variable with a **weekly standard deviation of 18.0 points**
+(range −42..+62 over 2024-25's 37 folds) and **no meaningful week-to-week persistence**
+(lag-1 autocorrelation 0.07). A three-week window therefore misses ~√3·18 ≈ 31 points of
+rival-side spread — which is why h=3/5 claims stayed fiction (0.87 claimed, 0.00
+realized) even after the location was fixed. The gate below is unchanged from the first
+draft; only the mechanism and the population are corrected, and both corrections were
+made before any calibration number existed.
+
 ## The change, in one sentence
 
-The rival's eleven is scored **through the same scenario draws as our squad** — common
-and club components shared, idiosyncratic components drawn per player — plus the measured
-location edge, so that P(ahead) prices both the rival's variance and the covariance a
-shared player cancels.
+The rival's per-scenario score gains a **per-week edge draw resampled from the measured
+weekly edge series of the other development seasons** (leave-one-season-out, empirical
+resampling — no distributional fit), independent across the weeks of a window, replacing
+the zero-variance constant; the constant remains as the degenerate fallback and the
+zero-change default.
 
-Mechanically: `scenarios/rank.py` and `scenarios/rivals.py` stop receiving a fixed rival
-row and start receiving the rival's per-scenario scores built from the *same*
-`ScenarioSet` (and `ScenarioPathSet` for windows) that prices our candidates. The
-constant `rival_edge_points` stays as the location term with its measured value; what
-this work adds is the second moment and the cross-covariance, not a new mean.
+Mechanically: `RankObjectiveConfig` gains `rival_edge_samples` (a tuple of measured
+weekly edges; empty = constant-only, bit-for-bit today) and a deterministic seed; the
+solver and `compare_fixed_decisions` add one resampled draw per scenario per week to the
+rival's scenario scores. Nothing about how the rival's *players* are scored changes.
 
 ## Declared before measurement
 
-- **Population**: the same 147 development folds as `measure_windowed_rank`, seasons
-  2021-22..2024-25, the 2025-26 archive refused by configuration (its holdout status at
-  run time is recorded in the artifact either way).
+- **Edge series**: `measure_template_rival` run per development season (2021-22..2024-25,
+  37 folds each); season S's calibration draws only from the *other* seasons' series.
+  The 2024-25 series artifact predates the holdout spend and its provenance shows
+  2025-26 rows were loaded as history (not scored); recorded here for completeness —
+  the holdout was spent on 2026-08-22 and is no longer at stake.
+- **Population**: every fold of the four development seasons at each horizon (windows
+  clipped at season end), claims produced by the **fixed-decision path**
+  (`compare_fixed_decisions`) on the fold's held squad — cheap enough for ~140 windows
+  per horizon, against the five per horizon the first windowed run could afford. The
+  three-phase solver is exercised by the decision-stability clause, not by the
+  calibration population.
 - **Rival**: the ownership template rival (`template_rival_from_ownership`), unchanged.
 - **Horizons**: 1, 3, 5 — the product's windows.
 - **Instrument**: claimed P(ahead) per fold versus realized ahead-frequency, pooled and
