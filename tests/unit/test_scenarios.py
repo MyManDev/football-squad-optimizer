@@ -733,18 +733,29 @@ def test_empty_samples_are_bit_for_bit_the_constant_path() -> None:
         tuple(decision.starting_xi["player_id"].tolist()[:11]),
         decision.starting_xi["player_id"].iloc[0],
     )
-    base = optimize_rank_probability_squad(
-        scenarios, rival, OptimizationConfig(), RankObjectiveConfig(rival_edge_points=3.0)
+    # Bit-for-bit is asserted on the solver-free comparison path: the three-phase solve
+    # itself can return different optima for tied models (#192), so end-to-end equality
+    # of two solves is not a valid oracle.
+    base = compare_fixed_decisions(decision, rival, scenarios, rival_edge_points=3.0)
+    explicit = compare_fixed_decisions(
+        decision,
+        rival,
+        scenarios,
+        rival_edge_points=3.0,
+        rival_edge_samples=(),
+        rival_edge_seed=99,
     )
-    explicit = optimize_rank_probability_squad(
+    assert explicit.probability_ahead == base.probability_ahead
+    assert explicit.mean_difference == base.mean_difference
+    assert explicit.difference_quantiles == base.difference_quantiles
+    solved = optimize_rank_probability_squad(
         scenarios,
         rival,
         OptimizationConfig(),
         RankObjectiveConfig(rival_edge_points=3.0, rival_edge_samples=(), rival_edge_seed=99),
     )
-    assert explicit.probability_ahead == base.probability_ahead
-    assert explicit.scenario_mean_score == base.scenario_mean_score
-    assert explicit.optimization_result.diagnostics["rival_edge_drawn_sd"] == 0.0
+    assert solved.optimization_result.diagnostics["rival_edge_drawn_sd"] == 0.0
+    assert solved.optimization_result.diagnostics["rival_edge_samples"] == 0
 
 
 def test_sampled_edges_are_deterministic_and_carry_the_measured_spread() -> None:
@@ -759,24 +770,45 @@ def test_sampled_edges_are_deterministic_and_carry_the_measured_spread() -> None
         decision.starting_xi["player_id"].iloc[0],
     )
     samples = (-10.0, 0.0, 10.0, 20.0)
-    config = RankObjectiveConfig(rival_edge_samples=samples, rival_edge_weeks=3, rival_edge_seed=5)
-    first = optimize_rank_probability_squad(scenarios, rival, OptimizationConfig(), config)
-    second = optimize_rank_probability_squad(scenarios, rival, OptimizationConfig(), config)
+    # Determinism of the *draws* is asserted on the solver-free path (#192: two solves
+    # of a tied model are not an oracle); the solver run asserts the diagnostics.
+    first = compare_fixed_decisions(
+        decision,
+        rival,
+        scenarios,
+        rival_edge_samples=samples,
+        rival_edge_weeks=3,
+        rival_edge_seed=5,
+    )
+    second = compare_fixed_decisions(
+        decision,
+        rival,
+        scenarios,
+        rival_edge_samples=samples,
+        rival_edge_weeks=3,
+        rival_edge_seed=5,
+    )
     assert first.probability_ahead == second.probability_ahead
-    diag = first.optimization_result.diagnostics
-    assert diag["rival_edge_samples"] == len(samples)
-    assert diag["rival_edge_weeks"] == 3
-    assert diag["rival_edge_drawn_sd"] > 0.0
-    other = optimize_rank_probability_squad(
+    assert first.mean_difference == second.mean_difference
+    other = compare_fixed_decisions(
+        decision,
+        rival,
+        scenarios,
+        rival_edge_samples=samples,
+        rival_edge_weeks=3,
+        rival_edge_seed=6,
+    )
+    assert other.mean_difference != first.mean_difference
+    solved = optimize_rank_probability_squad(
         scenarios,
         rival,
         OptimizationConfig(),
-        RankObjectiveConfig(rival_edge_samples=samples, rival_edge_weeks=3, rival_edge_seed=6),
+        RankObjectiveConfig(rival_edge_samples=samples, rival_edge_weeks=3, rival_edge_seed=5),
     )
-    assert (
-        other.optimization_result.diagnostics["rival_edge_drawn_mean"]
-        != diag["rival_edge_drawn_mean"]
-    )
+    diag = solved.optimization_result.diagnostics
+    assert diag["rival_edge_samples"] == len(samples)
+    assert diag["rival_edge_weeks"] == 3
+    assert diag["rival_edge_drawn_sd"] > 0.0
 
 
 def test_an_identical_squad_differs_from_the_rival_by_exactly_the_drawn_edge() -> None:
