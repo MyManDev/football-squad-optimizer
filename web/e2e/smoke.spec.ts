@@ -9,20 +9,20 @@ test("squad shows the latest decision", async ({ page }) => {
 
 test("suggested moves states the opening week honestly", async ({ page }) => {
   await page.goto("/moves");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Önerilen hamleler");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Önerilen Hamleler");
   await expect(page.getByText(/Açılış kadrosu — yapılacak transfer yok/)).toBeVisible();
 });
 
 test("rivals shows the projections and says why there is no rival yet", async ({ page }) => {
   await page.goto("/rivals");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Rakip analizi");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Rakip Analizi");
   await expect(page.getByRole("table", { name: /Projeksiyon havuzu, FWD/ })).toBeVisible();
   await expect(page.getByText(/Bu karara karşı puanlanmış bir rakip yok/)).toBeVisible();
 });
 
 test("league shows the season and the cumulative chart", async ({ page }) => {
   await page.goto("/league");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig analizi");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Analizi");
   // One decision so far: the chart states why it is not drawn yet.
   await expect(page.getByText(/Tek oyun haftası bir noktadır, çizgi değildir/)).toBeVisible();
   // The league comparison is real data from the capture, with nothing scored yet.
@@ -33,15 +33,15 @@ test("league shows the season and the cumulative chart", async ({ page }) => {
 
 test("status is reachable from the footer", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Operasyon durumu" }).click();
+  await page.getByRole("link", { name: "Operasyon Durumu" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Durum");
 });
 
 test("language selection switches the full frame and persists across routes", async ({ page }) => {
   await page.goto("/moves?mode=garantici&window=3");
-  await page.getByRole("button", { name: "English" }).click();
+  await page.getByRole("button", { name: /EN.*English/ }).click();
 
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Suggested moves");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Suggested Moves");
   await expect(page.getByRole("radio", { name: /3 weeks/ })).toBeChecked();
   await expect(page).toHaveURL(/mode=garantici&window=3/);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -49,5 +49,5 @@ test("language selection switches the full frame and persists across routes", as
   await page.getByRole("link", { name: "Analysis" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analysis Center");
   await page.reload();
-  await expect(page.getByRole("link", { name: "Suggested moves" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Suggested Moves" })).toBeVisible();
 });

@@ -416,6 +416,7 @@ def _optimize_squad_with_objective_points(
     *,
     objective_points: Mapping[object, object] | None,
     objective_contract: str,
+    required_player_ids: tuple[int, ...] = (),
 ) -> OptimizationResult:
     """Solve the shared squad model with a validated private objective override."""
 
@@ -423,11 +424,27 @@ def _optimize_squad_with_objective_points(
         raise InvalidConfigurationError("config must be an OptimizationConfig instance.")
     if not isinstance(objective_contract, str) or not objective_contract.strip():
         raise InvalidConfigurationError("objective_contract must be a non-empty string.")
+    if not isinstance(required_player_ids, tuple) or any(
+        isinstance(v, bool) or not isinstance(v, int) for v in required_player_ids
+    ):
+        raise InvalidConfigurationError("required_player_ids must be a tuple of integers.")
 
     validated = validate_players(players, config)
     ordered_players = sort_players_by_id(validated)
+    if required_player_ids:
+        known = {int(v) for v in ordered_players["player_id"].tolist()}
+        unknown = sorted(set(required_player_ids) - known)
+        if unknown:
+            raise InvalidConfigurationError(
+                f"required_player_ids not in the pool: {unknown[:10]!r}."
+            )
     ordered_objective_points = _validated_objective_points(ordered_players, objective_points)
     artifacts = _build_model(ordered_players, config, ordered_objective_points)
+    if required_player_ids:
+        required = set(required_player_ids)
+        for index, player_id in enumerate(ordered_players["player_id"].tolist()):
+            if int(player_id) in required:
+                artifacts.model.add(artifacts.squad_vars[index] == 1)
     started_at = perf_counter()
     deadline = started_at + config.solver_time_limit_seconds
 
@@ -489,7 +506,12 @@ def _optimize_squad_with_objective_points(
         relative_gap = absolute_gap / max(1.0, abs(objective_value))
 
     result_solver = primary_solver
-    remaining_time = deadline - perf_counter()
+    # The tie-break gets at least the primary's own declared budget rather than only
+    # its leftover: a secondary solve cut off mid-search returns a FEASIBLE-but-arbitrary
+    # optimum, which is the machine-load nondeterminism #192 measured. Reusing the
+    # existing budget field adds no configuration surface, so the frozen declaration
+    # fingerprints (#43, Route A) are untouched.
+    remaining_time = max(deadline - perf_counter(), config.solver_time_limit_seconds)
     remaining_deterministic_time = _remaining_deterministic_time(
         config.solver_deterministic_time_limit,
         primary_deterministic_time,
@@ -504,6 +526,12 @@ def _optimize_squad_with_objective_points(
         and deterministic_budget_available
     ):
         base_diagnostics["tiebreak_attempted"] = True
+        # Hint the secondary solve with the primary's solution: a known-feasible,
+        # objective-optimal start turns most tie-break solves into a fast proof
+        # instead of a fresh search that the budget then cuts off arbitrarily (#192).
+        for variables in (artifacts.squad_vars, artifacts.starter_vars, artifacts.captain_vars):
+            for variable in variables:
+                artifacts.model.add_hint(variable, primary_solver.value(variable))
         _add_tiebreak_objective(
             artifacts.model,
             artifacts.squad_vars,
@@ -562,7 +590,17 @@ def _optimize_squad_with_objective_points(
     bench_indices = sorted(squad_set - starter_set)
     selected_squad = ordered_players.iloc[squad_indices].reset_index(drop=True).copy(deep=True)
     starting_xi = ordered_players.iloc[starter_indices].reset_index(drop=True).copy(deep=True)
-    bench = ordered_players.iloc[bench_indices].reset_index(drop=True).copy(deep=True)
+    # The bench is an ordered decision, not a set: on an automatic substitution the game
+    # walks it top to bottom, so the goalkeeper takes the fixed first slot and the
+    # outfield players follow by descending expectation (player id breaks ties, keeping
+    # the output deterministic). Index order alone would order them by player id — an
+    # accident of determinism, not a choice.
+    bench_frame = ordered_players.iloc[bench_indices]
+    keeper_rows = bench_frame.loc[bench_frame["position"] == "GK"]
+    outfield_rows = bench_frame.loc[bench_frame["position"] != "GK"].sort_values(
+        ["expected_points", "player_id"], ascending=[False, True], kind="mergesort"
+    )
+    bench = pd.concat([keeper_rows, outfield_rows]).reset_index(drop=True).copy(deep=True)
     captain = ordered_players.iloc[captain_indices[0]].copy(deep=True)
     captain.name = None
 
@@ -598,12 +636,22 @@ def _optimize_squad_with_objective_points(
 def optimize_squad(
     players: pd.DataFrame,
     config: OptimizationConfig,
+    *,
+    required_player_ids: tuple[int, ...] = (),
 ) -> OptimizationResult:
-    """Select a squad, starting XI, bench, and captain for one gameweek."""
+    """Select a squad, starting XI, bench, and captain for one gameweek.
+
+    ``required_player_ids`` forces those players into the selected squad (not
+    necessarily the eleven): the constraint a candidate like "highest projection with
+    the crowd's core held" needs. Unknown ids are refused; an infeasible requirement
+    is reported by the solver as any other infeasibility. Empty (the default) is the
+    historical model, bit for bit.
+    """
 
     return _optimize_squad_with_objective_points(
         players,
         config,
         objective_points=None,
         objective_contract="expected_points_v1",
+        required_player_ids=required_player_ids,
     )

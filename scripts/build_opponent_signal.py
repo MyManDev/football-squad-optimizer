@@ -30,6 +30,7 @@ counts are reported rather than assumed; anything else appearing in them is a de
 """
 
 import argparse
+import hashlib
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -222,6 +223,26 @@ def build_opponent_signal(
     return ordered, coverage
 
 
+def signal_fingerprint(table: pd.DataFrame) -> str:
+    """Digest the signal frame, so a declaration can bind its input rather than describe it.
+
+    The whole frame is hashed, not a subset: unlike a training slice, every column here *is*
+    the input a candidate reads, so a digest that skipped one would let that column change
+    without moving the value.
+
+    Rows are sorted by the grain before hashing, because a frame that differs only in row
+    order is the same input and must not read as a different one. ``lineterminator="\n"`` is
+    load-bearing: on Windows the default translates newlines a second time and the digest
+    would depend on the platform that computed it rather than on the data.
+    """
+
+    ordered = table.loc[:, list(SIGNAL_COLUMNS)].sort_values(
+        ["season", "gameweek", "club"], kind="stable"
+    )
+    payload = ordered.to_csv(index=False, lineterminator="\n").encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def signal_record(
     table: pd.DataFrame, coverage: SignalCoverage, seasons: tuple[str, ...]
 ) -> dict[str, object]:
@@ -230,6 +251,7 @@ def signal_record(
     return {
         "artifact_type": "opponent_signal",
         "contract_version": OPPONENT_SIGNAL_CONTRACT_VERSION,
+        "frame_fingerprint": signal_fingerprint(table),
         "seasons": list(seasons),
         "grain": "season/gameweek/club",
         "columns": list(SIGNAL_COLUMNS),
@@ -261,6 +283,9 @@ def signal_markdown(record: dict[str, object]) -> str:
         "# Opponent Signal",
         "",
         f"- Contract: `{record['contract_version']}`",
+        f"- Frame fingerprint: `{record['frame_fingerprint']}`",
+        "  A declaration binds its input to this value rather than describing it, so a frame",
+        "  that changed would produce a different candidate rather than the same one quietly.",
         f"- Grain: `{record['grain']}`",
         f"- Seasons: {_joined(record['seasons'])}",
         "",

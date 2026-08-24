@@ -7,6 +7,7 @@ import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
 import { useLanguage } from "../../../i18n/context";
+import { verdictText } from "../../../i18n/reasons";
 import { percent, points, signedPoints, utcShort } from "../../../lib/format";
 import { AverageChart } from "../components/AverageChart";
 import { CumulativeChart } from "../components/CumulativeChart";
@@ -65,6 +66,16 @@ export function LeaguePage() {
           note={view.chips_played.length ? view.chips_played.join(", ") : copy.noChip}
         />
       </StatRow>
+
+      <Card
+        title={messages.leagueMembers.linkTitle}
+        aside={messages.leagueMembers.leagueNumber(352490)}
+      >
+        <p className={styles.para}>{messages.leagueMembers.linkBody}</p>
+        <p className={styles.para}>
+          <Link to="/league/members">{messages.leagueMembers.linkLabel}</Link>
+        </p>
+      </Card>
 
       {view.rows.length > 1 ? (
         <Card title={copy.cumulative} aside={copy.points}>
@@ -144,7 +155,9 @@ function AgainstTheLeague({ view }: { view: LeagueView }) {
   return (
     <>
       <Card title={copy.againstLeague} aside={copy.weeklySummary(view.source_snapshot_id)}>
-        <p className={styles.para}>{view.verdict}</p>
+        <p className={styles.para}>
+          {verdictText(messages, view.verdict_code, view.verdict_params, view.verdict)}
+        </p>
         {view.scored_gameweeks > 0 ? (
           <AverageChart weeks={view.weeks} />
         ) : (

@@ -1,5 +1,7 @@
 export type Language = "tr" | "en";
 
+export type ReasonParams = Record<string, string | number | undefined>;
+
 const en = {
   common: {
     loading: "Loading…",
@@ -17,13 +19,13 @@ const en = {
     tagline: "a decision, and what it rests on",
     primary: "Primary",
     squad: "Squad",
-    moves: "Suggested moves",
+    moves: "Suggested Moves",
     rivals: "Rivals",
     league: "League",
     analysis: "Analysis",
     footer:
       "Every number on these pages was produced by the SquadOpt live path and frozen in its ledger; the page renders, it does not compute.",
-    operations: "Operations status",
+    operations: "Operations Status",
     notFound: "There is no page here.",
     metaDescription: "SquadOpt: a weekly FPL decision, and what it rests on.",
   },
@@ -51,6 +53,20 @@ const en = {
     deadline: "deadline",
     deadlineIn: "deadline in",
     projectedScore: "projected score",
+    settledTitle: "Projection versus Outcome",
+    settledAside: "settled",
+    settledProjected: "projected",
+    settledRealizedLabel: "realized",
+    settledNet: "net",
+    settledNetNote: "after transfer-hit points",
+    settledNote:
+      "Player tiles show the published event points and the multiplier applied to the captain when the settled player fields are present.",
+    projectedPlayerPoints: (points: string) => `xP ${points}`,
+    realizedPlayerPoints: (points: string) => `actual ${points}`,
+    eventPointsUnavailable: "event points pending",
+    playerPointDifference: (difference: string) => `difference ${difference}`,
+    pointDifferenceUnavailable: "difference pending",
+    captainMultiplier: (multiplier: number) => `×${multiplier} C`,
     lowerTail: (probability: string, points: string) => `lower ${probability} tail ${points}`,
     lowerTailUnavailable: "lower tail: not evaluated",
     squadCost: "squad cost",
@@ -63,7 +79,6 @@ const en = {
     startingXi: "Starting XI",
     starterCount: (count: number) => `${count} starters · captain counted twice`,
     captain: "Captain",
-    countedTwice: "counted twice",
     noCaptain: "Captain not in the starting eleven.",
     bench: "Bench",
     substitutionOrder: "in substitution order",
@@ -92,7 +107,7 @@ const en = {
     error: "The moves could not be shown.",
     noDecisionBody: "Moves appear once a gameweek has been decided.",
     deadline: "deadline",
-    title: "Suggested moves",
+    title: "Suggested Moves",
     chip: "chip",
     openingTitle: "Opening squad — no transfers to make.",
     openingBeforeLink:
@@ -118,13 +133,15 @@ const en = {
     plannerContract: (status: string) => `Planner contract ${status} at decision time.`,
   },
   decision: {
-    title: "Decision view",
+    title: "Decision View",
     shareable: "Shareable in the URL",
     intro:
       "The horizon and play mode save how you want to read the recommendation. This screen shows the current ledger decision; changing a selection does not run a new optimization yet.",
-    horizon: "Planning horizon",
+    entryIntro:
+      "The horizon and play mode select this member's example advice. These controls describe a point trade-off; they do not claim a probability of beating the league.",
+    horizon: "Planning Horizon",
     week: (count: number) => `${count} week${count === 1 ? "" : "s"}`,
-    mode: "Play mode",
+    mode: "Play Mode",
     leagueId: "League ID",
     leaguePlaceholder: "Connects when the league starts",
     leagueHelp: "The real league connection opens with the GW2 capture.",
@@ -139,7 +156,7 @@ const en = {
     modes: {
       pure: "Pure Points",
       pureDescription: "Targets the highest expected points independently of a rival.",
-      purePrice: "No rival budget",
+      purePrice: "No Rival Budget",
       safe: "Cautious",
       safeDescription: "Aims to reduce the chance of falling behind in the league.",
       aggressive: "Aggressive",
@@ -150,6 +167,7 @@ const en = {
       aheadFive: "P(5+ ahead)",
       cost: "cost",
       points: "points",
+      expectedPointCost: (points: string) => `~${points} expected-point cost`,
     },
   },
   rivals: {
@@ -159,7 +177,7 @@ const en = {
     nothingBody: "Projections and rival comparisons appear once a gameweek has been decided.",
     kicker: (season: string, gameweek: number, pool: number) =>
       `${season} · gameweek ${gameweek} · pool of ${pool} players`,
-    title: "Rival analysis",
+    title: "Rival Analysis",
     lede: "Two questions on one page: who else could have been picked (the projections the solver chose from), and how the chosen squad compares with a rival's in the same scenarios.",
     projections: "Projections",
     projectionsBody:
@@ -175,7 +193,7 @@ const en = {
     model: "model",
     features: "features",
     unavailable: "unavailable in pool",
-    against: "Against rivals",
+    against: "Against Rivals",
     noRivalTitle: "No rival was scored against this decision.",
     noRivalBeforeStatus:
       "A rival comparison needs two things this gameweek does not have: a decision whose risk view was evaluated (this one is ",
@@ -183,7 +201,7 @@ const en = {
       "), and a rival squad to score in the same scenarios. Both are being wired up — the template rival comes from the capture's ownership, mini-league rivals from the entry data. Until then this page shows the projections below rather than a probability nobody measured.",
     probabilityTitle: "Probability of finishing ahead",
     probabilityAside: "same scenarios, shared players cancel",
-    rivalComparisons: "Rival comparisons",
+    rivalComparisons: "Rival Comparisons",
     rival: "rival",
     probabilityInterval: "P(ahead) with 90% interval",
     meanGap: "mean gap",
@@ -200,7 +218,7 @@ const en = {
     ledgerError: "The ledger could not be read.",
     noSeason: "No season yet.",
     season: "season",
-    title: "League analysis",
+    title: "League Analysis",
     lede: "How this season is going, and how that compares with everyone else playing the same game.",
     decidedSettled: "decided · settled",
     decidedSettledNote: "gameweeks with a frozen decision · with an outcome",
@@ -218,7 +236,7 @@ const en = {
     comparisonMissing:
       "The comparison is built from the capture the decision used; this site build did not include one, so nothing about the league is claimed here.",
     firstRow: "The first row appears once gameweek 1 is decided.",
-    ourSeason: "Our season",
+    ourSeason: "Our Season",
     ledgerAside: "each row is a frozen, checksummed ledger entry",
     ledgerCaption: "Season ledger, one row per gameweek",
     decision: "decision",
@@ -242,11 +260,11 @@ const en = {
       "starters plus the captain again — the exposure we share with the field",
     differentials: "differentials",
     differentialNote: (threshold: number) => `starters owned by ${threshold}% or less`,
-    mostOwned: "Most owned",
+    mostOwned: "Most Owned",
     leastOwned: "least owned",
     ownershipNote:
       "Ownership is the capture's selected_by_percent at decision time; it moves after the deadline and this page does not follow it.",
-    openingSquad: "Opening squad",
+    openingSquad: "Opening Squad",
     transferCount: (count: number) => `${count} transfer${count === 1 ? "" : "s"}`,
     deadline: "deadline",
     settled: "settled",
@@ -261,6 +279,128 @@ const en = {
     ourNet: "our net score",
     gameAverage: "the game's average",
     lastWeek: (points: string) => `last scored week: ${points} against it`,
+  },
+  leagueMembers: {
+    loading: "Loading league members…",
+    notAvailable: "League member data is not connected yet.",
+    notAvailableBody:
+      "The page is ready for the post-deadline public entry feed. No example records are shipped in the production build.",
+    loadingEntry: "Loading this member's squad…",
+    entryNotAvailable: "This member is not available yet.",
+    entryNotAvailableBody:
+      "The public post-deadline squad or its advice has not been published to this site build.",
+    invalidEntry: "This entry ID is not valid.",
+    exampleData: "example data",
+    systemTeamBadge: "SquadOpt · system team",
+    systemTeamTitle: "SquadOpt is playing too",
+    leagueNumber: (leagueId: number) => `league ${leagueId}`,
+    title: "League Members",
+    members: "Members",
+    memberCount: (count: number) => `${count} members`,
+    caption: (leagueName: string) => `${leagueName} member standings`,
+    rank: "rank",
+    member: "member",
+    team: "team",
+    gameweekPoints: "GW points",
+    total: "total",
+    movement: "movement",
+    unknown: "unknown",
+    newMember: "new",
+    movementLabel: (movement: "up" | "down" | "same", places: number) =>
+      movement === "same" ? "—" : `${movement === "up" ? "↑" : "↓"} ${places}`,
+    unknownMember: "Unknown Member",
+    unknownTeam: "Unnamed Team",
+    publicDataTitle: "Public after the deadline",
+    publicDataBody:
+      "These records are public FPL data after the gameweek deadline. SquadOpt never asks for an FPL password, session or private account access.",
+    backToMembers: "← League members",
+    incompleteTitle: "Incomplete Source Record",
+    incompleteBody: (fields: string) =>
+      `The source did not provide: ${fields}. Nothing is invented to fill it.`,
+    entryAssumptionsTitle: "Public-data limits",
+    freeTransfersAssumed: (count: number) =>
+      `The public source does not reveal banked free transfers. This plan assumes ${count}; a second banked transfer may be invisible.`,
+    currentPriceFallback:
+      "Purchase prices are not public. Current prices are used as selling prices, which may overstate the available budget after a price rise.",
+    memberSquad: "Member Squad",
+    starterCount: (count: number) => `${count} starters`,
+    bench: "Bench",
+    benchCount: (count: number) => `${count} substitutes`,
+    emptySquad: "No squad is available for this member.",
+    emptySquadBody:
+      "The empty example fixes the UI behaviour for an entry whose public picks have not arrived.",
+    advice: "Suggested Moves",
+    honestyRule:
+      "Advice is labelled only with a point trade-off. Crowd-relative window diagnostics are not presented as probabilities.",
+    independentAdviceRule:
+      "Your advice is calculated only from your squad and your objective. SquadOpt's own team does not enter that calculation: the system cannot protect its rank by giving anyone worse advice; every member is evaluated independently by the same decision function.",
+    squadoptComparisonTitle: "Against the SquadOpt team",
+    squadoptComparison: (difference: string) =>
+      `Your point difference from SquadOpt's squad this gameweek: ${difference}`,
+    noMove: "No move clears the selected example point trade-off.",
+    noAdviceMissingData: "Advice is withheld because the source squad is incomplete.",
+    diagnosticOnly:
+      "Competitive modes are directional diagnostics until opponent-aware claims pass their measurement gates.",
+    out: "Out",
+    in: "In",
+    projectedGain: (points: string) => `${points} projected gain`,
+    expectedPointCost: (points: string) => `~${points} expected-point cost`,
+    windowValueReason: "The longer window recovers the transfer cost in the example projection.",
+    modeTradeoffReason:
+      "The mode changes the point trade-off, not a claimed probability of beating a rival.",
+    linkTitle: "Classic league 352490",
+    linkBody:
+      "The member surface is prepared mock-first; every row will link to that entry's public post-deadline squad and suggested moves.",
+    linkLabel: "Open league members →",
+  },
+  reasonCodes: {
+    no_capture: () => "no capture is held; the calendar is unknown",
+    settle_due: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} is finished in the latest capture and its decision has no outcome`,
+    recapture_for_outcome: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} was decided but is not marked finished; the capture is ${p.capture_age_hours} h old`,
+    await_outcome: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} awaits its outcome; next look after ${p.recapture_hours} h`,
+    deadline_missed: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} closed with no decision recorded; nothing can be decided for it now`,
+    no_open_deadline: () => "no deadline is open in the latest capture's calendar",
+    already_decided: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} is already decided; nothing to do until its outcome`,
+    before_window: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} deadline in ${p.hours_left} h; capture opens ${p.window_hours} h before it`,
+    capture_window_open: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} deadline in ${p.hours_left} h and no capture from inside the window is held`,
+    decide_opening: (p: ReasonParams) =>
+      `opening gameweek ${p.gameweek}: the capture is inside the window`,
+    decide_ready: (p: ReasonParams) =>
+      `gameweek ${p.gameweek}: capture and projection handoff are both ready`,
+    handoff_missing: (p: ReasonParams) =>
+      `gameweek ${p.gameweek} deadline in ${p.hours_left} h, capture held, but the projection handoff is missing`,
+  },
+  riskReasons: {
+    not_requested: "No residual history was supplied; distributional risk was not evaluated.",
+    available: "Risk metrics are supported by matched historical residual evidence.",
+    model_mismatch: "The residual history was produced by a different model contract.",
+    unsupported_opening_gameweek: "Midseason residuals do not support opening-gameweek risk.",
+    insufficient_history: "The eligible residual history is too short to calibrate.",
+  },
+  verdictCodes: {
+    no_scored_gameweeks: () =>
+      "No gameweek has been scored yet, so there is nothing to compare: the game publishes an average only once a gameweek finishes.",
+    standing: (p: ReasonParams) => {
+      const caveat =
+        p.caveat === "noise"
+          ? " - one gameweek is noise, not evidence"
+          : p.caveat === "few"
+            ? " - still fewer weeks than a season's variation needs"
+            : "";
+      const own =
+        p.mean_starter_ownership !== undefined
+          ? `; the starting eleven averages ${p.mean_starter_ownership}% ownership`
+          : "";
+      const sign = Number(p.difference) >= 0 ? "+" : "";
+      return `${sign}${p.difference} points against the game's average over ${p.scored} scored ${Number(p.scored) === 1 ? "gameweek" : "gameweeks"}${caveat}${own}.`;
+    },
   },
   status: {
     loading: "Loading the tick status…",
@@ -281,7 +421,7 @@ const en = {
     idle: "idle",
     actionCount: (count: number) => `${count} action(s)`,
     nothingDue: "Nothing is due.",
-    recent: "Recent run log",
+    recent: "Recent Run Log",
     newest: "newest first",
     noLog: "No run log yet — the tick has not run on this machine.",
   },
@@ -303,15 +443,15 @@ const en = {
     kicker: "evidence beside the decision",
     title: "Analysis Center",
     lede: "Clean negatives stay here alongside passed gates. The content is an unchanged copy of the English source documents.",
-    viewLabel: "Measurement view",
-    all: "All measurements",
+    viewLabel: "Measurement View",
+    all: "All Measurements",
     negatives: "Negatives",
-    filters: "Measurement filters",
+    filters: "Measurement Filters",
     type: "Type",
     phase: "Phase",
     allOption: "All",
-    from: "Start date",
-    to: "End date",
+    from: "Start Date",
+    to: "End Date",
     count: (shown: number, total: number) => `${shown} / ${total} measurements shown`,
     empty: "No measurements match these filters.",
   },
@@ -344,13 +484,13 @@ const tr: MessageSchema<typeof en> = {
     tagline: "bir karar ve dayandığı kanıt",
     primary: "Ana navigasyon",
     squad: "Kadro",
-    moves: "Önerilen hamleler",
+    moves: "Önerilen Hamleler",
     rivals: "Rakipler",
     league: "Lig",
     analysis: "Analiz",
     footer:
       "Bu sayfalardaki her sayı SquadOpt canlı akışı tarafından üretildi ve ledger içinde donduruldu; sayfa hesaplama yapmaz, sonucu gösterir.",
-    operations: "Operasyon durumu",
+    operations: "Operasyon Durumu",
     notFound: "Burada bir sayfa yok.",
     metaDescription: "SquadOpt: haftalık FPL kararı ve dayandığı kanıt.",
   },
@@ -374,6 +514,20 @@ const tr: MessageSchema<typeof en> = {
     deadline: "son tarih",
     deadlineIn: "son tarihe",
     projectedScore: "tahmini puan",
+    settledTitle: "Projeksiyon ve Gerçekleşen",
+    settledAside: "sonuçlandı",
+    settledProjected: "tahmin",
+    settledRealizedLabel: "gerçekleşen",
+    settledNet: "net",
+    settledNetNote: "transfer cezasından sonra",
+    settledNote:
+      "Sonuçlanan oyuncu alanları mevcut olduğunda kartlar yayımlanan event puanını ve kaptana uygulanan çarpanı gösterir.",
+    projectedPlayerPoints: (pointsValue) => `xP ${pointsValue}`,
+    realizedPlayerPoints: (pointsValue) => `gerçekleşen ${pointsValue}`,
+    eventPointsUnavailable: "event puanı bekleniyor",
+    playerPointDifference: (difference) => `fark ${difference}`,
+    pointDifferenceUnavailable: "fark bekleniyor",
+    captainMultiplier: (multiplier) => `×${multiplier} C`,
     lowerTail: (probability, pointsValue) => `alt ${probability} kuyruk ${pointsValue}`,
     lowerTailUnavailable: "alt kuyruk değerlendirilmedi",
     squadCost: "kadro maliyeti",
@@ -386,7 +540,6 @@ const tr: MessageSchema<typeof en> = {
     startingXi: "İlk 11",
     starterCount: (count) => `${count} ilk 11 oyuncusu · kaptan iki kez sayılır`,
     captain: "Kaptan",
-    countedTwice: "iki kez sayılır",
     noCaptain: "Kaptan ilk 11 içinde değil.",
     bench: "Yedekler",
     substitutionOrder: "oyuna giriş sırasıyla",
@@ -415,7 +568,7 @@ const tr: MessageSchema<typeof en> = {
     error: "Hamleler gösterilemedi.",
     noDecisionBody: "Bir oyun haftası kararlaştırılınca hamleler burada görünür.",
     deadline: "son tarih",
-    title: "Önerilen hamleler",
+    title: "Önerilen Hamleler",
     chip: "çip",
     openingTitle: "Açılış kadrosu — yapılacak transfer yok.",
     openingBeforeLink:
@@ -441,14 +594,16 @@ const tr: MessageSchema<typeof en> = {
     plannerContract: (status) => `Karar anında planlayıcı sözleşmesi: ${status}.`,
   },
   decision: {
-    title: "Karar görünümü",
+    title: "Karar Görünümü",
     shareable: "URL'de paylaşılabilir",
     intro:
       "Pencere ve oyun modu, öneriyi hangi açıdan okumak istediğinizi kaydeder. Bu ekran mevcut ledger kararını gösterir; seçimi değiştirmek henüz yeni bir optimizasyon çalıştırmaz.",
-    horizon: "Planlama penceresi",
+    entryIntro:
+      "Pencere ve oyun modu bu üyenin örnek önerisini seçer. Bu kontroller bir puan ödünleşimini anlatır; ligi geçme olasılığı iddia etmez.",
+    horizon: "Planlama Penceresi",
     week: (count) => `${count} hafta`,
-    mode: "Oyun modu",
-    leagueId: "Lig numarası",
+    mode: "Oyun Modu",
+    leagueId: "Lig Numarası",
     leaguePlaceholder: "Lig başlayınca bağlanır",
     leagueHelp: "Gerçek lig bağlantısı GW2 capture'ıyla açılacak.",
     diagnostic: "diagnostik",
@@ -461,7 +616,7 @@ const tr: MessageSchema<typeof en> = {
     modes: {
       pure: "Saf Puan",
       pureDescription: "Rakipten bağımsız en yüksek beklenen puanı hedefler.",
-      purePrice: "Rakip bütçesi yok",
+      purePrice: "Rakip Bütçesi Yok",
       safe: "Garantici",
       safeDescription: "Lig içinde geride kalma ihtimalini azaltmayı hedefler.",
       aggressive: "Agresif",
@@ -472,6 +627,7 @@ const tr: MessageSchema<typeof en> = {
       aheadFive: "P(5+ önde)",
       cost: "maliyet",
       points: "puan",
+      expectedPointCost: (pointsValue) => `~${pointsValue} beklenen puan maliyeti`,
     },
   },
   rivals: {
@@ -482,7 +638,7 @@ const tr: MessageSchema<typeof en> = {
       "Bir oyun haftası kararlaştırılınca projeksiyonlar ve rakip karşılaştırmaları görünür.",
     kicker: (season, gameweek, pool) =>
       `${season} · oyun haftası ${gameweek} · ${pool} oyunculuk havuz`,
-    title: "Rakip analizi",
+    title: "Rakip Analizi",
     lede: "Bu sayfa iki soruyu yanıtlar: başka kimler seçilebilirdi ve seçilen kadro aynı senaryolarda rakibe karşı nasıl görünüyor?",
     projections: "Projeksiyonlar",
     projectionsBody:
@@ -493,12 +649,12 @@ const tr: MessageSchema<typeof en> = {
     price: "fiyat",
     inSquad: "kadroda",
     bench: "yedek",
-    provenance: "Kaynak bilgisi",
+    provenance: "Kaynak Bilgisi",
     capture: "capture",
     model: "model",
     features: "özellikler",
     unavailable: "havuzda kullanılamayan",
-    against: "Rakiplere karşı",
+    against: "Rakiplere Karşı",
     noRivalTitle: "Bu karara karşı puanlanmış bir rakip yok.",
     noRivalBeforeStatus:
       "Rakip karşılaştırması için bu haftada eksik iki şey var: risk görünümü değerlendirilmiş bir karar (bu kararın durumu ",
@@ -506,7 +662,7 @@ const tr: MessageSchema<typeof en> = {
       ") ve aynı senaryolarda puanlanacak bir rakip kadro. Şablon rakip capture sahipliğinden, mini lig rakipleri entry verisinden bağlanacak. O zamana kadar ölçülmemiş bir olasılık yerine aşağıdaki projeksiyonlar gösterilir.",
     probabilityTitle: "Önde bitirme olasılığı",
     probabilityAside: "aynı senaryolar; ortak oyuncular birbirini götürür",
-    rivalComparisons: "Rakip karşılaştırmaları",
+    rivalComparisons: "Rakip Karşılaştırmaları",
     rival: "rakip",
     probabilityInterval: "%90 aralıkla P(önde)",
     meanGap: "ortalama fark",
@@ -523,7 +679,7 @@ const tr: MessageSchema<typeof en> = {
     ledgerError: "Ledger okunamadı.",
     noSeason: "Henüz sezon yok.",
     season: "sezon",
-    title: "Lig analizi",
+    title: "Lig Analizi",
     lede: "Bu sezonun nasıl ilerlediği ve aynı oyunu oynayan herkesle karşılaştırması.",
     decidedSettled: "kararlaştırılan · sonuçlanan",
     decidedSettledNote: "dondurulmuş kararı olan · sonucu olan oyun haftaları",
@@ -563,11 +719,11 @@ const tr: MessageSchema<typeof en> = {
     effectiveOwnershipNote: "ilk 11 ve kaptan tekrar — sahayla paylaştığımız maruziyet",
     differentials: "diferansiyeller",
     differentialNote: (threshold) => `%${threshold} veya daha az sahiplikli ilk 11 oyuncuları`,
-    mostOwned: "En yüksek sahiplik",
+    mostOwned: "En Yüksek Sahiplik",
     leastOwned: "en düşük sahiplik",
     ownershipNote:
       "Sahiplik, karar anındaki capture'ın selected_by_percent değeridir; son tarihten sonra değişir ve bu sayfa onu takip etmez.",
-    openingSquad: "Açılış kadrosu",
+    openingSquad: "Açılış Kadrosu",
     transferCount: (count) => `${count} transfer`,
     deadline: "son tarih",
     settled: "sonuçlandı",
@@ -581,6 +737,127 @@ const tr: MessageSchema<typeof en> = {
     ourNet: "net puanımız",
     gameAverage: "oyun ortalaması",
     lastWeek: (pointsValue) => `son puanlanan hafta: ortalamaya karşı ${pointsValue}`,
+  },
+  leagueMembers: {
+    loading: "Lig üyeleri yükleniyor…",
+    notAvailable: "Lig üye verisi henüz bağlı değil.",
+    notAvailableBody:
+      "Sayfa son tarih sonrası public entry akışına hazırdır. Örnek kayıtlar production paketine dahil edilmez.",
+    loadingEntry: "Üyenin kadrosu yükleniyor…",
+    entryNotAvailable: "Bu üye henüz kullanılamıyor.",
+    entryNotAvailableBody:
+      "Son tarih sonrası public kadro veya öneri bu site paketine henüz yayımlanmadı.",
+    invalidEntry: "Bu entry ID geçerli değil.",
+    exampleData: "örnek veri",
+    systemTeamBadge: "SquadOpt · sistem takımı",
+    systemTeamTitle: "SquadOpt da oynuyor",
+    leagueNumber: (leagueId) => `lig ${leagueId}`,
+    title: "Lig Üyeleri",
+    members: "Üyeler",
+    memberCount: (count) => `${count} üye`,
+    caption: (leagueName) => `${leagueName} üye sıralaması`,
+    rank: "sıra",
+    member: "üye",
+    team: "takım",
+    gameweekPoints: "OH puanı",
+    total: "toplam",
+    movement: "hareket",
+    unknown: "bilinmiyor",
+    newMember: "yeni",
+    movementLabel: (movement, places) =>
+      movement === "same" ? "—" : `${movement === "up" ? "↑" : "↓"} ${places}`,
+    unknownMember: "Bilinmeyen Üye",
+    unknownTeam: "İsimsiz takım",
+    publicDataTitle: "Son tarihten sonra herkese açık",
+    publicDataBody:
+      "Bu kayıtlar oyun haftası son tarihinden sonra herkese açık FPL verisidir. SquadOpt hiçbir zaman FPL şifresi, oturumu veya özel hesap erişimi istemez.",
+    backToMembers: "← Lig üyeleri",
+    incompleteTitle: "Eksik Kaynak Kaydı",
+    incompleteBody: (fields) =>
+      `Kaynak şu alanları sağlamadı: ${fields}. Boşlukları doldurmak için veri uydurulmaz.`,
+    entryAssumptionsTitle: "Public Veri Sınırları",
+    freeTransfersAssumed: (count) =>
+      `Public kaynak banka edilmiş serbest transfer sayısını göstermiyor. Bu plan ${count} varsayıyor; banka edilmiş ikinci transfer görünmüyor olabilir.`,
+    currentPriceFallback:
+      "Satın alma fiyatları public değildir. Satış fiyatı olarak mevcut fiyat kullanılır; fiyatı yükselen bir oyuncu için kullanılabilir bütçe olduğundan yüksek görünebilir.",
+    memberSquad: "Üye kadrosu",
+    starterCount: (count) => `${count} ilk 11 oyuncusu`,
+    bench: "Yedekler",
+    benchCount: (count) => `${count} yedek`,
+    emptySquad: "Bu üye için kadro bulunmuyor.",
+    emptySquadBody:
+      "Boş örnek, public seçimleri henüz gelmeyen bir entry için arayüz davranışını sabitler.",
+    advice: "Önerilen Hamleler",
+    honestyRule:
+      "Öneriler yalnızca puan ödünleşimi etiketi taşır. Kalabalık-göreli pencere diagnostikleri olasılık olarak sunulmaz.",
+    independentAdviceRule:
+      "Sana verilen öneri yalnızca senin kadrondan ve senin hedefinden hesaplanır. Sistemin kendi takımı bu hesaba girmez. Sistem kendi sırasını korumak için kimseye kötü öneri veremez; her üyenin önerisi bağımsız olarak aynı karar fonksiyonundan çıkar.",
+    squadoptComparisonTitle: "SquadOpt takımına karşı",
+    squadoptComparison: (difference) =>
+      `SquadOpt'un bu haftaki kadrosuyla puan farkın: ${difference}`,
+    noMove: "Seçilen örnek puan ödünleşimini geçen bir hamle yok.",
+    noAdviceMissingData: "Kaynak kadro eksik olduğu için öneri gösterilmiyor.",
+    diagnosticOnly:
+      "Rekabetçi modlar, rakip-farkındalıklı iddialar ölçüm kapılarını geçene kadar yön gösteren diagnostiklerdir.",
+    out: "Çıkan",
+    in: "Giren",
+    projectedGain: (pointsValue) => `${pointsValue} tahmini kazanç`,
+    expectedPointCost: (pointsValue) => `~${pointsValue} beklenen puan maliyeti`,
+    windowValueReason: "Uzun pencere, örnek projeksiyonda transfer maliyetini geri kazanıyor.",
+    modeTradeoffReason:
+      "Mod, rakibi geçme olasılığı iddia etmek yerine puan ödünleşimini değiştirir.",
+    linkTitle: "Klasik lig 352490",
+    linkBody:
+      "Üye yüzeyi mock-first hazırlandı; her satır üyenin son tarih sonrası public kadrosuna ve önerilen hamlelerine bağlanacak.",
+    linkLabel: "Lig üyelerini aç →",
+  },
+  reasonCodes: {
+    no_capture: () => "elde capture yok; takvim bilinmiyor",
+    settle_due: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} son capture'da bitmiş görünüyor ve kararının sonucu işlenmemiş`,
+    recapture_for_outcome: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} karara bağlandı ama bitmiş işaretli değil; capture ${p.capture_age_hours} saatlik`,
+    await_outcome: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} sonucunu bekliyor; ${p.recapture_hours} saat sonra tekrar bakılacak`,
+    deadline_missed: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} kararsız kapandı; artık bu hafta için karar verilemez`,
+    no_open_deadline: () => "son capture'ın takviminde açık bir deadline yok",
+    already_decided: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} zaten karara bağlandı; sonucu gelene kadar yapılacak iş yok`,
+    before_window: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} deadline'ına ${p.hours_left} saat var; capture penceresi ${p.window_hours} saat önce açılır`,
+    capture_window_open: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} deadline'ına ${p.hours_left} saat var ve pencere içinden capture alınmadı`,
+    decide_opening: (p: ReasonParams) => `açılış haftası ${p.gameweek}: capture pencere içinde`,
+    decide_ready: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek}: capture ve projeksiyon devri hazır`,
+    handoff_missing: (p: ReasonParams) =>
+      `oyun haftası ${p.gameweek} deadline'ına ${p.hours_left} saat var; capture hazır ama projeksiyon devri eksik`,
+  },
+  riskReasons: {
+    not_requested: "Artık geçmişi verilmedi; dağılımsal risk değerlendirilmedi.",
+    available: "Risk metrikleri, eşleşen tarihsel artık kanıtına dayanıyor.",
+    model_mismatch: "Artık geçmişi farklı bir model sözleşmesinden üretilmiş.",
+    unsupported_opening_gameweek: "Sezon içi artıklar açılış haftası riskini desteklemez.",
+    insufficient_history: "Uygun artık geçmişi kalibrasyon için çok kısa.",
+  },
+  verdictCodes: {
+    no_scored_gameweeks: () =>
+      "Henüz skorlanmış oyun haftası yok, karşılaştıracak bir şey de yok: oyun, ortalamayı ancak bir hafta bitince yayınlıyor.",
+    standing: (p: ReasonParams) => {
+      const caveat =
+        p.caveat === "noise"
+          ? " - tek hafta gürültüdür, kanıt değil"
+          : p.caveat === "few"
+            ? " - bir sezonun oynaklığı için hâlâ az hafta"
+            : "";
+      const own =
+        p.mean_starter_ownership !== undefined
+          ? `; ilk on birin ortalama sahipliği %${p.mean_starter_ownership}`
+          : "";
+      const sign = Number(p.difference) >= 0 ? "+" : "";
+      return `Skorlanan ${p.scored} haftada oyun ortalamasına karşı ${sign}${p.difference} puan${caveat}${own}.`;
+    },
   },
   status: {
     loading: "Tick durumu yükleniyor…",
@@ -601,7 +878,7 @@ const tr: MessageSchema<typeof en> = {
     idle: "boşta",
     actionCount: (count) => `${count} işlem`,
     nothingDue: "Yapılması gereken işlem yok.",
-    recent: "Son çalışma günlüğü",
+    recent: "Son Çalışma Günlüğü",
     newest: "en yeni önce",
     noLog: "Henüz çalışma günlüğü yok — tick bu makinede çalışmadı.",
   },
@@ -624,14 +901,14 @@ const tr: MessageSchema<typeof en> = {
     title: "Analiz Merkezi",
     lede: "Geçen kapılar kadar temiz negatifler de burada kalır. İçerikler İngilizce kaynak belgelerin değişmeden sunulan kopyalarıdır.",
     viewLabel: "Ölçüm görünümü",
-    all: "Tüm ölçümler",
+    all: "Tüm Ölçümler",
     negatives: "Negatifler",
     filters: "Ölçüm filtreleri",
     type: "Tür",
     phase: "Faz",
     allOption: "Tümü",
-    from: "Başlangıç tarihi",
-    to: "Bitiş tarihi",
+    from: "Başlangıç Tarihi",
+    to: "Bitiş Tarihi",
     count: (shown, total) => `${shown} / ${total} ölçüm gösteriliyor`,
     empty: "Bu filtrelerle ölçüm yok.",
   },

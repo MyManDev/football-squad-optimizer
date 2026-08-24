@@ -4,6 +4,7 @@ import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
 import { useLanguage } from "../../../i18n/context";
+import { reasonText } from "../../../i18n/reasons";
 import { local, utcShort } from "../../../lib/format";
 import styles from "./StatusPage.module.css";
 
@@ -79,7 +80,9 @@ export function StatusPage() {
                   {action.kind}
                   {action.gameweek ? ` ${messages.common.gameweekShort(action.gameweek)}` : ""}
                 </Badge>
-                <span>{action.reason}</span>
+                <span>
+                  {reasonText(messages, action.reason_code, action.reason_params, action.reason)}
+                </span>
               </li>
             ))}
           </ul>

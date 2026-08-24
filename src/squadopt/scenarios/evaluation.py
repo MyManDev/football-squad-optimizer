@@ -196,6 +196,149 @@ class ScenarioComparisonResult:
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
 
+@dataclass(frozen=True, slots=True)
+class AnchoredClaim:
+    """A windowed P(ahead of the crowd), built through the risk-neutral anchor.
+
+    ``candidate - crowd`` is decomposed as ``(candidate - anchor)`` under the scenario
+    draws plus ``(anchor - crowd)`` resampled from the measured weekly edge series —
+    the scenario-implied gap to the crowd, which `rival_calibration.md` proved to be a
+    location fiction, never enters (`anchored_differential_prereg.md`).
+    """
+
+    probability_ahead: float
+    probability_ahead_interval: tuple[float, float]
+    scenario_differential_mean: float
+    edge_draw_mean: float
+    edge_draw_sd: float
+    scenario_count: int
+    diagnostics: Mapping[str, object]
+
+
+def crowd_overlap(result: OptimizationResult, crowd: "RivalSquad") -> float:
+    """Captain-weighted starter share against the crowd's eleven, as declared.
+
+    Shared starters count one, a shared captain counts two, denominator twelve —
+    `overlap_scaled_edge_prereg.md` fixes this once; it is not a knob.
+    """
+
+    if not isinstance(result, OptimizationResult) or result.captain is None:
+        raise ScenarioValidationError("result must be a feasible OptimizationResult.")
+    crowd_ids = {int(str(p)) for p in crowd.starter_ids}
+    starters = {int(v) for v in result.starting_xi["player_id"]}
+    weight = float(len(starters & crowd_ids))
+    if int(result.captain["player_id"]) == int(str(crowd.captain_id)):
+        weight += 1.0
+    return weight / 12.0
+
+
+def anchored_probability_ahead(
+    candidate: OptimizationResult,
+    anchor: OptimizationResult,
+    scenarios: ScenarioSet,
+    *,
+    edge_samples: tuple[float, ...],
+    edge_weeks: int,
+    edge_seed: int,
+    overlap_scaling_crowd: "RivalSquad | None" = None,
+) -> AnchoredClaim:
+    """The anchored claim: P((candidate - anchor)_scenario > edge_draw).
+
+    The anchor is the fold's risk-neutral squad. For ``candidate == anchor`` the
+    scenario term vanishes exactly (same players cancel per scenario) and the claim
+    degenerates to the share of negative resampled window edges — the identity the
+    pre-registration's first clause pins.
+    """
+
+    for name, result in (("candidate", candidate), ("anchor", anchor)):
+        if not isinstance(result, OptimizationResult):
+            raise ScenarioValidationError(f"{name} must be an OptimizationResult.")
+        if not result.has_solution or result.captain is None:
+            raise ScenarioValidationError(f"{name} must be a feasible decision.")
+    verified = scenarios.validated_copy()
+    player_ids = verified.projections.table["player_id"].tolist()
+    column = {player_id: index for index, player_id in enumerate(player_ids)}
+    matrix = verified.scenario_points.to_numpy(dtype="float64", copy=False)
+
+    def squad_scores(result: OptimizationResult) -> np.ndarray:
+        starters = result.starting_xi["player_id"].tolist()
+        assert result.captain is not None
+        captain = result.captain["player_id"]
+        missing = [p for p in [*starters, captain] if p not in column]
+        if missing:
+            raise ScenarioValidationError(
+                f"Scenario players must cover the squad; missing={missing[:10]!r}."
+            )
+        scores: np.ndarray = matrix[:, [column[p] for p in starters]].sum(axis=1)
+        total: np.ndarray = scores + matrix[:, column[captain]]
+        return total
+
+    differential = squad_scores(candidate) - squad_scores(anchor)
+    edge = rival_edge_draws(
+        edge_samples, scenarios=matrix.shape[0], weeks=edge_weeks, seed=edge_seed
+    )
+    scale = 1.0
+    if overlap_scaling_crowd is not None:
+        # The crowd's edge is carried by its players: a candidate holding them inherits
+        # that share, so the edge it still faces is scaled by its non-overlap
+        # (overlap_scaled_edge_prereg). None (the default) is the anchored construction,
+        # bit for bit.
+        scale = 1.0 - crowd_overlap(candidate, overlap_scaling_crowd)
+    wins = differential - edge * scale > 0.0
+    ahead = int(wins.sum())
+    count = int(matrix.shape[0])
+    return AnchoredClaim(
+        probability_ahead=ahead / count,
+        probability_ahead_interval=wilson_interval(ahead, count),
+        scenario_differential_mean=float(differential.mean()),
+        edge_draw_mean=float(edge.mean()),
+        edge_draw_sd=float(edge.std()),
+        scenario_count=count,
+        diagnostics=MappingProxyType(
+            {
+                "construction": "anchored_differential_v1",
+                "edge_samples": len(edge_samples),
+                "edge_weeks": int(edge_weeks),
+                "edge_seed": int(edge_seed),
+                "edge_scale": float(scale),
+            }
+        ),
+    )
+
+
+def rival_edge_draws(
+    samples: tuple[float, ...],
+    *,
+    scenarios: int,
+    weeks: int,
+    seed: int,
+) -> np.ndarray:
+    """One resampled window edge per scenario: the sum of ``weeks`` iid draws.
+
+    ``samples`` are measured weekly edges (the crowd's realized advantage over the
+    projection, week by week); resampling the empirical series keeps the location and
+    the spread the measurement saw, with no distributional fit. Independence across
+    weeks is itself measured (lag-1 autocorrelation 0.07 on 2024-25, negative on the
+    other seasons), so a window's edge is a plain sum. Deterministic under ``seed``.
+    """
+
+    if not isinstance(seed, int) or isinstance(seed, bool):
+        raise ScenarioValidationError("seed must be an integer.")
+    if not isinstance(weeks, int) or isinstance(weeks, bool) or weeks < 1:
+        raise ScenarioValidationError("weeks must be a positive integer.")
+    if not isinstance(scenarios, int) or isinstance(scenarios, bool) or scenarios < 1:
+        raise ScenarioValidationError("scenarios must be a positive integer.")
+    if not samples:
+        raise ScenarioValidationError("samples must be non-empty.")
+    values = np.asarray(samples, dtype="float64")
+    if not np.isfinite(values).all():
+        raise ScenarioValidationError("Every edge sample must be finite.")
+    generator = np.random.default_rng(seed)
+    indices = generator.integers(0, len(values), size=(scenarios, weeks))
+    result: np.ndarray = values[indices].sum(axis=1)
+    return result
+
+
 def compare_fixed_decisions(
     optimization_result: OptimizationResult,
     rival: RivalSquad,
@@ -203,6 +346,9 @@ def compare_fixed_decisions(
     config: ScenarioEvaluationConfig | None = None,
     *,
     rival_edge_points: float = 0.0,
+    rival_edge_samples: tuple[float, ...] = (),
+    rival_edge_weeks: int = 1,
+    rival_edge_seed: int = 0,
 ) -> ScenarioComparisonResult:
     """Score my decision and a rival's squad in the same scenarios and read the gap.
 
@@ -244,10 +390,24 @@ def compare_fixed_decisions(
         raise ScenarioValidationError("rival_edge_points must be a finite number.")
     if not math.isfinite(float(rival_edge_points)):
         raise ScenarioValidationError("rival_edge_points must be a finite number.")
+    if rival_edge_samples and float(rival_edge_points) != 0.0:
+        raise ScenarioValidationError(
+            "rival_edge_samples carry the measured location already; combining them "
+            "with a non-zero rival_edge_points would count the edge twice."
+        )
+    if rival_edge_samples:
+        edge = rival_edge_draws(
+            tuple(float(v) for v in rival_edge_samples),
+            scenarios=matrix.shape[0],
+            weeks=rival_edge_weeks,
+            seed=rival_edge_seed,
+        )
+    else:
+        edge = np.full(matrix.shape[0], float(rival_edge_points))
     theirs = (
         matrix[:, [column[p] for p in rival.starter_ids]].sum(axis=1)
         + matrix[:, column[rival.captain_id]]
-        + float(rival_edge_points)
+        + edge
     )
     difference = mine - theirs
     ahead = int((difference > 0.0).sum())

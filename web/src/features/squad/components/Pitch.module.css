@@ -68,6 +68,25 @@
   font-variant-numeric: tabular-nums;
 }
 
+.outcome {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px var(--space-2);
+  padding-top: 3px;
+  border-top: 1px solid color-mix(in srgb, var(--color-chip-muted) 30%, transparent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-chip-muted);
+}
+
+.captainMultiplier {
+  justify-self: end;
+  padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--color-chip-muted) 45%, transparent);
+  border-radius: 999px;
+  font-weight: 700;
+}
+
 @media (max-width: 480px) {
   .chip {
     min-width: 84px;

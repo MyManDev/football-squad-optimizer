@@ -14,6 +14,7 @@
   ],
   "contract_version": "opponent_signal_v1",
   "defensive_signal_mean": 0.27145262198836523,
+  "frame_fingerprint": "8d977552f638a53c9be3cd7960a3009344cd04c9538bcdf416727f81e3342624",
   "gate_evidence": false,
   "grain": "season/gameweek/club",
   "locked_holdout_accessed": false,

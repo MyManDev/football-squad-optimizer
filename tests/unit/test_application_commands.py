@@ -87,7 +87,7 @@ def test_verification_failure_is_typed_and_publishes_nothing(world: dict[str, An
         decide(
             _decide_request(world),
             panel_builder=lambda root: gameweek_world._panel(),
-            verifier=lambda recommendation, projection, held: ["synthetic refusal"],
+            verifier=lambda recommendation, projection, held=None, **kw: ["synthetic refusal"],
         )
 
     assert caught.value.failures == ("synthetic refusal",)

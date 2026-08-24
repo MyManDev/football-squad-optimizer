@@ -257,3 +257,40 @@ def test_preserves_extra_input_columns(
 
     assert "source_note" in result.selected_squad.columns
     assert set(result.selected_squad["source_note"]) == {"synthetic"}
+
+
+def test_bench_is_ordered_keeper_first_then_by_descending_expectation(
+    baseline_result: OptimizationResult,
+) -> None:
+    """The bench is an ordered decision: automatic substitutions walk it top to bottom."""
+
+    bench = baseline_result.bench
+    assert len(bench) == 4
+    assert bench.iloc[0]["position"] == "GK"
+    outfield_points = [float(v) for v in bench.iloc[1:]["expected_points"]]
+    assert outfield_points == sorted(outfield_points, reverse=True)
+
+
+def test_the_tiebreak_gets_its_own_budget_and_completes_on_the_baseline(
+    baseline_players: pd.DataFrame,
+) -> None:
+    """#192: a tie-break cut off by the primary's leftover returned an arbitrary
+    secondary optimum. With its own budget and the primary solution as a hint, the
+    baseline solve must report the tie-break attempted and completed."""
+
+    result = optimize_squad(baseline_players, OptimizationConfig())
+    assert result.solver_status is SolverStatus.OPTIMAL
+    assert result.diagnostics["tiebreak_attempted"] is True
+    assert result.diagnostics["tiebreak_completed"] is True
+
+
+def test_two_solves_agree_on_the_full_squad_identity(baseline_players: pd.DataFrame) -> None:
+    """The replay guarantee at solution identity, not only objective value."""
+
+    first = optimize_squad(baseline_players, OptimizationConfig())
+    second = optimize_squad(baseline_players, OptimizationConfig())
+    assert [int(v) for v in first.selected_squad["player_id"]] == [
+        int(v) for v in second.selected_squad["player_id"]
+    ]
+    assert [int(v) for v in first.bench["player_id"]] == [int(v) for v in second.bench["player_id"]]
+    assert int(first.captain["player_id"]) == int(second.captain["player_id"])

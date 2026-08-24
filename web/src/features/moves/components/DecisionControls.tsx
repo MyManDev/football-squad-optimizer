@@ -1,39 +1,25 @@
-import { useSearchParams } from "react-router";
-
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { MODE_PRICE_FOLDS, getPlayModes, isPlayMode, type PlayMode } from "../modePrices";
+import { useDecisionSelection } from "../decisionSelection";
+import { MODE_PRICE_FOLDS, WINDOWS, getPlayModes } from "../modePrices";
 import styles from "./DecisionControls.module.css";
 
-const WINDOWS = [1, 3, 5] as const;
-type WindowSize = (typeof WINDOWS)[number];
-
-function isWindowSize(value: string | null): value is `${WindowSize}` {
-  return WINDOWS.some((window) => String(window) === value);
-}
-
-export function DecisionControls() {
+export function DecisionControls({ variant = "default" }: { variant?: "default" | "entry" }) {
   const { locale, messages } = useLanguage();
   const copy = messages.decision;
-  const playModes = getPlayModes(copy.modes, locale);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const rawMode = searchParams.get("mode");
-  const rawWindow = searchParams.get("window");
-  const mode: PlayMode = isPlayMode(rawMode) ? rawMode : "saf-puan";
-  const windowSize: WindowSize = isWindowSize(rawWindow) ? (Number(rawWindow) as WindowSize) : 1;
-
-  function update(key: "mode" | "window", value: string) {
-    const next = new URLSearchParams(searchParams);
-    next.set(key, value);
-    setSearchParams(next);
-  }
+  const playModes = getPlayModes(
+    copy.modes,
+    locale,
+    variant === "entry" ? "point-cost" : "measured",
+  );
+  const { mode, windowSize, update } = useDecisionSelection();
 
   const competitive = mode !== "saf-puan";
 
   return (
     <Card title={copy.title} aside={<Badge tone="accent">{copy.shareable}</Badge>}>
-      <p className={styles.intro}>{copy.intro}</p>
+      <p className={styles.intro}>{variant === "entry" ? copy.entryIntro : copy.intro}</p>
 
       <div className={styles.controls}>
         <fieldset className={styles.fieldset}>
@@ -78,11 +64,13 @@ export function DecisionControls() {
           </div>
         </fieldset>
 
-        <label className={styles.leagueField}>
-          <span>{copy.leagueId}</span>
-          <input type="text" inputMode="numeric" placeholder={copy.leaguePlaceholder} disabled />
-          <small>{copy.leagueHelp}</small>
-        </label>
+        {variant === "default" ? (
+          <label className={styles.leagueField}>
+            <span>{copy.leagueId}</span>
+            <input type="text" inputMode="numeric" placeholder={copy.leaguePlaceholder} disabled />
+            <small>{copy.leagueHelp}</small>
+          </label>
+        ) : null}
       </div>
 
       {competitive ? (

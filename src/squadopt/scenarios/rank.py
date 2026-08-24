@@ -61,6 +61,7 @@ from squadopt.scenarios.evaluation import (
     RivalSquad,
     ScenarioComparisonResult,
     compare_fixed_decisions,
+    rival_edge_draws,
     wilson_interval,
 )
 from squadopt.scenarios.models import (
@@ -90,6 +91,18 @@ class RankObjectiveConfig:
     systematically outscores the projection - the ownership template does, by a measured
     +7.19 a week - is under-priced and P(ahead) inflates. This constant restores the
     rival's measured edge. Zero (the default) is the historical behaviour, bit for bit."""
+    rival_edge_samples: tuple[float, ...] = ()
+    """Measured weekly edges to resample instead of the constant (empty = constant only).
+
+    A constant fixes the rival's location and leaves its spread at zero; the measured
+    weekly edge has a standard deviation of ~18 points, and over a window that missing
+    spread is what made claimed probabilities fiction (rival_scenario_prereg). The
+    samples carry the measured location, so combining them with a non-zero
+    ``rival_edge_points`` is refused as double counting."""
+    rival_edge_weeks: int = 1
+    """How many weekly draws sum into one scenario's edge (the window's horizon)."""
+    rival_edge_seed: int = 0
+    """Deterministic seed for the resampling; recorded in diagnostics."""
     expected_points_budget: float | None = None
     """When set with a reference, the squad's scenario-mean score may fall at most this
     far below the reference (the risk-neutral squad's mean): the price of the goal."""
@@ -117,6 +130,26 @@ class RankObjectiveConfig:
         if isinstance(edge, bool) or not isinstance(edge, int | float) or not math.isfinite(edge):
             raise ScenarioConfigurationError("rival_edge_points must be a finite number.")
         object.__setattr__(self, "rival_edge_points", float(edge))
+        samples = self.rival_edge_samples
+        if not isinstance(samples, tuple) or any(
+            isinstance(v, bool) or not isinstance(v, int | float) or not math.isfinite(v)
+            for v in samples
+        ):
+            raise ScenarioConfigurationError(
+                "rival_edge_samples must be a tuple of finite numbers."
+            )
+        object.__setattr__(self, "rival_edge_samples", tuple(float(v) for v in samples))
+        if samples and float(edge) != 0.0:
+            raise ScenarioConfigurationError(
+                "rival_edge_samples carry the measured location already; a non-zero "
+                "rival_edge_points on top would count the edge twice."
+            )
+        weeks = self.rival_edge_weeks
+        if isinstance(weeks, bool) or not isinstance(weeks, int) or weeks < 1:
+            raise ScenarioConfigurationError("rival_edge_weeks must be a positive integer.")
+        seed = self.rival_edge_seed
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise ScenarioConfigurationError("rival_edge_seed must be an integer.")
         budget = self.expected_points_budget
         if budget is not None:
             if isinstance(budget, bool) or not isinstance(budget, int | float):
@@ -206,16 +239,25 @@ def optimize_rank_probability_squad(
     matrix = verified.scenario_points.loc[:, player_ids].to_numpy(dtype="float64", copy=True)
     scale = optimization_config.expected_points_scale
     scaled_rows = [[scale_expected_points(v, scale) for v in row] for row in matrix.tolist()]
-    rival_raw = _rival_scores(matrix, column, rival) + settings.rival_edge_points
+    if settings.rival_edge_samples:
+        edge_vector = rival_edge_draws(
+            settings.rival_edge_samples,
+            scenarios=matrix.shape[0],
+            weeks=settings.rival_edge_weeks,
+            seed=settings.rival_edge_seed,
+        )
+    else:
+        edge_vector = np.full(matrix.shape[0], settings.rival_edge_points)
+    rival_raw = _rival_scores(matrix, column, rival) + edge_vector
     # The rival's scenario scores are summed from the same per-player scaled integers as
     # mine, so an identical squad scores identically to the last unit; scaling the float
     # sum instead would let rounding noise decide "ahead".
     rival_columns = [column[p] for p in rival.starter_ids]
     rival_captain_column = column[rival.captain_id]
-    edge_scaled = scale_expected_points(settings.rival_edge_points, scale)
+    edge_scaled_rows = [scale_expected_points(float(v), scale) for v in edge_vector]
     rival_scaled = [
-        sum(row[i] for i in rival_columns) + row[rival_captain_column] + edge_scaled
-        for row in scaled_rows
+        sum(row[i] for i in rival_columns) + row[rival_captain_column] + edge_scaled_rows[r]
+        for r, row in enumerate(scaled_rows)
     ]
     margin_scaled = scale_expected_points(settings.margin_points, scale)
     total_scenarios = len(scaled_rows)
@@ -312,6 +354,11 @@ def optimize_rank_probability_squad(
         "claim_scenarios": settings.claim_scenarios,
         "margin_points": settings.margin_points,
         "rival_edge_points": settings.rival_edge_points,
+        "rival_edge_samples": len(settings.rival_edge_samples),
+        "rival_edge_weeks": settings.rival_edge_weeks,
+        "rival_edge_seed": settings.rival_edge_seed,
+        "rival_edge_drawn_mean": float(np.mean(edge_vector)),
+        "rival_edge_drawn_sd": float(np.std(edge_vector)),
         "expected_points_budget": settings.expected_points_budget,
         "reference_expected_points": reference_expected_points,
         "rival_label": rival.label,
@@ -473,7 +520,13 @@ def optimize_rank_probability_squad(
     )
     comparison = (
         compare_fixed_decisions(
-            optimization_result, rival, verified, rival_edge_points=settings.rival_edge_points
+            optimization_result,
+            rival,
+            verified,
+            rival_edge_points=settings.rival_edge_points,
+            rival_edge_samples=settings.rival_edge_samples,
+            rival_edge_weeks=settings.rival_edge_weeks,
+            rival_edge_seed=settings.rival_edge_seed,
         )
         if settings.claim_scenarios == "in_sample"
         else None
@@ -514,6 +567,9 @@ def goal_menu(
     *,
     margin_points: float = 0.0,
     rival_edge_points: float = 0.0,
+    rival_edge_samples: tuple[float, ...] = (),
+    rival_edge_weeks: int = 1,
+    rival_edge_seed: int = 0,
 ) -> tuple[tuple[GoalMenuEntry, RankOptimizationResult], ...]:
     """Sweep the expected-points budget and return the menu against one rival.
 
@@ -546,6 +602,9 @@ def goal_menu(
                 margin_points=margin_points,
                 expected_points_budget=budget,
                 rival_edge_points=rival_edge_points,
+                rival_edge_samples=rival_edge_samples,
+                rival_edge_weeks=rival_edge_weeks,
+                rival_edge_seed=rival_edge_seed,
             ),
             reference_expected_points=reference_mean,
         )

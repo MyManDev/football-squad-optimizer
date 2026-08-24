@@ -132,6 +132,10 @@ export interface LeagueView {
   source_snapshot_id: string;
   total_difference_to_average: number | null;
   verdict: string;
+  verdict_code?: string;
+  verdict_params?: {
+    [k: string]: unknown;
+  };
   weeks: LeagueWeekView[];
 }
 export interface OwnershipView {
@@ -209,6 +213,10 @@ export interface TickActionView {
   handoff_path: string | null;
   kind: "capture" | "decide" | "settle" | "wait";
   reason: string;
+  reason_code?: string;
+  reason_params?: {
+    [k: string]: unknown;
+  };
   snapshot_id: string | null;
 }
 export interface RunLogEventView {

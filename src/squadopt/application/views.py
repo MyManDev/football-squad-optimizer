@@ -244,6 +244,9 @@ class TickActionView(_View):
     gameweek: int | None
     snapshot_id: str | None
     handoff_path: str | None
+    reason_code: str = ""
+    """A stable identifier the page can translate; the English reason stays the record."""
+    reason_params: Mapping[str, JsonValue] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

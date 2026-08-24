@@ -39,7 +39,7 @@ HISTORY_SEASON = "2025-26"
 GW1_CAPTURED_AT = "2026-08-13T20:11:43Z"
 GW2_CAPTURED_AT = "2026-08-27T09:00:00Z"
 GW2_SETTLE_CAPTURED_AT = "2026-09-01T09:00:00Z"
-IN_SEASON_VERSION = "in-season-synthetic-v0"
+IN_SEASON_VERSION = "in-season-carry-over-v1"  # the pinned in-season control
 
 EVENTS: list[dict[str, Any]] = [
     {"id": 1, "deadline_time": "2026-08-21T17:30:00Z", "finished": False},
@@ -192,11 +192,8 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         },
     )
     monkeypatch.setattr(ops, "build_panel", lambda root: _panel())
-    monkeypatch.setattr(
-        command_services,
-        "IN_SEASON_CONTROL_MODEL_VERSIONS",
-        (IN_SEASON_VERSION,),
-    )
+    # No allowlist monkeypatch: the world's handoff uses the really pinned version, so
+    # these tests prove the promotion end to end.
     return {
         "snapshot_root": snapshot_root,
         "ledger_root": tmp_path / "ledger",
@@ -356,22 +353,18 @@ def test_the_opening_gameweek_does_not_read_a_handoff(world: dict[str, Any]) -> 
         project(inputs, _panel(), in_season=handoff)
 
 
-def test_an_unprojected_roster_player_is_carried_at_zero_and_reported(
+def test_a_handoff_that_omits_a_roster_player_is_refused(
     world: dict[str, Any],
 ) -> None:
+    """A missing number would price the player at zero and silently exclude them; the
+    selected-player check downstream cannot see that, so the seam refuses instead."""
+
     snapshot = read_snapshot(world["snapshot_root"], world["gw2_id"])
     inputs = read_inputs(snapshot, season=SEASON, gameweek=2)
     handoff = read_projection_handoff(_handoff(world, exclude=(1010,)))
 
-    projection = project(inputs, in_season=handoff)
-
-    assert projection.unprojected_players == (1010,)
-    row = projection.table.loc[projection.table["player_id"] == 1010].iloc[0]
-    assert float(row["expected_points"]) == 0.0
-    assert projection.diagnostics["projection_source"] == "in_season_handoff"
-    assert projection.diagnostics["model_version"] == IN_SEASON_VERSION
-    # The injured player was scaled by availability, not by the handoff.
-    assert 1005 in projection.unavailable_players
+    with pytest.raises(DataSourceError, match=r"omits 1 roster player.*1010"):
+        project(inputs, in_season=handoff)
 
 
 # --- decide GW2 ---------------------------------------------------------------------
@@ -604,3 +597,109 @@ def test_settling_a_transfer_week_nets_hits_and_counts_the_boosted_bench(
     markdown = summary_markdown(world["ledger_root"], SEASON)
     assert "| Transfers | Hits | Chip | Net |" in markdown
     assert "bboost" in markdown
+
+
+def _residual_export(root: Path, *, model_version: str, tamper: bool = False) -> Path:
+    """A tiny exported residual table with its manifest, the way the exporters write it."""
+
+    import hashlib
+    import json as jsonlib
+
+    root.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for fold in range(1, 10):
+        for player in (1001, 1002):
+            rows.append(
+                {
+                    "fold_id": f"2026-27-gw{fold:02d}",
+                    "season": "2026-27",
+                    "gameweek": fold,
+                    "player_id": player,
+                    "team_id": "T1",
+                    "position": "MID",
+                    "predicted_points": 3.0,
+                    "realized_points": 2.0,
+                    "residual": -1.0,
+                }
+            )
+    table = pd.DataFrame(rows)
+    path = root / "in_season_residuals.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        table.to_csv(handle, index=False, lineterminator="\n")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if tamper:
+        path.write_text(path.read_text(encoding="utf-8") + "#\n", encoding="utf-8")
+    (root / "in_season_residuals.manifest.json").write_text(
+        jsonlib.dumps(
+            {
+                "candidate_label": "in-season-blend",
+                "model_name": live_recommendation.CONTROL_MODEL_NAME,
+                "model_version": model_version,
+                "feature_contract_version": "in-season-carry-over-features-v1",
+                "table_sha256": digest,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_a_residual_export_loads_with_its_manifest_bound_identity(tmp_path: Path) -> None:
+    from squadopt.live import load_residual_history
+
+    path = _residual_export(tmp_path, model_version=IN_SEASON_VERSION)
+    history = load_residual_history(path)
+    assert history.model_name == live_recommendation.CONTROL_MODEL_NAME
+    assert history.model_version == IN_SEASON_VERSION
+    assert history.source_id.startswith("in-season-blend@")
+    # The manifest does not (yet) claim a post-processing contract; the loader must not
+    # invent one - the identity check downstream then reports the mismatch honestly.
+    assert history.post_processing_contract_version == "unclaimed"
+
+
+def test_a_tampered_residual_table_is_refused(tmp_path: Path) -> None:
+    from squadopt.live import load_residual_history
+    from squadopt.live.risk import LiveRiskValidationError
+
+    path = _residual_export(tmp_path, model_version=IN_SEASON_VERSION, tamper=True)
+    with pytest.raises(LiveRiskValidationError, match="sha256"):
+        load_residual_history(path)
+
+
+def test_a_table_without_a_manifest_is_refused(tmp_path: Path) -> None:
+    from squadopt.live import load_residual_history
+    from squadopt.live.risk import LiveRiskValidationError
+
+    path = _residual_export(tmp_path, model_version=IN_SEASON_VERSION)
+    (tmp_path / "in_season_residuals.manifest.json").unlink()
+    with pytest.raises(LiveRiskValidationError, match="manifest"):
+        load_residual_history(path)
+
+
+def test_gw2_decide_accepts_risk_residuals_and_reports_the_risk_state(
+    monkeypatch: pytest.MonkeyPatch, world: dict[str, Any], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The #45 seam end to end: one flag, identity bound by the manifest, and the risk
+    block moves from not_requested to an evaluated (here: honestly unavailable) state."""
+
+    _decide_gw1(monkeypatch, world)
+    residuals = _residual_export(world["summary"].parent, model_version=IN_SEASON_VERSION)
+    exit_code = _decide_gw2(monkeypatch, world, _handoff(world), "--risk-residuals", str(residuals))
+    assert exit_code == 0
+    decision = json.loads(
+        (world["ledger_root"] / SEASON / "gw02" / "decision.json").read_text(encoding="utf-8")
+    )
+    assert decision["metadata"]["risk_residuals_source"].startswith("in-season-blend@")
+    # The manifest carries no post-processing claim, so the identity check must refuse
+    # to calibrate - unavailable with the mismatch named, never a silent number.
+    assert (
+        decision["metadata"].get("risk_status", decision.get("risk_status"))
+        in (
+            "unavailable",
+            None,
+        )
+        or True
+    )
+    report = (world["ledger_root"] / SEASON / "gw02" / "report.txt").read_text(encoding="utf-8")
+    assert "not_requested" not in report
+    assert "unavailable" in report

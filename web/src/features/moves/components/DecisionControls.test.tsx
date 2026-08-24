@@ -21,6 +21,15 @@ function renderControls(path = "/moves") {
   );
 }
 
+function renderEntryControls(path = "/league/members/35249001?mode=agresif&window=3") {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <DecisionControls variant="entry" />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+}
+
 describe("DecisionControls", () => {
   it("defaults to one-week pure points without presenting a rival probability", () => {
     renderControls();
@@ -28,7 +37,7 @@ describe("DecisionControls", () => {
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Saf Puan/ })).toBeChecked();
     expect(screen.queryByText("diagnostik")).not.toBeInTheDocument();
-    expect(screen.getByText("Rakip bütçesi yok")).toBeInTheDocument();
+    expect(screen.getByText("Rakip Bütçesi Yok")).toBeInTheDocument();
   });
 
   it("keeps the selected mode and window in the shareable URL", async () => {
@@ -52,5 +61,14 @@ describe("DecisionControls", () => {
     expect(screen.getByText("diagnostik")).toBeInTheDocument();
     expect(screen.getByText(/Lig-içi 5 haftalık sonuç bir olasılık değildir/)).toBeInTheDocument();
     expect(screen.getByText(/P\(5\+ önde\) %19/)).toBeInTheDocument();
+  });
+
+  it("uses point-cost labels without percentages on a member page", () => {
+    const { container } = renderEntryControls();
+
+    expect(screen.getByDisplayValue("agresif")).toBeChecked();
+    expect(screen.getByText(/~1,8 beklenen puan maliyeti/)).toBeInTheDocument();
+    expect(container.textContent).not.toContain("%");
+    expect(screen.queryByLabelText("Lig Numarası")).not.toBeInTheDocument();
   });
 });

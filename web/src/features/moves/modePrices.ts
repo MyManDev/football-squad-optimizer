@@ -3,6 +3,9 @@ import modePriceList from "../../../../docs/mode_price_list.json";
 import type { Messages } from "../../i18n/messages";
 
 export type PlayMode = "saf-puan" | "garantici" | "agresif" | "asiri-agresif";
+export const WINDOWS = [1, 3, 5] as const;
+export type WindowSize = (typeof WINDOWS)[number];
+export type ModePriceStyle = "measured" | "point-cost";
 
 interface PriceCell {
   ahead_by_more_than_five: number;
@@ -46,7 +49,36 @@ export interface PlayModeOption {
 export function getPlayModes(
   copy: Messages["decision"]["modes"],
   locale: string,
+  priceStyle: ModePriceStyle = "measured",
 ): readonly PlayModeOption[] {
+  if (priceStyle === "point-cost") {
+    return [
+      {
+        value: "saf-puan",
+        label: copy.pure,
+        description: copy.pureDescription,
+        price: copy.expectedPointCost(decimal(0, locale)),
+      },
+      {
+        value: "garantici",
+        label: copy.safe,
+        description: copy.safeDescription,
+        price: copy.expectedPointCost(decimal(budgetZero.garantici.mean_realized_cost, locale)),
+      },
+      {
+        value: "agresif",
+        label: copy.aggressive,
+        description: copy.aggressiveDescription,
+        price: copy.expectedPointCost(decimal(budgetZero.agresif.mean_realized_cost, locale)),
+      },
+      {
+        value: "asiri-agresif",
+        label: copy.extreme,
+        description: copy.extremeDescription,
+        price: copy.expectedPointCost(decimal(budgetZero.asiriAgresif.mean_realized_cost, locale)),
+      },
+    ];
+  }
   return [
     {
       value: "saf-puan",

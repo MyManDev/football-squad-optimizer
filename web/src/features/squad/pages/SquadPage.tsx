@@ -9,6 +9,7 @@ import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
 import { useLanguage } from "../../../i18n/context";
+import { riskText } from "../../../i18n/reasons";
 import {
   countdown,
   local,
@@ -73,10 +74,13 @@ export function SquadPage() {
 }
 
 function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: string }) {
-  const { language, locale, messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.squad;
   const now = useNow(30_000);
-  const remaining = countdown(view.deadline_utc, now, language);
+  const remaining = countdown(view.deadline_utc, now, {
+    closed: messages.common.closed,
+    day: messages.common.dayShort,
+  });
   const risk = view.risk;
   const captain = view.starting_xi.find((p) => p.is_captain);
   return (
@@ -94,9 +98,9 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
         </div>
         <div className={styles.deadline}>
           <div className={styles.kicker}>
-            {remaining === messages.common.closed ? copy.deadline : copy.deadlineIn}
+            {remaining.isClosed ? copy.deadline : copy.deadlineIn}
           </div>
-          <div className={`${styles.countdown} num`}>{remaining || "—"}</div>
+          <div className={`${styles.countdown} num`}>{remaining.text || "—"}</div>
           <div className={styles.kicker} title={view.deadline_utc}>
             {local(view.deadline_utc, locale)}
           </div>
@@ -136,8 +140,32 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
         />
       </StatRow>
 
+      {view.settled && view.outcome_realized_score !== null ? (
+        <Card title={copy.settledTitle} aside={<Badge tone="good">{copy.settledAside}</Badge>}>
+          <StatRow>
+            <Stat label={copy.settledProjected} value={points(view.projected_score, 1, locale)} />
+            <Stat
+              label={copy.settledRealizedLabel}
+              value={points(view.outcome_realized_score, 0, locale)}
+            />
+            <Stat
+              label={copy.settledNet}
+              value={
+                view.outcome_net_score === null ? "—" : points(view.outcome_net_score, 0, locale)
+              }
+              note={copy.settledNetNote}
+            />
+          </StatRow>
+          <p className={styles.settledNote}>{copy.settledNote}</p>
+        </Card>
+      ) : null}
+
       <Card tone="pitch" title={copy.startingXi} aside={copy.starterCount(view.starting_xi.length)}>
-        <Pitch starters={view.starting_xi} />
+        <Pitch
+          starters={view.starting_xi}
+          showOutcomes={view.settled}
+          captainMultiplier={view.captain_multiplier}
+        />
       </Card>
 
       <div className={styles.twoUp}>
@@ -147,7 +175,7 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
               <strong>{captain.name}</strong>
               <span className={styles.muted}>
                 {captain.team} · {captain.position} · {points(captain.expected_points, 1, locale)}{" "}
-                xP, {copy.countedTwice}
+                xP, {copy.captainMultiplier(view.captain_multiplier)}
               </span>
             </div>
           ) : (
@@ -183,7 +211,9 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
           </Badge>
         }
       >
-        <p className={styles.limit}>{risk.reason}</p>
+        <p className={styles.limit}>
+          {riskText(messages, risk.status, risk.blockers, risk.reason)}
+        </p>
         {risk.status === "available" && (
           <StatRow>
             <Stat

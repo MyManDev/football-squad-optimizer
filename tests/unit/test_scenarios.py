@@ -718,3 +718,251 @@ def test_an_edged_rival_is_harder_to_finish_ahead_of() -> None:
     assert edged.probability_ahead == 0.0
     assert edged.probability_ahead <= base.probability_ahead
     assert edged.optimization_result.diagnostics["rival_edge_points"] == pytest.approx(1000.0)
+
+
+def test_empty_samples_are_bit_for_bit_the_constant_path() -> None:
+    """The amended prereg's fallback clause: () consumes no randomness, changes nothing."""
+
+    from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    # Bit-for-bit is asserted on the solver-free comparison path: the three-phase solve
+    # itself can return different optima for tied models (#192), so end-to-end equality
+    # of two solves is not a valid oracle.
+    base = compare_fixed_decisions(decision, rival, scenarios, rival_edge_points=3.0)
+    explicit = compare_fixed_decisions(
+        decision,
+        rival,
+        scenarios,
+        rival_edge_points=3.0,
+        rival_edge_samples=(),
+        rival_edge_seed=99,
+    )
+    assert explicit.probability_ahead == base.probability_ahead
+    assert explicit.mean_difference == base.mean_difference
+    assert explicit.difference_quantiles == base.difference_quantiles
+    solved = optimize_rank_probability_squad(
+        scenarios,
+        rival,
+        OptimizationConfig(),
+        RankObjectiveConfig(rival_edge_points=3.0, rival_edge_samples=(), rival_edge_seed=99),
+    )
+    assert solved.optimization_result.diagnostics["rival_edge_drawn_sd"] == 0.0
+    assert solved.optimization_result.diagnostics["rival_edge_samples"] == 0
+
+
+def test_sampled_edges_are_deterministic_and_carry_the_measured_spread() -> None:
+    from squadopt.scenarios import RankObjectiveConfig, optimize_rank_probability_squad
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    samples = (-10.0, 0.0, 10.0, 20.0)
+    # Determinism of the *draws* is asserted on the solver-free path (#192: two solves
+    # of a tied model are not an oracle); the solver run asserts the diagnostics.
+    first = compare_fixed_decisions(
+        decision,
+        rival,
+        scenarios,
+        rival_edge_samples=samples,
+        rival_edge_weeks=3,
+        rival_edge_seed=5,
+    )
+    second = compare_fixed_decisions(
+        decision,
+        rival,
+        scenarios,
+        rival_edge_samples=samples,
+        rival_edge_weeks=3,
+        rival_edge_seed=5,
+    )
+    assert first.probability_ahead == second.probability_ahead
+    assert first.mean_difference == second.mean_difference
+    other = compare_fixed_decisions(
+        decision,
+        rival,
+        scenarios,
+        rival_edge_samples=samples,
+        rival_edge_weeks=3,
+        rival_edge_seed=6,
+    )
+    assert other.mean_difference != first.mean_difference
+    solved = optimize_rank_probability_squad(
+        scenarios,
+        rival,
+        OptimizationConfig(),
+        RankObjectiveConfig(rival_edge_samples=samples, rival_edge_weeks=3, rival_edge_seed=5),
+    )
+    diag = solved.optimization_result.diagnostics
+    assert diag["rival_edge_samples"] == len(samples)
+    assert diag["rival_edge_weeks"] == 3
+    assert diag["rival_edge_drawn_sd"] > 0.0
+
+
+def test_an_identical_squad_differs_from_the_rival_by_exactly_the_drawn_edge() -> None:
+    """The gate's shared-draw clause, now with the edge random: players still cancel."""
+
+    import numpy as np
+
+    from squadopt.scenarios.evaluation import rival_edge_draws
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    xi = decision.starting_xi["player_id"].tolist()
+    captain = decision.captain["player_id"]
+    rival = RivalSquad("mirror", tuple(xi), captain)
+    samples = (4.0, 8.0, 12.0)
+    result = compare_fixed_decisions(
+        decision,
+        rival,
+        scenarios,
+        rival_edge_samples=samples,
+        rival_edge_weeks=2,
+        rival_edge_seed=11,
+    )
+    drawn = rival_edge_draws(samples, scenarios=len(scenarios.scenario_points), weeks=2, seed=11)
+    # Mine minus theirs must be exactly minus the drawn edge in every scenario: the
+    # players cancelled, only the edge remains.
+    assert result.mean_difference == pytest.approx(-float(np.mean(drawn)))
+    assert result.probability_ahead == 0.0
+
+
+def test_samples_with_a_constant_edge_are_refused_everywhere() -> None:
+    from squadopt.scenarios import RankObjectiveConfig
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    rival = RivalSquad(
+        "edge-test",
+        tuple(decision.starting_xi["player_id"].tolist()[:11]),
+        decision.starting_xi["player_id"].iloc[0],
+    )
+    with pytest.raises(Exception, match="twice"):
+        RankObjectiveConfig(rival_edge_points=1.0, rival_edge_samples=(1.0,))
+    with pytest.raises(Exception, match="twice"):
+        compare_fixed_decisions(
+            decision, rival, scenarios, rival_edge_points=1.0, rival_edge_samples=(1.0,)
+        )
+
+
+def test_the_anchored_claim_degenerates_exactly_for_the_anchor_itself() -> None:
+    """anchored_differential_prereg clause 1: same squad, zero scenario term, and the
+    claim equals the share of negative resampled window edges on the same draw vector."""
+
+    import numpy as np
+
+    from squadopt.scenarios.evaluation import anchored_probability_ahead, rival_edge_draws
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    samples = (-12.0, -3.0, 4.0, 9.0, 21.0)
+    claim = anchored_probability_ahead(
+        decision, decision, scenarios, edge_samples=samples, edge_weeks=3, edge_seed=17
+    )
+    drawn = rival_edge_draws(samples, scenarios=len(scenarios.scenario_points), weeks=3, seed=17)
+    assert claim.scenario_differential_mean == 0.0
+    assert claim.probability_ahead == pytest.approx(float(np.mean(drawn < 0.0)))
+
+
+def test_a_required_player_is_in_the_squad_and_the_default_changes_nothing() -> None:
+    snapshot = _snapshot()
+    base = optimize_squad(snapshot.table, OptimizationConfig())
+    cheapest = int(snapshot.table.sort_values(["price_tenths", "player_id"]).iloc[0]["player_id"])
+    forced = optimize_squad(snapshot.table, OptimizationConfig(), required_player_ids=(cheapest,))
+    assert forced.has_solution
+    assert cheapest in {int(v) for v in forced.selected_squad["player_id"]}
+    explicit = optimize_squad(snapshot.table, OptimizationConfig(), required_player_ids=())
+    assert {int(v) for v in explicit.selected_squad["player_id"]} == {
+        int(v) for v in base.selected_squad["player_id"]
+    } or explicit.objective_value == base.objective_value
+
+
+def test_an_unknown_required_player_is_refused() -> None:
+    from squadopt.optimization import InvalidConfigurationError
+
+    snapshot = _snapshot()
+    with pytest.raises(InvalidConfigurationError, match="required_player_ids"):
+        optimize_squad(snapshot.table, OptimizationConfig(), required_player_ids=(999_999_999,))
+
+
+def test_crowd_overlap_is_captain_weighted_and_the_scaled_identity_is_structural() -> None:
+    """overlap_scaled_edge_prereg: shared starter 1, shared captain 2, denominator 12;
+    and a positive scaling never moves the degenerate claim off the negative-edge share."""
+
+    import numpy as np
+
+    from squadopt.scenarios.evaluation import (
+        anchored_probability_ahead,
+        crowd_overlap,
+        rival_edge_draws,
+    )
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    xi = [int(v) for v in decision.starting_xi["player_id"]]
+    captain = int(decision.captain["player_id"])
+
+    mirror = RivalSquad("mirror", tuple(xi), captain)
+    assert crowd_overlap(decision, mirror) == pytest.approx(1.0)
+    other_captain = next(p for p in xi if p != captain)
+    shifted = RivalSquad("shifted-captain", tuple(xi), other_captain)
+    assert crowd_overlap(decision, shifted) == pytest.approx(11.0 / 12.0)
+
+    samples = (-9.0, -2.0, 5.0, 14.0)
+    unscaled = anchored_probability_ahead(
+        decision, decision, scenarios, edge_samples=samples, edge_weeks=2, edge_seed=23
+    )
+    scaled = anchored_probability_ahead(
+        decision,
+        decision,
+        scenarios,
+        edge_samples=samples,
+        edge_weeks=2,
+        edge_seed=23,
+        overlap_scaling_crowd=shifted,
+    )
+    drawn = rival_edge_draws(samples, scenarios=len(scenarios.scenario_points), weeks=2, seed=23)
+    assert unscaled.probability_ahead == pytest.approx(float(np.mean(drawn < 0.0)))
+    assert scaled.probability_ahead == unscaled.probability_ahead
+    assert scaled.diagnostics["edge_scale"] == pytest.approx(1.0 - 11.0 / 12.0)
+
+
+def test_full_overlap_removes_the_edge_entirely() -> None:
+    from squadopt.scenarios.evaluation import anchored_probability_ahead
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    mirror = RivalSquad(
+        "mirror",
+        tuple(int(v) for v in decision.starting_xi["player_id"]),
+        int(decision.captain["player_id"]),
+    )
+    claim = anchored_probability_ahead(
+        decision,
+        decision,
+        scenarios,
+        edge_samples=(50.0,),
+        edge_weeks=1,
+        edge_seed=1,
+        overlap_scaling_crowd=mirror,
+    )
+    # Candidate == anchor == crowd: no differential, no edge faced - a level pair.
+    assert claim.diagnostics["edge_scale"] == 0.0
+    assert claim.probability_ahead == 0.0
