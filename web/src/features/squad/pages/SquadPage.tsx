@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { NotFoundError } from "../../../data/client";
-import { useIndex, useRecommendation } from "../../../data/queries";
-import type { RecommendationView } from "../../../data/schema";
+import { useIndex, useLedger, useRecommendation } from "../../../data/queries";
+import type { LedgerView, RecommendationView } from "../../../data/schema";
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -17,6 +17,7 @@ import {
   points,
   pounds,
   shortDigest,
+  signedPoints,
   utcShort,
 } from "../../../lib/format";
 import { Pitch } from "../components/Pitch";
@@ -41,6 +42,9 @@ export function SquadPage() {
   const season = params.season ?? latest?.season ?? undefined;
   const gameweek = params.gameweek ? Number(params.gameweek) : (latest?.gameweek ?? undefined);
   const recommendation = useRecommendation(season, gameweek);
+  // Deliberately not part of the pending or error guards below: the season card is extra
+  // context, so a slow or missing ledger must not delay or break the decision itself.
+  const ledger = useLedger(season);
 
   if (index.isPending || (season && gameweek && recommendation.isPending)) {
     return <EmptyState title={copy.loading} />;
@@ -69,11 +73,79 @@ export function SquadPage() {
   }
   if (!recommendation.data) return null;
   return (
-    <Squad view={recommendation.data.payload} generatedAt={recommendation.data.generatedAtUtc} />
+    <Squad
+      view={recommendation.data.payload}
+      generatedAt={recommendation.data.generatedAtUtc}
+      ledger={ledger.data?.payload ?? null}
+    />
   );
 }
 
-function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: string }) {
+/**
+ * Where the season stands, from the ledger the site already publishes.
+ *
+ * The season total is `total_realized_net_score` rather than `total_realized_score`, because
+ * net is the number the platform itself shows and the gross one overstates it by every
+ * transfer hit taken. There is no per-row cumulative *net* field in `ui_view_v1`, so this card
+ * reports the season total as a season total and does not claim an as-of-this-gameweek figure
+ * on a historical view.
+ */
+function SeasonStanding({ ledger }: { ledger: LedgerView }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.squad;
+  const settled = ledger.rows.filter((row) => row.settled && row.realized_net_score !== null);
+  const latest = settled.length > 0 ? settled[settled.length - 1] : null;
+  return (
+    <Card title={copy.seasonTitle} aside={<Badge tone="neutral">{ledger.season}</Badge>}>
+      <StatRow>
+        <Stat
+          label={copy.seasonNet}
+          value={
+            ledger.total_realized_net_score === null
+              ? "—"
+              : points(ledger.total_realized_net_score, 0, locale)
+          }
+          tone="accent"
+          note={copy.seasonNetNote(
+            ledger.settled_gameweeks,
+            points(ledger.total_transfer_hit_points, 0, locale),
+          )}
+        />
+        <Stat
+          label={copy.seasonLatestWeek}
+          value={latest === null ? "—" : points(latest.realized_net_score as number, 0, locale)}
+          note={
+            latest === null
+              ? undefined
+              : copy.seasonLatestWeekNote(
+                  messages.common.gameweekShort(latest.gameweek),
+                  points(latest.projected_score, 1, locale),
+                )
+          }
+        />
+        <Stat
+          label={copy.seasonVsProjection}
+          value={
+            ledger.total_projection_error === null
+              ? "—"
+              : signedPoints(ledger.total_projection_error, 1, locale)
+          }
+          note={copy.seasonVsProjectionNote}
+        />
+      </StatRow>
+    </Card>
+  );
+}
+
+function Squad({
+  view,
+  generatedAt,
+  ledger,
+}: {
+  view: RecommendationView;
+  generatedAt: string;
+  ledger: LedgerView | null;
+}) {
   const { locale, messages } = useLanguage();
   const copy = messages.squad;
   const now = useNow(30_000);
@@ -139,6 +211,8 @@ function Squad({ view, generatedAt }: { view: RecommendationView; generatedAt: s
           note={view.solver_proved_optimal ? copy.provedOptimal : copy.notProved}
         />
       </StatRow>
+
+      {ledger && ledger.settled_gameweeks > 0 ? <SeasonStanding ledger={ledger} /> : null}
 
       {view.settled && view.outcome_realized_score !== null ? (
         <Card title={copy.settledTitle} aside={<Badge tone="good">{copy.settledAside}</Badge>}>
