@@ -87,6 +87,12 @@ def league_standings_payload(league_id: int) -> str:
     return f"league-{_positive(league_id, 'league id')}-standings.json"
 
 
+def live_payload(gameweek: int) -> str:
+    """Payload name for one gameweek's live scoring document."""
+
+    return f"event-gw{_positive(gameweek, 'gameweek'):02d}-live.json"
+
+
 # The platform encodes position numerically. This is the same encoding the archive's
 # `players_raw.csv` carries, but it is declared here rather than shared with the
 # archive adapter: each source module is meant to know exactly one source, and
@@ -786,6 +792,7 @@ _ENTRY_FIELDS: Final = ("id", "name", "current_event")
 _PICK_FIELDS: Final = ("element", "position", "is_captain", "is_vice_captain", "multiplier")
 _CHIP_FIELDS: Final = ("name", "event")
 _STANDING_FIELDS: Final = ("entry", "entry_name", "player_name", "rank")
+_LIVE_ELEMENT_FIELDS: Final = ("id", "stats")
 
 # The squad the platform publishes: fifteen picks, the first eleven of which start.
 _SQUAD_SIZE: Final = 15
@@ -826,6 +833,122 @@ def league_standings_endpoint_path(league_id: int) -> Mapping[str, str]:
     return MappingProxyType(
         {league_standings_payload(identifier): f"leagues-classic/{identifier}/standings/"}
     )
+
+
+def live_endpoint_path(gameweek: int) -> Mapping[str, str]:
+    """Payload name to API path for one gameweek's live scoring document."""
+
+    week = _positive(gameweek, "gameweek")
+    return MappingProxyType({live_payload(week): f"event/{week}/live/"})
+
+
+@dataclass(frozen=True, slots=True)
+class LiveEventPoints:
+    """What a gameweek's players have scored so far, and how far from final it is.
+
+    The points are the platform's own running total per player. They are useful before a
+    gameweek closes and they are *not* the settled outcome, so the two facts that decide
+    what may be claimed from them travel in the same object rather than in a comment:
+
+    - ``bonus_confirmed`` is false until every one of the gameweek's fixtures is finished.
+      The platform adds bonus to a player's total only when his fixture finishes, so a
+      score read earlier is short by up to three points per player, and short by different
+      amounts for different players. That is not noise that averages out.
+    - ``fixtures_finished`` against ``fixtures_total`` says how much of the gameweek is
+      actually in the number, which is the difference between "your team scored 41" and
+      "your team has scored 41 of what will be a larger figure".
+    """
+
+    gameweek: int
+    points_by_player: Mapping[int, int]
+    bonus_confirmed: bool
+    fixtures_finished: int
+    fixtures_total: int
+    source_snapshot_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.points_by_player:
+            raise InvalidValueError(
+                f"Live payload for gameweek {self.gameweek} carries no player points."
+            )
+        if self.fixtures_total < 1:
+            raise InvalidValueError(
+                f"Gameweek {self.gameweek} has no fixtures in the captured fixtures "
+                "payload, so a live score for it describes nothing."
+            )
+        if not 0 <= self.fixtures_finished <= self.fixtures_total:
+            raise InvalidValueError(
+                f"Gameweek {self.gameweek} reports {self.fixtures_finished} finished "
+                f"fixtures of {self.fixtures_total}."
+            )
+        if self.bonus_confirmed and self.fixtures_finished != self.fixtures_total:
+            raise InvalidValueError(
+                f"Gameweek {self.gameweek} claims confirmed bonus while "
+                f"{self.fixtures_total - self.fixtures_finished} of its fixtures are "
+                "unfinished. Bonus is confirmed per fixture, so the claim cannot hold "
+                "before all of them are."
+            )
+
+
+def fpl_live_event_points(
+    live: bytes,
+    fixtures: bytes,
+    *,
+    gameweek: int,
+    source_snapshot_id: str | None = None,
+) -> LiveEventPoints:
+    """Return one gameweek's running player points from its captured live document.
+
+    Both documents are required, and the second one is the point. The live payload is a
+    bare ``{"elements": [...]}`` with **no gameweek of its own** -- the platform identifies
+    it only by the URL it was fetched from. So this module cannot verify that a payload
+    named for gameweek N describes gameweek N, and pretending otherwise would be worse
+    than saying it. What the fixtures payload does give is the gameweek's own progress,
+    which is the caveat a reader of these points actually needs.
+
+    Auto-substitutions are deliberately not modelled here. This returns points per player;
+    which eleven those points are counted for is a decision the ledger owns, and it scores
+    the eleven that were named because that is what the projection was for.
+    """
+
+    week = _positive(gameweek, "gameweek")
+    records = _records(_document(live, "Live"), "elements", "Live element")
+    _require_fields(records, _LIVE_ELEMENT_FIELDS, "Live element")
+
+    points: dict[int, int] = {}
+    for record in records:
+        player = _integer(record, "id", "Live element")
+        stats = record.get("stats")
+        if not isinstance(stats, dict):
+            raise DataSourceError(
+                f"Live element {player} carries a {type(stats).__name__} 'stats' section "
+                "rather than an object; the adapter reads its total_points."
+            )
+        if player in points:
+            raise DuplicateRecordsError(
+                f"Live payload for gameweek {week} declares player {player} more than once."
+            )
+        points[player] = _integer(stats, "total_points", f"Live element {player} stats")
+
+    finished, total = _gameweek_fixture_progress(fixtures, gameweek=week)
+    return LiveEventPoints(
+        gameweek=week,
+        points_by_player=MappingProxyType(dict(sorted(points.items()))),
+        bonus_confirmed=finished == total,
+        fixtures_finished=finished,
+        fixtures_total=total,
+        source_snapshot_id=source_snapshot_id,
+    )
+
+
+def _gameweek_fixture_progress(fixtures: bytes, *, gameweek: int) -> tuple[int, int]:
+    """How many of one gameweek's fixtures are finished, and how many there are."""
+
+    records = _array_records(fixtures, "Fixture")
+    _require_fields(records, ("event", "finished"), "Fixture")
+    mine = [record for record in records if record.get("event") == gameweek]
+    finished = sum(1 for record in mine if _boolean(record, "finished", "Fixture"))
+    return finished, len(mine)
 
 
 @dataclass(frozen=True, slots=True)

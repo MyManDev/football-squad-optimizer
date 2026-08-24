@@ -22,6 +22,7 @@ from squadopt.data.sources.fpl_live import (
     EntryPicksRecord,
     GameweekDeadline,
     LeagueStanding,
+    LiveEventPoints,
     availability_snapshot,
     entry_endpoint_paths,
     entry_history_payload,
@@ -31,9 +32,12 @@ from squadopt.data.sources.fpl_live import (
     fixture_snapshot,
     fpl_entry_picks,
     fpl_league_standings,
+    fpl_live_event_points,
     gameweek_deadlines,
     league_standings_endpoint_path,
     league_standings_payload,
+    live_endpoint_path,
+    live_payload,
     next_open_deadline,
     player_snapshot,
     team_codes,
@@ -738,12 +742,14 @@ def test_every_built_payload_name_stays_inside_the_snapshot_grammar() -> None:
         entry_history_payload(11),
         entry_picks_payload(11, 2),
         league_standings_payload(352490),
+        live_payload(2),
     ]
     assert names == [
         "entry-11.json",
         "entry-11-history.json",
         "entry-11-picks-gw02.json",
         "league-352490-standings.json",
+        "event-gw02-live.json",
     ]
     for name in names:
         assert _PAYLOAD_NAME.match(name), name
@@ -985,3 +991,145 @@ def test_the_twin_carries_exactly_the_application_seams_fields() -> None:
     assert {field.name for field in dataclasses.fields(EntryPicksRecord)} == {
         field.name for field in dataclasses.fields(EntryPicks)
     }
+
+
+# --- live gameweek points -----------------------------------------------------------
+#
+# These points exist to be shown while a gameweek is still being played, so every test
+# below is really about one question: can a reader tell how finished the number is?
+
+
+def _live_element(player: int, points: int, **stats: Any) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "minutes": 90,
+        "bonus": 0,
+        "bps": 20,
+        "total_points": points,
+    }
+    record.update(stats)
+    return {"id": player, "stats": record, "explain": [], "modified": True}
+
+
+def _live_payload(elements: list[dict[str, Any]] | None = None) -> bytes:
+    records = [_live_element(1, 6), _live_element(2, 2)] if elements is None else elements
+    return json.dumps({"elements": records}).encode("utf-8")
+
+
+def _gameweek_fixtures(finished: int, total: int, *, event: int = 1) -> bytes:
+    records = [
+        _fixture(id=index + 1, event=event, finished=index < finished) for index in range(total)
+    ]
+    return json.dumps(records).encode("utf-8")
+
+
+def test_the_live_payload_name_maps_to_its_endpoint() -> None:
+    """The grammar itself is asserted with the other built names, in one place."""
+
+    assert live_endpoint_path(2) == {"event-gw02-live.json": "event/2/live/"}
+
+
+@pytest.mark.parametrize("gameweek", [0, -1, True])
+def test_a_live_payload_name_refuses_a_gameweek_that_is_not_one(gameweek: Any) -> None:
+    with pytest.raises(InvalidValueError, match="gameweek"):
+        live_payload(gameweek)
+
+
+def test_points_are_read_per_player_with_the_gameweeks_progress_beside_them() -> None:
+    result = fpl_live_event_points(
+        _live_payload(),
+        _gameweek_fixtures(finished=6, total=10),
+        gameweek=1,
+        source_snapshot_id="fpl-live-20260822T140000Z-abc",
+    )
+
+    assert result.points_by_player == {1: 6, 2: 2}
+    assert (result.fixtures_finished, result.fixtures_total) == (6, 10)
+    assert result.bonus_confirmed is False
+    assert result.source_snapshot_id == "fpl-live-20260822T140000Z-abc"
+
+
+def test_bonus_is_confirmed_only_when_every_fixture_of_the_gameweek_is_finished() -> None:
+    """The distinction the whole record exists for.
+
+    The platform adds bonus to a player's total when *his* fixture finishes, so a score
+    read earlier is short by up to three points per player and short by different amounts
+    for different players. Nine of ten finished is not "basically final".
+    """
+
+    nearly = fpl_live_event_points(_live_payload(), _gameweek_fixtures(9, 10), gameweek=1)
+    complete = fpl_live_event_points(_live_payload(), _gameweek_fixtures(10, 10), gameweek=1)
+
+    assert nearly.bonus_confirmed is False
+    assert complete.bonus_confirmed is True
+
+
+def test_progress_is_counted_for_the_asked_gameweek_only() -> None:
+    """The live document names no gameweek, so the fixtures decide which one this is."""
+
+    fixtures = json.dumps(
+        [
+            _fixture(id=1, event=1, finished=True),
+            _fixture(id=2, event=1, finished=True),
+            _fixture(id=3, event=2, finished=False),
+        ]
+    ).encode("utf-8")
+
+    result = fpl_live_event_points(_live_payload(), fixtures, gameweek=1)
+
+    assert (result.fixtures_finished, result.fixtures_total) == (2, 2)
+    assert result.bonus_confirmed is True
+
+
+def test_a_gameweek_with_no_fixtures_is_refused_rather_than_scored() -> None:
+    """A live score for a gameweek the fixtures do not mention describes nothing."""
+
+    with pytest.raises(InvalidValueError, match="no fixtures"):
+        fpl_live_event_points(_live_payload(), _gameweek_fixtures(1, 1, event=1), gameweek=7)
+
+
+def test_a_stats_section_that_is_not_an_object_stops_the_read() -> None:
+    payload = json.dumps({"elements": [{"id": 1, "stats": [], "explain": []}]}).encode("utf-8")
+
+    with pytest.raises(DataSourceError, match="stats"):
+        fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_a_missing_stats_section_names_the_field_rather_than_emitting_a_null() -> None:
+    payload = json.dumps({"elements": [{"id": 1, "explain": []}]}).encode("utf-8")
+
+    with pytest.raises(DataSourceError, match="stats"):
+        fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_non_integer_points_are_refused() -> None:
+    payload = _live_payload([_live_element(1, 6), _live_element(2, 0, total_points="4")])
+
+    with pytest.raises(InvalidValueError, match="total_points"):
+        fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_a_repeated_player_is_a_changed_payload_not_a_last_one_wins() -> None:
+    payload = _live_payload([_live_element(1, 6), _live_element(1, 2)])
+
+    with pytest.raises(DuplicateRecordsError, match="more than once"):
+        fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_an_empty_elements_array_is_refused() -> None:
+    payload = json.dumps({"elements": []}).encode("utf-8")
+
+    with pytest.raises(DataSourceError, match="elements"):
+        fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_the_record_refuses_to_claim_confirmed_bonus_while_fixtures_are_unfinished() -> None:
+    """The guard is on the record itself, so no future caller can assemble the lie."""
+
+    with pytest.raises(InvalidValueError, match="cannot hold"):
+        LiveEventPoints(
+            gameweek=1,
+            points_by_player={1: 6},
+            bonus_confirmed=True,
+            fixtures_finished=9,
+            fixtures_total=10,
+        )
