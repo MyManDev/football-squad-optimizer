@@ -7,7 +7,13 @@ import indexFixture from "../../../../public/data/index.json";
 import type { DataClient, Loaded } from "../../../data/client";
 import { NotFoundError } from "../../../data/client";
 import { DataClientContext } from "../../../data/queries";
-import type { RecommendationView, SiteIndex } from "../../../data/schema";
+import type { LedgerView, RecommendationView, SiteIndex } from "../../../data/schema";
+import {
+  hitLedgerFixture,
+  pendingWeekLedgerFixture,
+  settledLedgerFixture,
+  unsettledLedgerFixture,
+} from "../../../fixtures/ledger";
 import {
   settledRecommendationFixture,
   unsettledRecommendationFixture,
@@ -22,7 +28,11 @@ function loaded<T>(payload: T): Loaded<T> {
   return { payload, generatedAtUtc: "2026-08-19T10:00:00Z" };
 }
 
-function makeClient(deadlineUtc?: string, viewOverride?: RecommendationView): DataClient {
+function makeClient(
+  deadlineUtc?: string,
+  viewOverride?: RecommendationView,
+  ledger?: LedgerView,
+): DataClient {
   return {
     getIndex: async () => loaded(indexFixture.payload as SiteIndex),
     getRecommendation: async (season, gameweek) => {
@@ -35,8 +45,11 @@ function makeClient(deadlineUtc?: string, viewOverride?: RecommendationView): Da
     getPool: async () => {
       throw new Error("not used");
     },
+    // Left throwing by default on purpose: the season card must be additive, so every test
+    // that does not opt in exercises the page with the ledger query failing.
     getLedger: async () => {
-      throw new Error("not used");
+      if (ledger === undefined) throw new Error("not used");
+      return loaded(ledger);
     },
     getLeague: async () => {
       throw new Error("not used");
@@ -53,10 +66,16 @@ function renderAt(
     deadlineUtc,
     language = "tr",
     viewOverride,
-  }: { deadlineUtc?: string; language?: Language; viewOverride?: RecommendationView } = {},
+    ledger,
+  }: {
+    deadlineUtc?: string;
+    language?: Language;
+    viewOverride?: RecommendationView;
+    ledger?: LedgerView;
+  } = {},
 ) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const client = makeClient(deadlineUtc, viewOverride);
+  const client = makeClient(deadlineUtc, viewOverride, ledger);
   return render(
     <QueryClientProvider client={queryClient}>
       <DataClientContext.Provider value={client}>
@@ -148,5 +167,64 @@ describe("SquadPage", () => {
     renderAt("/", { viewOverride: tripleCaptain });
 
     expect(await screen.findByText("×3 C")).toBeInTheDocument();
+  });
+});
+
+describe("SquadPage season standing", () => {
+  it("is absent until a gameweek has settled", async () => {
+    renderAt("/", { ledger: unsettledLedgerFixture });
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /Oyun haftası 1/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Sezon durumu")).not.toBeInTheDocument();
+  });
+
+  it("does not appear, and does not break the page, when the ledger cannot be read", async () => {
+    renderAt("/");
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /Oyun haftası 1/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Sezon durumu")).not.toBeInTheDocument();
+  });
+
+  it("reports the season total, the latest settled week and the projection gap", async () => {
+    renderAt("/", { ledger: settledLedgerFixture });
+
+    expect(await screen.findByText("Sezon durumu")).toBeInTheDocument();
+    // With one settled week the season total and that week's points are the same number by
+    // definition, so 61 legitimately appears twice — once per stat.
+    expect(screen.getAllByText("61")).toHaveLength(2);
+    expect(screen.getByText("1 hafta · 0 ceza puanı")).toBeInTheDocument();
+    expect(screen.getByText(/^OH1 · tahmin 56,1$/)).toBeInTheDocument();
+    expect(screen.getByText("+4,9")).toBeInTheDocument();
+  });
+
+  it("shows the net season total, not the gross one, when a hit was taken", async () => {
+    renderAt("/", { ledger: hitLedgerFixture });
+
+    expect(await screen.findByText("Sezon durumu")).toBeInTheDocument();
+    // 111 gross, 107 net after a four-point hit. FPL shows 107, so this card must too.
+    expect(screen.getByText("107")).toBeInTheDocument();
+    expect(screen.queryByText("111")).not.toBeInTheDocument();
+    expect(screen.getByText("2 hafta · 4 ceza puanı")).toBeInTheDocument();
+  });
+
+  it("reports the latest week with an outcome, not the latest decided week", async () => {
+    renderAt("/", { ledger: pendingWeekLedgerFixture });
+
+    expect(await screen.findByText("Sezon durumu")).toBeInTheDocument();
+    // Gameweek three is decided but unsettled; its 46-point predecessor is the latest outcome.
+    expect(screen.getByText(/^OH2 · tahmin 54,0$/)).toBeInTheDocument();
+    expect(screen.getByText("46")).toBeInTheDocument();
+  });
+
+  it("labels the card in English too", async () => {
+    renderAt("/", { language: "en", ledger: settledLedgerFixture });
+
+    expect(await screen.findByText("Season standing")).toBeInTheDocument();
+    expect(screen.getByText("1 settled · 0 hit points")).toBeInTheDocument();
+    expect(screen.getByText(/^GW1 · projected 56.1$/)).toBeInTheDocument();
   });
 });
