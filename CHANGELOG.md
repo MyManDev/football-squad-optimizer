@@ -11,14 +11,19 @@ records how the `v<semver>` tag namespace relates to the operational `run-*` and
 
 ## 1.0.0
 
-**What this release is: the system that made and published the first live decision.**
+**What this release is: the first software release cut after the system's first live decision.**
 
-That is a statement about something already done and immutable, which is the only kind of
-thing a release label should assert. It is deliberately not "the system we think is ready" —
-nothing pending can retroactively make it false.
+The distinction matters, because the tag does not sit on the commit that produced that
+decision — it sits on a later release commit. What the label points at is something already
+done and immutable, which is the only kind of thing a release label should assert. It is
+deliberately not "the system we think is ready": nothing pending can retroactively make it
+false.
 
-The decision it names, every value read back from the published view
-(`web/public/data/2026-27/gw01/recommendation.json`) rather than transcribed from a run log:
+The decision it comes after, read back from the record rather than transcribed from a run log.
+Most rows come from the published decision view
+(`web/public/data/2026-27/gw01/recommendation.json`); the two that do not are marked, because a
+table that says "all of this came from one file" when it did not is the kind of small untruth
+this project spends its time removing:
 
 | | |
 | --- | --- |
@@ -30,7 +35,7 @@ The decision it names, every value read back from the published view
 | Squad cost | 100.0 of 100.0 |
 | Captain multiplier | 2 |
 | Players excluded as unavailable | 96 |
-| Published as | `site-2026-27-gw01-decision` |
+| Published as | `site-2026-27-gw01-decision` *(release tag, not a field of the view)* |
 
 Contracts in force for that decision:
 
@@ -41,7 +46,7 @@ Contracts in force for that decision:
 | Report | `live_recommendation_v3` |
 | Season rules | `season_rules_v1` (fingerprint `6aa14f8b…`) |
 | Published view | `ui_view_v1` |
-| Season tick | `season_tick_v1` |
+| Season tick | `season_tick_v1` *(from `status.json`, not the decision view)* |
 | Prediction fingerprint | `7a056a4b2c52630c2c4c5835aa8c1a52031a8c69abf99df152d46f6baa8563df` |
 
 ### Added

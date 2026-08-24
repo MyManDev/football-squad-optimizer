@@ -117,12 +117,11 @@ dispatch was refused by the tag guard and the release was re-cut as
 `site-2026-27-gw01-fix2`. The tag stays, inert, for the same reason `v2026-27.gw01` stays. If
 you find it in the list, it deployed nothing.
 
-Check the list against the rules rather than trusting this section:
+Check the list against the rules rather than trusting this section. Git does this on its own,
+so the check runs the same in PowerShell as in a shell:
 
-```bash
-git tag --sort=creatordate | while read -r t; do
-  printf '%-34s %s\n' "$t" "$(git cat-file -t "$t")"
-done
+```console
+git for-each-ref --sort=creatordate --format="%(refname:short) %(objecttype)" refs/tags
 ```
 
 Every tag should be an annotated `tag` object, not a `commit`: the production workflow rejects
