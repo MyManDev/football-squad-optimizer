@@ -623,16 +623,23 @@ is the accepted deliverable for that checklist item.
 ## Quality checks
 
 ```powershell
-.venv\Scripts\python -m pytest
+.venv\Scripts\python -m pytest -n auto --dist loadscope
 .venv\Scripts\python -m ruff check .
 .venv\Scripts\python -m ruff format --check .
 .venv\Scripts\python -m mypy src\squadopt
 ```
 
+The full suite is the merge gate, and it runs in parallel: 115 s against 444 s serial on eight
+workers, with the same 2,502 passed and 1 skipped either way. `-n auto` counts physical cores,
+so it picks fewer workers than a thread count suggests, and it is not in `addopts` — a single
+`pytest path::test` stays serial and starts instantly.
+
 Two pytest markers split the suite: `slow` (solver-heavy tests of more than about five
 seconds each) and `integration` (everything under `tests/integration`, applied
-automatically). The fast suite for a pull request is `pytest -m "not slow"`; the full
-suite is plain `pytest` and is what the merge gate means.
+automatically). `-m "not slow"` is no longer the useful shortcut it was — it saves about
+112 s serially, so the parallel full suite beats it outright and gates on everything.
+[Branching and protection](docs/architecture/branching.md) records the measurements and why
+`loadscope` is the chosen distribution.
 
 See [the optimization specification](docs/optimization_spec.md) for the formulation,
 rounding rules, deterministic tie-breaking, assumptions, and current limitations.

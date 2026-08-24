@@ -49,31 +49,64 @@ the layering contract in [dependency rules](dependency_rules.md). CI enforces al
 
 ### Two things to know before wiring these into CI
 
-**The fast suite is not fast yet.** Measured on `b031ef1`, on one developer machine
-(Python 3.11.0, 1,969 collected tests):
+**The suite runs in parallel, and the marks are not what makes it fast.** Measured on
+`51bbaf6`, one developer machine (Python 3.11.0, 16 logical / 8 physical cores, 2,503 collected
+tests):
 
-| Suite | Command | Tests run | Wall clock |
-| --- | --- | --- | --- |
-| full | `pytest` | 1,968 (1 skipped) | **443 s** (7 m 23 s) |
-| "fast" | `pytest -m "not slow"` | 1,960 (8 deselected) | **335 s** (5 m 34 s) |
+| Suite | Command | Wall clock |
+| --- | --- | --- |
+| serial | `pytest` | 444 s (7 m 24 s) |
+| serial, deselecting `slow` | `pytest -m "not slow"` | ~332 s (derived, see below) |
+| **parallel — what CI runs** | `pytest -n auto --dist loadscope` | **115 s** (1 m 54 s) |
+| parallel, default distribution | `pytest -n auto --dist load` | 131 s (2 m 11 s) |
 
-So the eight `slow` tests are 0.4 per cent of the count and 24 per cent of the wall clock —
-the marks are well chosen. But deselecting them still leaves **5 m 34 s**, so `-m "not slow"`
-is not a fast suite in any useful sense, and wiring PR gates to it buys under two minutes.
+Every one of those runs reported the same 2,502 passed and 1 skipped. That equality is the
+gate: a parallel run that passes a different number of tests has found an ordering assumption,
+not a speed-up.
 
-Where the remaining time goes: the 37 `tests/integration` tests are inside the "fast" suite;
-the session-scoped `baseline_result` fixture (`tests/conftest.py:31-33`) runs a full CP-SAT
-solve regardless of markers; CP-SAT is deliberately single-threaded for determinism with a
-10 s default budget per solve; and the solver-dense files (`test_evaluator.py`,
-`test_optimizer.py`, `test_risk_optimizer.py`, `test_bayesian_optimization.py`,
-`test_multi_gw_rehearsal.py`) carry no marks at all. The costliest individual tests are the
-rank-objective and scenario searches at 8–21 s each.
+Locally, use the same command CI does:
 
-A genuinely fast suite needs either more marks, parallelism (`pytest-xdist` — note the
-determinism constraint applies within a solve, not across tests), or both. Those are choices
-for the core-architecture owner. The numbers above are the first test-suite timings recorded for
-this repository; regenerate them with `pytest --durations=15` rather than trusting this table
-after the suite grows.
+```bash
+python -m pytest -n auto --dist loadscope
+```
+
+`-n auto` is deliberately **not** in `addopts`, so a plain `pytest path::test` stays serial and
+starts instantly. `auto` counts *physical* cores, not logical: it created **8** workers on the
+16-thread machine above, and will create 4 on a `ubuntu-latest` runner — so CI's wall clock is
+longer than the number in the table. Read what the run reports rather than assuming.
+
+**Why `loadscope` rather than the default.** `loadscope` groups a module onto one worker, so the
+eleven module-scoped fixtures are built once instead of once per worker that happens to draw one
+of their tests. It measured faster despite distributing less freely, which was not the
+prediction — the default was expected to win because the heaviest module has no module fixture
+to rebuild. Measure before changing this.
+
+**What sets the floor.** Grouping by module means the slowest module is the shortest the run can
+be. `tests/unit/test_scenarios.py` is 50 tests and **79 s** on its own, which is 69 per cent of
+the 115 s parallel wall clock — so more workers buy almost nothing until that file is split or
+its solver budgets come down. That is the next lever, not more parallelism.
+
+**Why parallelism is safe here**, checked rather than assumed: every write in the suite is under
+`tmp_path`, and the repository paths tests touch (`docs/`, `web/public/data/`) are read-only; no
+test opens a socket or binds a port, and `tests/integration/test_backend_api.py` uses FastAPI's
+in-process `TestClient`. The determinism constraint is unaffected because it applies *within* a
+solve — CP-SAT is pinned to `num_search_workers = 1`
+(`src/squadopt/optimization/optimizer.py`) — not across tests.
+
+**What the marks actually cover.** The nine `slow` tests carry ~112 s of the 444 s, which is
+where the derived serial figure above comes from (444 − 112 = 332, against 335 s measured on
+`b031ef1`). But of the 30 costliest items, 21 carry **no** mark and hold another ~101 s, so
+`-m "not slow"` was never going to produce a fast suite. Marking is worth revisiting now that
+parallelism changed what "slow" is for; #230 records the list.
+
+**The largest single item is a fixture, not a test.** `test_screening_experiment`'s module
+fixture is 22.9 s on its own — 5 per cent of the serial wall clock — and parallelism cannot
+remove it, only move it. Tracked in #233. For contrast, the session-scoped `baseline_result`
+fixture (`tests/conftest.py`) does run a full CP-SAT solve, but it costs 0.04 s; an earlier
+draft of this section named it as a cause of the runtime, which measurement does not support.
+
+Regenerate all of this with `pytest -q --durations=30` rather than trusting the table after the
+suite grows again.
 
 **Interpreter coverage is deliberate.** `requires-python = ">=3.11"` and ruff target Python
 3.11, while mypy models Python 3.13. CI therefore runs both Python 3.11 (declared dependency
