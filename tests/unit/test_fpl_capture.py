@@ -8,6 +8,7 @@ waited out.
 import json
 import re
 import urllib.error
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -271,6 +272,24 @@ def test_a_dry_run_with_entries_writes_nothing(
     [
         ("malformed json", "{not json"),
         ("wrong contract", json.dumps({"contract_version": "other", "entries": []})),
+        ("a list instead of an object", "[]"),
+        (
+            "null entries",
+            json.dumps({"contract_version": ENTRY_REGISTRY_CONTRACT_VERSION, "entries": None}),
+        ),
+        (
+            "missing entry id",
+            json.dumps({"contract_version": ENTRY_REGISTRY_CONTRACT_VERSION, "entries": [{}]}),
+        ),
+        (
+            "invalid entry id",
+            json.dumps(
+                {
+                    "contract_version": ENTRY_REGISTRY_CONTRACT_VERSION,
+                    "entries": [{"entry_id": "not-an-integer"}],
+                }
+            ),
+        ),
         (
             "repeated entry",
             json.dumps(
@@ -291,6 +310,21 @@ def test_an_unusable_registry_is_reported_in_the_data_error_contract(
         fpl_capture.registered_entry_ids(path)
 
 
+def test_a_missing_registry_is_not_silently_treated_as_an_empty_one(tmp_path: Path) -> None:
+    path = tmp_path / "missing.json"
+    with pytest.raises(DataSourceError, match="not a readable file"):
+        fpl_capture.registered_entry_ids(path)
+
+
+def test_a_registry_that_is_not_utf8_is_reported_in_the_data_error_contract(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "registry.json"
+    path.write_bytes(b"\xff\xfe")
+    with pytest.raises(DataSourceError, match=re.escape(str(path))):
+        fpl_capture.registered_entry_ids(path)
+
+
 def test_an_unusable_registry_stops_the_capture_rather_than_tracebacking(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -304,6 +338,17 @@ def test_an_unusable_registry_stops_the_capture_rather_than_tracebacking(
 
 
 # --- when the recorded instant is taken -----------------------------------------------
+
+
+def test_the_clock_preserves_subsecond_precision(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz: object = None) -> datetime:
+            assert tz is UTC
+            return cls(2026, 8, 25, 0, 0, 11, 987654, tzinfo=UTC)
+
+    monkeypatch.setattr(fpl_capture, "datetime", FixedDateTime)
+    assert fpl_capture._utc_now() == "2026-08-25T00:00:11.987654Z"
 
 
 def test_the_recorded_instant_is_taken_after_every_read(

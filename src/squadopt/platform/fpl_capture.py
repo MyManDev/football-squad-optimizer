@@ -5,7 +5,6 @@ HTTP adapter here lets installed CLI entry points provide it without importing a
 module under ``scripts``.
 """
 
-import json
 import time
 import urllib.error
 import urllib.request
@@ -13,7 +12,7 @@ from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
-from squadopt.application.entries import EntryError, EntryRegistry
+from squadopt.application.entries import EntryRegistry
 from squadopt.data.errors import DataSourceError
 from squadopt.data.identity import reconcile_player_identity
 from squadopt.data.snapshots import SnapshotMetadata, write_snapshot
@@ -82,7 +81,9 @@ def fetch(
 
 
 def _utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    # Preserve the precision the clock supplies. Truncating a 12:00:00.900 read to
+    # 12:00:00 would recreate the early time-of-knowledge claim this stamp prevents.
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _ordered_positions(counts: dict[str, int]) -> str:
@@ -149,18 +150,19 @@ def registered_endpoints(
 def registered_entry_ids(path: Path) -> tuple[int, ...]:
     """Read the registry, reporting a bad one in the data error contract.
 
-    ``EntryRegistry.load`` raises what its own layer raises: ``JSONDecodeError`` for malformed
-    JSON and ``EntryError`` -- a ``ValueError`` -- for a wrong contract version or a repeated
-    entry id. Neither is a ``DataError``, so all three reached the operator as a traceback in
-    the middle of a capture. A capture that cannot read its registry has to say which file and
-    why, in the same vocabulary as every other capture failure.
+    ``EntryRegistry.load`` raises parser and shape errors from its own layer. None is a
+    ``DataError``, so malformed JSON, a malformed document shape, a bad contract value or an
+    unusable file would otherwise reach the operator as a traceback. A capture that cannot read
+    its registry has to say which file and why, in the same vocabulary as every other capture
+    failure.
     """
+
+    if not path.is_file():
+        raise DataSourceError(f"{path} is not a usable entry registry: not a readable file")
 
     try:
         return EntryRegistry.load(path).ids()
-    except json.JSONDecodeError as error:
-        raise DataSourceError(f"{path} is not valid JSON: {error}") from error
-    except EntryError as error:
+    except (ValueError, TypeError, KeyError, AttributeError) as error:
         raise DataSourceError(f"{path} is not a usable entry registry: {error}") from error
     except OSError as error:
         raise DataSourceError(f"{path} could not be read: {error}") from error
