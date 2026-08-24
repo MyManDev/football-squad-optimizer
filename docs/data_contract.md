@@ -122,6 +122,49 @@ features until a real source's snapshot semantics are inspected.
 The classification is asserted to be a complete, disjoint partition of the
 canonical schema, so the leakage rules cannot develop a silent hole.
 
+### Entry payloads: which capture may be read for whose squad
+
+The rule above is about columns of the canonical panel. The per-entry documents (#127) are
+not panel rows, and they need their own statement because the question they answer is
+"whose squad was this, when" rather than "was this column knowable".
+
+**A gameweek's picks are frozen at that gameweek's own deadline, not when its fixtures
+finish.** So for the gameweek `t` decision, `event/{t-1}/picks` is the squad the manager
+holds going in, and it is complete the moment `t-1`'s deadline passes. This is deliberately
+a weaker condition than the one `in_season_totals` needs: played *history* requires matches
+to have happened, a *squad* does not. The two must not be conflated, because assuming picks
+need played fixtures would delay a read that is already valid, and assuming history needs
+only a passed deadline would read counters that are still empty (the failure recorded in
+issue #224).
+
+**One capture, read twice.** The capture taken after gameweek `t-1` is settled is the same
+capture the `t` decision's entry payloads come from. There is no separate fetch moment for
+picks, and there must not be one: two captures would mean two different roster states
+answering for the same decision.
+
+**Before the opening deadline there is nothing to read.** Gameweek 0 does not exist, so a
+capture open for gameweek 1 reads no picks at all rather than reading an empty document.
+
+**The standings page is a membership record, not a schema.** A captured
+`league-{id}-standings.json` states who was in the league at that instant. It seeds the
+registry; it is not a source of player-gameweek rows and no feature reads it.
+
+Two fields the public endpoints do not publish, and which therefore have to be carried as
+declared unknowns rather than filled in:
+
+| Field | State | What a consumer may not claim |
+| --- | --- | --- |
+| `purchase_prices` | empty, `purchase_prices_known=False` | Not a selling price. A held squad built from these picks values every player at his *current* price, which overstates the budget for anyone who has risen since he was bought. |
+| `free_transfers` | `1`, `free_transfers_known=False` | Not the banked count. The endpoints never state it. It is derivable from the per-event transfers and costs, but only through a model of the banking cap (changed in 2024-25) and of the chip weeks that consume no transfer — so it is an open decision, not a parsing detail. |
+
+Both flags exist so a consumer that spends real budget or plans real transfers on these
+numbers has to acknowledge the limit rather than discover it.
+
+**The manager's own name is not captured into the registry.** The standings page publishes
+it beside the team name; only the team name becomes the registry label, and the registry
+itself stays out of git (`.gitignore`) because it is third-party data about identifiable
+people and this repository is public.
+
 ## 4. Guarantees
 
 - Public transformations copy; no input `DataFrame` is mutated in place.
