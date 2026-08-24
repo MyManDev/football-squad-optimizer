@@ -231,7 +231,7 @@ jobs:
           EXPECTED_DEPLOYMENT_MODE: preview
           EXPECTED_DEPLOYMENT_BRANCH: pr-${{ needs.qualify_preview.outputs.pr_number }}
           EXPECTED_DEPLOYMENT_COMMIT_SHA: ${{ needs.qualify_preview.outputs.head_sha }}
-          EXPECTED_DEPLOYMENT_ALIASES: ${{ format('https://pr-{0}.{1}', needs.qualify_preview.outputs.pr_number, steps.budget.outputs.pages_subdomain) }}
+          EXPECTED_PREVIEW_ALIAS: ${{ format('https://pr-{0}.{1}', needs.qualify_preview.outputs.pr_number, steps.budget.outputs.pages_subdomain) }}
         run: node trusted/web/scripts/verify-cloudflare-deployment.mjs
 
       - name: Smoke preview alias
@@ -477,7 +477,6 @@ jobs:
           EXPECTED_DEPLOYMENT_MODE: production
           EXPECTED_DEPLOYMENT_BRANCH: main
           EXPECTED_DEPLOYMENT_COMMIT_SHA: ${{ needs.production_meta.outputs.commit_sha }}
-          EXPECTED_DEPLOYMENT_ALIASES: ${{ steps.budget.outputs.pages_aliases }}
         run: node trusted/web/scripts/verify-cloudflare-deployment.mjs
 
       - name: Smoke production alias

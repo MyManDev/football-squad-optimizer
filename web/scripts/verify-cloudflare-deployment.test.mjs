@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { expectedAliasSet, verifyDeploymentRecord } from "./verify-cloudflare-deployment.mjs";
+import {
+  verifyCanonicalDeployment,
+  verifyDeploymentRecord,
+  verifyPreviewAlias,
+} from "./verify-cloudflare-deployment.mjs";
 
 const commitSha = "a".repeat(40);
 const deploymentId = "f64788e9-fccd-4d4a-a28a-cb84f88f6";
@@ -19,7 +23,6 @@ const expected = {
   mode: "production",
   branch: "main",
   commitSha,
-  aliases: "https://squadopt.pages.dev",
 };
 
 describe("Cloudflare deployment identity", () => {
@@ -38,68 +41,84 @@ describe("Cloudflare deployment identity", () => {
         },
       },
     ],
-    ["alias", { ...valid, aliases: ["https://main.squadopt.pages.dev"] }],
     ["status", { ...valid, latest_stage: { status: "failure" } }],
+    ["id", { ...valid, id: "0000ffff-0000-0000-0000-000000000000" }],
+    ["project", { ...valid, project_name: "other" }],
   ])("rejects a mismatched %s", (_name, deployment) => {
     expect(() => verifyDeploymentRecord({ deployment, ...expected })).toThrow();
   });
+
+  it("says nothing about hostnames", () => {
+    // The record check is shared by both modes, and what a deployment is reachable at is not.
+    const noAliases = { ...valid, aliases: [] };
+    expect(() => verifyDeploymentRecord({ deployment: noAliases, ...expected })).not.toThrow();
+  });
 });
 
-// A project with a custom domain attached reports that domain in a production deployment's
-// ``aliases`` and never the apex ``*.pages.dev`` hostname. Asserting the subdomain alone
-// failed two real production dispatches after a successful upload (#222).
-describe("Cloudflare deployment identity across the project's canonical aliases", () => {
-  const canonical = "https://squadopt.pages.dev,https://squadopt.com";
+// Preview deployments own their branch alias and the API reports it — confirmed by real runs
+// (Actions 32717643420, 32723509231), not assumed.
+describe("preview alias", () => {
+  const preview = {
+    ...valid,
+    environment: "preview",
+    aliases: ["https://pr-7.squadopt.pages.dev"],
+  };
 
-  it("accepts a deployment owning the attached custom domain rather than the apex", () => {
-    expect(
-      verifyDeploymentRecord({
-        deployment: { ...valid, aliases: ["https://squadopt.com"] },
-        ...expected,
-        aliases: canonical,
-      }),
-    ).toBe("https://squadopt.com");
-  });
-
-  it("still accepts a deployment owning the pages.dev apex", () => {
-    expect(verifyDeploymentRecord({ deployment: valid, ...expected, aliases: canonical })).toBe(
-      "https://squadopt.pages.dev",
+  it("accepts the branch alias the deployment owns", () => {
+    expect(verifyPreviewAlias(preview, "https://pr-7.squadopt.pages.dev")).toBe(
+      "https://pr-7.squadopt.pages.dev",
     );
   });
 
-  it("rejects a deployment owning none of the canonical aliases", () => {
-    expect(() =>
-      verifyDeploymentRecord({
-        deployment: { ...valid, aliases: ["https://pr-7.squadopt.pages.dev"] },
-        ...expected,
-        aliases: canonical,
-      }),
-    ).toThrow("owns none of the expected aliases");
+  it("normalises case and a trailing slash before comparing", () => {
+    expect(verifyPreviewAlias(preview, "https://PR-7.SquadOpt.pages.dev/")).toBe(
+      "https://pr-7.squadopt.pages.dev",
+    );
   });
 
-  it("rejects a deployment carrying no aliases at all", () => {
-    expect(() =>
-      verifyDeploymentRecord({
-        deployment: { ...valid, aliases: [] },
-        ...expected,
-        aliases: canonical,
-      }),
-    ).toThrow("owns none of the expected aliases");
+  it.each([
+    ["a different pull request", { ...preview, aliases: ["https://pr-9.squadopt.pages.dev"] }],
+    ["no aliases at all", { ...preview, aliases: [] }],
+    ["a missing aliases field", { ...preview, aliases: undefined }],
+  ])("rejects %s", (_name, deployment) => {
+    expect(() => verifyPreviewAlias(deployment, "https://pr-7.squadopt.pages.dev")).toThrow(
+      "does not own expected alias",
+    );
   });
 
-  it("refuses an empty expected set rather than passing everything", () => {
-    expect(() => expectedAliasSet("")).toThrow("At least one expected deployment alias");
-    expect(() => expectedAliasSet([])).toThrow("At least one expected deployment alias");
+  it("refuses a non-https expectation", () => {
+    expect(() => verifyPreviewAlias(preview, "http://pr-7.squadopt.pages.dev")).toThrow(
+      "Expected an HTTPS alias",
+    );
+  });
+});
+
+// Production is a different question: the apex is the project's canonical hostname, not a
+// per-deployment alias. Asserting the alias failed three dispatches after a successful upload
+// (#222) on a project with no custom domain attached.
+describe("production canonical deployment", () => {
+  it("accepts the project whose canonical deployment is this one", () => {
+    const project = { canonical_deployment: { id: deploymentId } };
+    expect(verifyCanonicalDeployment(project, deploymentId)).toBe(deploymentId);
   });
 
-  it("reads a comma-separated list, an array or its own output", () => {
-    const fromString = expectedAliasSet(canonical);
-    expect([...fromString]).toEqual(["https://squadopt.pages.dev", "https://squadopt.com"]);
-    expect([...expectedAliasSet(fromString)]).toEqual([...fromString]);
-    expect([...expectedAliasSet([" https://Squadopt.COM/ "])]).toEqual(["https://squadopt.com"]);
+  it("rejects a project still serving a previous deployment", () => {
+    const project = { canonical_deployment: { id: "0000ffff-0000-0000-0000-000000000000" } };
+    expect(() => verifyCanonicalDeployment(project, deploymentId)).toThrow(
+      "canonical deployment is 0000ffff-0000-0000-0000-000000000000",
+    );
   });
 
-  it("refuses a non-https expected alias", () => {
-    expect(() => expectedAliasSet("http://squadopt.com")).toThrow("Expected an HTTPS alias");
+  it.each([
+    ["no canonical_deployment", {}],
+    ["a null canonical_deployment", { canonical_deployment: null }],
+    ["a canonical_deployment without an id", { canonical_deployment: {} }],
+    ["an empty id", { canonical_deployment: { id: "" } }],
+  ])("refuses to pass when the project reports %s", (_name, project) => {
+    // Silence here would be the original bug in a new place: an unverifiable claim reported
+    // as verified.
+    expect(() => verifyCanonicalDeployment(project, deploymentId)).toThrow(
+      "reports no canonical_deployment.id",
+    );
   });
 });

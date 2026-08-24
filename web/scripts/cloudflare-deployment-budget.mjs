@@ -27,38 +27,6 @@ export function validateProjectConfiguration(project) {
   return validatedPagesSubdomain(project?.subdomain);
 }
 
-// One or more dot-separated hostname labels. Written as a literal rather than assembled
-// from a string, because a template literal turns "\." into "." and would quietly accept
-// any character where a dot is meant.
-const PAGES_DOMAIN_PATTERN =
-  /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
-
-// A custom domain attached to the project. Validated the same way as the subdomain rather
-// than trusted, because it becomes part of an identity assertion.
-export function validatedPagesDomain(value) {
-  const domain = String(value ?? "")
-    .trim()
-    .toLowerCase();
-  if (domain.length > 253 || !PAGES_DOMAIN_PATTERN.test(domain)) {
-    throw new Error("Cloudflare Pages API returned an invalid project domain");
-  }
-  return domain;
-}
-
-// Every hostname the project may legitimately answer on, as https URLs. Identity
-// verification needs the whole set: a production deployment's ``aliases`` array carries the
-// attached custom domains, and not the apex ``*.pages.dev`` hostname, so asserting the
-// subdomain alone asserts something the API does not report.
-export function projectAliasUrls(project) {
-  const subdomain = validateProjectConfiguration(project);
-  const domains = project?.domains;
-  if (domains != null && !Array.isArray(domains)) {
-    throw new Error("Cloudflare Pages API returned a non-array project domain list");
-  }
-  const hostnames = [subdomain, ...(domains ?? []).map((domain) => validatedPagesDomain(domain))];
-  return [...new Set(hostnames)].map((hostname) => `https://${hostname}`);
-}
-
 export function utcDayBounds(now = new Date()) {
   const start = new Date(now);
   start.setUTCHours(0, 0, 0, 0);
@@ -185,13 +153,11 @@ async function main() {
   }
   const projectDetails = await getProject({ accountId, project, apiToken });
   const pagesSubdomain = validateProjectConfiguration(projectDetails);
-  const pagesAliases = projectAliasUrls(projectDetails);
 
   const deployments = await listDeployments({ accountId, project, apiToken });
   const outcome = deploymentDecision({ deployments, mode });
   await writeOutput("decision", outcome.decision);
   await writeOutput("pages_subdomain", pagesSubdomain);
-  await writeOutput("pages_aliases", pagesAliases.join(","));
   await writeOutput("today_count", outcome.todayCount);
   await writeOutput(
     "applicable_limit",

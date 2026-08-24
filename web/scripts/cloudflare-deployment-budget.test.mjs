@@ -5,10 +5,8 @@ import {
   PREVIEW_DEPLOYMENT_LIMIT,
   deploymentDecision,
   listDeployments,
-  projectAliasUrls,
   utcDayBounds,
   validateProjectConfiguration,
-  validatedPagesDomain,
   validatedPagesSubdomain,
 } from "./cloudflare-deployment-budget.mjs";
 
@@ -60,38 +58,6 @@ describe("Cloudflare deployment budget", () => {
         subdomain: "squadopt.pages.dev",
       }),
     ).toThrow("Direct Upload");
-  });
-
-  it("accepts a dotted custom domain and refuses anything that is not one", () => {
-    expect(validatedPagesDomain("SquadOpt.com")).toBe("squadopt.com");
-    expect(validatedPagesDomain("www.squadopt.com")).toBe("www.squadopt.com");
-    // A single label is not a domain. This is the case an assembled regex would have let
-    // through: "\." inside a template literal becomes ".", which matches any character.
-    expect(() => validatedPagesDomain("nodots")).toThrow("invalid project domain");
-    expect(() => validatedPagesDomain("bad..dots")).toThrow("invalid project domain");
-    expect(() => validatedPagesDomain("-leading.com")).toThrow("invalid project domain");
-  });
-
-  it("reports the apex and every attached custom domain as canonical aliases", () => {
-    const project = {
-      production_branch: "main",
-      source: null,
-      subdomain: "squadopt.pages.dev",
-      domains: ["squadopt.com", "www.squadopt.com"],
-    };
-    expect(projectAliasUrls(project)).toEqual([
-      "https://squadopt.pages.dev",
-      "https://squadopt.com",
-      "https://www.squadopt.com",
-    ]);
-    expect(projectAliasUrls({ ...project, domains: [] })).toEqual(["https://squadopt.pages.dev"]);
-    // Cloudflare lists the apex among the project domains on some projects; one entry each.
-    expect(projectAliasUrls({ ...project, domains: ["squadopt.pages.dev"] })).toEqual([
-      "https://squadopt.pages.dev",
-    ]);
-    expect(() => projectAliasUrls({ ...project, domains: "squadopt.com" })).toThrow(
-      "non-array project domain list",
-    );
   });
 
   it("reserves two daily slots by stopping previews at eight", () => {
