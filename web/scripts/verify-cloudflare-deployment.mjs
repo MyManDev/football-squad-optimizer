@@ -18,6 +18,19 @@ function normalizedUrl(value) {
   return url.href.replace(/\/$/, "").toLowerCase();
 }
 
+// The aliases a deployment may legitimately own, from a comma-separated list or an array.
+// Empty is refused rather than defaulted: a verification with nothing to compare against
+// would pass every deployment.
+export function expectedAliasSet(value) {
+  const candidates = (typeof value === "string" ? value.split(",") : [...(value ?? [])])
+    .map((candidate) => String(candidate).trim())
+    .filter((candidate) => candidate.length > 0);
+  if (candidates.length === 0) {
+    throw new Error("At least one expected deployment alias is required");
+  }
+  return new Set(candidates.map((candidate) => normalizedUrl(candidate)));
+}
+
 export function verifyDeploymentRecord({
   deployment,
   deploymentId,
@@ -25,7 +38,7 @@ export function verifyDeploymentRecord({
   mode,
   branch,
   commitSha,
-  alias,
+  aliases,
 }) {
   if (deployment?.id !== deploymentId) throw new Error("Cloudflare deployment ID mismatch");
   if (deployment?.project_name !== project) throw new Error("Cloudflare project name mismatch");
@@ -44,13 +57,21 @@ export function verifyDeploymentRecord({
     throw new Error("Cloudflare deployment commit SHA mismatch");
   }
 
-  const expectedAlias = normalizedUrl(alias);
-  const aliases = Array.isArray(deployment?.aliases)
+  // Any one of the project's canonical aliases, not one specific alias. When a custom
+  // domain is attached, a production deployment's ``aliases`` array carries that domain and
+  // not the apex ``*.pages.dev`` hostname, so requiring the subdomain asserted something the
+  // API does not report. Owning none of them is still a rejection.
+  const expected = expectedAliasSet(aliases);
+  const owned = Array.isArray(deployment?.aliases)
     ? deployment.aliases.map((candidate) => normalizedUrl(candidate))
     : [];
-  if (!aliases.includes(expectedAlias)) {
-    throw new Error(`Cloudflare deployment does not own expected alias ${expectedAlias}`);
+  const matched = owned.find((candidate) => expected.has(candidate));
+  if (matched === undefined) {
+    throw new Error(
+      `Cloudflare deployment owns none of the expected aliases ${[...expected].join(", ")}`,
+    );
   }
+  return matched;
 }
 
 async function getDeployment({ accountId, project, deploymentId, apiToken }) {
@@ -82,7 +103,7 @@ async function main() {
   const mode = requiredEnvironment("EXPECTED_DEPLOYMENT_MODE");
   const branch = requiredEnvironment("EXPECTED_DEPLOYMENT_BRANCH");
   const commitSha = requiredEnvironment("EXPECTED_DEPLOYMENT_COMMIT_SHA").toLowerCase();
-  const alias = requiredEnvironment("EXPECTED_DEPLOYMENT_ALIAS");
+  const aliases = expectedAliasSet(requiredEnvironment("EXPECTED_DEPLOYMENT_ALIASES"));
   const actionEnvironment = requiredEnvironment("ACTION_PAGES_ENVIRONMENT");
 
   if (!/^[0-9a-f]{32}$/i.test(accountId)) throw new Error("Invalid Cloudflare account ID");
@@ -101,17 +122,17 @@ async function main() {
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     try {
       const deployment = await getDeployment({ accountId, project, deploymentId, apiToken });
-      verifyDeploymentRecord({
+      const matched = verifyDeploymentRecord({
         deployment,
         deploymentId,
         project,
         mode,
         branch,
         commitSha,
-        alias,
+        aliases,
       });
       console.log(
-        `Verified Cloudflare deployment ${deploymentId}: ${mode} ${branch} ${commitSha} -> ${alias}`,
+        `Verified Cloudflare deployment ${deploymentId}: ${mode} ${branch} ${commitSha} -> ${matched}`,
       );
       return;
     } catch (error) {
