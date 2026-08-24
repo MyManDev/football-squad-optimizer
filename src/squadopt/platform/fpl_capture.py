@@ -5,11 +5,14 @@ HTTP adapter here lets installed CLI entry points provide it without importing a
 module under ``scripts``.
 """
 
+import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
+from squadopt.application.entries import EntryRegistry
 from squadopt.data.errors import DataSourceError
 from squadopt.data.identity import reconcile_player_identity
 from squadopt.data.snapshots import SnapshotMetadata, write_snapshot
@@ -17,7 +20,9 @@ from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
     FPL_LIVE_SOURCE,
+    entry_endpoint_paths,
     gameweek_deadlines,
+    league_standings_endpoint_path,
     next_open_deadline,
     player_snapshot,
 )
@@ -30,22 +35,55 @@ ENDPOINTS: dict[str, str] = {
 }
 USER_AGENT = "squadopt/1.0 (private research; contact via repository owner)"
 REQUEST_TIMEOUT_SECONDS = 30
+RETRY_ATTEMPTS = 4
+RETRY_INITIAL_SECONDS = 2.0
+RETRY_MAX_SECONDS = 16.0
 
 
-def fetch(url: str) -> bytes:
-    """Read one endpoint, translating network failures into the data error contract."""
-
+def _read(url: str) -> bytes:
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
-            return bytes(response.read())
-    except urllib.error.HTTPError as error:
-        raise DataSourceError(
-            f"{url} returned HTTP {error.code} {error.reason}. A 429 means the source is "
-            "rate limiting; wait rather than retrying in a loop."
-        ) from error
-    except urllib.error.URLError as error:
-        raise DataSourceError(f"Could not reach {url}: {error.reason}") from error
+    with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+        return bytes(response.read())
+
+
+def fetch(
+    url: str,
+    *,
+    attempts: int = RETRY_ATTEMPTS,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> bytes:
+    """Read one endpoint, translating network failures into the data error contract.
+
+    A capture used to be two requests, where a rate limit was best left to the operator.
+    It is now two plus three per registered entry, so the same polite pause the old error
+    message told a human to take is taken here instead: 429 and 5xx are retried with a
+    bounded backoff, because they say "later", while every other 4xx says "never" and is
+    raised immediately. The last failure is reported rather than swallowed.
+    """
+
+    delay = RETRY_INITIAL_SECONDS
+    for attempt in range(1, max(1, attempts) + 1):
+        try:
+            return _read(url)
+        except urllib.error.HTTPError as error:
+            retriable = error.code == 429 or 500 <= error.code < 600
+            if not retriable or attempt == attempts:
+                raise DataSourceError(
+                    f"{url} returned HTTP {error.code} {error.reason}"
+                    + (f" on all {attempts} attempts." if retriable else ".")
+                ) from error
+            print(f"  waiting  HTTP {error.code} from {url}; retrying in {delay:.0f}s")
+        except urllib.error.URLError as error:
+            raise DataSourceError(f"Could not reach {url}: {error.reason}") from error
+        sleeper(delay)
+        delay = min(delay * 2, RETRY_MAX_SECONDS)
+    raise DataSourceError(f"{url} was never read.")  # pragma: no cover - loop always returns
+
+
+def _utc_now() -> str:
+    # Preserve the precision the clock supplies. Truncating a 12:00:00.900 read to
+    # 12:00:00 would recreate the early time-of-knowledge claim this stamp prevents.
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _ordered_positions(counts: dict[str, int]) -> str:
@@ -80,21 +118,100 @@ def summarise(payloads: dict[str, bytes], captured_at: str, *, archive_root: Pat
     )
 
 
+def registered_endpoints(
+    bootstrap: bytes,
+    *,
+    as_of_utc: str,
+    entry_registry: Path | None,
+    league_id: int | None,
+) -> Mapping[str, str]:
+    """Payload name to URL for the registered entries and their league, if asked for.
+
+    The paths come from the data adapter; only the base URL is joined here. The gameweek
+    is the one before the deadline this capture is open for, because that is the last
+    gameweek whose picks are published -- picks are frozen at their own deadline, so this
+    does not depend on the fixtures having been played. Before the opening deadline there
+    is no such gameweek and no picks are read.
+    """
+
+    if entry_registry is None and league_id is None:
+        return {}
+    paths: dict[str, str] = {}
+    if league_id is not None:
+        paths.update(league_standings_endpoint_path(league_id))
+    if entry_registry is not None:
+        identifiers = registered_entry_ids(entry_registry)
+        target = next_open_deadline(gameweek_deadlines(bootstrap), as_of_utc=as_of_utc).gameweek
+        if identifiers and target > 1:
+            paths.update(entry_endpoint_paths(identifiers, gameweek=target - 1))
+    return {name: f"{BASE_URL}/{path}" for name, path in sorted(paths.items())}
+
+
+def registered_entry_ids(path: Path) -> tuple[int, ...]:
+    """Read the registry, reporting a bad one in the data error contract.
+
+    ``EntryRegistry.load`` raises parser and shape errors from its own layer. None is a
+    ``DataError``, so malformed JSON, a malformed document shape, a bad contract value or an
+    unusable file would otherwise reach the operator as a traceback. A capture that cannot read
+    its registry has to say which file and why, in the same vocabulary as every other capture
+    failure.
+    """
+
+    if not path.is_file():
+        raise DataSourceError(f"{path} is not a usable entry registry: not a readable file")
+
+    try:
+        return EntryRegistry.load(path).ids()
+    except (ValueError, TypeError, KeyError, AttributeError) as error:
+        raise DataSourceError(f"{path} is not a usable entry registry: {error}") from error
+    except OSError as error:
+        raise DataSourceError(f"{path} could not be read: {error}") from error
+
+
 def capture(
     snapshot_root: Path,
     *,
     archive_root: Path | None = None,
     dry_run: bool = False,
+    entry_registry: Path | None = None,
+    league_id: int | None = None,
 ) -> SnapshotMetadata | None:
-    """Fetch, describe and optionally persist one immutable two-endpoint snapshot."""
+    """Fetch, describe and optionally persist one immutable snapshot.
+
+    The two season endpoints are always read. Passing ``entry_registry`` adds the three
+    documents each registered entry publishes, and ``league_id`` adds the league standings
+    page, so a capture can record who was in the league when a recommendation was made.
+
+    ``captured_at`` is stamped **after every read**, so no payload in the snapshot was fetched
+    later than the instant the snapshot claims. Stamping it earlier would have been wrong in a
+    way that is easy to talk yourself into: a document read afterwards can contain events from
+    after the stamp, so the snapshot would assert knowledge at a time that knowledge did not
+    exist. The resolution of which gameweek's picks to read uses a separate provisional clock,
+    which only chooses a URL and is never recorded.
+    """
 
     print(f"Reading {len(ENDPOINTS)} endpoint(s) from {BASE_URL}")
     payloads = {name: fetch(url) for name, url in sorted(ENDPOINTS.items())}
     for name, content in sorted(payloads.items()):
         print(f"  read     {name}  ({len(content):,} bytes)")
-    captured_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    extra = registered_endpoints(
+        payloads[BOOTSTRAP_PAYLOAD],
+        as_of_utc=_utc_now(),
+        entry_registry=entry_registry,
+        league_id=league_id,
+    )
+    if extra:
+        print(f"Reading {len(extra)} registered-entry endpoint(s)")
+        for name, url in extra.items():
+            payloads[name] = fetch(url)
+            print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
+
+    captured_at = _utc_now()
     print()
     summarise(payloads, captured_at, archive_root=archive_root)
+    if extra:
+        print(f"  registered       {len(extra)} extra payload(s)")
     if dry_run:
         return None
     return write_snapshot(

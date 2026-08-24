@@ -61,6 +61,14 @@ const en = {
     settledNetNote: "after transfer-hit points",
     settledNote:
       "Player tiles show the published event points and the multiplier applied to the captain when the settled player fields are present.",
+    seasonTitle: "Season standing",
+    seasonNet: "season (net)",
+    seasonNetNote: (weeks: number, hits: string) => `${weeks} settled · ${hits} hit points`,
+    seasonLatestWeek: "latest settled week",
+    seasonLatestWeekNote: (gameweek: string, projected: string) =>
+      `${gameweek} · projected ${projected}`,
+    seasonVsProjection: "versus projection",
+    seasonVsProjectionNote: "realized minus projected, over settled weeks",
     projectedPlayerPoints: (points: string) => `xP ${points}`,
     realizedPlayerPoints: (points: string) => `actual ${points}`,
     eventPointsUnavailable: "event points pending",
@@ -522,6 +530,13 @@ const tr: MessageSchema<typeof en> = {
     settledNetNote: "transfer cezasından sonra",
     settledNote:
       "Sonuçlanan oyuncu alanları mevcut olduğunda kartlar yayımlanan event puanını ve kaptana uygulanan çarpanı gösterir.",
+    seasonTitle: "Sezon durumu",
+    seasonNet: "sezon (net)",
+    seasonNetNote: (weeks, hits) => `${weeks} hafta · ${hits} ceza puanı`,
+    seasonLatestWeek: "son tamamlanan hafta",
+    seasonLatestWeekNote: (gameweek, projected) => `${gameweek} · tahmin ${projected}`,
+    seasonVsProjection: "projeksiyona karşı",
+    seasonVsProjectionNote: "sonuçlanan haftalarda gerçekleşen eksi tahmin",
     projectedPlayerPoints: (pointsValue) => `xP ${pointsValue}`,
     realizedPlayerPoints: (pointsValue) => `gerçekleşen ${pointsValue}`,
     eventPointsUnavailable: "event puanı bekleniyor",
