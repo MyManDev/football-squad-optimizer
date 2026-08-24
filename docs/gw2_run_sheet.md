@@ -24,6 +24,13 @@ What is new this week, and why the order changed:
 - #181 (the `in-season-carry-over-v1` pin and the omitted-player refusal) and #183 (the
   producer script) are merged; the Monday rehearsal ran the producer against a real
   post-settle capture and the round-trip verified.
+- The handoff on disk is only as honest as the capture that produced it. The
+  `data/handoffs/2026-27-gw02.json` written before any GW1 fixture finished reports a full
+  gameweek of history it does not have (#224: `gameweeks_played` is a calendar fact, not a
+  data fact). After the producer rehearsal, confirm the file's `source_snapshot_id` is the
+  post-settle capture. Friday's producer run overwrites it from the fresh capture regardless,
+  and decide refuses a capture mismatch — this check exists so Friday never starts from a
+  file that merely *looks* complete.
 - A deliberate develop-to-main release with green main-push CI exists, and the immutable
   annotated execution tag `run-2026-27-gw02` is on that exact main SHA. Same rules as GW1:
   no existing tag moves, and the tag is created only after the main-push CI is green.
