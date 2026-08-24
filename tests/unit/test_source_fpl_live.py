@@ -4,7 +4,9 @@ Every payload here is hand-built. The adapter reads bytes that are already on di
 so nothing in this file needs a network or a captured snapshot.
 """
 
+import dataclasses
 import json
+import re
 from typing import Any
 
 import pytest
@@ -17,10 +19,21 @@ from squadopt.data.errors import (
 from squadopt.data.sources.fpl_live import (
     POSITION_CODES,
     SNAPSHOT_COLUMNS,
+    EntryPicksRecord,
     GameweekDeadline,
+    LeagueStanding,
     availability_snapshot,
+    entry_endpoint_paths,
+    entry_history_payload,
+    entry_label,
+    entry_payload,
+    entry_picks_payload,
     fixture_snapshot,
+    fpl_entry_picks,
+    fpl_league_standings,
     gameweek_deadlines,
+    league_standings_endpoint_path,
+    league_standings_payload,
     next_open_deadline,
     player_snapshot,
     team_codes,
@@ -647,3 +660,328 @@ def test_a_renamed_availability_field_stops_the_run(field: str) -> None:
 
     with pytest.raises(DataSourceError, match=field):
         availability_snapshot(_payload([record]))
+
+
+# --- registered entries and their league ----------------------------------------------
+#
+# Same rule as the rest of this file: every payload is hand-built, nothing reaches a
+# network, and a renamed source field has to stop the run rather than emit a null.
+
+_PAYLOAD_NAME = re.compile(r"^[a-z0-9]+(?:[-_.][a-z0-9]+)*$")
+
+
+def _picks_payload(
+    *,
+    squad: list[int] | None = None,
+    captain_position: int | None = 1,
+    bank: int = 5,
+    positions: list[int] | None = None,
+) -> bytes:
+    """Return one ``event/{gw}/picks`` document carrying the fields the adapter reads."""
+
+    elements = squad if squad is not None else list(range(101, 116))
+    slots = positions if positions is not None else list(range(1, len(elements) + 1))
+    picks = [
+        {
+            "element": element,
+            "position": position,
+            "is_captain": position == captain_position,
+            "is_vice_captain": position == 2,
+            "multiplier": 2 if position == captain_position else (1 if position <= 11 else 0),
+        }
+        for element, position in zip(elements, slots, strict=True)
+    ]
+    document = {
+        "picks": picks,
+        "active_chip": None,
+        "entry_history": {"bank": bank, "event_transfers": 0, "event_transfers_cost": 0},
+    }
+    return json.dumps(document).encode("utf-8")
+
+
+def _history_payload(*, chips: list[dict[str, Any]] | None = None) -> bytes:
+    document = {
+        "chips": [] if chips is None else chips,
+        "current": [{"event": 1, "event_transfers": 0, "points_on_bench": 3, "bank": 5}],
+    }
+    return json.dumps(document).encode("utf-8")
+
+
+def _standings_payload(
+    *,
+    results: list[dict[str, Any]] | None = None,
+    has_next: bool = False,
+    league_id: int = 352490,
+) -> bytes:
+    rows = (
+        results
+        if results is not None
+        else [
+            {"entry": 11, "entry_name": "First XI", "player_name": "A Manager", "rank": 1},
+            {"entry": 22, "entry_name": "Second XI", "player_name": "B Manager", "rank": 2},
+        ]
+    )
+    document = {
+        "league": {"id": league_id, "name": "The Mini League"},
+        "standings": {"has_next": has_next, "page": 1, "results": rows},
+    }
+    return json.dumps(document).encode("utf-8")
+
+
+def _entry_payload(*, entry_id: int = 11, name: str = "First XI") -> bytes:
+    return json.dumps({"id": entry_id, "name": name, "current_event": 1}).encode("utf-8")
+
+
+def test_every_built_payload_name_stays_inside_the_snapshot_grammar() -> None:
+    names = [
+        entry_payload(11),
+        entry_history_payload(11),
+        entry_picks_payload(11, 2),
+        league_standings_payload(352490),
+    ]
+    assert names == [
+        "entry-11.json",
+        "entry-11-history.json",
+        "entry-11-picks-gw02.json",
+        "league-352490-standings.json",
+    ]
+    for name in names:
+        assert _PAYLOAD_NAME.match(name), name
+
+
+@pytest.mark.parametrize("identifier", [0, -1, True])
+def test_a_payload_name_refuses_an_identifier_the_source_never_publishes(identifier: Any) -> None:
+    with pytest.raises(InvalidValueError):
+        entry_payload(identifier)
+
+
+def test_each_entry_contributes_three_documents_with_the_gameweek_in_its_picks() -> None:
+    paths = entry_endpoint_paths([11, 22], gameweek=1)
+    assert dict(paths) == {
+        "entry-11.json": "entry/11/",
+        "entry-11-history.json": "entry/11/history/",
+        "entry-11-picks-gw01.json": "entry/11/event/1/picks/",
+        "entry-22.json": "entry/22/",
+        "entry-22-history.json": "entry/22/history/",
+        "entry-22-picks-gw01.json": "entry/22/event/1/picks/",
+    }
+
+
+def test_the_endpoint_map_carries_paths_rather_than_urls() -> None:
+    """The base URL and the transport stay with the platform adapter, not here."""
+
+    paths = list(entry_endpoint_paths([11], gameweek=2).values())
+    paths += list(league_standings_endpoint_path(352490).values())
+    assert not any(path.startswith("http") for path in paths)
+
+
+def test_a_registry_that_lists_an_entry_twice_is_rejected() -> None:
+    with pytest.raises(InvalidValueError, match="distinct"):
+        entry_endpoint_paths([11, 22, 11], gameweek=1)
+
+
+def test_the_league_page_yields_its_members_in_rank_order() -> None:
+    members = fpl_league_standings(_standings_payload(), league_id=352490)
+    assert [member.entry_id for member in members] == [11, 22]
+    assert members[0] == LeagueStanding(
+        entry_id=11, entry_name="First XI", player_name="A Manager", rank=1
+    )
+
+
+def test_a_league_with_further_pages_is_refused_rather_than_truncated() -> None:
+    with pytest.raises(DataSourceError, match="more standings pages"):
+        fpl_league_standings(_standings_payload(has_next=True), league_id=352490)
+
+
+def test_a_standings_payload_describing_another_league_is_rejected() -> None:
+    with pytest.raises(DataSourceError, match="declares league 999"):
+        fpl_league_standings(_standings_payload(league_id=999), league_id=352490)
+
+
+def test_a_league_listing_the_same_entry_twice_is_rejected() -> None:
+    rows = [
+        {"entry": 11, "entry_name": "First XI", "player_name": "A Manager", "rank": 1},
+        {"entry": 11, "entry_name": "First XI", "player_name": "A Manager", "rank": 2},
+    ]
+    with pytest.raises(DuplicateRecordsError):
+        fpl_league_standings(_standings_payload(results=rows), league_id=352490)
+
+
+def test_a_standings_payload_without_its_standings_object_is_rejected() -> None:
+    document = {"league": {"id": 352490}, "standings": []}
+    with pytest.raises(DataSourceError, match="'standings' object"):
+        fpl_league_standings(json.dumps(document).encode("utf-8"), league_id=352490)
+
+
+@pytest.mark.parametrize("field", ["entry", "entry_name", "player_name", "rank"])
+def test_a_renamed_standings_field_stops_the_run_and_names_itself(field: str) -> None:
+    row = {"entry": 11, "entry_name": "First XI", "player_name": "A Manager", "rank": 1}
+    del row[field]
+    with pytest.raises(DataSourceError, match=field):
+        fpl_league_standings(_standings_payload(results=[row]), league_id=352490)
+
+
+def test_the_entry_summary_supplies_the_registry_label() -> None:
+    assert entry_label(_entry_payload(), entry_id=11) == "First XI"
+
+
+def test_an_entry_payload_describing_another_entry_is_rejected() -> None:
+    with pytest.raises(DataSourceError, match="declares entry 99"):
+        entry_label(_entry_payload(entry_id=99), entry_id=11)
+
+
+def test_a_nameless_entry_is_rejected() -> None:
+    with pytest.raises(InvalidValueError, match="empty team name"):
+        entry_label(_entry_payload(name="  "), entry_id=11)
+
+
+def test_the_picks_document_becomes_a_fifteen_player_squad_starting_eleven() -> None:
+    record = fpl_entry_picks(
+        _picks_payload(),
+        _history_payload(),
+        entry_id=11,
+        season="2026-27",
+        gameweek=1,
+        source_snapshot_id="fpl-live-20260825T000000Z-abc",
+    )
+    assert record.squad == tuple(range(101, 116))
+    assert record.starting_xi == tuple(range(101, 112))
+    assert record.captain == 101
+    assert record.bank_tenths == 5
+    assert record.gameweek == 1
+    assert record.season == "2026-27"
+    assert record.source_snapshot_id == "fpl-live-20260825T000000Z-abc"
+
+
+def test_the_two_limits_the_public_endpoints_impose_are_flagged_not_guessed() -> None:
+    record = fpl_entry_picks(
+        _picks_payload(), _history_payload(), entry_id=11, season="2026-27", gameweek=1
+    )
+    assert record.free_transfers == 1
+    assert record.free_transfers_known is False
+    assert dict(record.purchase_prices) == {}
+    assert record.purchase_prices_known is False
+
+
+def test_chips_are_read_from_the_history_and_grouped_by_name() -> None:
+    chips = [
+        {"name": "bboost", "event": 3},
+        {"name": "3xc", "event": 7},
+        {"name": "bboost", "event": 2},
+    ]
+    record = fpl_entry_picks(
+        _picks_payload(),
+        _history_payload(chips=chips),
+        entry_id=11,
+        season="2026-27",
+        gameweek=1,
+    )
+    assert dict(record.chips_used) == {"bboost": (2, 3), "3xc": (7,)}
+
+
+def test_an_entry_that_has_played_no_chip_reports_no_chips() -> None:
+    record = fpl_entry_picks(
+        _picks_payload(), _history_payload(), entry_id=11, season="2026-27", gameweek=1
+    )
+    assert dict(record.chips_used) == {}
+
+
+def test_a_history_without_its_chips_array_is_a_changed_payload() -> None:
+    document = {"current": []}
+    with pytest.raises(DataSourceError, match="'chips' array"):
+        fpl_entry_picks(
+            _picks_payload(),
+            json.dumps(document).encode("utf-8"),
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+        )
+
+
+def test_a_squad_missing_a_position_is_rejected_rather_than_padded() -> None:
+    with pytest.raises(DataSourceError, match="squad positions 1 to 15"):
+        fpl_entry_picks(
+            _picks_payload(squad=list(range(101, 115)), positions=list(range(1, 15))),
+            _history_payload(),
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+        )
+
+
+def test_a_repeated_squad_position_is_rejected() -> None:
+    with pytest.raises(DuplicateRecordsError, match="position 1 twice"):
+        fpl_entry_picks(
+            _picks_payload(squad=list(range(101, 116)), positions=[1] * 15),
+            _history_payload(),
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+        )
+
+
+@pytest.mark.parametrize(("captain_position", "count"), [(None, 0), (16, 0)])
+def test_a_squad_without_exactly_one_captain_is_rejected(
+    captain_position: int | None, count: int
+) -> None:
+    with pytest.raises(DataSourceError, match=f"names {count} captains"):
+        fpl_entry_picks(
+            _picks_payload(captain_position=captain_position),
+            _history_payload(),
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+        )
+
+
+def test_a_captain_outside_the_starting_eleven_is_rejected() -> None:
+    with pytest.raises(InvalidValueError, match="not in the starting eleven"):
+        fpl_entry_picks(
+            _picks_payload(captain_position=12),
+            _history_payload(),
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+        )
+
+
+def test_picks_without_their_entry_history_are_rejected() -> None:
+    document = json.loads(_picks_payload().decode("utf-8"))
+    del document["entry_history"]
+    with pytest.raises(DataSourceError, match="'entry_history'"):
+        fpl_entry_picks(
+            json.dumps(document).encode("utf-8"),
+            _history_payload(),
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+        )
+
+
+@pytest.mark.parametrize("field", ["element", "position", "is_captain"])
+def test_a_renamed_pick_field_stops_the_run_and_names_itself(field: str) -> None:
+    document = json.loads(_picks_payload().decode("utf-8"))
+    for pick in document["picks"]:
+        del pick[field]
+    with pytest.raises(DataSourceError, match=field):
+        fpl_entry_picks(
+            json.dumps(document).encode("utf-8"),
+            _history_payload(),
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+        )
+
+
+def test_the_twin_carries_exactly_the_application_seams_fields() -> None:
+    """The twin exists so ``data`` never imports ``application``; drift defeats the point.
+
+    A field added on either side without the other is the failure this pins: the
+    application maps the twin by name, so a mismatch is a silent dropped field.
+    """
+
+    from squadopt.application.entries import EntryPicks
+
+    assert {field.name for field in dataclasses.fields(EntryPicksRecord)} == {
+        field.name for field in dataclasses.fields(EntryPicks)
+    }
