@@ -92,6 +92,53 @@ the PR number appended by the squash merge — the convention the history alread
 written down. Check it against the log (`git log --oneline`) rather than against a commit count
 recorded here.
 
+## Tag namespaces
+
+Four namespaces, each answering a different question. They were not designed together — the
+first one was in use before any of this was written down — so the point of the table is to stop
+a reader in March from guessing which kind of thing a tag is.
+
+| Namespace | Answers | Created by | Example |
+| --- | --- | --- | --- |
+| `v<semver>` | Which *software release* is this? | release owner, on `main` after the release merge | `v1.0.0` |
+| `run-<season>-gw<NN>` | Which tree *executed* a gameweek? | operator, before the capture window opens | `run-2026-27-gw01` |
+| `site-<season>-gw<NN>-<decision\|settled\|fix<N>>` | Which artifact was *deployed*? | operator, before dispatching Pages | `site-2026-27-gw01-decision` |
+| `v<season>.gw<NN>` | — | nobody, from now on | `v2026-27.gw01` |
+
+The last row is the hazard this section exists for. `v2026-27.gw01` is a **season pointer**
+occupying the `v*` namespace, created in #130 before a taxonomy existed. It is not a software
+version and does not compare with one. It stays exactly where it is: the runbook's rule is that
+a tag is never moved or reused, and quietly re-pointing history to tidy a naming mistake would
+be worse than the mistake. Nothing else will be named this way.
+
+There is also one tag that matches no namespace at all: **`site-2026-27-gw01-ui`**. It looks
+deployable and is not — `ui` is outside the suffix set the Pages workflow accepts, so the
+dispatch was refused by the tag guard and the release was re-cut as
+`site-2026-27-gw01-fix2`. The tag stays, inert, for the same reason `v2026-27.gw01` stays. If
+you find it in the list, it deployed nothing.
+
+Check the list against the rules rather than trusting this section:
+
+```bash
+git tag --sort=creatordate | while read -r t; do
+  printf '%-34s %s\n' "$t" "$(git cat-file -t "$t")"
+done
+```
+
+Every tag should be an annotated `tag` object, not a `commit`: the production workflow rejects
+lightweight tags outright.
+
+Two mechanical consequences worth knowing:
+
+- The Pages workflow only accepts `site-\d{4}-\d{2}-gw\d{2}-(decision|settled|fix\d+)`. A tag
+  outside that shape cannot be deployed, whatever it is called — so an ad-hoc suffix is not a
+  naming preference, it is an undeployable release. This has already cost one dispatch.
+- `run-*` and `site-*` are per-gameweek and accumulate; `v<semver>` is per software release and
+  is expected to be rare. A gameweek that ships no behavioural change adds no `v*` tag.
+
+`deployment_runbook.md` remains authoritative for how `run-*` and `site-*` are created and
+dispatched. This section only says what the namespaces *are*.
+
 ## Verification
 
 ```bash
