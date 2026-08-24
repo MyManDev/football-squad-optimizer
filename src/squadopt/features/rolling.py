@@ -53,6 +53,42 @@ def _require_outcome_source(column: str) -> None:
         )
 
 
+def _require_one_row_per_gameweek(frame: pd.DataFrame, group_columns: Sequence[str]) -> None:
+    """Confirm each group has at most one row per gameweek.
+
+    This is the invariant ``shift(1)`` actually depends on. The shift moves by *row*, not
+    by gameweek, so if a group holds two rows for one gameweek the second row's window
+    starts at the first row — a value from the very gameweek the feature describes. No
+    error, no warning, just a wrong number, which is the most expensive shape a fault can
+    take here.
+
+    The ordering check below is not enough on its own: ``is_monotonic_increasing`` is
+    non-strict, so ``[1, 1, 2, 2]`` passes it.
+
+    Whether duplicates are possible depends on which key is grouped, which is why this is
+    checked rather than reasoned about. Under ``PLAYER_GROUP_COLUMNS`` the canonical key
+    ``(season, gameweek, player_id)`` already rejects them. Under ``TEAM_GROUP_COLUMNS``
+    they are the *normal shape* of a player panel — eleven players of one club share a
+    gameweek — so a caller reaching for the team-grain function with a player-grain frame
+    is the case this exists to stop.
+    """
+
+    duplicated = frame.duplicated(subset=[*group_columns, "gameweek"])
+    if not bool(duplicated.any()):
+        return
+    offenders = (
+        frame.loc[duplicated, [*group_columns, "gameweek"]]
+        .drop_duplicates()
+        .itertuples(index=False, name=None)
+    )
+    examples = [tuple(row) for row in offenders][:10]
+    raise FeatureConfigurationError(
+        f"Rolling features need at most one row per {list(group_columns)!r} per gameweek; "
+        f"the shift moves by row, so a repeated gameweek would let a row see its own. "
+        f"Offending {[*group_columns, 'gameweek']!r} combinations: {examples!r}."
+    )
+
+
 def _require_time_ordered(frame: pd.DataFrame, group_columns: Sequence[str]) -> None:
     """Confirm each player's rows ascend in gameweek order.
 
@@ -61,8 +97,8 @@ def _require_time_ordered(frame: pd.DataFrame, group_columns: Sequence[str]) -> 
     their relative order, so the groups themselves need not be contiguous. This
     checks exactly the invariant the window depends on and nothing more.
 
-    Duplicate gameweeks cannot appear here because the canonical key already
-    rejects them.
+    Repeated gameweeks are rejected by :func:`_require_one_row_per_gameweek` before this
+    runs, which matters because the test used here would not catch them.
     """
 
     ordered = frame.groupby(list(group_columns), sort=False)["gameweek"].apply(
@@ -94,6 +130,7 @@ def _shifted_rolling(
         raise FeatureConfigurationError(
             f"min_periods must be between 1 and window ({window}), got {min_periods}."
         )
+    _require_one_row_per_gameweek(frame, group_columns)
     _require_time_ordered(frame, group_columns)
 
     def _aggregate(values: pd.Series) -> pd.Series:
