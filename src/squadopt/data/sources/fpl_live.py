@@ -45,6 +45,48 @@ FPL_LIVE_SOURCE: Final = "fpl-live"
 BOOTSTRAP_PAYLOAD: Final = "bootstrap-static.json"
 FIXTURES_PAYLOAD: Final = "fixtures.json"
 
+
+def _positive(value: int, label: str) -> int:
+    """An identifier the source only ever publishes as a positive integer."""
+
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise InvalidValueError(f"{label} must be a positive integer, got {value!r}.")
+    return value
+
+
+# Per-entry and per-league payloads. Unlike the two above there is one of each per
+# registered entry, so the names are built rather than named. They stay inside the
+# snapshot's payload-name grammar (lowercase, digits, hyphens and dots) so a capture
+# directory remains readable without this module.
+
+
+def entry_payload(entry_id: int) -> str:
+    """Payload name for one entry's summary document."""
+
+    return f"entry-{_positive(entry_id, 'entry id')}.json"
+
+
+def entry_history_payload(entry_id: int) -> str:
+    """Payload name for one entry's season history."""
+
+    return f"entry-{_positive(entry_id, 'entry id')}-history.json"
+
+
+def entry_picks_payload(entry_id: int, gameweek: int) -> str:
+    """Payload name for one entry's picks at one gameweek."""
+
+    return (
+        f"entry-{_positive(entry_id, 'entry id')}"
+        f"-picks-gw{_positive(gameweek, 'gameweek'):02d}.json"
+    )
+
+
+def league_standings_payload(league_id: int) -> str:
+    """Payload name for a classic league's standings page."""
+
+    return f"league-{_positive(league_id, 'league id')}-standings.json"
+
+
 # The platform encodes position numerically. This is the same encoding the archive's
 # `players_raw.csv` carries, but it is declared here rather than shared with the
 # archive adapter: each source module is meant to know exactly one source, and
@@ -732,3 +774,285 @@ def player_snapshot(bootstrap: bytes) -> pd.DataFrame:
     frame["name"] = frame["name"].astype("string")
     frame["team_id"] = frame["team_id"].astype("string")
     return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
+# --- registered entries and their league ---------------------------------------------
+#
+# Paths, not URLs. This module never fetches; the platform adapter owns the base URL and
+# the transport, so declaring where a payload comes from stays separate from going to get
+# it. Everything below reads bytes that are already on disk, like the rest of the module.
+
+_ENTRY_FIELDS: Final = ("id", "name", "current_event")
+_PICK_FIELDS: Final = ("element", "position", "is_captain", "is_vice_captain", "multiplier")
+_CHIP_FIELDS: Final = ("name", "event")
+_STANDING_FIELDS: Final = ("entry", "entry_name", "player_name", "rank")
+
+# The squad the platform publishes: fifteen picks, the first eleven of which start.
+_SQUAD_SIZE: Final = 15
+_STARTING_SIZE: Final = 11
+
+
+def entry_endpoint_paths(entry_ids: Sequence[int], *, gameweek: int) -> Mapping[str, str]:
+    """Payload name to API path for every registered entry at one gameweek.
+
+    Three documents per entry, because they answer three different questions and the
+    platform publishes them separately: the summary names the team, the history carries
+    the chips a planner's windows need, and the picks are the squad itself.
+
+    The gameweek is the one whose picks are *known*. Per the time-of-knowledge rule in
+    ``docs/data_contract.md``, the picks for gameweek N are only complete once N has been
+    played, so the capture taken before the N+1 deadline reads ``event/N/picks``.
+    """
+
+    week = _positive(gameweek, "gameweek")
+    identifiers = [_positive(entry_id, "entry id") for entry_id in entry_ids]
+    duplicated = sorted({i for i in identifiers if identifiers.count(i) > 1})
+    if duplicated:
+        raise InvalidValueError(
+            f"Entry ids must be distinct; {format_examples(duplicated)} appear more than once."
+        )
+    paths: dict[str, str] = {}
+    for entry_id in identifiers:
+        paths[entry_payload(entry_id)] = f"entry/{entry_id}/"
+        paths[entry_history_payload(entry_id)] = f"entry/{entry_id}/history/"
+        paths[entry_picks_payload(entry_id, week)] = f"entry/{entry_id}/event/{week}/picks/"
+    return MappingProxyType(paths)
+
+
+def league_standings_endpoint_path(league_id: int) -> Mapping[str, str]:
+    """Payload name to API path for a classic league's first standings page."""
+
+    identifier = _positive(league_id, "league id")
+    return MappingProxyType(
+        {league_standings_payload(identifier): f"leagues-classic/{identifier}/standings/"}
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class LeagueStanding:
+    """One member of a classic league, as the standings page reports them."""
+
+    entry_id: int
+    entry_name: str
+    player_name: str
+    rank: int
+
+
+def fpl_league_standings(standings: bytes, *, league_id: int) -> tuple[LeagueStanding, ...]:
+    """Return a classic league's members, in the order the page ranks them.
+
+    Refuses a truncated league rather than returning part of one. The standings page is
+    paginated and a capture holds its first page; a league large enough to spill over
+    would otherwise seed a registry that silently omits members, which is the kind of gap
+    that surfaces weeks later as a missing recommendation.
+    """
+
+    identifier = _positive(league_id, "league id")
+    document = _document(standings, "League standings")
+    league = document.get("league")
+    if isinstance(league, dict):
+        declared = league.get("id")
+        if isinstance(declared, int) and not isinstance(declared, bool) and declared != identifier:
+            raise DataSourceError(
+                f"League standings payload declares league {declared}, not {identifier}. "
+                "A payload named for one league and describing another would seed the "
+                "wrong registry."
+            )
+    section = document.get("standings")
+    if not isinstance(section, dict):
+        raise DataSourceError(
+            "League standings payload must carry a 'standings' object, got "
+            f"{type(section).__name__}."
+        )
+    if section.get("has_next") is True:
+        raise DataSourceError(
+            f"League {identifier} has more standings pages than this capture holds. Only "
+            "the first page is captured, so seeding from it would omit members; capture "
+            "the remaining pages before reading this league."
+        )
+    records = _records(section, "results", "League standing")
+    _require_fields(records, _STANDING_FIELDS, "League standing")
+
+    members: list[LeagueStanding] = []
+    seen: set[int] = set()
+    for record in records:
+        entry_id = _positive(_integer(record, "entry", "League standing"), "entry id")
+        if entry_id in seen:
+            raise DuplicateRecordsError(
+                f"League {identifier} standings list entry {entry_id} more than once."
+            )
+        seen.add(entry_id)
+        members.append(
+            LeagueStanding(
+                entry_id=entry_id,
+                entry_name=_text(record, "entry_name", "League standing"),
+                player_name=_text(record, "player_name", "League standing"),
+                rank=_integer(record, "rank", "League standing"),
+            )
+        )
+    return tuple(members)
+
+
+def entry_label(entry: bytes, *, entry_id: int) -> str:
+    """Return the team name the entry summary publishes, for the registry's label."""
+
+    identifier = _positive(entry_id, "entry id")
+    document = _document(entry, "Entry")
+    _require_fields((document,), _ENTRY_FIELDS, "Entry")
+    declared = _integer(document, "id", "Entry")
+    if declared != identifier:
+        raise DataSourceError(f"Entry payload declares entry {declared}, not {identifier}.")
+    name = _text(document, "name", "Entry")
+    if not name:
+        raise InvalidValueError(f"Entry {identifier} declares an empty team name.")
+    return name
+
+
+def _chips_used(history: bytes, *, entry_id: int) -> Mapping[str, tuple[int, ...]]:
+    """Chip name to the gameweeks it was played, from the entry's season history."""
+
+    document = _document(history, "Entry history")
+    chips = document.get("chips")
+    if not isinstance(chips, list):
+        raise DataSourceError(
+            f"Entry {entry_id} history must carry a 'chips' array, got "
+            f"{type(chips).__name__}. An entry that has played no chip publishes an empty "
+            "array, so a missing section is a changed payload rather than an unused chip."
+        )
+    records = tuple(record for record in chips if isinstance(record, dict))
+    if len(records) != len(chips):
+        raise DataSourceError(f"Entry {entry_id} history has non-object entries in 'chips'.")
+    _require_fields(records, _CHIP_FIELDS, "Entry chip")
+    played: dict[str, list[int]] = {}
+    for record in records:
+        name = _text(record, "name", "Entry chip")
+        if not name:
+            raise InvalidValueError(f"Entry {entry_id} played a chip with an empty name.")
+        played.setdefault(name, []).append(_integer(record, "event", "Entry chip"))
+    return MappingProxyType({name: tuple(sorted(events)) for name, events in played.items()})
+
+
+@dataclass(frozen=True, slots=True)
+class EntryPicksRecord:
+    """One entry's squad at one gameweek, as the public endpoints report it.
+
+    The twin of ``squadopt.application.entries.EntryPicks``, declared here so the layer
+    direction stays application to data. The field names match so the application side
+    maps it without a translation table.
+    """
+
+    entry_id: int
+    season: str
+    gameweek: int
+    squad: tuple[int, ...]
+    starting_xi: tuple[int, ...]
+    captain: int
+    bank_tenths: int
+    free_transfers: int
+    free_transfers_known: bool
+    chips_used: Mapping[str, tuple[int, ...]]
+    purchase_prices: Mapping[int, int]
+    purchase_prices_known: bool
+    source_snapshot_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if len(self.squad) != _SQUAD_SIZE or len(set(self.squad)) != _SQUAD_SIZE:
+            raise InvalidValueError(
+                f"Entry {self.entry_id} gameweek {self.gameweek} must hold {_SQUAD_SIZE} "
+                f"distinct players, got {len(self.squad)} ({len(set(self.squad))} distinct)."
+            )
+        if len(self.starting_xi) != _STARTING_SIZE or not set(self.starting_xi) <= set(self.squad):
+            raise InvalidValueError(
+                f"Entry {self.entry_id} gameweek {self.gameweek} must start "
+                f"{_STARTING_SIZE} of its own squad."
+            )
+        if self.captain not in self.starting_xi:
+            raise InvalidValueError(
+                f"Entry {self.entry_id} gameweek {self.gameweek} names a captain who is "
+                "not in the starting eleven."
+            )
+        if self.bank_tenths < 0:
+            raise InvalidValueError(
+                f"Entry {self.entry_id} reports a negative bank of {self.bank_tenths}."
+            )
+
+
+def fpl_entry_picks(
+    picks: bytes,
+    history: bytes,
+    *,
+    entry_id: int,
+    season: str,
+    gameweek: int,
+    source_snapshot_id: str | None = None,
+) -> EntryPicksRecord:
+    """Return one entry's squad at one gameweek from its two captured documents.
+
+    Two limits are recorded rather than papered over, because both change what a consumer
+    may claim.
+
+    ``purchase_prices`` is empty and flagged unknown: the public endpoints publish no
+    purchase price, so a squad built from this values every player at his current price,
+    which overstates the budget for anyone who has risen since he was bought.
+
+    ``free_transfers`` is the rule-implied floor of one, flagged unknown. The endpoints
+    never state the banked count. It is *derivable* from the history's per-event transfers
+    and costs, but only through a model of the banking rules -- which changed in 2024-25 --
+    and of the chip weeks that consume no transfer. That model is a reviewed decision with
+    its own tests, not a side effect of parsing a capture, so this adapter reports the
+    honest unknown instead of a plausible number.
+    """
+
+    identifier = _positive(entry_id, "entry id")
+    week = _positive(gameweek, "gameweek")
+    document = _document(picks, "Entry picks")
+    records = _records(document, "picks", "Entry pick")
+    _require_fields(records, _PICK_FIELDS, "Entry pick")
+
+    by_position: dict[int, int] = {}
+    captains: list[int] = []
+    for record in records:
+        position = _integer(record, "position", "Entry pick")
+        element = _positive(_integer(record, "element", "Entry pick"), "element id")
+        if position in by_position:
+            raise DuplicateRecordsError(
+                f"Entry {identifier} gameweek {week} lists squad position {position} twice."
+            )
+        by_position[position] = element
+        if _boolean(record, "is_captain", "Entry pick"):
+            captains.append(element)
+
+    if set(by_position) != set(range(1, _SQUAD_SIZE + 1)):
+        raise DataSourceError(
+            f"Entry {identifier} gameweek {week} must list squad positions 1 to "
+            f"{_SQUAD_SIZE}; got {sorted(by_position)}."
+        )
+    if len(captains) != 1:
+        raise DataSourceError(
+            f"Entry {identifier} gameweek {week} names {len(captains)} captains; the "
+            "platform names exactly one."
+        )
+
+    squad = tuple(by_position[position] for position in sorted(by_position))
+    entry_history = document.get("entry_history")
+    if not isinstance(entry_history, dict):
+        raise DataSourceError(
+            f"Entry {identifier} gameweek {week} picks must carry an 'entry_history' "
+            f"object, got {type(entry_history).__name__}."
+        )
+
+    return EntryPicksRecord(
+        entry_id=identifier,
+        season=_require_season(season),
+        gameweek=week,
+        squad=squad,
+        starting_xi=squad[:_STARTING_SIZE],
+        captain=captains[0],
+        bank_tenths=_integer(entry_history, "bank", "Entry history"),
+        free_transfers=1,
+        free_transfers_known=False,
+        chips_used=_chips_used(history, entry_id=identifier),
+        purchase_prices=MappingProxyType({}),
+        purchase_prices_known=False,
+        source_snapshot_id=source_snapshot_id,
+    )
