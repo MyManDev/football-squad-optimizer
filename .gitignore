@@ -240,6 +240,11 @@ data/ledger/
 data/handoffs/
 data/logs/
 data/runtime/
+# The entry registry lists the members of a real classic league by entry id and team
+# name, so it is third-party data about identifiable people and stays local like the
+# captures. data/sample/entry_registry_v1.example.json carries the shape, and
+# scripts/seed_entry_registry.py rebuilds the real file from a captured standings page.
+data/entries/
 
 # Reproducible local experiment outputs (reports are generated, not source data)
 artifacts/
