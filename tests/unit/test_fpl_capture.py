@@ -6,6 +6,7 @@ waited out.
 """
 
 import json
+import re
 import urllib.error
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ from typing import Any
 import pytest
 
 from squadopt.application.entries import ENTRY_REGISTRY_CONTRACT_VERSION
-from squadopt.data.errors import DataSourceError
+from squadopt.data.errors import DataError, DataSourceError
 from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.platform import fpl_capture
@@ -256,3 +257,99 @@ def test_a_dry_run_with_entries_writes_nothing(
         is None
     )
     assert not root.exists()
+
+
+# --- the registry error contract ------------------------------------------------------
+#
+# `EntryRegistry.load` raises what its own layer raises. None of it is a `DataError`, and the
+# manual capture shell only catches `DataError`, so every one of these reached the operator as
+# a traceback in the middle of a capture before this was translated.
+
+
+@pytest.mark.parametrize(
+    ("case", "body"),
+    [
+        ("malformed json", "{not json"),
+        ("wrong contract", json.dumps({"contract_version": "other", "entries": []})),
+        (
+            "repeated entry",
+            json.dumps(
+                {
+                    "contract_version": ENTRY_REGISTRY_CONTRACT_VERSION,
+                    "entries": [{"entry_id": 11}, {"entry_id": 11}],
+                }
+            ),
+        ),
+    ],
+)
+def test_an_unusable_registry_is_reported_in_the_data_error_contract(
+    case: str, body: str, tmp_path: Path
+) -> None:
+    path = tmp_path / "registry.json"
+    path.write_text(body, encoding="utf-8")
+    with pytest.raises(DataSourceError, match=re.escape(str(path))):
+        fpl_capture.registered_entry_ids(path)
+
+
+def test_an_unusable_registry_stops_the_capture_rather_than_tracebacking(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The failure has to arrive as a capture failure, not as a JSON parser's exception."""
+
+    monkeypatch.setattr(fpl_capture, "fetch", lambda url, **_: _bootstrap())
+    registry = tmp_path / "registry.json"
+    registry.write_text("{not json", encoding="utf-8")
+    with pytest.raises(DataError):
+        fpl_capture.capture(tmp_path / "snapshots", entry_registry=registry)
+
+
+# --- when the recorded instant is taken -----------------------------------------------
+
+
+def test_the_recorded_instant_is_taken_after_every_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No payload may have been fetched later than the instant the snapshot claims.
+
+    An earlier stamp was the original design, justified as "under-claiming freshness". It is
+    not safe: a document read after the stamp can contain events from after it, so the
+    snapshot would assert knowledge at a time that knowledge did not exist.
+    """
+
+    events: list[str] = []
+    ticks = iter(f"2026-08-25T00:00:{second:02d}Z" for second in range(10, 60))
+
+    def fake_fetch(url: str, **_: Any) -> bytes:
+        events.append("fetch")
+        if url.endswith("bootstrap-static/"):
+            return _bootstrap()
+        if url.endswith("fixtures/"):
+            return json.dumps([{"event": 1, "kickoff_time": "2026-08-21T19:00:00Z"}]).encode()
+        return b"{}"
+
+    def fake_now() -> str:
+        events.append("clock")
+        return next(ticks)
+
+    monkeypatch.setattr(fpl_capture, "fetch", fake_fetch)
+    monkeypatch.setattr(fpl_capture, "_utc_now", fake_now)
+
+    written = fpl_capture.capture(
+        tmp_path / "snapshots",
+        entry_registry=_registry(tmp_path / "registry.json", [11, 22]),
+        league_id=352490,
+    )
+    assert written is not None
+
+    # The clock is read twice: once provisionally to choose which gameweek's picks to read,
+    # and once to stamp the snapshot. Only the second is recorded, and it comes last.
+    assert events.count("clock") == 2
+    assert events[-1] == "clock", events
+    assert events.index("fetch") < len(events) - 1
+
+    last_read = max(index for index, event in enumerate(events) if event == "fetch")
+    stamped = max(index for index, event in enumerate(events) if event == "clock")
+    assert stamped > last_read
+
+    # And the value written is the later tick, not the provisional one.
+    assert written.captured_at_utc == "2026-08-25T00:00:11Z"

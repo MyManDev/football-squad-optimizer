@@ -5,6 +5,7 @@ HTTP adapter here lets installed CLI entry points provide it without importing a
 module under ``scripts``.
 """
 
+import json
 import time
 import urllib.error
 import urllib.request
@@ -12,7 +13,7 @@ from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
-from squadopt.application.entries import EntryRegistry
+from squadopt.application.entries import EntryError, EntryRegistry
 from squadopt.data.errors import DataSourceError
 from squadopt.data.identity import reconcile_player_identity
 from squadopt.data.snapshots import SnapshotMetadata, write_snapshot
@@ -80,6 +81,10 @@ def fetch(
     raise DataSourceError(f"{url} was never read.")  # pragma: no cover - loop always returns
 
 
+def _utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
 def _ordered_positions(counts: dict[str, int]) -> str:
     return ", ".join(
         f"{position} {counts.get(position, 0)}" for position in ("GK", "DEF", "MID", "FWD")
@@ -134,11 +139,31 @@ def registered_endpoints(
     if league_id is not None:
         paths.update(league_standings_endpoint_path(league_id))
     if entry_registry is not None:
-        identifiers = EntryRegistry.load(entry_registry).ids()
+        identifiers = registered_entry_ids(entry_registry)
         target = next_open_deadline(gameweek_deadlines(bootstrap), as_of_utc=as_of_utc).gameweek
         if identifiers and target > 1:
             paths.update(entry_endpoint_paths(identifiers, gameweek=target - 1))
     return {name: f"{BASE_URL}/{path}" for name, path in sorted(paths.items())}
+
+
+def registered_entry_ids(path: Path) -> tuple[int, ...]:
+    """Read the registry, reporting a bad one in the data error contract.
+
+    ``EntryRegistry.load`` raises what its own layer raises: ``JSONDecodeError`` for malformed
+    JSON and ``EntryError`` -- a ``ValueError`` -- for a wrong contract version or a repeated
+    entry id. Neither is a ``DataError``, so all three reached the operator as a traceback in
+    the middle of a capture. A capture that cannot read its registry has to say which file and
+    why, in the same vocabulary as every other capture failure.
+    """
+
+    try:
+        return EntryRegistry.load(path).ids()
+    except json.JSONDecodeError as error:
+        raise DataSourceError(f"{path} is not valid JSON: {error}") from error
+    except EntryError as error:
+        raise DataSourceError(f"{path} is not a usable entry registry: {error}") from error
+    except OSError as error:
+        raise DataSourceError(f"{path} could not be read: {error}") from error
 
 
 def capture(
@@ -155,21 +180,22 @@ def capture(
     documents each registered entry publishes, and ``league_id`` adds the league standings
     page, so a capture can record who was in the league when a recommendation was made.
 
-    ``captured_at`` is stamped after the season endpoints and before the per-entry ones, so
-    a capture with entries claims an instant marginally *earlier* than its last read. That
-    is the safe direction: the metadata under-claims freshness rather than over-claiming
-    it, and the extra documents describe squads already frozen at a past deadline.
+    ``captured_at`` is stamped **after every read**, so no payload in the snapshot was fetched
+    later than the instant the snapshot claims. Stamping it earlier would have been wrong in a
+    way that is easy to talk yourself into: a document read afterwards can contain events from
+    after the stamp, so the snapshot would assert knowledge at a time that knowledge did not
+    exist. The resolution of which gameweek's picks to read uses a separate provisional clock,
+    which only chooses a URL and is never recorded.
     """
 
     print(f"Reading {len(ENDPOINTS)} endpoint(s) from {BASE_URL}")
     payloads = {name: fetch(url) for name, url in sorted(ENDPOINTS.items())}
     for name, content in sorted(payloads.items()):
         print(f"  read     {name}  ({len(content):,} bytes)")
-    captured_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     extra = registered_endpoints(
         payloads[BOOTSTRAP_PAYLOAD],
-        as_of_utc=captured_at,
+        as_of_utc=_utc_now(),
         entry_registry=entry_registry,
         league_id=league_id,
     )
@@ -179,6 +205,7 @@ def capture(
             payloads[name] = fetch(url)
             print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
 
+    captured_at = _utc_now()
     print()
     summarise(payloads, captured_at, archive_root=archive_root)
     if extra:
