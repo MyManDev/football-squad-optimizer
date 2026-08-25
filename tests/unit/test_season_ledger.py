@@ -30,6 +30,7 @@ from squadopt.live import (
     record_decision,
     record_outcome,
     render,
+    score_named_eleven,
     summary_markdown,
 )
 
@@ -423,3 +424,104 @@ def test_the_summary_shows_settled_and_pending_gameweeks(
 def test_an_empty_season_loads_as_empty(tmp_path: Path) -> None:
     assert load_ledger(tmp_path / "ledger", SEASON) == ()
     assert ledger_summary(tmp_path / "ledger", SEASON).empty
+
+
+# --- one scoring rule, two callers ------------------------------------------
+#
+# ``score_named_eleven`` was extracted from ``record_outcome`` so a provisional score
+# computed while a gameweek is still running uses the settled rule rather than a copy of
+# it. These tests exist to keep the two from drifting apart, because the whole reason both
+# numbers exist is that they are compared with each other.
+
+
+def _decision_document(root: Path) -> dict[str, Any]:
+    path = root / SEASON / "gw01" / "decision.json"
+    return dict(json.loads(path.read_text(encoding="utf-8")))
+
+
+def test_the_extracted_rule_returns_exactly_what_the_outcome_records(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """If these ever disagree, a provisional score stops predicting the settled one."""
+
+    recommendation, projection, root = decision_world
+    record_decision(root, recommendation, projection, report_text="report")
+    points = _flat_points(recommendation, value=2.0)
+
+    standalone = score_named_eleven(_decision_document(root), points)
+    outcome_path = record_outcome(
+        root, SEASON, 1, points, source_snapshot_id=recommendation.snapshot_id
+    )
+    recorded = json.loads(outcome_path.read_text(encoding="utf-8"))
+
+    assert standalone == recorded["realized_xi_score"]
+
+
+def test_the_rule_counts_the_captain_twice_and_leaves_the_bench_out(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """Twelve scoring slots from eleven named players, and no auto-substitutions."""
+
+    recommendation, projection, root = decision_world
+    record_decision(root, recommendation, projection, report_text="report")
+    decision = _decision_document(root)
+    points = _flat_points(recommendation, value=2.0)
+
+    assert score_named_eleven(decision, points) == pytest.approx(12 * 2.0)
+
+    # A bench player scoring changes nothing: he was not named.
+    bench_first = int(decision["bench_player_ids"][0])
+    generous = {**points, bench_first: 20.0}
+    assert score_named_eleven(decision, generous) == pytest.approx(12 * 2.0)
+
+
+@pytest.mark.parametrize(
+    ("chip", "expected_slots"),
+    [(None, 12), ("bboost", 16), ("3xc", 13)],
+)
+def test_each_chip_changes_how_many_slots_are_counted(
+    decision_world: tuple[Recommendation, Projection, Path],
+    chip: str | None,
+    expected_slots: int,
+) -> None:
+    recommendation, projection, root = decision_world
+    record_decision(root, recommendation, projection, report_text="report")
+    decision = _decision_document(root)
+    decision["transfers"] = {"chip": chip, "transfer_hit_points": 0.0}
+    points = _flat_points(recommendation, value=2.0)
+
+    assert score_named_eleven(decision, points) == pytest.approx(expected_slots * 2.0)
+
+
+def test_the_rule_refuses_points_that_do_not_cover_the_squad(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """The same refusal the outcome path made, now reached by both callers."""
+
+    recommendation, projection, root = decision_world
+    record_decision(root, recommendation, projection, report_text="report")
+    decision = _decision_document(root)
+    points = _flat_points(recommendation, value=2.0)
+    points.pop(int(decision["captain_player_id"]))
+
+    with pytest.raises(LedgerError, match="do not cover every selected player"):
+        score_named_eleven(decision, points)
+
+
+def test_scoring_writes_nothing(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """A provisional caller must not be able to reach the immutable outcome through it.
+
+    An outcome is write-once: recording a pre-bonus figure would permanently prevent the
+    real settled score from ever being recorded for that gameweek.
+    """
+
+    recommendation, projection, root = decision_world
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    before = sorted(path.name for path in directory.iterdir())
+
+    score_named_eleven(_decision_document(root), _flat_points(recommendation, value=2.0))
+
+    assert sorted(path.name for path in directory.iterdir()) == before
+    assert not (directory / "outcome.json").exists()

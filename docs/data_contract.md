@@ -165,6 +165,35 @@ it beside the team name; only the team name becomes the registry label, and the 
 itself stays out of git (`.gitignore`) because it is third-party data about identifiable
 people and this repository is public.
 
+### Live gameweek points: a running total, and what it is short by
+
+`event-gw{NN}-live.json` carries what each player has scored *so far* in a gameweek that may
+still be being played. It exists so a decision can be shown against reality before the
+gameweek closes, and it needs its own rule because every reading of it is incomplete in a
+way that is easy to miss.
+
+**Bonus is added per fixture, when that fixture finishes.** A score read earlier is short by
+up to three points per player, and short by *different* amounts for different players — so
+it is a biased number, not a noisy one, and it does not average out across a squad. This is
+why `bonus_confirmed` travels with the points and is false until every one of the gameweek's
+fixtures is finished. Nine of ten finished is not "basically final".
+
+**The live document names no gameweek.** Its whole body is `{"elements": [...]}`; the
+platform identifies it only by the URL it was fetched from. The adapter therefore cannot
+verify that a payload named for gameweek `N` describes gameweek `N`, and does not pretend
+to. What it can state is that gameweek's own progress, which is why the fixtures payload is
+a required second argument and `fixtures_finished` / `fixtures_total` are reported beside
+the points.
+
+**These points are never a settled outcome.** A ledger outcome is immutable — the ledger
+refuses a second write for a gameweek that already has one. Recording a pre-bonus figure
+through that path would therefore permanently prevent the real settle from ever being
+recorded. Live points may be *derived into a view*; they may not be written as an outcome.
+
+**Automatic substitutions are not applied here.** This payload yields points per player.
+Which eleven those points are counted for belongs to the ledger, which scores the eleven
+that were named because that is what the projection was for.
+
 ## 4. Guarantees
 
 - Public transformations copy; no input `DataFrame` is mutated in place.

@@ -34,7 +34,7 @@ from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import pandas as pd
 
@@ -327,6 +327,51 @@ def extract_event_points(snapshot: CapturedSnapshot, *, gameweek: int) -> dict[i
     return points
 
 
+def score_named_eleven(decision: Mapping[str, Any], event_points: Mapping[int, float]) -> float:
+    """Score the eleven a decision named, under its chip, from one set of player points.
+
+    Starters plus the captain again; a bench boost counts the bench, a triple captain
+    counts the captain once more. Automatic substitutions are not applied: this scores the
+    eleven that were **named**, which is what the projection was for.
+
+    Public, and separate from ``record_outcome``, because two callers need the identical
+    rule. One is the settled outcome below. The other is any provisional score built while
+    a gameweek is still being played, which exists precisely to be compared against the
+    projection and later against the settled figure -- a second copy of this arithmetic
+    would drift, and the comparison is the whole point of having both numbers.
+
+    Scoring is all this does. It reads no ledger and writes nothing, so a provisional
+    caller cannot reach the immutable outcome path through it.
+    """
+
+    starters = [int(value) for value in decision["starting_xi_player_ids"]]
+    bench = [int(value) for value in decision["bench_player_ids"]]
+    captain = int(decision["captain_player_id"])
+    selected = [int(value) for value in decision["squad_player_ids"]]
+    missing = [player for player in {*selected, captain} if player not in event_points]
+    if missing:
+        raise LedgerError(
+            f"Realized points do not cover every selected player; missing {sorted(missing)[:10]!r}."
+        )
+    chip = _decision_chip(decision)
+    score = sum(float(event_points[player]) for player in starters) + float(event_points[captain])
+    if chip == "bboost":
+        score += sum(float(event_points[player]) for player in bench)
+    elif chip == "3xc":
+        score += float(event_points[captain])
+    return score
+
+
+def _decision_chip(decision: Mapping[str, Any]) -> object | None:
+    transfers = decision.get("transfers")
+    return transfers.get("chip") if isinstance(transfers, dict) else None
+
+
+def _decision_hit_points(decision: Mapping[str, Any]) -> float:
+    transfers = decision.get("transfers")
+    return float(transfers.get("transfer_hit_points", 0.0)) if isinstance(transfers, dict) else 0.0
+
+
 def record_outcome(
     root: Path,
     season: str,
@@ -359,30 +404,10 @@ def record_outcome(
         raise LedgerError("source_snapshot_id must be non-empty text.")
     _verify_manifest(directory)
     decision = json.loads(decision_path.read_text(encoding="utf-8"))
-    starters = [int(value) for value in decision["starting_xi_player_ids"]]
-    bench = [int(value) for value in decision["bench_player_ids"]]
-    captain = int(decision["captain_player_id"])
     selected = [int(value) for value in decision["squad_player_ids"]]
-    missing = [player for player in {*selected, captain} if player not in event_points]
-    if missing:
-        raise LedgerError(
-            f"Realized points do not cover every selected player; missing {sorted(missing)[:10]!r}."
-        )
-    transfers = decision.get("transfers")
-    chip = transfers.get("chip") if isinstance(transfers, dict) else None
-    hit_points = (
-        float(transfers.get("transfer_hit_points", 0.0)) if isinstance(transfers, dict) else 0.0
-    )
-    # Starters plus the captain again; a bench boost counts the bench, a triple captain
-    # counts the captain once more. Automatic substitutions are not applied: the ledger
-    # scores the eleven that were named, which is what the projection was for.
-    realized_xi = sum(float(event_points[player]) for player in starters) + float(
-        event_points[captain]
-    )
-    if chip == "bboost":
-        realized_xi += sum(float(event_points[player]) for player in bench)
-    elif chip == "3xc":
-        realized_xi += float(event_points[captain])
+    chip = _decision_chip(decision)
+    hit_points = _decision_hit_points(decision)
+    realized_xi = score_named_eleven(decision, event_points)
     outcome = {
         "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
         "season": season,

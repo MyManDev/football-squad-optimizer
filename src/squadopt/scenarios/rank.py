@@ -46,7 +46,6 @@ from squadopt.optimization.optimizer import (
     MIN_TIEBREAK_TIME_SECONDS,
     _add_decision_constraints,
     _add_tiebreak_objective,
-    _configure_solver,
     _deterministic_time_used,
     _empty_result,
     _map_solver_status,
@@ -55,6 +54,7 @@ from squadopt.optimization.optimizer import (
     _selected_indices,
     _solve,
     _verify_solution,
+    configure_solver,
 )
 from squadopt.optimization.validation import validate_players
 from squadopt.scenarios.evaluation import (
@@ -76,6 +76,19 @@ CLAIM_SCENARIO_MODES: Final = ("in_sample", "held_out_half")
 # expected-score phase and the deterministic rank tie-break.
 _PRIMARY_PHASE_SHARE: Final = 0.6
 _SECONDARY_PHASE_SHARE: Final = 0.3
+
+# A wall-clock budget makes a truncated search's answer a function of the CPU share the
+# process happened to receive: two identical calls agree on an idle machine and return
+# different squads under contention (#239). This objective exists to compare one squad's
+# claim against another's, so a reproducible stopping point is part of what it claims --
+# and CP-SAT's deterministic time is the budget that provides one. These are the limits
+# used when the caller has not chosen their own.
+#
+# The wall ceiling is not a second budget: it is high enough never to bind a normal solve,
+# and exists only so a pathological run still ends. If it ever binds, determinism is gone
+# again and the diagnostics say so.
+RANK_DETERMINISTIC_TIME_LIMIT: Final = 10.0
+RANK_WALL_CEILING_SECONDS: Final = 300.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,12 +342,17 @@ def optimize_rank_probability_squad(
     started_at = perf_counter()
     wall_limit = optimization_config.solver_time_limit_seconds
     deterministic_limit = optimization_config.solver_deterministic_time_limit
+    deterministic_budget_source = "caller"
+    if deterministic_limit is None:
+        deterministic_limit = RANK_DETERMINISTIC_TIME_LIMIT
+        wall_limit = max(wall_limit, RANK_WALL_CEILING_SECONDS)
+        deterministic_budget_source = "rank_default"
     deadline = started_at + wall_limit
 
     # Phase 1: the ahead count alone (small integers; a bound the solver can prove).
     model.maximize(ahead_total)
     solver = cp_model.CpSolver()
-    _configure_solver(
+    configure_solver(
         solver,
         optimization_config,
         wall_limit * _PRIMARY_PHASE_SHARE,
@@ -346,6 +364,12 @@ def optimize_rank_probability_squad(
     diagnostics: dict[str, object] = {
         "solver_backend": "ortools-cp-sat",
         "solver_status_name": _raw_status_name(raw_status),
+        # What stopped the search, so a reader can tell a reproducible truncation from one
+        # that depended on the machine (#239). ``rank_default`` means this function chose
+        # the deterministic budget; ``caller`` means the config carried one.
+        "deterministic_budget_source": deterministic_budget_source,
+        "deterministic_time_limit": deterministic_limit,
+        "wall_time_limit_seconds": wall_limit,
         "objective_contract": settings.contract_version,
         "scenario_fingerprint": verified.scenario_fingerprint,
         "scenario_count": total_scenarios,
@@ -363,7 +387,7 @@ def optimize_rank_probability_squad(
         "reference_expected_points": reference_expected_points,
         "rival_label": rival.label,
         "rival_scenario_mean_score": float(rival_raw.mean()),
-        "num_search_workers": 1,
+        "num_search_workers": solver.parameters.num_search_workers,
         "primary_deterministic_time": primary_deterministic_time,
         "secondary_attempted": False,
         "secondary_completed": False,
@@ -418,7 +442,7 @@ def optimize_rank_probability_squad(
                 model.add_hint(variable, int(solver.value(variable)))
         secondary_share = _SECONDARY_PHASE_SHARE / (1.0 - _PRIMARY_PHASE_SHARE)
         secondary_solver = cp_model.CpSolver()
-        _configure_solver(
+        configure_solver(
             secondary_solver,
             optimization_config,
             remaining_time * secondary_share,
@@ -461,7 +485,7 @@ def optimize_rank_probability_squad(
             secondary_value,
         )
         tiebreak_solver = cp_model.CpSolver()
-        _configure_solver(
+        configure_solver(
             tiebreak_solver, optimization_config, remaining_time, remaining_deterministic
         )
         raw_tiebreak = _solve(model, tiebreak_solver)

@@ -86,7 +86,10 @@ two reserved production slots exist for exactly this dispatch. Raw `data/ledger`
 
 ## After the gameweek (Monday-ish) — settle and the settled view
 
-Same shape as GW1's settle: capture after the last fixture, `squadopt gameweek settle
+Same shape as GW1's settle — including the wait. The last fixture ending is not the signal;
+`bonus_added` in `/api/event-status/` turning true is, and on GW1 that took more than eight
+and a half hours after the final kick-off. `opening_week_runbook.md` has the check. Capture
+after that, `squadopt gameweek settle
 --gameweek 2`, rebuild the site in a fresh worktree branch, release, tag
 `site-2026-27-gw02-settled`, dispatch. The settled view now carries each player's realized
 points and the captain multiplier (#184), so the page shows projection against outcome

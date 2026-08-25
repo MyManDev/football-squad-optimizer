@@ -35,6 +35,7 @@ from squadopt.live.ledger import (
     load_ledger,
     record_decision,
     record_outcome,
+    score_named_eleven,
     summary_markdown,
 )
 from squadopt.live.recommendation import (
@@ -183,6 +184,7 @@ __all__ = [
     "render_rules",
     "risk_not_requested",
     "rules_to_dict",
+    "score_named_eleven",
     "summary_markdown",
     "write_projection_handoff",
 ]
