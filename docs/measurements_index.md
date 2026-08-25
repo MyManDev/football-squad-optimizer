@@ -107,6 +107,21 @@ here (ADR 0003, rule 1).
 | `residual_signal_scan` | Enrichment fields the archive holds but no model reads, strictly lagged against the control residuals (101,447 rows): **recent luck** (returns − xGI, last 6) is monotone with a **1.07-point** residual spread — hot players are over-predicted by 0.74; **recently moved** players (594 rows) are under-predicted by **+0.62** with the model *widening* the raw gap (ratio 2.14); the source's own `xP` adds +0.48 in its top quartile; xGI/90 itself 0.32 (non-monotone); ownership ~nothing (0.10) | — |
 | `opponent_strength_signal` | Control residuals still move with opponent strength: **+0.162** attacking (monotone), **+0.322** defensive; effect is *larger* after the model than before it (1.24x / 1.06x) — unspent signal | #87 |
 
+## Season record
+
+**Not measurements.** These two are the live season's own record, appended on settle day from
+the frozen ledger entry, and they are the only rows here that describe the operational control
+scoring rather than an experiment evaluating one. They belong in this index because rule 1
+covers every committed artifact, not only experimental ones — and because the
+projection-versus-reality series is what a reader is most likely to come looking for. The
+header's claim still holds: recording what the control scored promoted nothing and changed
+nothing.
+
+| Artifact | Finding | PR |
+| --- | --- | --- |
+| `weekly_scorecard` (record) | Projection versus reality, one row per settled gameweek. **GW1 (`opening-carry-over-v1`): projected 56.08, realized XI 26, net 26, error −30.08.** The captain returned 4 points doubled — a 15% share of the realized XI, against a projection that had him as its largest single line. First entry of the series, so it establishes the sign convention (realized minus projected; negative means the projection was optimistic) and nothing about variance yet | #258 |
+| `season_ledger_2026-27` (record) | The `season_ledger_v1` summary of every live decision: GW1 from capture `fpl-live-20260821T143619Z-11bc603a8e1c`, solver `OPTIMAL`, 0 transfers, 0 hits, no chip, **96 players excluded as unavailable**. Settled gameweeks 1; mean realized 26.0; mean projection error −30.1. Raw entries stay local under `data/ledger/` with per-file checksums, so this file is the committed half of a record whose evidence is deliberately not committed | #258 |
+
 ## Process references
 
 `handoff_acceptance_checklist.md` · `candidate_declaration_review.md` ·
