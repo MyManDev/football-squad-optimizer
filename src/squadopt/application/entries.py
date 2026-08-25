@@ -103,7 +103,18 @@ class EntryRegistration:
 
 @dataclass(frozen=True, slots=True)
 class EntryRegistry:
-    """The entry ids the site precomputes for (a committed JSON file, PR-registered)."""
+    """The entry ids the site precomputes for.
+
+    ``data/entries/registry.json``, and it is deliberately **not** committed. The real file
+    lists a live classic league's members by entry id and team name, which is third-party
+    data about identifiable people, so it stays local like the captures do — the reasoning
+    is in ``.gitignore`` beside the rule. ``data/sample/entry_registry_v1.example.json``
+    carries the shape, and ``scripts/seed_entry_registry.py`` rebuilds the real file from a
+    captured standings page.
+
+    ``load`` returning an empty registry for a missing path is what makes that workable: a
+    fresh clone has no file and must not fail for the lack of one.
+    """
 
     entries: tuple[EntryRegistration, ...]
     contract_version: str = ENTRY_REGISTRY_CONTRACT_VERSION
