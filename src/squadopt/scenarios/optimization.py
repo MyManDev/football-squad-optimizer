@@ -20,7 +20,6 @@ from squadopt.optimization.optimizer import (
     MIN_TIEBREAK_TIME_SECONDS,
     _add_decision_constraints,
     _add_tiebreak_objective,
-    _configure_solver,
     _deterministic_time_used,
     _empty_result,
     _map_solver_status,
@@ -29,6 +28,7 @@ from squadopt.optimization.optimizer import (
     _selected_indices,
     _solve,
     _verify_solution,
+    configure_solver,
 )
 from squadopt.optimization.validation import validate_players
 from squadopt.scenarios.evaluation import evaluate_fixed_decision
@@ -251,7 +251,7 @@ def optimize_scenario_aware_squad(
     started_at = perf_counter()
     deadline = started_at + optimization_config.solver_time_limit_seconds
     primary_solver = cp_model.CpSolver()
-    _configure_solver(
+    configure_solver(
         primary_solver,
         optimization_config,
         optimization_config.solver_time_limit_seconds,
@@ -283,7 +283,7 @@ def optimize_scenario_aware_squad(
         "expected_points_scale": optimization_config.expected_points_scale,
         "rounding_mode": "ROUND_HALF_UP",
         "deterministic_seed": optimization_config.deterministic_seed,
-        "num_search_workers": 1,
+        "num_search_workers": primary_solver.parameters.num_search_workers,
         "solver_time_limit_seconds": optimization_config.solver_time_limit_seconds,
         "solver_deterministic_time_limit": (optimization_config.solver_deterministic_time_limit),
         "primary_deterministic_time": primary_deterministic_time,
@@ -352,7 +352,7 @@ def optimize_scenario_aware_squad(
         )
         tiebreak_solver = cp_model.CpSolver()
         diagnostics["tiebreak_deterministic_time_limit"] = remaining_deterministic_time
-        _configure_solver(
+        configure_solver(
             tiebreak_solver,
             optimization_config,
             remaining_time,

@@ -183,12 +183,23 @@ def _map_solver_status(raw_status: int) -> SolverStatus:
     raise SolverExecutionError(f"CP-SAT returned an unrecognized status: {raw_status!r}.")
 
 
-def _configure_solver(
+def configure_solver(
     solver: cp_model.CpSolver,
     config: OptimizationConfig,
     time_limit_seconds: float,
     deterministic_time_limit: float | None,
 ) -> None:
+    """Apply this repository's solver settings; the single place they are decided.
+
+    Public because three packages outside this one call it — `planning`, and both
+    `scenarios` solvers — and a name that three packages consume is not private.
+
+    Single search worker: CP-SAT's parallel search is nondeterministic, so a repeated
+    solve would not be a repeated answer. Callers that record what produced a result read
+    the value back from the configured solver rather than writing `1` beside it, so a
+    provenance record cannot go on claiming a property this function has stopped providing.
+    """
+
     solver.parameters.max_time_in_seconds = time_limit_seconds
     if deterministic_time_limit is not None:
         solver.parameters.max_deterministic_time = deterministic_time_limit
@@ -449,7 +460,7 @@ def _optimize_squad_with_objective_points(
     deadline = started_at + config.solver_time_limit_seconds
 
     primary_solver = cp_model.CpSolver()
-    _configure_solver(
+    configure_solver(
         primary_solver,
         config,
         config.solver_time_limit_seconds,
@@ -471,7 +482,7 @@ def _optimize_squad_with_objective_points(
         "bench_weight": config.bench_weight,
         "input_player_count": len(ordered_players),
         "deterministic_seed": config.deterministic_seed,
-        "num_search_workers": 1,
+        "num_search_workers": primary_solver.parameters.num_search_workers,
         "solver_time_limit_seconds": config.solver_time_limit_seconds,
         "solver_deterministic_time_limit": config.solver_deterministic_time_limit,
         "primary_deterministic_time": primary_deterministic_time,
@@ -543,7 +554,7 @@ def _optimize_squad_with_objective_points(
         )
         tiebreak_solver = cp_model.CpSolver()
         base_diagnostics["tiebreak_deterministic_time_limit"] = remaining_deterministic_time
-        _configure_solver(
+        configure_solver(
             tiebreak_solver,
             config,
             remaining_time,
