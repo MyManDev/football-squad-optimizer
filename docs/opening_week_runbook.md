@@ -89,7 +89,34 @@ python -m scripts.recommend_current_squad --snapshot-id <id> --output artifacts/
 
 ### After the gameweek finishes: settle
 
-Capture again (the later bootstrap carries realized `event_points`), then:
+**"Finishes" is the platform's word, not the calendar's, and the gap between them is hours.**
+Measured on gameweek 1: the last fixture kicked off at 19:00Z, and **eight and a half hours
+later** the gameweek was still open — every fixture at `minutes: 90` and
+`finished_provisional: true`, an average score published and rising (36, then 48), and yet
+`finished: false`, `data_checked: false`, with bonus points not added. Points read in that
+window are provisional and will change.
+
+Settle refuses it, which is the system working:
+
+```
+Gameweek 1 is not finished in this capture; realized points read now would describe
+matches still being played.
+```
+
+So do not plan the settle for a clock time. Check the platform first — one cheap call, no
+capture, nothing written:
+
+```console
+curl -s https://fantasy.premierleague.com/api/event-status/
+```
+
+Every entry showing `"bonus_added": true` and `"points": "r"` (rather than `"p"`) means the
+week's scores are final. `bootstrap-static.json`'s event then carries `finished: true` and
+`data_checked: true`, and that is the flag settle reads. Waiting costs nothing; settling early
+is impossible by design, and a settle taken from provisional points would write a wrong
+outcome into a ledger that does not permit corrections.
+
+Then capture again (the later bootstrap carries realized `event_points`) and settle:
 
 ```console
 squadopt gameweek settle --gameweek 1
