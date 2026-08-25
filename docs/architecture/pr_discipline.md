@@ -63,10 +63,27 @@ deselecting `slow` does not even avoid the session-scoped `baseline_result` fixt
 Use `-m "not slow"` for a quick local signal while iterating. Do not present it as having
 tested the change. Details and the full timing table are in [branching](branching.md).
 
-Note also that mypy checks only `src/squadopt` and ruff's `src` setting covers only
-`src` and `tests`, so `scripts/` — 51 modules and 11,346 lines, holding most of the entry-point
-logic — is outside two of the five gates. Treat script changes as unchecked and review them
-accordingly.
+Note also that `scripts/` — **77 modules and 17,444 lines**, holding most of the entry-point
+logic — sits outside two of the five gates. *Which* two is worth stating correctly, because an
+earlier version of this paragraph named the wrong one and would have sent a reader looking in
+the wrong place.
+
+**Ruff does cover `scripts/`.** Gates 1 and 2 run `ruff check .` and `ruff format --check .`
+over the repository, and the format gate reports 77 files there. Ruff's `src` setting names
+`src` and `tests`, but that controls first-party *import resolution*, not which files are
+checked. The two gates that stop at the package boundary are:
+
+- **mypy**, because `[tool.mypy]` sets `files = ["src/squadopt"]`;
+- **`lint-imports`**, which analyses 167 files — exactly the number of modules under
+  `src/squadopt` — so the layering contract in [dependency rules](dependency_rules.md) is not
+  enforced in `scripts/` at all.
+
+The second is the one to care about, because scripts cross package boundaries by nature rather
+than by accident: `scripts/measure_in_season_blend.py` imports from six subpackages in one file
+(`data`, `features`, `prediction`, `evaluation`, `backtest`, `experiments`). Nothing there
+fails when an import points the wrong way. So "treat script changes as unchecked" understates
+it — types are unchecked *and* the dependency order is unenforced, in the directory whose files
+reach across the most layers.
 
 ## The live path
 
