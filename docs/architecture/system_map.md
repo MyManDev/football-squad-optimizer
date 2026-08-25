@@ -2,7 +2,7 @@
 
 What the package contains today, how its parts depend on each other, and where the
 dependencies still point the wrong way. Measured, not asserted: every number here comes from
-an AST walk over the 132 modules under `src/squadopt`, and the walk is described in the
+an AST walk over the 167 modules under `src/squadopt`, and the walk is described in the
 verification section so a reviewer can disagree with the evidence rather than with the prose.
 
 Companion documents: [dependency rules](dependency_rules.md) fixes the order this map
@@ -34,7 +34,7 @@ one top-level module:
 | Runtime and registries | `platform` |
 | Convenience wiring | `integration.py`, `squadopt/__init__.py` |
 
-Outside the package: 53 files in `scripts/` and a `web/` frontend, which is not a Python
+Outside the package: 77 files in `scripts/` and a `web/` frontend, which is not a Python
 package and is therefore outside the import contract entirely — see
 [platform and runtime boundary](platform_runtime.md).
 
@@ -137,18 +137,26 @@ concepts. They belong in `evaluation`, which sits below both.
 
 ## What this map deliberately does not cover
 
-- **Barrel width.** `experiments/__init__.py` re-exports 82 names, `live` 79, `data` 68. Wide
+- **Barrel width.** `experiments/__init__.py` re-exports 123 names, `live` 81, `data` 68. Wide
   barrels are a readability and coupling concern, not a layering one, and closing the three
   edges above does not require touching them. Recorded here, not scheduled.
 - **`scripts/` and `tests/` inversions.** `src/` imports neither, so the useful direction of
-  that arrow is preserved. But `tests/` imports `scripts/` at 12 sites, several reaching
-  private members (for example `tests/unit/test_risk_reporting.py:5`), and `scripts/` is
-  outside both ruff's `src` setting and mypy's `files`, so 51 entry-point modules are
-  unchecked by two of the five gates. That is a tooling gap for the core-architecture owner,
-  not a package-layering gap.
-- **`data/identity.py`** has no importers inside `src/squadopt` at all — only `scripts/` and
-  `tests/`. Either it is a public utility in the wrong place or it is effectively unused.
-  Unresolved.
+  that arrow is preserved. But `tests/` imports `scripts/` at 24 sites, several reaching
+  private members (for example `tests/unit/test_risk_reporting.py:5`, which imports three),
+  and 77 entry-point modules are unchecked by two of the five gates. Ruff is **not** one of
+  them: `ruff check .` and `ruff format --check .` both cover `scripts/`, and ruff's `src`
+  setting governs first-party import resolution rather than which files are checked. The two
+  that stop at the package boundary are mypy (`files = ["src/squadopt"]`) and `lint-imports`,
+  which analyses exactly the 167 modules above. So the layering contract is unenforced in the
+  directory that reaches across the most layers — a tooling gap for the core-architecture
+  owner, not a package-layering gap. `pr_discipline.md` carried the same wrong attribution and
+  is corrected separately.
+- **`data/identity.py`** — resolved, and the resolution is the opposite of both options this
+  entry offered. It now has an importer inside `src/squadopt`: `platform/fpl_capture.py`. It
+  has none in `scripts/` at all, so the only remaining outside caller is
+  `tests/unit/test_data_identity.py`. `platform` is the highest package layer and `data` the
+  lowest, so that edge points downward and is legal by construction — the module is neither
+  misplaced nor unused, and it took a consumer arriving rather than an argument to settle it.
 
 ## Verification
 
@@ -163,6 +171,12 @@ grep over top-level lines would miss.
 The three pairs and five statements above are the whole result. Anything else appearing means
 this document is out of date, not that the walk is wrong.
 
-Last measured against `587279a` (PR #144): 17 subpackages, 153 modules, and the same three
-pairs and five statements as at `b031ef1`. The baseline did not grow across twenty-one merged
-pull requests and two new packages, which is the contract doing its job.
+Last measured against `95a6f7e`: **18 subpackages, 167 modules**, and the same three pairs and
+five statements as at `587279a` (PR #144) and `b031ef1` — the same files and the same lines,
+not merely the same count. The eighteenth subpackage is `api`, which became a package after
+the previous measurement.
+
+The baseline has now held across three measurements and every merge since #144, which is the
+contract doing its job. The counts around it did not hold, which is why they are re-measured
+here: the opening paragraph had said 132 modules while this line said 153, so the document
+disagreed with itself about the size of the thing it was measuring.
