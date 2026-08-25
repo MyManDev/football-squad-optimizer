@@ -23,10 +23,15 @@ test("rivals shows the projections and says why there is no rival yet", async ({
 test("league shows the season and the cumulative chart", async ({ page }) => {
   await page.goto("/league");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Analizi");
-  // One decision so far: the chart states why it is not drawn yet.
-  await expect(page.getByText(/Tek oyun haftası bir noktadır, çizgi değildir/)).toBeVisible();
-  // The league comparison is real data from the capture, with nothing scored yet.
-  await expect(page.getByText(/No gameweek has been scored yet/)).toBeVisible();
+  // This test runs against whatever is currently published, so every assertion in it has to
+  // hold for any week of the season rather than for the week it was written in. Whether the
+  // chart is drawn or replaced by the line explaining that one week is a point and not a
+  // line depends on how many weeks have scored, so neither is asserted: the previous version
+  // pinned the season's opening state and broke the moment gameweek one settled.
+  //
+  // The verdict is asserted through the phrase that survives every season state, and it is
+  // Turkish because the payload now carries a stable code the page translates.
+  await expect(page.getByText(/oyun ortalamasına karşı/)).toBeVisible();
   await expect(page.getByText(/Bu kadronun ne kadarı şablon/)).toBeVisible();
   await expect(page.getByRole("table")).toBeVisible();
 });
