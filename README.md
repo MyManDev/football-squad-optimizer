@@ -629,15 +629,15 @@ is the accepted deliverable for that checklist item.
 .venv\Scripts\python -m mypy src\squadopt
 ```
 
-The full suite is the merge gate, and it runs in parallel: 115 s against 444 s serial on eight
-workers, with the same 2,502 passed and 1 skipped either way. `-n auto` counts physical cores,
+The full suite is the merge gate, and it runs in parallel: 121 s against 453 s serial on eight
+workers, with the same 2,562 passed and 1 skipped either way. `-n auto` counts physical cores,
 so it picks fewer workers than a thread count suggests, and it is not in `addopts` — a single
 `pytest path::test` stays serial and starts instantly.
 
 Two pytest markers split the suite: `slow` (solver-heavy tests of more than about five
 seconds each) and `integration` (everything under `tests/integration`, applied
 automatically). `-m "not slow"` is no longer the useful shortcut it was — it saves about
-112 s serially, so the parallel full suite beats it outright and gates on everything.
+122 s serially, so the parallel full suite beats it outright and gates on everything.
 [Branching and protection](docs/architecture/branching.md) records the measurements and why
 `loadscope` is the chosen distribution.
 
