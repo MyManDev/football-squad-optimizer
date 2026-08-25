@@ -17,6 +17,25 @@ the 22 against that commit gives:
 Both remaining groups are declared below, separately, because they mean different things: one is
 a closed historical set and the other is debt. Merging them into a single "known exceptions"
 tuple would have let the second hide inside the first.
+
+## What this file does and does not cover
+
+The first version globbed ``docs/*.json`` only, and said it enforced rule 1. It half enforced
+it. ADR 0003's record tier is **"markdown, plus JSON under ~250 KB"**, so markdown records are
+artifacts too, and `docs/` holds more markdown (150 files) than JSON (80). #258 demonstrated the
+gap on its first outing: two generated markdown records landed with no row and nothing noticed.
+
+Markdown is now in scope **when a committed JSON of the same stem exists** -- that pair is one
+artifact published in two forms, sharing one row, so no guessing is involved and 77 files come
+in at once.
+
+Markdown with no JSON twin stays **out** of automatic scope, deliberately. Separating a
+generated record from prose by filename cannot be done reliably: ``weekly_scorecard.md`` is a
+record and ``data_contract.md`` is not, and no marker distinguishes them. Grepping for the paths
+the code writes conflates writes with references -- it returns ``data_contract.md``, which is
+only read. The alternative is an allowlist of some fifty prose documents, which would rot. So the
+limit is asserted by a test rather than left for a reader to assume, and the twinless records
+that matter are pinned by name.
 """
 
 import re
@@ -61,11 +80,33 @@ UNLISTED_AT_THE_TIME_OF_WRITING: tuple[str, ...] = ()
 
 EXEMPT: tuple[str, ...] = GRANDFATHERED_BY_RULE_4 + UNLISTED_AT_THE_TIME_OF_WRITING
 
+# Two generated markdown records with no JSON twin, so the twin rule cannot see them. They are
+# the settle chain's outputs and the reason the markdown gap was found; naming them is the only
+# thing that keeps them covered.
+TWINLESS_RECORDS_PINNED_BY_NAME: tuple[str, ...] = (
+    "season_ledger_2026-27.md",
+    "weekly_scorecard.md",
+)
+
+
+def _exempt_stems() -> set[str]:
+    """Exemptions are per *artifact*, so one entry covers a record's JSON and markdown alike."""
+
+    return {Path(name).stem for name in EXEMPT}
+
 
 def _committed_artifacts() -> list[str]:
-    """The committed JSON artifacts the rule applies to."""
+    """The committed record files rule 1 applies to.
 
-    return sorted(path.name for path in DOCS.glob("*.json"))
+    JSON, plus markdown that has a committed JSON of the same stem: one artifact in two forms,
+    one row. Twinless markdown is out of scope on purpose -- see the module docstring, and the
+    test that asserts the limit rather than leaving it implied.
+    """
+
+    json_names = sorted(path.name for path in DOCS.glob("*.json"))
+    stems = {Path(name).stem for name in json_names}
+    twinned = sorted(path.name for path in DOCS.glob("*.md") if path.stem in stems)
+    return json_names + twinned + sorted(TWINLESS_RECORDS_PINNED_BY_NAME)
 
 
 def _names_in_index() -> set[str]:
@@ -97,7 +138,8 @@ def unlisted_artifacts() -> list[str]:
 def test_every_committed_artifact_is_named_in_the_index() -> None:
     """ADR 0003 rule 1. The debt tuple may only shrink -- add the row, not the file."""
 
-    outstanding = sorted(set(unlisted_artifacts()) - set(EXEMPT))
+    excused = _exempt_stems()
+    outstanding = sorted(name for name in unlisted_artifacts() if Path(name).stem not in excused)
 
     assert not outstanding, (
         "These committed artifacts have no row in docs/measurements_index.md, which ADR 0003 "
@@ -155,6 +197,60 @@ def test_an_exempt_artifact_is_not_also_listed() -> None:
     both = sorted(name for name in EXEMPT if Path(name).stem in named)
 
     assert not both, f"These artifacts now have a row and must leave the exemption lists: {both!r}."
+
+
+# --- what is in scope, and what is not ---------------------------------------
+
+
+def test_markdown_with_a_json_twin_is_in_scope() -> None:
+    """The record tier is "markdown, plus JSON", so the markdown half is an artifact too."""
+
+    covered = set(_committed_artifacts())
+
+    assert "fw10_holdout.json" in covered
+    assert "fw10_holdout.md" in covered
+
+
+def test_one_exemption_entry_covers_both_forms_of_the_same_artifact() -> None:
+    """Grandfathering is per artifact, not per file.
+
+    Widening the glob to markdown surfaced fourteen ``.md`` siblings of the fourteen already
+    exempt ``.json`` records -- the same debt, previously counted once. Excusing them by stem
+    keeps the tuple a list of artifacts instead of doubling it into a list of files.
+    """
+
+    covered = set(_committed_artifacts())
+    excused = _exempt_stems()
+
+    assert "baseline_benchmark.md" in covered
+    assert "baseline_benchmark.md" not in EXEMPT
+    assert Path("baseline_benchmark.md").stem in excused
+
+
+def test_twinless_markdown_is_out_of_automatic_scope() -> None:
+    """The limit, asserted rather than implied.
+
+    Telling a generated record from prose by filename cannot be done reliably --
+    ``weekly_scorecard.md`` is a record and ``data_contract.md`` is not, with no marker between
+    them. So twinless markdown is not swept in, and this test exists so nobody reads the widened
+    glob as full coverage. The twinless records that matter are pinned by name instead.
+    """
+
+    covered = set(_committed_artifacts())
+
+    assert "data_contract.md" not in covered
+    assert "handoff_acceptance_checklist.md" not in covered
+    for name in TWINLESS_RECORDS_PINNED_BY_NAME:
+        assert name in covered
+
+
+def test_the_settle_records_that_found_this_gap_stay_listed() -> None:
+    """#258 landed both with no row while the JSON-only glob watched. Keep them pinned."""
+
+    named = _names_in_index()
+
+    assert "weekly_scorecard" in named
+    assert "season_ledger_2026-27" in named
 
 
 # --- the check itself has to be able to fail ---------------------------------
