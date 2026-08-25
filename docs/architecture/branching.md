@@ -77,30 +77,32 @@ starts instantly. `auto` counts *physical* cores, not logical: it created **8** 
 longer than the number in the table. Read what the run reports rather than assuming.
 
 **What it costs in CI, measured rather than extrapolated.** Four workers instead of eight, so
-the table above is an upper bound on the gain. Measured on one day, same runner class, with
-identical test content — `develop` at `95a6f7e` serially against this branch in parallel, the
-difference between them being the `-n auto` flag and four documentation files:
+the table above is an upper bound on the gain. Three runs each side, same runner class, same day:
+serially, `develop`'s own push runs at `1e89b7c`, `479f4f6` and `95a6f7e`; in parallel, three
+heads of the branch that turned the flag on. Every run is post-#244, so the test content is the
+same on both sides.
 
-| | serial (one run) | parallel (two runs) |
+| | serial (3 runs) | parallel (3 runs) |
 | --- | --- | --- |
-| `gates (py3.11)`, pytest step | 266 s | 202 s, 157 s |
-| `gates (py3.13)`, pytest step | 430 s | 235 s, 235 s |
-| slowest job — what a pull request actually waits for | **8 m 17 s** | **5 m 04 s, 5 m 07 s** |
+| pytest step, whichever interpreter was slower | 407–430 s | **224–235 s** |
+| slowest job — what a pull request actually waits for | 7 m 47 s – 8 m 17 s | **4 m 48 s – 5 m 07 s** |
 
-Read the third row and distrust the first two. The wait a pull request pays is set by the slower
-of the two jobs, and it reproduced to within three seconds across the parallel pair: **about
-three minutes saved per pull request.** The per-interpreter ratios do not deserve a number,
-because `gates (py3.11)` moved 202 s to 157 s between two runs of the same tree — a 29 per cent
-swing, wider than some of the differences a reader would want to draw from it. `gates (py3.13)`
-landing on 235 s twice says the variance is a runner property rather than a suite one.
+Neither row overlaps, which is the whole claim: **about three minutes off every pull request**,
+a factor of 1.5 to 1.7 on the wait. Three runs a side rather than one, because the first pair
+measured suggested 1.32× on one interpreter and the next run of the same tree contradicted it.
 
-Two things follow that the local figures hide. The interpreters disagree by a factor of 1.6
-*serially*, 430 s against 266 s, because 3.13 installs the pinned `constraints.txt` environment
-and 3.11 the declared ranges — worth knowing before attributing a slow gate to parallelism. And
-in parallel the two interpreters converge in spite of that serial gap, which is what being
-**floor-bound** looks like: four workers are already enough for the slowest module to set the
-wall clock. The floor described below is therefore not a future concern in CI. It binds now, and
-it is why the CI gain is smaller than the 3.8× measured locally.
+**Do not read a per-interpreter number out of this.** Across the three parallel runs the pytest
+step was 202, 157 and 224 s on `py3.11` and 235, 235 and 155 s on `py3.13` — overlapping ranges,
+and in each run one of the two happened to be the fast one. Runner variance here is larger than
+any interpreter difference, so a single pair will produce whatever ratio it likes. Serially the
+pinned 3.13 environment does tend to be the slower of the two (383–430 s against 266–407 s), but
+that is a tendency and not a factor.
+
+What the table does support is that the parallel runs cluster tightly at the top — 224 to 235 s
+whichever interpreter it is — which is what being **floor-bound** looks like: four workers are
+already enough for the slowest module to set the wall clock. The floor described below is
+therefore not a future concern in CI. It binds now, and it is why the CI gain is a factor of
+1.5–1.7 rather than the 3.8× measured locally on eight cores.
 
 **Why `loadscope` rather than the default.** `loadscope` groups a module onto one worker, so the
 eleven module-scoped fixtures are built once instead of once per worker that happens to draw one
