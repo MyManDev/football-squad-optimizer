@@ -1,6 +1,6 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-22T07:13:31Z",
+  "generated_at_utc": "2026-08-25T12:32:57Z",
   "payload": {
     "chips_played": [],
     "decided_gameweeks": 1,
@@ -9,15 +9,15 @@
         "captain_player_id": 223094,
         "chip": null,
         "cumulative_projected_score": 56.077499304365105,
-        "cumulative_realized_score": null,
+        "cumulative_realized_score": 26.0,
         "deadline_utc": "2026-08-21T17:30:00Z",
         "decision_kind": "opening",
         "gameweek": 1,
         "projected_score": 56.077499304365105,
-        "projection_error": null,
-        "realized_net_score": null,
-        "realized_score": null,
-        "settled": false,
+        "projection_error": -30.077499304365105,
+        "realized_net_score": 26.0,
+        "realized_score": 26.0,
+        "settled": true,
         "snapshot_id": "fpl-live-20260821T143619Z-11bc603a8e1c",
         "solver_status": "OPTIMAL",
         "transfer_count": 0,
@@ -26,12 +26,12 @@
       }
     ],
     "season": "2026-27",
-    "settled_gameweeks": 0,
+    "settled_gameweeks": 1,
     "total_projected_score": 56.077499304365105,
-    "total_projected_score_settled": null,
-    "total_projection_error": null,
-    "total_realized_net_score": null,
-    "total_realized_score": null,
+    "total_projected_score_settled": 56.077499304365105,
+    "total_projection_error": -30.077499304365105,
+    "total_realized_net_score": 26.0,
+    "total_realized_score": 26.0,
     "total_transfer_hit_points": 0.0
   }
 }
