@@ -46,7 +46,6 @@ from squadopt.optimization.optimizer import (
     MIN_TIEBREAK_TIME_SECONDS,
     _add_decision_constraints,
     _add_tiebreak_objective,
-    _configure_solver,
     _deterministic_time_used,
     _empty_result,
     _map_solver_status,
@@ -55,6 +54,7 @@ from squadopt.optimization.optimizer import (
     _selected_indices,
     _solve,
     _verify_solution,
+    configure_solver,
 )
 from squadopt.optimization.validation import validate_players
 from squadopt.scenarios.evaluation import (
@@ -352,7 +352,7 @@ def optimize_rank_probability_squad(
     # Phase 1: the ahead count alone (small integers; a bound the solver can prove).
     model.maximize(ahead_total)
     solver = cp_model.CpSolver()
-    _configure_solver(
+    configure_solver(
         solver,
         optimization_config,
         wall_limit * _PRIMARY_PHASE_SHARE,
@@ -387,7 +387,7 @@ def optimize_rank_probability_squad(
         "reference_expected_points": reference_expected_points,
         "rival_label": rival.label,
         "rival_scenario_mean_score": float(rival_raw.mean()),
-        "num_search_workers": 1,
+        "num_search_workers": solver.parameters.num_search_workers,
         "primary_deterministic_time": primary_deterministic_time,
         "secondary_attempted": False,
         "secondary_completed": False,
@@ -442,7 +442,7 @@ def optimize_rank_probability_squad(
                 model.add_hint(variable, int(solver.value(variable)))
         secondary_share = _SECONDARY_PHASE_SHARE / (1.0 - _PRIMARY_PHASE_SHARE)
         secondary_solver = cp_model.CpSolver()
-        _configure_solver(
+        configure_solver(
             secondary_solver,
             optimization_config,
             remaining_time * secondary_share,
@@ -485,7 +485,7 @@ def optimize_rank_probability_squad(
             secondary_value,
         )
         tiebreak_solver = cp_model.CpSolver()
-        _configure_solver(
+        configure_solver(
             tiebreak_solver, optimization_config, remaining_time, remaining_deterministic
         )
         raw_tiebreak = _solve(model, tiebreak_solver)
