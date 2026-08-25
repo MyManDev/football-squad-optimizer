@@ -78,22 +78,29 @@ longer than the number in the table. Read what the run reports rather than assum
 
 **What it costs in CI, measured rather than extrapolated.** Four workers instead of eight, so
 the table above is an upper bound on the gain. Measured on one day, same runner class, with
-identical test content — `develop` at `95a6f7e` serially against this branch at `b4f7ce1` in
-parallel, the difference between them being the `-n auto` flag and four documentation files:
+identical test content — `develop` at `95a6f7e` serially against this branch in parallel, the
+difference between them being the `-n auto` flag and four documentation files:
 
-| | serial | parallel | |
-| --- | --- | --- | --- |
-| `gates (py3.11)`, pytest step | 266 s | 202 s | 1.32× |
-| `gates (py3.13)`, pytest step | 430 s | 235 s | 1.83× |
-| slowest job — what a pull request actually waits for | 8 m 17 s | 5 m 04 s | 3 m 13 s saved |
+| | serial (one run) | parallel (two runs) |
+| --- | --- | --- |
+| `gates (py3.11)`, pytest step | 266 s | 202 s, 157 s |
+| `gates (py3.13)`, pytest step | 430 s | 235 s, 235 s |
+| slowest job — what a pull request actually waits for | **8 m 17 s** | **5 m 04 s, 5 m 07 s** |
+
+Read the third row and distrust the first two. The wait a pull request pays is set by the slower
+of the two jobs, and it reproduced to within three seconds across the parallel pair: **about
+three minutes saved per pull request.** The per-interpreter ratios do not deserve a number,
+because `gates (py3.11)` moved 202 s to 157 s between two runs of the same tree — a 29 per cent
+swing, wider than some of the differences a reader would want to draw from it. `gates (py3.13)`
+landing on 235 s twice says the variance is a runner property rather than a suite one.
 
 Two things follow that the local figures hide. The interpreters disagree by a factor of 1.6
-*serially*, 430 s against 266 s, because 3.13 runs the pinned `constraints.txt` environment and
-3.11 the declared ranges — worth knowing before attributing a slow gate to parallelism. And the
-two parallel runs land close together at 202 s and 235 s despite that serial gap, which is what
-being **floor-bound** looks like: four workers are already enough for the slowest module to set
-the wall clock. The floor described below is therefore not a future concern in CI. It binds now,
-and it is the reason the CI gain is smaller than the 3.8× measured locally.
+*serially*, 430 s against 266 s, because 3.13 installs the pinned `constraints.txt` environment
+and 3.11 the declared ranges — worth knowing before attributing a slow gate to parallelism. And
+in parallel the two interpreters converge in spite of that serial gap, which is what being
+**floor-bound** looks like: four workers are already enough for the slowest module to set the
+wall clock. The floor described below is therefore not a future concern in CI. It binds now, and
+it is why the CI gain is smaller than the 3.8× measured locally.
 
 **Why `loadscope` rather than the default.** `loadscope` groups a module onto one worker, so the
 eleven module-scoped fixtures are built once instead of once per worker that happens to draw one
