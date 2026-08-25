@@ -76,6 +76,25 @@ starts instantly. `auto` counts *physical* cores, not logical: it created **8** 
 16-thread machine above, and will create 4 on a `ubuntu-latest` runner — so CI's wall clock is
 longer than the number in the table. Read what the run reports rather than assuming.
 
+**What it costs in CI, measured rather than extrapolated.** Four workers instead of eight, so
+the table above is an upper bound on the gain. Measured on one day, same runner class, with
+identical test content — `develop` at `95a6f7e` serially against this branch at `b4f7ce1` in
+parallel, the difference between them being the `-n auto` flag and four documentation files:
+
+| | serial | parallel | |
+| --- | --- | --- | --- |
+| `gates (py3.11)`, pytest step | 266 s | 202 s | 1.32× |
+| `gates (py3.13)`, pytest step | 430 s | 235 s | 1.83× |
+| slowest job — what a pull request actually waits for | 8 m 17 s | 5 m 04 s | 3 m 13 s saved |
+
+Two things follow that the local figures hide. The interpreters disagree by a factor of 1.6
+*serially*, 430 s against 266 s, because 3.13 runs the pinned `constraints.txt` environment and
+3.11 the declared ranges — worth knowing before attributing a slow gate to parallelism. And the
+two parallel runs land close together at 202 s and 235 s despite that serial gap, which is what
+being **floor-bound** looks like: four workers are already enough for the slowest module to set
+the wall clock. The floor described below is therefore not a future concern in CI. It binds now,
+and it is the reason the CI gain is smaller than the 3.8× measured locally.
+
 **Why `loadscope` rather than the default.** `loadscope` groups a module onto one worker, so the
 eleven module-scoped fixtures are built once instead of once per worker that happens to draw one
 of their tests. It measured faster despite distributing less freely, which was not the
