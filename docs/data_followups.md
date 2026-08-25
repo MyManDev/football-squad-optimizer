@@ -215,6 +215,35 @@ historical scale.
 build the error message. Behaviour must not change, so the existing cleaning and
 validation tests are the specification and should pass untouched.
 
+**Status: measured, and not worth doing.** This item reasons from "full historical
+scale" without knowing what that scale would be. It is now known, so the deferral can be
+closed on a number instead of staying open on an assumption.
+
+`clean_canonical_dataset` on the real archive — 2020-21 through 2025-26, the six seasons
+every measurement loads — costs **1.087 s** for **156,075 rows** across the nine canonical
+columns the archive adapter produces, or 0.007 s per thousand rows, scaling linearly across
+the six seasons. That is **26.6 %** of a `build_panel` call, which sounds material until you
+ask how often the call happens.
+
+**Once per run.** Every caller loads the panel at the top and then iterates folds over the
+frame in memory: the `measure_*` and `export_*` scripts, `build_projection_handoff`,
+`recommend_current_squad`, the four `experiments/` studies, and `fpl_capture`'s identity
+check. The other entry point, `build_canonical_dataset`, is reached only by
+`scripts/run_pipeline_demo.py` and the tests, over the committed synthetic sample.
+
+So a perfect vectorization has a **ceiling of about one second per run**, against walk-forward
+benchmarks measured in hours. Against that, the change would edit the one module whose own
+docstring exists to justify being the single place types change — "so a coercion bug has
+exactly one home" — and would trade an actionable per-record message for a column-wide one
+on the path that reports bad source data. Paying real risk in the coercion layer to save a
+second once is the wrong trade in the opposite direction from the one this item worried
+about.
+
+**What would change the answer**, so this does not need re-measuring from scratch: cleaning
+moving onto a per-fold or per-request path rather than a once-per-run one, or a source
+arriving with an order of magnitude more rows *and* substantially more canonical columns
+than the archive's nine. Either makes the ceiling worth having; neither is true today.
+
 ### 8. A versioned feature-generation contract
 
 **Now.** `FeatureConfig` is explicit, frozen, and validated, but it carries no

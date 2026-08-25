@@ -11,8 +11,13 @@ when the integer round-trips back to the same text, so an identifier written
 
 Values are converted one at a time rather than with vectorized casts. Vectorized
 casting is faster but reports failures as an opaque column-wide error, and an
-actionable message naming the bad record matters more than speed at Sprint 0
-data sizes.
+actionable message naming the bad record is worth more than the speed.
+
+That was originally a Sprint 0 judgement about small data. It has since been
+measured at real scale and it still holds: cleaning the whole six-season archive
+costs about a second, and every caller loads the panel once per run rather than
+per fold, so vectorizing has a ceiling of roughly one second against benchmarks
+that run for hours. ``docs/data_followups.md`` item 7 carries the numbers.
 """
 
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
