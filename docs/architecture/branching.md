@@ -79,11 +79,21 @@ after the suite grows.
 3.11, while mypy models Python 3.13. CI therefore runs both Python 3.11 (declared dependency
 ranges) and 3.13 (the pinned measurement environment in `constraints.txt`).
 
-One gap remains: a dependency added to `pyproject.toml` is not automatically added to
-`constraints.txt`, and `scipy` arrived that way in #139 — declared as a runtime dependency,
-pinned in `constraints.txt`, but the two are kept in step by hand. A declared dependency
-missing from the pinned environment would make "the environment that produced the committed
-artifacts" untrue without failing anything.
+A dependency added to `pyproject.toml` is still not *automatically* added to
+`constraints.txt` — `scipy` arrived that way in #139 — but the two are no longer kept in step
+by hand alone. `tests/unit/test_dependency_pins.py` fails when a declared dependency has no
+pin, and fails again when a pin falls outside the range it is declared with, which is the same
+drift running the other way. Adding the dependency to both files is still a manual step; going
+on to merge with only one of them done is not.
+
+The gap was closed on evidence rather than on principle. `jsonschema` had been declared in the
+`api` and `dev` extras, imported by `src/squadopt/api/views.py` and used by five test modules,
+and was absent from `constraints.txt` together with its whole runtime subtree, while its type
+stubs were pinned. Worth being precise about what that cost: no measurement script imports
+`jsonschema`, so the committed artifacts were never affected. The 3.13 job is what was
+affected — it installs `-c constraints.txt -e ".[api,dev]"` and is described two paragraphs up
+as the pinned measurement environment, while resolving a schema-validation library freely
+inside `>=4.23,<5`.
 
 ## Branch names
 
