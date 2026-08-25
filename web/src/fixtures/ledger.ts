@@ -5,15 +5,37 @@ import type { LedgerRowView, LedgerView } from "../data/schema";
 /**
  * Ledger fixtures for the season-standing card.
  *
- * The committed `ledger.json` is the real published document and every realized field in it is
- * `null` — gameweek one had not settled when it was generated. That makes it the right fixture
- * for the "nothing to show yet" case and useless for every other one, so the settled shapes are
- * built from it rather than hand-written, keeping the unrelated fields honest.
+ * Shapes are built from the committed `ledger.json` rather than hand-written, so the fields
+ * these tests do not care about stay whatever the real document says.
+ *
+ * The unsettled one used to *be* that document, on the reasoning that every realized field in
+ * it was `null`. That reasoning had an expiry date nobody noticed: settling gameweek one
+ * republished the file with `settled_gameweeks: 1`, and the fixture named "unsettled" quietly
+ * became settled, failing the test that asserts the card stays away until there is something
+ * to show. A fixture whose meaning depends on the state of live data is a fixture that changes
+ * meaning without an edit, so the unsettled case is now emptied explicitly.
  */
 const rawView = ledgerDocument.payload as unknown as LedgerView;
 
-/** The published document as it stands before any gameweek settles. */
-export const unsettledLedgerFixture: LedgerView = rawView;
+/** A season with nothing settled yet: the card must not appear at all. */
+export const unsettledLedgerFixture: LedgerView = {
+  ...rawView,
+  settled_gameweeks: 0,
+  total_projected_score_settled: 0,
+  total_realized_score: null,
+  total_realized_net_score: null,
+  total_projection_error: null,
+  total_transfer_hit_points: 0,
+  rows: rawView.rows.map((entry) => ({
+    ...entry,
+    settled: false,
+    realized_score: null,
+    realized_net_score: null,
+    projection_error: null,
+    cumulative_realized_score: null,
+    transfer_hit_points: 0,
+  })),
+};
 
 function row(overrides: Partial<LedgerRowView> & { gameweek: number }): LedgerRowView {
   const base = rawView.rows[0];
