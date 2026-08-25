@@ -77,19 +77,25 @@ starts instantly. `auto` counts *physical* cores, not logical: it created **8** 
 longer than the number in the table. Read what the run reports rather than assuming.
 
 **What it costs in CI, measured rather than extrapolated.** Four workers instead of eight, so
-the table above is an upper bound on the gain. Three runs each side, same runner class, same day:
-serially, `develop`'s own push runs at `1e89b7c`, `479f4f6` and `95a6f7e`; in parallel, three
-heads of the branch that turned the flag on. Every run is post-#244, so the test content is the
-same on both sides.
+the table above is an upper bound on the gain. All runs post-#244 and on the same runner class:
+serially, `develop`'s own push runs at `1e89b7c`, `479f4f6` and `95a6f7e` plus five
+pull-request runs on branches off them; in parallel, four heads of the branch that turned the
+flag on. The two rows below rest on different sample sizes, so each says its own.
 
-| | serial (3 runs) | parallel (3 runs) |
+| | serial | parallel |
 | --- | --- | --- |
-| pytest step, whichever interpreter was slower | 407–430 s | **224–235 s** |
-| slowest job — what a pull request actually waits for | 7 m 47 s – 8 m 17 s | **4 m 48 s – 5 m 07 s** |
+| pytest step, whichever interpreter was slower *(3 runs each)* | 407–430 s | **224–235 s** |
+| slowest job — what a pull request waits for *(8 serial, 4 parallel)* | 6 m 20 s – 8 m 26 s | **4 m 48 s – 5 m 07 s** |
 
-Neither row overlaps, which is the whole claim: **about three minutes off every pull request**,
-a factor of 1.5 to 1.7 on the wait. Three runs a side rather than one, because the first pair
-measured suggested 1.32× on one interpreter and the next run of the same tree contradicted it.
+Neither row overlaps, which is the claim: on the wait, a factor of **1.24 to 1.76**, or 73 to
+218 seconds saved. Seven of the eight serial runs sit above 7 m 40 s, so **about three minutes
+describes the typical case rather than the floor** — the floor is a little over one minute.
+
+Getting to that took four attempts, which is the other thing worth recording. One pair of runs
+suggested 1.32× on one interpreter; the next run of the same tree contradicted it; three runs a
+side then gave 1.5 to 1.7; and the fourth through eighth serial observations widened the low end
+to 1.24 when one job came in at 6 m 20 s. The direction never moved and the ranges never
+overlapped. Any single pair, though, will produce whatever ratio it likes.
 
 **Do not read a per-interpreter number out of this.** Across the three parallel runs the pytest
 step was 202, 157 and 224 s on `py3.11` and 235, 235 and 155 s on `py3.13` — overlapping ranges,
@@ -102,7 +108,7 @@ What the table does support is that the parallel runs cluster tightly at the top
 whichever interpreter it is — which is what being **floor-bound** looks like: four workers are
 already enough for the slowest module to set the wall clock. The floor described below is
 therefore not a future concern in CI. It binds now, and it is why the CI gain is a factor of
-1.5–1.7 rather than the 3.8× measured locally on eight cores.
+1.24–1.76 rather than the 3.8× measured locally on eight cores.
 
 **Why `loadscope` rather than the default.** `loadscope` groups a module onto one worker, so the
 eleven module-scoped fixtures are built once instead of once per worker that happens to draw one
