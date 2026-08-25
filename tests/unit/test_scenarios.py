@@ -578,6 +578,16 @@ def test_the_expected_points_budget_binds_and_a_menu_is_monotone_in_the_budget()
 
 @pytest.mark.slow
 def test_the_rank_objective_is_deterministic() -> None:
+    """Two identical calls agree, and agree for a reason the test can state.
+
+    Under a wall-clock budget the agreement was a coincidence: it held while both solves
+    received the same CPU share and broke under contention, returning different squads
+    from identical inputs (#239). So equality alone is not the property worth pinning --
+    *why* the two searches stopped in the same place is. Either both proved optimality, or
+    both were stopped by a budget measured in deterministic work rather than elapsed time.
+    """
+
+    from squadopt.optimization import SolverStatus
     from squadopt.scenarios import optimize_rank_probability_squad
 
     _, scenarios, (_, rival) = _rank_world()
@@ -587,6 +597,26 @@ def test_the_rank_objective_is_deterministic() -> None:
     assert first.optimization_result.selected_squad["player_id"].tolist() == (
         second.optimization_result.selected_squad["player_id"].tolist()
     )
+    for result in (first, second):
+        if result.optimization_result.solver_status is SolverStatus.OPTIMAL:
+            continue
+        # A truncated search: the stopping point must not be a function of the clock.
+        assert result.diagnostics["deterministic_time_limit"] is not None
+        assert result.diagnostics["deterministic_budget_source"] == "rank_default"
+        assert float(result.diagnostics["wall_time_limit_seconds"]) >= 300.0
+
+
+def test_a_caller_that_brings_its_own_deterministic_budget_keeps_it() -> None:
+    """The rank default fills a gap; it does not overrule a choice already made."""
+
+    from squadopt.scenarios import optimize_rank_probability_squad
+
+    _, scenarios, (_, rival) = _rank_world()
+    chosen = OptimizationConfig(solver_time_limit_seconds=30.0, solver_deterministic_time_limit=2.0)
+    result = optimize_rank_probability_squad(scenarios, rival, chosen)
+    assert result.diagnostics["deterministic_budget_source"] == "caller"
+    assert result.diagnostics["deterministic_time_limit"] == 2.0
+    assert result.diagnostics["wall_time_limit_seconds"] == 30.0
 
 
 @pytest.mark.slow
