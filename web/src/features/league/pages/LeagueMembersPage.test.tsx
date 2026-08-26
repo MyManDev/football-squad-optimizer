@@ -22,6 +22,63 @@ function renderPage(node: React.ReactNode, path = "/league/members") {
 }
 
 describe("league member surfaces", () => {
+  it("appends our own row when the live envelope has none, and claims no rank for it", () => {
+    const live = {
+      ...mockLeagueMembersEnvelope,
+      payload: {
+        ...mockLeagueMembersEnvelope.payload,
+        members: mockLeagueMembersEnvelope.payload.members.filter(
+          (member) => member.member_kind !== "system",
+        ),
+      },
+    };
+    renderPage(
+      <LeagueMembersView
+        envelope={live}
+        systemRow={{
+          member_kind: "system",
+          entry_id: null,
+          manager_name: "SquadOpt",
+          team_name: "SquadOpt",
+          rank: 0,
+          gameweek_points: 26,
+          total_points: 26,
+          movement: "unknown",
+          movement_places: null,
+          data_quality: "complete",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("SquadOpt · sistem takımı")).toBeInTheDocument();
+    // Placing ourselves among the members needs their points, which the standings view
+    // does not carry; an invented rank would be the page's one unmeasured number.
+    const systemCells = screen.getByRole("link", { name: "SquadOpt" }).closest("tr")!;
+    expect(systemCells.querySelector("td")!.textContent).toBe("—");
+  });
+
+  it("does not double our row when the envelope already carries one", () => {
+    renderPage(
+      <LeagueMembersView
+        envelope={mockLeagueMembersEnvelope}
+        systemRow={{
+          member_kind: "system",
+          entry_id: null,
+          manager_name: "SquadOpt",
+          team_name: "SquadOpt",
+          rank: 0,
+          gameweek_points: 26,
+          total_points: 26,
+          movement: "unknown",
+          movement_places: null,
+          data_quality: "complete",
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText("SquadOpt · sistem takımı")).toHaveLength(1);
+  });
+
   it("renders member standings, the public-data notice and an example badge", () => {
     renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />);
 
