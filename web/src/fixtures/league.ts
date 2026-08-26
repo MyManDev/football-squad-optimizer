@@ -165,6 +165,7 @@ export const mockLeagueMembersEnvelope = envelope<LeagueMembers>({
   season: SEASON,
   gameweek: GAMEWEEK,
   public_after_deadline: true,
+  scored_gameweek: GAMEWEEK - 1,
   members: mockMembers,
 });
 
@@ -277,6 +278,7 @@ function squadEnvelope(entry: HumanEntryView, index: number): LeagueViewEnvelope
       league_id: LEAGUE_ID,
       season: SEASON,
       gameweek: GAMEWEEK,
+      scored_gameweek: GAMEWEEK - 1,
       entry,
       starting_xi: [],
       bench: [],
@@ -297,6 +299,7 @@ function squadEnvelope(entry: HumanEntryView, index: number): LeagueViewEnvelope
     league_id: LEAGUE_ID,
     season: SEASON,
     gameweek: GAMEWEEK,
+    scored_gameweek: GAMEWEEK - 1,
     entry,
     starting_xi: partial ? players.starting.slice(0, 8) : players.starting,
     bench: partial ? players.bench.slice(0, 2) : players.bench,

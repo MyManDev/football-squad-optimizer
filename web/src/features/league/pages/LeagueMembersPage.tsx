@@ -16,12 +16,15 @@ export function LeagueMembersPage() {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const index = useIndex();
-  const systemRow = useSystemRow(index.data?.payload.seasons[0]);
   const query = useQuery({
     queryKey: ["provisional-league-members"],
     queryFn: loadLeagueMembers,
     staleTime: 60_000,
   });
+  // Our row's week must match the week the published members are scored in, so it is read
+  // after the members document rather than beside it.
+  const scored = query.data?.payload.scored_gameweek ?? null;
+  const systemRow = useSystemRow(index.data?.payload.seasons[0], scored);
 
   if (query.isPending) return <EmptyState title={copy.loading} />;
   if (query.isError) {
@@ -42,12 +45,18 @@ export function LeagueMembersPage() {
  * standings view does not carry them; a rank invented here would be the one number on the
  * page that nobody measured.
  */
-function useSystemRow(season: string | undefined): EntryView | null {
+function useSystemRow(season: string | undefined, scoredGameweek: number | null): EntryView | null {
   const ledger = useLedger(season);
   const payload = ledger.data?.payload;
   if (!payload || payload.settled_gameweeks === 0) return null;
   const settled = payload.rows.filter((row) => row.settled && row.realized_net_score !== null);
-  const latest = settled.length > 0 ? settled[settled.length - 1] : null;
+  // Our score and theirs share one column under one heading. If our latest settled week is
+  // not the week that heading names, the two numbers describe different weeks, so ours is
+  // withheld rather than shown beside a label it does not belong to.
+  const latest =
+    scoredGameweek === null
+      ? null
+      : (settled.find((row) => row.gameweek === scoredGameweek) ?? null);
   return {
     member_kind: "system",
     entry_id: null,
@@ -55,7 +64,7 @@ function useSystemRow(season: string | undefined): EntryView | null {
     team_name: "SquadOpt",
     rank: 0,
     gameweek_points: latest?.realized_net_score ?? null,
-    total_points: payload.total_realized_net_score,
+    total_points: latest === null ? null : payload.total_realized_net_score,
     movement: "unknown",
     movement_places: null,
     data_quality: "complete",
@@ -105,7 +114,9 @@ export function LeagueMembersView({
                 <th scope="col">{copy.member}</th>
                 <th scope="col">{copy.team}</th>
                 <th scope="col" className={styles.right}>
-                  {copy.gameweekPoints}
+                  {view.scored_gameweek === null
+                    ? copy.gameweekPoints
+                    : copy.gameweekPointsFor(view.scored_gameweek)}
                 </th>
                 <th scope="col" className={styles.right}>
                   {copy.total}
@@ -124,6 +135,9 @@ export function LeagueMembersView({
             </tbody>
           </table>
         </div>
+        {view.scored_gameweek === null ? (
+          <p className={styles.notice}>{copy.noScoredWeek}</p>
+        ) : null}
       </Card>
     </div>
   );

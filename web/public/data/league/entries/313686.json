@@ -1,19 +1,20 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-08-26T08:49:12Z",
+  "generated_at_utc": "2026-08-26T12:21:53Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
     "season": "2026-27",
     "gameweek": 2,
+    "scored_gameweek": 1,
     "entry": {
       "member_kind": "human",
       "entry_id": 313686,
       "manager_name": "G\u00fcney Efe Tu\u011fluca",
       "team_name": "fasulyesineoynamam",
       "rank": 1,
-      "gameweek_points": null,
-      "total_points": null,
+      "gameweek_points": 73,
+      "total_points": 73,
       "movement": "unknown",
       "movement_places": null,
       "data_quality": "partial"
