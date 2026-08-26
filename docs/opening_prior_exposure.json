@@ -1,0 +1,157 @@
+{
+  "artifact_type": "opening_prior_exposure",
+  "coefficients": [
+    {
+      "coefficient": 0.3346331513588098,
+      "difference_from_frozen": 0.035227504999225834,
+      "fitted_on": [
+        "2020-21"
+      ],
+      "season": "2021-22"
+    },
+    {
+      "coefficient": 0.3272877946876376,
+      "difference_from_frozen": 0.027882148328053635,
+      "fitted_on": [
+        "2020-21",
+        "2021-22"
+      ],
+      "season": "2022-23"
+    },
+    {
+      "coefficient": 0.31591668205240103,
+      "difference_from_frozen": 0.01651103569281709,
+      "fitted_on": [
+        "2020-21",
+        "2021-22",
+        "2022-23"
+      ],
+      "season": "2023-24"
+    },
+    {
+      "coefficient": 0.30324540315768955,
+      "difference_from_frozen": 0.003839756798105609,
+      "fitted_on": [
+        "2020-21",
+        "2021-22",
+        "2022-23",
+        "2023-24"
+      ],
+      "season": "2024-25"
+    }
+  ],
+  "config": {
+    "control_form_window": 5,
+    "development_seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "min_prior_gameweeks_in_season": 1,
+    "prior_gameweek_equivalent": 6,
+    "prior_minute_equivalent": 270,
+    "probe_scale": 1e-06,
+    "verification_probe_scale": 0.0001
+  },
+  "configurations": [
+    {
+      "attributable_points": 976.960623926937,
+      "attributable_share": 0.007943991105531458,
+      "family": "archive_fed_control",
+      "finite_difference_disagreement": 1.9776478960342036e-10,
+      "folds": 147,
+      "label": "control-fw05",
+      "level_shift": 0.0007394316276712054,
+      "mean_projected_points_frozen": 1.2222299723809225,
+      "mean_projected_points_refit": 1.2229694040085937,
+      "projected_points": 122981.08229837674,
+      "row_share": 0.007146588859207271,
+      "rows": 101447,
+      "rows_touching_the_prior": 725,
+      "squad_shaped_attributable_points": 0.0,
+      "squad_shaped_attributable_share": 0.0,
+      "squad_shaped_projected_points": 15763.866666666663,
+      "squad_shaped_rows_touching_the_prior": 0
+    },
+    {
+      "attributable_points": 47570.73055783133,
+      "attributable_share": 0.2958338136785168,
+      "family": "in_season_blend",
+      "finite_difference_disagreement": 1.5397132042618971e-10,
+      "folds": 147,
+      "label": "blend-m270-g6-declared",
+      "level_shift": 0.03325787643576583,
+      "mean_projected_points_frozen": 1.5948225182082612,
+      "mean_projected_points_refit": 1.628080394644027,
+      "projected_points": 160802.20839638886,
+      "row_share": 0.4559425118534801,
+      "rows": 101447,
+      "rows_touching_the_prior": 46254,
+      "squad_shaped_attributable_points": 51.290622851141165,
+      "squad_shaped_attributable_share": 0.004588760922146355,
+      "squad_shaped_projected_points": 11177.445005600859,
+      "squad_shaped_rows_touching_the_prior": 113
+    },
+    {
+      "attributable_points": 62882.730750798175,
+      "attributable_share": 0.3526329001906557,
+      "family": "floor",
+      "finite_difference_disagreement": 1.51102513377269e-10,
+      "folds": 147,
+      "label": "carry-over-only",
+      "level_shift": 0.044667272365664035,
+      "mean_projected_points_frozen": 1.764456714807021,
+      "mean_projected_points_refit": 1.809123987172685,
+      "projected_points": 178323.4936864932,
+      "row_share": 0.4559425118534801,
+      "rows": 101447,
+      "rows_touching_the_prior": 46254,
+      "squad_shaped_attributable_points": 0.0,
+      "squad_shaped_attributable_share": 0.0,
+      "squad_shaped_projected_points": 11229.350969365389,
+      "squad_shaped_rows_touching_the_prior": 0
+    }
+  ],
+  "contract_version": "opening_prior_exposure_v1",
+  "created_utc": "2026-08-26T07:28:07+00:00",
+  "diagnostics": {
+    "decision_level_rescore": false,
+    "gate_evidence": false,
+    "locked_holdout_read": false,
+    "measurement_only": true,
+    "squad_shaped_population_is_a_proxy": true
+  },
+  "environment": {
+    "logical_cpu_count": 16,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
+    "python": "3.11.0"
+  },
+  "first_fold": "2021-22-gw02",
+  "folds": 147,
+  "frozen_coefficient": 0.29940564635958394,
+  "last_fold": "2024-25-gw38",
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 0,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "7cd2244d7c9d7e5ec7d97f05da4df3f29c8f1cf4",
+    "working_tree_dirty": true
+  }
+}
