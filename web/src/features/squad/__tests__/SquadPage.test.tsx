@@ -117,10 +117,10 @@ describe("SquadPage", () => {
   });
 
   it.each([
-    { language: "tr", deadlineUtc: "2099-08-21T17:30:00Z", label: "son tarihe" },
-    { language: "en", deadlineUtc: "2099-08-21T17:30:00Z", label: "deadline in" },
-    { language: "tr", deadlineUtc: "2000-08-21T17:30:00Z", label: "son tarih" },
-    { language: "en", deadlineUtc: "2000-08-21T17:30:00Z", label: "deadline" },
+    { language: "tr", deadlineUtc: "2099-08-21T17:30:00Z", label: "Son Tarihe" },
+    { language: "en", deadlineUtc: "2099-08-21T17:30:00Z", label: "Deadline In" },
+    { language: "tr", deadlineUtc: "2000-08-21T17:30:00Z", label: "Son Tarih" },
+    { language: "en", deadlineUtc: "2000-08-21T17:30:00Z", label: "Deadline" },
   ] as const)(
     "renders $label from countdown state in $language",
     async ({ deadlineUtc, label, language }) => {
