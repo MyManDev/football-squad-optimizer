@@ -52,20 +52,48 @@ async function mockModule() {
   return import("../../fixtures/league");
 }
 
-export async function loadLeagueMembers(): Promise<LeagueViewEnvelope<LeagueMembers>> {
-  if (import.meta.env.DEV || import.meta.env.MODE === "test") {
-    return (await mockModule()).mockLeagueMembersEnvelope;
+/**
+ * Read the published document; fall back to the example one only in development, and only
+ * when nothing is published.
+ *
+ * The gate used to be "development means examples", which was right while no league had
+ * ever been published and wrong the day one was: a developer looking at the site saw a
+ * league that does not exist, with players nobody owns, and had no way to reach the real
+ * one short of a production build. Every disagreement between the producer and this side
+ * — the file layout, the id space, our own missing row — survived because the surface a
+ * developer actually looks at was showing fiction.
+ *
+ * Tests keep the examples unconditionally: they assert against fixture contents, and a
+ * suite whose expectations depend on whether someone has run the producer locally is a
+ * suite that fails for reasons unrelated to the change under test.
+ */
+async function readOrExample<T>(
+  relative: string,
+  example: () => Promise<LeagueViewEnvelope<T>>,
+): Promise<LeagueViewEnvelope<T>> {
+  if (import.meta.env.MODE === "test") return example();
+  if (!import.meta.env.DEV) return read<T>(relative);
+  try {
+    return await read<T>(relative);
+  } catch (error) {
+    if (error instanceof LeagueDataMissing) return example();
+    throw error;
   }
-  return read<LeagueMembers>("members.json");
+}
+
+export async function loadLeagueMembers(): Promise<LeagueViewEnvelope<LeagueMembers>> {
+  return readOrExample<LeagueMembers>(
+    "members.json",
+    async () => (await mockModule()).mockLeagueMembersEnvelope,
+  );
 }
 
 export async function loadEntrySquad(entryId: number): Promise<LeagueViewEnvelope<EntrySquad>> {
-  if (import.meta.env.DEV || import.meta.env.MODE === "test") {
+  return readOrExample<EntrySquad>(`entries/${entryId}.json`, async () => {
     const fixture = (await mockModule()).mockEntrySquadEnvelopes[entryId];
     if (!fixture) throw new LeagueDataError(`No example entry ${entryId}.`);
     return fixture;
-  }
-  return read<EntrySquad>(`entries/${entryId}.json`);
+  });
 }
 
 export async function loadEntryAdvice(
@@ -73,8 +101,7 @@ export async function loadEntryAdvice(
   mode: PlayMode,
   window: WindowSize,
 ): Promise<LeagueViewEnvelope<EntryAdvice>> {
-  if (import.meta.env.DEV || import.meta.env.MODE === "test") {
-    return (await mockModule()).mockEntryAdviceEnvelope(entryId, mode, window);
-  }
-  return read<EntryAdvice>(`advice/${entryId}/${mode}/${window}.json`);
+  return readOrExample<EntryAdvice>(`advice/${entryId}/${mode}/${window}.json`, async () =>
+    (await mockModule()).mockEntryAdviceEnvelope(entryId, mode, window),
+  );
 }
