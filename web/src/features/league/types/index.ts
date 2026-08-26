@@ -42,6 +42,8 @@ export interface LeagueMembers {
   season: string;
   gameweek: number;
   public_after_deadline: boolean;
+  /** The gameweek the members' points were scored in; null while none is final. */
+  scored_gameweek: number | null;
   members: EntryView[];
 }
 
@@ -49,6 +51,7 @@ export interface EntrySquad {
   league_id: number;
   season: string;
   gameweek: number;
+  scored_gameweek: number | null;
   entry: HumanEntryView;
   starting_xi: PlayerView[];
   bench: PlayerView[];

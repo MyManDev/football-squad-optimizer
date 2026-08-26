@@ -22,6 +22,7 @@ is the public post-deadline picture the league's own standings page already show
 import argparse
 import json
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from squadopt.application.entries import EntryPicks, EntryRegistry
@@ -31,7 +32,13 @@ from squadopt.application.league_views import (
 )
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot
-from squadopt.data.sources.fpl_live import fpl_entry_picks, fpl_league_standings
+from squadopt.data.sources.fpl_live import (
+    EntryGameweekPoints,
+    fpl_entry_history_points,
+    fpl_entry_picks,
+    fpl_league_standings,
+    scored_gameweeks,
+)
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import project, read_inputs, read_projection_handoff, read_season_rules
 from squadopt.live.recommendation import infer_season
@@ -49,6 +56,40 @@ def _element_to_code(payloads: object) -> dict[int, int]:
         for element in elements
         if isinstance(element, dict) and "id" in element and "code" in element
     }
+
+
+def member_points(
+    payloads: Mapping[str, bytes], entry_ids: Sequence[int], *, gameweek: int
+) -> dict[int, EntryGameweekPoints]:
+    """Each member's score for one gameweek, from that member's own history.
+
+    A member whose history the capture does not hold, or who has no row for this week, is
+    **omitted** rather than recorded as zero: the caller publishes null for them, which
+    says the capture does not prove their score. Omission is the honest answer and a zero
+    would be a claim.
+    """
+
+    scores: dict[int, EntryGameweekPoints] = {}
+    for entry_id in entry_ids:
+        payload = payloads.get(f"entry-{entry_id}-history.json")
+        if payload is None:
+            continue
+        for week in fpl_entry_history_points(payload, entry_id=entry_id):
+            if week.gameweek == gameweek:
+                scores[entry_id] = week
+                break
+    return scores
+
+
+def last_scored_gameweek(bootstrap: bytes, *, before: int) -> int | None:
+    """The most recent week whose points are final, earlier than the week being built.
+
+    ``None`` while no week has been both finished and checked — before the opening
+    deadline, and during the hours after the last whistle when bonus has not landed.
+    """
+
+    scored = [week for week in scored_gameweeks(bootstrap) if week < before]
+    return max(scored) if scored else None
 
 
 SNAPSHOT_ROOT = Path("data/snapshots")
@@ -152,6 +193,11 @@ def main() -> int:
         payloads = getattr(snapshot, "payloads", {})
         standings: dict[int, MemberStanding] = {}
         league_name = f"League {arguments.league}"
+        registered = [int(entry.entry_id) for entry in registry.entries]
+        scored = last_scored_gameweek(
+            payloads["bootstrap-static.json"], before=int(inputs.deadline.gameweek)
+        )
+        scores = member_points(payloads, registered, gameweek=scored) if scored is not None else {}
         if standings_name in payloads:
             rows = fpl_league_standings(payloads[standings_name], league_id=arguments.league)
             standings = {
@@ -160,13 +206,24 @@ def main() -> int:
                     team_name=row.entry_name,
                     manager_name=row.player_name,
                     rank=row.rank,
+                    gameweek_points=(
+                        scores[row.entry_id].points if row.entry_id in scores else None
+                    ),
+                    total_points=(
+                        scores[row.entry_id].total_points if row.entry_id in scores else None
+                    ),
                 )
                 for row in rows
             }
+        scored_note = (
+            f"points for {len(scores)} of {len(registered)} from gameweek {scored}"
+            if scored is not None
+            else "no scored gameweek yet, so no points are published"
+        )
         print(
             f"capture {snapshot_id}: {len(registry.entries)} registered, "
             f"{len(standings)} in the standings, targeting {season} "
-            f"gameweek {inputs.deadline.gameweek}"
+            f"gameweek {inputs.deadline.gameweek}; {scored_note}"
         )
         if arguments.dry_run:
             print("Dry run: nothing written.")
@@ -193,6 +250,7 @@ def main() -> int:
             league_name=league_name,
             out_dir=out_dir,
             standings=standings,
+            scored_gameweek=scored,
         )
         print(f"Rendered {report.rendered_count} of {len(report.members)} members into {out_dir}")
         for member in report.members:

@@ -68,15 +68,21 @@ class MemberStanding:
 
     Declared here rather than imported from the data adapter so this module states what
     it needs rather than what one source happens to publish: a caller reading a different
-    standings source maps into this and nothing else changes. Points are absent on
-    purpose — the standings parser does not carry them today, and a zero would be a
-    fabricated number where the honest answer is "not published to this view yet".
+    standings source maps into this and nothing else changes.
+
+    Points are optional, and ``None`` is a claim rather than a placeholder: it says the
+    capture does not prove this member's score for the week being published — no history
+    row for it, or the week not yet final. A zero would say the member scored nothing,
+    which is a different and possibly untrue statement. Both must survive to the page, so
+    the renderer distinguishes them rather than collapsing both to falsy.
     """
 
     entry_id: int
     team_name: str
     manager_name: str
     rank: int
+    gameweek_points: int | None = None
+    total_points: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -139,6 +145,7 @@ def _entry_squad_payload(
     league_id: int,
     member_row: Mapping[str, object],
     missing: list[str],
+    scored_gameweek: int | None,
 ) -> dict[str, object]:
     """The member's own squad, as the site's entry page renders it."""
 
@@ -168,6 +175,7 @@ def _entry_squad_payload(
         "league_id": int(league_id),
         "season": picks.season,
         "gameweek": picks.gameweek + 1,
+        "scored_gameweek": scored_gameweek,
         "entry": dict(member_row),
         "starting_xi": starters,
         "bench": bench,
@@ -267,6 +275,7 @@ def build_league_views(
     league_name: str,
     out_dir: Path,
     standings: Mapping[int, MemberStanding] | None = None,
+    scored_gameweek: int | None = None,
     now: datetime | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
@@ -277,6 +286,17 @@ def build_league_views(
     """
 
     placings = dict(standings or {})
+    # A score and the week it belongs to are one fact. The members view is labelled with
+    # the *upcoming* gameweek, so points travelling without their own week would be read
+    # under the wrong heading — publish both or neither.
+    if scored_gameweek is None and any(
+        placing.gameweek_points is not None or placing.total_points is not None
+        for placing in placings.values()
+    ):
+        raise ValueError(
+            "Member points were supplied without the gameweek they were scored in. "
+            "The number and its week ship together or not at all."
+        )
 
     def _row(entry_id: int, label: str, quality: str) -> dict[str, object]:
         placing = placings.get(entry_id)
@@ -286,8 +306,8 @@ def build_league_views(
             "manager_name": placing.manager_name if placing else label,
             "team_name": placing.team_name if placing else None,
             "rank": placing.rank if placing else 0,
-            "gameweek_points": None,
-            "total_points": None,
+            "gameweek_points": placing.gameweek_points if placing else None,
+            "total_points": placing.total_points if placing else None,
             "movement": "unknown",
             "movement_places": None,
             "data_quality": quality,
@@ -326,6 +346,7 @@ def build_league_views(
             league_id=league_id,
             member_row=member_row,
             missing=missing,
+            scored_gameweek=scored_gameweek,
         )
         squad_path.write_text(
             json.dumps(_envelope(squad_payload, generated_at_utc=generated), indent=2),
@@ -354,6 +375,7 @@ def build_league_views(
         "season": season,
         "gameweek": gameweek,
         "public_after_deadline": True,
+        "scored_gameweek": scored_gameweek,
         "members": member_rows,
     }
     members_path = out / "members.json"

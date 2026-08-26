@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Any
 
+import pytest
 import tests.unit.test_live_transfers as world_module
 
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
@@ -283,3 +284,115 @@ def test_only_the_computed_mode_and_window_are_published(
         for path in (tmp_path / "league" / "advice").rglob("*.json")
     )
     assert published == ["advice/101/saf-puan/1.json"]
+
+
+def test_member_points_travel_with_the_week_they_were_scored_in(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """A score and its gameweek are one fact, because the view is labelled with another.
+
+    ``members.json`` carries the *upcoming* gameweek, so a score published without naming
+    its own week would be read under the wrong heading.
+    """
+
+    import json
+
+    from squadopt.application.league_views import MemberStanding
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    report = build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+        standings={
+            101: MemberStanding(
+                entry_id=101,
+                team_name="Ada FC",
+                manager_name="Ada A",
+                rank=1,
+                gameweek_points=73,
+                total_points=73,
+            )
+        },
+        scored_gameweek=1,
+    )
+    assert report.rendered_count == 1
+    members = json.loads((tmp_path / "league" / "members.json").read_text(encoding="utf-8"))
+    assert members["payload"]["scored_gameweek"] == 1
+    row = members["payload"]["members"][0]
+    assert row["gameweek_points"] == 73 and row["total_points"] == 73
+    entry = json.loads((tmp_path / "league" / "entries" / "101.json").read_text(encoding="utf-8"))
+    assert entry["payload"]["scored_gameweek"] == 1
+
+
+def test_points_without_their_gameweek_are_refused(world: dict[str, Any], tmp_path: Path) -> None:
+    from squadopt.application.league_views import MemberStanding
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    with pytest.raises(ValueError, match="ship together"):
+        build_league_views(
+            _Provider({101: _member_picks(world, 101, squad)}),
+            (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+            inputs,
+            projection,
+            rules,
+            league_id=352490,
+            league_name="Test League",
+            out_dir=tmp_path / "league",
+            standings={
+                101: MemberStanding(
+                    entry_id=101,
+                    team_name="Ada FC",
+                    manager_name="Ada A",
+                    rank=1,
+                    gameweek_points=73,
+                    total_points=73,
+                )
+            },
+        )
+
+
+def test_a_member_whose_picks_fail_still_carries_the_score_the_league_published(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Points come from the standings side, so an unreadable squad does not erase them."""
+
+    import json
+
+    from squadopt.application.league_views import MemberStanding
+
+    inputs, projection, rules = _world_context(world)
+    report = build_league_views(
+        _Provider({}),
+        (EntryRegistration(999, "member-missing", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+        standings={
+            999: MemberStanding(
+                entry_id=999,
+                team_name="Ghost FC",
+                manager_name="G Manager",
+                rank=9,
+                gameweek_points=41,
+                total_points=41,
+            )
+        },
+        scored_gameweek=1,
+    )
+    assert report.rendered_count == 0
+    row = json.loads((tmp_path / "league" / "members.json").read_text(encoding="utf-8"))["payload"][
+        "members"
+    ][0]
+    assert row["data_quality"] == "empty"
+    assert row["gameweek_points"] == 41, "a failed squad must not blank a published score"

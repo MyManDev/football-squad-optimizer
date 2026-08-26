@@ -319,6 +319,9 @@ const en = {
     member: "member",
     team: "team",
     gameweekPoints: "GW points",
+    gameweekPointsFor: (gameweek: number) => `GW${gameweek} points`,
+    noScoredWeek:
+      "No gameweek has been finalised yet, so no scores are published: points are only final once the platform has added bonus and checked the week.",
     total: "total",
     movement: "movement",
     unknown: "unknown",
@@ -792,6 +795,9 @@ const tr: MessageSchema<typeof en> = {
     member: "üye",
     team: "takım",
     gameweekPoints: "OH puanı",
+    gameweekPointsFor: (gameweek) => `OH${gameweek} puanı`,
+    noScoredWeek:
+      "Henüz kesinleşmiş oyun haftası yok, o yüzden puan yayınlanmıyor: puanlar ancak platform bonusu ekleyip haftayı kontrol edince kesinleşir.",
     total: "toplam",
     movement: "hareket",
     unknown: "bilinmiyor",
