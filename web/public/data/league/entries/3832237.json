@@ -1,0 +1,237 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-08-26T08:49:12Z",
+  "source_kind": "live",
+  "payload": {
+    "league_id": 352490,
+    "season": "2026-27",
+    "gameweek": 2,
+    "entry": {
+      "member_kind": "human",
+      "entry_id": 3832237,
+      "manager_name": "MEHMED SA\u0130D AY",
+      "team_name": "MEHMED SA\u0130D's Team",
+      "rank": 9,
+      "gameweek_points": null,
+      "total_points": null,
+      "movement": "unknown",
+      "movement_places": null,
+      "data_quality": "partial"
+    },
+    "starting_xi": [
+      {
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
+        "position": "GK",
+        "team": "Arsenal",
+        "price_tenths": 60,
+        "expected_points": 4.563362349394378,
+        "event_points": null,
+        "is_captain": true,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 226597,
+        "name": "Gabriel dos Santos Magalh\u00e3es",
+        "short_name": "Magalh\u00e3es",
+        "position": "DEF",
+        "team": "Arsenal",
+        "price_tenths": 80,
+        "expected_points": 4.626122793081376,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 472769,
+        "name": "Nico O'Reilly",
+        "short_name": "O'Reilly",
+        "position": "DEF",
+        "team": "Man City",
+        "price_tenths": 65,
+        "expected_points": 2.996918919851248,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 231416,
+        "name": "Ferdi Kad\u0131o\u011flu",
+        "short_name": "Kad\u0131o\u011flu",
+        "position": "DEF",
+        "team": "Brighton",
+        "price_tenths": 45,
+        "expected_points": 1.49025974025974,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 84450,
+        "name": "Granit Xhaka",
+        "short_name": "Xhaka",
+        "position": "MID",
+        "team": "Sunderland",
+        "price_tenths": 55,
+        "expected_points": 3.8360430464566093,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 437730,
+        "name": "Antoine Semenyo",
+        "short_name": "Semenyo",
+        "position": "MID",
+        "team": "Man City",
+        "price_tenths": 85,
+        "expected_points": 4.069319999341969,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "price_tenths": 80,
+        "expected_points": 3.856855150863978,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 430871,
+        "name": "Matheus Santos Carneiro da Cunha",
+        "short_name": "Cunha",
+        "position": "MID",
+        "team": "Man Utd",
+        "price_tenths": 80,
+        "expected_points": 3.5206195792943022,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "price_tenths": 70,
+        "expected_points": 4.779452838827839,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 169432,
+        "name": "Oli McBurnie",
+        "short_name": "McBurnie",
+        "position": "FWD",
+        "team": "Hull City",
+        "price_tenths": 55,
+        "expected_points": 2.1732936732070782,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 502500,
+        "name": "Igor Thiago Nascimento Rodrigues",
+        "short_name": "Rodrigues",
+        "position": "FWD",
+        "team": "Brentford",
+        "price_tenths": 80,
+        "expected_points": 2.6349108051086922,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 204936,
+        "name": "Gianluigi Donnarumma",
+        "short_name": "Donnarumma",
+        "position": "GK",
+        "team": "Man City",
+        "price_tenths": 55,
+        "expected_points": 3.8247708174178774,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": 1,
+        "role": "bench"
+      },
+      {
+        "player_id": 441164,
+        "name": "Pedro Porro Sauceda",
+        "short_name": "Sauceda",
+        "position": "DEF",
+        "team": "Spurs",
+        "price_tenths": 55,
+        "expected_points": 2.6091743119266058,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": 2,
+        "role": "bench"
+      },
+      {
+        "player_id": 106611,
+        "name": "Michael Keane",
+        "short_name": "Keane",
+        "position": "DEF",
+        "team": "Everton",
+        "price_tenths": 50,
+        "expected_points": 2.034940855323021,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": 3,
+        "role": "bench"
+      },
+      {
+        "player_id": 178301,
+        "name": "Ollie Watkins",
+        "short_name": "Watkins",
+        "position": "FWD",
+        "team": "Aston Villa",
+        "price_tenths": 80,
+        "expected_points": 4.11384783798577,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": 4,
+        "role": "bench"
+      }
+    ],
+    "bank_tenths": 5,
+    "free_transfers": 1,
+    "free_transfers_known": false,
+    "chips_used": {
+      "3xc": [
+        1
+      ]
+    },
+    "purchase_prices_known": false,
+    "source_snapshot_id": "fpl-live-20260826T083133Z-d45f1bea8b68",
+    "squadopt_comparison": null,
+    "data_quality": "partial",
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ]
+  }
+}

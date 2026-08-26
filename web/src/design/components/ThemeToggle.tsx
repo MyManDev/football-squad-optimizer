@@ -3,25 +3,32 @@ import { useEffect, useState } from "react";
 import { useLanguage } from "../../i18n/context";
 import styles from "./ThemeToggle.module.css";
 
-type Theme = "system" | "light" | "dark";
+type Theme = "light" | "dark";
 const KEY = "squadopt.theme";
 
+/**
+ * Two states, deliberately: light and dark. A viewer who has never chosen starts from
+ * their OS preference, read once — from then on the choice is explicit and stored, and
+ * the page never silently follows the OS again. (An earlier third "auto" state was
+ * removed: three-way cycling made the button's next stop unpredictable.)
+ */
 function readStored(): Theme {
   try {
     const value = window.localStorage.getItem(KEY);
-    return value === "light" || value === "dark" ? value : "system";
+    if (value === "light" || value === "dark") return value;
   } catch {
-    return "system";
+    /* storage may be unavailable; fall through to the OS preference */
+  }
+  try {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  } catch {
+    return "light";
   }
 }
 
 function apply(theme: Theme) {
-  const root = document.documentElement;
-  if (theme === "system") root.removeAttribute("data-theme");
-  else root.setAttribute("data-theme", theme);
+  document.documentElement.setAttribute("data-theme", theme);
 }
-
-const NEXT: Record<Theme, Theme> = { system: "dark", dark: "light", light: "system" };
 
 export function ThemeToggle() {
   const { messages } = useLanguage();
@@ -34,8 +41,8 @@ export function ThemeToggle() {
       /* storage may be unavailable; the choice still applies for this view */
     }
   }, [theme]);
+  const next: Theme = theme === "light" ? "dark" : "light";
   const labels: Record<Theme, string> = {
-    system: messages.theme.system,
     light: messages.theme.light,
     dark: messages.theme.dark,
   };
@@ -43,8 +50,8 @@ export function ThemeToggle() {
     <button
       type="button"
       className={styles.button}
-      onClick={() => setTheme(NEXT[theme])}
-      aria-label={messages.theme.switchTo(labels[theme], labels[NEXT[theme]])}
+      onClick={() => setTheme(next)}
+      aria-label={messages.theme.switchTo(labels[theme], labels[next])}
       title={`${messages.theme.label}: ${labels[theme]}`}
     >
       {labels[theme]}
