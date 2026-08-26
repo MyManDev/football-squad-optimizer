@@ -145,3 +145,79 @@ def test_a_members_advice_is_invariant_to_every_other_members_state(
     first = (tmp_path / "one" / "advice-101.json").read_bytes()
     second = (tmp_path / "two" / "advice-101.json").read_bytes()
     assert first == second
+
+
+def test_the_members_page_carries_the_league_standing_and_its_order(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Where a member sits comes from the standings, not from registry order.
+
+    Without it the page shipped rank 0 and a null team for everyone, which reads as a
+    league nobody has looked up rather than as one that has not started.
+    """
+
+    import json
+
+    from squadopt.application.league_views import MemberStanding
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    provider = _Provider(
+        {101: _member_picks(world, 101, squad), 202: _member_picks(world, 202, squad)}
+    )
+    registrations = (
+        EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),
+        EntryRegistration(202, "member-b", "2026-08-23T00:00:00Z"),
+    )
+    standings = {
+        202: MemberStanding(entry_id=202, team_name="Bea FC", manager_name="Bea B", rank=1),
+        101: MemberStanding(entry_id=101, team_name="Ada FC", manager_name="Ada A", rank=2),
+    }
+    report = build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+        standings=standings,
+    )
+    assert report.rendered_count == 2
+    rows = json.loads((tmp_path / "league" / "members.json").read_text(encoding="utf-8"))[
+        "payload"
+    ]["members"]
+    assert [row["entry_id"] for row in rows] == [202, 101], "standings order, not registry order"
+    assert [row["rank"] for row in rows] == [1, 2]
+    assert [row["team_name"] for row in rows] == ["Bea FC", "Ada FC"]
+    assert [row["manager_name"] for row in rows] == ["Bea B", "Ada A"]
+    # Points stay null: the standings parser does not carry them, and a zero would be a
+    # number nobody measured.
+    assert all(row["gameweek_points"] is None and row["total_points"] is None for row in rows)
+
+
+def test_without_standings_the_page_still_renders_from_the_registry(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The producer must not require a standings capture to publish anything."""
+
+    import json
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    report = build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+    )
+    assert report.rendered_count == 1
+    row = json.loads((tmp_path / "league" / "members.json").read_text(encoding="utf-8"))["payload"][
+        "members"
+    ][0]
+    assert row["manager_name"] == "member-a" and row["team_name"] is None and row["rank"] == 0

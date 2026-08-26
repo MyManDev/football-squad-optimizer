@@ -55,6 +55,23 @@ class MemberViewResult:
 
 
 @dataclass(frozen=True, slots=True)
+class MemberStanding:
+    """Where a member sits in the league, as the standings page reports it.
+
+    Declared here rather than imported from the data adapter so this module states what
+    it needs rather than what one source happens to publish: a caller reading a different
+    standings source maps into this and nothing else changes. Points are absent on
+    purpose — the standings parser does not carry them today, and a zero would be a
+    fabricated number where the honest answer is "not published to this view yet".
+    """
+
+    entry_id: int
+    team_name: str
+    manager_name: str
+    rank: int
+
+
+@dataclass(frozen=True, slots=True)
 class LeagueViewsReport:
     league_id: int
     season: str
@@ -165,6 +182,7 @@ def build_league_views(
     league_id: int,
     league_name: str,
     out_dir: Path,
+    standings: Mapping[int, MemberStanding] | None = None,
     now: datetime | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
@@ -173,6 +191,23 @@ def build_league_views(
     invariant to it (the test pins this bit-for-bit), and the system's row on the
     members page is rendered by the site from its own ledger views, not here.
     """
+
+    placings = dict(standings or {})
+
+    def _row(entry_id: int, label: str, quality: str) -> dict[str, object]:
+        placing = placings.get(entry_id)
+        return {
+            "member_kind": "human",
+            "entry_id": entry_id,
+            "manager_name": placing.manager_name if placing else label,
+            "team_name": placing.team_name if placing else None,
+            "rank": placing.rank if placing else 0,
+            "gameweek_points": None,
+            "total_points": None,
+            "movement": "unknown",
+            "movement_places": None,
+            "data_quality": quality,
+        }
 
     generated = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
     season = inputs.season
@@ -189,20 +224,7 @@ def build_league_views(
             advice = _member_advice(picks, inputs, projection, rules)
         except (EntryError, DataError) as error:
             results.append(MemberViewResult(entry_id, registration.label, False, reason=str(error)))
-            member_rows.append(
-                {
-                    "member_kind": "human",
-                    "entry_id": entry_id,
-                    "manager_name": registration.label,
-                    "team_name": None,
-                    "rank": 0,
-                    "gameweek_points": None,
-                    "total_points": None,
-                    "movement": "unknown",
-                    "movement_places": None,
-                    "data_quality": "empty",
-                }
-            )
+            member_rows.append(_row(entry_id, registration.label, "empty"))
             continue
         path = out / f"advice-{entry_id}.json"
         path.write_text(
@@ -211,19 +233,11 @@ def build_league_views(
         )
         written.append(path.name)
         results.append(MemberViewResult(entry_id, registration.label, True))
-        member_rows.append(
-            {
-                "member_kind": "human",
-                "entry_id": entry_id,
-                "manager_name": registration.label,
-                "team_name": None,
-                "rank": 0,
-                "gameweek_points": None,
-                "total_points": None,
-                "movement": "unknown",
-                "movement_places": None,
-                "data_quality": advice["data_quality"],
-            }
+        member_rows.append(_row(entry_id, registration.label, str(advice["data_quality"])))
+    # The standings order is the league's order; registry order is arbitrary.
+    if placings:
+        member_rows.sort(
+            key=lambda row: (int(str(row["rank"])) or 10**6, int(str(row["entry_id"])))
         )
     members_payload = {
         "league_id": int(league_id),
