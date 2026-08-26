@@ -19,6 +19,7 @@ from squadopt.application.mode_selection import (
     MODE_SLUGS,
     ModeAdvice,
     ModeSelectionError,
+    build_mode_paths,
     choose_rival,
     rival_squad_from_picks,
     select_member_modes,
@@ -213,6 +214,55 @@ def test_the_unmeasured_rival_edge_is_recorded_as_the_assumption_it_is() -> None
     result = select_member_modes(menu, paths, rival)  # type: ignore[arg-type]
     assert result.diagnostics["rival_edge_points_per_week"] == 0.0
     assert "unmeasured" in str(result.diagnostics["rival_edge_note"]).lower()
+
+
+def _identity(**overrides: str) -> SimpleNamespace:
+    values = {
+        "model_name": "m",
+        "model_version": "1",
+        "feature_contract_version": "f1",
+        "post_processing_contract_version": "p1",
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values, table=None, source_id="test")
+
+
+def test_mode_paths_refuse_a_residual_history_from_another_model() -> None:
+    projection = SimpleNamespace(
+        diagnostics={
+            "model_name": "m",
+            "model_version": "2",
+            "feature_contract_version": "f1",
+            "availability_contract_version": "p1",
+        },
+        table=None,
+    )
+    with pytest.raises(ModeSelectionError, match="different model contract"):
+        build_mode_paths(
+            projection,  # type: ignore[arg-type]
+            _identity(),  # type: ignore[arg-type]
+            season="2026-27",
+            gameweek=2,
+        )
+
+
+def test_mode_paths_refuse_a_projection_without_provenance() -> None:
+    projection = SimpleNamespace(
+        diagnostics={
+            "model_name": "m",
+            "model_version": "1",
+            "feature_contract_version": "f1",
+            "availability_contract_version": "p1",
+        },
+        table=None,
+    )
+    with pytest.raises(ModeSelectionError, match="training_cutoff"):
+        build_mode_paths(
+            projection,  # type: ignore[arg-type]
+            _identity(),  # type: ignore[arg-type]
+            season="2026-27",
+            gameweek=2,
+        )
 
 
 def test_an_empty_menu_is_refused() -> None:

@@ -31,10 +31,13 @@ from squadopt.experiments.plan_selection import (
     select_plan,
     selection_to_dict,
 )
+from squadopt.live.recommendation import Projection
+from squadopt.live.risk import LiveResidualHistory
 from squadopt.live.transfers import TransferDecision
 from squadopt.planning import TransferPlanResult
-from squadopt.scenarios import RivalSquad
-from squadopt.scenarios.paths import ScenarioPathSet
+from squadopt.prediction import PredictionError, PredictionProvenance, prepare_optimizer_projection
+from squadopt.scenarios import RivalSquad, ScenarioConfig, ScenarioError
+from squadopt.scenarios.paths import ScenarioPathSet, ScenarioPathTarget, generate_scenario_paths
 
 MEMBER_MODE_SELECTION_CONTRACT_VERSION: Final = "member_mode_selection_v1"
 
@@ -142,6 +145,72 @@ def choose_rival(
     above = [(rank, candidate_id) for rank, candidate_id in ranked if rank < own_rank]
     _, candidate_id = above[-1] if above else ranked[0]
     return candidates[candidate_id]
+
+
+def build_mode_paths(
+    projection: Projection,
+    residual_history: LiveResidualHistory,
+    *,
+    season: str,
+    gameweek: int,
+    config: ScenarioConfig | None = None,
+) -> ScenarioPathSet:
+    """One-week scenario paths for this deadline, from the decision's own projection.
+
+    The same honesty checks the live risk block applies, applied the same way: the
+    residual history must carry the identity of the model that produced the projection
+    (a mismatch is refused, not warned about), and the scenario generator's own history
+    requirements stand. The double-gameweek scale is left at the config's default; a
+    caller applying one must go through the live risk path, which owns the calendar.
+
+    At horizon one the paths are bit-for-bit `generate_scenarios`, so every recorded
+    single-week calibration statement applies to them unchanged.
+    """
+
+    expected_identity = (
+        str(projection.diagnostics.get("model_name", "")),
+        str(projection.diagnostics.get("model_version", "")),
+        str(projection.diagnostics.get("feature_contract_version", "")),
+        str(projection.diagnostics.get("availability_contract_version", "")),
+    )
+    observed_identity = (
+        residual_history.model_name,
+        residual_history.model_version,
+        residual_history.feature_contract_version,
+        residual_history.post_processing_contract_version,
+    )
+    if observed_identity != expected_identity:
+        raise ModeSelectionError(
+            "Residual history was produced by a different model contract than the "
+            f"projection: history {observed_identity!r} vs projection {expected_identity!r}."
+        )
+    training_cutoff = projection.diagnostics.get("training_cutoff")
+    training_fingerprint = projection.diagnostics.get("training_data_fingerprint")
+    if not isinstance(training_cutoff, str) or not training_cutoff:
+        raise ModeSelectionError("Projection diagnostics lack training_cutoff.")
+    if not isinstance(training_fingerprint, str):
+        raise ModeSelectionError("Projection diagnostics lack training_data_fingerprint.")
+    provenance = PredictionProvenance(
+        model_name=expected_identity[0],
+        model_version=expected_identity[1],
+        feature_contract_version=expected_identity[2],
+        training_cutoff=training_cutoff,
+        training_data_fingerprint=training_fingerprint,
+    )
+    try:
+        snapshot = prepare_optimizer_projection(
+            projection.table.loc[:, ["player_id", "name", "team_id", "position", "price_tenths"]],
+            projection.table.loc[:, ["player_id", "expected_points"]],
+            provenance,
+        )
+        return generate_scenario_paths(
+            {gameweek: snapshot},
+            residual_history.table,
+            ScenarioPathTarget(season=season, first_gameweek=gameweek, horizon=1),
+            config,
+        )
+    except (PredictionError, ScenarioError) as error:
+        raise ModeSelectionError(f"Mode paths could not be generated: {error}") from error
 
 
 def select_member_modes(
