@@ -108,7 +108,7 @@ describe("SquadPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(new RegExp(payload.snapshot_id))).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeInTheDocument();
-    expect(screen.getByText(/oyuna giriş sırasıyla/)).toBeInTheDocument();
+    expect(screen.getByText(/Oyuna Giriş Sırasıyla/)).toBeInTheDocument();
   });
 
   it("says plainly when a gameweek has no decision", async () => {
@@ -145,13 +145,13 @@ describe("SquadPage", () => {
     });
 
     expect(await screen.findByText("Projeksiyon ve Gerçekleşen")).toBeInTheDocument();
-    expect(screen.getByText("gerçekleşen")).toBeInTheDocument();
+    expect(screen.getByText("Gerçekleşen")).toBeInTheDocument();
     expect(
       screen.getAllByText(String(settledRecommendationFixture.outcome_realized_score)).length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText(/^xP /)).toHaveLength(11);
-    expect(screen.getAllByText(/^gerçekleşen /)).toHaveLength(11);
-    expect(screen.getAllByText(/^fark /)).toHaveLength(11);
+    expect(screen.getAllByText(/^Gerçekleşen /)).toHaveLength(11);
+    expect(screen.getAllByText(/^Fark /)).toHaveLength(11);
     expect(screen.getByText("×2 C")).toBeInTheDocument();
   });
 
@@ -196,8 +196,8 @@ describe("SquadPage season standing", () => {
     // With one settled week the season total and that week's points are the same number by
     // definition, so 61 legitimately appears twice — once per stat.
     expect(screen.getAllByText("61")).toHaveLength(2);
-    expect(screen.getByText("1 hafta · 0 ceza puanı")).toBeInTheDocument();
-    expect(screen.getByText(/^OH1 · tahmin 56,1$/)).toBeInTheDocument();
+    expect(screen.getByText("1 Hafta · 0 Ceza Puanı")).toBeInTheDocument();
+    expect(screen.getByText(/^OH1 · Tahmin 56,1$/)).toBeInTheDocument();
     expect(screen.getByText("+4,9")).toBeInTheDocument();
   });
 
@@ -208,7 +208,7 @@ describe("SquadPage season standing", () => {
     // 111 gross, 107 net after a four-point hit. FPL shows 107, so this card must too.
     expect(screen.getByText("107")).toBeInTheDocument();
     expect(screen.queryByText("111")).not.toBeInTheDocument();
-    expect(screen.getByText("2 hafta · 4 ceza puanı")).toBeInTheDocument();
+    expect(screen.getByText("2 Hafta · 4 Ceza Puanı")).toBeInTheDocument();
   });
 
   it("reports the latest week with an outcome, not the latest decided week", async () => {
@@ -216,7 +216,7 @@ describe("SquadPage season standing", () => {
 
     expect(await screen.findByText("Sezon Durumu")).toBeInTheDocument();
     // Gameweek three is decided but unsettled; its 46-point predecessor is the latest outcome.
-    expect(screen.getByText(/^OH2 · tahmin 54,0$/)).toBeInTheDocument();
+    expect(screen.getByText(/^OH2 · Tahmin 54,0$/)).toBeInTheDocument();
     expect(screen.getByText("46")).toBeInTheDocument();
   });
 
@@ -224,7 +224,7 @@ describe("SquadPage season standing", () => {
     renderAt("/", { language: "en", ledger: settledLedgerFixture });
 
     expect(await screen.findByText("Season Standing")).toBeInTheDocument();
-    expect(screen.getByText("1 settled · 0 hit points")).toBeInTheDocument();
-    expect(screen.getByText(/^GW1 · projected 56.1$/)).toBeInTheDocument();
+    expect(screen.getByText("1 Settled · 0 Hit Points")).toBeInTheDocument();
+    expect(screen.getByText(/^GW1 · Projected 56.1$/)).toBeInTheDocument();
   });
 });
