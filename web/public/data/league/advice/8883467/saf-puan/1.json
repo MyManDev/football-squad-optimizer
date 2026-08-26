@@ -1,0 +1,41 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-08-26T08:49:12Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 2,
+    "entry_id": 8883467,
+    "league_id": 352490,
+    "mode": "saf-puan",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20260826T083133Z-d45f1bea8b68",
+    "moves": [
+      {
+        "move_id": "gw02-1",
+        "player_out": {
+          "player_id": 166989,
+          "name": "Youri Tielemans",
+          "short_name": "Tielemans",
+          "position": "MID",
+          "team": "Man Utd"
+        },
+        "player_in": {
+          "player_id": 466525,
+          "name": "Anton Stach",
+          "short_name": "Stach",
+          "position": "MID",
+          "team": "Leeds"
+        },
+        "expected_points_delta": 3.1326314266268573,
+        "expected_points_cost": 0.0,
+        "reason_code": "window_value"
+      }
+    ],
+    "data_quality": "partial",
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ]
+  }
+}

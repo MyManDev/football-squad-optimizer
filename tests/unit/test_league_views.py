@@ -87,12 +87,14 @@ def test_the_builder_renders_members_and_advice_and_survives_one_failure(
     failed = [m for m in report.members if not m.rendered]
     assert len(failed) == 1 and failed[0].entry_id == 999
     assert (tmp_path / "league" / "members.json").is_file()
-    assert (tmp_path / "league" / "advice-101.json").is_file()
+    assert (tmp_path / "league" / "entries" / "101.json").is_file()
+    advice_path = tmp_path / "league" / "advice" / "101" / "saf-puan" / "1.json"
+    assert advice_path.is_file()
     import json
 
-    advice = json.loads((tmp_path / "league" / "advice-101.json").read_text(encoding="utf-8"))
+    advice = json.loads(advice_path.read_text(encoding="utf-8"))
     assert advice["contract_version"] == "provisional_league_ui_v1"
-    assert advice["payload"]["mode"] == "saf_puan"
+    assert advice["payload"]["mode"] == "saf-puan"
     # The unknown-flags travel: free transfers were not proven by the source.
     assert "free_transfers" in advice["payload"]["missing_fields"]
 
@@ -142,6 +144,142 @@ def test_a_members_advice_is_invariant_to_every_other_members_state(
         out_dir=tmp_path / "two",
         now=when,
     )
-    first = (tmp_path / "one" / "advice-101.json").read_bytes()
-    second = (tmp_path / "two" / "advice-101.json").read_bytes()
+    first = (tmp_path / "one" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
+    second = (tmp_path / "two" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
     assert first == second
+
+
+def test_the_members_page_carries_the_league_standing_and_its_order(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Where a member sits comes from the standings, not from registry order.
+
+    Without it the page shipped rank 0 and a null team for everyone, which reads as a
+    league nobody has looked up rather than as one that has not started.
+    """
+
+    import json
+
+    from squadopt.application.league_views import MemberStanding
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    provider = _Provider(
+        {101: _member_picks(world, 101, squad), 202: _member_picks(world, 202, squad)}
+    )
+    registrations = (
+        EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),
+        EntryRegistration(202, "member-b", "2026-08-23T00:00:00Z"),
+    )
+    standings = {
+        202: MemberStanding(entry_id=202, team_name="Bea FC", manager_name="Bea B", rank=1),
+        101: MemberStanding(entry_id=101, team_name="Ada FC", manager_name="Ada A", rank=2),
+    }
+    report = build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+        standings=standings,
+    )
+    assert report.rendered_count == 2
+    rows = json.loads((tmp_path / "league" / "members.json").read_text(encoding="utf-8"))[
+        "payload"
+    ]["members"]
+    assert [row["entry_id"] for row in rows] == [202, 101], "standings order, not registry order"
+    assert [row["rank"] for row in rows] == [1, 2]
+    assert [row["team_name"] for row in rows] == ["Bea FC", "Ada FC"]
+    assert [row["manager_name"] for row in rows] == ["Bea B", "Ada A"]
+    # Points stay null: the standings parser does not carry them, and a zero would be a
+    # number nobody measured.
+    assert all(row["gameweek_points"] is None and row["total_points"] is None for row in rows)
+
+
+def test_without_standings_the_page_still_renders_from_the_registry(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The producer must not require a standings capture to publish anything."""
+
+    import json
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    report = build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+    )
+    assert report.rendered_count == 1
+    row = json.loads((tmp_path / "league" / "members.json").read_text(encoding="utf-8"))["payload"][
+        "members"
+    ][0]
+    assert row["manager_name"] == "member-a" and row["team_name"] is None and row["rank"] == 0
+
+
+def test_the_entry_page_gets_the_members_own_squad_not_our_advice(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """entries/{id}.json describes what the member holds, before any suggestion."""
+
+    import json
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    picks = _member_picks(world, 101, squad)
+    build_league_views(
+        _Provider({101: picks}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+    )
+    payload = json.loads(
+        (tmp_path / "league" / "entries" / "101.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert payload["league_id"] == 352490
+    assert [p["player_id"] for p in payload["starting_xi"]] == list(picks.starting_xi)
+    assert len(payload["bench"]) == len(picks.squad) - len(picks.starting_xi)
+    assert [p["bench_order"] for p in payload["bench"]] == [1, 2, 3, 4]
+    assert sum(1 for p in payload["starting_xi"] if p["is_captain"]) == 1
+    assert payload["bank_tenths"] == picks.bank_tenths
+    # The unknown flags travel to the entry page too, not just to the advice.
+    assert payload["free_transfers_known"] is False
+    assert "free_transfers" in payload["missing_fields"]
+    # No score comparison is claimed while the standings view carries no points.
+    assert payload["squadopt_comparison"] is None
+
+
+def test_only_the_computed_mode_and_window_are_published(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """A file for an uncomputed mode would show an answer nobody measured."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+    )
+    published = sorted(
+        path.relative_to(tmp_path / "league").as_posix()
+        for path in (tmp_path / "league" / "advice").rglob("*.json")
+    )
+    assert published == ["advice/101/saf-puan/1.json"]

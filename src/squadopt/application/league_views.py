@@ -43,6 +43,14 @@ from squadopt.live import (
 
 LEAGUE_VIEW_CONTRACT_VERSION = "provisional_league_ui_v1"
 
+# The site addresses advice by mode and window. Only this pair is computed: the plan is a
+# one-week expected-points optimisation, and the competitive modes are priced on the
+# decision controls rather than solved here. Publishing a file for a combination nobody
+# computed would make the site show an answer where none was measured, so the other
+# combinations are simply absent and the page says so.
+COMPUTED_MODE = "saf-puan"
+COMPUTED_WINDOW = 1
+
 
 @dataclass(frozen=True, slots=True)
 class MemberViewResult:
@@ -52,6 +60,23 @@ class MemberViewResult:
     label: str
     rendered: bool
     reason: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class MemberStanding:
+    """Where a member sits in the league, as the standings page reports it.
+
+    Declared here rather than imported from the data adapter so this module states what
+    it needs rather than what one source happens to publish: a caller reading a different
+    standings source maps into this and nothing else changes. Points are absent on
+    purpose — the standings parser does not carry them today, and a zero would be a
+    fabricated number where the honest answer is "not published to this view yet".
+    """
+
+    entry_id: int
+    team_name: str
+    manager_name: str
+    rank: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,11 +112,86 @@ def _advice_player(row: "pd.Series[Any]") -> dict[str, object]:
     }
 
 
+def _entry_player(
+    row: "pd.Series[Any]", *, role: str, is_captain: bool, bench_order: int | None
+) -> dict[str, object]:
+    name = str(row["name"])
+    return {
+        "player_id": int(str(row["player_id"])),
+        "name": name,
+        "short_name": name.rsplit(" ", 1)[-1],
+        "position": str(row["position"]),
+        "team": str(row["team_id"]),
+        "price_tenths": int(str(row["price_tenths"])),
+        "expected_points": float(str(row["expected_points"])),
+        "event_points": None,
+        "is_captain": is_captain,
+        "bench_order": bench_order,
+        "role": role,
+    }
+
+
+def _entry_squad_payload(
+    picks: EntryPicks,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    *,
+    league_id: int,
+    member_row: Mapping[str, object],
+    missing: list[str],
+) -> dict[str, object]:
+    """The member's own squad, as the site's entry page renders it."""
+
+    pool = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
+    starters: list[dict[str, object]] = []
+    bench: list[dict[str, object]] = []
+    bench_index = 0
+    for player_id in picks.squad:
+        row = pool.get(int(player_id))
+        if row is None:
+            continue
+        if int(player_id) in set(picks.starting_xi):
+            starters.append(
+                _entry_player(
+                    row,
+                    role="starter",
+                    is_captain=int(player_id) == int(picks.captain),
+                    bench_order=None,
+                )
+            )
+        else:
+            bench_index += 1
+            bench.append(
+                _entry_player(row, role="bench", is_captain=False, bench_order=bench_index)
+            )
+    return {
+        "league_id": int(league_id),
+        "season": picks.season,
+        "gameweek": picks.gameweek + 1,
+        "entry": dict(member_row),
+        "starting_xi": starters,
+        "bench": bench,
+        "bank_tenths": int(picks.bank_tenths),
+        "free_transfers": int(picks.free_transfers),
+        "free_transfers_known": bool(picks.free_transfers_known),
+        "chips_used": {name: list(weeks) for name, weeks in picks.chips_used.items()},
+        "purchase_prices_known": bool(picks.purchase_prices_known),
+        "source_snapshot_id": picks.source_snapshot_id,
+        # Comparing a member's gameweek score with ours needs both scores; the standings
+        # view does not carry points yet, so this stays absent rather than guessed.
+        "squadopt_comparison": None,
+        "data_quality": "partial" if missing else "complete",
+        "missing_fields": list(missing),
+    }
+
+
 def _member_advice(
     picks: EntryPicks,
     inputs: RecommendationInputs,
     projection: Projection,
     rules: SeasonRules,
+    *,
+    league_id: int,
 ) -> dict[str, object]:
     """One member's advice payload — from their squad and the shared projection only."""
 
@@ -146,8 +246,9 @@ def _member_advice(
         "season": picks.season,
         "gameweek": picks.gameweek + 1,
         "entry_id": picks.entry_id,
-        "mode": "saf_puan",
-        "window": 1,
+        "league_id": league_id,
+        "mode": COMPUTED_MODE,
+        "window": COMPUTED_WINDOW,
         "source_snapshot_id": picks.source_snapshot_id,
         "moves": moves,
         "data_quality": "partial" if missing else "complete",
@@ -165,6 +266,7 @@ def build_league_views(
     league_id: int,
     league_name: str,
     out_dir: Path,
+    standings: Mapping[int, MemberStanding] | None = None,
     now: datetime | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
@@ -173,6 +275,23 @@ def build_league_views(
     invariant to it (the test pins this bit-for-bit), and the system's row on the
     members page is rendered by the site from its own ledger views, not here.
     """
+
+    placings = dict(standings or {})
+
+    def _row(entry_id: int, label: str, quality: str) -> dict[str, object]:
+        placing = placings.get(entry_id)
+        return {
+            "member_kind": "human",
+            "entry_id": entry_id,
+            "manager_name": placing.manager_name if placing else label,
+            "team_name": placing.team_name if placing else None,
+            "rank": placing.rank if placing else 0,
+            "gameweek_points": None,
+            "total_points": None,
+            "movement": "unknown",
+            "movement_places": None,
+            "data_quality": quality,
+        }
 
     generated = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
     season = inputs.season
@@ -186,44 +305,48 @@ def build_league_views(
         entry_id = int(registration.entry_id)
         try:
             picks = provider.picks(entry_id, season, gameweek - 1)
-            advice = _member_advice(picks, inputs, projection, rules)
+            advice = _member_advice(picks, inputs, projection, rules, league_id=league_id)
         except (EntryError, DataError) as error:
             results.append(MemberViewResult(entry_id, registration.label, False, reason=str(error)))
-            member_rows.append(
-                {
-                    "member_kind": "human",
-                    "entry_id": entry_id,
-                    "manager_name": registration.label,
-                    "team_name": None,
-                    "rank": 0,
-                    "gameweek_points": None,
-                    "total_points": None,
-                    "movement": "unknown",
-                    "movement_places": None,
-                    "data_quality": "empty",
-                }
-            )
+            member_rows.append(_row(entry_id, registration.label, "empty"))
             continue
-        path = out / f"advice-{entry_id}.json"
-        path.write_text(
+        quality = str(advice["data_quality"])
+        member_row = _row(entry_id, registration.label, quality)
+        raw_missing = advice.get("missing_fields")
+        missing = [str(field) for field in raw_missing] if isinstance(raw_missing, list) else []
+
+        # The site addresses these by path: entries/{id}.json for the squad, and
+        # advice/{id}/{mode}/{window}.json for a decision under one mode and horizon.
+        squad_path = out / "entries" / f"{entry_id}.json"
+        squad_path.parent.mkdir(parents=True, exist_ok=True)
+        squad_payload = _entry_squad_payload(
+            picks,
+            inputs,
+            projection,
+            league_id=league_id,
+            member_row=member_row,
+            missing=missing,
+        )
+        squad_path.write_text(
+            json.dumps(_envelope(squad_payload, generated_at_utc=generated), indent=2),
+            encoding="utf-8",
+        )
+        written.append(f"entries/{entry_id}.json")
+
+        advice_path = out / "advice" / str(entry_id) / COMPUTED_MODE / f"{COMPUTED_WINDOW}.json"
+        advice_path.parent.mkdir(parents=True, exist_ok=True)
+        advice_path.write_text(
             json.dumps(_envelope(advice, generated_at_utc=generated), indent=2),
             encoding="utf-8",
         )
-        written.append(path.name)
+        written.append(f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json")
+
         results.append(MemberViewResult(entry_id, registration.label, True))
-        member_rows.append(
-            {
-                "member_kind": "human",
-                "entry_id": entry_id,
-                "manager_name": registration.label,
-                "team_name": None,
-                "rank": 0,
-                "gameweek_points": None,
-                "total_points": None,
-                "movement": "unknown",
-                "movement_places": None,
-                "data_quality": advice["data_quality"],
-            }
+        member_rows.append(member_row)
+    # The standings order is the league's order; registry order is arbitrary.
+    if placings:
+        member_rows.sort(
+            key=lambda row: (int(str(row["rank"])) or 10**6, int(str(row["entry_id"])))
         )
     members_payload = {
         "league_id": int(league_id),

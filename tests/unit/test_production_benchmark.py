@@ -368,7 +368,7 @@ def test_declaration_and_benchmark_fingerprints_are_stable_and_sensitive() -> No
             changed_component="expected_points_rate",
             change_summary="Fit the scoring rate on the expanding training slice.",
             frozen_components=("minutes_stage", "cold_start_ladder", "availability_rule"),
-            source_reference="https://github.com/SquadOpt/football-squad-optimizer/issues/43",
+            source_reference="https://github.com/MyManDev/football-squad-optimizer/issues/43",
         )
     )
 
