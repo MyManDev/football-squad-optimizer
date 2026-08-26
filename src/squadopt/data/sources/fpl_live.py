@@ -857,10 +857,19 @@ class LiveEventPoints:
     - ``fixtures_finished`` against ``fixtures_total`` says how much of the gameweek is
       actually in the number, which is the difference between "your team scored 41" and
       "your team has scored 41 of what will be a larger figure".
+
+    ``minutes_by_player`` travels here rather than in an object of its own because the two
+    come out of one ``stats`` blob and because neither is sufficient alone: the platform's
+    own score replaces a starter who played no minutes with a bench player, so a caller
+    holding the points and not the minutes cannot say which eleven the points belong to.
+    Which is why the key sets must match exactly -- a player whose minutes were dropped
+    would read as "did not play", and the rule would field a substitute for a man who was
+    on the pitch. This object supplies that rule's inputs; it does not apply it.
     """
 
     gameweek: int
     points_by_player: Mapping[int, int]
+    minutes_by_player: Mapping[int, int]
     bonus_confirmed: bool
     fixtures_finished: int
     fixtures_total: int
@@ -870,6 +879,22 @@ class LiveEventPoints:
         if not self.points_by_player:
             raise InvalidValueError(
                 f"Live payload for gameweek {self.gameweek} carries no player points."
+            )
+        if set(self.minutes_by_player) != set(self.points_by_player):
+            scored = set(self.points_by_player) - set(self.minutes_by_player)
+            timed = set(self.minutes_by_player) - set(self.points_by_player)
+            raise InvalidValueError(
+                f"Gameweek {self.gameweek} reports points and minutes for different "
+                f"players: {len(scored)} with points and no minutes "
+                f"({format_examples(sorted(scored))}), {len(timed)} the other way "
+                f"({format_examples(sorted(timed))}). A missing minute count reads as "
+                "'did not play', which is how a substitution gets fabricated."
+            )
+        negative = sorted(player for player, played in self.minutes_by_player.items() if played < 0)
+        if negative:
+            raise InvalidValueError(
+                f"Gameweek {self.gameweek} reports negative minutes for "
+                f"{format_examples(negative)}."
             )
         if self.fixtures_total < 1:
             raise InvalidValueError(
@@ -897,7 +922,7 @@ def fpl_live_event_points(
     gameweek: int,
     source_snapshot_id: str | None = None,
 ) -> LiveEventPoints:
-    """Return one gameweek's running player points from its captured live document.
+    """Return one gameweek's running player points and minutes from its captured live document.
 
     Both documents are required, and the second one is the point. The live payload is a
     bare ``{"elements": [...]}`` with **no gameweek of its own** -- the platform identifies
@@ -906,9 +931,17 @@ def fpl_live_event_points(
     than saying it. What the fixtures payload does give is the gameweek's own progress,
     which is the caveat a reader of these points actually needs.
 
-    Auto-substitutions are deliberately not modelled here. This returns points per player;
-    which eleven those points are counted for is a decision the ledger owns, and it scores
-    the eleven that were named because that is what the projection was for.
+    Auto-substitutions are deliberately not modelled here, and the minutes do not change
+    that. This returns points *and* minutes per player, which is what a substitution rule
+    needs; which eleven those points are counted for stays a decision the ledger owns.
+    Supplying an input is not the same as applying a rule, and keeping the two apart is
+    what lets one caller score the named eleven and another the platform's, from one
+    reading of one payload.
+
+    ``minutes`` comes from the live document rather than from ``bootstrap-static`` because
+    the bootstrap's counter is season-cumulative. It equals the gameweek's minutes for
+    gameweek one and for no other, and a rule built on that coincidence would be silently
+    wrong from gameweek two onward.
     """
 
     week = _positive(gameweek, "gameweek")
@@ -916,24 +949,30 @@ def fpl_live_event_points(
     _require_fields(records, _LIVE_ELEMENT_FIELDS, "Live element")
 
     points: dict[int, int] = {}
+    minutes: dict[int, int] = {}
     for record in records:
         player = _integer(record, "id", "Live element")
         stats = record.get("stats")
         if not isinstance(stats, dict):
             raise DataSourceError(
                 f"Live element {player} carries a {type(stats).__name__} 'stats' section "
-                "rather than an object; the adapter reads its total_points."
+                "rather than an object; the adapter reads its total_points and minutes."
             )
         if player in points:
             raise DuplicateRecordsError(
                 f"Live payload for gameweek {week} declares player {player} more than once."
             )
         points[player] = _integer(stats, "total_points", f"Live element {player} stats")
+        # Read rather than defaulted when absent. A player silently given zero minutes
+        # reads as "did not play", and the substitution rule downstream would field a
+        # bench player for someone who was on the pitch -- a wrong eleven, not a gap.
+        minutes[player] = _integer(stats, "minutes", f"Live element {player} stats")
 
     finished, total = _gameweek_fixture_progress(fixtures, gameweek=week)
     return LiveEventPoints(
         gameweek=week,
         points_by_player=MappingProxyType(dict(sorted(points.items()))),
+        minutes_by_player=MappingProxyType(dict(sorted(minutes.items()))),
         bonus_confirmed=finished == total,
         fixtures_finished=finished,
         fixtures_total=total,

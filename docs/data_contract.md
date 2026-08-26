@@ -190,9 +190,23 @@ refuses a second write for a gameweek that already has one. Recording a pre-bonu
 through that path would therefore permanently prevent the real settle from ever being
 recorded. Live points may be *derived into a view*; they may not be written as an outcome.
 
-**Automatic substitutions are not applied here.** This payload yields points per player.
-Which eleven those points are counted for belongs to the ledger, which scores the eleven
-that were named because that is what the projection was for.
+**Automatic substitutions are not applied here — but their inputs are read.** This payload
+yields points *and minutes* per player. Which eleven those points are counted for belongs to
+the ledger, which scores the eleven that were **named** because that is what the projection
+was for; the platform's own score replaces a starter who played no minutes and is a second,
+equally real number (#262). Supplying an input is not applying a rule, and keeping the two
+apart is what lets one caller score the named eleven and another the platform's from one
+reading of one payload.
+
+**Minutes come from this document and not from `bootstrap-static`.** The bootstrap's
+`minutes` is season-cumulative: it equals the gameweek's for gameweek one and for no other,
+because that is the only gameweek with nothing behind it. Reading it as a per-gameweek figure
+would be right once and silently wrong from gameweek two onward. The two mappings must also
+cover exactly the same players, and the adapter refuses a payload where they do not — a
+player whose minutes went missing reads as *did not play*, which is how a substitution gets
+fabricated for someone who was on the pitch. For the same reason a `stats` object with no
+`minutes` key is refused rather than defaulted to zero, and no upper bound is imposed: a
+double gameweek legitimately reaches 180.
 
 ## 4. Guarantees
 

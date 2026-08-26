@@ -1043,6 +1043,7 @@ def test_points_are_read_per_player_with_the_gameweeks_progress_beside_them() ->
     )
 
     assert result.points_by_player == {1: 6, 2: 2}
+    assert result.minutes_by_player == {1: 90, 2: 90}
     assert (result.fixtures_finished, result.fixtures_total) == (6, 10)
     assert result.bonus_confirmed is False
     assert result.source_snapshot_id == "fpl-live-20260822T140000Z-abc"
@@ -1129,7 +1130,85 @@ def test_the_record_refuses_to_claim_confirmed_bonus_while_fixtures_are_unfinish
         LiveEventPoints(
             gameweek=1,
             points_by_player={1: 6},
+            minutes_by_player={1: 90},
             bonus_confirmed=True,
             fixtures_finished=9,
             fixtures_total=10,
+        )
+
+
+# --- minutes, because points alone cannot say which eleven they belong to ------------
+#
+# The platform's own score replaces a starter who played no minutes with a bench player
+# (#262). That rule lives in the ledger; what these tests pin is that its input arrives
+# intact, because every way of losing it produces a *wrong eleven* rather than a gap.
+
+
+def test_minutes_are_read_beside_the_points_and_sorted_with_them() -> None:
+    payload = _live_payload([_live_element(2, 2, minutes=45), _live_element(1, 6, minutes=90)])
+
+    result = fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+    assert result.minutes_by_player == {1: 90, 2: 45}
+    assert list(result.minutes_by_player) == sorted(result.minutes_by_player)
+    assert set(result.minutes_by_player) == set(result.points_by_player)
+
+
+def test_a_stats_object_without_minutes_is_refused_rather_than_defaulted_to_zero() -> None:
+    """Zero is the one value that must never be guessed: it means 'substitute him'."""
+
+    element = _live_element(1, 6)
+    del element["stats"]["minutes"]
+
+    # Absent and non-integer land on the same guard as `total_points` does, and the
+    # message names the field rather than the record, so the payload change is legible.
+    with pytest.raises(InvalidValueError, match="'minutes' must be an integer"):
+        fpl_live_event_points(_live_payload([element]), _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_non_integer_minutes_are_refused() -> None:
+    payload = _live_payload([_live_element(1, 6), _live_element(2, 2, minutes="90")])
+
+    with pytest.raises(InvalidValueError, match="minutes"):
+        fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_a_double_gameweek_player_may_exceed_ninety_minutes() -> None:
+    """No upper bound, deliberately: 180 is legal and a cap would encode a false rule."""
+
+    payload = _live_payload([_live_element(1, 12, minutes=180)])
+
+    result = fpl_live_event_points(payload, _gameweek_fixtures(2, 2), gameweek=1)
+
+    assert result.minutes_by_player == {1: 180}
+
+
+def test_negative_minutes_are_refused() -> None:
+    with pytest.raises(InvalidValueError, match="negative minutes"):
+        LiveEventPoints(
+            gameweek=1,
+            points_by_player={1: 6},
+            minutes_by_player={1: -1},
+            bonus_confirmed=False,
+            fixtures_finished=0,
+            fixtures_total=1,
+        )
+
+
+def test_points_and_minutes_must_describe_the_same_players() -> None:
+    """A player with points and no minutes reads as 'did not play' downstream.
+
+    That is not a missing value a caller can route around: the substitution rule would
+    field a bench player for someone who was on the pitch, and the resulting eleven looks
+    entirely plausible. So the record refuses to exist rather than let a caller assemble it.
+    """
+
+    with pytest.raises(InvalidValueError, match="different players"):
+        LiveEventPoints(
+            gameweek=1,
+            points_by_player={1: 6, 2: 2},
+            minutes_by_player={1: 90},
+            bonus_confirmed=False,
+            fixtures_finished=0,
+            fixtures_total=1,
         )
