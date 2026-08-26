@@ -134,11 +134,25 @@ So the day a probabilistic hand-off is proposed, it touches `REQUIRED_COLUMNS`
 anyway. That conversation is the right moment to decide where `uncertainty/` belongs, because
 by then it will be a decision about live code rather than about a roadmap.
 
+## `data/identity.py`, classified
+
+This page asked the data side whether the module is a public utility, a contract, or dead, on
+the premise that nothing inside `src/squadopt` imports it. That premise no longer holds, and
+the measurement is in the [system map](system_map.md) rather than repeated here: the module has
+an importer inside the package (`platform/fpl_capture.py`), none in `scripts/` at all, and the
+edge runs from the highest package layer to the lowest, so it is legal by construction.
+
+What that leaves for this page is the half a layering measurement cannot answer, because review
+authority is not a property of the import graph. **It is a public data-side utility with one
+in-package consumer, and it is not a `contracts/` candidate** — nothing imports it by
+construction, it is not a vocabulary two layers must agree on, and it is not re-exported from
+`squadopt.data`, so its one consumer reaches it by module path. The module stays in the data
+zone and the data side approves changes to it. Because the consumer is the platform's, a change
+to `reconcile_player_identity`'s signature or to what it refuses is a heads-up to the platform
+owner rather than a shared-boundary change; it is not one of the four surfaces above.
+
 ## Unresolved
 
-- **`data/identity.py`** sits in the data zone but has no importers inside `src/squadopt` —
-  only `scripts/` and `tests/`. Whether it is a public utility, a contract, or dead is the data
-  side's call to make and record.
 - **`recalibration/` and `preflight/`** are assigned to the optimization/evaluation side on the
   strength of who wrote them (2 commits each). If the data side ends up doing the recalibration
   work in practice, move it here rather than working around the table.
@@ -154,4 +168,6 @@ git log origin/develop --format='%an' -- src/squadopt/backtest | sort | uniq -c 
 Run it for any zone. If the table and the history disagree for a whole package, the table needs
 a deliberate decision rather than a quiet edit.
 
-Last reviewed against `b031ef1` (PR #110).
+Last reviewed against `b031ef1` (PR #110). The `data/identity.py` section above is newer
+and rests on the system map's measurement at `95a6f7e`; the rest of the page has not been
+re-checked since, and saying so is cheaper than implying it has.
