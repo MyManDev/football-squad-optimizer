@@ -11,6 +11,17 @@ export class LeagueDataError extends Error {
   }
 }
 
+/**
+ * Raised when the document exists nowhere: the site publishes only the mode and window it
+ * actually computed, so asking for another one is a normal outcome rather than a fault.
+ */
+export class LeagueDataMissing extends LeagueDataError {
+  constructor(relative: string) {
+    super(`No published league document at ${relative}.`);
+    this.name = "LeagueDataMissing";
+  }
+}
+
 function assertEnvelope<T>(value: LeagueViewEnvelope<T>): LeagueViewEnvelope<T> {
   if (value.contract_version !== CONTRACT_VERSION) {
     throw new LeagueDataError(
@@ -22,8 +33,19 @@ function assertEnvelope<T>(value: LeagueViewEnvelope<T>): LeagueViewEnvelope<T> 
 
 async function read<T>(relative: string): Promise<LeagueViewEnvelope<T>> {
   const response = await fetch(`${BASE}${relative}`, { cache: "no-cache" });
+  if (response.status === 404) throw new LeagueDataMissing(relative);
   if (!response.ok) throw new LeagueDataError(`League data is not available (${response.status}).`);
-  return assertEnvelope((await response.json()) as LeagueViewEnvelope<T>);
+  // A static host answers an unknown path with the app shell rather than a 404, so a
+  // missing document arrives as a 200 carrying HTML. Parsing that as JSON fails with a
+  // syntax error that says nothing; treating it as "not published" says what happened.
+  const body = await response.text();
+  let parsed: LeagueViewEnvelope<T>;
+  try {
+    parsed = JSON.parse(body) as LeagueViewEnvelope<T>;
+  } catch {
+    throw new LeagueDataMissing(relative);
+  }
+  return assertEnvelope(parsed);
 }
 
 async function mockModule() {

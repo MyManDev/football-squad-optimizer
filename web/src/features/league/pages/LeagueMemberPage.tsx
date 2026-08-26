@@ -11,7 +11,7 @@ import { useDecisionSelection } from "../../moves/decisionSelection";
 import { Pitch } from "../../squad/components/Pitch";
 import { SquadPage } from "../../squad/pages/SquadPage";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import { loadEntryAdvice, loadEntrySquad } from "../data";
+import { LeagueDataMissing, loadEntryAdvice, loadEntrySquad } from "../data";
 import type { AdviceMove, EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import styles from "./LeagueMemberPage.module.css";
 
@@ -38,8 +38,18 @@ export function LeagueMemberPage() {
   if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
   if (squad.isPending || advice.isPending) return <EmptyState title={copy.loadingEntry} />;
-  if (squad.isError || advice.isError) {
+  if (squad.isError) {
     return <EmptyState title={copy.entryNotAvailable}>{copy.entryNotAvailableBody}</EmptyState>;
+  }
+  if (advice.isError) {
+    // Only this pair is solved per member; asking for another is a normal outcome, and
+    // saying "not available" for it would read as a fault the reader should report.
+    const uncomputed = advice.error instanceof LeagueDataMissing;
+    return (
+      <EmptyState title={uncomputed ? copy.adviceNotComputed : copy.entryNotAvailable}>
+        {uncomputed ? copy.adviceNotComputedBody : copy.entryNotAvailableBody}
+      </EmptyState>
+    );
   }
   return <LeagueMemberView squad={squad.data} advice={advice.data} />;
 }

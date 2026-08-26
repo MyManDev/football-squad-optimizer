@@ -300,6 +300,9 @@ const en = {
     notAvailableBody:
       "The page is ready for the post-deadline public entry feed. No example records are shipped in the production build.",
     loadingEntry: "Loading this member's squad…",
+    adviceNotComputed: "This mode and horizon were not computed for this publish.",
+    adviceNotComputedBody:
+      "The site publishes the decision it actually solved. Pure points over one week is the computed pair; the competitive modes are priced on the controls above rather than solved for each member.",
     entryNotAvailable: "This member is not available yet.",
     entryNotAvailableBody:
       "The public post-deadline squad or its advice has not been published to this site build.",
@@ -770,6 +773,9 @@ const tr: MessageSchema<typeof en> = {
     notAvailableBody:
       "Sayfa son tarih sonrası public entry akışına hazırdır. Örnek kayıtlar production paketine dahil edilmez.",
     loadingEntry: "Üyenin kadrosu yükleniyor…",
+    adviceNotComputed: "Bu mod ve ufuk bu yayın için hesaplanmadı.",
+    adviceNotComputedBody:
+      "Site yalnızca gerçekten çözdüğü kararı yayınlar. Hesaplanan çift saf puan / 1 hafta; rekabetçi modlar her üye için çözülmek yerine yukarıdaki kontrollerde fiyatlanır.",
     entryNotAvailable: "Bu üye henüz kullanılamıyor.",
     entryNotAvailableBody:
       "Son tarih sonrası public kadro veya öneri bu site paketine henüz yayımlanmadı.",
