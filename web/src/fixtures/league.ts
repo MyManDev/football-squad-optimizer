@@ -383,6 +383,10 @@ export function mockEntryAdviceEnvelope(
     window,
     source_snapshot_id: "example-post-deadline-gw02",
     moves: quality === "complete" ? moveFor(mode, window) : [],
+    // The producer prices the whole plan against the pure-points pick, in expected
+    // points only; the example mirrors that shape so the page renders it in dev/test.
+    expected_points_cost: mode === "saf-puan" ? 0 : 0.8,
+    rival_label: mode === "saf-puan" ? null : "Harbor Rovers",
     data_quality: quality,
     missing_fields: quality === "complete" ? [] : (squad?.missing_fields ?? ["entry"]),
   });
