@@ -36,7 +36,6 @@ const en = {
   },
   theme: {
     label: "Theme",
-    system: "Auto",
     light: "Light",
     dark: "Dark",
     switchTo: (current: string, next: string) => `Theme: ${current}. Switch to ${next}.`,
@@ -152,8 +151,14 @@ const en = {
     week: (count: number) => `${count} week${count === 1 ? "" : "s"}`,
     mode: "Play Mode",
     leagueId: "League ID",
-    leaguePlaceholder: "Connects when the league starts",
-    leagueHelp: "The real league connection opens with the GW2 capture.",
+    leaguePlaceholder: "League number or FPL link",
+    leagueHelp: "Precomputed for the registered league; opens its members page.",
+    leagueConnect: "Connect",
+    leagueInvalid: "Enter a league number or an FPL league link.",
+    leagueUnavailable:
+      "League member data is not published yet; it arrives with the next decision publish.",
+    leagueMismatch: (leagueId: number) =>
+      `This site precomputes league ${leagueId} only; that is the league it can open.`,
     diagnostic: "diagnostic",
     diagnosticTitle: (weeks: number) =>
       `The league-relative ${weeks}-week result is not a probability.`,
@@ -506,7 +511,6 @@ const tr: MessageSchema<typeof en> = {
   language: { label: "Dil", tr: "Türkçe", en: "English" },
   theme: {
     label: "Tema",
-    system: "Otomatik",
     light: "Açık",
     dark: "Koyu",
     switchTo: (current, next) => `Tema: ${current}. ${next} temaya geç.`,
@@ -621,8 +625,13 @@ const tr: MessageSchema<typeof en> = {
     week: (count) => `${count} hafta`,
     mode: "Oyun Modu",
     leagueId: "Lig Numarası",
-    leaguePlaceholder: "Lig başlayınca bağlanır",
-    leagueHelp: "Gerçek lig bağlantısı GW2 capture'ıyla açılacak.",
+    leaguePlaceholder: "Lig numarası ya da FPL bağlantısı",
+    leagueHelp: "Kayıtlı lig için önceden hesaplanır; üyeler sayfasını açar.",
+    leagueConnect: "Bağlan",
+    leagueInvalid: "Bir lig numarası ya da FPL lig bağlantısı gir.",
+    leagueUnavailable: "Lig üyesi verisi henüz yayınlanmadı; bir sonraki karar yayınıyla gelir.",
+    leagueMismatch: (leagueId) =>
+      `Bu site yalnızca ${leagueId} numaralı ligi hesaplar; açabildiği lig o.`,
     diagnostic: "diagnostik",
     diagnosticTitle: (weeks) => `Lig-içi ${weeks} haftalık sonuç bir olasılık değildir.`,
     diagnosticBody:
