@@ -106,7 +106,7 @@ def test_an_identical_answer_from_a_retry_completes_quietly(tmp_path: Path) -> N
 
 
 def test_recover_walks_a_dead_workers_job_back_to_queued(tmp_path: Path) -> None:
-    """The disposable-worker rule, end to end: claim, die, recover, redo."""
+    """The disposable-worker rule, end to end: claim, die, lease expires, recover, redo."""
 
     queue = FileJobQueue(tmp_path / "jobs")
     cache = FileAdviceCache(tmp_path / "cache")
@@ -114,7 +114,7 @@ def test_recover_walks_a_dead_workers_job_back_to_queued(tmp_path: Path) -> None
     claimed = queue.claim(at_utc="2026-08-27T12:00:05Z")
     assert claimed is not None  # ... and the worker dies here, mid-compute
 
-    recovered = queue.recover(at_utc="2026-08-27T12:05:00Z")
+    recovered = queue.recover(at_utc="2026-08-27T12:05:00Z", lease_seconds=0.0)
 
     assert len(recovered) == 1
     assert recovered[0].status == "queued"
@@ -136,3 +136,73 @@ def test_submit_is_not_upsert_and_store_needs_an_existing_job(tmp_path: Path) ->
     with pytest.raises(AdviceQueueError, match="queued job"):
         running = _job("job-x").transition("running", at_utc="2026-08-27T12:00:05Z")
         queue.submit(running)
+
+
+def test_a_live_workers_claim_is_not_stolen_by_recovery(tmp_path: Path) -> None:
+    """The reviewed two-worker case: B recovers while A's lease is fresh — nothing
+    is requeued; A's heartbeat keeps the claim; after the lease lapses it is fair game."""
+
+    queue = FileJobQueue(tmp_path / "jobs")
+    queue.submit(_job())
+    claimed = queue.claim(at_utc="2026-08-27T12:00:05Z")
+    assert claimed is not None  # worker A, alive and computing
+
+    assert queue.recover(at_utc="2026-08-27T12:00:10Z") == ()  # worker B starts up
+    still = queue.load("job-0001")
+    assert still is not None and still.status == "running" and still.attempt == 1
+
+    queue.heartbeat("job-0001")  # A is still alive
+    assert queue.recover(at_utc="2026-08-27T12:00:20Z") == ()
+
+    stolen = queue.recover(at_utc="2026-08-27T12:10:00Z", lease_seconds=0.0)
+    assert len(stolen) == 1 and stolen[0].attempt == 2  # only a lapsed lease is abandoned
+
+
+def test_concurrent_submitters_cannot_both_create_one_id(tmp_path: Path) -> None:
+    import threading
+
+    queue = FileJobQueue(tmp_path / "jobs")
+    barrier = threading.Barrier(2)
+    outcomes: list[str] = []
+
+    def submit() -> None:
+        try:
+            barrier.wait(timeout=5)
+            queue.submit(_job())
+            outcomes.append("ok")
+        except AdviceQueueError:
+            outcomes.append("refused")
+
+    threads = [threading.Thread(target=submit) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+    assert sorted(outcomes) == ["ok", "refused"]  # at-most-one creation, atomically
+
+
+def test_job_ids_are_validated_before_any_path_is_composed(tmp_path: Path) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    for hostile in ("../escape", "a/b", "..", "x" * 200):
+        with pytest.raises(AdviceQueueError, match="invalid format"):
+            queue.load(hostile)
+
+
+def test_persisted_failure_reasons_carry_no_host_paths(tmp_path: Path) -> None:
+    from squadopt.platform.advice_queue import sanitize_error_message
+
+    queue = FileJobQueue(tmp_path / "jobs")
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit(_job())
+
+    def explode(job: AdviceJob) -> bytes:
+        raise RuntimeError(
+            r"handoff missing at C:\Users\ertug\data\handoffs\gw03.json and /var/lib/squadopt/cache"
+        )
+
+    failed = run_advice_worker_once(queue, cache, explode, at_utc="2026-08-27T12:00:30Z")
+    assert failed is not None and failed.error is not None
+    assert "ertug" not in failed.error.message
+    assert "/var/" not in failed.error.message
+    assert "<path>" in failed.error.message
+    assert sanitize_error_message("") == "unspecified failure"

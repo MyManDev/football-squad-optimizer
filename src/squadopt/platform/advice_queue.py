@@ -9,10 +9,12 @@ lock at the domain level.
 
 The file adapter keeps one JSON document per job and makes claiming atomic with an
 exclusive claim-marker file: two workers racing for one job cannot both win, because
-``O_EXCL`` creation succeeds once. A worker that dies mid-job leaves a ``running``
-record behind; ``recover`` walks those back to ``queued`` through the contract's own
-disposable-worker edge, attempt counted, and the retry is safe because cache writes
-are immutable-key.
+``O_EXCL`` creation succeeds once. The marker doubles as the claim's **heartbeat**:
+its mtime is refreshed by the owning worker, and ``recover`` walks a ``running``
+record back to ``queued`` only when that heartbeat is older than the lease — a live
+worker's job is live work, and a horizontal deployment must not let one replica's
+startup steal another replica's claim. The retry stays safe because cache writes are
+immutable-key.
 
 A compute answer that *differs* from what the cache already holds under the same key
 is not retried and not papered over: it is recorded as a failed job naming a
@@ -23,16 +25,42 @@ from __future__ import annotations
 
 import contextlib
 import os
+import re
+import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Protocol
+from typing import Final, Protocol
 
 from squadopt.platform.advice_cache import AdviceCacheError, AdviceCacheRepository
 from squadopt.platform.jobs_contract import (
+    _JOB_ID_PATTERN,
     AdviceJob,
     BackendJobsContractError,
     JobError,
 )
+
+#: How stale a claim's heartbeat must be before recovery may treat it as abandoned.
+DEFAULT_LEASE_SECONDS: Final = 300.0
+
+_SANITIZE_PATTERNS: Final = (
+    re.compile(r"[A-Za-z]:[\\/][^\s'\"]*"),  # windows paths
+    re.compile(r"/(?:home|tmp|var|usr|etc)/[^\s'\"]*"),  # unix paths
+)
+
+
+def sanitize_error_message(message: str, *, limit: int = 200) -> str:
+    """A failure reason fit for a public record: no host paths, one line, bounded.
+
+    The stored job record travels out through the jobs endpoint, so whatever a worker
+    exception carries — file locations, mount points, usernames inside paths — must
+    not be persisted verbatim.
+    """
+
+    first_line = message.splitlines()[0] if message.strip() else "unspecified failure"
+    for pattern in _SANITIZE_PATTERNS:
+        first_line = pattern.sub("<path>", first_line)
+    trimmed = first_line.strip()[:limit]
+    return trimmed or "unspecified failure"
 
 
 class AdviceQueueError(ValueError):
@@ -50,7 +78,9 @@ class JobQueue(Protocol):
 
     def load(self, job_id: str) -> AdviceJob | None: ...
 
-    def recover(self, *, at_utc: str) -> tuple[AdviceJob, ...]: ...
+    def recover(
+        self, *, at_utc: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
+    ) -> tuple[AdviceJob, ...]: ...
 
 
 def _serialize(job: AdviceJob) -> bytes:
@@ -66,18 +96,45 @@ class FileJobQueue:
         self._root = Path(root)
 
     def _path(self, job_id: str) -> Path:
-        return self._root / f"{job_id}.json"
+        return self._root / f"{self._valid_id(job_id)}.json"
 
     def _claim_marker(self, job_id: str) -> Path:
-        return self._root / f"{job_id}.claim"
+        return self._root / f"{self._valid_id(job_id)}.claim"
+
+    @staticmethod
+    def _valid_id(job_id: str) -> str:
+        # The GET route hands this store untrusted ids; the jobs contract's own
+        # grammar is the gate, so a traversal cannot even compose a path.
+        if not isinstance(job_id, str) or not _JOB_ID_PATTERN.fullmatch(job_id):
+            raise AdviceQueueError(f"job_id has an invalid format: {job_id!r}.")
+        return job_id
 
     def submit(self, job: AdviceJob) -> None:
+        """Create the record atomically: at most one submission ever wins an id.
+
+        An existence check followed by a write lets two submitters interleave past
+        each other; creation therefore goes through a finished temporary file linked
+        onto the final name, which succeeds exactly once."""
+
         if job.status != "queued":
             raise AdviceQueueError("Only a queued job can be submitted.")
         path = self._path(job.job_id)
-        if path.exists():
-            raise AdviceQueueError(f"Job {job.job_id!r} already exists; submit is not upsert.")
-        self._write(path, job)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        import tempfile
+
+        descriptor, temporary = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(_serialize(job))
+            try:
+                os.link(temporary, path)
+            except FileExistsError:
+                raise AdviceQueueError(
+                    f"Job {job.job_id!r} already exists; submit is not upsert."
+                ) from None
+        finally:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(temporary)
 
     def store(self, job: AdviceJob) -> None:
         path = self._path(job.job_id)
@@ -117,30 +174,48 @@ class FileJobQueue:
             except FileExistsError:
                 continue
             os.close(descriptor)
+            os.utime(marker)  # the heartbeat starts now
             running = job.transition("running", at_utc=at_utc)
             self._write(self._path(job.job_id), running)
             return running
         return None
 
-    def recover(self, *, at_utc: str) -> tuple[AdviceJob, ...]:
+    def heartbeat(self, job_id: str) -> None:
+        """Refresh the claim's lease; the owning worker calls this while computing."""
+
+        with contextlib.suppress(FileNotFoundError):
+            os.utime(self._claim_marker(job_id))
+
+    def recover(
+        self, *, at_utc: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
+    ) -> tuple[AdviceJob, ...]:
         """Walk abandoned running jobs back to queued through the contract's own edge.
 
-        Called at worker start, before claiming: a record still ``running`` with no
-        living worker is a crash's leavings. The claim markers are released so the
-        requeued jobs are claimable again, and the attempt counter does the crash-loop
-        bookkeeping.
+        Abandoned means the claim's heartbeat is stale: the marker's mtime is older
+        than the lease, or the marker is gone entirely. A live worker within its
+        lease keeps its job — one replica's startup must not steal another replica's
+        claim (the reviewed two-worker case, pinned in tests). The attempt counter
+        does the crash-loop bookkeeping.
         """
 
         recovered: list[AdviceJob] = []
         if not self._root.exists():
             return ()
+        now = time.time()
         for path in sorted(self._root.glob("*.json")):
             job = self.load(path.stem)
             if job is None or job.status != "running":
                 continue
+            marker = self._claim_marker(job.job_id)
+            try:
+                age = now - marker.stat().st_mtime
+            except FileNotFoundError:
+                age = float("inf")
+            if age < lease_seconds:
+                continue  # live work stays claimed
             requeued = job.transition("queued", at_utc=at_utc)
             self._write(path, requeued)
-            self._claim_marker(job.job_id).unlink(missing_ok=True)
+            marker.unlink(missing_ok=True)
             recovered.append(requeued)
         return tuple(recovered)
 
@@ -189,7 +264,7 @@ def run_advice_worker_once(
         failed = job.transition(
             "failed",
             at_utc=at_utc,
-            error=JobError(code="DETERMINISM_DEFECT", message=str(error)),
+            error=JobError(code="DETERMINISM_DEFECT", message=sanitize_error_message(str(error))),
         )
         queue.store(failed)
         return failed
@@ -199,7 +274,10 @@ def run_advice_worker_once(
         failed = job.transition(
             "failed",
             at_utc=at_utc,
-            error=JobError(code="ADVICE_FAILED", message=str(error) or type(error).__name__),
+            error=JobError(
+                code="ADVICE_FAILED",
+                message=sanitize_error_message(str(error) or type(error).__name__),
+            ),
         )
         queue.store(failed)
         return failed
