@@ -1,6 +1,6 @@
 # ADR 0006 — Host the advice backend beside Pages, not inside it
 
-- **Status:** proposed (open to the platform owner's approval)
+- **Status:** accepted (amended per the platform owner's review, 2026-08-27)
 - **Date:** 2026-08-27
 - **Decider:** Ertuğrul, with the platform owner reviewing
 - **Related:** [ADR 0004](0004-cloudflare-pages-deployment.md),
@@ -31,20 +31,55 @@ imports no solver), `squadopt-worker` (CPU-bound, the only thing that scales),
   absent — `VITE_ADVICE_API_ORIGIN` defaults to empty, and empty means today's static
   site, byte for byte.
 - **The API and the worker are one container image, two processes, on a separate
-  origin** — a Linux x86-64 host, because `ortools` wheels are x86-64 Linux and the
-  solver's determinism was measured there. A single vCPU per worker replica is
-  sufficient: the solve is single-threaded and the budget deterministic.
-- **The backend host must provide a persistent disk.** The first adapters are
-  file-backed by design (advice cache, job queue — ADR 0005's "start with files"
-  posture). An ephemeral disk would silently fire ADR 0005's PostgreSQL trigger — jobs
-  and cache lost on every restart is "atomic lifecycle transitions from more than one
-  process" territory — and a trigger fired by accident is the worst way to adopt a
-  database. If a chosen host cannot offer persistent disk, that is the trigger firing
-  **knowingly**: record it as fired, adopt the Postgres/Redis adapters deliberately,
-  and say so in this file's status history rather than working around it.
+  origin** — a Linux x86-64 host. Not for wheel availability: the pinned
+  `ortools>=9.15.6755` publishes Linux aarch64 wheels too, so either architecture
+  would install. x86-64 is required because the solver's determinism and its time
+  budget were **measured** on x86-64, and a deployment on an unmeasured architecture
+  would be claiming numbers nobody has; aarch64 becomes eligible the day its parity
+  is measured, not before. A single vCPU per worker replica is sufficient: the solve
+  is single-threaded and the budget deterministic.
+- **The backend host must provide one shared ReadWrite filesystem, mounted by every
+  process that touches the store.** "Persistent disk" understates the requirement:
+  the API writes the job queue that the worker reads, and every replica must observe
+  the same immutable cache — a volume that is persistent but private to one service
+  (Render and Railway service volumes, for example) cannot serve the stated split.
+  The mount must carry the primitives the adapters were built and reviewed on:
+  `O_EXCL` exclusive create (claim markers), hard-link create-once (`os.link` from a
+  finished temporary file — cache entries, job submission, the open-job index), and
+  mtime as a heartbeat. Any shared filesystem is **verified against these primitives
+  before it carries traffic**, not assumed (SMB mounts, notably, do not carry hard
+  links; NFS mounts generally do). Until such a mount exists, the file-backed phase
+  is explicitly constrained to **one deployment unit** — api and worker processes in
+  the same container sharing a local volume — where the primitives are ordinary
+  local-filesystem behavior.
+- **Losing the store's durability or its semantics fires ADR 0005's trigger
+  knowingly, never silently.** An ephemeral disk, or a shared mount that fails the
+  primitive checks, is "atomic lifecycle transitions from more than one process"
+  territory: record the trigger as fired, adopt the Postgres/Redis adapters
+  deliberately, and say so in this file's status history rather than working around
+  it.
 - **CORS is an allowlist, never a wildcard**; the allowed origins are the Pages
   domains, read from configuration, not code. Secrets live in the host's environment;
   nothing secret reaches the browser.
+
+## Initial topology, and what promotes it
+
+- **Start as one deployment unit**: a single container app running both processes
+  (uvicorn serving `squadopt-api`, one worker loop) over one ReadWrite volume. One
+  worker replica — the plan's scaling order starts at standings validation and the
+  cache, not at replicas — so the shared-filesystem question does not even arise on
+  day one.
+- **Provider**: Azure Container Apps, per the platform owner's provider review — it
+  requires `linux/amd64` (matching the measured architecture), keeps secrets in
+  environment configuration, and its Azure Files mounts can be attached ReadWrite
+  across replicas, revisions, and apps when the split comes. AWS ECS/Fargate + EFS
+  fits the same shape with more operational surface, and stays the recorded
+  alternative.
+- **Promotion trigger**: the same measurement "When to revisit" names — queue depth
+  or job wait at the deadline peak exceeding what one worker serves. Promotion means
+  splitting the worker into its own app and moving the store onto a shared ReadWrite
+  mount (Azure Files), **after** the primitive verification above passes on that
+  mount; if it does not pass, that is the ADR 0005 trigger, handled there.
 
 ## Consequences
 
@@ -69,6 +104,7 @@ requests by construction.
 ## When to revisit
 
 If measured queue depth or job wait says one host cannot serve the league's deadline
-peak; if the persistent-disk requirement fails on the chosen host (see above — that is
-ADR 0005's trigger, handled there); or if a second league multiplies entry counts past
-what an operator-seeded registry sensibly carries.
+peak; if the shared-filesystem requirement fails on the chosen host — no mount, or a
+mount that fails the primitive checks (see above — that is ADR 0005's trigger, handled
+there); or if a second league multiplies entry counts past what an operator-seeded
+registry sensibly carries.
