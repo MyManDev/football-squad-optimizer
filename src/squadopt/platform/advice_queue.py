@@ -78,6 +78,8 @@ class JobQueue(Protocol):
 
     def load(self, job_id: str) -> AdviceJob | None: ...
 
+    def jobs(self) -> tuple[AdviceJob, ...]: ...
+
     def recover(
         self, *, at_utc: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
     ) -> tuple[AdviceJob, ...]: ...
@@ -152,6 +154,19 @@ class FileJobQueue:
         import json
 
         return AdviceJob.from_payload(json.loads(raw))
+
+    def jobs(self) -> tuple[AdviceJob, ...]:
+        """Every record in the store, oldest first; league-scale, so a scan is fine."""
+
+        if not self._root.exists():
+            return ()
+        found = [self.load(path.stem) for path in sorted(self._root.glob("*.json"))]
+        return tuple(
+            sorted(
+                (job for job in found if job is not None),
+                key=lambda item: (item.created_at_utc, item.job_id),
+            )
+        )
 
     def claim(self, *, at_utc: str) -> AdviceJob | None:
         """Move the oldest queued job to running, or return None.
