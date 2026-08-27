@@ -7,13 +7,14 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { DecisionControls } from "../../moves/components/DecisionControls";
+import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { useDecisionSelection } from "../../moves/decisionSelection";
 import { Pitch } from "../../squad/components/Pitch";
 import { SquadPage } from "../../squad/pages/SquadPage";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import { LeagueDataMissing, loadEntryAdvice, loadEntrySquad } from "../data";
-import type { AdviceMove, EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
+import { LeagueDataMissing, loadEntryAdvice, loadEntrySquad, loadLeagueMembers } from "../data";
+import type { AdviceMove, EntryAdvice, EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberPage() {
@@ -35,6 +36,11 @@ export function LeagueMemberPage() {
     enabled: validEntryId,
     staleTime: 60_000,
   });
+  const membersQuery = useQuery({
+    queryKey: ["provisional-league-members"],
+    queryFn: loadLeagueMembers,
+    staleTime: 60_000,
+  });
 
   if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
@@ -52,7 +58,13 @@ export function LeagueMemberPage() {
       </EmptyState>
     );
   }
-  return <LeagueMemberView squad={squad.data} advice={advice.data} />;
+  return (
+    <LeagueMemberView
+      squad={squad.data}
+      advice={advice.data}
+      members={membersQuery.data?.payload.members ?? []}
+    />
+  );
 }
 
 function SystemLeagueMemberPage() {
@@ -81,9 +93,11 @@ function SystemLeagueMemberPage() {
 export function LeagueMemberView({
   squad,
   advice,
+  members = [],
 }: {
   squad: LeagueViewEnvelope<EntrySquad>;
   advice: LeagueViewEnvelope<EntryAdvice>;
+  members?: EntryView[];
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -173,6 +187,11 @@ export function LeagueMemberView({
         </h2>
         <TemplatePicker />
         <DecisionControls variant="entry" />
+        <AdviceRequestPanel
+          leagueId={advice.payload.league_id}
+          entryId={view.entry.entry_id ?? 0}
+          members={members}
+        />
         <AdviceCard envelope={advice} />
       </section>
     </div>
