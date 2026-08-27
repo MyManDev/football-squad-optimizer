@@ -296,6 +296,13 @@ const en = {
   },
   leagueMembers: {
     loading: "Loading league members…",
+    templatesTitle: "Game templates",
+    templatesBody:
+      "A template is a named strategy-and-window pair. Applying one sets the same shareable selection the controls read; your own templates live in this browser.",
+    templateMeta: (strategy: string, window: number) => `${strategy} · ${window}w`,
+    templateNamePlaceholder: "Name this combination",
+    templateSave: "Save current",
+    templateRemove: (name: string) => `Remove template ${name}`,
     viewerTitle: "Which one is you?",
     viewerBody:
       "Pick your own row to get advice from your squad. This is a claim, not a login: anyone can pick anyone, and that is fine because everything shown here is already public after the deadline.",
@@ -786,6 +793,13 @@ const tr: MessageSchema<typeof en> = {
     lastWeek: (pointsValue) => `son puanlanan hafta: ortalamaya karşı ${pointsValue}`,
   },
   leagueMembers: {
+    templatesTitle: "Oyun şablonları",
+    templatesBody:
+      "Şablon, adlandırılmış bir strateji-pencere çiftidir. Uygulamak, kontrollerin okuduğu paylaşılabilir seçimi kurar; kendi şablonların bu tarayıcıda durur.",
+    templateMeta: (strategy: string, window: number) => `${strategy} · ${window}h`,
+    templateNamePlaceholder: "Bu kombinasyonu adlandır",
+    templateSave: "Seçimi kaydet",
+    templateRemove: (name: string) => `${name} şablonunu kaldır`,
     viewerTitle: "Hangisi sensin?",
     viewerBody:
       "Kendi satırını seç ki tavsiye kendi kadrondan hesaplansın. Bu bir beyandır, giriş değil: herkes herkesi seçebilir ve bu sorun değil, çünkü burada gösterilen her şey son tarihten sonra zaten herkese açık.",
