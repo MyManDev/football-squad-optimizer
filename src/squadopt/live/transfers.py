@@ -475,10 +475,12 @@ def plan_transfers_with_overlap(
     than a parameter on ``plan_transfers`` so the baseline call sites cannot change
     behavior by accident: the saf-puan path stays byte-identical by construction.
 
-    Unlike ``plan_transfers``, an unproven plan is returned rather than raised on:
-    a banded plan the solver found but could not prove is publishable **with its
-    status** (the member-solver-status rule), and the caller decides. Only a plan
-    with no weeks at all is an error.
+    As in ``plan_transfers``, an unproven plan is returned rather than raised on: a
+    banded plan the solver found but could not prove is publishable **with its status**
+    (the member-solver-status rule), and the caller decides. Only no solution at all,
+    or a solution with no weeks, is an error. The contrast is with ``plan_menu``, which
+    stops at the first non-OPTIMAL plan because a menu entry has to be proven before it
+    can be offered.
     """
 
     prepared = _prepare_planning(

@@ -201,13 +201,15 @@ def advise_entry(
     projection: Projection,
     rules: SeasonRules,
 ) -> dict[str, object]:
-    """Compute one member's baseline advice for a validated request.
+    """Compute one member's advice for a validated request.
 
     The request is checked against the capture it will be answered from: the season and
-    gameweek must be the capture's own, the strategy and window must be a combination
-    that is actually computed, and a rival parameter is refused until the rival request
-    lands — an advice file for a combination nobody computed would make the site show
-    an answer where none was measured.
+    gameweek must be the capture's own, and the strategy and window must be a
+    combination that is actually computed — an advice file for a combination nobody
+    computed would make the site show an answer where none was measured. The rival
+    parameter is validated against the strategy that asks for it: ``saf-puan`` is
+    rival-free and refuses one, a catalogue strategy whose overlap band reaches the
+    solver requires one, and nobody may name themselves.
     """
 
     if request.season != str(inputs.season):
