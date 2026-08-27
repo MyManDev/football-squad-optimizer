@@ -339,6 +339,65 @@ def test_result_is_deterministic_and_inputs_are_not_mutated(
     assert first.objective_value == second.objective_value
 
 
+def test_wall_clock_limits_do_not_choose_the_plan(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """Two calls that differ only in their wall clock agree squad for squad.
+
+    A wall-clock limit only decides anything when it is what stops the search -- and then
+    the answer is a function of the CPU share the process happened to receive (#247).
+    When the caller brings no deterministic budget the planner supplies one and raises
+    the wall to a ceiling that does not bind, so the caller's wall figure stops deciding
+    which members prove their plan optimal.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    tight = replace(small_config, solver_time_limit_seconds=0.05)
+    loose = replace(small_config, solver_time_limit_seconds=60.0)
+
+    first = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, tight)
+    second = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, loose)
+
+    assert [week.selected_squad["player_id"].tolist() for week in first.weeks] == [
+        week.selected_squad["player_id"].tolist() for week in second.weeks
+    ]
+    assert (
+        first.diagnostics["deterministic_time_used"]
+        == second.diagnostics["deterministic_time_used"]
+    )
+    for result in (first, second):
+        assert result.diagnostics["deterministic_budget_source"] == "planner_default"
+        assert (
+            result.diagnostics["solver_deterministic_time_limit"]
+            == planning_optimizer.PLAN_DETERMINISTIC_TIME_LIMIT
+        )
+        assert (
+            float(str(result.diagnostics["wall_time_limit_seconds"]))
+            >= planning_optimizer.PLAN_WALL_CEILING_SECONDS
+        )
+
+
+def test_a_caller_that_brings_its_own_deterministic_budget_keeps_it(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The planner default fills a gap; it does not overrule a choice already made."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    chosen = replace(
+        small_config,
+        solver_time_limit_seconds=30.0,
+        solver_deterministic_time_limit=2.0,
+    )
+
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, chosen)
+
+    assert result.diagnostics["deterministic_budget_source"] == "caller"
+    assert result.diagnostics["solver_deterministic_time_limit"] == 2.0
+    assert result.diagnostics["wall_time_limit_seconds"] == 30.0
+
+
 def test_unknown_solver_status_is_structured(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,
