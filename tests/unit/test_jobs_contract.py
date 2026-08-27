@@ -124,3 +124,61 @@ def test_a_malformed_payload_is_refused_loudly() -> None:
     good["status"] = "paused"
     with pytest.raises(BackendJobsContractError, match="Unknown job status"):
         AdviceJob.from_payload(good)
+
+
+def test_fractional_seconds_do_not_reorder_time() -> None:
+    """The reviewer's exact regression: '.' sorts before 'Z', instants do not."""
+
+    job = _job(
+        created_at_utc="2026-08-27T12:00:00Z",
+        updated_at_utc="2026-08-27T12:00:00.100000Z",
+    )
+    assert job.updated_at_utc == "2026-08-27T12:00:00.100000+00:00".replace("+00:00", "Z")
+    later = job.transition("running", at_utc="2026-08-27T12:00:00.200000Z")
+    assert later.status == "running"
+
+
+def test_the_parser_enforces_exactly_what_construction_enforces() -> None:
+    good = _job().as_payload()
+    with_extra = {**good, "operator_note": "hi"}
+    with pytest.raises(BackendJobsContractError, match="unexpected"):
+        AdviceJob.from_payload(with_extra)
+    missing = {k: v for k, v in good.items() if k != "cache_key"}
+    with pytest.raises(BackendJobsContractError, match="missing"):
+        AdviceJob.from_payload(missing)
+    stringly = {**good, "attempt": "1"}
+    with pytest.raises(BackendJobsContractError, match="attempt must be an integer"):
+        AdviceJob.from_payload(stringly)
+    bool_attempt = {**good, "attempt": True}
+    with pytest.raises(BackendJobsContractError, match="attempt must be an integer"):
+        AdviceJob.from_payload(bool_attempt)
+
+
+def test_the_committed_schema_matches_the_generator_and_accepts_real_records() -> None:
+    import json
+
+    import jsonschema
+
+    from squadopt.platform.jobs_contract import (
+        BACKEND_JOBS_SCHEMA_PATH,
+        backend_jobs_schema,
+    )
+
+    committed = json.loads(BACKEND_JOBS_SCHEMA_PATH.read_text(encoding="utf-8"))
+    assert committed == backend_jobs_schema()
+    schema = backend_jobs_schema()
+    jsonschema.validate(_job().as_payload(), schema)
+    done = (
+        _job()
+        .transition("running", at_utc="2026-08-27T12:00:05Z")
+        .transition("completed", at_utc="2026-08-27T12:00:35Z", result_ref=RESULT)
+    )
+    jsonschema.validate(done.as_payload(), schema)
+    with jsonschema_raises():
+        jsonschema.validate({**_job().as_payload(), "extra": 1}, schema)
+
+
+def jsonschema_raises():
+    import jsonschema
+
+    return pytest.raises(jsonschema.ValidationError)

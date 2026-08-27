@@ -27,6 +27,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, replace
 from datetime import datetime
+from pathlib import Path
 from typing import Final, Literal, TypeAlias
 
 BACKEND_JOBS_CONTRACT_VERSION: Final = "backend_jobs_v1"
@@ -50,6 +51,12 @@ _ERROR_CODE_PATTERN: Final = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
 
 class BackendJobsContractError(ValueError):
     """A value or transition cannot be represented by ``backend_jobs_v1``."""
+
+
+def _instant(value: str) -> datetime:
+    """The parsed instant of an already-normalized UTC timestamp."""
+
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
 def _utc(value: object, *, label: str) -> str:
@@ -124,7 +131,9 @@ class AdviceJob:
         object.__setattr__(
             self, "updated_at_utc", _utc(self.updated_at_utc, label="updated_at_utc")
         )
-        if self.updated_at_utc < self.created_at_utc:
+        # Compare instants, never strings: a later value that carries fractional
+        # seconds sorts lexicographically before one that does not ('.' < 'Z').
+        if _instant(self.updated_at_utc) < _instant(self.created_at_utc):
             raise BackendJobsContractError("updated_at_utc may not precede created_at_utc.")
         if isinstance(self.attempt, bool) or not isinstance(self.attempt, int) or self.attempt < 1:
             raise BackendJobsContractError("attempt must be a positive integer.")
@@ -180,7 +189,7 @@ class AdviceJob:
                 "terminal states are terminal."
             )
         stamped = _utc(at_utc, label="at_utc")
-        if stamped < self.updated_at_utc:
+        if _instant(stamped) < _instant(self.updated_at_utc):
             raise BackendJobsContractError("A transition may not move time backwards.")
         return replace(
             self,
@@ -215,38 +224,141 @@ class AdviceJob:
 
     @classmethod
     def from_payload(cls, payload: object) -> AdviceJob:
-        """Rebuild a record from its payload; anything malformed is refused loudly."""
+        """Rebuild a record from its payload; anything malformed is refused loudly.
+
+        The parser enforces exactly what construction enforces — the same field set,
+        the same types, no coercion — because a store or a wire that can smuggle an
+        extra key or a stringified number past the boundary is a store the contract
+        no longer describes.
+        """
 
         if not isinstance(payload, dict):
             raise BackendJobsContractError("A job payload must be a JSON object.")
-        data = dict(payload)
-        raw_error = data.get("error")
+        expected = {
+            "contract_version",
+            "job_id",
+            "status",
+            "request_fingerprint",
+            "cache_key",
+            "created_at_utc",
+            "updated_at_utc",
+            "attempt",
+            "idempotency_key",
+            "result_ref",
+            "error",
+        }
+        actual = set(payload)
+        if actual != expected:
+            raise BackendJobsContractError(
+                "A job payload's fields do not match backend_jobs_v1: "
+                f"missing={sorted(expected - actual)!r}, unexpected={sorted(actual - expected)!r}."
+            )
+        for name in (
+            "contract_version",
+            "job_id",
+            "status",
+            "request_fingerprint",
+            "cache_key",
+            "created_at_utc",
+            "updated_at_utc",
+        ):
+            if not isinstance(payload[name], str):
+                raise BackendJobsContractError(f"{name} must be a string.")
+        if isinstance(payload["attempt"], bool) or not isinstance(payload["attempt"], int):
+            raise BackendJobsContractError("attempt must be an integer.")
+        for name in ("idempotency_key", "result_ref"):
+            if payload[name] is not None and not isinstance(payload[name], str):
+                raise BackendJobsContractError(f"{name} must be null or a string.")
+        raw_error = payload["error"]
         error: JobError | None = None
         if raw_error is not None:
-            if not isinstance(raw_error, dict):
-                raise BackendJobsContractError("error must be null or an object.")
-            error = JobError(
-                code=str(raw_error.get("code", "")), message=str(raw_error.get("message", ""))
-            )
-        try:
-            return cls(
-                job_id=str(data["job_id"]),
-                status=data["status"],
-                request_fingerprint=str(data["request_fingerprint"]),
-                cache_key=str(data["cache_key"]),
-                created_at_utc=str(data["created_at_utc"]),
-                updated_at_utc=str(data["updated_at_utc"]),
-                attempt=int(str(data.get("attempt", 1))),
-                idempotency_key=(
-                    None if data.get("idempotency_key") is None else str(data["idempotency_key"])
-                ),
-                result_ref=None if data.get("result_ref") is None else str(data["result_ref"]),
-                error=error,
-                contract_version=str(data.get("contract_version", "")),
-            )
-        except KeyError as missing:
-            raise BackendJobsContractError(f"A job payload is missing {missing}.") from missing
+            if not isinstance(raw_error, dict) or set(raw_error) != {"code", "message"}:
+                raise BackendJobsContractError("error must be null or {code, message}.")
+            if not isinstance(raw_error["code"], str) or not isinstance(raw_error["message"], str):
+                raise BackendJobsContractError("error code and message must be strings.")
+            error = JobError(code=raw_error["code"], message=raw_error["message"])
+        return cls(
+            job_id=payload["job_id"],
+            status=payload["status"],
+            request_fingerprint=payload["request_fingerprint"],
+            cache_key=payload["cache_key"],
+            created_at_utc=payload["created_at_utc"],
+            updated_at_utc=payload["updated_at_utc"],
+            attempt=payload["attempt"],
+            idempotency_key=payload["idempotency_key"],
+            result_ref=payload["result_ref"],
+            error=error,
+            contract_version=payload["contract_version"],
+        )
 
 
 #: The whole machine, readable at a glance and importable by the queue and its tests.
 ALLOWED_TRANSITIONS: Final[frozenset[tuple[str, str]]] = _TRANSITIONS
+
+BACKEND_JOBS_SCHEMA_PATH: Final = Path("docs") / "contracts" / "backend_jobs_v1.schema.json"
+
+
+def backend_jobs_schema() -> dict[str, object]:
+    """The strict JSON Schema for one ``backend_jobs_v1`` record."""
+
+    fingerprint = {"type": "string", "pattern": _SHA256_PATTERN.pattern}
+    timestamp = {"type": "string", "format": "date-time", "pattern": "Z$"}
+    return {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://squadopt.dev/contracts/backend_jobs_v1.schema.json",
+        "title": "SquadOpt advice job record",
+        "type": "object",
+        "properties": {
+            "contract_version": {"type": "string", "const": BACKEND_JOBS_CONTRACT_VERSION},
+            "job_id": {"type": "string", "pattern": _JOB_ID_PATTERN.pattern},
+            "status": {"type": "string", "enum": sorted(_STATUSES)},
+            "request_fingerprint": fingerprint,
+            "cache_key": fingerprint,
+            "created_at_utc": timestamp,
+            "updated_at_utc": timestamp,
+            "attempt": {"type": "integer", "minimum": 1},
+            "idempotency_key": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+            "result_ref": {"anyOf": [fingerprint, {"type": "null"}]},
+            "error": {
+                "anyOf": [
+                    {
+                        "type": "object",
+                        "properties": {
+                            "code": {"type": "string", "pattern": _ERROR_CODE_PATTERN.pattern},
+                            "message": {"type": "string", "minLength": 1},
+                        },
+                        "required": ["code", "message"],
+                        "additionalProperties": False,
+                    },
+                    {"type": "null"},
+                ]
+            },
+        },
+        "required": [
+            "contract_version",
+            "job_id",
+            "status",
+            "request_fingerprint",
+            "cache_key",
+            "created_at_utc",
+            "updated_at_utc",
+            "attempt",
+            "idempotency_key",
+            "result_ref",
+            "error",
+        ],
+        "additionalProperties": False,
+    }
+
+
+def write_backend_jobs_schema(path: Path | str | None = None) -> Path:
+    import json as _json
+
+    target = Path(path) if path is not None else BACKEND_JOBS_SCHEMA_PATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        _json.dumps(backend_jobs_schema(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    return target
