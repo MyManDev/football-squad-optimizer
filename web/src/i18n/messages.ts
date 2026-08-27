@@ -368,6 +368,9 @@ const en = {
     windowValueReason: "The longer window recovers the transfer cost in the example projection.",
     modeTradeoffReason:
       "The mode changes the point trade-off, not a claimed probability of beating a rival.",
+    planCost: (points: string) =>
+      `This mode's plan gives up ~${points} expected points against the pure-points pick.`,
+    planRival: (name: string) => `priced against ${name}'s squad`,
     linkTitle: "Classic league 352490",
     linkBody:
       "The member surface is prepared mock-first; every row will link to that entry's public post-deadline squad and suggested moves.",
@@ -844,6 +847,9 @@ const tr: MessageSchema<typeof en> = {
     windowValueReason: "Uzun pencere, örnek projeksiyonda transfer maliyetini geri kazanıyor.",
     modeTradeoffReason:
       "Mod, rakibi geçme olasılığı iddia etmek yerine puan ödünleşimini değiştirir.",
+    planCost: (pointsValue) =>
+      `Bu modun planı, saf puan seçimine göre ~${pointsValue} beklenen puandan vazgeçiyor.`,
+    planRival: (name) => `${name} kadrosuna göre fiyatlandı`,
     linkTitle: "Klasik lig 352490",
     linkBody:
       "Üye yüzeyi mock-first hazırlandı; her satır üyenin son tarih sonrası public kadrosuna ve önerilen hamlelerine bağlanacak.",

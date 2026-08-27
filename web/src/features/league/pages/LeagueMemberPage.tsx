@@ -178,13 +178,21 @@ export function LeagueMemberView({
 }
 
 function AdviceCard({ envelope }: { envelope: LeagueViewEnvelope<EntryAdvice> }) {
-  const { messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = envelope.payload;
   return (
     <Card title={copy.advice} aside={<ExampleDataBadge sourceKind={envelope.source_kind} />}>
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      {view.mode !== "saf-puan" && view.expected_points_cost != null ? (
+        <p className={styles.planCost}>
+          <strong className="num">
+            {copy.planCost(points(view.expected_points_cost, 1, locale))}
+          </strong>
+          {view.rival_label ? <span> · {copy.planRival(view.rival_label)}</span> : null}
+        </p>
+      ) : null}
       {view.moves.length === 0 ? (
         <p className={styles.muted}>
           {view.data_quality === "complete" ? copy.noMove : copy.noAdviceMissingData}
