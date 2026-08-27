@@ -339,7 +339,7 @@ def main() -> int:
         "strategies": strategies,
         "holdout_untouched": True,
         "elapsed_seconds": round(perf_counter() - started, 1),
-        "metadata": artifact_metadata(panel_rows=int(len(panel)), created_utc=created_utc),
+        "metadata": artifact_metadata(panel_rows=len(panel), created_utc=created_utc),
     }
     write_json(arguments.json_output, document)
     write_text(arguments.markdown_output, _to_markdown(document))
