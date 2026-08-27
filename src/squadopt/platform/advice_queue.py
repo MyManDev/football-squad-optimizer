@@ -21,6 +21,7 @@ determinism defect, because under a complete key that is the only thing it can b
 
 from __future__ import annotations
 
+import contextlib
 import os
 from collections.abc import Callable
 from pathlib import Path
@@ -153,10 +154,8 @@ class FileJobQueue:
                 handle.write(_serialize(job))
             os.replace(temporary, path)
         except BaseException:
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary)
-            except FileNotFoundError:
-                pass
             raise
 
 
