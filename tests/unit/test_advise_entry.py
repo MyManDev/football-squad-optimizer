@@ -104,13 +104,88 @@ def test_uncomputed_combinations_are_refused_not_faked(world: dict[str, Any]) ->
             request, provider=provider, inputs=inputs, projection=projection, rules=rules
         )
 
-    with pytest.raises(EntryError, match="not computed"):
+    with pytest.raises(EntryError, match="needs a rival"):
         call(_request(strategy="fark-yarat"))
     with pytest.raises(EntryError, match="not computed"):
         call(_request(window=3))
-    with pytest.raises(EntryError, match="rival request parameter"):
+    with pytest.raises(EntryError, match="not in the catalogue"):
+        call(_request(strategy="kaptan-taklidi"))
+    with pytest.raises(EntryError, match="not wired"):
+        call(_request(strategy="kaptan-ayris", rival_entry_id=202))
+    with pytest.raises(EntryError, match="rival-free"):
         call(_request(rival_entry_id=202))
+    with pytest.raises(EntryError, match="own rival"):
+        call(_request(strategy="fark-yarat", rival_entry_id=101))
     with pytest.raises(EntryError, match="not the capture's"):
         call(_request(gameweek=7))
     with pytest.raises(EntryError, match="not the capture's"):
         call(_request(season="2025-26"))
+
+
+def _rival_squad(world: dict[str, Any]) -> list[int]:
+    # Only the first eleven (the public XI) matters to the band. It is arranged to
+    # share exactly six players with the member's fifteen, so the differential band
+    # (overlap <= 5) is one same-position swap away — reachable within the world's
+    # budget and club caps, and the constraint still has to bind for the test to mean
+    # anything.
+    codes = [1004, 1005, 1006, 1012, 1013, 1014]  # shared with the member
+    codes += [1003, 1009, 1017, 1018, 1019]  # outsiders completing the eleven
+    codes += [1010, 1011, 1023, 1024]  # bench, outside the band
+    return codes
+
+
+def test_a_rival_strategy_computes_against_the_named_rival(world: dict[str, Any]) -> None:
+    """fark-yarat with a rival: banded plan, price tag, and only publishable fields."""
+
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider(
+        {
+            101: _member_picks(world, 101, _legal_squad(world)),
+            202: _member_picks(world, 202, _rival_squad(world)),
+        }
+    )
+    payload = advise_entry(
+        _request(strategy="fark-yarat", rival_entry_id=202),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+    assert payload["mode"] == "fark-yarat"
+    assert payload["rival_entry_id"] == 202
+    assert payload["rival_label"] == "entry-202"
+    # The band held: at most five of the rival's eleven in the decided fifteen.
+    overlap = payload["overlap_count"]
+    assert isinstance(overlap, int) and 0 <= overlap <= 5
+    # The price tag is the control's expected points minus the banded plan's — a
+    # constraint can only cost, never pay.
+    cost = payload["expected_points_cost"]
+    assert isinstance(cost, float) and cost >= 0.0
+    # The gap is a mean in expected points; its spread is not computed, and no
+    # probability-shaped field exists anywhere in the payload.
+    assert isinstance(payload["expected_gap_vs_rival"], float)
+    assert isinstance(payload["captain_agreement"], bool)
+    assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
+    assert not any("probab" in key or key.startswith("p_") for key in payload)
+
+
+def test_the_rival_changes_labels_not_the_baseline(world: dict[str, Any]) -> None:
+    """The saf-puan answer is byte-identical whether or not a rival entry exists in the
+    capture: the rival is a parameter of rival strategies, never an input to the
+    baseline — the invariance rule, exercised at the seam the backend will call."""
+
+    inputs, projection, rules = _world_context(world)
+    alone = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    accompanied = _Provider(
+        {
+            101: _member_picks(world, 101, _legal_squad(world)),
+            202: _member_picks(world, 202, _rival_squad(world)),
+        }
+    )
+    baseline_alone = advise_entry(
+        _request(), provider=alone, inputs=inputs, projection=projection, rules=rules
+    )
+    baseline_accompanied = advise_entry(
+        _request(), provider=accompanied, inputs=inputs, projection=projection, rules=rules
+    )
+    assert baseline_alone == baseline_accompanied
