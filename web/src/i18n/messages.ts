@@ -296,6 +296,14 @@ const en = {
   },
   leagueMembers: {
     loading: "Loading league members…",
+    viewerTitle: "Which one is you?",
+    viewerBody:
+      "Pick your own row to get advice from your squad. This is a claim, not a login: anyone can pick anyone, and that is fine because everything shown here is already public after the deadline.",
+    viewerSelect: "This is me",
+    viewerYouBadge: "You",
+    viewerSelected: (name: string) =>
+      `Viewing as ${name}. Advice pages will start from this squad.`,
+    viewerClear: "Clear selection",
     notAvailable: "League member data is not connected yet.",
     notAvailableBody:
       "The page is ready for the post-deadline public entry feed. No example records are shipped in the production build.",
@@ -774,6 +782,14 @@ const tr: MessageSchema<typeof en> = {
     lastWeek: (pointsValue) => `son puanlanan hafta: ortalamaya karşı ${pointsValue}`,
   },
   leagueMembers: {
+    viewerTitle: "Hangisi sensin?",
+    viewerBody:
+      "Kendi satırını seç ki tavsiye kendi kadrondan hesaplansın. Bu bir beyandır, giriş değil: herkes herkesi seçebilir ve bu sorun değil, çünkü burada gösterilen her şey son tarihten sonra zaten herkese açık.",
+    viewerSelect: "Bu benim",
+    viewerYouBadge: "Sen",
+    viewerSelected: (name: string) =>
+      `${name} olarak bakıyorsun. Tavsiye sayfaları bu kadrodan başlayacak.`,
+    viewerClear: "Seçimi kaldır",
     loading: "Lig üyeleri yükleniyor…",
     notAvailable: "Lig üye verisi henüz bağlı değil.",
     notAvailableBody:
