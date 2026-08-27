@@ -104,6 +104,27 @@ class AdviceSubmitService:
     def job(self, job_id: str) -> AdviceJob | None:
         return self._queue.load(job_id)
 
+    def public_job_view(self, job_id: str) -> dict[str, object] | None:
+        """The job as the world may see it: progress and a coded reason, nothing else.
+
+        The stored record carries the client's idempotency key and the worker's
+        failure text; neither belongs on a public endpoint, so the view names the
+        fields it serves instead of serving the record.
+        """
+
+        record = self._queue.load(job_id)
+        if record is None:
+            return None
+        return {
+            "contract_version": "advice_job_view_v1",
+            "job_id": record.job_id,
+            "status": record.status,
+            "created_at_utc": record.created_at_utc,
+            "updated_at_utc": record.updated_at_utc,
+            "attempt": record.attempt,
+            "error_code": record.error.code if record.error is not None else None,
+        }
+
     def submit(
         self,
         *,
@@ -151,25 +172,32 @@ class AdviceSubmitService:
             strategy=strategy,
             window=int(window),
             rival_entry_id=rival_entry_id,
+            # Server-resolved: the same client fields on a newer capture become a
+            # different fingerprint, so dedup cannot serve stale work (review, #288).
+            capture_snapshot_id=context.capture_snapshot_id,
         )
         fingerprint = command.request_fingerprint
 
-        open_jobs = [job for job in self._queue.jobs() if not job.is_terminal]
+        history = self._queue.jobs()
         if idempotency_key is not None:
-            for job in open_jobs:
+            # Idempotency history survives terminal state: a key reused for a
+            # different request is a conflict whether or not the first job finished.
+            for job in history:
                 if job.idempotency_key == idempotency_key:
                     if job.request_fingerprint != fingerprint:
                         raise IdempotencyConflictError(
                             "This Idempotency-Key was already used for a different request."
                         )
-                    return SubmitOutcome(kind="job", job=job)
-        for job in open_jobs:
-            if job.request_fingerprint == fingerprint:
-                return SubmitOutcome(kind="job", job=job)
+                    if not job.is_terminal:
+                        return SubmitOutcome(kind="job", job=job)
+                    # Terminal replay of the same request: the cache answers when it
+                    # can; a failed job means the same key may honestly try again.
+                    replay = self._reader.cached(cache_key)
+                    if replay is not None:
+                        return SubmitOutcome(kind="hit", payload=replay)
+                    break
 
-        attempt_ordinal = sum(
-            1 for job in self._queue.jobs() if job.request_fingerprint == fingerprint
-        )
+        attempt_ordinal = sum(1 for job in history if job.request_fingerprint == fingerprint)
         record = AdviceJob(
             job_id=f"advice-{fingerprint[:16]}-{attempt_ordinal + 1}",
             status="queued",
@@ -179,5 +207,7 @@ class AdviceSubmitService:
             updated_at_utc=at_utc,
             idempotency_key=command.idempotency_key,
         )
-        self._queue.submit(record)
-        return SubmitOutcome(kind="job", job=record)
+        # At-most-one open job is the queue's atomic guarantee, not a scan's promise:
+        # two api processes racing here converge on one winner.
+        winner, _created = self._queue.submit_unique(record)
+        return SubmitOutcome(kind="job", job=winner)

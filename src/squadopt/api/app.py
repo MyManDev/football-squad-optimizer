@@ -34,6 +34,7 @@ from squadopt.platform.advice_submit import (
     IdempotencyConflictError,
     RateLimitedError,
 )
+from squadopt.platform.api_contract import BackendApiContractError
 
 DEFAULT_SITE_DATA_ROOT: Final = Path("web") / "public" / "data"
 _SEASON_PATTERN: Final = r"^[0-9]{4}-[0-9]{2}$"
@@ -58,6 +59,33 @@ def _log_exception(message: str, request: Request, error: Exception) -> None:
         exc_info=(type(error), error, error.__traceback__),
         extra={"fields": {"method": request.method, "path": request.url.path}},
     )
+
+
+def _parse_advise_body(body: object) -> tuple[str, int, int | None]:
+    """The AdviseRequestBody schema, enforced in one place.
+
+    Exactly the declared keys (additionalProperties: false), a string strategy, an
+    integer window of 1/3/5 with bool explicitly refused, and a rival that is null or
+    a positive integer. Every refusal is a contract error the route maps onto 422 —
+    a malformed body is the client's mistake, never this process's 500.
+    """
+
+    if not isinstance(body, dict):
+        raise BackendApiContractError("The POST body must be an object.")
+    allowed = {"strategy", "window", "rival_entry_id"}
+    unexpected = set(body) - allowed
+    if unexpected:
+        raise BackendApiContractError(f"Unexpected body fields: {sorted(unexpected)!r}.")
+    strategy = body.get("strategy")
+    if not isinstance(strategy, str) or not strategy.strip():
+        raise BackendApiContractError("strategy must be a non-empty string.")
+    window = body.get("window")
+    if isinstance(window, bool) or window not in (1, 3, 5):
+        raise BackendApiContractError("window must be 1, 3, or 5.")
+    rival = body.get("rival_entry_id")
+    if rival is not None and (isinstance(rival, bool) or not isinstance(rival, int) or rival < 1):
+        raise BackendApiContractError("rival_entry_id must be null or a positive integer.")
+    return strategy, window, rival
 
 
 def create_app(
@@ -229,21 +257,10 @@ def create_app(
             body = await request.json()
         except Exception:
             return _contract_error(422, "VALIDATION_FAILED", "The POST body must be JSON.")
-        if not isinstance(body, dict):
-            return _contract_error(422, "VALIDATION_FAILED", "The POST body must be an object.")
-        strategy = body.get("strategy")
-        window = body.get("window")
-        rival = body.get("rival_entry_id")
-        if not isinstance(strategy, str) or window not in (1, 3, 5):
-            return _contract_error(
-                422, "VALIDATION_FAILED", "strategy and a window of 1, 3, or 5 are required."
-            )
-        if rival is not None and (
-            not isinstance(rival, int) or isinstance(rival, bool) or rival < 1
-        ):
-            return _contract_error(
-                422, "VALIDATION_FAILED", "rival_entry_id must be null or a positive integer."
-            )
+        try:
+            strategy, window, rival = _parse_advise_body(body)
+        except BackendApiContractError as error:
+            return _contract_error(422, "VALIDATION_FAILED", str(error))
         from datetime import UTC, datetime
 
         outcome = advice_submit.submit(
@@ -272,10 +289,13 @@ def create_app(
     def advice_job(job_id: str) -> JSONResponse:
         if advice_submit is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
-        record = advice_submit.job(job_id)
-        if record is None:
+        try:
+            view = advice_submit.public_job_view(job_id)
+        except Exception:
             return _contract_error(404, "NOT_FOUND", "No such advice job.")
-        return JSONResponse(content=record.as_payload(), headers={"Cache-Control": "no-cache"})
+        if view is None:
+            return _contract_error(404, "NOT_FOUND", "No such advice job.")
+        return JSONResponse(content=view, headers={"Cache-Control": "no-cache"})
 
     @application.get("/health", response_class=JSONResponse)
     def health() -> JSONResponse:

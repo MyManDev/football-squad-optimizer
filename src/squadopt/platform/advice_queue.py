@@ -111,6 +111,43 @@ class FileJobQueue:
             raise AdviceQueueError(f"job_id has an invalid format: {job_id!r}.")
         return job_id
 
+    def _open_index(self, fingerprint: str) -> Path:
+        return self._root / f"open-{fingerprint}.idx"
+
+    def submit_unique(self, job: AdviceJob) -> tuple[AdviceJob, bool]:
+        """Enqueue at most one open job per request fingerprint, atomically.
+
+        The reviewed race: a scan followed by submit lets two api processes enqueue
+        duplicates. The open-job index file is created with the same link-once
+        primitive as everything else here; the loser reads the winner's job id and
+        returns that job with ``created=False``. The index is released when the job
+        reaches a terminal state, so a failed request can be asked again.
+        """
+
+        index = self._open_index(job.request_fingerprint)
+        self._root.mkdir(parents=True, exist_ok=True)
+        import tempfile
+
+        descriptor, temporary = tempfile.mkstemp(dir=self._root, suffix=".tmp")
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(job.job_id.encode("utf-8"))
+            try:
+                os.link(temporary, index)
+            except FileExistsError:
+                winner_id = index.read_text(encoding="utf-8").strip()
+                winner = self.load(winner_id)
+                if winner is not None and not winner.is_terminal:
+                    return winner, False
+                # A stale index (terminal or vanished job): replace it and win.
+                index.unlink(missing_ok=True)
+                os.link(temporary, index)
+        finally:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(temporary)
+        self.submit(job)
+        return job, True
+
     def submit(self, job: AdviceJob) -> None:
         """Create the record atomically: at most one submission ever wins an id.
 
@@ -145,6 +182,11 @@ class FileJobQueue:
         self._write(path, job)
         if job.is_terminal:
             self._claim_marker(job.job_id).unlink(missing_ok=True)
+            # Release the open-job index so the same request can be asked again.
+            index = self._open_index(job.request_fingerprint)
+            with contextlib.suppress(FileNotFoundError):
+                if index.read_text(encoding="utf-8").strip() == job.job_id:
+                    index.unlink(missing_ok=True)
 
     def load(self, job_id: str) -> AdviceJob | None:
         try:
