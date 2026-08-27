@@ -97,3 +97,28 @@
     font-size: var(--step-3);
   }
 }
+
+.viewerSelect {
+  margin-left: 0.5rem;
+  border: 1px solid var(--border, currentColor);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.75rem;
+  padding: 0.05rem 0.55rem;
+  cursor: pointer;
+}
+
+.viewerSelect:hover {
+  background: var(--surface-hover, rgba(127, 127, 127, 0.12));
+}
+
+.viewerClear {
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-decoration: underline;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+}

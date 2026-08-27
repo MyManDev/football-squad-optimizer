@@ -439,6 +439,7 @@ def build_league_views(
         squad_path.write_text(
             json.dumps(_envelope(squad_payload, generated_at_utc=generated), indent=2),
             encoding="utf-8",
+            newline="\n",
         )
         written.append(f"entries/{entry_id}.json")
 
@@ -447,6 +448,7 @@ def build_league_views(
         advice_path.write_text(
             json.dumps(_envelope(advice, generated_at_utc=generated), indent=2),
             encoding="utf-8",
+            newline="\n",
         )
         written.append(f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json")
 
@@ -493,6 +495,7 @@ def build_league_views(
                     mode_path.write_text(
                         json.dumps(_envelope(mode_payload, generated_at_utc=generated), indent=2),
                         encoding="utf-8",
+                        newline="\n",
                     )
                     written.append(f"advice/{entry_id}/{item.mode}/{COMPUTED_WINDOW}.json")
             except (EntryError, DataError, ModeSelectionError, ExperimentError, KeyError) as error:
@@ -521,6 +524,7 @@ def build_league_views(
     members_path.write_text(
         json.dumps(_envelope(members_payload, generated_at_utc=generated), indent=2),
         encoding="utf-8",
+        newline="\n",
     )
     written.append(members_path.name)
     return LeagueViewsReport(

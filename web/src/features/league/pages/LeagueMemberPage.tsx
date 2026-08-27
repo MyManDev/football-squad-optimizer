@@ -187,6 +187,12 @@ function AdviceCard({ envelope }: { envelope: LeagueViewEnvelope<EntryAdvice> })
     <Card title={copy.advice} aside={<ExampleDataBadge sourceKind={envelope.source_kind} />}>
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      {view.solver_status === "FEASIBLE" ? (
+        <p className={styles.honesty}>
+          <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
+          {copy.unprovenPlanBody(points(view.optimality_gap ?? 0, 1, locale))}
+        </p>
+      ) : null}
       {view.mode !== "saf-puan" && view.expected_points_cost != null ? (
         <p className={styles.planCost}>
           <strong className="num">
