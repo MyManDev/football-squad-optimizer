@@ -39,6 +39,7 @@ from squadopt.optimization.optimizer import (
 from squadopt.optimization.validation import validate_players
 from squadopt.planning.models import (
     ChipAvailability,
+    FirstWeekOverlap,
     InitialSquadState,
     PlanningHorizon,
     PlanningWeekResult,
@@ -776,6 +777,33 @@ def _forbid_squads(
         )
 
 
+def _bound_first_week_overlap(
+    artifacts: _PlanArtifacts,
+    first_week: pd.DataFrame,
+    band: FirstWeekOverlap | None,
+) -> None:
+    """Bound how many of the band's players the first-week fifteen holds.
+
+    Matching mirrors ``_forbid_squads``: ids are whatever the horizon carries, matched
+    as they are. A floor above the number of band players the horizon carries leaves
+    the constraint unsatisfiable and the solve INFEASIBLE — the honest reading of a
+    band the world cannot meet, and the reason a menu builder drops the band instead
+    of publishing an unproven entry for it.
+    """
+
+    if band is None:
+        return
+    column_of = {player: index for index, player in enumerate(first_week["player_id"])}
+    columns = [
+        column_of[player] for player in sorted(band.player_ids, key=str) if player in column_of
+    ]
+    held = cp_model.LinearExpr.sum([artifacts.squad_vars[0][column] for column in columns])
+    if band.minimum is not None:
+        artifacts.model.add(held >= band.minimum)
+    if band.maximum is not None:
+        artifacts.model.add(held <= band.maximum)
+
+
 def optimize_transfer_plan(
     horizon: PlanningHorizon,
     initial_state: InitialSquadState,
@@ -783,6 +811,7 @@ def optimize_transfer_plan(
     transfer_config: TransferPlanningConfig | None = None,
     chips: ChipAvailability | None = None,
     excluded_squads: Sequence[frozenset[object]] = (),
+    first_week_overlap: FirstWeekOverlap | None = None,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
 
@@ -797,6 +826,10 @@ def optimize_transfer_plan(
     that exact squad and nothing else. This is what lets a mode choose between plans
     instead of re-ranking a menu of one — without it every mode returns the optimizer's
     single answer under a different name.
+
+    ``first_week_overlap`` bounds how many of a named set of players — a rival's known
+    eleven — the first-week fifteen holds. It is the strategy catalogue's overlap band
+    in solver terms; ``None`` is today's unconstrained planner, bit for bit.
     """
 
     if not isinstance(horizon, PlanningHorizon):
@@ -833,6 +866,9 @@ def optimize_transfer_plan(
         availability,
     )
     _forbid_squads(artifacts, players_by_week[0], excluded_squads, optimization_config.squad_size)
+    if first_week_overlap is not None and not isinstance(first_week_overlap, FirstWeekOverlap):
+        raise TransferPlanningValidationError("first_week_overlap must be a FirstWeekOverlap.")
+    _bound_first_week_overlap(artifacts, players_by_week[0], first_week_overlap)
     started_at = perf_counter()
     deadline = started_at + optimization_config.solver_time_limit_seconds
     primary_solver = cp_model.CpSolver()
@@ -860,6 +896,15 @@ def optimize_transfer_plan(
         "gameweeks": verified_horizon.gameweeks,
         "horizon_length": len(verified_horizon.gameweeks),
         "chip_availability_fingerprint": availability.availability_fingerprint,
+        "first_week_overlap": (
+            None
+            if first_week_overlap is None
+            else {
+                "player_count": len(first_week_overlap.player_ids),
+                "minimum": first_week_overlap.minimum,
+                "maximum": first_week_overlap.maximum,
+            }
+        ),
         "chips_available": {name: sorted(weeks) for name, weeks in availability.available.items()},
         "expected_points_scale": optimization_config.expected_points_scale,
         "objective_weight_scale": settings.objective_weight_scale,
