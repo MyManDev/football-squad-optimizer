@@ -154,6 +154,79 @@ def test_a_members_advice_is_invariant_to_every_other_members_state(
     assert first == second
 
 
+def test_an_unproven_plan_is_published_with_its_status_not_discarded(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A member whose plan the solver found but could not prove keeps their page.
+
+    Before this, the OPTIMAL-only gate on the member path threw the found plan away and
+    the member vanished from their own league — and under a wall-clock budget, which
+    members vanished depended on the machine (#247). The plan the solver found is real;
+    what was missing is the proof, and the payload now states exactly that: the status
+    and the measured bound gap, no more.
+    """
+
+    import dataclasses
+
+    from squadopt.live import transfers as live_transfers
+    from squadopt.optimization import SolverStatus
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+
+    real_plan_transfers = live_transfers.plan_transfers
+
+    def feasible_plan_transfers(*args: Any, **kwargs: Any) -> Any:
+        plan, decision, config = real_plan_transfers(*args, **kwargs)
+        # The solve is real; only the proof is withheld, as a budget-bound solve would.
+        relabelled = dataclasses.replace(
+            plan,
+            solver_status=SolverStatus.FEASIBLE,
+            diagnostics={**dict(plan.diagnostics), "absolute_optimality_gap": 0.25},
+        )
+        return relabelled, decision, config
+
+    monkeypatch.setattr("squadopt.application.league_views.plan_transfers", feasible_plan_transfers)
+    report = build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "unproven",
+    )
+
+    assert [member.rendered for member in report.members] == [True]
+    raw = (tmp_path / "unproven" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
+    payload = json.loads(raw)["payload"]
+    assert payload["solver_status"] == "FEASIBLE"
+    assert payload["optimality_gap"] == 0.25
+    assert payload["moves"]  # the found plan itself is published, not just the caveat
+
+
+def test_a_proven_plan_publishes_its_proof(world: dict[str, Any], tmp_path: Path) -> None:
+    """The baseline advice carries OPTIMAL and a zero gap when the proof exists."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "proven",
+    )
+    raw = (tmp_path / "proven" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
+    payload = json.loads(raw)["payload"]
+    assert payload["solver_status"] == "OPTIMAL"
+    assert payload["optimality_gap"] == 0.0
+
+
 def test_the_members_page_carries_the_league_standing_and_its_order(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
@@ -521,7 +594,7 @@ def test_the_baseline_advice_is_byte_identical_with_and_without_paths(
 # thing here that would notice. The planner itself has the GW1 opening pin
 # (test_live_recommendation.py); this is the same gate for the in-season member path,
 # which that pin never exercised: a held squad, sell prices, and a transfer decision.
-IN_SEASON_MEMBER_ADVICE_SHA256 = "219e2d64346d96ab120c84c2ca528bc310e5da5e9eaef68e91fe716425f316b3"
+IN_SEASON_MEMBER_ADVICE_SHA256 = "81cbc617f4d451b3b366c189ffc7fecf0cbbb7b47a6b6878b7283dd880e5a305"
 # (player_out, player_in, expected_points_delta, expected_points_cost) per move.
 IN_SEASON_MEMBER_MOVES = (
     (1005, 1009, 2.5, 4.0),

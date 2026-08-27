@@ -4,8 +4,11 @@ The web side (Package 5) reads ``data/league/members.json``, ``entries/{id}.json
 ``advice/{id}/{mode}/{window}.json`` under the provisional contract its
 ``PROVISIONAL_CONTRACT.md`` records; this module is the producing half. It consumes the
 `EntryPicksProvider` seam — today a test double, after #127 the capture-built provider —
-and turns each member's held squad into a transfer recommendation with the same function
-that decides our own gameweek. Given scenario paths it also prices each member's transfer
+and turns each member's held squad into a transfer plan with the same planner that
+decides our own gameweek — without the decide path's proof-or-refuse gate: our ledger
+refuses an unproven plan, a member's page publishes it with its ``solver_status`` and
+measured ``optimality_gap`` instead — a found plan with its missing proof stated is
+more honest than a vanished member. Given scenario paths it also prices each member's transfer
 menu per play mode against a real rival from their own league (`mode_selection`), and
 publishes one advice file per computed mode.
 
@@ -47,7 +50,7 @@ from squadopt.live import (
     Projection,
     RecommendationInputs,
     SeasonRules,
-    build_transfer_recommendation,
+    plan_transfers,
 )
 from squadopt.live.transfers import TransferDecision, plan_transfer_menu
 from squadopt.scenarios import RivalSquad
@@ -218,14 +221,24 @@ def _member_advice(
     decision: TransferDecision | None = None,
     expected_points_cost: float = 0.0,
     rival_label: str | None = None,
+    solver_status: str | None = None,
+    optimality_gap: float | None = None,
 ) -> dict[str, object]:
     """One member's advice payload — from their squad and the shared projection only.
 
     Without ``decision`` this solves the one-week pure-points plan itself: the site's
     saf-puan baseline, exactly what the page always showed. With one — a menu entry a
     mode's selector chose — it renders that decision instead, labelled ``mode`` and
-    carrying the mode's expected-points price tag. A competitive mode without a supplied
-    decision is refused rather than silently re-labelled as the baseline.
+    carrying the mode's expected-points price tag together with the solver's own account
+    of that plan (``solver_status``, ``optimality_gap``), read from the menu entry it
+    chose. A competitive mode without a supplied decision is refused rather than
+    silently re-labelled as the baseline.
+
+    A plan the solver found but could not prove optimal is published with
+    ``solver_status: "FEASIBLE"`` and the measured bound gap, not discarded: the plan
+    it found is real, the missing proof is stated, and the reader decides. Discarding it
+    made a member vanish from their own league page (#247's leg of this: which members
+    vanished depended on the machine).
     """
 
     if mode != COMPUTED_MODE and decision is None:
@@ -237,13 +250,14 @@ def _member_advice(
             for _, row in inputs.players.iterrows()
         }
         held = held_squad_from_picks(picks, current_prices=prices)
-        recommendation = build_transfer_recommendation(inputs, projection, held, rules)
-        transfers = recommendation.transfers
-        by_id = (
-            {int(str(row["player_id"])): row for _, row in recommendation.squad.iterrows()}
-            if transfers is not None
-            else {}
-        )
+        plan, plan_decision, _ = plan_transfers(inputs, projection, held, rules)
+        transfers = plan_decision
+        by_id = {
+            int(str(row["player_id"])): row for _, row in plan.weeks[0].selected_squad.iterrows()
+        }
+        solver_status = plan.solver_status.name
+        raw_gap = plan.diagnostics.get("absolute_optimality_gap")
+        optimality_gap = float(str(raw_gap)) if raw_gap is not None else None
     else:
         transfers = decision
         by_id = pool_by_id
@@ -299,6 +313,10 @@ def _member_advice(
         # the only cross-mode number the site may show (no probability ships, ever).
         "expected_points_cost": float(expected_points_cost),
         "rival_label": rival_label,
+        # The solver's own account of the plan: OPTIMAL is a proof, FEASIBLE is a found
+        # plan with the measured bound gap beside it. Absent proof is stated, not hidden.
+        "solver_status": solver_status,
+        "optimality_gap": optimality_gap,
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
     }
@@ -477,6 +495,8 @@ def build_league_views(
                         # a scenario-mean re-pick of the same menu would let sampling
                         # noise move the one answer the control also gives.
                         continue
+                    chosen_plan = menu[item.plan_index][0]
+                    chosen_gap = chosen_plan.diagnostics.get("absolute_optimality_gap")
                     mode_payload = _member_advice(
                         picks,
                         inputs,
@@ -487,6 +507,8 @@ def build_league_views(
                         decision=item.decision,
                         expected_points_cost=item.expected_points_cost,
                         rival_label=item.rival_label,
+                        solver_status=chosen_plan.solver_status.name,
+                        optimality_gap=(float(str(chosen_gap)) if chosen_gap is not None else None),
                     )
                     mode_path = (
                         out / "advice" / str(entry_id) / item.mode / f"{COMPUTED_WINDOW}.json"
