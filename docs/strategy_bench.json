@@ -1,0 +1,240 @@
+{
+  "bands": {
+    "control": {
+      "strategy": "saf-puan"
+    },
+    "differential": {
+      "overlap_ceiling": 5,
+      "strategy": "fark-yarat"
+    },
+    "high_overlap": {
+      "overlap_floor": 9,
+      "strategy": "ortak-koru"
+    }
+  },
+  "contract_version": "strategy_bench_v1",
+  "created_utc": "2026-08-27T18:47:21+00:00",
+  "elapsed_seconds": 3797.3,
+  "gate4_h1_not_sacrificed": {
+    "mirrored_folds": 147,
+    "mismatches": [],
+    "passes": true
+  },
+  "holdout_untouched": true,
+  "horizons": {
+    "1": {
+      "band_binding_diagnostics": {
+        "differential": {
+          "mean_overlap_count": 3.564625850340136,
+          "share_cost_zero": 0.9523809523809523
+        },
+        "high_overlap": {
+          "mean_overlap_count": 9.0,
+          "share_cost_zero": 0.02040816326530612
+        }
+      },
+      "feasibility_share": {
+        "control": 1.0,
+        "differential": 1.0,
+        "high_overlap": 1.0
+      },
+      "folds": 147,
+      "gate1_separation": {
+        "interval_90": [
+          -0.07482993197278912,
+          0.027210884353741496
+        ],
+        "mean_difference": -0.027210884353741496,
+        "paired_folds": 147,
+        "passes": false
+      },
+      "gate2_direction_passes": true,
+      "gate2_wins_big_frequency": {
+        "control": 0.24489795918367346,
+        "differential": 0.24489795918367346,
+        "high_overlap": 0.24489795918367346
+      },
+      "gate3_price_honesty": {
+        "differential": {
+          "interval_90": [
+            -0.016326530612244646,
+            0.10748299319727898
+          ],
+          "mean_realized_minus_claimed": 0.03265306122448997,
+          "paired_folds": 147,
+          "passes": true
+        },
+        "high_overlap": {
+          "interval_90": [
+            -6.220385487528347,
+            -3.864756235827664
+          ],
+          "mean_realized_minus_claimed": -5.286961451247167,
+          "paired_folds": 147,
+          "passes": true
+        }
+      },
+      "gated": true
+    },
+    "3": {
+      "band_binding_diagnostics": {
+        "differential": {
+          "mean_overlap_count": 3.5285714285714285,
+          "share_cost_zero": 0.95
+        },
+        "high_overlap": {
+          "mean_overlap_count": 9.0,
+          "share_cost_zero": 0.023076923076923078
+        }
+      },
+      "feasibility_share": {
+        "control": 1.0,
+        "differential": 1.0,
+        "high_overlap": 0.9285714285714286
+      },
+      "folds": 140,
+      "gate1_separation": {
+        "interval_90": [
+          0.0,
+          0.1
+        ],
+        "mean_difference": 0.046153846153846156,
+        "paired_folds": 130,
+        "passes": false
+      },
+      "gate2_direction_passes": true,
+      "gate2_wins_big_frequency": {
+        "control": 0.24285714285714285,
+        "differential": 0.24285714285714285,
+        "high_overlap": 0.2076923076923077
+      },
+      "gate3_price_honesty": {
+        "differential": {
+          "interval_90": [
+            -0.002857142857142695,
+            0.13285714285714262
+          ],
+          "mean_realized_minus_claimed": 0.05428571428571445,
+          "paired_folds": 140,
+          "passes": true
+        },
+        "high_overlap": {
+          "interval_90": [
+            -6.36955128205128,
+            -2.464185897435899
+          ],
+          "mean_realized_minus_claimed": -4.800512820512823,
+          "paired_folds": 130,
+          "passes": true
+        }
+      },
+      "gated": true
+    },
+    "5": {
+      "band_binding_diagnostics": {
+        "differential": {
+          "mean_overlap_count": 3.517543859649123,
+          "share_cost_zero": 0.9385964912280702
+        },
+        "high_overlap": {
+          "mean_overlap_count": 9.0,
+          "share_cost_zero": 0.03488372093023256
+        }
+      },
+      "feasibility_share": {
+        "control": 1.0,
+        "differential": 1.0,
+        "high_overlap": 0.7543859649122807
+      },
+      "folds": 114,
+      "gate1_separation": {
+        "interval_90": [
+          -0.03488372093023256,
+          0.06976744186046512
+        ],
+        "mean_difference": 0.011627906976744186,
+        "paired_folds": 86,
+        "passes": false
+      },
+      "gate2_direction_passes": false,
+      "gate2_wins_big_frequency": {
+        "control": 0.23684210526315788,
+        "differential": 0.22807017543859648,
+        "high_overlap": 0.19767441860465115
+      },
+      "gate3_price_honesty": {
+        "differential": {
+          "interval_90": [
+            0.027982456140350713,
+            0.1719298245614037
+          ],
+          "mean_realized_minus_claimed": 0.08421052631578968,
+          "paired_folds": 114,
+          "passes": false
+        },
+        "high_overlap": {
+          "interval_90": [
+            -6.9448546511627915,
+            -2.111366279069768
+          ],
+          "mean_realized_minus_claimed": -5.063953488372093,
+          "paired_folds": 86,
+          "passes": true
+        }
+      },
+      "gated": false
+    }
+  },
+  "interval_policy": {
+    "bootstrap_resamples": 5000,
+    "confidence_level": 0.9,
+    "deterministic_seed": 0,
+    "moving_block_length": 4
+  },
+  "metadata": {
+    "created_utc": "2026-08-27T18:47:21+00:00",
+    "environment": {
+      "logical_cpu_count": 32,
+      "ortools": "9.15.6755",
+      "pandas": "3.0.5",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+      "python": "3.13.5"
+    },
+    "provenance": {
+      "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+      "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+      "archive_repository": "vaastav/Fantasy-Premier-League",
+      "experiment_contract_version": "screening_doe_v1",
+      "feature_generation_contract_version": "form_window_v1",
+      "history_rows": 156075,
+      "history_seasons": [
+        "2020-21",
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25",
+        "2025-26"
+      ],
+      "repository_commit": "90a636d611505d57d175a273a49888d401db70f9",
+      "working_tree_dirty": false
+    }
+  },
+  "population": {
+    "clipped_windows": 24,
+    "folds_built": 147,
+    "horizons": [
+      1,
+      3,
+      5
+    ],
+    "is_declared_population": true,
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ]
+  },
+  "prereg": "docs/strategy_bench_prereg.md"
+}
