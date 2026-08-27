@@ -22,6 +22,12 @@ from squadopt.experiments.control_residuals import (
     control_model_version,
     control_residual_manifest,
 )
+from squadopt.experiments.design import (
+    EXPERIMENT_DESIGN_CONTRACT_VERSION,
+    DesignKind,
+    ExperimentDesign,
+    StrategyObjective,
+)
 from squadopt.experiments.models import (
     CandidateAssessment,
     FrozenCandidate,
@@ -179,6 +185,7 @@ __all__ = [
     "DEFAULT_DEVELOPMENT_SEASONS",
     "DEFAULT_FORM_WINDOWS",
     "DEFAULT_HOLDOUT_SEASONS",
+    "EXPERIMENT_DESIGN_CONTRACT_VERSION",
     "MODES",
     "MULTI_GW_REHEARSAL_CONTRACT_VERSION",
     "NAIVE_PROJECTION_RULE",
@@ -209,10 +216,12 @@ __all__ = [
     "ChipWindowRule",
     "CsRemeasureConfig",
     "CsRemeasureStudy",
+    "DesignKind",
     "DifficultyDrift",
     "DixonColesConfig",
     "ExperimentCandidate",
     "ExperimentConfigurationError",
+    "ExperimentDesign",
     "ExperimentError",
     "ExperimentExecutionError",
     "FrozenCandidate",
@@ -254,6 +263,7 @@ __all__ = [
     "SeasonChainResult",
     "SeasonChainWeek",
     "SelectionOptimismResult",
+    "StrategyObjective",
     "TeamRating",
     "TeamRatingStudy",
     "TeamRatingStudyConfig",
