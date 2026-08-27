@@ -23,6 +23,11 @@ from pathlib import Path
 from typing import Final, Protocol
 
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
+from squadopt.platform.advice_documents import (
+    LEAGUE_STATE_CONTRACT_VERSION,
+    validate_advice_document,
+    validate_league_state,
+)
 
 LEAGUE_TREE_CONTRACT_VERSION: Final = "provisional_league_ui_v1"
 
@@ -135,15 +140,23 @@ class AdviceReadStore:
 
         payload = self._directory.league(league_id)
         if payload is None:
-            return {"league_id": int(league_id), "connected": False}
-        return {
-            "league_id": int(league_id),
-            "connected": True,
-            "league_name": payload.get("league_name"),
-            "season": payload.get("season"),
-            "gameweek": payload.get("gameweek"),
-            "member_count": len(_member_entry_ids(payload)),
-        }
+            document: dict[str, object] = {
+                "contract_version": LEAGUE_STATE_CONTRACT_VERSION,
+                "league_id": int(league_id),
+                "connected": False,
+            }
+        else:
+            document = {
+                "contract_version": LEAGUE_STATE_CONTRACT_VERSION,
+                "league_id": int(league_id),
+                "connected": True,
+                "league_name": payload.get("league_name"),
+                "season": payload.get("season"),
+                "gameweek": payload.get("gameweek"),
+                "member_count": len(_member_entry_ids(payload)),
+            }
+        validate_league_state(document)  # the route serves only what the contract names
+        return document
 
     def read_advice(
         self,
@@ -189,4 +202,7 @@ class AdviceReadStore:
             raise AdviceNotComputedError(
                 f"No advice computed for entry {entry_id} under {strategy}/{window}."
             )
+        # The route serves these bytes verbatim under a versioned claim, so bytes that
+        # do not carry the version are an internal error, never a published document.
+        validate_advice_document(cached)
         return cached

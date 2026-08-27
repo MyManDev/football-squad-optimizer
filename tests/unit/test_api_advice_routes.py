@@ -25,6 +25,29 @@ CONTEXT = AdviceRequestContext(
 )
 
 
+def _valid_advice_document(entry_id: int = 313686) -> bytes:
+    import json as _json
+
+    return _json.dumps(
+        {
+            "contract_version": "provisional_league_ui_v1",
+            "generated_at_utc": "2026-08-27T12:00:00Z",
+            "source_kind": "live",
+            "payload": {
+                "season": "2026-27",
+                "gameweek": 3,
+                "entry_id": entry_id,
+                "league_id": 352490,
+                "mode": "saf-puan",
+                "window": 1,
+                "moves": [],
+                "data_quality": "complete",
+                "missing_fields": [],
+            },
+        }
+    ).encode("utf-8")
+
+
 class _Context:
     def current(self) -> AdviceRequestContext:
         return CONTEXT
@@ -66,7 +89,11 @@ def test_league_state_and_the_three_answers(tmp_path: Path) -> None:
 
     unknown = client.get("/api/v1/leagues/999999")
     assert unknown.status_code == 200
-    assert unknown.json() == {"league_id": 999999, "connected": False}
+    assert unknown.json() == {
+        "contract_version": "league_state_v1",
+        "league_id": 999999,
+        "connected": False,
+    }
 
 
 def test_advice_is_a_pure_cache_read(tmp_path: Path) -> None:
@@ -90,11 +117,11 @@ def test_advice_is_a_pure_cache_read(tmp_path: Path) -> None:
         repository_commit=CONTEXT.repository_commit,
         configuration_fingerprint=CONTEXT.configuration_fingerprint,
     )
-    cache.put(key, b'{"payload": {"moves": []}}')
+    cache.put(key, _valid_advice_document())
 
     hit = client.get(url)
     assert hit.status_code == 200
-    assert hit.content == b'{"payload": {"moves": []}}'  # the exact cached bytes
+    assert hit.content == _valid_advice_document()  # the exact cached bytes
 
 
 def test_refusals_map_onto_status_codes(tmp_path: Path) -> None:
@@ -129,3 +156,48 @@ def test_without_a_store_the_routes_say_disabled_and_the_old_app_is_untouched(
 
     health = client.get("/health")
     assert health.status_code == 200  # the read-only app is exactly what it was
+
+
+def test_corrupted_cache_bytes_are_an_internal_error_not_a_published_document(
+    tmp_path: Path,
+) -> None:
+    """The review's exact risk: bytes that do not carry the versioned shape must not
+    travel out under the route's claim."""
+
+    client, cache = _client(tmp_path)
+    key = advice_cache_key(
+        advice_contract_version=CONTEXT.advice_contract_version,
+        capture_snapshot_id=CONTEXT.capture_snapshot_id,
+        season=CONTEXT.season,
+        gameweek=CONTEXT.gameweek,
+        league_id=LEAGUE_ID,
+        entry_id=313686,
+        strategy="saf-puan",
+        window=1,
+        projection_handoff_fingerprint=CONTEXT.projection_handoff_fingerprint,
+        repository_commit=CONTEXT.repository_commit,
+        configuration_fingerprint=CONTEXT.configuration_fingerprint,
+    )
+    cache.put(key, b'{"anything": "at all"}')
+
+    response = client.get(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/313686/advice?strategy=saf-puan&window=1"
+    )
+
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+    assert "anything" not in response.text  # the corrupted bytes never travel out
+
+
+def test_the_committed_read_schemas_match_their_generators() -> None:
+    import json
+
+    from squadopt.platform.advice_documents import (
+        ADVICE_READ_SCHEMA_PATH,
+        LEAGUE_STATE_SCHEMA_PATH,
+        advice_read_schema,
+        league_state_schema,
+    )
+
+    assert json.loads(ADVICE_READ_SCHEMA_PATH.read_text(encoding="utf-8")) == advice_read_schema()
+    assert json.loads(LEAGUE_STATE_SCHEMA_PATH.read_text(encoding="utf-8")) == league_state_schema()

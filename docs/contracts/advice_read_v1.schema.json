@@ -1,0 +1,81 @@
+{
+  "$id": "https://squadopt.dev/contracts/advice_read_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "provisional_league_ui_v1",
+      "type": "string"
+    },
+    "generated_at_utc": {
+      "pattern": "Z$",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "properties": {
+        "data_quality": {
+          "type": "string"
+        },
+        "entry_id": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "gameweek": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "league_id": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "missing_fields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "moves": {
+          "type": "array"
+        },
+        "season": {
+          "type": "string"
+        },
+        "window": {
+          "enum": [
+            1,
+            3,
+            5
+          ],
+          "type": "integer"
+        }
+      },
+      "required": [
+        "season",
+        "gameweek",
+        "entry_id",
+        "league_id",
+        "mode",
+        "window",
+        "moves",
+        "data_quality",
+        "missing_fields"
+      ],
+      "type": "object"
+    },
+    "source_kind": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "contract_version",
+    "generated_at_utc",
+    "source_kind",
+    "payload"
+  ],
+  "title": "SquadOpt served advice document",
+  "type": "object"
+}

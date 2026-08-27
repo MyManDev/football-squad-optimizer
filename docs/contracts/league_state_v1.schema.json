@@ -1,0 +1,59 @@
+{
+  "$id": "https://squadopt.dev/contracts/league_state_v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "connected": {
+      "type": "boolean"
+    },
+    "contract_version": {
+      "const": "league_state_v1",
+      "type": "string"
+    },
+    "gameweek": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "league_id": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "league_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "member_count": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "season": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "contract_version",
+    "league_id",
+    "connected"
+  ],
+  "title": "SquadOpt league connection state",
+  "type": "object"
+}

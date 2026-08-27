@@ -20,6 +20,7 @@ from squadopt.api.views import (
     PublishedViewStore,
 )
 from squadopt.platform import BACKEND_API_VERSION, ApiError, ApiErrorResponse, ApiServiceInfo
+from squadopt.platform.advice_documents import AdviceDocumentError
 from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
     AdviceNotComputedError,
@@ -131,6 +132,11 @@ def create_app(
     @application.exception_handler(AdviceNotComputedError)
     async def advice_not_computed(_request: Request, error: AdviceNotComputedError) -> JSONResponse:
         return _contract_error(404, "NOT_COMPUTED", str(error))
+
+    @application.exception_handler(AdviceDocumentError)
+    async def advice_document_invalid(request: Request, error: AdviceDocumentError) -> JSONResponse:
+        _log_exception("api.advice_document_invalid", request, error)
+        return _contract_error(500, "INTERNAL_ERROR", "The stored advice is unavailable.")
 
     @application.exception_handler(AdviceBackendNotReadyError)
     async def advice_not_ready(

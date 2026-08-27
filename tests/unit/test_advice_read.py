@@ -29,6 +29,29 @@ CONTEXT = AdviceRequestContext(
 )
 
 
+def _valid_advice_document(entry_id: int = 313686) -> bytes:
+    import json as _json
+
+    return _json.dumps(
+        {
+            "contract_version": "provisional_league_ui_v1",
+            "generated_at_utc": "2026-08-27T12:00:00Z",
+            "source_kind": "live",
+            "payload": {
+                "season": "2026-27",
+                "gameweek": 3,
+                "entry_id": entry_id,
+                "league_id": 352490,
+                "mode": "saf-puan",
+                "window": 1,
+                "moves": [],
+                "data_quality": "complete",
+                "missing_fields": [],
+            },
+        }
+    ).encode("utf-8")
+
+
 class _Context:
     def __init__(self, context: AdviceRequestContext | None) -> None:
         self._context = context
@@ -70,7 +93,12 @@ def test_league_state_reads_the_published_tree_and_counts_humans(tmp_path: Path)
     connected = store.league_state(LEAGUE_ID)
     assert connected["connected"] is True
     assert connected["member_count"] == 2  # the system row is not a member
-    assert store.league_state(999999) == {"league_id": 999999, "connected": False}
+    assert store.league_state(999999) == {
+        "contract_version": "league_state_v1",
+        "league_id": 999999,
+        "connected": False,
+    }
+    assert connected["contract_version"] == "league_state_v1"
 
 
 def test_a_hit_returns_the_exact_cached_bytes(tmp_path: Path) -> None:
@@ -89,11 +117,11 @@ def test_a_hit_returns_the_exact_cached_bytes(tmp_path: Path) -> None:
         repository_commit=CONTEXT.repository_commit,
         configuration_fingerprint=CONTEXT.configuration_fingerprint,
     )
-    cache.put(key, b'{"payload": {"moves": []}}')
+    cache.put(key, _valid_advice_document())
 
     result = store.read_advice(league_id=LEAGUE_ID, entry_id=313686, strategy="saf-puan", window=1)
 
-    assert result == b'{"payload": {"moves": []}}'
+    assert result == _valid_advice_document()
     # An ignored rival on a rival-less strategy hits the same entry: forced null.
     with_rival = store.read_advice(
         league_id=LEAGUE_ID, entry_id=313686, strategy="saf-puan", window=1, rival_entry_id=2199732
