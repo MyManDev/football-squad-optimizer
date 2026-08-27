@@ -263,6 +263,7 @@ def _advise(**changes: object) -> ApiCommandRequest:
         "entry_id": 313686,
         "strategy": "saf-puan",
         "window": 1,
+        "capture_snapshot_id": "fpl-live-20260826T083133Z-d45f1bea8b68",
     }
     values.update(changes)
     return ApiCommandRequest(**values)  # type: ignore[arg-type]
@@ -275,7 +276,7 @@ def test_advise_round_trips_validates_and_pins_its_own_fingerprint() -> None:
     _validate(document, "AdviseCommandRequest")
     # Pinned like the decide fingerprint: a normalization change must declare itself.
     assert request.request_fingerprint == (
-        "55fa6a9c807bfd8de3e598ccd22deae004a087df3d941699f13c7e6a6e9d894f"
+        "c1ccaf17b696e15dbb5814f595f983862e0de7be0d39f569ea4e778dd7556ce6"
     )
     assert _advise(rival_entry_id=2199732).request_fingerprint != request.request_fingerprint
     assert _advise(window=3).request_fingerprint != request.request_fingerprint
@@ -285,6 +286,12 @@ def test_advise_shape_is_strict() -> None:
     with pytest.raises(BackendApiContractError, match="requires season"):
         _advise(window=None)
     with pytest.raises(BackendApiContractError, match="window must be 1, 3, or 5"):
+        _advise(window=True)  # a bool is not a window, whatever int(True) says
+    with pytest.raises(BackendApiContractError, match="capture_snapshot_id"):
+        _advise(capture_snapshot_id=None)
+    with pytest.raises(BackendApiContractError, match="accepts no league"):
+        _decide(capture_snapshot_id="fpl-live-x")
+    with pytest.raises(BackendApiContractError, match="window must be 1, 3, or 5"):
         _advise(window=2)
     with pytest.raises(BackendApiContractError, match="may not equal entry_id"):
         _advise(rival_entry_id=313686)
@@ -292,6 +299,24 @@ def test_advise_shape_is_strict() -> None:
         _advise(snapshot_id=SNAPSHOT_ID)
     with pytest.raises(BackendApiContractError, match="accepts no league"):
         _decide(league_id=352490)
+
+
+def test_a_new_capture_is_a_new_request_identity() -> None:
+    """The reviewer's dedup finding, pinned: same client fields, newer capture,
+    different fingerprint — stale jobs cannot be served across captures."""
+
+    first = _advise()
+    later = _advise(capture_snapshot_id="fpl-live-20260828T090000Z-aaaaaaaaaaaa")
+    assert first.request_fingerprint != later.request_fingerprint
+
+
+def test_the_schema_and_the_runtime_agree_season_is_required_for_advise() -> None:
+    import jsonschema
+
+    document = _advise().to_dict()
+    document["season"] = None
+    with pytest.raises(jsonschema.ValidationError):
+        _validate(document, "AdviseCommandRequest")
 
 
 def test_the_original_three_operations_did_not_move_a_byte() -> None:

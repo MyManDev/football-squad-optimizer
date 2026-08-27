@@ -135,6 +135,9 @@ class ApiCommandRequest:
     strategy: str | None = None
     window: int | None = None
     rival_entry_id: int | None = None
+    capture_snapshot_id: str | None = None
+    """Server-resolved, never client-supplied: which capture answers this request.
+    Part of the advise fingerprint so deduplication cannot outlive the capture."""
     contract_version: str = BACKEND_API_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
@@ -198,8 +201,19 @@ class ApiCommandRequest:
             "strategy",
             _optional_pattern(self.strategy, label="strategy", pattern=_NAME_PATTERN),
         )
-        if self.window is not None and self.window not in {1, 3, 5}:
+        if self.window is not None and (
+            isinstance(self.window, bool) or self.window not in {1, 3, 5}
+        ):
             raise BackendApiContractError("window must be 1, 3, or 5.")
+        object.__setattr__(
+            self,
+            "capture_snapshot_id",
+            _optional_pattern(
+                self.capture_snapshot_id,
+                label="capture_snapshot_id",
+                pattern=_IDENTIFIER_PATTERN,
+            ),
+        )
         self._validate_shape()
 
     def _validate_shape(self) -> None:
@@ -211,6 +225,7 @@ class ApiCommandRequest:
                 self.strategy,
                 self.window,
                 self.rival_entry_id,
+                self.capture_snapshot_id,
             )
         ):
             raise BackendApiContractError(
@@ -224,10 +239,11 @@ class ApiCommandRequest:
                 or self.entry_id is None
                 or self.strategy is None
                 or self.window is None
+                or self.capture_snapshot_id is None
             ):
                 raise BackendApiContractError(
                     "league.advise requires season, gameweek, league_id, entry_id, "
-                    "strategy, and window."
+                    "strategy, window, and the server-resolved capture_snapshot_id."
                 )
             if self.rival_entry_id is not None and self.rival_entry_id == self.entry_id:
                 raise BackendApiContractError("rival_entry_id may not equal entry_id.")
@@ -307,6 +323,9 @@ class ApiCommandRequest:
                     "strategy": self.strategy,
                     "window": self.window,
                     "rival_entry_id": self.rival_entry_id,
+                    # Server-resolved: the same client fields on a newer capture are a
+                    # different request, so deduplication cannot serve stale work.
+                    "capture_snapshot_id": self.capture_snapshot_id,
                 }
             )
         else:
@@ -360,6 +379,7 @@ class ApiCommandRequest:
                 "strategy",
                 "window",
                 "rival_entry_id",
+                "capture_snapshot_id",
             },
         }[operation]
         expected = common | specific
@@ -386,6 +406,7 @@ class ApiCommandRequest:
             strategy=document.get("strategy"),  # type: ignore[arg-type]
             window=document.get("window"),  # type: ignore[arg-type]
             rival_entry_id=document.get("rival_entry_id"),  # type: ignore[arg-type]
+            capture_snapshot_id=document.get("capture_snapshot_id"),  # type: ignore[arg-type]
         )
         if document["request_fingerprint"] != request.request_fingerprint:
             raise BackendApiContractError(
@@ -645,6 +666,9 @@ def backend_api_schema() -> dict[str, Any]:
     advise = _object(
         {
             **common_request,
+            # The runtime requires season for league.advise; the schema says the same
+            # thing, so the two cannot disagree about a valid request.
+            "season": season,
             "operation": {"type": "string", "const": "league.advise"},
             "gameweek": {"type": "integer", "minimum": 1},
             "league_id": {"type": "integer", "minimum": 1},
@@ -652,6 +676,7 @@ def backend_api_schema() -> dict[str, Any]:
             "strategy": {"type": "string", "pattern": _NAME_PATTERN.pattern},
             "window": {"type": "integer", "enum": [1, 3, 5]},
             "rival_entry_id": _nullable({"type": "integer", "minimum": 1}),
+            "capture_snapshot_id": identifier,
         }
     )
     decide_body = _object(
