@@ -296,6 +296,26 @@ const en = {
   },
   leagueMembers: {
     loading: "Loading league members…",
+    computeTitle: "Compute this plan",
+    computeBodySelf:
+      "Compute the selected strategy and window from your own squad, against the rival you pick.",
+    computeBodyOther:
+      "You are viewing another member. The computation starts from this member's public squad.",
+    computeRival: "Rival",
+    computeRivalNearest: "Nearest above in the standings",
+    computeButton: "Compute",
+    computeRequesting: "Sending the request…",
+    computeQueued: "Queued",
+    computeRunning: "Computing",
+    computeWaiting: "The answer will appear here when the computation finishes.",
+    computeWaitingWithFallback: "Showing the previously published plan below while this computes.",
+    computeDone: "Computed",
+    computeProvenance: (capture: string, at: string) => `Capture ${capture}, computed ${at}.`,
+    computeStaticFallback: "The backend was unreachable; this is the published static answer.",
+    computeUnavailable:
+      "Only the published site is available right now; this combination was not published.",
+    computeFailed:
+      "The computation did not finish. The published plan, where one exists, still stands.",
     viewerTitle: "Which one is you?",
     viewerBody:
       "Pick your own row to get advice from your squad. This is a claim, not a login: anyone can pick anyone, and that is fine because everything shown here is already public after the deadline.",
@@ -789,6 +809,24 @@ const tr: MessageSchema<typeof en> = {
     lastWeek: (pointsValue) => `son puanlanan hafta: ortalamaya karşı ${pointsValue}`,
   },
   leagueMembers: {
+    computeTitle: "Bu planı hesapla",
+    computeBodySelf:
+      "Seçili strateji ve pencereyi kendi kadrondan, seçtiğin rakibe karşı hesaplat.",
+    computeBodyOther:
+      "Başka bir üyeye bakıyorsun. Hesap bu üyenin herkese açık kadrosundan başlar.",
+    computeRival: "Rakip",
+    computeRivalNearest: "Sıralamada hemen üstündeki",
+    computeButton: "Hesapla",
+    computeRequesting: "İstek gönderiliyor…",
+    computeQueued: "Kuyrukta",
+    computeRunning: "Hesaplanıyor",
+    computeWaiting: "Hesap bitince cevap burada görünecek.",
+    computeWaitingWithFallback: "Hesap sürerken aşağıda daha önce yayınlanmış plan gösteriliyor.",
+    computeDone: "Hesaplandı",
+    computeProvenance: (capture: string, at: string) => `Capture ${capture}, hesap ${at}.`,
+    computeStaticFallback: "Backend'e ulaşılamadı; bu, yayınlanmış statik cevap.",
+    computeUnavailable: "Şu an yalnız yayınlanmış site var; bu kombinasyon yayınlanmamış.",
+    computeFailed: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
     viewerTitle: "Hangisi sensin?",
     viewerBody:
       "Kendi satırını seç ki tavsiye kendi kadrondan hesaplansın. Bu bir beyandır, giriş değil: herkes herkesi seçebilir ve bu sorun değil, çünkü burada gösterilen her şey son tarihten sonra zaten herkese açık.",
