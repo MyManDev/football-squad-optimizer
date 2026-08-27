@@ -1,6 +1,7 @@
 """Deterministic CP-SAT optimizer for multi-gameweek transfer planning."""
 
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from time import perf_counter
@@ -747,12 +748,41 @@ def _extract_plan(
     )
 
 
+def _forbid_squads(
+    artifacts: _PlanArtifacts,
+    first_week: pd.DataFrame,
+    excluded_squads: Sequence[frozenset[object]],
+    squad_size: int,
+) -> None:
+    """Rule out squads a caller has already been given, and nothing else.
+
+    A no-good cut per squad: of those fifteen players, at most fourteen may be held in
+    the opening week. Players the horizon does not carry are ignored rather than refused —
+    an excluded squad from an older capture may name someone since removed, and refusing
+    it would turn a stale exclusion into a failed plan.
+    """
+
+    if not excluded_squads:
+        return
+    # Player ids are whatever the horizon carries — codes in production, labels in
+    # tests — so they are matched as they are rather than coerced.
+    column_of = {player: index for index, player in enumerate(first_week["player_id"])}
+    for squad in excluded_squads:
+        columns = [column_of[player] for player in squad if player in column_of]
+        if len(columns) < squad_size:
+            continue
+        artifacts.model.add(
+            sum(artifacts.squad_vars[0][column] for column in columns) <= squad_size - 1
+        )
+
+
 def optimize_transfer_plan(
     horizon: PlanningHorizon,
     initial_state: InitialSquadState,
     optimization_config: OptimizationConfig,
     transfer_config: TransferPlanningConfig | None = None,
     chips: ChipAvailability | None = None,
+    excluded_squads: Sequence[frozenset[object]] = (),
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
 
@@ -760,6 +790,13 @@ def optimize_transfer_plan(
     (bench boost, triple captain, wildcard); omitted or empty, the planner is exactly
     the chip-less planner. Each available chip is played at most once in the horizon
     and at most one chip is played per gameweek.
+
+    ``excluded_squads`` forbids first-week squads that have already been produced, so a
+    caller can ask for the next-best plan rather than the same one. Each entry becomes a
+    no-good cut: at most fourteen of those fifteen may be held together, which rules out
+    that exact squad and nothing else. This is what lets a mode choose between plans
+    instead of re-ranking a menu of one — without it every mode returns the optimizer's
+    single answer under a different name.
     """
 
     if not isinstance(horizon, PlanningHorizon):
@@ -795,6 +832,7 @@ def optimize_transfer_plan(
         settings,
         availability,
     )
+    _forbid_squads(artifacts, players_by_week[0], excluded_squads, optimization_config.squad_size)
     started_at = perf_counter()
     deadline = started_at + optimization_config.solver_time_limit_seconds
     primary_solver = cp_model.CpSolver()
