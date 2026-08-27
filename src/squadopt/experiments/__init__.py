@@ -146,6 +146,12 @@ from squadopt.experiments.selection_optimism import (
     measure_selection_optimism,
 )
 from squadopt.experiments.statistics import season_aware_moving_block_interval
+from squadopt.experiments.strategy_gate import (
+    STRATEGY_DECLARATION_CONTRACT_VERSION,
+    StrategyDeclaration,
+    StrategyGateResult,
+    run_strategy_gate,
+)
 from squadopt.experiments.team_rating import (
     TEAM_RATING_STUDY_CONTRACT_VERSION,
     DixonColesConfig,
@@ -201,6 +207,7 @@ __all__ = [
     "SEASON_CHAIN_CONTRACT_VERSION",
     "SELECTION_OPTIMISM_CONTRACT_VERSION",
     "SHRINKAGE_RULE_VERSION",
+    "STRATEGY_DECLARATION_CONTRACT_VERSION",
     "TEAM_RATING_STUDY_CONTRACT_VERSION",
     "TERMINAL_VALUE_STUDY_CONTRACT_VERSION",
     "BaselinePolicyObjective",
@@ -254,6 +261,8 @@ __all__ = [
     "SeasonChainResult",
     "SeasonChainWeek",
     "SelectionOptimismResult",
+    "StrategyDeclaration",
+    "StrategyGateResult",
     "TeamRating",
     "TeamRatingStudy",
     "TeamRatingStudyConfig",
@@ -282,6 +291,7 @@ __all__ = [
     "run_opponent_projection_study",
     "run_schedule_signal_study",
     "run_screening_experiment",
+    "run_strategy_gate",
     "run_team_rating_study",
     "run_terminal_value_study",
     "screening_result_to_dict",
