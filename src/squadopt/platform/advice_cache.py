@@ -23,6 +23,7 @@ swap, not a rewrite.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import os
@@ -162,8 +163,6 @@ class FileAdviceCache:
                 handle.write(payload)
             os.replace(temporary, path)
         except BaseException:
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary)
-            except FileNotFoundError:
-                pass
             raise
