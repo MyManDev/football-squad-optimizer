@@ -11,7 +11,7 @@ import { useDecisionSelection } from "../../moves/decisionSelection";
 import { Pitch } from "../../squad/components/Pitch";
 import { SquadPage } from "../../squad/pages/SquadPage";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import { loadEntryAdvice, loadEntrySquad } from "../data";
+import { LeagueDataMissing, loadEntryAdvice, loadEntrySquad } from "../data";
 import type { AdviceMove, EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import styles from "./LeagueMemberPage.module.css";
 
@@ -38,8 +38,18 @@ export function LeagueMemberPage() {
   if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
   if (squad.isPending || advice.isPending) return <EmptyState title={copy.loadingEntry} />;
-  if (squad.isError || advice.isError) {
+  if (squad.isError) {
     return <EmptyState title={copy.entryNotAvailable}>{copy.entryNotAvailableBody}</EmptyState>;
+  }
+  if (advice.isError) {
+    // Only this pair is solved per member; asking for another is a normal outcome, and
+    // saying "not available" for it would read as a fault the reader should report.
+    const uncomputed = advice.error instanceof LeagueDataMissing;
+    return (
+      <EmptyState title={uncomputed ? copy.adviceNotComputed : copy.entryNotAvailable}>
+        {uncomputed ? copy.adviceNotComputedBody : copy.entryNotAvailableBody}
+      </EmptyState>
+    );
   }
   return <LeagueMemberView squad={squad.data} advice={advice.data} />;
 }
@@ -168,13 +178,21 @@ export function LeagueMemberView({
 }
 
 function AdviceCard({ envelope }: { envelope: LeagueViewEnvelope<EntryAdvice> }) {
-  const { messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = envelope.payload;
   return (
     <Card title={copy.advice} aside={<ExampleDataBadge sourceKind={envelope.source_kind} />}>
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      {view.mode !== "saf-puan" && view.expected_points_cost != null ? (
+        <p className={styles.planCost}>
+          <strong className="num">
+            {copy.planCost(points(view.expected_points_cost, 1, locale))}
+          </strong>
+          {view.rival_label ? <span> · {copy.planRival(view.rival_label)}</span> : null}
+        </p>
+      ) : null}
       {view.moves.length === 0 ? (
         <p className={styles.muted}>
           {view.data_quality === "complete" ? copy.noMove : copy.noAdviceMissingData}

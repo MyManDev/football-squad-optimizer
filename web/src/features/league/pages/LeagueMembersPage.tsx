@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
+import { useIndex, useLedger } from "../../../data/queries";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
@@ -14,23 +15,77 @@ import styles from "./LeagueMembersPage.module.css";
 export function LeagueMembersPage() {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
+  const index = useIndex();
   const query = useQuery({
     queryKey: ["provisional-league-members"],
     queryFn: loadLeagueMembers,
     staleTime: 60_000,
   });
+  // Our row's week must match the week the published members are scored in, so it is read
+  // after the members document rather than beside it.
+  const scored = query.data?.payload.scored_gameweek ?? null;
+  const systemRow = useSystemRow(index.data?.payload.seasons[0], scored);
 
   if (query.isPending) return <EmptyState title={copy.loading} />;
   if (query.isError) {
     return <EmptyState title={copy.notAvailable}>{copy.notAvailableBody}</EmptyState>;
   }
-  return <LeagueMembersView envelope={query.data} />;
+  return <LeagueMembersView envelope={query.data} systemRow={systemRow} />;
 }
 
-export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<LeagueMembers> }) {
+/**
+ * Our own row, read from the ledger the site already publishes.
+ *
+ * The producer deliberately does not write it: a member's advice must be computed without
+ * reference to our squad, so the module that renders members never reads our ledger. That
+ * leaves the site to add the row from its own record — which is also the only place the
+ * number is settled rather than projected.
+ *
+ * No rank is claimed. Placing ourselves among the members needs their points, and the
+ * standings view does not carry them; a rank invented here would be the one number on the
+ * page that nobody measured.
+ */
+function useSystemRow(season: string | undefined, scoredGameweek: number | null): EntryView | null {
+  const ledger = useLedger(season);
+  const payload = ledger.data?.payload;
+  if (!payload || payload.settled_gameweeks === 0) return null;
+  const settled = payload.rows.filter((row) => row.settled && row.realized_net_score !== null);
+  // Our score and theirs share one column under one heading. If our latest settled week is
+  // not the week that heading names, the two numbers describe different weeks, so ours is
+  // withheld rather than shown beside a label it does not belong to.
+  const latest =
+    scoredGameweek === null
+      ? null
+      : (settled.find((row) => row.gameweek === scoredGameweek) ?? null);
+  return {
+    member_kind: "system",
+    entry_id: null,
+    manager_name: "SquadOpt",
+    team_name: "SquadOpt",
+    rank: 0,
+    gameweek_points: latest?.realized_net_score ?? null,
+    total_points: latest === null ? null : payload.total_realized_net_score,
+    movement: "unknown",
+    movement_places: null,
+    data_quality: "complete",
+  };
+}
+
+export function LeagueMembersView({
+  envelope,
+  systemRow = null,
+}: {
+  envelope: LeagueViewEnvelope<LeagueMembers>;
+  systemRow?: EntryView | null;
+}) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = envelope.payload;
+  // The example envelope carries its own system row; a live one never does, because the
+  // producer must not read our ledger. Appending unconditionally would double it.
+  const alreadyPresent = view.members.some((member) => member.member_kind === "system");
+  const rows: EntryView[] =
+    systemRow && !alreadyPresent ? [...view.members, systemRow] : view.members;
   return (
     <div className={styles.page}>
       <header className={styles.head}>
@@ -59,7 +114,9 @@ export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<L
                 <th scope="col">{copy.member}</th>
                 <th scope="col">{copy.team}</th>
                 <th scope="col" className={styles.right}>
-                  {copy.gameweekPoints}
+                  {view.scored_gameweek === null
+                    ? copy.gameweekPoints
+                    : copy.gameweekPointsFor(view.scored_gameweek)}
                 </th>
                 <th scope="col" className={styles.right}>
                   {copy.total}
@@ -68,7 +125,7 @@ export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<L
               </tr>
             </thead>
             <tbody>
-              {view.members.map((member) => (
+              {rows.map((member) => (
                 <MemberRow
                   key={member.member_kind === "system" ? "squadopt" : member.entry_id}
                   member={member}
@@ -78,6 +135,9 @@ export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<L
             </tbody>
           </table>
         </div>
+        {view.scored_gameweek === null ? (
+          <p className={styles.notice}>{copy.noScoredWeek}</p>
+        ) : null}
       </Card>
     </div>
   );
@@ -94,7 +154,7 @@ function MemberRow({ member, locale }: { member: EntryView; locale: string }) {
         : copy.movementLabel(member.movement, member.movement_places ?? 0);
   return (
     <tr className={member.member_kind === "system" ? styles.systemRow : undefined}>
-      <td className="num">{member.rank}</td>
+      <td className="num">{member.rank === 0 ? "—" : member.rank}</td>
       <td>
         <Link
           className={styles.memberLink}

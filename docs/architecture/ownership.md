@@ -99,9 +99,14 @@ claim that everything about it is known.
 
 ## Live-path freeze window
 
-No merge touching `live/`, `optimization/`, `prediction/` or `scenarios/` inside **24 hours
-either side of a deadline**. The deadline is whatever the current capture publishes, not a date
-written here — `run_season_tick` resolves it from the snapshot.
+No merge touching `live/`, `optimization/`, `planning/`, `prediction/` or `scenarios/` inside
+**24 hours either side of a deadline**. The deadline is whatever the current capture publishes,
+not a date written here — `run_season_tick` resolves it from the snapshot.
+
+`planning/` joined this list when the season did: the opening week's only decision was a squad
+from scratch through `optimization/`, but every deadline since is a transfer plan through
+`planning/`, and the league tree publishes fifteen members' plans from the same module. A
+planner change inside the window is a live-decision change, whatever its diff says.
 
 Inside the window the only permitted changes are a fix for a blocker found by the runbook's own
 checks, recorded with the blocker report template (`../gw1_blocker_report_template.md`). Docs

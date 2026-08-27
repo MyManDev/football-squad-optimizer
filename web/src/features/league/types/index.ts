@@ -42,6 +42,8 @@ export interface LeagueMembers {
   season: string;
   gameweek: number;
   public_after_deadline: boolean;
+  /** The gameweek the members' points were scored in; null while none is final. */
+  scored_gameweek: number | null;
   members: EntryView[];
 }
 
@@ -49,6 +51,7 @@ export interface EntrySquad {
   league_id: number;
   season: string;
   gameweek: number;
+  scored_gameweek: number | null;
   entry: HumanEntryView;
   starting_xi: PlayerView[];
   bench: PlayerView[];
@@ -95,6 +98,14 @@ export interface EntryAdvice {
   window: WindowSize;
   source_snapshot_id: string | null;
   moves: AdviceMove[];
+  /**
+   * The whole plan's expected-points price against the pure-points pick — the only
+   * cross-mode number the producer publishes (never a probability). Absent on documents
+   * published before the competitive modes were computed.
+   */
+  expected_points_cost?: number;
+  /** The league neighbour the competitive modes were priced against; null for saf-puan. */
+  rival_label?: string | null;
   data_quality: EntryDataQuality;
   missing_fields: string[];
 }

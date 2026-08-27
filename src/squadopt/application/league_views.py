@@ -1,11 +1,13 @@
 """Render per-member league views: the JSON tree the site's league pages read.
 
-The web side (Package 5) reads ``data/league/members.json``, ``entry-{id}.json`` and
-``advice-{id}.json`` under the provisional contract its ``PROVISIONAL_CONTRACT.md``
-records; this module is the producing half. It consumes the `EntryPicksProvider` seam —
-today a test double, after #127 the capture-built provider — and turns each member's
-held squad into a transfer recommendation with the same function that decides our own
-gameweek.
+The web side (Package 5) reads ``data/league/members.json``, ``entries/{id}.json`` and
+``advice/{id}/{mode}/{window}.json`` under the provisional contract its
+``PROVISIONAL_CONTRACT.md`` records; this module is the producing half. It consumes the
+`EntryPicksProvider` seam — today a test double, after #127 the capture-built provider —
+and turns each member's held squad into a transfer recommendation with the same function
+that decides our own gameweek. Given scenario paths it also prices each member's transfer
+menu per play mode against a real rival from their own league (`mode_selection`), and
+publishes one advice file per computed mode.
 
 Two rules are load-bearing and tested rather than asserted:
 
@@ -33,15 +35,35 @@ from squadopt.application.entries import (
     EntryRegistration,
     held_squad_from_picks,
 )
+from squadopt.application.mode_selection import (
+    ModeSelectionError,
+    choose_rival,
+    rival_squad_from_picks,
+    select_member_modes,
+)
 from squadopt.data.errors import DataError
+from squadopt.experiments.config import ExperimentError
 from squadopt.live import (
     Projection,
     RecommendationInputs,
     SeasonRules,
     build_transfer_recommendation,
 )
+from squadopt.live.transfers import TransferDecision, plan_transfer_menu
+from squadopt.scenarios import RivalSquad
+from squadopt.scenarios.paths import ScenarioPathSet
 
 LEAGUE_VIEW_CONTRACT_VERSION = "provisional_league_ui_v1"
+
+# The site addresses advice by mode and window. The baseline pair — saf-puan at window
+# one — is always computed, and it is always the deterministic planner's own answer.
+# The competitive modes are computed only when the caller supplies scenario paths to
+# price the member's menu on (`mode_paths`); without them the other combinations are
+# simply absent and the page says so. Windows beyond one are not computed at all:
+# publishing a file for a combination nobody computed would make the site show an
+# answer where none was measured.
+COMPUTED_MODE = "saf-puan"
+COMPUTED_WINDOW = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +74,29 @@ class MemberViewResult:
     label: str
     rendered: bool
     reason: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class MemberStanding:
+    """Where a member sits in the league, as the standings page reports it.
+
+    Declared here rather than imported from the data adapter so this module states what
+    it needs rather than what one source happens to publish: a caller reading a different
+    standings source maps into this and nothing else changes.
+
+    Points are optional, and ``None`` is a claim rather than a placeholder: it says the
+    capture does not prove this member's score for the week being published — no history
+    row for it, or the week not yet final. A zero would say the member scored nothing,
+    which is a different and possibly untrue statement. Both must survive to the page, so
+    the renderer distinguishes them rather than collapsing both to falsy.
+    """
+
+    entry_id: int
+    team_name: str
+    manager_name: str
+    rank: int
+    gameweek_points: int | None = None
+    total_points: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,25 +132,124 @@ def _advice_player(row: "pd.Series[Any]") -> dict[str, object]:
     }
 
 
+def _entry_player(
+    row: "pd.Series[Any]", *, role: str, is_captain: bool, bench_order: int | None
+) -> dict[str, object]:
+    name = str(row["name"])
+    return {
+        "player_id": int(str(row["player_id"])),
+        "name": name,
+        "short_name": name.rsplit(" ", 1)[-1],
+        "position": str(row["position"]),
+        "team": str(row["team_id"]),
+        "price_tenths": int(str(row["price_tenths"])),
+        "expected_points": float(str(row["expected_points"])),
+        "event_points": None,
+        "is_captain": is_captain,
+        "bench_order": bench_order,
+        "role": role,
+    }
+
+
+def _entry_squad_payload(
+    picks: EntryPicks,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    *,
+    league_id: int,
+    member_row: Mapping[str, object],
+    missing: list[str],
+    scored_gameweek: int | None,
+) -> dict[str, object]:
+    """The member's own squad, as the site's entry page renders it."""
+
+    pool = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
+    starters: list[dict[str, object]] = []
+    bench: list[dict[str, object]] = []
+    bench_index = 0
+    for player_id in picks.squad:
+        row = pool.get(int(player_id))
+        if row is None:
+            continue
+        if int(player_id) in set(picks.starting_xi):
+            starters.append(
+                _entry_player(
+                    row,
+                    role="starter",
+                    is_captain=int(player_id) == int(picks.captain),
+                    bench_order=None,
+                )
+            )
+        else:
+            bench_index += 1
+            bench.append(
+                _entry_player(row, role="bench", is_captain=False, bench_order=bench_index)
+            )
+    return {
+        "league_id": int(league_id),
+        "season": picks.season,
+        "gameweek": picks.gameweek + 1,
+        "scored_gameweek": scored_gameweek,
+        "entry": dict(member_row),
+        "starting_xi": starters,
+        "bench": bench,
+        "bank_tenths": int(picks.bank_tenths),
+        "free_transfers": int(picks.free_transfers),
+        "free_transfers_known": bool(picks.free_transfers_known),
+        "chips_used": {name: list(weeks) for name, weeks in picks.chips_used.items()},
+        "purchase_prices_known": bool(picks.purchase_prices_known),
+        "source_snapshot_id": picks.source_snapshot_id,
+        # Comparing a member's gameweek score with ours needs both scores; the standings
+        # view does not carry points yet, so this stays absent rather than guessed.
+        "squadopt_comparison": None,
+        "data_quality": "partial" if missing else "complete",
+        "missing_fields": list(missing),
+    }
+
+
 def _member_advice(
     picks: EntryPicks,
     inputs: RecommendationInputs,
     projection: Projection,
     rules: SeasonRules,
+    *,
+    league_id: int,
+    mode: str = COMPUTED_MODE,
+    decision: TransferDecision | None = None,
+    expected_points_cost: float = 0.0,
+    rival_label: str | None = None,
 ) -> dict[str, object]:
-    """One member's advice payload — from their squad and the shared projection only."""
+    """One member's advice payload — from their squad and the shared projection only.
 
-    prices = {
-        int(str(row["player_id"])): int(str(row["price_tenths"]))
-        for _, row in inputs.players.iterrows()
-    }
-    held = held_squad_from_picks(picks, current_prices=prices)
-    recommendation = build_transfer_recommendation(inputs, projection, held, rules)
-    transfers = recommendation.transfers
+    Without ``decision`` this solves the one-week pure-points plan itself: the site's
+    saf-puan baseline, exactly what the page always showed. With one — a menu entry a
+    mode's selector chose — it renders that decision instead, labelled ``mode`` and
+    carrying the mode's expected-points price tag. A competitive mode without a supplied
+    decision is refused rather than silently re-labelled as the baseline.
+    """
+
+    if mode != COMPUTED_MODE and decision is None:
+        raise EntryError(f"Mode {mode!r} advice needs the decision its selector chose.")
+    pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
+    if decision is None:
+        prices = {
+            int(str(row["player_id"])): int(str(row["price_tenths"]))
+            for _, row in inputs.players.iterrows()
+        }
+        held = held_squad_from_picks(picks, current_prices=prices)
+        recommendation = build_transfer_recommendation(inputs, projection, held, rules)
+        transfers = recommendation.transfers
+        by_id = (
+            {int(str(row["player_id"])): row for _, row in recommendation.squad.iterrows()}
+            if transfers is not None
+            else {}
+        )
+    else:
+        transfers = decision
+        by_id = pool_by_id
+    reason_code = "window_value" if mode == COMPUTED_MODE else "mode_tradeoff"
     moves: list[dict[str, object]] = []
     if transfers is not None:
-        by_id = {int(str(row["player_id"])): row for _, row in recommendation.squad.iterrows()}
-        pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
         record = transfers.as_record()
         outs_raw = record.get("transfers_out", [])
         ins_raw = record.get("transfers_in", [])
@@ -134,7 +278,7 @@ def _member_advice(
                     ),
                     "expected_points_delta": delta,
                     "expected_points_cost": float(str(record.get("transfer_hit_points", 0.0))),
-                    "reason_code": "window_value",
+                    "reason_code": reason_code,
                 }
             )
     missing: list[str] = []
@@ -146,10 +290,15 @@ def _member_advice(
         "season": picks.season,
         "gameweek": picks.gameweek + 1,
         "entry_id": picks.entry_id,
-        "mode": "saf_puan",
-        "window": 1,
+        "league_id": league_id,
+        "mode": mode,
+        "window": COMPUTED_WINDOW,
         "source_snapshot_id": picks.source_snapshot_id,
         "moves": moves,
+        # The mode's whole-plan price against the pure-points pick, in expected points —
+        # the only cross-mode number the site may show (no probability ships, ever).
+        "expected_points_cost": float(expected_points_cost),
+        "rival_label": rival_label,
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
     }
@@ -165,14 +314,61 @@ def build_league_views(
     league_id: int,
     league_name: str,
     out_dir: Path,
+    standings: Mapping[int, MemberStanding] | None = None,
+    scored_gameweek: int | None = None,
     now: datetime | None = None,
+    mode_paths: ScenarioPathSet | None = None,
+    menu_plan_count: int = 5,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
     The system's own squad is deliberately not an input: member advice must be
     invariant to it (the test pins this bit-for-bit), and the system's row on the
     members page is rendered by the site from its own ledger views, not here.
+
+    ``mode_paths`` — one-week scenario paths for this deadline — turns on the
+    competitive modes: each member's transfer menu is priced on the shared paths
+    against a real rival from their own league (their nearest standings neighbour),
+    and one advice file per competitive mode is written beside the baseline. The
+    baseline saf-puan file stays byte-identical either way: it is always the
+    deterministic planner's answer, never a scenario-scored re-pick. A member whose
+    menu or selection fails keeps their baseline advice, with the reason recorded.
     """
+
+    placings = dict(standings or {})
+    if mode_paths is not None:
+        window_weeks = tuple(int(week) for week in mode_paths.target.gameweeks)
+        if window_weeks != (int(inputs.deadline.gameweek),):
+            raise ValueError(
+                f"mode_paths cover gameweeks {window_weeks!r}; these views decide "
+                f"gameweek {int(inputs.deadline.gameweek)}."
+            )
+    # A score and the week it belongs to are one fact. The members view is labelled with
+    # the *upcoming* gameweek, so points travelling without their own week would be read
+    # under the wrong heading — publish both or neither.
+    if scored_gameweek is None and any(
+        placing.gameweek_points is not None or placing.total_points is not None
+        for placing in placings.values()
+    ):
+        raise ValueError(
+            "Member points were supplied without the gameweek they were scored in. "
+            "The number and its week ship together or not at all."
+        )
+
+    def _row(entry_id: int, label: str, quality: str) -> dict[str, object]:
+        placing = placings.get(entry_id)
+        return {
+            "member_kind": "human",
+            "entry_id": entry_id,
+            "manager_name": placing.manager_name if placing else label,
+            "team_name": placing.team_name if placing else None,
+            "rank": placing.rank if placing else 0,
+            "gameweek_points": placing.gameweek_points if placing else None,
+            "total_points": placing.total_points if placing else None,
+            "movement": "unknown",
+            "movement_places": None,
+            "data_quality": quality,
+        }
 
     generated = (now or datetime.now(UTC)).strftime("%Y-%m-%dT%H:%M:%SZ")
     season = inputs.season
@@ -182,48 +378,138 @@ def build_league_views(
     written: list[str] = []
     results: list[MemberViewResult] = []
     member_rows: list[dict[str, object]] = []
+
+    # Every member's picks are fetched once, up front: a rival is another member's real
+    # squad, so the batch needs all of them before any single member's modes can render.
+    # The system's squad is not here — the provider reads the league capture, which
+    # cannot contain the ledger's paper entry — so rival choice preserves invariance.
+    fetched: dict[int, EntryPicks | str] = {}
     for registration in registrations:
         entry_id = int(registration.entry_id)
         try:
-            picks = provider.picks(entry_id, season, gameweek - 1)
-            advice = _member_advice(picks, inputs, projection, rules)
+            fetched[entry_id] = provider.picks(entry_id, season, gameweek - 1)
+        except (EntryError, DataError) as error:
+            fetched[entry_id] = str(error)
+    rival_squads: dict[int, RivalSquad] = {}
+    ranks: dict[int, int] = {}
+    if mode_paths is not None:
+        for registration in registrations:
+            entry_id = int(registration.entry_id)
+            picks_or_error = fetched[entry_id]
+            if isinstance(picks_or_error, EntryPicks):
+                placing = placings.get(entry_id)
+                label = placing.team_name if placing is not None else registration.label
+                rival_squads[entry_id] = rival_squad_from_picks(picks_or_error, label=label)
+        ranks = {entry_id: placing.rank for entry_id, placing in placings.items()}
+        prices = {
+            int(str(row["player_id"])): int(str(row["price_tenths"]))
+            for _, row in inputs.players.iterrows()
+        }
+
+    for registration in registrations:
+        entry_id = int(registration.entry_id)
+        picks_or_error = fetched[entry_id]
+        try:
+            if not isinstance(picks_or_error, EntryPicks):
+                raise EntryError(picks_or_error)
+            picks = picks_or_error
+            advice = _member_advice(picks, inputs, projection, rules, league_id=league_id)
         except (EntryError, DataError) as error:
             results.append(MemberViewResult(entry_id, registration.label, False, reason=str(error)))
-            member_rows.append(
-                {
-                    "member_kind": "human",
-                    "entry_id": entry_id,
-                    "manager_name": registration.label,
-                    "team_name": None,
-                    "rank": 0,
-                    "gameweek_points": None,
-                    "total_points": None,
-                    "movement": "unknown",
-                    "movement_places": None,
-                    "data_quality": "empty",
-                }
-            )
+            member_rows.append(_row(entry_id, registration.label, "empty"))
             continue
-        path = out / f"advice-{entry_id}.json"
-        path.write_text(
+        quality = str(advice["data_quality"])
+        member_row = _row(entry_id, registration.label, quality)
+        raw_missing = advice.get("missing_fields")
+        missing = [str(field) for field in raw_missing] if isinstance(raw_missing, list) else []
+
+        # The site addresses these by path: entries/{id}.json for the squad, and
+        # advice/{id}/{mode}/{window}.json for a decision under one mode and horizon.
+        squad_path = out / "entries" / f"{entry_id}.json"
+        squad_path.parent.mkdir(parents=True, exist_ok=True)
+        squad_payload = _entry_squad_payload(
+            picks,
+            inputs,
+            projection,
+            league_id=league_id,
+            member_row=member_row,
+            missing=missing,
+            scored_gameweek=scored_gameweek,
+        )
+        squad_path.write_text(
+            json.dumps(_envelope(squad_payload, generated_at_utc=generated), indent=2),
+            encoding="utf-8",
+            newline="\n",
+        )
+        written.append(f"entries/{entry_id}.json")
+
+        advice_path = out / "advice" / str(entry_id) / COMPUTED_MODE / f"{COMPUTED_WINDOW}.json"
+        advice_path.parent.mkdir(parents=True, exist_ok=True)
+        advice_path.write_text(
             json.dumps(_envelope(advice, generated_at_utc=generated), indent=2),
             encoding="utf-8",
+            newline="\n",
         )
-        written.append(path.name)
-        results.append(MemberViewResult(entry_id, registration.label, True))
-        member_rows.append(
-            {
-                "member_kind": "human",
-                "entry_id": entry_id,
-                "manager_name": registration.label,
-                "team_name": None,
-                "rank": 0,
-                "gameweek_points": None,
-                "total_points": None,
-                "movement": "unknown",
-                "movement_places": None,
-                "data_quality": advice["data_quality"],
-            }
+        written.append(f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json")
+
+        mode_note = ""
+        rival = (
+            choose_rival(
+                entry_id,
+                ranks,
+                {i: squad for i, squad in rival_squads.items() if i != entry_id},
+            )
+            if mode_paths is not None
+            else None
+        )
+        # Without a league neighbour the competitive modes are honestly absent, and the
+        # member's menu is not worth solving for nobody.
+        if mode_paths is not None and rival is not None:
+            try:
+                held = held_squad_from_picks(picks, current_prices=prices)
+                menu = plan_transfer_menu(
+                    inputs, projection, held, rules, plan_count=menu_plan_count
+                )
+                selection = select_member_modes(menu, mode_paths, rival)
+                for item in selection.advice:
+                    if item.mode == COMPUTED_MODE:
+                        # The published saf-puan stays the deterministic baseline above;
+                        # a scenario-mean re-pick of the same menu would let sampling
+                        # noise move the one answer the control also gives.
+                        continue
+                    mode_payload = _member_advice(
+                        picks,
+                        inputs,
+                        projection,
+                        rules,
+                        league_id=league_id,
+                        mode=item.mode,
+                        decision=item.decision,
+                        expected_points_cost=item.expected_points_cost,
+                        rival_label=item.rival_label,
+                    )
+                    mode_path = (
+                        out / "advice" / str(entry_id) / item.mode / f"{COMPUTED_WINDOW}.json"
+                    )
+                    mode_path.parent.mkdir(parents=True, exist_ok=True)
+                    mode_path.write_text(
+                        json.dumps(_envelope(mode_payload, generated_at_utc=generated), indent=2),
+                        encoding="utf-8",
+                        newline="\n",
+                    )
+                    written.append(f"advice/{entry_id}/{item.mode}/{COMPUTED_WINDOW}.json")
+            except (EntryError, DataError, ModeSelectionError, ExperimentError, KeyError) as error:
+                # One member's modes failing must not sink their baseline, or the batch.
+                # KeyError is the scenario scorer meeting a player the paths do not
+                # carry — a data gap for this member, not a reason the league fails.
+                mode_note = f"competitive modes unavailable: {error}"
+
+        results.append(MemberViewResult(entry_id, registration.label, True, reason=mode_note))
+        member_rows.append(member_row)
+    # The standings order is the league's order; registry order is arbitrary.
+    if placings:
+        member_rows.sort(
+            key=lambda row: (int(str(row["rank"])) or 10**6, int(str(row["entry_id"])))
         )
     members_payload = {
         "league_id": int(league_id),
@@ -231,12 +517,14 @@ def build_league_views(
         "season": season,
         "gameweek": gameweek,
         "public_after_deadline": True,
+        "scored_gameweek": scored_gameweek,
         "members": member_rows,
     }
     members_path = out / "members.json"
     members_path.write_text(
         json.dumps(_envelope(members_payload, generated_at_utc=generated), indent=2),
         encoding="utf-8",
+        newline="\n",
     )
     written.append(members_path.name)
     return LeagueViewsReport(

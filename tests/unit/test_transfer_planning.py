@@ -339,6 +339,65 @@ def test_result_is_deterministic_and_inputs_are_not_mutated(
     assert first.objective_value == second.objective_value
 
 
+def test_wall_clock_limits_do_not_choose_the_plan(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """Two calls that differ only in their wall clock agree squad for squad.
+
+    A wall-clock limit only decides anything when it is what stops the search -- and then
+    the answer is a function of the CPU share the process happened to receive (#247).
+    When the caller brings no deterministic budget the planner supplies one and raises
+    the wall to a ceiling that does not bind, so the caller's wall figure stops deciding
+    which members prove their plan optimal.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    tight = replace(small_config, solver_time_limit_seconds=0.05)
+    loose = replace(small_config, solver_time_limit_seconds=60.0)
+
+    first = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, tight)
+    second = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, loose)
+
+    assert [week.selected_squad["player_id"].tolist() for week in first.weeks] == [
+        week.selected_squad["player_id"].tolist() for week in second.weeks
+    ]
+    assert (
+        first.diagnostics["deterministic_time_used"]
+        == second.diagnostics["deterministic_time_used"]
+    )
+    for result in (first, second):
+        assert result.diagnostics["deterministic_budget_source"] == "planner_default"
+        assert (
+            result.diagnostics["solver_deterministic_time_limit"]
+            == planning_optimizer.PLAN_DETERMINISTIC_TIME_LIMIT
+        )
+        assert (
+            float(str(result.diagnostics["wall_time_limit_seconds"]))
+            >= planning_optimizer.PLAN_WALL_CEILING_SECONDS
+        )
+
+
+def test_a_caller_that_brings_its_own_deterministic_budget_keeps_it(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The planner default fills a gap; it does not overrule a choice already made."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    chosen = replace(
+        small_config,
+        solver_time_limit_seconds=30.0,
+        solver_deterministic_time_limit=2.0,
+    )
+
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, chosen)
+
+    assert result.diagnostics["deterministic_budget_source"] == "caller"
+    assert result.diagnostics["solver_deterministic_time_limit"] == 2.0
+    assert result.diagnostics["wall_time_limit_seconds"] == 30.0
+
+
 def test_unknown_solver_status_is_structured(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,
@@ -810,3 +869,73 @@ def test_chip_plans_are_deterministic_and_fingerprinted(
         ChipAvailability(available={"bboost": {1}}).availability_fingerprint
         != ChipAvailability(available={"bboost": {2}}).availability_fingerprint
     )
+
+
+# --- alternative plans, so a mode has something to choose between ----------------------
+
+
+def test_an_excluded_squad_is_not_returned_again(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The planner returns one answer; a menu needs the next-best ones too.
+
+    Without this, every play mode re-ranks a list of one and returns the same transfers
+    under four different names — a computation the reader would reasonably assume differs.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    initial = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    best = optimize_transfer_plan(horizon, initial, small_config)
+    best_squad = frozenset(best.weeks[0].selected_squad["player_id"].tolist())
+
+    second = optimize_transfer_plan(horizon, initial, small_config, excluded_squads=(best_squad,))
+
+    assert second.solver_status is SolverStatus.OPTIMAL
+    second_squad = frozenset(second.weeks[0].selected_squad["player_id"].tolist())
+    assert second_squad != best_squad
+    # Still a legal squad, not merely a different one.
+    assert len(second_squad) == small_config.squad_size
+    # And it is worse or equal on the objective, which is what "next best" means.
+    assert second.objective_value <= best.objective_value
+
+
+def test_excluding_nothing_leaves_the_plan_untouched(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The default path must be byte-identical to the planner before this parameter."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    initial = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    without = optimize_transfer_plan(horizon, initial, small_config)
+    with_empty = optimize_transfer_plan(horizon, initial, small_config, excluded_squads=())
+
+    assert without.objective_value == with_empty.objective_value
+    assert (
+        without.weeks[0].selected_squad["player_id"].tolist()
+        == with_empty.weeks[0].selected_squad["player_id"].tolist()
+    )
+
+
+def test_a_stale_exclusion_naming_absent_players_is_ignored(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """An exclusion from an older capture must not turn into a failed plan."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    initial = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    plain = optimize_transfer_plan(horizon, initial, small_config)
+    stale = optimize_transfer_plan(
+        horizon,
+        initial,
+        small_config,
+        excluded_squads=(frozenset({"GONE_A", "GONE_B"}),),
+    )
+
+    assert stale.solver_status is SolverStatus.OPTIMAL
+    assert stale.objective_value == plain.objective_value
