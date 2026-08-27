@@ -71,3 +71,23 @@ does not search it. Both verdicts are recorded per knob in the artifact.
   not this screening's.
 - Monotonicity of cost in the band tightness is expected by construction and is
   **not** a finding; only the paired movement against the default is.
+
+## Amendment — 2026-08-27, after the first run, before the binding analysis
+
+The first run executed the analysis exactly as declared above and produced
+**degenerate intervals**: every 90% interval collapsed to its own mean. The defect is
+structural, not numerical — with four folds per season and `PromotionPolicy`'s
+default `moving_block_length = 4`, the only possible block *is* the season, so every
+resample reproduces the sample exactly and the bootstrap has zero variance by
+construction. An interval that cannot widen "excludes zero" for any nonzero mean,
+which would have made the movement gate pass vacuously.
+
+Recorded in the record-error tradition rather than silently replaced: the first
+run's artifact is superseded, its fold values (deterministic solves) are unchanged,
+and the **binding analysis** re-computes only the intervals with
+`moving_block_length = 2` (two blocks per season, the largest length that resamples
+at all on this population), all other policy parameters unchanged. The interval
+policy is recorded in the artifact. The feasibility half of the rule is untouched.
+This amendment was written after seeing the first run's output; what it changes is
+justified by the structure of the population alone, and whichever verdicts the
+corrected intervals produce are the result.
