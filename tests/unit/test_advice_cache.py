@@ -111,3 +111,67 @@ def test_no_torn_entry_is_left_behind(tmp_path: Path) -> None:
     assert leftovers == []
     stored = [p for p in tmp_path.rglob("*.json")]
     assert len(stored) == 1 and stored[0].name == f"{key}.json"
+
+
+def test_two_synchronized_writers_cannot_both_win(tmp_path: Path) -> None:
+    """The reviewed race, forced: both writers observe the miss together; creation is
+    atomic, so exactly one set of bytes stands and the loser conflicts loudly."""
+
+    import threading
+
+    from squadopt.platform.advice_cache import AdviceCacheConflictError
+
+    cache = FileAdviceCache(tmp_path)
+    key = _key()
+    barrier = threading.Barrier(2)
+    outcomes: list[str] = []
+
+    def write(payload: bytes) -> None:
+        class _RacingCache(FileAdviceCache):
+            def get(self, inner_key: str) -> bytes | None:  # observe the miss together
+                value = super().get(inner_key)
+                if value is None:
+                    barrier.wait(timeout=5)
+                return value
+
+        try:
+            _RacingCache(tmp_path).put(key, payload)
+            outcomes.append("ok")
+        except AdviceCacheConflictError:
+            outcomes.append("conflict")
+
+    first = threading.Thread(target=write, args=(b'{"answer": 1}',))
+    second = threading.Thread(target=write, args=(b'{"answer": 2}',))
+    first.start(), second.start()
+    first.join(timeout=10), second.join(timeout=10)
+
+    assert sorted(outcomes) == ["conflict", "ok"]
+    assert cache.get(key) in (b'{"answer": 1}', b'{"answer": 2}')  # one winner, whole
+
+
+def test_two_synchronized_identical_writers_both_succeed(tmp_path: Path) -> None:
+    import threading
+
+    cache = FileAdviceCache(tmp_path)
+    key = _key()
+    barrier = threading.Barrier(2)
+    outcomes: list[str] = []
+
+    def write() -> None:
+        class _RacingCache(FileAdviceCache):
+            def get(self, inner_key: str) -> bytes | None:
+                value = super().get(inner_key)
+                if value is None:
+                    barrier.wait(timeout=5)
+                return value
+
+        _RacingCache(tmp_path).put(key, b'{"answer": 1}')
+        outcomes.append("ok")
+
+    threads = [threading.Thread(target=write) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+    assert outcomes == ["ok", "ok"]
+    assert cache.get(key) == b'{"answer": 1}'

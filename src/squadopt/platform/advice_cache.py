@@ -41,6 +41,10 @@ class AdviceCacheError(ValueError):
     """A cache key or write violates the store's contract."""
 
 
+class AdviceCacheConflictError(AdviceCacheError):
+    """Two different answers met under one complete key: a determinism defect."""
+
+
 def advice_cache_key(
     *,
     advice_contract_version: str,
@@ -137,12 +141,16 @@ class FileAdviceCache:
             return None
 
     def put(self, key: str, payload: bytes) -> None:
-        """Write once. Identical bytes again: a no-op. Different bytes: an error.
+        """Write once. Identical bytes again: a no-op. Different bytes: a conflict.
 
-        Under a complete key a second, different answer can only mean a determinism
-        defect, and a cache that silently keeps either version papers over exactly
-        the property the rest of this repository measures. The write lands through a
-        temporary file and an atomic replace so a killed worker leaves no torn entry.
+        The no-overwrite rule is enforced by an atomic create — ``os.link`` from a
+        finished temporary file onto the final name succeeds exactly once — not by a
+        read followed by a replace, which two concurrent writers can both pass before
+        either lands (the reviewed race: both observed the miss, the last replace won
+        silently). The loser of creation reads the winner and accepts only
+        byte-identical content; different bytes raise ``AdviceCacheConflictError``,
+        because under a complete key that can only be a determinism defect. A killed
+        writer leaves no torn entry: the final name only ever appears complete.
         """
 
         if not isinstance(payload, bytes) or not payload:
@@ -150,19 +158,30 @@ class FileAdviceCache:
         path = self._path(key)
         existing = self.get(key)
         if existing is not None:
-            if existing == payload:
-                return
-            raise AdviceCacheError(
-                f"Key {key[:12]}… already holds different bytes; an immutable key "
-                "refuses the overwrite because this can only be a determinism defect."
-            )
+            self._require_identical(key, existing, payload)
+            return
         path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
         try:
             with os.fdopen(descriptor, "wb") as handle:
                 handle.write(payload)
-            os.replace(temporary, path)
-        except BaseException:
+            try:
+                os.link(temporary, path)  # atomic create; fails if the key exists
+            except FileExistsError:
+                winner = self.get(key)
+                if winner is None:
+                    raise AdviceCacheError(
+                        f"Key {key[:12]}… exists but cannot be read back."
+                    ) from None
+                self._require_identical(key, winner, payload)
+        finally:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary)
-            raise
+
+    @staticmethod
+    def _require_identical(key: str, existing: bytes, payload: bytes) -> None:
+        if existing != payload:
+            raise AdviceCacheConflictError(
+                f"Key {key[:12]}… already holds different bytes; an immutable key "
+                "refuses the overwrite because this can only be a determinism defect."
+            )
