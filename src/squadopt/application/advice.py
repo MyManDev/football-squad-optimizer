@@ -24,13 +24,17 @@ from squadopt.application.entries import (
     EntryPicksProvider,
     held_squad_from_picks,
 )
+from squadopt.application.strategies import STRATEGY_CATALOG
+from squadopt.data.errors import DataSourceError
 from squadopt.live import (
     Projection,
     RecommendationInputs,
     SeasonRules,
     plan_transfers,
+    plan_transfers_with_overlap,
 )
 from squadopt.live.transfers import TransferDecision
+from squadopt.planning import FirstWeekOverlap
 
 #: The one combination computed today: the deterministic planner's own answer.
 COMPUTED_MODE = "saf-puan"
@@ -215,26 +219,125 @@ def advise_entry(
             f"Request gameweek {request.gameweek} is not the capture's "
             f"{int(inputs.deadline.gameweek)}."
         )
-    if request.strategy != COMPUTED_MODE:
-        raise EntryError(
-            f"Strategy {request.strategy!r} is not computed on this path yet; only "
-            f"{COMPUTED_MODE!r} is."
-        )
     if request.window != COMPUTED_WINDOW:
         raise EntryError(f"Window {request.window} is not computed; only {COMPUTED_WINDOW} is.")
-    if request.rival_entry_id is not None:
-        raise EntryError(
-            "A requested rival arrives with the rival request parameter; until then the "
-            "competitive files come from the batch mode selection."
+    if request.strategy == COMPUTED_MODE:
+        if request.rival_entry_id is not None:
+            raise EntryError(
+                f"{COMPUTED_MODE!r} is rival-free; to name a rival, ask for a rival "
+                "strategy from the catalogue."
+            )
+        picks = provider.picks(request.entry_id, request.season, request.gameweek - 1)
+        return build_advice_payload(
+            picks,
+            inputs,
+            projection,
+            rules,
+            league_id=request.league_id,
         )
+    strategy = STRATEGY_CATALOG.get(request.strategy)
+    if strategy is None:
+        raise EntryError(f"Strategy {request.strategy!r} is not in the catalogue.")
+    floor = strategy.constraints.overlap_floor
+    ceiling = strategy.constraints.overlap_ceiling
+    if floor is None and ceiling is None:
+        raise EntryError(
+            f"Strategy {request.strategy!r} is not computed on this path yet; its "
+            "constraint is not wired to the solver."
+        )
+    if request.rival_entry_id is None:
+        raise EntryError(f"Strategy {request.strategy!r} needs a rival: pass rival_entry_id.")
+    if request.rival_entry_id == request.entry_id:
+        raise EntryError("A member cannot be their own rival.")
+    return _advise_against_rival(
+        request,
+        rival_entry_id=request.rival_entry_id,
+        floor=floor,
+        ceiling=ceiling,
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+
+def _advise_against_rival(
+    request: AdviseEntryRequest,
+    *,
+    rival_entry_id: int,
+    floor: int | None,
+    ceiling: int | None,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+) -> dict[str, object]:
+    """One member's plan under a rival strategy's overlap band, priced and labelled.
+
+    The member's own squad is still the only starting point — the rival contributes a
+    constraint (their public eleven) and the comparison labels, nothing else, so the
+    invariance rule survives: what this member is told is computed from this member's
+    squad and the shared projection. The price tag is the control's expected points
+    minus the banded plan's, both from this request's own solves. Everything added to
+    the payload here is in the strategy's declared ``publishes`` set — the mean gap,
+    the overlap count, captain agreement; no spread, no probability, ever.
+    """
+
     picks = provider.picks(request.entry_id, request.season, request.gameweek - 1)
-    return build_advice_payload(
+    rival_picks = provider.picks(rival_entry_id, request.season, request.gameweek - 1)
+    rival_eleven = frozenset(int(value) for value in rival_picks.starting_xi)
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    held = held_squad_from_picks(picks, current_prices=prices)
+    control_plan, _control_decision, _ = plan_transfers(inputs, projection, held, rules)
+    band = FirstWeekOverlap(player_ids=rival_eleven, minimum=floor, maximum=ceiling)
+    try:
+        plan, decision, _config = plan_transfers_with_overlap(inputs, projection, held, rules, band)
+    except DataSourceError as error:
+        raise EntryError(
+            f"The {request.strategy!r} band cannot be satisfied from this squad against "
+            f"entry {rival_entry_id}: no provable plan exists."
+        ) from error
+    raw_gap = plan.diagnostics.get("absolute_optimality_gap")
+    payload = build_advice_payload(
         picks,
         inputs,
         projection,
         rules,
         league_id=request.league_id,
+        mode=request.strategy,
+        decision=decision,
+        expected_points_cost=(
+            float(control_plan.total_projected_score or 0.0)
+            - float(plan.total_projected_score or 0.0)
+        ),
+        rival_label=f"entry-{rival_entry_id}",
+        solver_status=plan.solver_status.name,
+        optimality_gap=float(str(raw_gap)) if raw_gap is not None else None,
     )
+    expected = {
+        int(str(row["player_id"])): float(str(row["expected_points"]))
+        for _, row in projection.table.iterrows()
+    }
+    week = plan.weeks[0]
+    squad_ids = {int(str(value)) for value in week.selected_squad["player_id"]}
+    my_eleven = [int(str(value)) for value in week.starting_xi["player_id"]]
+    my_captain = int(str(week.captain["player_id"]))
+    rival_captain = int(rival_picks.captain)
+    my_expected = sum(expected.get(p, 0.0) for p in my_eleven) + expected.get(my_captain, 0.0)
+    rival_expected = sum(expected.get(p, 0.0) for p in sorted(rival_eleven)) + expected.get(
+        rival_captain, 0.0
+    )
+    payload["rival_entry_id"] = rival_entry_id
+    payload["overlap_count"] = len(squad_ids & rival_eleven)
+    # A mean and only a mean: shared players cancel exactly in the fixed-decision
+    # comparison, so this is projection arithmetic over the differentials. The spread
+    # those same differentials generate is not publishable, and is not computed.
+    payload["expected_gap_vs_rival"] = my_expected - rival_expected
+    payload["captain_agreement"] = my_captain == rival_captain
+    return payload
 
 
 __all__: tuple[str, ...] = (
