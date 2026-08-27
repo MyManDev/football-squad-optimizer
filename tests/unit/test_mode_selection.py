@@ -163,8 +163,15 @@ def test_without_a_rival_only_the_pure_mode_is_computed() -> None:
     assert result.advice[0].expected_points_cost == 0.0
 
 
-def test_modes_can_disagree_and_the_price_tag_says_what_it_costs() -> None:
-    """A safe plan and a risky one: Garantici pays a measured expected-points price."""
+def test_every_mode_now_picks_the_expected_points_winner() -> None:
+    """A perfect win-share no longer buys the safe plan the Garantici pick.
+
+    The selector under it (`select_plan`) reads expected points only; the win-shares
+    are diagnostics. Until the strategies declare structural constraints of their own,
+    the modes agree on the same menu entry and their price tags are honestly zero —
+    the disagreement that returns later comes from declared constraints, not from a
+    probability.
+    """
 
     scenarios = 4000
     generator = np.random.default_rng(7)
@@ -185,11 +192,9 @@ def test_modes_can_disagree_and_the_price_tag_says_what_it_costs() -> None:
     result = select_member_modes(menu, paths, rival)  # type: ignore[arg-type]
 
     by_mode = result.by_mode()
-    assert by_mode["garantici"].decision.name == "safe"  # type: ignore[attr-defined]
-    assert by_mode["asiri-agresif"].decision.name == "risky"  # type: ignore[attr-defined]
-    assert by_mode["saf-puan"].decision.name == "risky"  # type: ignore[attr-defined]
-    assert by_mode["garantici"].expected_points_cost > 0.0
-    assert by_mode["asiri-agresif"].expected_points_cost == 0.0
+    for slug in ("garantici", "agresif", "asiri-agresif", "saf-puan"):
+        assert by_mode[slug].decision.name == "risky"  # type: ignore[attr-defined]
+        assert by_mode[slug].expected_points_cost == 0.0
 
 
 def test_the_advice_surface_carries_no_probability() -> None:
