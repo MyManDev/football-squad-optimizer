@@ -7,6 +7,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { DecisionControls } from "../../moves/components/DecisionControls";
+import { TemplatePicker } from "../templates/TemplatePicker";
 import { useDecisionSelection } from "../../moves/decisionSelection";
 import { Pitch } from "../../squad/components/Pitch";
 import { SquadPage } from "../../squad/pages/SquadPage";
@@ -170,6 +171,7 @@ export function LeagueMemberView({
         <h2 className="visually-hidden" id="entry-advice-title">
           {copy.advice}
         </h2>
+        <TemplatePicker />
         <DecisionControls variant="entry" />
         <AdviceCard envelope={advice} />
       </section>
@@ -185,6 +187,12 @@ function AdviceCard({ envelope }: { envelope: LeagueViewEnvelope<EntryAdvice> })
     <Card title={copy.advice} aside={<ExampleDataBadge sourceKind={envelope.source_kind} />}>
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      {view.solver_status === "FEASIBLE" ? (
+        <p className={styles.honesty}>
+          <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
+          {copy.unprovenPlanBody(points(view.optimality_gap ?? 0, 1, locale))}
+        </p>
+      ) : null}
       {view.mode !== "saf-puan" && view.expected_points_cost != null ? (
         <p className={styles.planCost}>
           <strong className="num">
