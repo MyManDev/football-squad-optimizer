@@ -186,7 +186,7 @@ def test_an_unproven_plan_is_published_with_its_status_not_discarded(
         )
         return relabelled, decision, config
 
-    monkeypatch.setattr("squadopt.application.league_views.plan_transfers", feasible_plan_transfers)
+    monkeypatch.setattr("squadopt.application.advice.plan_transfers", feasible_plan_transfers)
     report = build_league_views(
         _Provider({101: _member_picks(world, 101, squad)}),
         (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
