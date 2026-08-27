@@ -106,6 +106,14 @@ export interface EntryAdvice {
   expected_points_cost?: number;
   /** The league neighbour the competitive modes were priced against; null for saf-puan. */
   rival_label?: string | null;
+  /**
+   * The solver's own account of the plan: "OPTIMAL" is a proof, "FEASIBLE" is a found
+   * plan whose proof did not finish inside the budget. Absent on documents published
+   * before the producer carried it.
+   */
+  solver_status?: string | null;
+  /** The measured bound gap beside a FEASIBLE plan; 0 under proof. */
+  optimality_gap?: number | null;
   data_quality: EntryDataQuality;
   missing_fields: string[];
 }

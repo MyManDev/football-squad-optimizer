@@ -146,7 +146,7 @@ const en = {
     intro:
       "The horizon and play mode save how you want to read the recommendation. This screen shows the current ledger decision; changing a selection does not run a new optimization yet.",
     entryIntro:
-      "The horizon and play mode select this member's example advice. These controls describe a point trade-off; they do not claim a probability of beating the league.",
+      "The horizon and play mode select this member's example advice. These controls describe a point trade-off; they never claim how likely you are to beat the league.",
     horizon: "Planning Horizon",
     week: (count: number) => `${count} week${count === 1 ? "" : "s"}`,
     mode: "Play Mode",
@@ -161,7 +161,7 @@ const en = {
       `This site precomputes league ${leagueId} only; that is the league it can open.`,
     diagnostic: "diagnostic",
     diagnosticTitle: (weeks: number) =>
-      `The league-relative ${weeks}-week result is not a probability.`,
+      `The league-relative ${weeks}-week result is a diagnostic, never a chance of winning.`,
     diagnosticBody:
       "The scenarios price only part of the crowd's measured +7.19 points/week edge, so the competitive horizon is directional only.",
     sourceBefore: "Price labels come from the zero-point budget cell of the ",
@@ -296,6 +296,21 @@ const en = {
   },
   leagueMembers: {
     loading: "Loading league members…",
+    templatesTitle: "Game templates",
+    templatesBody:
+      "A template is a named strategy-and-window pair. Applying one sets the same shareable selection the controls read; your own templates live in this browser.",
+    templateMeta: (strategy: string, window: number) => `${strategy} · ${window}w`,
+    templateNamePlaceholder: "Name this combination",
+    templateSave: "Save current",
+    templateRemove: (name: string) => `Remove template ${name}`,
+    viewerTitle: "Which one is you?",
+    viewerBody:
+      "Pick your own row to get advice from your squad. This is a claim, not a login: anyone can pick anyone, and that is fine because everything shown here is already public after the deadline.",
+    viewerSelect: "This is me",
+    viewerYouBadge: "You",
+    viewerSelected: (name: string) =>
+      `Viewing as ${name}. Advice pages will start from this squad.`,
+    viewerClear: "Clear selection",
     notAvailable: "League member data is not connected yet.",
     notAvailableBody:
       "The page is ready for the post-deadline public entry feed. No example records are shipped in the production build.",
@@ -351,7 +366,7 @@ const en = {
       "The empty example fixes the UI behaviour for an entry whose public picks have not arrived.",
     advice: "Suggested Moves",
     honestyRule:
-      "Advice is labelled only with a point trade-off. Crowd-relative window diagnostics are not presented as probabilities.",
+      "Advice is labelled only with a point trade-off. Crowd-relative window diagnostics are never dressed up as a chance of winning.",
     independentAdviceRule:
       "Your advice is calculated only from your squad and your objective. SquadOpt's own team does not enter that calculation: the system cannot protect its rank by giving anyone worse advice; every member is evaluated independently by the same decision function.",
     squadoptComparisonTitle: "Against the SquadOpt team",
@@ -360,14 +375,17 @@ const en = {
     noMove: "No move clears the selected example point trade-off.",
     noAdviceMissingData: "Advice is withheld because the source squad is incomplete.",
     diagnosticOnly:
-      "Competitive modes are directional diagnostics until opponent-aware claims pass their measurement gates.",
+      "Two squads are compared under one projection. Players you both own cancel out; the players you do not share decide the gap. We publish expected points, never a chance of winning — that claim fell three times in its own measurement, and the line is closed.",
+    unprovenPlanBadge: "Proof incomplete",
+    unprovenPlanBody: (gap: string) =>
+      `The solver found this plan but could not prove nothing better exists (gap ≤ ${gap} pts). The plan is real; the missing part is the proof.`,
     out: "Out",
     in: "In",
     projectedGain: (points: string) => `${points} projected gain`,
     expectedPointCost: (points: string) => `~${points} expected-point cost`,
     windowValueReason: "The longer window recovers the transfer cost in the example projection.",
     modeTradeoffReason:
-      "The mode changes the point trade-off, not a claimed probability of beating a rival.",
+      "The mode changes the point trade-off, never a claimed chance of beating a rival.",
     planCost: (points: string) =>
       `This mode's plan gives up ~${points} expected points against the pure-points pick.`,
     planRival: (name: string) => `priced against ${name}'s squad`,
@@ -642,7 +660,8 @@ const tr: MessageSchema<typeof en> = {
     leagueMismatch: (leagueId) =>
       `Bu site yalnızca ${leagueId} numaralı ligi hesaplar; açabildiği lig o.`,
     diagnostic: "diagnostik",
-    diagnosticTitle: (weeks) => `Lig-içi ${weeks} haftalık sonuç bir olasılık değildir.`,
+    diagnosticTitle: (weeks) =>
+      `Lig-içi ${weeks} haftalık sonuç bir teşhis göstergesidir; kazanma ihtimali değildir.`,
     diagnosticBody:
       "Senaryolar kalabalığın ölçülen +7,19 puan/hafta üstünlüğünü yalnız kısmen fiyatlıyor; bu nedenle rekabetçi pencere yalnız yön gösterir.",
     sourceBefore: "Fiyat etiketleri ",
@@ -774,6 +793,21 @@ const tr: MessageSchema<typeof en> = {
     lastWeek: (pointsValue) => `son puanlanan hafta: ortalamaya karşı ${pointsValue}`,
   },
   leagueMembers: {
+    templatesTitle: "Oyun şablonları",
+    templatesBody:
+      "Şablon, adlandırılmış bir strateji-pencere çiftidir. Uygulamak, kontrollerin okuduğu paylaşılabilir seçimi kurar; kendi şablonların bu tarayıcıda durur.",
+    templateMeta: (strategy: string, window: number) => `${strategy} · ${window}h`,
+    templateNamePlaceholder: "Bu kombinasyonu adlandır",
+    templateSave: "Seçimi kaydet",
+    templateRemove: (name: string) => `${name} şablonunu kaldır`,
+    viewerTitle: "Hangisi sensin?",
+    viewerBody:
+      "Kendi satırını seç ki tavsiye kendi kadrondan hesaplansın. Bu bir beyandır, giriş değil: herkes herkesi seçebilir ve bu sorun değil, çünkü burada gösterilen her şey son tarihten sonra zaten herkese açık.",
+    viewerSelect: "Bu benim",
+    viewerYouBadge: "Sen",
+    viewerSelected: (name: string) =>
+      `${name} olarak bakıyorsun. Tavsiye sayfaları bu kadrodan başlayacak.`,
+    viewerClear: "Seçimi kaldır",
     loading: "Lig üyeleri yükleniyor…",
     notAvailable: "Lig üye verisi henüz bağlı değil.",
     notAvailableBody:
@@ -830,7 +864,7 @@ const tr: MessageSchema<typeof en> = {
       "Boş örnek, public seçimleri henüz gelmeyen bir entry için arayüz davranışını sabitler.",
     advice: "Önerilen Hamleler",
     honestyRule:
-      "Öneriler yalnızca puan ödünleşimi etiketi taşır. Kalabalık-göreli pencere diagnostikleri olasılık olarak sunulmaz.",
+      "Öneriler yalnızca puan ödünleşimi etiketi taşır. Kalabalık-göreli pencere diagnostikleri kazanma ihtimali gibi sunulmaz.",
     independentAdviceRule:
       "Sana verilen öneri yalnızca senin kadrondan ve senin hedefinden hesaplanır. Sistemin kendi takımı bu hesaba girmez. Sistem kendi sırasını korumak için kimseye kötü öneri veremez; her üyenin önerisi bağımsız olarak aynı karar fonksiyonundan çıkar.",
     squadoptComparisonTitle: "SquadOpt takımına karşı",
@@ -839,7 +873,10 @@ const tr: MessageSchema<typeof en> = {
     noMove: "Seçilen örnek puan ödünleşimini geçen bir hamle yok.",
     noAdviceMissingData: "Kaynak kadro eksik olduğu için öneri gösterilmiyor.",
     diagnosticOnly:
-      "Rekabetçi modlar, rakip-farkındalıklı iddialar ölçüm kapılarını geçene kadar yön gösteren diagnostiklerdir.",
+      "İki kadro aynı projeksiyonla karşılaştırılır. İkinizde de olan oyuncular sadeleşir; farkı paylaşmadığınız oyuncular belirler. Beklenen puan yayınlıyoruz, kazanma ihtimali değil — o iddia kendi ölçümünde üç kez düştü ve hat kapandı.",
+    unprovenPlanBadge: "Kanıt tamamlanamadı",
+    unprovenPlanBody: (gap: string) =>
+      `Çözücü bu planı buldu ama daha iyisinin olmadığını kanıtlayamadı (fark ≤ ${gap} puan). Plan gerçek; eksik olan kanıt.`,
     out: "Çıkan",
     in: "Giren",
     projectedGain: (pointsValue) => `${pointsValue} tahmini kazanç`,
