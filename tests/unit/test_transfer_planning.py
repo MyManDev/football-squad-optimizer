@@ -810,3 +810,73 @@ def test_chip_plans_are_deterministic_and_fingerprinted(
         ChipAvailability(available={"bboost": {1}}).availability_fingerprint
         != ChipAvailability(available={"bboost": {2}}).availability_fingerprint
     )
+
+
+# --- alternative plans, so a mode has something to choose between ----------------------
+
+
+def test_an_excluded_squad_is_not_returned_again(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The planner returns one answer; a menu needs the next-best ones too.
+
+    Without this, every play mode re-ranks a list of one and returns the same transfers
+    under four different names — a computation the reader would reasonably assume differs.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    initial = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    best = optimize_transfer_plan(horizon, initial, small_config)
+    best_squad = frozenset(best.weeks[0].selected_squad["player_id"].tolist())
+
+    second = optimize_transfer_plan(horizon, initial, small_config, excluded_squads=(best_squad,))
+
+    assert second.solver_status is SolverStatus.OPTIMAL
+    second_squad = frozenset(second.weeks[0].selected_squad["player_id"].tolist())
+    assert second_squad != best_squad
+    # Still a legal squad, not merely a different one.
+    assert len(second_squad) == small_config.squad_size
+    # And it is worse or equal on the objective, which is what "next best" means.
+    assert second.objective_value <= best.objective_value
+
+
+def test_excluding_nothing_leaves_the_plan_untouched(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The default path must be byte-identical to the planner before this parameter."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    initial = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    without = optimize_transfer_plan(horizon, initial, small_config)
+    with_empty = optimize_transfer_plan(horizon, initial, small_config, excluded_squads=())
+
+    assert without.objective_value == with_empty.objective_value
+    assert (
+        without.weeks[0].selected_squad["player_id"].tolist()
+        == with_empty.weeks[0].selected_squad["player_id"].tolist()
+    )
+
+
+def test_a_stale_exclusion_naming_absent_players_is_ignored(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """An exclusion from an older capture must not turn into a failed plan."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    initial = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    plain = optimize_transfer_plan(horizon, initial, small_config)
+    stale = optimize_transfer_plan(
+        horizon,
+        initial,
+        small_config,
+        excluded_squads=(frozenset({"GONE_A", "GONE_B"}),),
+    )
+
+    assert stale.solver_status is SolverStatus.OPTIMAL
+    assert stale.objective_value == plain.objective_value

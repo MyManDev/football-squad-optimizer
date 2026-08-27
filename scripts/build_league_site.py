@@ -30,6 +30,7 @@ from squadopt.application.league_views import (
     MemberStanding,
     build_league_views,
 )
+from squadopt.application.mode_selection import build_mode_paths
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.fpl_live import (
@@ -40,7 +41,13 @@ from squadopt.data.sources.fpl_live import (
     scored_gameweeks,
 )
 from squadopt.data.sources.vaastav import build_panel
-from squadopt.live import project, read_inputs, read_projection_handoff, read_season_rules
+from squadopt.live import (
+    load_residual_history,
+    project,
+    read_inputs,
+    read_projection_handoff,
+    read_season_rules,
+)
 from squadopt.live.recommendation import infer_season
 
 
@@ -172,6 +179,13 @@ def main() -> int:
         help="projection handoff for this capture and gameweek; required from GW2 on, "
         "the same file the decision reads (projection_handoff_v1)",
     )
+    parser.add_argument(
+        "--mode-residuals",
+        type=Path,
+        help="residual export (csv/parquet beside its manifest) to build one-week scenario "
+        "paths from; turns on the competitive play modes. When given, a history that "
+        "cannot honestly support paths fails the run rather than silently downgrading.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     arguments = parser.parse_args()
 
@@ -239,6 +253,19 @@ def main() -> int:
             else None
         )
         projection = project(inputs, panel, in_season=in_season)
+        mode_paths = None
+        if arguments.mode_residuals:
+            history = load_residual_history(arguments.mode_residuals)
+            mode_paths = build_mode_paths(
+                projection,
+                history,
+                season=season,
+                gameweek=int(inputs.deadline.gameweek),
+            )
+            print(
+                f"mode paths: {mode_paths.config.scenario_count} scenarios for gameweek "
+                f"{inputs.deadline.gameweek} from {history.source_id}"
+            )
         out_dir = Path(arguments.out) / "data" / "league"
         report = build_league_views(
             _CapturePicks(snapshot, snapshot_id),
@@ -251,6 +278,7 @@ def main() -> int:
             out_dir=out_dir,
             standings=standings,
             scored_gameweek=scored,
+            mode_paths=mode_paths,
         )
         print(f"Rendered {report.rendered_count} of {len(report.members)} members into {out_dir}")
         for member in report.members:

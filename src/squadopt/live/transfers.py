@@ -27,7 +27,7 @@ from squadopt.data.errors import DataSourceError
 from squadopt.live.errors import LedgerError
 from squadopt.live.recommendation import Projection, RecommendationInputs
 from squadopt.live.rules import SeasonRules, chip_availability_for
-from squadopt.optimization import OptimizationConfig
+from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import (
     CHIP_NAMES,
     ChipAvailability,
@@ -200,16 +200,31 @@ def _chip_availability(
     return ChipAvailability(available={chip: frozenset({gameweek})}, forced={gameweek: chip})
 
 
-def plan_transfers(
+@dataclass(frozen=True, slots=True)
+class _PreparedPlanning:
+    """Everything a solve needs, built once so a menu of solves shares one setup."""
+
+    horizon: PlanningHorizon
+    state: InitialSquadState
+    availability: ChipAvailability | None
+    settings: OptimizationConfig
+    transfer_config: TransferPlanningConfig
+    sell_prices: Mapping[int, int]
+    current: Mapping[int, int]
+    fee: float
+    gameweek: int
+
+
+def _prepare_planning(
     inputs: RecommendationInputs,
     projection: Projection,
     held: HeldSquad,
     rules: SeasonRules,
     *,
-    optimization: OptimizationConfig | None = None,
-    chip: str | None = None,
-) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
-    """Decide this deadline's transfers from the held squad with a one-week horizon."""
+    optimization: OptimizationConfig | None,
+    chip: str | None,
+) -> _PreparedPlanning:
+    """Validate the held squad against the capture and build the one-week horizon."""
 
     settings = OptimizationConfig() if optimization is None else optimization
     gameweek = int(inputs.deadline.gameweek)
@@ -266,18 +281,30 @@ def plan_transfers(
         free_transfers=min(held.free_transfers, transfer_config.max_free_transfers),
     )
     availability = _chip_availability(rules, gameweek, held, chip)
-    plan = optimize_transfer_plan(
-        PlanningHorizon(horizon_table),
-        state,
-        settings,
-        transfer_config,
-        chips=availability,
+    return _PreparedPlanning(
+        horizon=PlanningHorizon(horizon_table),
+        state=state,
+        availability=availability,
+        settings=settings,
+        transfer_config=transfer_config,
+        sell_prices=sell_prices,
+        current=current,
+        fee=fee,
+        gameweek=gameweek,
     )
-    if not plan.has_solution or not plan.weeks:
-        raise DataSourceError(
-            f"The transfer planner returned {plan.solver_status.name} with no plan for "
-            f"{inputs.season} gameweek {gameweek}."
-        )
+
+
+def _package_decision(
+    plan: TransferPlanResult,
+    held: HeldSquad,
+    availability: ChipAvailability | None,
+    transfer_config: TransferPlanningConfig,
+    sell_prices: Mapping[int, int],
+    current: Mapping[int, int],
+    fee: float,
+) -> TransferDecision:
+    """Turn the plan's opening week into the decision the ledger records."""
+
     week = plan.weeks[0]
     new_squad = tuple(int(value) for value in week.selected_squad["player_id"].tolist())
     purchase = dict(held.purchase_prices)
@@ -321,4 +348,111 @@ def plan_transfers(
             "planner_relative_gap": plan.diagnostics.get("relative_optimality_gap"),
         },
     )
-    return plan, decision, transfer_config
+    return decision
+
+
+def plan_transfer_menu(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    held: HeldSquad,
+    rules: SeasonRules,
+    *,
+    optimization: OptimizationConfig | None = None,
+    chip: str | None = None,
+    plan_count: int = 5,
+) -> tuple[tuple[TransferPlanResult, TransferDecision], ...]:
+    """Up to ``plan_count`` proven plans for this deadline, best first.
+
+    The planner returns one answer; a play mode needs alternatives to choose between, or
+    every mode returns the same transfers under a different name. Each solve excludes the
+    opening-week squads already produced, so entry *k* is the best plan that keeps none of
+    the previous *k-1* squads intact — next-best in the objective's own terms, not a
+    perturbation.
+
+    The menu holds **proven** plans only. The first entry failing to prove optimality ends
+    the menu rather than joining it: an unproven alternative is exactly the machine-load
+    nondeterminism the live path refuses everywhere else, and a mode choosing from a menu
+    with one arbitrary entry inherits that arbitrariness silently. A shorter menu is an
+    honest one.
+
+    The first plan must exist and be proven — the same requirement ``plan_transfers``
+    enforces — because a menu with no safe default is not a decision surface.
+    """
+
+    if not isinstance(plan_count, int) or isinstance(plan_count, bool) or plan_count < 1:
+        raise DataSourceError("plan_count must be a positive integer.")
+    prepared = _prepare_planning(
+        inputs, projection, held, rules, optimization=optimization, chip=chip
+    )
+    menu: list[tuple[TransferPlanResult, TransferDecision]] = []
+    excluded: list[frozenset[object]] = []
+    while len(menu) < plan_count:
+        plan = optimize_transfer_plan(
+            prepared.horizon,
+            prepared.state,
+            prepared.settings,
+            prepared.transfer_config,
+            chips=prepared.availability,
+            excluded_squads=tuple(excluded),
+        )
+        if not plan.has_solution or not plan.weeks:
+            break
+        if plan.solver_status is not SolverStatus.OPTIMAL:
+            break
+        decision = _package_decision(
+            plan,
+            held,
+            prepared.availability,
+            prepared.transfer_config,
+            prepared.sell_prices,
+            prepared.current,
+            prepared.fee,
+        )
+        menu.append((plan, decision))
+        excluded.append(
+            frozenset(int(value) for value in plan.weeks[0].selected_squad["player_id"].tolist())
+        )
+    if not menu:
+        raise DataSourceError(
+            f"The transfer planner produced no proven plan for {inputs.season} gameweek "
+            f"{prepared.gameweek}."
+        )
+    return tuple(menu)
+
+
+def plan_transfers(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    held: HeldSquad,
+    rules: SeasonRules,
+    *,
+    optimization: OptimizationConfig | None = None,
+    chip: str | None = None,
+) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
+    """Decide this deadline's transfers from the held squad with a one-week horizon."""
+
+    prepared = _prepare_planning(
+        inputs, projection, held, rules, optimization=optimization, chip=chip
+    )
+    plan = optimize_transfer_plan(
+        prepared.horizon,
+        prepared.state,
+        prepared.settings,
+        prepared.transfer_config,
+        chips=prepared.availability,
+    )
+    if not plan.has_solution or not plan.weeks:
+        raise DataSourceError(
+            f"The transfer planner returned {plan.solver_status.name} with no plan for "
+            f"{inputs.season} gameweek {prepared.gameweek}."
+        )
+    decision = _package_decision(
+        plan,
+        held,
+        prepared.availability,
+        prepared.transfer_config,
+        prepared.sell_prices,
+        prepared.current,
+        prepared.fee,
+    )
+    return plan, decision, prepared.transfer_config
