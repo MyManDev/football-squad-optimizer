@@ -1,5 +1,6 @@
 """The league views builder: member advice from the seam, independence pinned as fact."""
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -512,6 +513,72 @@ def test_the_baseline_advice_is_byte_identical_with_and_without_paths(
     first = (tmp_path / "plain" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
     second = (tmp_path / "modes" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
     assert first == second
+
+
+# The in-season member plan this world produces, recorded so that a change to the member
+# advice path has to declare itself. Every other test in this file compares two runs of
+# the same commit, which passes even if every number moved; these literals are the only
+# thing here that would notice. The planner itself has the GW1 opening pin
+# (test_live_recommendation.py); this is the same gate for the in-season member path,
+# which that pin never exercised: a held squad, sell prices, and a transfer decision.
+IN_SEASON_MEMBER_ADVICE_SHA256 = "e9482cf30166756feb0336856f37d92e22b6faeff0039a011d1ff0c0efb23b0a"
+# (player_out, player_in, expected_points_delta, expected_points_cost) per move.
+IN_SEASON_MEMBER_MOVES = (
+    (1005, 1009, 2.5, 4.0),
+    (1020, 1024, 7.0, 4.0),
+)
+
+
+def test_the_recorded_in_season_member_plan_holds(world: dict[str, Any], tmp_path: Path) -> None:
+    """Rebuilding member 101's advice reproduces the plan recorded here, byte for byte.
+
+    This is the member path's replay gate. A pull request changing what this world's
+    member is told — the planner, the projection reading, the advice payload, its JSON
+    rendering — fails here and must say so in the pull request, updating these literals
+    in the same commit. The refactor that moves this path behind a service boundary must
+    keep the hash identical, which is the point of pinning bytes rather than fields.
+
+    If these literals do not reproduce on another machine at the same commit, that is a
+    determinism defect worth reporting rather than a test to loosen.
+    """
+
+    import hashlib
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    when = __import__("datetime").datetime(2026, 8, 23, 12, 0, tzinfo=__import__("datetime").UTC)
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "pin",
+        now=when,
+    )
+    raw = (tmp_path / "pin" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
+    payload = json.loads(raw)["payload"]
+    # The readable literals first, so a failure names the move that changed rather than
+    # only reporting a hash mismatch.
+    assert (
+        tuple(
+            (
+                move["player_out"]["player_id"],
+                move["player_in"]["player_id"],
+                move["expected_points_delta"],
+                move["expected_points_cost"],
+            )
+            for move in payload["moves"]
+        )
+        == IN_SEASON_MEMBER_MOVES
+    )
+    assert payload["mode"] == "saf-puan"
+    assert payload["window"] == 1
+    assert payload["expected_points_cost"] == 0.0
+    assert payload["source_snapshot_id"] == world["gw2_id"]
+    assert hashlib.sha256(raw).hexdigest() == IN_SEASON_MEMBER_ADVICE_SHA256
 
 
 def test_without_a_rival_only_the_baseline_is_published(
