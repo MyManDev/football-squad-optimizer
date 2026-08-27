@@ -7,6 +7,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { DecisionControls } from "../../moves/components/DecisionControls";
+import { TemplatePicker } from "../templates/TemplatePicker";
 import { useDecisionSelection } from "../../moves/decisionSelection";
 import { Pitch } from "../../squad/components/Pitch";
 import { SquadPage } from "../../squad/pages/SquadPage";
@@ -170,6 +171,7 @@ export function LeagueMemberView({
         <h2 className="visually-hidden" id="entry-advice-title">
           {copy.advice}
         </h2>
+        <TemplatePicker />
         <DecisionControls variant="entry" />
         <AdviceCard envelope={advice} />
       </section>
