@@ -58,7 +58,7 @@ def _client(tmp_path: Path) -> tuple[TestClient, FileAdviceCache]:
 
 
 def test_league_state_and_the_three_answers(tmp_path: Path) -> None:
-    client, cache = _client(tmp_path)
+    client, _cache = _client(tmp_path)
 
     connected = client.get(f"/api/v1/leagues/{LEAGUE_ID}")
     assert connected.status_code == 200
