@@ -9,6 +9,7 @@ import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { loadLeagueMembers } from "../data";
+import { useViewerEntry } from "../identity/useViewerEntry";
 import type { EntryView, LeagueMembers, LeagueViewEnvelope } from "../types";
 import styles from "./LeagueMembersPage.module.css";
 
@@ -80,7 +81,14 @@ export function LeagueMembersView({
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
+  const { viewer, select, clear } = useViewerEntry();
   const view = envelope.payload;
+  const viewerRow =
+    viewer === null
+      ? null
+      : (view.members.find(
+          (member) => member.member_kind === "human" && member.entry_id === viewer.entryId,
+        ) ?? null);
   // The example envelope carries its own system row; a live one never does, because the
   // producer must not read our ledger. Appending unconditionally would double it.
   const alreadyPresent = view.members.some((member) => member.member_kind === "system");
@@ -102,6 +110,20 @@ export function LeagueMembersView({
 
       <Card tone="muted" title={copy.publicDataTitle}>
         <p className={styles.notice}>{copy.publicDataBody}</p>
+      </Card>
+
+      <Card tone="muted" title={copy.viewerTitle}>
+        <p className={styles.notice}>{copy.viewerBody}</p>
+        {viewerRow ? (
+          <p className={styles.notice}>
+            <strong>
+              {copy.viewerSelected(viewerRow.manager_name ?? `#${viewerRow.entry_id}`)}
+            </strong>{" "}
+            <button type="button" className={styles.viewerClear} onClick={clear}>
+              {copy.viewerClear}
+            </button>
+          </p>
+        ) : null}
       </Card>
 
       <Card title={copy.members} aside={copy.memberCount(view.members.length)}>
@@ -130,6 +152,8 @@ export function LeagueMembersView({
                   key={member.member_kind === "system" ? "squadopt" : member.entry_id}
                   member={member}
                   locale={locale}
+                  viewerEntryId={viewer?.entryId ?? null}
+                  onSelectViewer={select}
                 />
               ))}
             </tbody>
@@ -143,9 +167,20 @@ export function LeagueMembersView({
   );
 }
 
-function MemberRow({ member, locale }: { member: EntryView; locale: string }) {
+function MemberRow({
+  member,
+  locale,
+  viewerEntryId,
+  onSelectViewer,
+}: {
+  member: EntryView;
+  locale: string;
+  viewerEntryId: number | null;
+  onSelectViewer: (entryId: number) => void;
+}) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
+  const isViewer = member.member_kind === "human" && member.entry_id === viewerEntryId;
   const movement =
     member.movement === "unknown"
       ? copy.unknown
@@ -173,6 +208,19 @@ function MemberRow({ member, locale }: { member: EntryView; locale: string }) {
         ) : (
           <span className={styles.sub}>#{member.entry_id}</span>
         )}
+        {member.member_kind === "human" ? (
+          isViewer ? (
+            <Badge tone="accent">{copy.viewerYouBadge}</Badge>
+          ) : (
+            <button
+              type="button"
+              className={styles.viewerSelect}
+              onClick={() => onSelectViewer(member.entry_id ?? 0)}
+            >
+              {copy.viewerSelect}
+            </button>
+          )
+        ) : null}
       </td>
       <td>{member.team_name ?? "—"}</td>
       <td className={`${styles.right} num`}>
