@@ -23,11 +23,15 @@ BACKEND_API_CONTRACT_VERSION: Final = "backend_api_v1"
 BACKEND_API_VERSION: Final = "v1"
 BACKEND_API_SCHEMA_PATH: Final = Path("docs") / "contracts" / "backend_api_v1.schema.json"
 
-ApiOperation: TypeAlias = Literal["gameweek.decide", "gameweek.settle", "season.tick"]
+ApiOperation: TypeAlias = Literal[
+    "gameweek.decide", "gameweek.settle", "season.tick", "league.advise"
+]
 ApiRunStatus: TypeAlias = Literal["completed", "failed"]
 JsonValue: TypeAlias = str | int | float | bool | list["JsonValue"] | dict[str, "JsonValue"] | None
 
-_OPERATIONS: Final = frozenset({"gameweek.decide", "gameweek.settle", "season.tick"})
+_OPERATIONS: Final = frozenset(
+    {"gameweek.decide", "gameweek.settle", "season.tick", "league.advise"}
+)
 _RUN_STATUSES: Final = frozenset({"completed", "failed"})
 _IDENTIFIER_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _IDEMPOTENCY_PATTERN: Final = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$")
@@ -126,6 +130,11 @@ class ApiCommandRequest:
     chip: str | None = None
     mode: Literal["live", "replay"] | None = None
     dry_run: bool = False
+    league_id: int | None = None
+    entry_id: int | None = None
+    strategy: str | None = None
+    window: int | None = None
+    rival_entry_id: int | None = None
     contract_version: str = BACKEND_API_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
@@ -178,9 +187,67 @@ class ApiCommandRequest:
             raise BackendApiContractError("mode must be 'live' or 'replay'.")
         if not isinstance(self.dry_run, bool):
             raise BackendApiContractError("dry_run must be boolean.")
+        for name in ("league_id", "entry_id", "rival_entry_id"):
+            value = getattr(self, name)
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 1
+            ):
+                raise BackendApiContractError(f"{name} must be a positive integer.")
+        object.__setattr__(
+            self,
+            "strategy",
+            _optional_pattern(self.strategy, label="strategy", pattern=_NAME_PATTERN),
+        )
+        if self.window is not None and self.window not in {1, 3, 5}:
+            raise BackendApiContractError("window must be 1, 3, or 5.")
         self._validate_shape()
 
     def _validate_shape(self) -> None:
+        if self.operation != "league.advise" and any(
+            value is not None
+            for value in (
+                self.league_id,
+                self.entry_id,
+                self.strategy,
+                self.window,
+                self.rival_entry_id,
+            )
+        ):
+            raise BackendApiContractError(
+                f"{self.operation} accepts no league, entry, strategy, window, or rival."
+            )
+        if self.operation == "league.advise":
+            if (
+                self.season is None
+                or self.gameweek is None
+                or self.league_id is None
+                or self.entry_id is None
+                or self.strategy is None
+                or self.window is None
+            ):
+                raise BackendApiContractError(
+                    "league.advise requires season, gameweek, league_id, entry_id, "
+                    "strategy, and window."
+                )
+            if self.rival_entry_id is not None and self.rival_entry_id == self.entry_id:
+                raise BackendApiContractError("rival_entry_id may not equal entry_id.")
+            if (
+                any(
+                    value is not None
+                    for value in (
+                        self.snapshot_id,
+                        self.projection_artifact_id,
+                        self.chip,
+                        self.mode,
+                    )
+                )
+                or self.dry_run
+            ):
+                raise BackendApiContractError(
+                    "league.advise accepts no snapshot, projection, chip, mode, or "
+                    "dry_run; the server answers from the current capture."
+                )
+            return
         if self.operation == "gameweek.decide":
             if self.season is None or self.gameweek is None or self.mode is None:
                 raise BackendApiContractError(
@@ -231,6 +298,17 @@ class ApiCommandRequest:
             )
         elif self.operation == "gameweek.settle":
             payload.update({"gameweek": self.gameweek, "snapshot_id": self.snapshot_id})
+        elif self.operation == "league.advise":
+            payload.update(
+                {
+                    "gameweek": self.gameweek,
+                    "league_id": self.league_id,
+                    "entry_id": self.entry_id,
+                    "strategy": self.strategy,
+                    "window": self.window,
+                    "rival_entry_id": self.rival_entry_id,
+                }
+            )
         else:
             payload["dry_run"] = self.dry_run
         return payload
@@ -275,6 +353,14 @@ class ApiCommandRequest:
             },
             "gameweek.settle": {"gameweek", "snapshot_id"},
             "season.tick": {"dry_run"},
+            "league.advise": {
+                "gameweek",
+                "league_id",
+                "entry_id",
+                "strategy",
+                "window",
+                "rival_entry_id",
+            },
         }[operation]
         expected = common | specific
         actual = set(document)
@@ -295,6 +381,11 @@ class ApiCommandRequest:
             chip=document.get("chip"),  # type: ignore[arg-type]
             mode=document.get("mode"),  # type: ignore[arg-type]
             dry_run=document.get("dry_run", False),  # type: ignore[arg-type]
+            league_id=document.get("league_id"),  # type: ignore[arg-type]
+            entry_id=document.get("entry_id"),  # type: ignore[arg-type]
+            strategy=document.get("strategy"),  # type: ignore[arg-type]
+            window=document.get("window"),  # type: ignore[arg-type]
+            rival_entry_id=document.get("rival_entry_id"),  # type: ignore[arg-type]
         )
         if document["request_fingerprint"] != request.request_fingerprint:
             raise BackendApiContractError(
@@ -551,6 +642,18 @@ def backend_api_schema() -> dict[str, Any]:
             "dry_run": {"type": "boolean"},
         }
     )
+    advise = _object(
+        {
+            **common_request,
+            "operation": {"type": "string", "const": "league.advise"},
+            "gameweek": {"type": "integer", "minimum": 1},
+            "league_id": {"type": "integer", "minimum": 1},
+            "entry_id": {"type": "integer", "minimum": 1},
+            "strategy": {"type": "string", "pattern": _NAME_PATTERN.pattern},
+            "window": {"type": "integer", "enum": [1, 3, 5]},
+            "rival_entry_id": _nullable({"type": "integer", "minimum": 1}),
+        }
+    )
     decide_body = _object(
         {
             "snapshot_id": nullable_identifier,
@@ -567,6 +670,14 @@ def backend_api_schema() -> dict[str, Any]:
     tick_body = _object(
         {"dry_run": {"type": "boolean"}},
         required=[],
+    )
+    advise_body = _object(
+        {
+            "strategy": {"type": "string", "pattern": _NAME_PATTERN.pattern},
+            "window": {"type": "integer", "enum": [1, 3, 5]},
+            "rival_entry_id": _nullable({"type": "integer", "minimum": 1}),
+        },
+        required=["strategy", "window"],
     )
     error = _object(
         {
@@ -631,12 +742,15 @@ def backend_api_schema() -> dict[str, Any]:
                 {"$ref": "#/$defs/DecideCommandRequest"},
                 {"$ref": "#/$defs/SettleCommandRequest"},
                 {"$ref": "#/$defs/TickCommandRequest"},
+                {"$ref": "#/$defs/AdviseCommandRequest"},
             ]
         },
         "ApiError": error,
         "ApiErrorResponse": error_response,
         "ApiRunResponse": run,
         "ApiServiceInfo": service_info,
+        "AdviseCommandRequest": advise,
+        "AdviseRequestBody": advise_body,
         "DecideCommandRequest": decide,
         "DecideRequestBody": decide_body,
         "SettleCommandRequest": settle,

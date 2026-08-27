@@ -248,3 +248,80 @@ def test_schema_is_valid_committed_deterministic_and_accepts_every_document() ->
     )
     for document in documents:
         jsonschema.validate(document, schema)
+
+
+# --- league.advise, added without moving a byte of the other three ------------------
+
+
+def _advise(**changes: object) -> ApiCommandRequest:
+    values: dict[str, object] = {
+        "operation": "league.advise",
+        "idempotency_key": "client:advise:1",
+        "season": "2026-27",
+        "gameweek": 3,
+        "league_id": 352490,
+        "entry_id": 313686,
+        "strategy": "saf-puan",
+        "window": 1,
+    }
+    values.update(changes)
+    return ApiCommandRequest(**values)  # type: ignore[arg-type]
+
+
+def test_advise_round_trips_validates_and_pins_its_own_fingerprint() -> None:
+    request = _advise()
+    document = request.to_dict()
+    assert ApiCommandRequest.from_dict(document) == request
+    _validate(document, "AdviseCommandRequest")
+    # Pinned like the decide fingerprint: a normalization change must declare itself.
+    assert request.request_fingerprint == (
+        "55fa6a9c807bfd8de3e598ccd22deae004a087df3d941699f13c7e6a6e9d894f"
+    )
+    assert _advise(rival_entry_id=2199732).request_fingerprint != request.request_fingerprint
+    assert _advise(window=3).request_fingerprint != request.request_fingerprint
+
+
+def test_advise_shape_is_strict() -> None:
+    with pytest.raises(BackendApiContractError, match="requires season"):
+        _advise(window=None)
+    with pytest.raises(BackendApiContractError, match="window must be 1, 3, or 5"):
+        _advise(window=2)
+    with pytest.raises(BackendApiContractError, match="may not equal entry_id"):
+        _advise(rival_entry_id=313686)
+    with pytest.raises(BackendApiContractError, match="current capture"):
+        _advise(snapshot_id=SNAPSHOT_ID)
+    with pytest.raises(BackendApiContractError, match="accepts no league"):
+        _decide(league_id=352490)
+
+
+def test_the_original_three_operations_did_not_move_a_byte() -> None:
+    """The additive proof: the pinned decide fingerprint above is the primary gate;
+    this one closes the loop for settle and tick payload shapes."""
+
+    settle = ApiCommandRequest(
+        operation="gameweek.settle",
+        idempotency_key="settle:2026-27:1",
+        season="2026-27",
+        gameweek=1,
+        snapshot_id=SNAPSHOT_ID,
+    )
+    tick = ApiCommandRequest(
+        operation="season.tick", idempotency_key="tick:1", season="2026-27", dry_run=True
+    )
+    assert set(settle.to_dict()) == {
+        "contract_version",
+        "operation",
+        "season",
+        "gameweek",
+        "snapshot_id",
+        "idempotency_key",
+        "request_fingerprint",
+    }
+    assert set(tick.to_dict()) == {
+        "contract_version",
+        "operation",
+        "season",
+        "dry_run",
+        "idempotency_key",
+        "request_fingerprint",
+    }
