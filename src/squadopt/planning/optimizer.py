@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from time import perf_counter
+from typing import Final
 
 import pandas as pd
 from ortools.sat.python import cp_model
@@ -48,6 +49,27 @@ from squadopt.planning.models import (
     TransferPlanningValidationError,
     TransferPlanResult,
 )
+
+# A wall-clock budget only decides anything when it is what stops the search -- and then
+# the answer is a function of the CPU share the process happened to receive. Fifteen
+# members solved back to back inherit exactly that: which of them proves its plan optimal
+# depends on the machine and its load, not on the problem (#247, measured for the rank
+# objective as #239). CP-SAT's deterministic time is the budget that gives a truncated
+# search a reproducible stopping point, so it is the default budget here, as it already
+# is for the rank objective (#244). These limits apply only when the caller has not
+# chosen a deterministic budget of their own.
+#
+# The budget is measured, not guessed: on the GW2 capture the hardest of the fifteen
+# registered members proves its primary plan optimal at 16.25 deterministic units, so
+# the default covers that with headroom. A member that still exhausts it returns
+# FEASIBLE with ``deterministic_time_budget_exhausted`` set -- deterministically, on
+# every machine.
+#
+# The wall ceiling is not a second budget: it is high enough never to bind a normal
+# solve, and exists only so a pathological run still ends. If it ever binds, determinism
+# is gone again and the diagnostics say so.
+PLAN_DETERMINISTIC_TIME_LIMIT: Final = 20.0
+PLAN_WALL_CEILING_SECONDS: Final = 300.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -870,13 +892,20 @@ def optimize_transfer_plan(
         raise TransferPlanningValidationError("first_week_overlap must be a FirstWeekOverlap.")
     _bound_first_week_overlap(artifacts, players_by_week[0], first_week_overlap)
     started_at = perf_counter()
-    deadline = started_at + optimization_config.solver_time_limit_seconds
+    wall_limit = optimization_config.solver_time_limit_seconds
+    deterministic_limit = optimization_config.solver_deterministic_time_limit
+    deterministic_budget_source = "caller"
+    if deterministic_limit is None:
+        deterministic_limit = PLAN_DETERMINISTIC_TIME_LIMIT
+        wall_limit = max(wall_limit, PLAN_WALL_CEILING_SECONDS)
+        deterministic_budget_source = "planner_default"
+    deadline = started_at + wall_limit
     primary_solver = cp_model.CpSolver()
     configure_solver(
         primary_solver,
         optimization_config,
-        optimization_config.solver_time_limit_seconds,
-        optimization_config.solver_deterministic_time_limit,
+        wall_limit,
+        deterministic_limit,
     )
     raw_primary_status = _solve(artifacts.model, primary_solver)
     primary_status = _map_solver_status(raw_primary_status)
@@ -919,19 +948,18 @@ def optimize_transfer_plan(
         "deterministic_seed": optimization_config.deterministic_seed,
         "num_search_workers": primary_solver.parameters.num_search_workers,
         "solver_time_limit_seconds": optimization_config.solver_time_limit_seconds,
-        "solver_deterministic_time_limit": (optimization_config.solver_deterministic_time_limit),
+        "wall_time_limit_seconds": wall_limit,
+        # ``planner_default`` means this function supplied the deterministic budget;
+        # ``caller`` means the configuration carried one.
+        "deterministic_budget_source": deterministic_budget_source,
+        "solver_deterministic_time_limit": deterministic_limit,
         "primary_deterministic_time": primary_deterministic_time,
         "tiebreak_deterministic_time_limit": None,
         "tiebreak_deterministic_time": None,
         "deterministic_time_used": primary_deterministic_time,
         "deterministic_time_budget_exhausted": (
-            optimization_config.solver_deterministic_time_limit is not None
-            and primary_status is not SolverStatus.OPTIMAL
-            and primary_deterministic_time
-            >= (
-                optimization_config.solver_deterministic_time_limit
-                - MIN_TIEBREAK_DETERMINISTIC_TIME
-            )
+            primary_status is not SolverStatus.OPTIMAL
+            and primary_deterministic_time >= deterministic_limit - MIN_TIEBREAK_DETERMINISTIC_TIME
         ),
         "tiebreak_attempted": False,
         "tiebreak_status": None,
@@ -953,7 +981,7 @@ def optimize_transfer_plan(
     result_solver = primary_solver
     remaining_time = deadline - perf_counter()
     remaining_deterministic_time = _remaining_deterministic_time(
-        optimization_config.solver_deterministic_time_limit,
+        deterministic_limit,
         primary_deterministic_time,
     )
     deterministic_budget_available = (
@@ -966,6 +994,16 @@ def optimize_transfer_plan(
         and deterministic_budget_available
     ):
         diagnostics["tiebreak_attempted"] = True
+        # Hint the tie-break with the primary's solution: a known-feasible,
+        # objective-optimal start turns most tie-break solves into a fast proof
+        # instead of a fresh search that the budget then cuts off arbitrarily (#192).
+        for week_vars in (artifacts.squad_vars, artifacts.starter_vars, artifacts.captain_vars):
+            for week in week_vars:
+                for variable in week:
+                    artifacts.model.add_hint(variable, primary_solver.value(variable))
+        for week_chips in artifacts.chip_vars:
+            for name in sorted(week_chips):
+                artifacts.model.add_hint(week_chips[name], primary_solver.value(week_chips[name]))
         _add_tiebreak(artifacts, optimization_config, primary_value)
         tiebreak_solver = cp_model.CpSolver()
         diagnostics["tiebreak_deterministic_time_limit"] = remaining_deterministic_time
