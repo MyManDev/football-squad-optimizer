@@ -49,6 +49,9 @@ LOGGER = logging.getLogger(__name__)
 
 STRATEGY_SCREENING_CONTRACT_VERSION = "strategy_screening_v1"
 DEVELOPMENT_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25")
+LOCKED_HOLDOUT_SEASON = "2025-26"
+HISTORY_PRIOR_SEASON = "2020-21"
+HISTORY_SEASONS = (HISTORY_PRIOR_SEASON, *DEVELOPMENT_SEASONS)
 ORIGINS = (5, 15, 25, 33)
 SCREENED_SLUGS = ("ortak-koru", "fark-yarat")
 DEFAULT_LEVELS: dict[str, int] = {"ortak-koru": 9, "fark-yarat": 5}
@@ -90,6 +93,24 @@ def _parse_arguments() -> argparse.Namespace:
         "--markdown-output", type=Path, default=REPOSITORY_ROOT / "docs" / "strategy_screening.md"
     )
     return parser.parse_args()
+
+
+def _loaded_seasons(panel: pd.DataFrame) -> tuple[str, ...]:
+    """Return the seasons actually loaded, which is the provenance ground truth."""
+
+    return tuple(sorted({str(season) for season in panel["season"].unique()}))
+
+
+def _metadata(
+    *, panel_rows: int, created_utc: str, loaded_seasons: tuple[str, ...]
+) -> dict[str, object]:
+    """Build shared metadata and attach the actually loaded season boundary."""
+
+    metadata = artifact_metadata(panel_rows=panel_rows, created_utc=created_utc)
+    provenance = metadata["provenance"]
+    assert isinstance(provenance, dict)
+    provenance["history_seasons"] = list(loaded_seasons)
+    return metadata
 
 
 def _build_fold(
@@ -190,7 +211,14 @@ def main() -> int:
     started = perf_counter()
 
     LOGGER.info("Building the panel and the control's residual folds")
-    panel = build_panel(arguments.archive_root)
+    panel = build_panel(arguments.archive_root, seasons=HISTORY_SEASONS)
+    loaded_seasons = _loaded_seasons(panel)
+    if LOCKED_HOLDOUT_SEASON in loaded_seasons:
+        LOGGER.error(
+            "%s rows reached the panel; aborting before any artifact is written",
+            LOCKED_HOLDOUT_SEASON,
+        )
+        return 1
     residuals = build_control_residual_table(panel, PolicyObjectiveConfig())
     ownership = load_enrichment_rows(arguments.archive_root, DEVELOPMENT_SEASONS)
 
@@ -337,9 +365,11 @@ def main() -> int:
             "deterministic_seed": 0,
         },
         "strategies": strategies,
-        "holdout_untouched": True,
+        "holdout_untouched": LOCKED_HOLDOUT_SEASON not in loaded_seasons,
         "elapsed_seconds": round(perf_counter() - started, 1),
-        "metadata": artifact_metadata(panel_rows=len(panel), created_utc=created_utc),
+        "metadata": _metadata(
+            panel_rows=len(panel), created_utc=created_utc, loaded_seasons=loaded_seasons
+        ),
     }
     write_json(arguments.json_output, document)
     write_text(arguments.markdown_output, _to_markdown(document))

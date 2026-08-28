@@ -91,3 +91,18 @@ policy is recorded in the artifact. The feasibility half of the rule is untouche
 This amendment was written after seeing the first run's output; what it changes is
 justified by the structure of the population alone, and whichever verdicts the
 corrected intervals produce are the result.
+
+## Corrective-run amendment — 2026-08-28, holdout no-read boundary
+
+Review established that the binding run loaded the archive with `build_panel`'s
+unrestricted default and filtered to the development population only downstream.
+Because that default includes the locked 2025-26 season, the committed artifact's
+`holdout_untouched: true` statement was not supported. The existing result is therefore
+non-binding; its numbers cannot justify either knob verdict.
+
+No factor, fold, threshold, bootstrap rule, seed or verdict rule changes. Before a
+corrective run, the loader must receive the explicit history list 2020-21 through
+2024-25, excluding 2025-26 before any file is loaded. Provenance and
+`holdout_untouched` derive from seasons actually present in the returned panel, and an
+unexpected holdout row aborts before residual construction or artifact writes. These
+rules and their boundary tests are committed before the corrective execution.
