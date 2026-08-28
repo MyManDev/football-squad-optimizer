@@ -46,7 +46,7 @@ before anything reads a feature window.
 {
   "candidate_label": "in_season_carry_over_blend",
   "contract_version": "oos_residual_export_v1",
-  "created_at_utc": "2026-08-28T16:19:05+00:00",
+  "created_at_utc": "2026-08-28T17:23:53+00:00",
   "dataset_snapshot_id": "8c97b2adb123863c3dd581e730f1360e89815ac2",
   "development_seasons": [
     "2021-22",
@@ -61,9 +61,10 @@ before anything reads a feature window.
   "model_name": "squadopt-deterministic-baseline",
   "model_version": "in-season-carry-over-v1",
   "opening_gameweeks_included": false,
-  "repository_commit": "316fffacc674695b6411205b0e6f8ca2501ee4ec",
+  "predicted_points_decimals": 9,
+  "repository_commit": "1f12d46ec345d4fa29c087c1f910ad764445ba27",
   "row_count": 101447,
-  "table_sha256": "7543a9498187ce0ac0918ac58c77ced5031ee1fa2905dbe422c619c4e9f6efce",
+  "table_sha256": "17f88e6e75618adc01ec6357317a6849bdb053e7eeed1cd6627c8eceab15fc7a",
   "training_contract_version": "in-season-carry-over-v1"
 }
 ```
@@ -71,8 +72,8 @@ before anything reads a feature window.
 ## Preflight
 
 - Verdict: PASSED (24 checks)
-- Table file: `C:/Users/ertug/Desktop/squadopt-p2b-runner/artifacts/residuals/in_season_residuals.csv` (local, not committed)
-- Manifest file: `C:/Users/ertug/Desktop/squadopt-p2b-runner/artifacts/residuals/in_season_residuals.manifest.json` (local, not committed)
+- Table file: `artifacts/residuals/in_season_residuals.csv` (local, not committed)
+- Manifest file: `artifacts/residuals/in_season_residuals.manifest.json` (local, not committed)
 
 ## Reproduction
 
