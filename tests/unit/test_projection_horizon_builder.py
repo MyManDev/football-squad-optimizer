@@ -61,7 +61,12 @@ def _fixture(identifier: int, gameweek: int, home: int, away: int) -> dict[str, 
     }
 
 
-def _calendar(*, blank_club: int | None = None, double_club: int | None = None) -> bytes:
+def _calendar(
+    *,
+    blank_club: int | None = None,
+    double_club: int | None = None,
+    gameweeks: tuple[int, ...] = (1, 2),
+) -> bytes:
     """Two gameweeks of fixtures, with an optional blank and an optional double in GW2.
 
     GW1 pairs every club once. GW2 does the same, then drops the blank club's fixture and
@@ -71,7 +76,7 @@ def _calendar(*, blank_club: int | None = None, double_club: int | None = None) 
 
     records: list[dict[str, Any]] = []
     identifier = 0
-    for gameweek in (1, 2):
+    for gameweek in gameweeks:
         for home, away in ((1, 2), (3, 4), (5, 6)):
             if gameweek == 2 and blank_club in (home, away):
                 continue
@@ -158,7 +163,9 @@ def test_the_post_processing_contract_names_the_scaling_rule(tmp_path: Path) -> 
     horizon = _horizon(tmp_path)
 
     assert "captured_availability_rule_v1" in horizon.post_processing_contract_version
-    assert "linear_fixture_count_scaling_v1" in horizon.post_processing_contract_version
+    assert (
+        "first_week_control_future_fixture_scaling_v2" in horizon.post_processing_contract_version
+    )
 
 
 def test_the_horizon_converts_to_a_planning_horizon(tmp_path: Path) -> None:
@@ -370,13 +377,15 @@ def test_a_horizon_starting_after_the_opening_gameweek_needs_a_handoff(tmp_path:
     """Moving the decision point without current-season history remains forbidden."""
 
     with pytest.raises(DataSourceError, match="needs the current season's played history"):
-        _horizon(tmp_path, (2, 3))
+        _horizon(tmp_path, (2,))
 
 
+@pytest.mark.parametrize("fixtures", [_calendar(), _calendar(double_club=1)])
 def test_a_midseason_horizon_matches_the_live_projection_at_its_first_week(
     tmp_path: Path,
+    fixtures: bytes,
 ) -> None:
-    capture = _capture(tmp_path)
+    capture = _capture(tmp_path, fixtures=fixtures)
     handoff = _in_season_handoff(capture)
     live = project(
         read_inputs(capture, season=SEASON, gameweek=2),
@@ -400,6 +409,25 @@ def test_a_midseason_horizon_matches_the_live_projection_at_its_first_week(
     assert float(difference.max()) == 0.0
     assert horizon.model_version == IN_SEASON_MODEL_VERSION
     assert horizon.feature_contract_version == IN_SEASON_FEATURE_CONTRACT_VERSION
+
+
+def test_a_blank_first_week_abstains_if_the_control_assigns_positive_points(
+    tmp_path: Path,
+) -> None:
+    capture = _capture(tmp_path, fixtures=_calendar(blank_club=1))
+
+    with pytest.raises(DataSourceError, match="no fixture"):
+        build_projection_horizon(
+            capture,
+            (2,),
+            season=SEASON,
+            in_season=_in_season_handoff(capture),
+        )
+
+
+def test_a_horizon_refuses_gameweeks_absent_from_the_captured_season(tmp_path: Path) -> None:
+    with pytest.raises(DataSourceError, match="absent from the captured season"):
+        _horizon(tmp_path, (1, 2, 3))
 
 
 def test_a_midseason_horizon_refuses_a_handoff_for_another_capture(tmp_path: Path) -> None:
