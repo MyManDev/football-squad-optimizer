@@ -7,7 +7,6 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
-from scripts.plan_transfer_horizon import _document, _write_once
 from tests.unit.test_live_recommendation import (
     GW1_REPLAY_SQUAD,
     GW1_REPLAY_TOTAL_COST_TENTHS,
@@ -22,6 +21,7 @@ from tests.unit.test_projection_horizon_builder import (
     _in_season_handoff,
 )
 
+from squadopt.application import horizon_plan_document, write_horizon_plan
 from squadopt.data.errors import DataError, DataSourceError
 from squadopt.live import (
     HeldSquad,
@@ -140,7 +140,7 @@ def test_the_operational_document_is_structured_and_contains_no_percentage_claim
     inputs, horizon, held, rules = _inputs(tmp_path, (2,))
     plan, config = plan_transfer_horizon(inputs, horizon, held, rules)
 
-    document = _document(horizon, plan, config)
+    document = horizon_plan_document(horizon, plan, config)
     encoded = json.dumps(document, sort_keys=True)
 
     assert document["solver_status"] == "OPTIMAL"
@@ -167,7 +167,7 @@ def test_a_deterministically_truncated_plan_remains_structured_shadow_output(
     )
 
     plan, config = plan_transfer_horizon(inputs, horizon, held, rules)
-    document = _document(horizon, plan, config)
+    document = horizon_plan_document(horizon, plan, config)
 
     assert plan.solver_status is SolverStatus.FEASIBLE
     assert document["publication_status"] == "shadow_unproven"
@@ -179,10 +179,10 @@ def test_an_identical_replay_is_a_no_op_and_different_content_is_refused(
     destination = tmp_path / "plan.json"
     document: dict[str, object] = {"contract_version": "test_v1", "value": 1}
 
-    assert _write_once(destination, document) is True
+    assert write_horizon_plan(destination, document) is True
     original = destination.read_bytes()
-    assert _write_once(destination, document) is False
+    assert write_horizon_plan(destination, document) is False
     assert destination.read_bytes() == original
 
     with pytest.raises(DataError, match="Refusing to overwrite"):
-        _write_once(destination, {**document, "value": 2})
+        write_horizon_plan(destination, {**document, "value": 2})
