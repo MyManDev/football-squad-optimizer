@@ -25,11 +25,12 @@ The working agreements live under [`docs/architecture/`](docs/architecture/). St
    .venv/Scripts/python -m ruff check .
    .venv/Scripts/python -m ruff format --check .
    .venv/Scripts/python -m mypy
-   .venv/Scripts/python -m pytest
+   .venv/Scripts/python -m pytest -n auto --dist loadscope
    ```
 
-   Run the full `pytest`. `-m "not slow"` deselects 8 of 1,969 tests and is a local convenience,
-   not a substitute.
+   Run the full suite in parallel, the way CI does: 121 s against 453 s serial. `-m "not slow"`
+   deselects 9 of 2,563 tests and now saves nothing worth having, because the parallel full
+   suite is faster than the serial subset.
 4. Stay in your zone; shared boundaries need all three owners.
 5. Live-path changes carry the replay check and respect the deadline freeze window.
 
