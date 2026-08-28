@@ -49,11 +49,9 @@ from squadopt.data.sources.fpl_live import (
 )
 from squadopt.features.cross_season import CrossSeasonConfig
 from squadopt.live.recommendation import (
-    CONTROL_MODEL_NAME,
-    CONTROL_MODEL_VERSION,
-    OPENING_FEATURE_CONTRACT_VERSION,
-    SUPPORTED_TARGET_GAMEWEEK,
+    InSeasonProjection,
     infer_season,
+    project,
     read_inputs,
 )
 from squadopt.planning.horizon import (
@@ -63,10 +61,8 @@ from squadopt.planning.horizon import (
 from squadopt.prediction.availability import (
     AVAILABILITY_RULE_CONTRACT_VERSION,
     AvailabilityRuleConfig,
-    apply_availability,
 )
 from squadopt.prediction.config import BaselineProjectionConfig
-from squadopt.prediction.opening import build_opening_projection_from_snapshot
 
 # The calendar rule applied on top of the calendar-blind control. Named in the horizon's
 # post-processing contract so a consumer can tell that the scaling happened outside the
@@ -177,18 +173,25 @@ def build_projection_horizon(
     decision_snapshot: CapturedSnapshot,
     target_gameweeks: tuple[int, ...],
     *,
-    panel: pd.DataFrame,
+    panel: pd.DataFrame | None = None,
     season: str | None = None,
     projection_config: BaselineProjectionConfig | None = None,
     cross_season: CrossSeasonConfig | None = None,
     availability_config: AvailabilityRuleConfig | None = None,
+    in_season: InSeasonProjection | None = None,
 ) -> ProjectionHorizon:
-    """Project every requested gameweek from one capture and one completed history."""
+    """Project a consecutive horizon from one captured information state.
+
+    Gameweek one uses the completed-history ``panel``. A horizon beginning later in the
+    season uses an ``in_season`` handoff for the first target gameweek. The live
+    projection seam validates that handoff against the season, capture and gameweek
+    before its numbers are reused across the captured future calendar.
+    """
 
     if not isinstance(decision_snapshot, CapturedSnapshot):
         raise DataSourceError("decision_snapshot must be a CapturedSnapshot.")
-    if not isinstance(panel, pd.DataFrame):
-        raise DataSourceError("panel must be a pandas DataFrame.")
+    if panel is not None and not isinstance(panel, pd.DataFrame):
+        raise DataSourceError("panel must be a pandas DataFrame when supplied.")
     gameweeks = _require_consecutive(target_gameweeks)
 
     bootstrap = _payload(decision_snapshot, BOOTSTRAP_PAYLOAD)
@@ -199,27 +202,15 @@ def build_projection_horizon(
     # The information state. Read once, at the first target, and reused unchanged for
     # every later gameweek — which is the whole claim this module makes.
     inputs = read_inputs(decision_snapshot, season=resolved_season, gameweek=gameweeks[0])
-    if inputs.deadline.gameweek != SUPPORTED_TARGET_GAMEWEEK:
-        raise DataSourceError(
-            f"A horizon must start at gameweek {SUPPORTED_TARGET_GAMEWEEK}, not "
-            f"{inputs.deadline.gameweek}. The base projection carries completed seasons "
-            "into a season with no played gameweeks; starting mid-season would silently "
-            "ignore everything that had happened that season, which is the same reason "
-            "the single-gameweek recommendation refuses a later target. Varying the "
-            "calendar ahead of an opening decision point is sound; moving the decision "
-            "point itself is not."
-        )
-    projected = apply_availability(
-        build_opening_projection_from_snapshot(
-            panel,
-            inputs.players,
-            season=resolved_season,
-            config=projection_config,
-            cross_season=cross_season,
-        ),
-        inputs.availability,
-        config=availability_config,
-    ).table
+    projection = project(
+        inputs,
+        panel,
+        projection_config=projection_config,
+        cross_season=cross_season,
+        availability_config=availability_config,
+        in_season=in_season,
+    )
+    projected = projection.table
 
     calendar = aggregate_team_gameweek(
         fixture_snapshot(
@@ -246,11 +237,22 @@ def build_projection_horizon(
         table=table,
         season=resolved_season,
         source_snapshot_id=snapshot_id,
-        model_name=CONTROL_MODEL_NAME,
-        model_version=CONTROL_MODEL_VERSION,
-        feature_contract_version=OPENING_FEATURE_CONTRACT_VERSION,
+        model_name=_projection_identity(projection.diagnostics, "model_name"),
+        model_version=_projection_identity(projection.diagnostics, "model_version"),
+        feature_contract_version=_projection_identity(
+            projection.diagnostics, "feature_contract_version"
+        ),
         post_processing_contract_version=HORIZON_POST_PROCESSING_CONTRACT_VERSION,
     )
+
+
+def _projection_identity(diagnostics: Mapping[str, object], name: str) -> str:
+    """Return one required provenance value from the shared projection seam."""
+
+    value = diagnostics.get(name)
+    if not isinstance(value, str) or not value.strip():
+        raise DataSourceError(f"Projection diagnostics carry no non-empty {name!r}.")
+    return value
 
 
 def _gameweek_rows(
@@ -332,18 +334,19 @@ def fixture_counts_by_player(
 
 
 def make_projection_horizon_builder(
-    panel: pd.DataFrame,
+    panel: pd.DataFrame | None = None,
     *,
     season: str | None = None,
     projection_config: BaselineProjectionConfig | None = None,
     cross_season: CrossSeasonConfig | None = None,
     availability_config: AvailabilityRuleConfig | None = None,
+    in_season: InSeasonProjection | None = None,
 ) -> Callable[[CapturedSnapshot, tuple[int, ...]], ProjectionHorizon]:
-    """Bind the completed history so the result satisfies ``ProjectionHorizonBuilder``.
+    """Bind projection inputs so the result satisfies ``ProjectionHorizonBuilder``.
 
-    The protocol takes only a snapshot and the target gameweeks, which is right: the
-    planner should not have to know that a projection needs a historical panel. Binding
-    it here keeps that detail on this side of the seam.
+    The planner should not know whether the decision point needs completed history or an
+    in-season handoff. Binding that producer-side detail here keeps the planning seam
+    unchanged.
     """
 
     def build(
@@ -358,6 +361,7 @@ def make_projection_horizon_builder(
             projection_config=projection_config,
             cross_season=cross_season,
             availability_config=availability_config,
+            in_season=in_season,
         )
 
     return build
