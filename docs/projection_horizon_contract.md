@@ -87,6 +87,23 @@ are modeled; inventing them in the conversion would smuggle an unversioned price
 into the planner. A future price-transition contract replaces this conversion rather
 than widening it.
 
+## Application operation
+
+`squadopt.application.plan_horizon(HorizonPlanRequest(...))` is the transport-neutral
+operation used by command-line, worker, and later HTTP adapters. It resolves the named
+capture, validates the in-season handoff against that capture, reads the held squad from
+the previous immutable ledger entry, builds the horizon, solves it, and writes one
+fingerprinted artifact.
+
+The operation returns `HorizonPlanResult`; callers do not scrape console text. An
+`OPTIMAL` plan is marked `proven`. A `FEASIBLE` plan is refused by default and may be
+recorded only when the caller explicitly enables shadow output, in which case it is
+marked `shadow_unproven`. Replaying identical inputs reuses the same bytes and path;
+different bytes may never overwrite an existing artifact.
+
+`python -m scripts.plan_transfer_horizon` is only the CLI adapter over this operation.
+It contains argument parsing and presentation, not planning or artifact business logic.
+
 ## What this contract does not claim
 
 - It does not predict information that becomes known after the capture. Availability and
