@@ -58,6 +58,7 @@ from squadopt.preflight import (
 
 RESIDUAL_EXPORT_CONTRACT_VERSION: Final = "oos_residual_export_v1"
 EVALUATION_OBJECTIVE_VERSION: Final = "single_gameweek_realized_squad_points_v1"
+PREDICTED_POINTS_DECIMALS: Final = 9
 
 # The regime this file claims. A different label from the control's, deliberately: the
 # pairing rule refuses two exports claiming the same regime, and these are two regimes.
@@ -177,7 +178,23 @@ def manifest(
         "table_sha256": table_sha256,
         "created_at_utc": created_at_utc,
         "locked_holdout_accessed": False,
+        "predicted_points_decimals": PREDICTED_POINTS_DECIMALS,
     }
+
+
+def write_residual_table(table: pd.DataFrame, path: Path) -> None:
+    """Serialize the byte-addressed export with the measured decimal rule."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # newline="" prevents a second platform-specific translation. The checksum is
+    # over these exact bytes, including the fixed nine-decimal float representation.
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        table.to_csv(
+            handle,
+            index=False,
+            lineterminator="\n",
+            float_format=f"%.{PREDICTED_POINTS_DECIMALS}f",
+        )
 
 
 def summary(
@@ -285,10 +302,7 @@ def main() -> int:
     table = build_residual_table(arguments.archive_root)
     arguments.table_root.mkdir(parents=True, exist_ok=True)
     table_path = arguments.table_root / f"{arguments.table_name}.csv"
-    # newline="" so the writer does not translate line endings a second time; the recorded
-    # checksum is of the bytes on disk, and a doubled terminator changes them.
-    with table_path.open("w", encoding="utf-8", newline="") as handle:
-        table.to_csv(handle, index=False, lineterminator="\n")
+    write_residual_table(table, table_path)
     digest = hashlib.sha256(table_path.read_bytes()).hexdigest()
 
     record = manifest(

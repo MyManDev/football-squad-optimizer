@@ -41,6 +41,7 @@ from squadopt.experiments.residual_manifest import (
 )
 from squadopt.experiments.shadow_report import (
     ShadowCalibrationReport,
+    ShadowExecutionMetadata,
     ShadowGateResult,
 )
 from squadopt.uncertainty.fixture_conformal import (
@@ -150,6 +151,7 @@ def _fold_order(table: pd.DataFrame) -> list[str]:
 def _abstain(
     *,
     generated_at_utc: str,
+    execution: ShadowExecutionMetadata,
     manifest: ResidualSourceManifest,
     cutoff_fold_id: str,
     sample_size: int,
@@ -161,6 +163,7 @@ def _abstain(
 
     return ShadowCalibrationReport(
         generated_at_utc=generated_at_utc,
+        execution=execution,
         horizon=1,
         residual_source=manifest.to_shadow_source(cutoff_fold_id=cutoff_fold_id),
         sample_size=sample_size,
@@ -181,6 +184,7 @@ def run_shadow_calibration(
     *,
     config: ShadowCalibrationConfig,
     generated_at_utc: str,
+    execution: ShadowExecutionMetadata,
     provenance_fingerprints: Mapping[str, str],
 ) -> ShadowCalibrationReport:
     """Run gate P1 against the bound export, or abstain and say why.
@@ -214,6 +218,7 @@ def run_shadow_calibration(
     if uncovered:
         return _abstain(
             generated_at_utc=generated_at_utc,
+            execution=execution,
             manifest=manifest,
             cutoff_fold_id=config.cutoff_fold_id,
             sample_size=0,
@@ -235,6 +240,7 @@ def run_shadow_calibration(
     if len(evaluation_folds) < config.min_evaluation_folds:
         return _abstain(
             generated_at_utc=generated_at_utc,
+            execution=execution,
             manifest=manifest,
             cutoff_fold_id=config.cutoff_fold_id,
             sample_size=len(evaluation_folds),
@@ -327,6 +333,7 @@ def run_shadow_calibration(
 
     return ShadowCalibrationReport(
         generated_at_utc=generated_at_utc,
+        execution=execution,
         horizon=config.horizon,
         residual_source=manifest.to_shadow_source(cutoff_fold_id=config.cutoff_fold_id),
         sample_size=len(evaluation_folds),
@@ -349,7 +356,15 @@ def replay_identity(document: Mapping[str, object]) -> dict[str, object]:
     is exempt — a differing number is a differing measurement.
     """
 
-    return {key: value for key, value in document.items() if key != "generated_at_utc"}
+    identity = {key: value for key, value in document.items() if key != "generated_at_utc"}
+    execution = identity.get("execution")
+    if isinstance(execution, Mapping):
+        identity["execution"] = {
+            key: value
+            for key, value in execution.items()
+            if key not in {"started_at_utc", "completed_at_utc", "elapsed_seconds"}
+        }
+    return identity
 
 
 def bootstrap_interval(
