@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { DecisionControls } from "./DecisionControls";
 
 afterEach(cleanup);
@@ -30,6 +31,16 @@ function renderEntryControls(path = "/league/members/35249001?mode=agresif&windo
   );
 }
 
+function renderEnglishControls(path = "/moves") {
+  return render(
+    <LanguageProvider initialLanguage="en">
+      <MemoryRouter initialEntries={[path]}>
+        <DecisionControls />
+      </MemoryRouter>
+    </LanguageProvider>,
+  );
+}
+
 describe("DecisionControls", () => {
   it("defaults to one-week pure points without presenting a rival probability", () => {
     renderControls();
@@ -38,6 +49,8 @@ describe("DecisionControls", () => {
     expect(screen.getByRole("radio", { name: /Saf Puan/ })).toBeChecked();
     expect(screen.queryByText("diagnostik")).not.toBeInTheDocument();
     expect(screen.getByText("Rakip Bütçesi Yok")).toBeInTheDocument();
+    expect(screen.getByText("canlı kontrol")).toBeInTheDocument();
+    expect(screen.getByText(/H1 mevcut kararı belirler/)).toBeInTheDocument();
   });
 
   it("keeps the selected mode and window in the shareable URL", async () => {
@@ -51,6 +64,15 @@ describe("DecisionControls", () => {
     expect(new URLSearchParams(query).get("window")).toBe("3");
     expect(new URLSearchParams(query).get("mode")).toBe("garantici");
     expect(screen.getByText("P(geride) %46 → %27")).toBeInTheDocument();
+    expect(screen.getByText("araştırma gölgesi")).toBeInTheDocument();
+    expect(screen.getByText(/H3 gölge kanıt için ayrılmıştır/)).toBeInTheDocument();
+  });
+
+  it("explains the horizon role in English as well", () => {
+    renderEnglishControls("/moves?window=5");
+
+    expect(screen.getByText("research shadow")).toBeInTheDocument();
+    expect(screen.getByText(/H5 is reserved for shadow evidence/)).toBeInTheDocument();
   });
 
   it("marks crowd-relative windows as diagnostic rather than probability", () => {

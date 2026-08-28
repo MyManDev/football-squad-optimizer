@@ -11,6 +11,13 @@ test("suggested moves states the opening week honestly", async ({ page }) => {
   await page.goto("/moves");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Önerilen Hamleler");
   await expect(page.getByText(/Açılış kadrosu — yapılacak transfer yok/)).toBeVisible();
+  await expect(page.getByText("canlı kontrol")).toBeVisible();
+
+  await page.getByRole("radio", { name: "3 hafta" }).click();
+
+  await expect(page).toHaveURL(/window=3/);
+  await expect(page.getByText("araştırma gölgesi")).toBeVisible();
+  await expect(page.getByText(/H3 gölge kanıt için ayrılmıştır/)).toBeVisible();
 });
 
 test("rivals shows the projections and says why there is no rival yet", async ({ page }) => {

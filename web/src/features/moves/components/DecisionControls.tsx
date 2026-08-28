@@ -56,6 +56,7 @@ export function DecisionControls({ variant = "default" }: { variant?: "default" 
   }
 
   const competitive = mode !== "saf-puan";
+  const liveControl = windowSize === 1;
 
   return (
     <Card title={copy.title} aside={<Badge tone="accent">{copy.shareable}</Badge>}>
@@ -141,6 +142,23 @@ export function DecisionControls({ variant = "default" }: { variant?: "default" 
             )}
           </form>
         ) : null}
+      </div>
+
+      <div
+        className={`${styles.horizonStatus} ${
+          liveControl ? styles.horizonControl : styles.horizonShadow
+        }`}
+        role="note"
+      >
+        <Badge tone={liveControl ? "good" : "warn"}>
+          {liveControl ? copy.liveControl : copy.researchShadow}
+        </Badge>
+        <span>
+          <strong>
+            {liveControl ? copy.liveControlTitle : copy.researchShadowTitle(windowSize)}
+          </strong>{" "}
+          {liveControl ? copy.liveControlBody : copy.researchShadowBody}
+        </span>
       </div>
 
       {competitive ? (
