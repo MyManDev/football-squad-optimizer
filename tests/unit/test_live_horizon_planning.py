@@ -17,6 +17,7 @@ from tests.unit.test_live_recommendation import (
 )
 from tests.unit.test_live_transfers import CHIPS, _game_config
 from tests.unit.test_projection_horizon_builder import (
+    _calendar,
     _capture,
     _in_season_handoff,
 )
@@ -32,7 +33,7 @@ from squadopt.live import (
 )
 from squadopt.live import transfers as live_transfers
 from squadopt.optimization import SolverStatus
-from squadopt.planning import ProjectionHorizon
+from squadopt.planning import ProjectionHorizon, TransferPlanningValidationError
 
 
 def _held(players: pd.DataFrame) -> HeldSquad:
@@ -56,9 +57,27 @@ def _held(players: pd.DataFrame) -> HeldSquad:
 
 def _inputs(tmp_path: Path, gameweeks: tuple[int, ...]) -> tuple[object, ...]:
     bootstrap = json.loads(_projection_bootstrap().decode("utf-8"))
+    deadlines = {
+        3: "2026-09-12T17:30:00Z",
+        4: "2026-09-19T17:30:00Z",
+        5: "2026-09-26T17:30:00Z",
+        6: "2026-10-03T17:30:00Z",
+    }
+    for gameweek in range(3, max(gameweeks) + 1):
+        bootstrap["events"].append(
+            {
+                "id": gameweek,
+                "deadline_time": deadlines[gameweek],
+                "finished": False,
+            }
+        )
     bootstrap["game_config"] = _game_config()
     bootstrap["chips"] = CHIPS
-    capture = _capture(tmp_path, bootstrap=json.dumps(bootstrap).encode("utf-8"))
+    capture = _capture(
+        tmp_path,
+        bootstrap=json.dumps(bootstrap).encode("utf-8"),
+        fixtures=_calendar(gameweeks=tuple(range(1, max(gameweeks) + 1))),
+    )
     inputs = read_inputs(capture, season=SEASON, gameweek=2)
     horizon = build_projection_horizon(
         capture,
@@ -80,7 +99,7 @@ def test_live_horizon_plans_every_requested_gameweek(tmp_path: Path, length: int
     assert tuple(week.gameweek for week in plan.weeks) == gameweeks
     assert plan.diagnostics["horizon_length"] == length
     assert config.max_free_transfers == rules.transfers.max_free_transfers
-    assert config.max_transfers_per_gameweek == 1
+    assert config.max_transfers_per_gameweek == (None if length == 1 else 1)
 
 
 def test_the_same_live_horizon_plans_identically_twice(tmp_path: Path) -> None:
@@ -140,7 +159,13 @@ def test_the_operational_document_is_structured_and_contains_no_percentage_claim
     inputs, horizon, held, rules = _inputs(tmp_path, (2,))
     plan, config = plan_transfer_horizon(inputs, horizon, held, rules)
 
-    document = horizon_plan_document(horizon, plan, config)
+    document = horizon_plan_document(
+        horizon,
+        plan,
+        config,
+        projection_handoff_fingerprint="handoff-fingerprint",
+        initial_state_fingerprint="initial-state-fingerprint",
+    )
     encoded = json.dumps(document, sort_keys=True)
 
     assert document["solver_status"] == "OPTIMAL"
@@ -167,10 +192,42 @@ def test_a_deterministically_truncated_plan_remains_structured_shadow_output(
     )
 
     plan, config = plan_transfer_horizon(inputs, horizon, held, rules)
-    document = horizon_plan_document(horizon, plan, config)
+    document = horizon_plan_document(
+        horizon,
+        plan,
+        config,
+        projection_handoff_fingerprint="handoff-fingerprint",
+        initial_state_fingerprint="initial-state-fingerprint",
+    )
 
     assert plan.solver_status is SolverStatus.FEASIBLE
-    assert document["publication_status"] == "shadow_unproven"
+    assert document["publication_status"] == "shadow_only"
+    assert document["solver_proof_status"] == "unproven"
+
+
+def test_an_optimal_long_horizon_remains_research_shadow(tmp_path: Path) -> None:
+    inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
+    plan, config = plan_transfer_horizon(inputs, horizon, held, rules)
+
+    document = horizon_plan_document(
+        horizon,
+        plan,
+        config,
+        projection_handoff_fingerprint="handoff-fingerprint",
+        initial_state_fingerprint="initial-state-fingerprint",
+    )
+
+    assert document["solver_proof_status"] == "proven"
+    assert document["decision_role"] == "research_shadow"
+    assert document["publication_status"] == "shadow_only"
+
+
+def test_planner_refuses_a_horizon_mutated_after_fingerprinting(tmp_path: Path) -> None:
+    inputs, horizon, held, rules = _inputs(tmp_path, (2,))
+    horizon.table.loc[horizon.table.index[0], "expected_points"] += 1.0
+
+    with pytest.raises(TransferPlanningValidationError, match="changed after its fingerprint"):
+        plan_transfer_horizon(inputs, horizon, held, rules)
 
 
 def test_an_identical_replay_is_a_no_op_and_different_content_is_refused(
@@ -183,6 +240,7 @@ def test_an_identical_replay_is_a_no_op_and_different_content_is_refused(
     original = destination.read_bytes()
     assert write_horizon_plan(destination, document) is False
     assert destination.read_bytes() == original
+    assert not list(tmp_path.glob(".*.tmp"))
 
     with pytest.raises(DataError, match="Refusing to overwrite"):
         write_horizon_plan(destination, {**document, "value": 2})
