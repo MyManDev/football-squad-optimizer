@@ -1,9 +1,11 @@
 """Deterministic CP-SAT optimizer for multi-gameweek transfer planning."""
 
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from time import perf_counter
+from typing import Final
 
 import pandas as pd
 from ortools.sat.python import cp_model
@@ -38,6 +40,7 @@ from squadopt.optimization.optimizer import (
 from squadopt.optimization.validation import validate_players
 from squadopt.planning.models import (
     ChipAvailability,
+    FirstWeekOverlap,
     InitialSquadState,
     PlanningHorizon,
     PlanningWeekResult,
@@ -46,6 +49,27 @@ from squadopt.planning.models import (
     TransferPlanningValidationError,
     TransferPlanResult,
 )
+
+# A wall-clock budget only decides anything when it is what stops the search -- and then
+# the answer is a function of the CPU share the process happened to receive. Fifteen
+# members solved back to back inherit exactly that: which of them proves its plan optimal
+# depends on the machine and its load, not on the problem (#247, measured for the rank
+# objective as #239). CP-SAT's deterministic time is the budget that gives a truncated
+# search a reproducible stopping point, so it is the default budget here, as it already
+# is for the rank objective (#244). These limits apply only when the caller has not
+# chosen a deterministic budget of their own.
+#
+# The budget is measured, not guessed: on the GW2 capture the hardest of the fifteen
+# registered members proves its primary plan optimal at 16.25 deterministic units, so
+# the default covers that with headroom. A member that still exhausts it returns
+# FEASIBLE with ``deterministic_time_budget_exhausted`` set -- deterministically, on
+# every machine.
+#
+# The wall ceiling is not a second budget: it is high enough never to bind a normal
+# solve, and exists only so a pathological run still ends. If it ever binds, determinism
+# is gone again and the diagnostics say so.
+PLAN_DETERMINISTIC_TIME_LIMIT: Final = 20.0
+PLAN_WALL_CEILING_SECONDS: Final = 300.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -747,12 +771,69 @@ def _extract_plan(
     )
 
 
+def _forbid_squads(
+    artifacts: _PlanArtifacts,
+    first_week: pd.DataFrame,
+    excluded_squads: Sequence[frozenset[object]],
+    squad_size: int,
+) -> None:
+    """Rule out squads a caller has already been given, and nothing else.
+
+    A no-good cut per squad: of those fifteen players, at most fourteen may be held in
+    the opening week. Players the horizon does not carry are ignored rather than refused —
+    an excluded squad from an older capture may name someone since removed, and refusing
+    it would turn a stale exclusion into a failed plan.
+    """
+
+    if not excluded_squads:
+        return
+    # Player ids are whatever the horizon carries — codes in production, labels in
+    # tests — so they are matched as they are rather than coerced.
+    column_of = {player: index for index, player in enumerate(first_week["player_id"])}
+    for squad in excluded_squads:
+        columns = [column_of[player] for player in squad if player in column_of]
+        if len(columns) < squad_size:
+            continue
+        artifacts.model.add(
+            sum(artifacts.squad_vars[0][column] for column in columns) <= squad_size - 1
+        )
+
+
+def _bound_first_week_overlap(
+    artifacts: _PlanArtifacts,
+    first_week: pd.DataFrame,
+    band: FirstWeekOverlap | None,
+) -> None:
+    """Bound how many of the band's players the first-week fifteen holds.
+
+    Matching mirrors ``_forbid_squads``: ids are whatever the horizon carries, matched
+    as they are. A floor above the number of band players the horizon carries leaves
+    the constraint unsatisfiable and the solve INFEASIBLE — the honest reading of a
+    band the world cannot meet, and the reason a menu builder drops the band instead
+    of publishing an unproven entry for it.
+    """
+
+    if band is None:
+        return
+    column_of = {player: index for index, player in enumerate(first_week["player_id"])}
+    columns = [
+        column_of[player] for player in sorted(band.player_ids, key=str) if player in column_of
+    ]
+    held = cp_model.LinearExpr.sum([artifacts.squad_vars[0][column] for column in columns])
+    if band.minimum is not None:
+        artifacts.model.add(held >= band.minimum)
+    if band.maximum is not None:
+        artifacts.model.add(held <= band.maximum)
+
+
 def optimize_transfer_plan(
     horizon: PlanningHorizon,
     initial_state: InitialSquadState,
     optimization_config: OptimizationConfig,
     transfer_config: TransferPlanningConfig | None = None,
     chips: ChipAvailability | None = None,
+    excluded_squads: Sequence[frozenset[object]] = (),
+    first_week_overlap: FirstWeekOverlap | None = None,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
 
@@ -760,6 +841,17 @@ def optimize_transfer_plan(
     (bench boost, triple captain, wildcard); omitted or empty, the planner is exactly
     the chip-less planner. Each available chip is played at most once in the horizon
     and at most one chip is played per gameweek.
+
+    ``excluded_squads`` forbids first-week squads that have already been produced, so a
+    caller can ask for the next-best plan rather than the same one. Each entry becomes a
+    no-good cut: at most fourteen of those fifteen may be held together, which rules out
+    that exact squad and nothing else. This is what lets a mode choose between plans
+    instead of re-ranking a menu of one — without it every mode returns the optimizer's
+    single answer under a different name.
+
+    ``first_week_overlap`` bounds how many of a named set of players — a rival's known
+    eleven — the first-week fifteen holds. It is the strategy catalogue's overlap band
+    in solver terms; ``None`` is today's unconstrained planner, bit for bit.
     """
 
     if not isinstance(horizon, PlanningHorizon):
@@ -795,14 +887,25 @@ def optimize_transfer_plan(
         settings,
         availability,
     )
+    _forbid_squads(artifacts, players_by_week[0], excluded_squads, optimization_config.squad_size)
+    if first_week_overlap is not None and not isinstance(first_week_overlap, FirstWeekOverlap):
+        raise TransferPlanningValidationError("first_week_overlap must be a FirstWeekOverlap.")
+    _bound_first_week_overlap(artifacts, players_by_week[0], first_week_overlap)
     started_at = perf_counter()
-    deadline = started_at + optimization_config.solver_time_limit_seconds
+    wall_limit = optimization_config.solver_time_limit_seconds
+    deterministic_limit = optimization_config.solver_deterministic_time_limit
+    deterministic_budget_source = "caller"
+    if deterministic_limit is None:
+        deterministic_limit = PLAN_DETERMINISTIC_TIME_LIMIT
+        wall_limit = max(wall_limit, PLAN_WALL_CEILING_SECONDS)
+        deterministic_budget_source = "planner_default"
+    deadline = started_at + wall_limit
     primary_solver = cp_model.CpSolver()
     configure_solver(
         primary_solver,
         optimization_config,
-        optimization_config.solver_time_limit_seconds,
-        optimization_config.solver_deterministic_time_limit,
+        wall_limit,
+        deterministic_limit,
     )
     raw_primary_status = _solve(artifacts.model, primary_solver)
     primary_status = _map_solver_status(raw_primary_status)
@@ -822,6 +925,15 @@ def optimize_transfer_plan(
         "gameweeks": verified_horizon.gameweeks,
         "horizon_length": len(verified_horizon.gameweeks),
         "chip_availability_fingerprint": availability.availability_fingerprint,
+        "first_week_overlap": (
+            None
+            if first_week_overlap is None
+            else {
+                "player_count": len(first_week_overlap.player_ids),
+                "minimum": first_week_overlap.minimum,
+                "maximum": first_week_overlap.maximum,
+            }
+        ),
         "chips_available": {name: sorted(weeks) for name, weeks in availability.available.items()},
         "expected_points_scale": optimization_config.expected_points_scale,
         "objective_weight_scale": settings.objective_weight_scale,
@@ -836,19 +948,18 @@ def optimize_transfer_plan(
         "deterministic_seed": optimization_config.deterministic_seed,
         "num_search_workers": primary_solver.parameters.num_search_workers,
         "solver_time_limit_seconds": optimization_config.solver_time_limit_seconds,
-        "solver_deterministic_time_limit": (optimization_config.solver_deterministic_time_limit),
+        "wall_time_limit_seconds": wall_limit,
+        # ``planner_default`` means this function supplied the deterministic budget;
+        # ``caller`` means the configuration carried one.
+        "deterministic_budget_source": deterministic_budget_source,
+        "solver_deterministic_time_limit": deterministic_limit,
         "primary_deterministic_time": primary_deterministic_time,
         "tiebreak_deterministic_time_limit": None,
         "tiebreak_deterministic_time": None,
         "deterministic_time_used": primary_deterministic_time,
         "deterministic_time_budget_exhausted": (
-            optimization_config.solver_deterministic_time_limit is not None
-            and primary_status is not SolverStatus.OPTIMAL
-            and primary_deterministic_time
-            >= (
-                optimization_config.solver_deterministic_time_limit
-                - MIN_TIEBREAK_DETERMINISTIC_TIME
-            )
+            primary_status is not SolverStatus.OPTIMAL
+            and primary_deterministic_time >= deterministic_limit - MIN_TIEBREAK_DETERMINISTIC_TIME
         ),
         "tiebreak_attempted": False,
         "tiebreak_status": None,
@@ -870,7 +981,7 @@ def optimize_transfer_plan(
     result_solver = primary_solver
     remaining_time = deadline - perf_counter()
     remaining_deterministic_time = _remaining_deterministic_time(
-        optimization_config.solver_deterministic_time_limit,
+        deterministic_limit,
         primary_deterministic_time,
     )
     deterministic_budget_available = (
@@ -883,6 +994,16 @@ def optimize_transfer_plan(
         and deterministic_budget_available
     ):
         diagnostics["tiebreak_attempted"] = True
+        # Hint the tie-break with the primary's solution: a known-feasible,
+        # objective-optimal start turns most tie-break solves into a fast proof
+        # instead of a fresh search that the budget then cuts off arbitrarily (#192).
+        for week_vars in (artifacts.squad_vars, artifacts.starter_vars, artifacts.captain_vars):
+            for week in week_vars:
+                for variable in week:
+                    artifacts.model.add_hint(variable, primary_solver.value(variable))
+        for week_chips in artifacts.chip_vars:
+            for name in sorted(week_chips):
+                artifacts.model.add_hint(week_chips[name], primary_solver.value(week_chips[name]))
         _add_tiebreak(artifacts, optimization_config, primary_value)
         tiebreak_solver = cp_model.CpSolver()
         diagnostics["tiebreak_deterministic_time_limit"] = remaining_deterministic_time
