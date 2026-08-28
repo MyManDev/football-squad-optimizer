@@ -1,8 +1,12 @@
 """The league views builder: member advice from the seam, independence pinned as fact."""
 
+import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+import numpy as np
+import pandas as pd
 import pytest
 import tests.unit.test_live_transfers as world_module
 
@@ -148,6 +152,79 @@ def test_a_members_advice_is_invariant_to_every_other_members_state(
     first = (tmp_path / "one" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
     second = (tmp_path / "two" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
     assert first == second
+
+
+def test_an_unproven_plan_is_published_with_its_status_not_discarded(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A member whose plan the solver found but could not prove keeps their page.
+
+    Before this, the OPTIMAL-only gate on the member path threw the found plan away and
+    the member vanished from their own league — and under a wall-clock budget, which
+    members vanished depended on the machine (#247). The plan the solver found is real;
+    what was missing is the proof, and the payload now states exactly that: the status
+    and the measured bound gap, no more.
+    """
+
+    import dataclasses
+
+    from squadopt.live import transfers as live_transfers
+    from squadopt.optimization import SolverStatus
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+
+    real_plan_transfers = live_transfers.plan_transfers
+
+    def feasible_plan_transfers(*args: Any, **kwargs: Any) -> Any:
+        plan, decision, config = real_plan_transfers(*args, **kwargs)
+        # The solve is real; only the proof is withheld, as a budget-bound solve would.
+        relabelled = dataclasses.replace(
+            plan,
+            solver_status=SolverStatus.FEASIBLE,
+            diagnostics={**dict(plan.diagnostics), "absolute_optimality_gap": 0.25},
+        )
+        return relabelled, decision, config
+
+    monkeypatch.setattr("squadopt.application.advice.plan_transfers", feasible_plan_transfers)
+    report = build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "unproven",
+    )
+
+    assert [member.rendered for member in report.members] == [True]
+    raw = (tmp_path / "unproven" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
+    payload = json.loads(raw)["payload"]
+    assert payload["solver_status"] == "FEASIBLE"
+    assert payload["optimality_gap"] == 0.25
+    assert payload["moves"]  # the found plan itself is published, not just the caveat
+
+
+def test_a_proven_plan_publishes_its_proof(world: dict[str, Any], tmp_path: Path) -> None:
+    """The baseline advice carries OPTIMAL and a zero gap when the proof exists."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "proven",
+    )
+    raw = (tmp_path / "proven" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
+    payload = json.loads(raw)["payload"]
+    assert payload["solver_status"] == "OPTIMAL"
+    assert payload["optimality_gap"] == 0.0
 
 
 def test_the_members_page_carries_the_league_standing_and_its_order(
@@ -396,3 +473,258 @@ def test_a_member_whose_picks_fail_still_carries_the_score_the_league_published(
     ][0]
     assert row["data_quality"] == "empty"
     assert row["gameweek_points"] == 41, "a failed squad must not blank a published score"
+
+
+class _WorldPaths:
+    """One-week fake scenario paths over the world's whole pool, for the mode selector."""
+
+    def __init__(
+        self, projection: Any, gameweek: int, *, scenarios: int = 64, seed: int = 3
+    ) -> None:
+        codes = [int(str(row["player_id"])) for _, row in projection.table.iterrows()]
+        generator = np.random.default_rng(seed)
+        self._frame = pd.DataFrame(
+            generator.uniform(0.0, 8.0, size=(scenarios, len(codes))), columns=codes
+        )
+        self.target = SimpleNamespace(gameweeks=(gameweek,), horizon=1, window_id=f"gw{gameweek}")
+        self.config = SimpleNamespace(scenario_count=scenarios)
+
+    def drop_player(self, code: int) -> None:
+        self._frame = self._frame.drop(columns=[code])
+
+    def week(self, gameweek: int) -> pd.DataFrame:
+        return self._frame
+
+
+def _two_member_standings() -> dict[int, Any]:
+    from squadopt.application.league_views import MemberStanding
+
+    return {
+        101: MemberStanding(entry_id=101, team_name="Ada FC", manager_name="Ada A", rank=1),
+        202: MemberStanding(entry_id=202, team_name="Bora FC", manager_name="Bora B", rank=2),
+    }
+
+
+def test_with_paths_every_mode_is_published_and_none_carries_a_probability(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Four files per member, real league rivals, price tags only — no probability ships."""
+
+    import json
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    other = list(squad)
+    other[10], other[11] = 1017, 1018
+    provider = _Provider(
+        {101: _member_picks(world, 101, squad), 202: _member_picks(world, 202, other)}
+    )
+    report = build_league_views(
+        provider,
+        (
+            EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),
+            EntryRegistration(202, "member-b", "2026-08-23T00:00:00Z"),
+        ),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+        standings=_two_member_standings(),
+        scored_gameweek=1,
+        mode_paths=_WorldPaths(projection, 2),  # type: ignore[arg-type]
+    )
+    assert report.rendered_count == 2
+    published = sorted(
+        path.relative_to(tmp_path / "league").as_posix()
+        for path in (tmp_path / "league" / "advice").rglob("*.json")
+    )
+    modes = ("agresif", "asiri-agresif", "garantici", "saf-puan")
+    assert published == [f"advice/{entry}/{mode}/1.json" for entry in (101, 202) for mode in modes]
+    for entry_id, rival_name in ((101, "Bora FC"), (202, "Ada FC")):
+        for mode in modes:
+            raw = (tmp_path / "league" / "advice" / str(entry_id) / mode / "1.json").read_text(
+                encoding="utf-8"
+            )
+            assert "probability" not in raw.lower(), "no probability may ever be published"
+            payload = json.loads(raw)["payload"]
+            assert payload["mode"] == mode
+            assert payload["window"] == 1
+            if mode == "saf-puan":
+                assert payload["expected_points_cost"] == 0.0
+                assert payload["rival_label"] is None
+            else:
+                assert payload["expected_points_cost"] >= 0.0
+                assert payload["rival_label"] == rival_name
+
+
+def test_the_baseline_advice_is_byte_identical_with_and_without_paths(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The saf-puan file is the deterministic planner's answer, never a scenario re-pick."""
+
+    import datetime
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    registrations = (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),)
+    for out_name, paths in (("plain", None), ("modes", _WorldPaths(projection, 2))):
+        build_league_views(
+            _Provider({101: _member_picks(world, 101, squad)}),
+            registrations,
+            inputs,
+            projection,
+            rules,
+            league_id=352490,
+            league_name="Test League",
+            out_dir=tmp_path / out_name,
+            now=when,
+            mode_paths=paths,  # type: ignore[arg-type]
+        )
+    first = (tmp_path / "plain" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
+    second = (tmp_path / "modes" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
+    assert first == second
+
+
+# The in-season member plan this world produces, recorded so that a change to the member
+# advice path has to declare itself. Every other test in this file compares two runs of
+# the same commit, which passes even if every number moved; these literals are the only
+# thing here that would notice. The planner itself has the GW1 opening pin
+# (test_live_recommendation.py); this is the same gate for the in-season member path,
+# which that pin never exercised: a held squad, sell prices, and a transfer decision.
+IN_SEASON_MEMBER_ADVICE_SHA256 = "81cbc617f4d451b3b366c189ffc7fecf0cbbb7b47a6b6878b7283dd880e5a305"
+# (player_out, player_in, expected_points_delta, expected_points_cost) per move.
+IN_SEASON_MEMBER_MOVES = (
+    (1005, 1009, 2.5, 4.0),
+    (1020, 1024, 7.0, 4.0),
+)
+
+
+def test_the_recorded_in_season_member_plan_holds(world: dict[str, Any], tmp_path: Path) -> None:
+    """Rebuilding member 101's advice reproduces the plan recorded here, byte for byte.
+
+    This is the member path's replay gate. A pull request changing what this world's
+    member is told — the planner, the projection reading, the advice payload, its JSON
+    rendering — fails here and must say so in the pull request, updating these literals
+    in the same commit. The refactor that moves this path behind a service boundary must
+    keep the hash identical, which is the point of pinning bytes rather than fields.
+
+    If these literals do not reproduce on another machine at the same commit, that is a
+    determinism defect worth reporting rather than a test to loosen.
+    """
+
+    import hashlib
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    when = __import__("datetime").datetime(2026, 8, 23, 12, 0, tzinfo=__import__("datetime").UTC)
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "pin",
+        now=when,
+    )
+    raw = (tmp_path / "pin" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
+    payload = json.loads(raw)["payload"]
+    # The readable literals first, so a failure names the move that changed rather than
+    # only reporting a hash mismatch.
+    assert (
+        tuple(
+            (
+                move["player_out"]["player_id"],
+                move["player_in"]["player_id"],
+                move["expected_points_delta"],
+                move["expected_points_cost"],
+            )
+            for move in payload["moves"]
+        )
+        == IN_SEASON_MEMBER_MOVES
+    )
+    assert payload["mode"] == "saf-puan"
+    assert payload["window"] == 1
+    assert payload["expected_points_cost"] == 0.0
+    assert payload["source_snapshot_id"] == world["gw2_id"]
+    assert hashlib.sha256(raw).hexdigest() == IN_SEASON_MEMBER_ADVICE_SHA256
+
+
+def test_without_a_rival_only_the_baseline_is_published(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """A lone member has no league neighbour, so competitive modes are absent, not faked."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+        mode_paths=_WorldPaths(projection, 2),  # type: ignore[arg-type]
+    )
+    published = sorted(
+        path.relative_to(tmp_path / "league").as_posix()
+        for path in (tmp_path / "league" / "advice").rglob("*.json")
+    )
+    assert published == ["advice/101/saf-puan/1.json"]
+
+
+def test_a_member_whose_mode_scoring_fails_keeps_the_baseline(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Paths missing a player the member holds break their modes, not their advice."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    other = list(squad)
+    other[10], other[11] = 1017, 1018
+    paths = _WorldPaths(projection, 2)
+    paths.drop_player(squad[0])  # member 101's captain is not priced by the paths
+    report = build_league_views(
+        _Provider({101: _member_picks(world, 101, squad), 202: _member_picks(world, 202, other)}),
+        (
+            EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),
+            EntryRegistration(202, "member-b", "2026-08-23T00:00:00Z"),
+        ),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+        standings=_two_member_standings(),
+        scored_gameweek=1,
+        mode_paths=paths,  # type: ignore[arg-type]
+    )
+    assert report.rendered_count == 2
+    failed = next(member for member in report.members if member.entry_id == 101)
+    assert failed.rendered and "competitive modes unavailable" in failed.reason
+    assert (tmp_path / "league" / "advice" / "101" / "saf-puan" / "1.json").is_file()
+    assert not (tmp_path / "league" / "advice" / "101" / "garantici").exists()
+
+
+def test_paths_for_the_wrong_gameweek_are_refused(world: dict[str, Any], tmp_path: Path) -> None:
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    with pytest.raises(ValueError, match="these views decide"):
+        build_league_views(
+            _Provider({101: _member_picks(world, 101, squad)}),
+            (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+            inputs,
+            projection,
+            rules,
+            league_id=352490,
+            league_name="Test League",
+            out_dir=tmp_path / "league",
+            mode_paths=_WorldPaths(projection, 3),  # type: ignore[arg-type]
+        )

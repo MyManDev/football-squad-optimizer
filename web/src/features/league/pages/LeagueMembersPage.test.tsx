@@ -171,6 +171,29 @@ describe("league member surfaces", () => {
     expect(container.textContent).not.toContain("%");
   });
 
+  it("prices the competitive plan against a real rival, and saf-puan carries no price line", () => {
+    const entryId = 35249001;
+    renderPage(
+      <LeagueMemberView
+        squad={mockEntrySquadEnvelopes[entryId]!}
+        advice={mockEntryAdviceEnvelope(entryId, "garantici", 1)}
+      />,
+      `/league/members/${entryId}?mode=garantici`,
+    );
+    expect(screen.getByText(/beklenen puandan vazgeçiyor/)).toBeInTheDocument();
+    expect(screen.getByText(/Harbor Rovers kadrosuna göre fiyatlandı/)).toBeInTheDocument();
+
+    cleanup();
+    renderPage(
+      <LeagueMemberView
+        squad={mockEntrySquadEnvelopes[entryId]!}
+        advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
+      />,
+      `/league/members/${entryId}`,
+    );
+    expect(screen.queryByText(/beklenen puandan vazgeçiyor/)).not.toBeInTheDocument();
+  });
+
   it("renders the empty-squad branch without presenting advice", () => {
     const entryId = 35249010;
     renderPage(
