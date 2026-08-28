@@ -66,6 +66,12 @@ LOGGER = logging.getLogger(__name__)
 
 STRATEGY_BENCH_CONTRACT_VERSION = "strategy_bench_v1"
 DEVELOPMENT_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25")
+LOCKED_HOLDOUT_SEASON = "2025-26"
+# The panel needs one season of prior cross-season history ahead of the development
+# population, and nothing else. Passing this list explicitly is the holdout boundary:
+# the loader's own default is every supported season, which includes the holdout.
+HISTORY_PRIOR_SEASON = "2020-21"
+HISTORY_SEASONS = (HISTORY_PRIOR_SEASON, *DEVELOPMENT_SEASONS)
 HORIZONS = (1, 3, 5)
 GATED_HORIZONS = (1, 3)
 WINS_BIG_MARGIN = 5.0
@@ -269,14 +275,51 @@ def _interval(
     return fmean(value for _, value in pairs), low, high
 
 
+def _validate_evaluation_seasons(raw: str) -> tuple[str, ...] | None:
+    """Parse ``--seasons`` and refuse the holdout before any loader can be invoked."""
+
+    seasons = tuple(s for s in raw.split(",") if s)
+    if LOCKED_HOLDOUT_SEASON in seasons:
+        print(f"{LOCKED_HOLDOUT_SEASON} is the locked holdout and may not be read.")
+        return None
+    outside = [season for season in seasons if season not in DEVELOPMENT_SEASONS]
+    if outside:
+        print(
+            f"Seasons {outside!r} are outside the declared development population "
+            f"{list(DEVELOPMENT_SEASONS)!r}."
+        )
+        return None
+    if not seasons:
+        print("At least one development season is required.")
+        return None
+    return seasons
+
+
+def _loaded_seasons(panel: pd.DataFrame) -> tuple[str, ...]:
+    """The seasons actually present in the loaded panel — provenance ground truth."""
+
+    return tuple(sorted({str(season) for season in panel["season"].unique()}))
+
+
 def main() -> int:
     arguments = _parse_arguments()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
     started = perf_counter()
 
+    seasons = _validate_evaluation_seasons(str(arguments.seasons))
+    if seasons is None:
+        return 1
+
     LOGGER.info("Building the panel and the control's residual folds")
-    panel = build_panel(arguments.archive_root)
+    panel = build_panel(arguments.archive_root, seasons=HISTORY_SEASONS)
+    loaded_seasons = _loaded_seasons(panel)
+    if LOCKED_HOLDOUT_SEASON in loaded_seasons:
+        print(
+            f"{LOCKED_HOLDOUT_SEASON} rows are present in the loaded panel; "
+            "refusing to continue or write artifacts."
+        )
+        return 1
     residuals = build_control_residual_table(panel, PolicyObjectiveConfig())
     ownership = load_enrichment_rows(arguments.archive_root, DEVELOPMENT_SEASONS)
     optimization = OptimizationConfig(solver_time_limit_seconds=float(arguments.solver_time_limit))
@@ -284,10 +327,6 @@ def main() -> int:
     differential = STRATEGY_CATALOG["fark-yarat"]
 
     folds: list[Fold] = []
-    seasons = tuple(s for s in str(arguments.seasons).split(",") if s)
-    if "2025-26" in seasons:
-        print("2025-26 is the locked holdout and may not be read.")
-        return 1
     for season in seasons:
         season_ids = sorted(
             residuals.loc[residuals["fold_id"].str.startswith(season), "fold_id"].unique()
@@ -486,9 +525,11 @@ def main() -> int:
         },
         "horizons": horizons_report,
         "gate4_h1_not_sacrificed": gate4,
-        "holdout_untouched": True,
+        "holdout_untouched": LOCKED_HOLDOUT_SEASON not in loaded_seasons,
         "elapsed_seconds": round(perf_counter() - started, 1),
-        "metadata": artifact_metadata(panel_rows=len(panel), created_utc=created_utc),
+        "metadata": artifact_metadata(
+            panel_rows=len(panel), created_utc=created_utc, history_seasons=loaded_seasons
+        ),
     }
     write_json(arguments.json_output, document)
     write_text(arguments.markdown_output, _to_markdown(document))
@@ -509,7 +550,11 @@ def _to_markdown(document: dict[str, object]) -> str:
         "`strategy_bench_prereg.md` (#279) before the catalogue existed",
         f"- Population: {document['population']}",
         f"- Bands: {document['bands']}",
-        "- The locked holdout was not accessed by this run.",
+        (
+            "- The locked holdout was not accessed by this run."
+            if document["holdout_untouched"]
+            else "- INVALID: the locked holdout was accessed by this run."
+        ),
         "",
     ]
     horizons = document["horizons"]
