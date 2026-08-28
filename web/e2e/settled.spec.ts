@@ -12,8 +12,8 @@ test("the real settled contract fills the scorecard and player rows at 390px", a
   await expect(page.getByText("Projeksiyon ve Gerçekleşen")).toBeVisible();
   await expect(page.getByText("×2 C", { exact: true })).toBeVisible();
   await expect(page.getByText(/^xP /).first()).toBeVisible();
-  await expect(page.getByText(/^gerçekleşen /).first()).toBeVisible();
-  await expect(page.getByText(/^fark /).first()).toBeVisible();
+  await expect(page.getByText(/^Gerçekleşen /).first()).toBeVisible();
+  await expect(page.getByText(/^Fark /).first()).toBeVisible();
   await expect(
     page
       .getByText(String(settledRecommendationFixture.outcome_realized_score), { exact: true })

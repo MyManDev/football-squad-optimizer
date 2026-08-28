@@ -131,15 +131,29 @@
 }
 
 .provenance {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-line);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-text-muted);
   overflow-wrap: anywhere;
+}
+
+.provenance summary {
+  cursor: pointer;
+  user-select: none;
+  width: fit-content;
+}
+
+.provenance summary:hover {
+  color: var(--color-text);
+}
+
+.provenanceDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-2);
 }
 
 @media (max-width: 640px) {

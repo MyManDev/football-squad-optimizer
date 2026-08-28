@@ -7,12 +7,14 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { DecisionControls } from "../../moves/components/DecisionControls";
+import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
+import { TemplatePicker } from "../templates/TemplatePicker";
 import { useDecisionSelection } from "../../moves/decisionSelection";
 import { Pitch } from "../../squad/components/Pitch";
 import { SquadPage } from "../../squad/pages/SquadPage";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import { loadEntryAdvice, loadEntrySquad } from "../data";
-import type { AdviceMove, EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
+import { LeagueDataMissing, loadEntryAdvice, loadEntrySquad, loadLeagueMembers } from "../data";
+import type { AdviceMove, EntryAdvice, EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
 import styles from "./LeagueMemberPage.module.css";
 
 export function LeagueMemberPage() {
@@ -34,14 +36,35 @@ export function LeagueMemberPage() {
     enabled: validEntryId,
     staleTime: 60_000,
   });
+  const membersQuery = useQuery({
+    queryKey: ["provisional-league-members"],
+    queryFn: loadLeagueMembers,
+    staleTime: 60_000,
+  });
 
   if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
   if (squad.isPending || advice.isPending) return <EmptyState title={copy.loadingEntry} />;
-  if (squad.isError || advice.isError) {
+  if (squad.isError) {
     return <EmptyState title={copy.entryNotAvailable}>{copy.entryNotAvailableBody}</EmptyState>;
   }
-  return <LeagueMemberView squad={squad.data} advice={advice.data} />;
+  if (advice.isError) {
+    // Only this pair is solved per member; asking for another is a normal outcome, and
+    // saying "not available" for it would read as a fault the reader should report.
+    const uncomputed = advice.error instanceof LeagueDataMissing;
+    return (
+      <EmptyState title={uncomputed ? copy.adviceNotComputed : copy.entryNotAvailable}>
+        {uncomputed ? copy.adviceNotComputedBody : copy.entryNotAvailableBody}
+      </EmptyState>
+    );
+  }
+  return (
+    <LeagueMemberView
+      squad={squad.data}
+      advice={advice.data}
+      members={membersQuery.data?.payload.members ?? []}
+    />
+  );
 }
 
 function SystemLeagueMemberPage() {
@@ -70,9 +93,11 @@ function SystemLeagueMemberPage() {
 export function LeagueMemberView({
   squad,
   advice,
+  members = [],
 }: {
   squad: LeagueViewEnvelope<EntrySquad>;
   advice: LeagueViewEnvelope<EntryAdvice>;
+  members?: EntryView[];
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -160,7 +185,13 @@ export function LeagueMemberView({
         <h2 className="visually-hidden" id="entry-advice-title">
           {copy.advice}
         </h2>
+        <TemplatePicker />
         <DecisionControls variant="entry" />
+        <AdviceRequestPanel
+          leagueId={advice.payload.league_id}
+          entryId={view.entry.entry_id ?? 0}
+          members={members}
+        />
         <AdviceCard envelope={advice} />
       </section>
     </div>
@@ -168,13 +199,27 @@ export function LeagueMemberView({
 }
 
 function AdviceCard({ envelope }: { envelope: LeagueViewEnvelope<EntryAdvice> }) {
-  const { messages } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = envelope.payload;
   return (
     <Card title={copy.advice} aside={<ExampleDataBadge sourceKind={envelope.source_kind} />}>
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      {view.solver_status === "FEASIBLE" ? (
+        <p className={styles.honesty}>
+          <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
+          {copy.unprovenPlanBody(points(view.optimality_gap ?? 0, 1, locale))}
+        </p>
+      ) : null}
+      {view.mode !== "saf-puan" && view.expected_points_cost != null ? (
+        <p className={styles.planCost}>
+          <strong className="num">
+            {copy.planCost(points(view.expected_points_cost, 1, locale))}
+          </strong>
+          {view.rival_label ? <span> · {copy.planRival(view.rival_label)}</span> : null}
+        </p>
+      ) : null}
       {view.moves.length === 0 ? (
         <p className={styles.muted}>
           {view.data_quality === "complete" ? copy.noMove : copy.noAdviceMissingData}
