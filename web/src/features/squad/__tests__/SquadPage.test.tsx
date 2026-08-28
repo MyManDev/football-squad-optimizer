@@ -108,7 +108,7 @@ describe("SquadPage", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(new RegExp(payload.snapshot_id))).toBeInTheDocument();
     expect(screen.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeInTheDocument();
-    expect(screen.getByText(/oyuna giriş sırasıyla/)).toBeInTheDocument();
+    expect(screen.getByText(/Oyuna Giriş Sırasıyla/)).toBeInTheDocument();
   });
 
   it("says plainly when a gameweek has no decision", async () => {
@@ -117,10 +117,10 @@ describe("SquadPage", () => {
   });
 
   it.each([
-    { language: "tr", deadlineUtc: "2099-08-21T17:30:00Z", label: "son tarihe" },
-    { language: "en", deadlineUtc: "2099-08-21T17:30:00Z", label: "deadline in" },
-    { language: "tr", deadlineUtc: "2000-08-21T17:30:00Z", label: "son tarih" },
-    { language: "en", deadlineUtc: "2000-08-21T17:30:00Z", label: "deadline" },
+    { language: "tr", deadlineUtc: "2099-08-21T17:30:00Z", label: "Son Tarihe" },
+    { language: "en", deadlineUtc: "2099-08-21T17:30:00Z", label: "Deadline In" },
+    { language: "tr", deadlineUtc: "2000-08-21T17:30:00Z", label: "Son Tarih" },
+    { language: "en", deadlineUtc: "2000-08-21T17:30:00Z", label: "Deadline" },
   ] as const)(
     "renders $label from countdown state in $language",
     async ({ deadlineUtc, label, language }) => {
@@ -145,13 +145,13 @@ describe("SquadPage", () => {
     });
 
     expect(await screen.findByText("Projeksiyon ve Gerçekleşen")).toBeInTheDocument();
-    expect(screen.getByText("gerçekleşen")).toBeInTheDocument();
+    expect(screen.getByText("Gerçekleşen")).toBeInTheDocument();
     expect(
       screen.getAllByText(String(settledRecommendationFixture.outcome_realized_score)).length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText(/^xP /)).toHaveLength(11);
-    expect(screen.getAllByText(/^gerçekleşen /)).toHaveLength(11);
-    expect(screen.getAllByText(/^fark /)).toHaveLength(11);
+    expect(screen.getAllByText(/^Gerçekleşen /)).toHaveLength(11);
+    expect(screen.getAllByText(/^Fark /)).toHaveLength(11);
     expect(screen.getByText("×2 C")).toBeInTheDocument();
   });
 
@@ -177,7 +177,7 @@ describe("SquadPage season standing", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: /Oyun haftası 1/ }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Sezon durumu")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sezon Durumu")).not.toBeInTheDocument();
   });
 
   it("does not appear, and does not break the page, when the ledger cannot be read", async () => {
@@ -186,45 +186,45 @@ describe("SquadPage season standing", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: /Oyun haftası 1/ }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Sezon durumu")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sezon Durumu")).not.toBeInTheDocument();
   });
 
   it("reports the season total, the latest settled week and the projection gap", async () => {
     renderAt("/", { ledger: settledLedgerFixture });
 
-    expect(await screen.findByText("Sezon durumu")).toBeInTheDocument();
+    expect(await screen.findByText("Sezon Durumu")).toBeInTheDocument();
     // With one settled week the season total and that week's points are the same number by
     // definition, so 61 legitimately appears twice — once per stat.
     expect(screen.getAllByText("61")).toHaveLength(2);
-    expect(screen.getByText("1 hafta · 0 ceza puanı")).toBeInTheDocument();
-    expect(screen.getByText(/^OH1 · tahmin 56,1$/)).toBeInTheDocument();
+    expect(screen.getByText("1 Hafta · 0 Ceza Puanı")).toBeInTheDocument();
+    expect(screen.getByText(/^OH1 · Tahmin 56,1$/)).toBeInTheDocument();
     expect(screen.getByText("+4,9")).toBeInTheDocument();
   });
 
   it("shows the net season total, not the gross one, when a hit was taken", async () => {
     renderAt("/", { ledger: hitLedgerFixture });
 
-    expect(await screen.findByText("Sezon durumu")).toBeInTheDocument();
+    expect(await screen.findByText("Sezon Durumu")).toBeInTheDocument();
     // 111 gross, 107 net after a four-point hit. FPL shows 107, so this card must too.
     expect(screen.getByText("107")).toBeInTheDocument();
     expect(screen.queryByText("111")).not.toBeInTheDocument();
-    expect(screen.getByText("2 hafta · 4 ceza puanı")).toBeInTheDocument();
+    expect(screen.getByText("2 Hafta · 4 Ceza Puanı")).toBeInTheDocument();
   });
 
   it("reports the latest week with an outcome, not the latest decided week", async () => {
     renderAt("/", { ledger: pendingWeekLedgerFixture });
 
-    expect(await screen.findByText("Sezon durumu")).toBeInTheDocument();
+    expect(await screen.findByText("Sezon Durumu")).toBeInTheDocument();
     // Gameweek three is decided but unsettled; its 46-point predecessor is the latest outcome.
-    expect(screen.getByText(/^OH2 · tahmin 54,0$/)).toBeInTheDocument();
+    expect(screen.getByText(/^OH2 · Tahmin 54,0$/)).toBeInTheDocument();
     expect(screen.getByText("46")).toBeInTheDocument();
   });
 
   it("labels the card in English too", async () => {
     renderAt("/", { language: "en", ledger: settledLedgerFixture });
 
-    expect(await screen.findByText("Season standing")).toBeInTheDocument();
-    expect(screen.getByText("1 settled · 0 hit points")).toBeInTheDocument();
-    expect(screen.getByText(/^GW1 · projected 56.1$/)).toBeInTheDocument();
+    expect(await screen.findByText("Season Standing")).toBeInTheDocument();
+    expect(screen.getByText("1 Settled · 0 Hit Points")).toBeInTheDocument();
+    expect(screen.getByText(/^GW1 · Projected 56.1$/)).toBeInTheDocument();
   });
 });

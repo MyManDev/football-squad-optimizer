@@ -20,8 +20,8 @@ without saying what they are accountable for producing.
 | Role | Owns the question | Zone |
 | --- | --- | --- |
 | **data / data mining**<br>Data & Predictive Modeling | How do we produce the best available, leakage-safe, calibrated future information for the optimizer? | `data/`, `features/`, `prediction/` |
-| **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`, `live/`; core CI, dependency enforcement, and the current `application/` pilot |
-| **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | `platform/`, runtime registries and adapters, installed CLI, API, workers, persistence adapters, deployment, and observability |
+| **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`; `live/`'s measurement and decision logic; core CI, dependency enforcement, and the current `application/` pilot |
+| **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | `platform/`, `live/`'s operational surface (`ledger.py`, `tick.py`, `recommendation.py`) since the handover below, runtime registries and adapters, installed CLI, API, workers, persistence adapters, deployment, and observability |
 | **shared — all three** | — | `contracts/` (when it exists), `data/schema.py`, `optimization/config.py`, `backtest/` |
 
 The middle column is the useful half when a piece of work does not obviously belong to a
@@ -74,21 +74,39 @@ change that only *reads* a shared boundary needs nothing extra.
 
 ## `live/` and the handover
 
-`live/` belongs to the optimization/evaluation side today — that is where all 13 of its commits
-came from, and the operational surface (`ledger.py`, `tick.py`, `recommendation.py`) is the
+`live/` began on the optimization/evaluation side — that is where all 13 of its early commits
+came from, and the operational surface (`ledger.py`, `tick.py`, `recommendation.py`) was the
 least safe thing in the repository to hand to a new owner mid-season.
 
-On handover, the platform/backend side takes the operational surface of `live/` together with
-runtime orchestration, packaging, operational application services, and the script/CLI shells.
-Core CI and dependency enforcement remain core-architecture responsibilities; measurement
-logic and scientific contracts stay with the sides that own them. The handover happens
-**after** the opening gameweek is captured, decided and settled, not before.
+The condition written here was that the handover happens **after** the opening gameweek is
+captured, decided and settled, not before. **That condition was met on 2026-08-25**: gameweek 1
+was captured (`fpl-live-20260821T143619Z-11bc603a8e1c`), decided (ledger
+`data/ledger/2026-27/gw01/`, `OPTIMAL`, projected 56.08) and settled from the post-gameweek
+capture `fpl-live-20260825T123200Z-120a15c72afe` (realized 26, error −30.08), with the settled
+view published as `site-2026-27-gw01-settled`.
+
+So the handover is in force. The platform/backend side owns the operational surface of `live/`
+together with runtime orchestration, packaging, operational application services, and the
+script/CLI shells. Core CI and dependency enforcement remain core-architecture
+responsibilities; measurement logic and scientific contracts stay with the sides that own them.
+
+What the condition was protecting, and what it is not: the risk was handing over an operational
+path that had never been run end to end, so nobody could tell a defect from a misunderstanding.
+It has now been run end to end once. Once is not a season — the first in-season decision (GW2,
+transfers rather than an opening squad) has not happened yet, and the surface will be exercised
+in ways the opening week did not exercise it. The handover transfers the ownership, not the
+claim that everything about it is known.
 
 ## Live-path freeze window
 
-No merge touching `live/`, `optimization/`, `prediction/` or `scenarios/` inside **24 hours
-either side of a deadline**. The deadline is whatever the current capture publishes, not a date
-written here — `run_season_tick` resolves it from the snapshot.
+No merge touching `live/`, `optimization/`, `planning/`, `prediction/` or `scenarios/` inside
+**24 hours either side of a deadline**. The deadline is whatever the current capture publishes,
+not a date written here — `run_season_tick` resolves it from the snapshot.
+
+`planning/` joined this list when the season did: the opening week's only decision was a squad
+from scratch through `optimization/`, but every deadline since is a transfer plan through
+`planning/`, and the league tree publishes fifteen members' plans from the same module. A
+planner change inside the window is a live-decision change, whatever its diff says.
 
 Inside the window the only permitted changes are a fix for a blocker found by the runbook's own
 checks, recorded with the blocker report template (`../gw1_blocker_report_template.md`). Docs

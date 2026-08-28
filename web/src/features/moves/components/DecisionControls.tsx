@@ -1,19 +1,59 @@
+import { useState } from "react";
+import { useNavigate } from "react-router";
+
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
+import { loadLeagueMembers } from "../../league/data";
 import { useDecisionSelection } from "../decisionSelection";
 import { MODE_PRICE_FOLDS, WINDOWS, getPlayModes } from "../modePrices";
 import styles from "./DecisionControls.module.css";
 
+/** A plain number, or the id inside an FPL league URL (…/leagues/352490/standings/c). */
+function parseLeagueId(text: string): number | null {
+  const fromUrl = text.match(/leagues\/(\d+)/);
+  if (fromUrl) return Number(fromUrl[1]);
+  const plain = text.trim().match(/^(\d+)$/);
+  return plain ? Number(plain[1]) : null;
+}
+
+type LeagueFieldState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "invalid" }
+  | { kind: "unavailable" }
+  | { kind: "mismatch"; publishedId: number };
+
 export function DecisionControls({ variant = "default" }: { variant?: "default" | "entry" }) {
   const { locale, messages } = useLanguage();
   const copy = messages.decision;
+  const navigate = useNavigate();
+  const [leagueInput, setLeagueInput] = useState("");
+  const [leagueState, setLeagueState] = useState<LeagueFieldState>({ kind: "idle" });
   const playModes = getPlayModes(
     copy.modes,
     locale,
     variant === "entry" ? "point-cost" : "measured",
   );
   const { mode, windowSize, update } = useDecisionSelection();
+
+  async function connectLeague() {
+    const requested = parseLeagueId(leagueInput);
+    if (requested === null) {
+      setLeagueState({ kind: "invalid" });
+      return;
+    }
+    setLeagueState({ kind: "checking" });
+    try {
+      // A static site can only open the league it precomputed; the published members
+      // document says which one that is, and its absence is the honest "not yet" state.
+      const members = await loadLeagueMembers();
+      if (members.payload.league_id === requested) navigate("/league/members");
+      else setLeagueState({ kind: "mismatch", publishedId: members.payload.league_id });
+    } catch {
+      setLeagueState({ kind: "unavailable" });
+    }
+  }
 
   const competitive = mode !== "saf-puan";
 
@@ -65,11 +105,41 @@ export function DecisionControls({ variant = "default" }: { variant?: "default" 
         </fieldset>
 
         {variant === "default" ? (
-          <label className={styles.leagueField}>
-            <span>{copy.leagueId}</span>
-            <input type="text" inputMode="numeric" placeholder={copy.leaguePlaceholder} disabled />
-            <small>{copy.leagueHelp}</small>
-          </label>
+          <form
+            className={styles.leagueField}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void connectLeague();
+            }}
+          >
+            <label>
+              <span>{copy.leagueId}</span>
+              <div className={styles.leagueRow}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder={copy.leaguePlaceholder}
+                  value={leagueInput}
+                  onChange={(event) => {
+                    setLeagueInput(event.target.value);
+                    setLeagueState({ kind: "idle" });
+                  }}
+                />
+                <button type="submit" disabled={leagueState.kind === "checking"}>
+                  {copy.leagueConnect}
+                </button>
+              </div>
+            </label>
+            {leagueState.kind === "invalid" ? (
+              <small role="alert">{copy.leagueInvalid}</small>
+            ) : leagueState.kind === "unavailable" ? (
+              <small role="alert">{copy.leagueUnavailable}</small>
+            ) : leagueState.kind === "mismatch" ? (
+              <small role="alert">{copy.leagueMismatch(leagueState.publishedId)}</small>
+            ) : (
+              <small>{copy.leagueHelp}</small>
+            )}
+          </form>
         ) : null}
       </div>
 
