@@ -25,6 +25,7 @@ anything reads a feature window.
 
 import argparse
 import hashlib
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -49,6 +50,10 @@ from squadopt.prediction.in_season import (
     IN_SEASON_FEATURE_CONTRACT_VERSION,
     IN_SEASON_MODEL_VERSION,
     InSeasonBlendConfig,
+)
+from squadopt.preflight import (
+    preflight_report_to_markdown,
+    run_residual_export_preflight,
 )
 
 RESIDUAL_EXPORT_CONTRACT_VERSION: Final = "oos_residual_export_v1"
@@ -175,8 +180,21 @@ def manifest(
     }
 
 
-def summary(record: dict[str, object], table: pd.DataFrame) -> str:
-    """Say what this export is for, and the one thing it must not be used for."""
+def summary(
+    record: dict[str, object],
+    table: pd.DataFrame,
+    *,
+    preflight_verdict: str = "not run",
+    preflight_checks: int = 0,
+    table_path: Path | None = None,
+    manifest_path: Path | None = None,
+) -> str:
+    """Say what this export is for, and the one thing it must not be used for.
+
+    The manifest travels inside this committed document, as the control export's
+    record already does: a consumer that must name one export by fingerprint cannot
+    do it from prose, and the table itself stays local.
+    """
 
     residual = table["residual"]
     listed = record["development_seasons"]
@@ -227,6 +245,26 @@ def summary(record: dict[str, object], table: pd.DataFrame) -> str:
             "The locked holdout was not read: the panel is cut to the development seasons",
             "before anything reads a feature window.",
             "",
+            "## Manifest",
+            "",
+            "```json",
+            json.dumps(record, indent=2, sort_keys=True),
+            "```",
+            "",
+            "## Preflight",
+            "",
+            f"- Verdict: {preflight_verdict} ({preflight_checks} checks)",
+            f"- Table file: `{table_path.as_posix() if table_path else 'unknown'}` "
+            "(local, not committed)",
+            f"- Manifest file: `{manifest_path.as_posix() if manifest_path else 'unknown'}` "
+            "(local, not committed)",
+            "",
+            "## Reproduction",
+            "",
+            "```powershell",
+            r".venv\Scripts\python -m scripts.export_in_season_residuals",
+            "```",
+            "",
         ]
     )
 
@@ -261,7 +299,26 @@ def main() -> int:
     )
     manifest_path = arguments.table_root / f"{arguments.table_name}.manifest.json"
     write_json(manifest_path, record)
-    write_text(arguments.summary_output, summary(record, table))
+
+    report = run_residual_export_preflight(
+        table, record, table_sha256=digest, artifact_label=table_path.name
+    )
+    print(preflight_report_to_markdown(report))
+    if not report.passed:
+        print("Preflight failed; the export does not satisfy its own contract.")
+        return 1
+
+    write_text(
+        arguments.summary_output,
+        summary(
+            record,
+            table,
+            preflight_verdict="PASSED" if report.passed else "FAILED",
+            preflight_checks=len(report.findings),
+            table_path=table_path,
+            manifest_path=manifest_path,
+        ),
+    )
 
     print(f"Rows        {record['row_count']:,} over {record['fold_count']} folds")
     print(f"Identity    {record['model_name']} / {record['model_version']}")
