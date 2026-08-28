@@ -318,3 +318,50 @@ def test_the_public_site_schema_rejects_the_report(tmp_path: Path) -> None:
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(report_to_dict(_run(tmp_path)), schema)  # type: ignore[arg-type]
+
+
+def test_the_runs_own_artifact_does_not_count_as_a_dirty_tree(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Found by running the real measurement twice: the report lands in the repository,
+    so an unfiltered dirty-tree check made the second run record different provenance
+    for identical numbers — a replay that read as a conflict."""
+
+    import subprocess
+
+    import scripts.run_shadow_calibration as cli
+
+    output = cli.REPOSITORY_ROOT / "docs" / "shadow_calibration_in_season.json"
+
+    def fake_status(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="?? docs/shadow_calibration_in_season.json\n"
+        )
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_status)
+    assert cli._tree_dirty_ignoring(output) is False
+
+    def fake_status_with_source(
+        *_args: object, **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="?? docs/shadow_calibration_in_season.json\n M src/squadopt/x.py\n",
+        )
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_status_with_source)
+    assert cli._tree_dirty_ignoring(output) is True
+
+
+def test_an_unreadable_tree_is_reported_dirty_rather_than_assumed_clean(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+
+    import scripts.run_shadow_calibration as cli
+
+    def boom(*_args: object, **_kwargs: object) -> object:
+        raise OSError("git is unavailable")
+
+    monkeypatch.setattr(cli.subprocess, "run", boom)
+    assert cli._tree_dirty_ignoring(cli.DEFAULT_OUTPUT) is True

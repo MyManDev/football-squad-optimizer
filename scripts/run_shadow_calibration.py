@@ -15,6 +15,7 @@ overwritten, so a recorded result cannot be quietly replaced by a later one.
 
 import argparse
 import json
+import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -42,6 +43,37 @@ FEATURE_CONTRACT_VERSION: Final = "in-season-carry-over-features-v1"
 #: The prereg's split: fit on 2021-22..2023-24, score 2024-25 frozen.
 DEFAULT_CUTOFF_FOLD_ID: Final = "2023-24-gw38"
 DEFAULT_OUTPUT: Final = REPOSITORY_ROOT / "docs" / "shadow_calibration_in_season.json"
+
+
+def _tree_dirty_ignoring(path: Path) -> bool:
+    """Is anything but this run's own artifact modified?
+
+    The run writes its report into the repository, so a second run of the same
+    measurement would otherwise see a dirty tree caused by the first and record
+    different provenance for identical numbers — a replay that reads as a conflict.
+    The artifact is an output, not source, so it is excluded from the question.
+    """
+
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=REPOSITORY_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError):
+        # Provenance is only honest when it is known; an unreadable tree is dirty.
+        return True
+    try:
+        relative = path.resolve().relative_to(REPOSITORY_ROOT).as_posix()
+    except ValueError:
+        relative = None
+    for line in status.splitlines():
+        entry = line[3:].strip().strip('"')
+        if entry and entry != relative:
+            return True
+    return False
 
 
 def _write_once(document: dict[str, object], path: Path) -> str:
@@ -77,7 +109,8 @@ def main() -> int:
     )
     table = pd.read_csv(arguments.residual_table)
     calendar = calendar_from_archive(arguments.archive_root, manifest.source_seasons)
-    revision, dirty = _git_revision()
+    revision, _ = _git_revision()
+    dirty = _tree_dirty_ignoring(arguments.json_output)
 
     report = run_shadow_calibration(
         manifest,
