@@ -46,12 +46,12 @@ imports no solver), `squadopt-worker` (CPU-bound, the only thing that scales),
   The mount must carry the primitives the adapters were built and reviewed on:
   `O_EXCL` exclusive create (claim markers), hard-link create-once (`os.link` from a
   finished temporary file — cache entries, job submission, the open-job index), and
-  mtime as a heartbeat. Any shared filesystem is **verified against these primitives
-  before it carries traffic**, not assumed (SMB mounts, notably, do not carry hard
-  links; NFS mounts generally do). Until such a mount exists, the file-backed phase
-  is explicitly constrained to **one deployment unit** — api and worker processes in
-  the same container sharing a local volume — where the primitives are ordinary
-  local-filesystem behavior.
+  mtime as a heartbeat. The accepted day-one store is a **durable Azure Files NFS
+  mount**, not Container Apps local storage and not an SMB mount. Both containers
+  mount the same path ReadWrite. A startup capability probe must prove exclusive
+  create, hard-link no-overwrite, cross-container visibility, heartbeat mtime and
+  persistence across a replacement before API ingress is enabled. A failed probe
+  keeps the service unready; it is never downgraded to a local-disk fallback.
 - **Losing the store's durability or its semantics fires ADR 0005's trigger
   knowingly, never silently.** An ephemeral disk, or a shared mount that fails the
   primitive checks, is "atomic lifecycle transitions from more than one process"
@@ -64,22 +64,26 @@ imports no solver), `squadopt-worker` (CPU-bound, the only thing that scales),
 
 ## Initial topology, and what promotes it
 
-- **Start as one deployment unit**: a single container app running both processes
-  (uvicorn serving `squadopt-api`, one worker loop) over one ReadWrite volume. One
-  worker replica — the plan's scaling order starts at standings validation and the
-  cache, not at replicas — so the shared-filesystem question does not even arise on
-  day one.
-- **Provider**: Azure Container Apps, per the platform owner's provider review — it
-  requires `linux/amd64` (matching the measured architecture), keeps secrets in
-  environment configuration, and its Azure Files mounts can be attached ReadWrite
-  across replicas, revisions, and apps when the split comes. AWS ECS/Fargate + EFS
-  fits the same shape with more operational surface, and stays the recorded
-  alternative.
+- **Start as one Container App replica with two containers from the same image**:
+  one API command (uvicorn serving `squadopt-api`) and one worker command. Only the
+  API container receives external ingress; the worker has no public listener. Both
+  mount the same durable Azure Files NFS share ReadWrite from day one. Container Apps
+  local storage is explicitly ineligible because it is ephemeral across restart and
+  replica replacement; one replica limits concurrency but does not make local state
+  durable.
+- **Provider**: Azure Container Apps, per the platform owner's provider review. The
+  deployment image is `linux/amd64`, the platform profile selected for this topology;
+  this also matches the architecture on which the solver budget was measured. This
+  is not a wheel-availability claim: the pinned OR-Tools release also publishes Linux
+  aarch64 wheels. Secrets stay in environment configuration. AWS ECS/Fargate + EFS
+  fits the same durable shared-filesystem shape with more operational surface, and
+  remains the recorded alternative.
 - **Promotion trigger**: the same measurement "When to revisit" names — queue depth
   or job wait at the deadline peak exceeding what one worker serves. Promotion means
-  splitting the worker into its own app and moving the store onto a shared ReadWrite
-  mount (Azure Files), **after** the primitive verification above passes on that
-  mount; if it does not pass, that is the ADR 0005 trigger, handled there.
+  splitting the worker into its own Container App and then increasing worker replicas,
+  while retaining the same already-probed Azure Files NFS share. The storage boundary
+  does not change during promotion. If the share later fails durability or primitive
+  checks, that is the ADR 0005 trigger and requires the managed-store migration.
 
 ## Consequences
 
