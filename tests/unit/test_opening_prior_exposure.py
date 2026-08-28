@@ -22,6 +22,7 @@ from typing import Any
 import pandas as pd
 import pytest
 from scripts import measure_in_season_blend as benchmark
+from scripts import measure_opening_prior_exposure as runner
 
 from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
 from squadopt.experiments.opening_prior_exposure import (
@@ -97,14 +98,36 @@ def test_the_holdout_season_is_cut_away_before_anything_reads_it(
 ) -> None:
     from squadopt.experiments import opening_prior_exposure as exposure
 
-    seasons = ("2020-21", *exposure.DEVELOPMENT_SEASONS, exposure.LOCKED_HOLDOUT_SEASON)
-    monkeypatch.setattr(exposure, "build_panel", lambda root: _panel(seasons))
+    requested: list[tuple[str, ...]] = []
+
+    def build_visible_panel(root: Path, *, seasons: tuple[str, ...]) -> pd.DataFrame:
+        del root
+        requested.append(tuple(seasons))
+        return _panel(tuple(seasons))
+
+    monkeypatch.setattr(exposure, "build_panel", build_visible_panel)
 
     visible = _visible_panel(Path("unused"), OpeningPriorExposureConfig())
 
     remaining = sorted({str(value) for value in visible["season"].tolist()})
+    assert requested == [exposure.HISTORY_SEASONS]
     assert exposure.LOCKED_HOLDOUT_SEASON not in remaining
     assert "2020-21" in remaining, "the season before the development block carries the fit"
+
+
+def test_a_loader_that_returns_the_holdout_is_refused_before_features(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from squadopt.experiments import opening_prior_exposure as exposure
+
+    def build_leaky_panel(root: Path, *, seasons: tuple[str, ...]) -> pd.DataFrame:
+        del root, seasons
+        return _panel((*exposure.HISTORY_SEASONS, exposure.LOCKED_HOLDOUT_SEASON))
+
+    monkeypatch.setattr(exposure, "build_panel", build_leaky_panel)
+
+    with pytest.raises(ExperimentExecutionError, match="was loaded"):
+        _visible_panel(Path("unused"), OpeningPriorExposureConfig())
 
 
 def test_the_holdout_cannot_be_configured_as_a_development_season() -> None:
@@ -117,7 +140,11 @@ def test_the_holdout_cannot_be_configured_as_a_development_season() -> None:
 def test_a_missing_development_season_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     from squadopt.experiments import opening_prior_exposure as exposure
 
-    monkeypatch.setattr(exposure, "build_panel", lambda root: _panel(("2021-22",)))
+    monkeypatch.setattr(
+        exposure,
+        "build_panel",
+        lambda root, *, seasons: _panel(("2021-22",)),
+    )
 
     with pytest.raises(ExperimentExecutionError, match="absent from the panel"):
         _visible_panel(Path("unused"), OpeningPriorExposureConfig())
@@ -255,12 +282,17 @@ def test_the_measurement_runs_end_to_end_and_declares_itself(
 ) -> None:
     from squadopt.experiments import opening_prior_exposure as exposure
 
-    seasons = ("2020-21", *exposure.DEVELOPMENT_SEASONS, exposure.LOCKED_HOLDOUT_SEASON)
-    monkeypatch.setattr(exposure, "build_panel", lambda root: _panel(seasons))
+    monkeypatch.setattr(
+        exposure,
+        "build_panel",
+        lambda root, *, seasons: _panel(tuple(seasons)),
+    )
 
     result = measure_opening_prior_exposure(Path("unused"), fold_limit=2)
 
     assert result.contract_version == exposure.OPENING_PRIOR_EXPOSURE_CONTRACT_VERSION
+    assert result.history_seasons == exposure.HISTORY_SEASONS
+    assert result.history_rows == len(_panel(exposure.HISTORY_SEASONS))
     assert result.folds == 2
     assert {entry.label for entry in result.configurations} == {
         exposure.CONTROL_LABEL,
@@ -270,8 +302,41 @@ def test_the_measurement_runs_end_to_end_and_declares_itself(
     assert result.diagnostics["measurement_only"] is True
     assert result.diagnostics["gate_evidence"] is False
     assert result.diagnostics["locked_holdout_read"] is False
+    assert result.diagnostics["history_seasons"] == exposure.HISTORY_SEASONS
     assert result.diagnostics["decision_level_rescore"] is False
     for entry in result.configurations:
         assert entry.rows > 0
         assert 0.0 <= entry.row_share <= 1.0
         assert entry.finite_difference_disagreement < 1e-3
+
+
+def test_the_artifact_provenance_comes_from_the_bounded_panel(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from squadopt.experiments import opening_prior_exposure as exposure
+
+    monkeypatch.setattr(
+        exposure,
+        "build_panel",
+        lambda root, *, seasons: _panel(tuple(seasons)),
+    )
+    result = measure_opening_prior_exposure(Path("unused"), fold_limit=2)
+    monkeypatch.setattr(
+        runner,
+        "artifact_metadata",
+        lambda *, panel_rows, created_utc: {
+            "created_utc": created_utc,
+            "provenance": {
+                "history_rows": panel_rows,
+                "history_seasons": [exposure.LOCKED_HOLDOUT_SEASON],
+            },
+        },
+    )
+
+    document = runner._document(result, "2026-08-28T00:00:00+00:00")
+
+    assert document["locked_holdout_accessed"] is False
+    assert document["provenance"] == {
+        "history_rows": result.history_rows,
+        "history_seasons": list(exposure.HISTORY_SEASONS),
+    }

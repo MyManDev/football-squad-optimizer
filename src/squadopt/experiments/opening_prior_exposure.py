@@ -90,6 +90,7 @@ OPENING_PRIOR_EXPOSURE_CONTRACT_VERSION: Final = "opening_prior_exposure_v1"
 DEVELOPMENT_SEASONS: Final = ("2021-22", "2022-23", "2023-24", "2024-25")
 MIN_PRIOR_GAMEWEEKS_IN_SEASON: Final = 1
 LOCKED_HOLDOUT_SEASON: Final = "2025-26"
+HISTORY_SEASONS: Final = ("2020-21", *DEVELOPMENT_SEASONS)
 
 ROSTER_COLUMNS: Final = ("player_id", "name", "team_id", "position", "price_tenths")
 
@@ -200,6 +201,8 @@ class SeasonCoefficient:
 class OpeningPriorExposure:
     contract_version: str
     config: OpeningPriorExposureConfig
+    history_seasons: tuple[str, ...]
+    history_rows: int
     frozen_coefficient: float
     folds: int
     first_fold: str
@@ -216,7 +219,13 @@ def _visible_panel(archive_root: Path, config: OpeningPriorExposureConfig) -> pd
     even as carry-over history. The same guard the benchmark applies, for the same reason.
     """
 
-    panel = build_panel(archive_root)
+    panel = build_panel(archive_root, seasons=HISTORY_SEASONS)
+    loaded = sorted({str(value) for value in panel["season"].tolist()})
+    if LOCKED_HOLDOUT_SEASON in loaded:
+        raise ExperimentExecutionError(
+            f"{LOCKED_HOLDOUT_SEASON} was loaded; it is the locked holdout and must not "
+            "be read by this measurement."
+        )
     ranks = season_ranks(panel)
     unknown = sorted(set(config.development_seasons) - set(ranks))
     if unknown:
@@ -225,12 +234,6 @@ def _visible_panel(archive_root: Path, config: OpeningPriorExposureConfig) -> pd
         )
     last_rank = max(ranks[season] for season in config.development_seasons)
     visible = panel.loc[panel["season"].map(lambda season: ranks[str(season)] <= last_rank)]
-    remaining = sorted({str(value) for value in visible["season"].tolist()})
-    if LOCKED_HOLDOUT_SEASON in remaining:
-        raise ExperimentExecutionError(
-            f"{LOCKED_HOLDOUT_SEASON} survived the cut; it is the locked holdout and must "
-            "not be visible to this measurement."
-        )
     return visible.copy(deep=True)
 
 
@@ -397,6 +400,10 @@ def measure_opening_prior_exposure(
 
     settings = OpeningPriorExposureConfig() if config is None else config
     panel = _visible_panel(Path(archive_root), settings)
+    ranks = season_ranks(panel)
+    loaded_history_seasons = tuple(
+        sorted({str(value) for value in panel["season"].tolist()}, key=lambda season: ranks[season])
+    )
     decisions = walk_forward_decision_points(
         panel,
         seasons=settings.development_seasons,
@@ -488,6 +495,8 @@ def measure_opening_prior_exposure(
     return OpeningPriorExposure(
         contract_version=OPENING_PRIOR_EXPOSURE_CONTRACT_VERSION,
         config=settings,
+        history_seasons=loaded_history_seasons,
+        history_rows=len(panel),
         frozen_coefficient=frozen,
         folds=len(decisions),
         first_fold=decisions[0].fold_id,
@@ -498,7 +507,9 @@ def measure_opening_prior_exposure(
             {
                 "measurement_only": True,
                 "gate_evidence": False,
-                "locked_holdout_read": False,
+                "history_seasons": loaded_history_seasons,
+                "history_rows": len(panel),
+                "locked_holdout_read": LOCKED_HOLDOUT_SEASON in loaded_history_seasons,
                 "decision_level_rescore": False,
                 "squad_shaped_population_is_a_proxy": True,
             }

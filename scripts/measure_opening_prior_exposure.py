@@ -17,9 +17,11 @@ cut from the panel before any feature window can reach it.
 
 import argparse
 import sys
+from collections.abc import Mapping
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
@@ -31,6 +33,7 @@ from scripts._experiment_cli import (
 
 from squadopt.experiments import ExperimentError
 from squadopt.experiments.opening_prior_exposure import (
+    LOCKED_HOLDOUT_SEASON,
     OPENING_PRIOR_EXPOSURE_CONTRACT_VERSION,
     OpeningPriorExposure,
     OpeningPriorExposureConfig,
@@ -40,8 +43,15 @@ from squadopt.experiments.opening_prior_exposure import (
 
 
 def _document(exposure: OpeningPriorExposure, created_utc: str) -> dict[str, object]:
+    history_seasons = list(exposure.history_seasons)
+    history_rows = exposure.history_rows
+    locked_holdout_accessed = LOCKED_HOLDOUT_SEASON in history_seasons
+    metadata = artifact_metadata(panel_rows=history_rows, created_utc=created_utc)
+    provenance = dict(cast(Mapping[str, object], metadata["provenance"]))
+    provenance["history_seasons"] = history_seasons
     return {
-        **artifact_metadata(panel_rows=0, created_utc=created_utc),
+        **metadata,
+        "provenance": provenance,
         "artifact_type": "opening_prior_exposure",
         "contract_version": OPENING_PRIOR_EXPOSURE_CONTRACT_VERSION,
         "config": asdict(exposure.config),
@@ -65,7 +75,7 @@ def _document(exposure: OpeningPriorExposure, created_utc: str) -> dict[str, obj
         ],
         "diagnostics": dict(exposure.diagnostics),
         "measurement_only": True,
-        "locked_holdout_accessed": False,
+        "locked_holdout_accessed": locked_holdout_accessed,
     }
 
 
