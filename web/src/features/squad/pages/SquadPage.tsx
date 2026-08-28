@@ -339,20 +339,29 @@ function Squad({
         )}
       </Card>
 
+      {/* The full identity chain stays on the page — it is what makes the decision
+          auditable — but folded away: a reader wants the squad, an auditor can open it. */}
       <footer className={styles.provenance}>
-        <span>
-          {copy.captured} {utcShort(view.captured_at_utc, locale)} · {view.snapshot_id}
-        </span>
-        <span>
-          {view.model_name}@{view.model_version} · {view.feature_contract_version} ·{" "}
-          {copy.projection} {shortDigest(view.prediction_fingerprint)}
-        </span>
-        <span>
-          {view.report_contract_version} · {copy.generated} {utcShort(generatedAt, locale)}
-          {view.settled && view.outcome_realized_score !== null
-            ? ` · ${copy.settledRealized(points(view.outcome_realized_score, 1, locale))}`
-            : ""}
-        </span>
+        <details>
+          <summary>
+            {copy.recordIdentity} · {utcShort(view.captured_at_utc, locale)}
+          </summary>
+          <div className={styles.provenanceDetail}>
+            <span>
+              {copy.captured} {utcShort(view.captured_at_utc, locale)} · {view.snapshot_id}
+            </span>
+            <span>
+              {view.model_name}@{view.model_version} · {view.feature_contract_version} ·{" "}
+              {copy.projection} {shortDigest(view.prediction_fingerprint)}
+            </span>
+            <span>
+              {view.report_contract_version} · {copy.generated} {utcShort(generatedAt, locale)}
+              {view.settled && view.outcome_realized_score !== null
+                ? ` · ${copy.settledRealized(points(view.outcome_realized_score, 1, locale))}`
+                : ""}
+            </span>
+          </div>
+        </details>
       </footer>
     </div>
   );

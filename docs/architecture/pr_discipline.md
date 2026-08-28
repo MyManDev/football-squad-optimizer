@@ -88,8 +88,10 @@ reach across the most layers.
 
 ## The live path
 
-`live/`, `optimization/`, `prediction/` and `scenarios/` are the operational path. Any PR
-touching them:
+`live/`, `optimization/`, `planning/`, `prediction/` and `scenarios/` are the operational
+path. `planning/` is on the list because the in-season decision — ours and every league
+member's — is a transfer plan solved there; the opening gameweek never exercised it, which is
+how it stayed off this list for a season's first week. Any PR touching them:
 
 1. Runs the full suite, including the replay determinism tests in
    `tests/unit/test_live_recommendation.py`.
@@ -99,7 +101,12 @@ touching them:
    bench, the captain, the cost and the score. If it moves, either the change altered a live
    decision — say so explicitly in the PR, get the live-path owner's agreement, and update the
    literals in the same commit — or it is a bug.
-3. Respects the freeze window in [ownership](ownership.md): no merges within 24 hours either
+3. Runs **`test_the_recorded_in_season_member_plan_holds`**
+   (`tests/unit/test_league_views.py`), the same gate for the in-season member path the
+   opening pin never exercised: a held squad, sell prices, and a transfer decision, pinned to
+   recorded literals and a byte hash of the published advice. The same two outcomes apply —
+   a declared decision change with the literals moved in the same commit, or a bug.
+4. Respects the freeze window in [ownership](ownership.md): no merges within 24 hours either
    side of a deadline.
 
 ### About the replay check
