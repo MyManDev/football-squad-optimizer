@@ -6,6 +6,27 @@ import { afterEach, describe, expect, it } from "vitest";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { DecisionControls } from "./DecisionControls";
 
+const EVIDENCE = {
+  contract_version: "public_horizon_evidence_v1",
+  ledger_control_verified: true,
+  horizons: [
+    {
+      horizon: 1,
+      decision_role: "live_control",
+      solver_status: "OPTIMAL",
+      solver_proof_status: "proven",
+      publication_status: "decision_eligible",
+    },
+    {
+      horizon: 3,
+      decision_role: "research_shadow",
+      solver_status: "FEASIBLE",
+      solver_proof_status: "unproven",
+      publication_status: "shadow_only",
+    },
+  ],
+};
+
 afterEach(cleanup);
 
 function LocationProbe() {
@@ -66,6 +87,10 @@ describe("DecisionControls", () => {
     expect(screen.getByText("P(geride) %46 → %27")).toBeInTheDocument();
     expect(screen.getByText("araştırma gölgesi")).toBeInTheDocument();
     expect(screen.getByText(/H3 gölge kanıt için ayrılmıştır/)).toBeInTheDocument();
+    expect(screen.getByText("araştırma gölgesi").closest('[role="note"]')).toHaveAttribute(
+      "aria-live",
+      "polite",
+    );
   });
 
   it("explains the horizon role in English as well", () => {
@@ -73,6 +98,21 @@ describe("DecisionControls", () => {
 
     expect(screen.getByText("research shadow")).toBeInTheDocument();
     expect(screen.getByText(/H5 is reserved for shadow evidence/)).toBeInTheDocument();
+  });
+
+  it("distinguishes computed shadow evidence from an unrun window", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/moves"]}>
+        <DecisionControls horizonEvidence={EVIDENCE} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/H1, dondurulmuş ledger kararını aynen üretti/)).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: /3 hafta/ }));
+    expect(screen.getByText(/FEASIBLE; çözücü kanıtı: unproven/)).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: /5 hafta/ }));
+    expect(screen.getByText(/Sonuç toplu koşudan sonra oluşur/)).toBeInTheDocument();
   });
 
   it("marks crowd-relative windows as diagnostic rather than probability", () => {

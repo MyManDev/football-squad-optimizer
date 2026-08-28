@@ -96,9 +96,11 @@ the previous immutable ledger entry, builds the horizon, solves it, and writes o
 fingerprinted artifact.
 
 The operation returns `HorizonPlanResult`; callers do not scrape console text. An
-`OPTIMAL` plan is marked `proven`. A `FEASIBLE` plan is refused by default and may be
-recorded only when the caller explicitly enables shadow output, in which case it is
-marked `shadow_unproven`. Replaying identical inputs reuses the same bytes and path;
+`OPTIMAL` plan has a `proven` solver proof, but only an optimal H1 artifact is
+`decision_eligible`. Longer horizons remain `shadow_only`. A `FEASIBLE` plan is refused
+by default and may be recorded only when the caller explicitly enables shadow output,
+in which case it is `shadow_only` with an `unproven` solver proof. Replaying identical
+inputs reuses the same bytes and path;
 different bytes may never overwrite an existing artifact.
 
 `python -m scripts.plan_transfer_horizon` is only the CLI adapter over this operation.
@@ -108,7 +110,7 @@ It contains argument parsing and presentation, not planning or artifact business
 
 `squadopt.application.plan_horizon_batch(...)` runs the supported horizons against the
 same season, snapshot, handoff, ledger origin, and solver-budget policy. Its immutable
-`live_transfer_horizon_batch_v1` manifest links the fingerprinted child artifacts by
+`live_transfer_horizon_batch_v2` manifest links the fingerprinted child artifacts by
 paths relative to the artifact root, so workstation directories never enter portable
 evidence.
 
@@ -118,11 +120,28 @@ solver proof is not evidence that a longer forecast is calibrated. A failed chil
 already completed immutable artifacts available for replay but produces no batch
 manifest, preventing a partial run from looking complete.
 
+H1 uses the same uncapped transfer policy as the operational one-week command. Longer
+horizons use the measured one-transfer-per-gameweek discipline by default. This avoids a
+second H1 policy hiding inside the evidence batch.
+
 ```powershell
 .venv\Scripts\python -m scripts.run_transfer_horizon_batch `
   --horizons 1,3,5 `
   --in-season-projection data/handoffs/2026-27-gw02.json
 ```
+
+## Public evidence boundary
+
+`squadopt.application.load_public_horizon_evidence(...)` is the only route from a batch
+manifest into the static UI. It verifies the manifest and child fingerprints, path
+containment, lineage, and the H1 decision against the immutable ledger. Squad, XI,
+captain, bench order, transfers, projected score, model, and snapshot must agree. The
+sanitized `public_horizon_evidence_v1` block exposes solver status and proof status only;
+it never exposes H3/H5 actions or turns a research shadow into advice.
+
+`scripts.build_site --horizon-manifest <path>` attaches this block to the matching
+recommendation metadata. Omitting the option preserves the existing site output. A
+mismatch is a hard build failure rather than a warning.
 
 ## What this contract does not claim
 
