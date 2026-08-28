@@ -299,7 +299,7 @@ def _declaration() -> CandidateDeclaration:
             "optimizer_contract",
             "promotion_gates",
         ),
-        source_reference="https://github.com/SquadOpt/football-squad-optimizer/issues/43",
+        source_reference="https://github.com/MyManDev/football-squad-optimizer/issues/43",
     )
 
 

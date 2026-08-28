@@ -12,7 +12,7 @@ from numbers import Integral, Real
 from types import MappingProxyType
 from typing import Final
 
-BAYESIAN_OPTIMIZATION_CONTRACT_VERSION: Final = "deterministic_policy_bo_v1"
+BAYESIAN_OPTIMIZATION_CONTRACT_VERSION: Final = "deterministic_policy_bo_v2"
 
 
 class BayesianOptimizationError(Exception):
@@ -191,6 +191,14 @@ class BayesianOptimizationConfig:
     kernel_length_scale: float = 1.0
     matern_nu: float = 2.5
     observation_noise: float = 1.0e-6
+    """GP alpha. The default is near-interpolation and was the recorded warning of the
+    chip search: with a measured season spread of 46-98 points, treating one fold-mean
+    as exact lets the surrogate chase noise. Callers with a fold-paired objective
+    should set this from the measured folds — ``estimate_observation_noise``."""
+    batch_size: int = 1
+    """Candidates proposed per surrogate fit (constant-liar q-EI). One is the
+    historical sequential behaviour, bit for bit; more amortizes ~100 s evaluations
+    that can run side by side."""
     contract_version: str = BAYESIAN_OPTIMIZATION_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
@@ -227,6 +235,11 @@ class BayesianOptimizationConfig:
         )
         length_scale = _finite(self.kernel_length_scale, "kernel_length_scale", 1.0e-12)
         noise = _finite(self.observation_noise, "observation_noise", 1.0e-15)
+        batch = _integer(self.batch_size, "batch_size", 1)
+        if batch > max(1, self.evaluation_budget - self.initial_design_size):
+            raise BayesianOptimizationConfigurationError(
+                "batch_size may not exceed the post-design evaluation budget."
+            )
         nu = _finite(self.matern_nu, "matern_nu", 1.0e-12)
         if nu not in {0.5, 1.5, 2.5}:
             raise BayesianOptimizationConfigurationError("matern_nu must be 0.5, 1.5, or 2.5.")
@@ -238,6 +251,7 @@ class BayesianOptimizationConfig:
         object.__setattr__(self, "kernel_length_scale", length_scale)
         object.__setattr__(self, "matern_nu", nu)
         object.__setattr__(self, "observation_noise", noise)
+        object.__setattr__(self, "batch_size", batch)
 
     @property
     def search_space_size(self) -> int:
@@ -267,6 +281,7 @@ class BayesianOptimizationConfig:
             "kernel_length_scale": float(self.kernel_length_scale).hex(),
             "matern_nu": float(self.matern_nu).hex(),
             "observation_noise": float(self.observation_noise).hex(),
+            "batch_size": self.batch_size,
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()

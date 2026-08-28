@@ -1,0 +1,41 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-08-26T12:21:53Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 2,
+    "entry_id": 3832237,
+    "league_id": 352490,
+    "mode": "saf-puan",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20260826T083133Z-d45f1bea8b68",
+    "moves": [
+      {
+        "move_id": "gw02-1",
+        "player_out": {
+          "player_id": 502500,
+          "name": "Igor Thiago Nascimento Rodrigues",
+          "short_name": "Rodrigues",
+          "position": "FWD",
+          "team": "Brentford"
+        },
+        "player_in": {
+          "player_id": 475168,
+          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+          "short_name": "Jesus",
+          "position": "FWD",
+          "team": "Chelsea"
+        },
+        "expected_points_delta": 2.594023499915428,
+        "expected_points_cost": 0.0,
+        "reason_code": "window_value"
+      }
+    ],
+    "data_quality": "partial",
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ]
+  }
+}
