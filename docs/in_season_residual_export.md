@@ -39,3 +39,43 @@ residuals produce honest coverage is a separate measurement.
 
 The locked holdout was not read: the panel is cut to the development seasons
 before anything reads a feature window.
+
+## Manifest
+
+```json
+{
+  "candidate_label": "in_season_carry_over_blend",
+  "contract_version": "oos_residual_export_v1",
+  "created_at_utc": "2026-08-28T16:19:05+00:00",
+  "dataset_snapshot_id": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+  "development_seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "evaluation_objective": "single_gameweek_realized_squad_points_v1",
+  "feature_contract_version": "in-season-carry-over-features-v1",
+  "fold_count": 147,
+  "locked_holdout_accessed": false,
+  "model_name": "squadopt-deterministic-baseline",
+  "model_version": "in-season-carry-over-v1",
+  "opening_gameweeks_included": false,
+  "repository_commit": "316fffacc674695b6411205b0e6f8ca2501ee4ec",
+  "row_count": 101447,
+  "table_sha256": "7543a9498187ce0ac0918ac58c77ced5031ee1fa2905dbe422c619c4e9f6efce",
+  "training_contract_version": "in-season-carry-over-v1"
+}
+```
+
+## Preflight
+
+- Verdict: PASSED (24 checks)
+- Table file: `C:/Users/ertug/Desktop/squadopt-p2b-runner/artifacts/residuals/in_season_residuals.csv` (local, not committed)
+- Manifest file: `C:/Users/ertug/Desktop/squadopt-p2b-runner/artifacts/residuals/in_season_residuals.manifest.json` (local, not committed)
+
+## Reproduction
+
+```powershell
+.venv\Scripts\python -m scripts.export_in_season_residuals
+```
