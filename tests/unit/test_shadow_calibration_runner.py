@@ -3,6 +3,7 @@
 import hashlib
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pandas as pd
@@ -19,7 +20,11 @@ from squadopt.experiments.shadow_calibration import (
     replay_identity,
     run_shadow_calibration,
 )
-from squadopt.experiments.shadow_report import report_to_dict, write_shadow_report
+from squadopt.experiments.shadow_report import (
+    ShadowExecutionMetadata,
+    report_to_dict,
+    write_shadow_report,
+)
 from squadopt.preflight import RESIDUAL_EXPORT_COLUMNS
 
 MODEL_NAME = "squadopt-deterministic-baseline"
@@ -29,6 +34,17 @@ COMMIT = "c" * 40
 POSITIONS = ("GK", "DEF", "MID", "FWD")
 SEASONS = ("2021-22", "2022-23")
 WHEN = "2026-08-28T12:00:00+00:00"
+
+
+def _execution() -> ShadowExecutionMetadata:
+    return ShadowExecutionMetadata(
+        started_at_utc=WHEN,
+        completed_at_utc="2026-08-28T12:00:01+00:00",
+        elapsed_seconds=1.0,
+        deterministic_seed=0,
+        warnings=(),
+    )
+
 
 #: Wide enough that a 0.90 conformal radius fit on the early folds covers close to
 #: 0.90 of the later ones: a deterministic sawtooth, not a random draw.
@@ -99,6 +115,7 @@ def _bind(tmp_path: Path, table: pd.DataFrame, **overrides: object) -> object:
         "dataset_snapshot_id": "vaastav-fpl@" + "d" * 40,
         "table_sha256": digest,
         "created_at_utc": WHEN,
+        "predicted_points_decimals": 9,
     }
     document.update(overrides)
     manifest_path = tmp_path / "residuals.manifest.json"
@@ -122,6 +139,7 @@ def _run(tmp_path: Path, table: pd.DataFrame | None = None, **config_overrides: 
         _calendar(frame),
         config=ShadowCalibrationConfig(**options),  # type: ignore[arg-type]
         generated_at_utc=WHEN,
+        execution=_execution(),
         provenance_fingerprints={"repository_commit": COMMIT},
     )
 
@@ -173,6 +191,7 @@ def test_a_model_mismatch_is_refused_at_binding(tmp_path: Path) -> None:
                     "dataset_snapshot_id": "vaastav-fpl@" + "d" * 40,
                     "table_sha256": digest,
                     "created_at_utc": WHEN,
+                    "predicted_points_decimals": 9,
                 }
             ),
             encoding="utf-8",
@@ -214,6 +233,7 @@ def test_a_table_that_is_not_the_bound_export_is_refused(tmp_path: Path) -> None
             _calendar(table),
             config=ShadowCalibrationConfig(cutoff_fold_id="2021-22-gw39"),
             generated_at_utc=WHEN,
+            execution=_execution(),
             provenance_fingerprints={},
         )
 
@@ -250,6 +270,7 @@ def test_an_uncovered_gameweek_abstains_rather_than_scoring_a_zero(tmp_path: Pat
         thinned,
         config=ShadowCalibrationConfig(cutoff_fold_id="2021-22-gw39"),
         generated_at_utc=WHEN,
+        execution=_execution(),
         provenance_fingerprints={},
     )
     assert report.shadow_status == "abstained"
@@ -290,6 +311,39 @@ def test_replay_identity_excludes_only_the_wall_clock(tmp_path: Path) -> None:
     assert replay_identity(document) == replay_identity(other)
     conflicting = {**document, "sample_size": document["sample_size"] + 1}  # type: ignore[operator]
     assert replay_identity(document) != replay_identity(conflicting)
+
+
+def test_atomic_writer_accepts_concurrent_identical_content(tmp_path: Path) -> None:
+    from scripts.run_shadow_calibration import _write_once
+
+    target = tmp_path / "shadow.json"
+    document = report_to_dict(_run(tmp_path / "source"))  # type: ignore[arg-type]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(lambda _: _write_once(document, target), range(2)))
+
+    assert sorted(outcomes) == ["replay", "written"]
+    assert json.loads(target.read_text(encoding="utf-8")) == document
+    assert list(tmp_path.glob(".shadow.json.tmp-*")) == []
+
+
+def test_atomic_writer_refuses_a_concurrent_conflict(tmp_path: Path) -> None:
+    from scripts.run_shadow_calibration import _write_once
+
+    target = tmp_path / "shadow.json"
+    first = report_to_dict(_run(tmp_path / "first"))  # type: ignore[arg-type]
+    second = {**first, "sample_size": int(first["sample_size"]) + 1}
+
+    def attempt(document: dict[str, object]) -> str:
+        try:
+            return _write_once(document, target)
+        except SystemExit:
+            return "conflict"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(attempt, (first, second)))
+
+    assert sorted(outcomes) == ["conflict", "written"]
+    assert list(tmp_path.glob(".shadow.json.tmp-*")) == []
 
 
 def test_the_bootstrap_is_deterministic_and_refuses_non_finite() -> None:

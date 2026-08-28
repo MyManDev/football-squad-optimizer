@@ -110,3 +110,22 @@ contract (`shadow_calibration_report_v1`) is not referenced by `ui_view_v1` or a
 site payload; and guard tests sweep the published league tree for probability-shaped
 keys and text in both languages. Every committed measurement artifact under this
 protocol carries its `docs/measurements_index.md` row.
+
+## Corrective-run amendment — serialization and create-once boundary
+
+The first player-level execution exposed two protocol defects before review: its
+residual manifest did not declare the measured nine-decimal serialization rule, and
+its report writer used a check-then-write sequence that was neither crash-safe nor
+safe under concurrent writers. That artifact is therefore **non-binding**. Its numbers
+do not satisfy this protocol and cannot unlock any status.
+
+The thresholds, split, gates, seeds, and sample floors above remain unchanged. Before
+the corrective run, the exporter must serialize floating-point values to exactly nine
+decimal places and declare `predicted_points_decimals: 9`; the consumer must reject a
+missing or different declaration. The report writer must complete and fsync a sibling
+temporary file, publish with an atomic no-overwrite link, compare a losing writer with
+the winning bytes, and remove its temporary file. Concurrent identical and conflicting
+writers are tested. The binding report must also record start and completion UTC,
+elapsed seconds, deterministic seed, and an explicit warnings list. Only a clean-tree
+execution after these rules are committed is eligible to replace the non-binding
+artifact.

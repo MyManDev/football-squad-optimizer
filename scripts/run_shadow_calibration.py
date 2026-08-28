@@ -14,9 +14,14 @@ overwritten, so a recorded result cannot be quietly replaced by a later one.
 """
 
 import argparse
+import contextlib
 import json
+import os
+import secrets
 import subprocess
 import sys
+import warnings
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -30,7 +35,7 @@ from squadopt.experiments.shadow_calibration import (
     replay_identity,
     run_shadow_calibration,
 )
-from squadopt.experiments.shadow_report import report_to_dict, write_shadow_report
+from squadopt.experiments.shadow_report import ShadowExecutionMetadata, report_to_dict
 from squadopt.uncertainty.fixture_folds import calendar_from_archive
 
 #: The model this protocol calibrates, named in the pre-registration. It is a
@@ -77,17 +82,43 @@ def _tree_dirty_ignoring(path: Path) -> bool:
 
 
 def _write_once(document: dict[str, object], path: Path) -> str:
-    """Write the report, or accept an identical replay, or refuse a conflict."""
+    """Atomically create a report, accept a replay, and refuse a conflict."""
 
-    if path.is_file():
-        existing = json.loads(path.read_text(encoding="utf-8"))
-        if replay_identity(existing) == replay_identity(document):
-            return "replay"
-        raise SystemExit(
-            f"{path} already holds a different measurement. A recorded result is not "
-            "overwritten; move or delete it deliberately if it is genuinely superseded."
-        )
-    return "written"
+    resolved = path.resolve()
+    if "web/public" in resolved.as_posix():
+        raise SystemExit(f"{resolved} is a published site path; shadow reports are internal.")
+    payload = (json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n").encode(
+        "utf-8"
+    )
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    temporary = resolved.with_name(f".{resolved.name}.tmp-{os.getpid()}-{secrets.token_hex(8)}")
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, resolved)
+            return "written"
+        except FileExistsError:
+            existing_bytes = resolved.read_bytes()
+            if existing_bytes == payload:
+                return "replay"
+            try:
+                existing = json.loads(existing_bytes)
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise SystemExit(
+                    f"{resolved} already exists but is not the recorded JSON contract."
+                ) from error
+            if replay_identity(existing) == replay_identity(document):
+                return "replay"
+            raise SystemExit(
+                f"{resolved} already holds a different measurement. A recorded result is not "
+                "overwritten; move or delete it deliberately if it is genuinely superseded."
+            ) from None
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            temporary.unlink()
 
 
 def main() -> int:
@@ -112,25 +143,44 @@ def main() -> int:
     revision, _ = _git_revision()
     dirty = _tree_dirty_ignoring(arguments.json_output)
 
-    report = run_shadow_calibration(
-        manifest,
-        table,
-        calendar,
-        config=ShadowCalibrationConfig(cutoff_fold_id=arguments.cutoff_fold_id),
-        generated_at_utc=started.isoformat(timespec="seconds"),
-        provenance_fingerprints={
-            "repository_commit": revision,
-            "working_tree_dirty": str(dirty).lower(),
-            "dataset_snapshot_id": manifest.dataset_snapshot_id,
-            "residual_generation_commit": manifest.generation_commit,
-        },
+    config = ShadowCalibrationConfig(cutoff_fold_id=arguments.cutoff_fold_id)
+    placeholder = ShadowExecutionMetadata(
+        started_at_utc=started.isoformat(timespec="seconds"),
+        completed_at_utc=started.isoformat(timespec="seconds"),
+        elapsed_seconds=0.0,
+        deterministic_seed=config.bootstrap_seed,
+        warnings=(),
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        report = run_shadow_calibration(
+            manifest,
+            table,
+            calendar,
+            config=config,
+            generated_at_utc=started.isoformat(timespec="seconds"),
+            execution=placeholder,
+            provenance_fingerprints={
+                "repository_commit": revision,
+                "working_tree_dirty": str(dirty).lower(),
+                "dataset_snapshot_id": manifest.dataset_snapshot_id,
+                "residual_generation_commit": manifest.generation_commit,
+            },
+        )
+    completed = datetime.now(UTC)
+    elapsed = (completed - started).total_seconds()
+    report = replace(
+        report,
+        execution=ShadowExecutionMetadata(
+            started_at_utc=started.isoformat(timespec="seconds"),
+            completed_at_utc=completed.isoformat(timespec="seconds"),
+            elapsed_seconds=float(elapsed),
+            deterministic_seed=config.bootstrap_seed,
+            warnings=tuple(str(item.message) for item in caught),
+        ),
     )
     document = report_to_dict(report)
     outcome = _write_once(document, arguments.json_output)
-    if outcome == "written":
-        write_shadow_report(report, arguments.json_output)
-
-    elapsed = (datetime.now(UTC) - started).total_seconds()
     print(f"Status      {report.shadow_status} ({outcome})")
     print(f"Identity    {MODEL_NAME} / {MODEL_VERSION}")
     print(f"Cutoff      {arguments.cutoff_fold_id}")

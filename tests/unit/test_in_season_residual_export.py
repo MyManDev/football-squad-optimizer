@@ -9,6 +9,8 @@ The contract checks are exercised against hand-built tables. Building the real o
 whole archive, which belongs in the script rather than in a unit suite.
 """
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 from scripts import export_in_season_residuals as export
@@ -83,6 +85,7 @@ def test_the_manifest_carries_the_contract_and_the_holdout_claim() -> None:
     assert record["opening_gameweeks_included"] is False
     assert record["fold_count"] == 2
     assert record["row_count"] == 4
+    assert record["predicted_points_decimals"] == 9
 
 
 # --- opening gameweeks must not reach a history that cannot describe them -----
@@ -165,3 +168,13 @@ def test_the_column_order_matches_the_contract() -> None:
         "realized_points",
         "residual",
     )
+
+
+def test_the_export_serializes_floats_to_exactly_nine_decimals(tmp_path: Path) -> None:
+    target = tmp_path / "residuals.csv"
+    export.write_residual_table(_table(predicted=1.0 / 3.0, realized=2.0 / 3.0), target)
+
+    data = target.read_text(encoding="utf-8")
+    assert "0.333333333" in data
+    assert "0.666666667" in data
+    assert "\r" not in data
