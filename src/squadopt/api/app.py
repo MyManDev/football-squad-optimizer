@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Final
 
@@ -95,6 +97,7 @@ def create_app(
     advice_store: AdviceReadStore | None = None,
     advice_submit: AdviceSubmitService | None = None,
     allowed_origins: tuple[str, ...] = (),
+    utc_now: Callable[[], datetime] | None = None,
 ) -> FastAPI:
     """Build the API with an injectable read adapter and no solver startup work.
 
@@ -261,7 +264,9 @@ def create_app(
             strategy, window, rival = _parse_advise_body(body)
         except BackendApiContractError as error:
             return _contract_error(422, "VALIDATION_FAILED", str(error))
-        from datetime import UTC, datetime
+        current = datetime.now(UTC) if utc_now is None else utc_now()
+        if current.tzinfo is None or current.utcoffset() is None:
+            raise ValueError("utc_now must return a timezone-aware datetime.")
 
         outcome = advice_submit.submit(
             league_id=league_id,
@@ -271,7 +276,7 @@ def create_app(
             rival_entry_id=rival,
             idempotency_key=request.headers.get("Idempotency-Key"),
             client_bucket=request.client.host if request.client else "unknown",
-            at_utc=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            at_utc=current.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
         if outcome.kind == "hit" and outcome.payload is not None:
             return Response(

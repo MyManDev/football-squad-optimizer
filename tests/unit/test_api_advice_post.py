@@ -1,6 +1,7 @@
 """The POST: a hit, one open job per request, idempotency, CORS, and rate limits."""
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -84,7 +85,12 @@ def _world(tmp_path: Path, **app_kwargs: object):
         FileLeagueDirectory(tmp_path / "site"), cache, _Context(), {"saf-puan": False}
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
-    application = create_app(data_root=tmp_path / "site", advice_store=reader, advice_submit=submit)
+    application = create_app(
+        data_root=tmp_path / "site",
+        advice_store=reader,
+        advice_submit=submit,
+        utc_now=lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
+    )
     client = TestClient(application, raise_server_exceptions=False)
     return client, cache, queue
 
