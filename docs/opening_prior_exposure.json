@@ -56,35 +56,35 @@
   },
   "configurations": [
     {
-      "attributable_points": 976.960623926937,
+      "attributable_points": 976.9606239269368,
       "attributable_share": 0.007943991105531458,
       "family": "archive_fed_control",
       "finite_difference_disagreement": 1.9776478960342036e-10,
       "folds": 147,
       "label": "control-fw05",
-      "level_shift": 0.0007394316276712054,
-      "mean_projected_points_frozen": 1.2222299723809225,
-      "mean_projected_points_refit": 1.2229694040085937,
-      "projected_points": 122981.08229837674,
+      "level_shift": 0.0007394316276714274,
+      "mean_projected_points_frozen": 1.2222299723809227,
+      "mean_projected_points_refit": 1.222969404008594,
+      "projected_points": 122981.08229837671,
       "row_share": 0.007146588859207271,
       "rows": 101447,
       "rows_touching_the_prior": 725,
       "squad_shaped_attributable_points": 0.0,
       "squad_shaped_attributable_share": 0.0,
-      "squad_shaped_projected_points": 15763.866666666663,
+      "squad_shaped_projected_points": 15763.866666666667,
       "squad_shaped_rows_touching_the_prior": 0
     },
     {
-      "attributable_points": 47570.73055783133,
-      "attributable_share": 0.2958338136785168,
+      "attributable_points": 47570.73055783134,
+      "attributable_share": 0.29583381367851697,
       "family": "in_season_blend",
       "finite_difference_disagreement": 1.5397132042618971e-10,
       "folds": 147,
       "label": "blend-m270-g6-declared",
-      "level_shift": 0.03325787643576583,
+      "level_shift": 0.03325787643576561,
       "mean_projected_points_frozen": 1.5948225182082612,
-      "mean_projected_points_refit": 1.628080394644027,
-      "projected_points": 160802.20839638886,
+      "mean_projected_points_refit": 1.6280803946440268,
+      "projected_points": 160802.2083963888,
       "row_share": 0.4559425118534801,
       "rows": 101447,
       "rows_touching_the_prior": 46254,
@@ -94,8 +94,8 @@
       "squad_shaped_rows_touching_the_prior": 113
     },
     {
-      "attributable_points": 62882.730750798175,
-      "attributable_share": 0.3526329001906557,
+      "attributable_points": 62882.7307507982,
+      "attributable_share": 0.35263290019065546,
       "family": "floor",
       "finite_difference_disagreement": 1.51102513377269e-10,
       "folds": 147,
@@ -103,32 +103,40 @@
       "level_shift": 0.044667272365664035,
       "mean_projected_points_frozen": 1.764456714807021,
       "mean_projected_points_refit": 1.809123987172685,
-      "projected_points": 178323.4936864932,
+      "projected_points": 178323.49368649337,
       "row_share": 0.4559425118534801,
       "rows": 101447,
       "rows_touching_the_prior": 46254,
       "squad_shaped_attributable_points": 0.0,
       "squad_shaped_attributable_share": 0.0,
-      "squad_shaped_projected_points": 11229.350969365389,
+      "squad_shaped_projected_points": 11229.350969365427,
       "squad_shaped_rows_touching_the_prior": 0
     }
   ],
   "contract_version": "opening_prior_exposure_v1",
-  "created_utc": "2026-08-26T07:28:07+00:00",
+  "created_utc": "2026-08-28T17:49:07+00:00",
   "diagnostics": {
     "decision_level_rescore": false,
     "gate_evidence": false,
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
     "locked_holdout_read": false,
     "measurement_only": true,
     "squad_shaped_population_is_a_proxy": true
   },
   "environment": {
-    "logical_cpu_count": 16,
+    "logical_cpu_count": 32,
     "ortools": "9.15.6755",
     "pandas": "3.0.5",
-    "platform": "Windows-10-10.0.26200-SP0",
-    "processor": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
-    "python": "3.11.0"
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
   },
   "first_fold": "2021-22-gw02",
   "folds": 147,
@@ -142,16 +150,15 @@
     "archive_repository": "vaastav/Fantasy-Premier-League",
     "experiment_contract_version": "screening_doe_v1",
     "feature_generation_contract_version": "form_window_v1",
-    "history_rows": 0,
+    "history_rows": 126737,
     "history_seasons": [
       "2020-21",
       "2021-22",
       "2022-23",
       "2023-24",
-      "2024-25",
-      "2025-26"
+      "2024-25"
     ],
-    "repository_commit": "7cd2244d7c9d7e5ec7d97f05da4df3f29c8f1cf4",
-    "working_tree_dirty": true
+    "repository_commit": "a5a8d16b019e7226b697e90601ff9878c0fca761",
+    "working_tree_dirty": false
   }
 }
