@@ -191,6 +191,8 @@ def test_an_empty_registry_reads_nothing_extra(tmp_path: Path) -> None:
 def test_the_extra_payloads_land_in_the_snapshot_and_survive_the_checksum(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(fpl_capture, "_utc_now", lambda: "2026-08-25T09:00:00Z")
+
     def fake_fetch(url: str, **_: Any) -> bytes:
         if url.endswith("bootstrap-static/"):
             return _bootstrap()
@@ -225,6 +227,8 @@ def test_a_capture_without_a_registry_is_the_two_endpoints_it_always_was(
 ) -> None:
     """The injected capture operation calls this with one argument; it must not grow one."""
 
+    monkeypatch.setattr(fpl_capture, "_utc_now", lambda: "2026-08-25T09:00:00Z")
+
     def fake_fetch(url: str, **_: Any) -> bytes:
         if url.endswith("bootstrap-static/"):
             return _bootstrap()
@@ -240,6 +244,8 @@ def test_a_capture_without_a_registry_is_the_two_endpoints_it_always_was(
 def test_a_dry_run_with_entries_writes_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(fpl_capture, "_utc_now", lambda: "2026-08-25T09:00:00Z")
+
     def fake_fetch(url: str, **_: Any) -> bytes:
         if url.endswith("bootstrap-static/"):
             return _bootstrap()

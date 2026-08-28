@@ -49,19 +49,20 @@ Five gates are wired into CI. All must pass on the delivering branch:
 .venv/Scripts/python -m ruff format --check .
 .venv/Scripts/python -m mypy
 .venv/Scripts/lint-imports
-.venv/Scripts/python -m pytest
+.venv/Scripts/python -m pytest -n auto --dist loadscope
 ```
 
-**Run the full `pytest`, not `-m "not slow"`.** The full suite is the merge gate, and the
-marker split buys less than two minutes: measured on `b031ef1`, the full suite is 443 s and
-`-m "not slow"` is 335 s. The eight `slow` tests are 0.4% of the 1,969 collected and 24% of the
-wall clock, so the marks are well chosen — but 5 m 34 s is not a fast suite. The 37
-`tests/integration` tests, including a full decision-chain rehearsal, are inside it, and
-deselecting `slow` does not even avoid the session-scoped `baseline_result` fixture
-(`tests/conftest.py:31-33`), which runs a CP-SAT solve regardless.
+**Run the full suite in parallel, not `-m "not slow"`.** The full suite is the merge gate, and
+the marker split no longer buys anything: measured on `43b0d7f`, the parallel full suite is
+**121 s** while the serial run is 453 s and deselecting `slow` still leaves ~331 s. So the
+fast-suite question is settled by parallelism rather than by marks — the whole gate now costs
+less than a third of what the subset used to. The nine `slow` tests are 0.4% of the 2,563
+collected and 27% of the serial wall clock; the marks are reasonable, but 21 of the 30 costliest
+items carry no mark at all (#230), so the subset was never the fast suite it looked like.
 
-Use `-m "not slow"` for a quick local signal while iterating. Do not present it as having
-tested the change. Details and the full timing table are in [branching](branching.md).
+Use a single `pytest path::test` for a quick local signal while iterating — `-n auto` is not in
+`addopts`, so that stays serial and starts instantly. Do not present a subset as having tested
+the change. Details and the full timing table are in [branching](branching.md).
 
 Note also that `scripts/` — **77 modules and 17,444 lines**, holding most of the entry-point
 logic — sits outside two of the five gates. *Which* two is worth stating correctly, because an
