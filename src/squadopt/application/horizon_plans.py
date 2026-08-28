@@ -250,10 +250,10 @@ def write_horizon_plan(path: Path, document: Mapping[str, object]) -> bool:
             suffix=".tmp",
             delete=False,
         ) as handle:
+            temporary_path = Path(handle.name)
             handle.write(serialized)
             handle.flush()
             os.fsync(handle.fileno())
-            temporary_path = Path(handle.name)
         try:
             os.link(temporary_path, destination)
         except FileExistsError:
