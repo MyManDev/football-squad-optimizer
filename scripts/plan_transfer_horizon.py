@@ -11,12 +11,13 @@ calendar varies across later weeks. No price transition is invented.
 """
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
 
 import pandas as pd
-from scripts._experiment_cli import REPOSITORY_ROOT, write_json
+from scripts._experiment_cli import REPOSITORY_ROOT
 
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -64,7 +65,7 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=REPOSITORY_ROOT / "artifacts" / "live" / "transfer_horizon.json",
+        help="write here; omitted, derive an immutable fingerprinted artifact path",
     )
     parser.add_argument("--print-json", action="store_true", help="print the full artifact")
     return parser.parse_args()
@@ -99,7 +100,10 @@ def _document(
         raise TypeError("plan must be a TransferPlanResult.")
     if not isinstance(transfer_config, TransferPlanningConfig):
         raise TypeError("transfer_config must be a TransferPlanningConfig.")
-    return {
+    diagnostics = {
+        key: value for key, value in plan.diagnostics.items() if key not in {"solve_time_seconds"}
+    }
+    document: dict[str, object] = {
         "artifact_type": "live_transfer_horizon",
         "contract_version": "live_transfer_horizon_v1",
         "season": horizon.season,
@@ -126,7 +130,7 @@ def _document(
         "total_projected_score": plan.total_projected_score,
         "total_projected_bench_points": plan.total_projected_bench_points,
         "total_transfer_hit_points": plan.total_transfer_hit_points,
-        "diagnostics": dict(plan.diagnostics),
+        "diagnostics": diagnostics,
         "weeks": [
             {
                 "gameweek": week.gameweek,
@@ -155,6 +159,27 @@ def _document(
             "This artifact contains deterministic expected-point outputs only.",
         ],
     }
+    encoded = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    document["artifact_fingerprint"] = hashlib.sha256(encoded).hexdigest()
+    return document
+
+
+def _write_once(path: Path, document: dict[str, object]) -> bool:
+    """Create one immutable artifact, or accept an identical replay as a no-op."""
+
+    serialized = json.dumps(document, indent=2, sort_keys=True) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="utf-8", newline="\n") as handle:
+            handle.write(serialized)
+    except FileExistsError:
+        if path.read_text(encoding="utf-8") != serialized:
+            raise DataError(
+                f"Refusing to overwrite {path}: an artifact with different content "
+                "already exists at this immutable path."
+            ) from None
+        return False
+    return True
 
 
 def main() -> int:
@@ -210,7 +235,17 @@ def main() -> int:
                 "It may only be written explicitly with --allow-feasible-shadow."
             )
         document = _document(horizon, plan, transfer_config)
-        write_json(arguments.output, document)
+        fingerprint = str(document["artifact_fingerprint"])
+        destination = arguments.output or (
+            REPOSITORY_ROOT
+            / "artifacts"
+            / "live"
+            / season
+            / f"gw{first:02d}"
+            / f"h{arguments.gameweeks}"
+            / f"transfer_horizon_{fingerprint[:16]}.json"
+        )
+        created = _write_once(destination, document)
     except (DataError, TransferPlanningError, OSError, TypeError, ValueError) as error:
         print(f"Could not plan the transfer horizon:\n  {error}")
         return 1
@@ -234,7 +269,7 @@ def main() -> int:
                 f"{week.transfer_count} transfer(s), {week.transfer_hit_points:.0f} hit; "
                 f"{moves}"
             )
-    print(f"Wrote {arguments.output}")
+    print(f"{'Wrote' if created else 'Reused'} {destination}")
     return 0
 
 

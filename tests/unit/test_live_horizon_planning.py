@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
-from scripts.plan_transfer_horizon import _document
+from scripts.plan_transfer_horizon import _document, _write_once
 from tests.unit.test_live_recommendation import (
     GW1_REPLAY_SQUAD,
     GW1_REPLAY_TOTAL_COST_TENTHS,
@@ -22,7 +22,7 @@ from tests.unit.test_projection_horizon_builder import (
     _in_season_handoff,
 )
 
-from squadopt.data.errors import DataSourceError
+from squadopt.data.errors import DataError, DataSourceError
 from squadopt.live import (
     HeldSquad,
     build_projection_horizon,
@@ -146,6 +146,8 @@ def test_the_operational_document_is_structured_and_contains_no_percentage_claim
     assert document["solver_status"] == "OPTIMAL"
     assert document["target_gameweeks"] == [2]
     assert len(document["weeks"]) == 1
+    assert len(str(document["artifact_fingerprint"])) == 64
+    assert "solve_time_seconds" not in document["diagnostics"]
     assert "%" not in encoded
 
 
@@ -169,3 +171,18 @@ def test_a_deterministically_truncated_plan_remains_structured_shadow_output(
 
     assert plan.solver_status is SolverStatus.FEASIBLE
     assert document["publication_status"] == "shadow_unproven"
+
+
+def test_an_identical_replay_is_a_no_op_and_different_content_is_refused(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "plan.json"
+    document: dict[str, object] = {"contract_version": "test_v1", "value": 1}
+
+    assert _write_once(destination, document) is True
+    original = destination.read_bytes()
+    assert _write_once(destination, document) is False
+    assert destination.read_bytes() == original
+
+    with pytest.raises(DataError, match="Refusing to overwrite"):
+        _write_once(destination, {**document, "value": 2})
