@@ -181,6 +181,47 @@ def test_concurrent_submitters_cannot_both_create_one_id(tmp_path: Path) -> None
     assert sorted(outcomes) == ["ok", "refused"]  # at-most-one creation, atomically
 
 
+def test_unique_submitter_waits_for_the_winners_job_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The index is the reservation; its record may appear a moment later."""
+
+    import threading
+
+    queue = FileJobQueue(tmp_path / "jobs")
+    original_submit = queue.submit
+    winner_reserved = threading.Event()
+    release_winner = threading.Event()
+    outcomes: list[tuple[str, bool]] = []
+
+    def delayed_submit(job: AdviceJob) -> None:
+        winner_reserved.set()
+        assert release_winner.wait(timeout=5)
+        original_submit(job)
+
+    monkeypatch.setattr(queue, "submit", delayed_submit)
+
+    def first() -> None:
+        winner, created = queue.submit_unique(_job("job-first"))
+        outcomes.append((winner.job_id, created))
+
+    def second() -> None:
+        winner, created = queue.submit_unique(_job("job-second"))
+        outcomes.append((winner.job_id, created))
+
+    first_thread = threading.Thread(target=first)
+    first_thread.start()
+    assert winner_reserved.wait(timeout=5)
+    second_thread = threading.Thread(target=second)
+    second_thread.start()
+    release_winner.set()
+    first_thread.join(timeout=10)
+    second_thread.join(timeout=10)
+
+    assert sorted(outcomes) == [("job-first", False), ("job-first", True)]
+    assert queue.load("job-second") is None
+
+
 def test_job_ids_are_validated_before_any_path_is_composed(tmp_path: Path) -> None:
     queue = FileJobQueue(tmp_path / "jobs")
     for hostile in ("../escape", "a/b", "..", "x" * 200):

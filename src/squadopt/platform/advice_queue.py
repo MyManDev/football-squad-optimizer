@@ -41,6 +41,7 @@ from squadopt.platform.jobs_contract import (
 
 #: How stale a claim's heartbeat must be before recovery may treat it as abandoned.
 DEFAULT_LEASE_SECONDS: Final = 300.0
+INDEX_PUBLICATION_WAIT_SECONDS: Final = 2.0
 
 _SANITIZE_PATTERNS: Final = (
     re.compile(r"[A-Za-z]:[\\/][^\s'\"]*"),  # windows paths
@@ -131,23 +132,43 @@ class FileJobQueue:
         import tempfile
 
         descriptor, temporary = tempfile.mkstemp(dir=self._root, suffix=".tmp")
+        owns_index = False
+        deadline = time.monotonic() + INDEX_PUBLICATION_WAIT_SECONDS
         try:
             with os.fdopen(descriptor, "wb") as handle:
                 handle.write(job.job_id.encode("utf-8"))
-            try:
-                os.link(temporary, index)
-            except FileExistsError:
-                winner_id = index.read_text(encoding="utf-8").strip()
-                winner = self.load(winner_id)
-                if winner is not None and not winner.is_terminal:
-                    return winner, False
-                # A stale index (terminal or vanished job): replace it and win.
-                index.unlink(missing_ok=True)
-                os.link(temporary, index)
+            while not owns_index:
+                try:
+                    os.link(temporary, index)
+                    owns_index = True
+                except FileExistsError:
+                    try:
+                        winner_id = index.read_text(encoding="utf-8").strip()
+                    except FileNotFoundError:
+                        continue  # terminal cleanup raced this read; try the link again
+                    winner = self.load(winner_id)
+                    if winner is not None and not winner.is_terminal:
+                        return winner, False
+                    if time.monotonic() >= deadline:
+                        raise AdviceQueueError(
+                            "The open-job index did not publish a readable open job; "
+                            "refusing to create a duplicate."
+                        ) from None
+                    # The index is visible before its winner's job file by design:
+                    # publishing the reservation first prevents a duplicate. Wait for
+                    # the winning writer (or terminal cleanup), never unlink its claim.
+                    time.sleep(0.001)
         finally:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(temporary)
-        self.submit(job)
+        try:
+            self.submit(job)
+        except BaseException:
+            # A failed winner must not leave a reservation that can never resolve.
+            with contextlib.suppress(FileNotFoundError):
+                if index.read_text(encoding="utf-8").strip() == job.job_id:
+                    index.unlink()
+            raise
         return job, True
 
     def submit(self, job: AdviceJob) -> None:
