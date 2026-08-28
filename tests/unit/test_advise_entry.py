@@ -169,6 +169,34 @@ def test_a_rival_strategy_computes_against_the_named_rival(world: dict[str, Any]
     assert not any("probab" in key or key.startswith("p_") for key in payload)
 
 
+def test_a_rival_missing_from_the_projection_is_refused_not_scored_as_zero(
+    world: dict[str, Any],
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    rival = _rival_squad(world)
+    provider = _Provider(
+        {
+            101: _member_picks(world, 101, _legal_squad(world)),
+            202: _member_picks(world, 202, rival),
+        }
+    )
+    incomplete = dataclasses.replace(
+        projection,
+        table=projection.table.loc[projection.table["player_id"] != rival[0]].reset_index(
+            drop=True
+        ),
+    )
+
+    with pytest.raises(EntryError, match="cannot treat missing players as zero"):
+        advise_entry(
+            _request(strategy="fark-yarat", rival_entry_id=202),
+            provider=provider,
+            inputs=inputs,
+            projection=incomplete,
+            rules=rules,
+        )
+
+
 def test_the_rival_changes_labels_not_the_baseline(world: dict[str, Any]) -> None:
     """The saf-puan answer is byte-identical whether or not a rival entry exists in the
     capture: the rival is a parameter of rival strategies, never an input to the
