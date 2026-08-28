@@ -35,6 +35,7 @@ from squadopt.live import (
     plan_transfers_with_overlap,
 )
 from squadopt.live.transfers import TransferDecision
+from squadopt.optimization import SolverStatus
 from squadopt.planning import FirstWeekOverlap
 
 #: The one combination computed today: the deterministic planner's own answer.
@@ -308,6 +309,11 @@ def _advise_against_rival(
     }
     held = held_squad_from_picks(picks, current_prices=prices)
     control_plan, _control_decision, _ = plan_transfers(inputs, projection, held, rules)
+    if control_plan.solver_status is not SolverStatus.OPTIMAL:
+        raise EntryError(
+            "The unconstrained control plan must be OPTIMAL before publishing an "
+            "expected-points cost against it."
+        )
     band = FirstWeekOverlap(player_ids=rival_eleven, minimum=floor, maximum=ceiling)
     try:
         plan, decision, _config = plan_transfers_with_overlap(inputs, projection, held, rules, band)
