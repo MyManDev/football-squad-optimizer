@@ -594,6 +594,18 @@ default. A deterministic-budget `FEASIBLE` result can be recorded for research w
 `--allow-feasible-shadow`; that artifact is marked `shadow_unproven` and is not a live
 recommendation.
 
+To run the decision control and longer research horizons under one replay-safe lineage:
+
+```powershell
+.venv\Scripts\python -m scripts.run_transfer_horizon_batch `
+  --horizons 1,3,5 `
+  --in-season-projection data/handoffs/2026-27-gw02.json
+```
+
+The batch manifest links child artifacts without absolute workstation paths. H1 remains
+the only decision-eligible control; H3 and H5 remain research shadows even when their
+solver status is `OPTIMAL`.
+
 ## Signal the control has not spent
 
 Opponent strength is estimated from shifted results in `squadopt.features.strength` and no
