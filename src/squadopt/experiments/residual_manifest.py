@@ -108,7 +108,7 @@ class ResidualSourceManifest:
     generation_commit: str
     dataset_snapshot_id: str
     table_sha256: str
-    predicted_points_decimals: int | None
+    predicted_points_decimals: int
     locked_holdout_excluded: bool
     created_at_utc: str | None
 
@@ -323,13 +323,22 @@ def load_residual_source_manifest(
     )
 
     decimals_value = document.get("predicted_points_decimals")
-    decimals = None if decimals_value is None else int(str(decimals_value))
-    if decimals is not None:
-        _require(
-            decimals == DECLARED_PREDICTED_POINTS_DECIMALS,
-            f"predicted_points_decimals is {decimals}, not the measured "
-            f"{DECLARED_PREDICTED_POINTS_DECIMALS} the byte rule fixes.",
-        )
+    _require(
+        decimals_value is not None,
+        "predicted_points_decimals is missing; a byte-addressed residual export must "
+        f"declare the measured {DECLARED_PREDICTED_POINTS_DECIMALS}-decimal rule.",
+    )
+    try:
+        decimals = int(str(decimals_value))
+    except ValueError as error:
+        raise ResidualSourceError(
+            "predicted_points_decimals must be an integer declaration."
+        ) from error
+    _require(
+        decimals == DECLARED_PREDICTED_POINTS_DECIMALS,
+        f"predicted_points_decimals is {decimals}, not the measured "
+        f"{DECLARED_PREDICTED_POINTS_DECIMALS} the byte rule fixes.",
+    )
 
     created = document.get("created_at_utc")
     return ResidualSourceManifest(
