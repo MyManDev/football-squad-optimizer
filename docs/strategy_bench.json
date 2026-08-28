@@ -13,8 +13,8 @@
     }
   },
   "contract_version": "strategy_bench_v1",
-  "created_utc": "2026-08-27T18:47:21+00:00",
-  "elapsed_seconds": 3797.3,
+  "created_utc": "2026-08-28T07:34:46+00:00",
+  "elapsed_seconds": 8618.8,
   "gate4_h1_not_sacrificed": {
     "mirrored_folds": 147,
     "mismatches": [],
@@ -192,7 +192,7 @@
     "moving_block_length": 4
   },
   "metadata": {
-    "created_utc": "2026-08-27T18:47:21+00:00",
+    "created_utc": "2026-08-28T07:34:46+00:00",
     "environment": {
       "logical_cpu_count": 32,
       "ortools": "9.15.6755",
@@ -207,16 +207,15 @@
       "archive_repository": "vaastav/Fantasy-Premier-League",
       "experiment_contract_version": "screening_doe_v1",
       "feature_generation_contract_version": "form_window_v1",
-      "history_rows": 156075,
+      "history_rows": 126737,
       "history_seasons": [
         "2020-21",
         "2021-22",
         "2022-23",
         "2023-24",
-        "2024-25",
-        "2025-26"
+        "2024-25"
       ],
-      "repository_commit": "90a636d611505d57d175a273a49888d401db70f9",
+      "repository_commit": "8bedced03a99aa26b55a8b5154cc22642b837d49",
       "working_tree_dirty": false
     }
   },
