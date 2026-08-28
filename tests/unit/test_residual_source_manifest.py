@@ -15,6 +15,7 @@ import pandas as pd
 import pytest
 
 from squadopt.experiments.residual_manifest import (
+    DECLARED_PREDICTED_POINTS_DECIMALS,
     RESIDUAL_SOURCE_MANIFEST_CONTRACT_VERSION,
     ResidualSourceError,
     load_residual_source_manifest,
@@ -76,6 +77,7 @@ def _write(tmp_path: Path, table: pd.DataFrame, **overrides: object) -> tuple[Pa
         "table_sha256": digest,
         "created_at_utc": "2026-08-28T12:00:00+00:00",
         "locked_holdout_accessed": False,
+        "predicted_points_decimals": DECLARED_PREDICTED_POINTS_DECIMALS,
     }
     document.update(overrides)
     manifest_path = tmp_path / "in_season_residuals.manifest.json"
@@ -208,6 +210,16 @@ def test_a_wrong_opening_gameweek_claim_is_rejected(tmp_path: Path) -> None:
 def test_a_stale_rounding_declaration_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(ResidualSourceError, match="predicted_points_decimals"):
         _load(*_write(tmp_path, _table(), predicted_points_decimals=4))
+
+
+def test_a_missing_rounding_declaration_is_rejected(tmp_path: Path) -> None:
+    table_path, manifest_path = _write(tmp_path, _table())
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    del document["predicted_points_decimals"]
+    manifest_path.write_text(json.dumps(document, indent=2, sort_keys=True), encoding="utf-8")
+
+    with pytest.raises(ResidualSourceError, match="predicted_points_decimals is missing"):
+        _load(table_path, manifest_path)
 
 
 def test_the_bound_source_is_accepted_by_the_phase_2a_contract(tmp_path: Path) -> None:
