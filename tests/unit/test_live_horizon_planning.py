@@ -1,12 +1,14 @@
 """Integration tests for planning from a captured multi-gameweek projection."""
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
+from scripts import plan_transfer_horizon as horizon_script
 from scripts.plan_transfer_horizon import _document, _write_once
 from tests.unit.test_live_recommendation import (
     GW1_REPLAY_SQUAD,
@@ -186,3 +188,34 @@ def test_an_identical_replay_is_a_no_op_and_different_content_is_refused(
 
     with pytest.raises(DataError, match="Refusing to overwrite"):
         _write_once(destination, {**document, "value": 2})
+
+
+def test_a_failure_before_publication_leaves_no_final_or_temporary_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "plan.json"
+
+    def fail_durability(_file_descriptor: int) -> None:
+        raise OSError("synthetic durability failure")
+
+    monkeypatch.setattr(horizon_script.os, "fsync", fail_durability)
+
+    with pytest.raises(OSError, match="synthetic durability failure"):
+        _write_once(destination, {"contract_version": "test_v1"})
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".plan.json.*.tmp"))
+
+
+def test_concurrent_identical_writers_publish_once_and_replay_the_same_bytes(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "plan.json"
+    document: dict[str, object] = {"contract_version": "test_v1", "value": 1}
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        outcomes = list(executor.map(lambda _index: _write_once(destination, document), range(8)))
+
+    assert outcomes.count(True) == 1
+    assert outcomes.count(False) == 7
+    assert json.loads(destination.read_text(encoding="utf-8")) == document
+    assert not list(tmp_path.glob(".plan.json.*.tmp"))

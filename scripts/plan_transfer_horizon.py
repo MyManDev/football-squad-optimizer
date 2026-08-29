@@ -13,7 +13,9 @@ calendar varies across later weeks. No price transition is invented.
 import argparse
 import hashlib
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -165,21 +167,38 @@ def _document(
 
 
 def _write_once(path: Path, document: dict[str, object]) -> bool:
-    """Create one immutable artifact, or accept an identical replay as a no-op."""
+    """Atomically create one immutable artifact, or accept an identical replay."""
 
     serialized = json.dumps(document, indent=2, sort_keys=True) + "\n"
     path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path: Path | None = None
     try:
-        with path.open("x", encoding="utf-8", newline="\n") as handle:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            newline="\n",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
             handle.write(serialized)
-    except FileExistsError:
-        if path.read_text(encoding="utf-8") != serialized:
-            raise DataError(
-                f"Refusing to overwrite {path}: an artifact with different content "
-                "already exists at this immutable path."
-            ) from None
-        return False
-    return True
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary_path, path)
+        except FileExistsError:
+            if path.read_text(encoding="utf-8") != serialized:
+                raise DataError(
+                    f"Refusing to overwrite {path}: an artifact with different content "
+                    "already exists at this immutable path."
+                ) from None
+            return False
+        return True
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 
 def main() -> int:
