@@ -301,3 +301,48 @@ different shift, and is not evidence about the values fixed here.
   knobs that produce summaries neither S1 nor S2 reads. They are pinned at their
   defaults and recorded for completeness, so that a later protocol which does read
   them cannot claim this run's numbers were taken under different ones.
+
+### Found while implementing, and blocking a binding run (2026-08-29)
+
+An adversarial read of the instrument found one thing the second amendment does not
+decide, and it stops the protocol from running at all. It is recorded here rather than
+settled, because settling it moves the shift and therefore both squad gates.
+
+- **The shift fit's eligible population.** The fit population is built per season:
+  the earliest development fold has no prior residual folds at all, the next has one,
+  and so on. `min_history_folds = 8` makes the generator refuse any fold with fewer
+  than eight, so the first several folds of each fit season cannot be scored as the
+  population is currently assembled. Clause 18 says the value "drops the earliest
+  eligible folds", which does not say whether those folds simply leave the shift fit,
+  or whether the residual history should be widened — across seasons, or with the
+  2020-21 season the panel already loads — so that every declared fold is eligible.
+  The two readings fit the shift on different populations and produce different
+  numbers, so **no binding S1/S2 run is eligible until an amendment names one.**
+
+  The implementation refuses rather than choosing. `fit_frozen_shift` checks the
+  population before anything is generated, and raises with the count of ineligible
+  folds and the first of them. The tempting repair — skip whichever folds the
+  generator rejects — is exactly the failure this programme exists to prevent: it lets
+  the crash choose the fit population, after the run has already shown you which folds
+  it would drop.
+
+### Recorded as facts about the instrument, not as open decisions
+
+Two properties of the protocol as frozen. Neither is a defect and neither needs a
+decision; both belong in the record because a reader of the artifact would otherwise
+draw a stronger conclusion than the numbers support.
+
+- **The 37 evaluation readings are not independent of each other.** Clause 9 freezes
+  one residual history for the whole evaluation season and clause 8 fixes one seed, so
+  every fold draws the same common gameweek shock. The fold-level bootstrap of clause
+  22 resamples folds as though they were independent, so its interval understates the
+  uncertainty, and S2's decisive count is partly a property of one shared draw. This is
+  why clause 22 confines the bootstrap to diagnostics. The artifact records the shared
+  draw explicitly.
+- **Completeness is checked per gate family, and P1 is measured in cells.** The report
+  contract can see that the P1 family was answered; it cannot know how many cells that
+  family should have had, because the per-group cells are gated only when a group
+  clears its row floor. The merge closes the gap where it has the information — the
+  pooled cell is required by name and every recorded cell's verdict is recomputed from
+  its own observation — but a reader should know that "P1 answered" is a statement
+  about the family, and that the cells are what the recorded artifact happens to carry.
