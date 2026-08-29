@@ -145,6 +145,20 @@ answering for the same decision.
 **Before the opening deadline there is nothing to read.** Gameweek 0 does not exist, so a
 capture open for gameweek 1 reads no picks at all rather than reading an empty document.
 
+**The picks name players in the platform's per-season space, not the canonical one.** An
+entry document identifies a player by his **element** id, which is assigned per season; the
+canonical panel, the prices, the projection and the ledger all identify him by **code**,
+which survives a transfer window. Both are plain integers, so handing one where the other is
+meant does not raise — it **matches nothing**, and the caller gets a full squad it cannot
+price. That is not hypothetical: it is what #265 spent a day on, with fifteen members, "no
+current price for players [1, 8, …]", and zero rows rendered.
+
+The translation is `player_codes`, and it belongs **at the capture boundary, once** — the
+element space must not reach a consumer that means codes. `reconcile_player_identity` is the
+guard that turns this class of silent mismatch into a stated one, and its refusal message
+already names this exact confusion; a path that joins a captured roster against known history
+should run it rather than discover the mismatch downstream as missing prices.
+
 **The standings page is a membership record, not a schema.** A captured
 `league-{id}-standings.json` states who was in the league at that instant. It seeds the
 registry; it is not a source of player-gameweek rows and no feature reads it.
