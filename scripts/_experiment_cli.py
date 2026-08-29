@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import subprocess
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
@@ -52,8 +53,17 @@ def _git_revision() -> tuple[str, bool]:
     return revision, dirty
 
 
-def artifact_metadata(*, panel_rows: int, created_utc: str | None = None) -> dict[str, object]:
-    """Return dataset, repository, dependency, and hardware provenance."""
+def artifact_metadata(
+    *,
+    panel_rows: int,
+    created_utc: str | None = None,
+    history_seasons: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Return dataset, repository, dependency, and hardware provenance.
+
+    ``history_seasons`` is the list of seasons the caller actually loaded; callers
+    that load the full supported range may omit it and keep the historical default.
+    """
 
     revision, dirty = _git_revision()
     return {
@@ -64,7 +74,9 @@ def artifact_metadata(*, panel_rows: int, created_utc: str | None = None) -> dic
             "archive_repository": ARCHIVE_REPOSITORY,
             "archive_commit": ARCHIVE_COMMIT,
             "archive_manifest_sha256": _sha256(MANIFEST_PATH),
-            "history_seasons": list(SUPPORTED_SEASONS),
+            "history_seasons": list(
+                SUPPORTED_SEASONS if history_seasons is None else history_seasons
+            ),
             "history_rows": panel_rows,
             "experiment_contract_version": SCREENING_EXPERIMENT_CONTRACT_VERSION,
             "feature_generation_contract_version": FEATURE_GENERATION_CONTRACT_VERSION,
