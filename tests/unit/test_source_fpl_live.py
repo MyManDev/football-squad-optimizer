@@ -703,10 +703,27 @@ def _picks_payload(
     return json.dumps(document).encode("utf-8")
 
 
-def _history_payload(*, chips: list[dict[str, Any]] | None = None) -> bytes:
+def _history_payload(
+    *,
+    chips: list[dict[str, Any]] | None = None,
+    current: list[dict[str, Any]] | None = None,
+) -> bytes:
     document = {
         "chips": [] if chips is None else chips,
-        "current": [{"event": 1, "event_transfers": 0, "points_on_bench": 3, "bank": 5}],
+        "current": (
+            current
+            if current is not None
+            else [
+                {
+                    "event": 1,
+                    "points": 64,
+                    "total_points": 64,
+                    "event_transfers": 0,
+                    "points_on_bench": 3,
+                    "bank": 5,
+                }
+            ]
+        ),
     }
     return json.dumps(document).encode("utf-8")
 
@@ -1135,6 +1152,117 @@ def test_the_record_refuses_to_claim_confirmed_bonus_while_fixtures_are_unfinish
             fixtures_finished=9,
             fixtures_total=10,
         )
+
+
+# --- the entry's own history as the source of a member's score ------------------------
+#
+# The league page's points come from here rather than from the standings table: a history
+# row names the gameweek it belongs to, and the standings' event_total does not.
+
+
+def test_the_history_returns_each_played_gameweek_in_order() -> None:
+    from squadopt.data.sources.fpl_live import fpl_entry_history_points
+
+    payload = _history_payload(
+        current=[
+            {"event": 2, "points": 51, "total_points": 115},
+            {"event": 1, "points": 64, "total_points": 64},
+        ]
+    )
+
+    weeks = fpl_entry_history_points(payload, entry_id=11)
+
+    assert [(week.gameweek, week.points, week.total_points) for week in weeks] == [
+        (1, 64, 64),
+        (2, 51, 115),
+    ]
+    assert {week.entry_id for week in weeks} == {11}
+
+
+def test_a_week_that_ended_negative_after_a_hit_is_read_rather_than_refused() -> None:
+    """A minus four is a real score; refusing it would invent data as surely as a zero."""
+
+    from squadopt.data.sources.fpl_live import fpl_entry_history_points
+
+    payload = _history_payload(current=[{"event": 7, "points": -2, "total_points": 300}])
+
+    assert fpl_entry_history_points(payload, entry_id=11)[0].points == -2
+
+
+@pytest.mark.parametrize("field", ["event", "points", "total_points"])
+def test_a_renamed_history_field_is_refused_by_name(field: str) -> None:
+    from squadopt.data.sources.fpl_live import fpl_entry_history_points
+
+    row = {"event": 1, "points": 64, "total_points": 64}
+    del row[field]
+
+    with pytest.raises(DataSourceError, match=field):
+        fpl_entry_history_points(_history_payload(current=[row]), entry_id=11)
+
+
+def test_a_gameweek_listed_twice_is_refused() -> None:
+    from squadopt.data.sources.fpl_live import fpl_entry_history_points
+
+    payload = _history_payload(
+        current=[
+            {"event": 1, "points": 64, "total_points": 64},
+            {"event": 1, "points": 51, "total_points": 115},
+        ]
+    )
+
+    with pytest.raises(DuplicateRecordsError, match="gameweek 1"):
+        fpl_entry_history_points(payload, entry_id=11)
+
+
+def test_a_history_with_no_played_weeks_is_refused_rather_than_read_as_empty() -> None:
+    from squadopt.data.sources.fpl_live import fpl_entry_history_points
+
+    with pytest.raises(DataSourceError, match="current"):
+        fpl_entry_history_points(_history_payload(current=[]), entry_id=11)
+
+
+def test_non_integer_history_points_are_refused() -> None:
+    from squadopt.data.sources.fpl_live import fpl_entry_history_points
+
+    payload = _history_payload(current=[{"event": 1, "points": "64", "total_points": 64}])
+
+    with pytest.raises(InvalidValueError, match="points"):
+        fpl_entry_history_points(payload, entry_id=11)
+
+
+# --- which weeks may be published at all ----------------------------------------------
+
+
+def _events_payload(events: list[dict[str, Any]]) -> bytes:
+    return json.dumps({"events": events}).encode("utf-8")
+
+
+@pytest.mark.parametrize(
+    ("finished", "data_checked", "scored"),
+    [(True, True, True), (True, False, False), (False, False, False)],
+)
+def test_a_week_counts_as_scored_only_when_finished_and_checked(
+    finished: bool, data_checked: bool, scored: bool
+) -> None:
+    """finished alone is the ledger's gate; bonus lands with data_checked.
+
+    Gameweek 1 sat finished-but-unchecked for eight and a half hours with every fixture
+    played, so this is the difference between a member's real score and one short by up to
+    three points per player.
+    """
+
+    from squadopt.data.sources.fpl_live import scored_gameweeks
+
+    payload = _events_payload([{"id": 1, "finished": finished, "data_checked": data_checked}])
+
+    assert (1 in scored_gameweeks(payload)) is scored
+
+
+def test_a_bootstrap_without_the_checked_flag_is_refused_by_name() -> None:
+    from squadopt.data.sources.fpl_live import scored_gameweeks
+
+    with pytest.raises(DataSourceError, match="data_checked"):
+        scored_gameweeks(_events_payload([{"id": 1, "finished": True}]))
 
 
 # --- minutes, because points alone cannot say which eleven they belong to ------------

@@ -793,6 +793,13 @@ _PICK_FIELDS: Final = ("element", "position", "is_captain", "is_vice_captain", "
 _CHIP_FIELDS: Final = ("name", "event")
 _STANDING_FIELDS: Final = ("entry", "entry_name", "player_name", "rank")
 _LIVE_ELEMENT_FIELDS: Final = ("id", "stats")
+_HISTORY_EVENT_FIELDS: Final = ("event", "points", "total_points")
+# The two flags that together mean "this week's points are final". `finished` alone is what
+# the ledger gates realized outcomes on; `data_checked` is the one that flips when bonus is
+# added, and gameweek 1 sat finished-but-unchecked for eight and a half hours with every
+# fixture already played. Both live in the same captured document, so the stricter reading
+# costs one key.
+_SCORED_EVENT_FIELDS: Final = ("id", "finished", "data_checked")
 
 # The squad the platform publishes: fifteen picks, the first eleven of which start.
 _SQUAD_SIZE: Final = 15
@@ -1053,6 +1060,86 @@ def fpl_league_standings(standings: bytes, *, league_id: int) -> tuple[LeagueSta
             )
         )
     return tuple(members)
+
+
+@dataclass(frozen=True, slots=True)
+class EntryGameweekPoints:
+    """One entry's score for one played gameweek, as that entry's own history states it.
+
+    Read from ``entry/{id}/history/`` rather than from the league standings for two
+    reasons that are properties of the documents rather than preferences. The history row
+    **names the gameweek it belongs to**, while the standings' ``event_total`` names none
+    and would have to be assumed to mean the current week — and the published members view
+    is labelled with the *upcoming* gameweek, so an unlabelled score lands under the wrong
+    week's heading. And the standings table carries ``last_updated_data``, which in the
+    capture this was built against was thirteen hours older than the capture itself; the
+    entry documents are fetched in the same pass as the picks.
+
+    ``points`` is net of the week's transfer cost, as the source publishes it, and may be
+    negative after a hit — refusing a negative week would be the same class of error as
+    inventing a positive one.
+    """
+
+    entry_id: int
+    gameweek: int
+    points: int
+    total_points: int
+
+
+def fpl_entry_history_points(history: bytes, *, entry_id: int) -> tuple[EntryGameweekPoints, ...]:
+    """Return one entry's played gameweeks, in gameweek order.
+
+    Only weeks the source has actually played appear in ``current``; an unplayed week is
+    absent rather than zero, and this function preserves that — a caller asking for a week
+    that is not here gets nothing back, which is the honest answer.
+    """
+
+    identifier = _positive(entry_id, "entry id")
+    document = _document(history, "Entry history")
+    records = _records(document, "current", "Entry history")
+    _require_fields(records, _HISTORY_EVENT_FIELDS, "Entry history")
+    weeks: list[EntryGameweekPoints] = []
+    seen: set[int] = set()
+    for record in records:
+        gameweek = _positive(_integer(record, "event", "Entry history"), "gameweek")
+        if gameweek in seen:
+            raise DuplicateRecordsError(
+                f"Entry {identifier} history lists gameweek {gameweek} more than once."
+            )
+        seen.add(gameweek)
+        weeks.append(
+            EntryGameweekPoints(
+                entry_id=identifier,
+                gameweek=gameweek,
+                points=_integer(record, "points", "Entry history"),
+                total_points=_integer(record, "total_points", "Entry history"),
+            )
+        )
+    return tuple(sorted(weeks, key=lambda week: week.gameweek))
+
+
+def scored_gameweeks(bootstrap: bytes) -> frozenset[int]:
+    """Return the gameweeks whose points are final: finished **and** checked.
+
+    ``finished`` alone is what ``live/ledger.py`` gates our own realized outcome on, and it
+    is not enough for a score published to a reader. Bonus is added per fixture, so a score
+    read before it lands is short by up to three points per player and short by *different*
+    amounts for different players — biased rather than noisy, and it does not average out
+    across a squad. Gameweek 1 was measured sitting at ``finished: false, data_checked:
+    false`` eight and a half hours after its last kick-off with every fixture at ninety
+    minutes, so the gap this guards against is hours wide rather than minutes.
+    """
+
+    document = _document(bootstrap, "Bootstrap")
+    records = _records(document, "events", "Bootstrap event")
+    _require_fields(records, _SCORED_EVENT_FIELDS, "Bootstrap event")
+    scored: set[int] = set()
+    for record in records:
+        if _boolean(record, "finished", "Bootstrap event") and _boolean(
+            record, "data_checked", "Bootstrap event"
+        ):
+            scored.add(_positive(_integer(record, "id", "Bootstrap event"), "gameweek"))
+    return frozenset(scored)
 
 
 def entry_label(entry: bytes, *, entry_id: int) -> str:
