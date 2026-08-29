@@ -1245,8 +1245,27 @@ class EntryPicksRecord:
     season: str
     gameweek: int
     squad: tuple[int, ...]
+    """The fifteen picks in the platform's own order: positions 1 to 15.
+
+    The order is load-bearing, not incidental. ``squad[:11]`` is the named eleven and
+    ``squad[11:]`` is the bench **in substitution order** — the sequence the platform walks
+    when it replaces a starter who played no minutes (#262). Sorting this tuple would keep
+    every member and destroy the rule.
+    """
     starting_xi: tuple[int, ...]
     captain: int
+    vice_captain: int
+    """Who inherits the multiplier when the captain plays no minutes.
+
+    Required rather than defaulted: there is no value that can stand in for it. Guessing
+    the vice would not fail loudly, it would hand the armband to the wrong player in exactly
+    the weeks the captain blanked, which is when it matters most.
+
+    The adapter requires the vice to be in the squad and to differ from the captain, and
+    deliberately does **not** require him to be in the starting eleven. Six real entries
+    were checked and all six named both inside the eleven, but six is not a rule, and an
+    adapter that refuses a real capture is worse than one that accepts a bench vice.
+    """
     bank_tenths: int
     free_transfers: int
     free_transfers_known: bool
@@ -1270,6 +1289,17 @@ class EntryPicksRecord:
             raise InvalidValueError(
                 f"Entry {self.entry_id} gameweek {self.gameweek} names a captain who is "
                 "not in the starting eleven."
+            )
+        if self.vice_captain not in self.squad:
+            raise InvalidValueError(
+                f"Entry {self.entry_id} gameweek {self.gameweek} names a vice-captain who "
+                "is not in the squad."
+            )
+        if self.vice_captain == self.captain:
+            raise InvalidValueError(
+                f"Entry {self.entry_id} gameweek {self.gameweek} names the same player as "
+                "captain and vice-captain, which would leave the multiplier nowhere to go "
+                "when he plays no minutes."
             )
         if self.bank_tenths < 0:
             raise InvalidValueError(
@@ -1311,6 +1341,7 @@ def fpl_entry_picks(
 
     by_position: dict[int, int] = {}
     captains: list[int] = []
+    vice_captains: list[int] = []
     for record in records:
         position = _integer(record, "position", "Entry pick")
         element = _positive(_integer(record, "element", "Entry pick"), "element id")
@@ -1321,6 +1352,8 @@ def fpl_entry_picks(
         by_position[position] = element
         if _boolean(record, "is_captain", "Entry pick"):
             captains.append(element)
+        if _boolean(record, "is_vice_captain", "Entry pick"):
+            vice_captains.append(element)
 
     if set(by_position) != set(range(1, _SQUAD_SIZE + 1)):
         raise DataSourceError(
@@ -1331,6 +1364,11 @@ def fpl_entry_picks(
         raise DataSourceError(
             f"Entry {identifier} gameweek {week} names {len(captains)} captains; the "
             "platform names exactly one."
+        )
+    if len(vice_captains) != 1:
+        raise DataSourceError(
+            f"Entry {identifier} gameweek {week} names {len(vice_captains)} vice-captains; "
+            "the platform names exactly one."
         )
 
     squad = tuple(by_position[position] for position in sorted(by_position))
@@ -1348,6 +1386,7 @@ def fpl_entry_picks(
         squad=squad,
         starting_xi=squad[:_STARTING_SIZE],
         captain=captains[0],
+        vice_captain=vice_captains[0],
         bank_tenths=_integer(entry_history, "bank", "Entry history"),
         free_transfers=1,
         free_transfers_known=False,

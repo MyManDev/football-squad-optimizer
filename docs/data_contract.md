@@ -174,6 +174,20 @@ declared unknowns rather than filled in:
 Both flags exist so a consumer that spends real budget or plans real transfers on these
 numbers has to acknowledge the limit rather than discover it.
 
+**Pick order is data, not presentation.** `squad` holds the fifteen picks in the platform's
+own positions 1 to 15. `squad[:11]` is the named eleven and **`squad[11:]` is the bench in
+substitution order** — the sequence the platform walks when it replaces a starter who played
+no minutes (#262). Sorting that tuple would keep every member and destroy the rule, which is
+why a test pins the order rather than only the membership.
+
+**The vice-captain is carried, not derived.** `vice_captain` is a required field with no
+default: it decides who inherits the multiplier when the captain plays no minutes, so a
+guessed value would hand the armband to the wrong player in exactly the weeks the captain
+blanked. The adapter requires him to be in the squad and to differ from the captain, and
+deliberately does **not** require him to be in the starting eleven — six real entries were
+checked and all six named theirs inside the eleven, but six is not a rule, and refusing a
+real capture is a worse failure for an adapter than accepting a bench vice.
+
 **The manager's own name is not captured into the registry.** The standings page publishes
 it beside the team name; only the team name becomes the registry label, and the registry
 itself stays out of git (`.gitignore`) because it is third-party data about identifiable

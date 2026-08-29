@@ -752,6 +752,7 @@ def _picks_payload(
     *,
     squad: list[int] | None = None,
     captain_position: int | None = 1,
+    vice_position: int | None = 2,
     bank: int = 5,
     positions: list[int] | None = None,
 ) -> bytes:
@@ -764,7 +765,7 @@ def _picks_payload(
             "element": element,
             "position": position,
             "is_captain": position == captain_position,
-            "is_vice_captain": position == 2,
+            "is_vice_captain": position == vice_position,
             "multiplier": 2 if position == captain_position else (1 if position <= 11 else 0),
         }
         for element, position in zip(elements, slots, strict=True)
@@ -1414,3 +1415,101 @@ def test_points_and_minutes_must_describe_the_same_players() -> None:
             fixtures_finished=0,
             fixtures_total=1,
         )
+
+
+# --- the vice-captain, and the order the bench is walked in ---------------------------
+#
+# Both exist for the same rule (#262): when a starter plays no minutes the platform fields
+# a bench player, and when the *captain* plays no minutes the multiplier moves to the vice.
+# The adapter's job is to deliver those two inputs unguessed.
+
+
+def test_the_vice_captain_is_read_beside_the_captain() -> None:
+    record = fpl_entry_picks(
+        _picks_payload(captain_position=1, vice_position=2),
+        _history_payload(),
+        entry_id=11,
+        season="2026-27",
+        gameweek=1,
+    )
+
+    assert record.captain == 101
+    assert record.vice_captain == 102
+
+
+def test_a_vice_captain_on_the_bench_is_accepted() -> None:
+    """Six real entries named theirs inside the eleven; six is not a rule.
+
+    Refusing a bench vice would reject a real capture, which is a worse failure for an
+    adapter than carrying one. The record only requires him to be in the squad.
+    """
+
+    record = fpl_entry_picks(
+        _picks_payload(captain_position=1, vice_position=13),
+        _history_payload(),
+        entry_id=11,
+        season="2026-27",
+        gameweek=1,
+    )
+
+    assert record.vice_captain == 113
+    assert record.vice_captain not in record.starting_xi
+
+
+@pytest.mark.parametrize("vice_position", [None, 1])
+def test_a_payload_without_exactly_one_vice_captain_is_refused(vice_position: int | None) -> None:
+    """None named, or the captain named twice: both leave the multiplier undecided."""
+
+    with pytest.raises((DataSourceError, InvalidValueError)):
+        fpl_entry_picks(
+            _picks_payload(captain_position=1, vice_position=vice_position),
+            _history_payload(),
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+        )
+
+
+def test_the_same_player_cannot_be_captain_and_vice() -> None:
+    """The one case the platform's own flags could express and the rule cannot use."""
+
+    with pytest.raises(InvalidValueError, match="captain and vice-captain"):
+        EntryPicksRecord(
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+            squad=tuple(range(101, 116)),
+            starting_xi=tuple(range(101, 112)),
+            captain=101,
+            vice_captain=101,
+            bank_tenths=0,
+            free_transfers=1,
+            free_transfers_known=False,
+            chips_used={},
+            purchase_prices={},
+            purchase_prices_known=False,
+        )
+
+
+def test_the_bench_is_the_squad_tail_in_substitution_order() -> None:
+    """The property the substitution rule rests on, pinned because it is implicit.
+
+    ``squad`` is built from the platform's pick positions 1 to 15 in order, so the tail is
+    the bench in the sequence the platform walks. Nothing in the type says so, and sorting
+    the tuple would keep every member while destroying the rule -- a change that would pass
+    every other test in this module.
+    """
+
+    shuffled = [105, 101, 110, 103, 108, 102, 112, 104, 115, 106, 113, 107, 114, 109, 111]
+    record = fpl_entry_picks(
+        _picks_payload(squad=shuffled),
+        _history_payload(),
+        entry_id=11,
+        season="2026-27",
+        gameweek=1,
+    )
+
+    assert record.squad == tuple(shuffled)  # pick order, not sorted
+    assert record.starting_xi == tuple(shuffled[:11])
+    assert record.squad[11:] == tuple(shuffled[11:])
+    assert sorted(record.squad) != list(record.squad)  # the shuffle really was one
