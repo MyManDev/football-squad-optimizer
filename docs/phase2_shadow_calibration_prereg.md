@@ -129,3 +129,85 @@ writers are tested. The binding report must also record start and completion UTC
 elapsed seconds, deterministic seed, and an explicit warnings list. Only a clean-tree
 execution after these rules are committed is eligible to replace the non-binding
 artifact.
+
+## Squad-gate amendment (2026-08-29): the S1/S2 protocol, frozen
+
+**Written 2026-08-29, before any squad-level measurement of the target model exists or
+runs.** The original protocol above names gates S1 and S2 but leaves their
+operationalisation to "the existing scenario-audit instrument", and a read of that
+instrument found four choices it does not fix — which squad is scored and from whose
+projections, the selection-optimism location shift, the scenario count, and the
+residual population that feeds the generator. Each moves the result, so each is fixed
+here rather than at implementation time. The thresholds, split, sample floors and
+seeds above are unchanged; this amendment adds no gate and relaxes none.
+
+### What is frozen
+
+1. **Target model.** `in-season-carry-over-v1` — model name
+   `squadopt-deterministic-baseline`, feature contract
+   `in-season-carry-over-features-v1`. The archive-fed control
+   (`deterministic_baseline` / `form_window_NN_v1`) is **not** the subject and may not
+   supply the scored decision, the scenarios, or the shift.
+2. **Scored decision.** Per fold, the risk-neutral deterministic squad, starting XI and
+   captain chosen by `optimize_squad` from the target model's own projections.
+3. **Realized scoring.** The existing canonical `score_realized_squad_points` under
+   `realized_squad_points_v1`. No new scoring formula is written for this protocol.
+4. **Development seasons.** 2021-22, 2022-23, 2023-24.
+5. **Frozen evaluation season.** 2024-25.
+6. **Frozen selection-optimism shift.** One scalar, fitted only on chronological
+   out-of-sample development folds:
+
+       shift = -mean over development folds of (raw scenario mean score - realized squad score)
+
+   where the raw scenario mean is the pre-shift, pre-scale mean. **No 2024-25 fold may
+   enter this fit.** The expanding-window "online" variant is not this protocol's
+   shift: it produces a different number per fold and, on an evaluation population,
+   fits on the evaluation season's own outcomes.
+7. **Scenario count.** Exactly 200.
+8. **Scenario seed.** Exactly 11.
+9. **Residual population.** In development, each fold sees only residual folds strictly
+   earlier than itself. During the frozen 2024-25 evaluation the residual population is
+   **frozen at the end of 2023-24** — 2024-25's own earlier weeks do not join the fit,
+   so all 37 evaluation folds are scored against one identical history.
+10. **Dispersion.** None; scale exactly 1.0.
+11. **Double-gameweek scale.** Exactly 1.0. Not tuned in this protocol.
+12. **Lower quantile.** Exactly 0.10, read with the instrument's existing linear
+    interpolation rule, unchanged.
+13. **Bootstrap.** Fold-level, 5000 resamples, 90% interval, seed 0.
+14. **Gates, inclusive at both bounds.** S1: mean PIT in [0.43, 0.57]. S2:
+    realized-below-q10 rate in [0.04, 0.16].
+15. **Outcome.** A failing P1, S1 or S2 makes the full result **failed**. A missing
+    gate, missing provenance or a sample below the declared floor makes it
+    **abstained**. There is no re-run with changed parameters.
+
+### Scientific disclosure
+
+This amendment was written before any target-model S1/S2 binding measurement existed.
+The previously recorded mean PIT of 0.07 belongs to a different instrument context —
+the archive-fed control's squad, under its own projections and its own shift — and was
+not used to select or tune any parameter above. The bands in clause 14 are the bands
+the original protocol declared; this amendment did not touch them.
+
+### Still unfixed, and therefore blocking a binding run
+
+Reading the instrument found three further controls that change which squad is chosen
+or which folds are fitted, and that neither the original protocol nor the decisions
+above name. They are recorded here rather than chosen, because choosing a control
+after seeing what it does to a gate is the failure this programme exists to prevent.
+**No binding S1/S2 run is eligible until a further amendment fixes them.**
+
+- **`bench_weight`.** `optimize_squad` cannot be called without one, and the two
+  precedents disagree: the in-season benchmark that measured this model uses the
+  library default 0.1, while the scenario audit that computes S1/S2 uses 0.0. It
+  changes the selected squad, therefore the PIT and the tail rate.
+- **Decision universe.** Whether the squad is chosen over the fold's whole roster or
+  over a reduced candidate pool. The only existing squad instrument decides over a
+  pool; the whole roster is a different problem with a different answer.
+- **`min_history_folds`.** The generator's default of 8 drops the earliest eligible
+  folds from any population it governs, which silently reshapes the development fit
+  that produces the frozen shift. Whatever value is used must be declared, and the
+  resulting fold count, first fold and last fold recorded.
+
+Until that amendment exists, an implementation must refuse to supply these values by
+default: they are required inputs with no fallback, and a run that cannot name them
+does not start.
