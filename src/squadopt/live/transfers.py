@@ -583,6 +583,8 @@ def plan_transfer_horizon(
             f"deterministic time used was {used!r}, relative gap was {relative_gap!r}."
         )
     return plan, planning_policy
+
+
 def plan_transfers_with_overlap(
     inputs: RecommendationInputs,
     projection: Projection,
