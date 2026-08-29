@@ -413,6 +413,57 @@ def team_codes(bootstrap: bytes) -> Mapping[int, int]:
     return MappingProxyType(mapping)
 
 
+def player_codes(bootstrap: bytes) -> Mapping[int, int]:
+    """Return the per-season element id to persistent player code mapping.
+
+    The same problem as :func:`team_codes` and the same shape, one level down. The
+    per-entry endpoints name a player by his **element** id, which is assigned per season;
+    the canonical panel, the prices, the projection and the ledger all name him by
+    ``code``, which survives a transfer window. Both are plain integers, so handing one
+    where the other is meant does not raise -- it **matches nothing**, and the caller sees
+    a full squad of players it cannot price. That is the failure
+    :func:`squadopt.data.identity.reconcile_player_identity` was written to turn into a
+    stated one, and its refusal message names this exact confusion.
+
+    Two things this deliberately is not.
+
+    It is **not a roster**. Unlike :func:`player_snapshot` it does not drop entries whose
+    ``element_type`` is outside :data:`POSITION_CODES`, because it is a translation table:
+    every element the payload names can appear in a document that needs translating, and
+    silently omitting one would surface downstream as "the capture does not name element
+    N" -- blaming a player for a filter applied here.
+
+    It is **not tolerant of a thinner payload**. A missing or renamed field stops the run
+    and names itself, rather than yielding a shorter mapping: a translation table that is
+    quietly incomplete is worse than none, because the lookups that survive it look
+    correct. For the same reason a repeated ``code`` is refused as well as a repeated
+    ``id`` -- a duplicate key makes the mapping ambiguous, and a duplicate value silently
+    merges two people into one identity, which is the more expensive half.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, ("id", "code"), "Element")
+
+    mapping: dict[int, int] = {}
+    owner: dict[int, int] = {}
+    for record in records:
+        identifier = _integer(record, "id", "Element")
+        if identifier in mapping:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload declares element id {identifier} more than once."
+            )
+        code = _integer(record, "code", "Element")
+        if code in owner:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload gives player code {code} to element ids "
+                f"{owner[code]} and {identifier}; one code is one player, so a repeated "
+                "code would merge two of them into one identity."
+            )
+        mapping[identifier] = code
+        owner[code] = identifier
+    return MappingProxyType(mapping)
+
+
 def _require_season(season: object) -> str:
     if not isinstance(season, str) or not _SEASON_PATTERN.match(season):
         raise InvalidValueError(f"season must be spelled like '2026-27', got {season!r}.")
