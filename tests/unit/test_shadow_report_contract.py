@@ -12,6 +12,7 @@ from squadopt.experiments.shadow_report import (
     SHADOW_CALIBRATION_CONTRACT_V1,
     SHADOW_CALIBRATION_CONTRACT_V2,
     SHADOW_CALIBRATION_CONTRACT_VERSION,
+    SHADOW_CONTRACT_VERSIONS,
     ShadowCalibrationReport,
     ShadowExecutionMetadata,
     ShadowGateResult,
@@ -388,7 +389,7 @@ def test_the_loader_refuses_a_boolean_where_a_number_belongs() -> None:
 
     document = report_to_dict(_v2())
     document["point_estimate"] = True
-    with pytest.raises(ShadowReportError, match="must be a number or null"):
+    with pytest.raises(ShadowReportError, match="must be a floating-point number"):
         load_shadow_report(document)
 
 
@@ -443,3 +444,181 @@ def test_replay_identity_excludes_only_the_wall_clock() -> None:
     assert set(execution) == {"deterministic_seed", "warnings"}
     assert identity["gate_results"] == document["gate_results"]
     assert identity["declared_gates"] == document["declared_gates"]
+
+
+# --- what an adversarial read of the contract found --------------------------------
+#
+# Everything below was a way to get a document past this contract that the contract
+# would not itself accept: a report mutated after validation, a document that means two
+# things at once, a number that loads as something other than what it says.
+
+
+def test_a_sequence_mutated_after_validation_cannot_be_published(tmp_path: Path) -> None:
+    """Validation runs once, against containers the caller still owns.
+
+    ``gate_results`` is annotated as a tuple but any sequence is accepted, so a caller
+    could hand in a list, keep the reference, and append a failing gate after every rule
+    had run — the writer would then publish gates this contract never saw, under a
+    passing verdict. The fields are frozen into tuples on construction, so the later
+    append reaches nothing.
+    """
+
+    gates = [_passing(family) for family in PREREG_GATE_FAMILIES]
+    report = _v2(gate_results=gates)
+    gates.append(
+        ShadowGateResult(gate="S9_never_pre_registered", passes=False, observed=0.02, threshold="t")
+    )
+    assert len(report.gate_results) == len(PREREG_GATE_FAMILIES)
+
+    target = tmp_path / "frozen.json"
+    write_shadow_report_once(report, target)
+    written = json.loads(target.read_text(encoding="utf-8"))
+    assert [gate["gate"] for gate in written["gate_results"]] == [
+        f"{family}_measured" for family in PREREG_GATE_FAMILIES
+    ]
+
+
+def test_a_set_declaration_is_refused_because_its_order_is_not_a_fact() -> None:
+    """A set's iteration order varies between processes, so it is not a record."""
+
+    with pytest.raises(ShadowReportError, match="iteration order varies"):
+        _v2(declared_gates=set(PREREG_GATE_FAMILIES))
+
+
+def test_the_declaration_must_be_the_protocol_in_its_own_order() -> None:
+    with pytest.raises(ShadowReportError, match="in another order"):
+        _v2(declared_gates=tuple(reversed(PREREG_GATE_FAMILIES)))
+
+
+def test_a_repeated_gate_id_is_refused() -> None:
+    """One gate is one answer; two entries under one id can carry two observations."""
+
+    with pytest.raises(ShadowReportError, match="repeats"):
+        _v2(
+            gate_results=(
+                *(_passing(f) for f in PREREG_GATE_FAMILIES),
+                _passing(PREREG_GATE_FAMILIES[0]),
+            )
+        )
+
+
+def test_a_family_cannot_be_answered_by_a_cell_with_no_name() -> None:
+    """``P1_player_coverage_`` and a zero-width cell would otherwise satisfy P1."""
+
+    for blank in ("P1_player_coverage_", "P1_player_coverage_\u200b", "P1_player_coverage_ x"):
+        with pytest.raises(ShadowReportError, match="matches no declared family"):
+            _v2(
+                gate_results=(
+                    ShadowGateResult(gate=blank, passes=True, observed=0.9, threshold="t"),
+                    *(_passing(f) for f in PREREG_GATE_FAMILIES[1:]),
+                )
+            )
+
+
+def test_a_pass_over_a_sample_of_nothing_is_refused() -> None:
+    with pytest.raises(ShadowReportError, match="pass of nothing"):
+        _v2(sample_size=0)
+
+
+def test_a_boolean_horizon_or_sample_size_is_refused() -> None:
+    """True equals 1 and False equals 0, so both would slip past a value check."""
+
+    with pytest.raises(ShadowReportError, match="horizon must be an integer"):
+        _v2(horizon=True)
+    with pytest.raises(ShadowReportError, match="sample_size must be an integer"):
+        _v2(sample_size=True)
+
+
+def test_the_generated_stamp_must_be_a_utc_instant() -> None:
+    """It is the one field replay identity excludes, so nothing else constrains it."""
+
+    with pytest.raises(ShadowReportError, match="ISO-8601"):
+        _v2(generated_at_utc="not a timestamp at all")
+
+
+def test_a_blank_reason_is_not_a_reason() -> None:
+    with pytest.raises(ShadowReportError, match="in words"):
+        _v2(shadow_status="abstained", reasons=("   ",))
+
+
+def test_a_document_that_repeats_a_key_is_refused(tmp_path: Path) -> None:
+    """Which value it means is not decidable, and the digest would attest both.
+
+    Python keeps the last value, so a file that literally contains
+    ``"shadow_status": "failed"`` would otherwise load as a pass — with a digest
+    endorsing exactly those bytes.
+    """
+
+    document = report_to_dict(_v2())
+    body = json.dumps(document, indent=2, sort_keys=True)
+    doubled = body.replace(
+        '"shadow_status": "calibrated_internal"',
+        '"shadow_status": "failed",\n  "shadow_status": "calibrated_internal"',
+        1,
+    )
+    path = tmp_path / "doubled.json"
+    path.write_text(doubled + "\n", encoding="utf-8")
+    with pytest.raises(ShadowReportError, match="repeats the key"):
+        read_shadow_report(path)
+
+
+@pytest.mark.parametrize(
+    ("section", "key"),
+    [
+        ("execution", "contract_version"),
+        ("residual_source", "holdout_seasons_read"),
+    ],
+)
+def test_an_unrecognised_nested_field_is_refused(section: str, key: str) -> None:
+    """A later contract's rules would naturally live nested, not at the top level."""
+
+    document = report_to_dict(_v2())
+    nested = document[section]
+    assert isinstance(nested, dict)
+    nested[key] = "whatever a newer version means by this"
+    with pytest.raises(ShadowReportError, match="unrecognised fields"):
+        load_shadow_report(document)
+
+
+def test_an_integer_where_a_float_belongs_is_refused() -> None:
+    """A document that loads and does not round-trip is not a record of itself."""
+
+    document = report_to_dict(_v2())
+    diagnostics = document["calibration_diagnostics"]
+    assert isinstance(diagnostics, dict)
+    diagnostics["pooled_observations"] = 4
+    with pytest.raises(ShadowReportError, match="floating-point"):
+        load_shadow_report(document)
+
+
+def test_a_v1_document_may_not_carry_the_declaration_key_at_all() -> None:
+    """Not even empty: it would not re-serialize to its own bytes."""
+
+    document = report_to_dict(_report())
+    document["declared_gates"] = []
+    with pytest.raises(ShadowReportError, match="v2 field"):
+        load_shadow_report(document)
+
+
+def test_the_family_set_is_pinned_to_the_version_that_declared_it() -> None:
+    """A new family means a new version, not a retroactive refusal of old artifacts.
+
+    If the completeness rule read a module-level constant at load time, adding a fourth
+    family would make every recorded v2 artifact unloadable — the same failure the v1
+    freeze exists to prevent, one level up.
+    """
+
+    from squadopt.experiments.shadow_report import _PREREG_BY_VERSION
+
+    assert set(_PREREG_BY_VERSION) <= set(SHADOW_CONTRACT_VERSIONS)
+    assert _PREREG_BY_VERSION[SHADOW_CALIBRATION_CONTRACT_V2] == PREREG_GATE_FAMILIES
+    assert SHADOW_CALIBRATION_CONTRACT_V1 not in _PREREG_BY_VERSION
+
+
+def test_an_unreadable_occupant_path_is_a_contract_error(tmp_path: Path) -> None:
+    """A directory where the artifact belongs is refused, not raised through raw."""
+
+    directory = tmp_path / "occupied.json"
+    directory.mkdir()
+    with pytest.raises(ShadowReportError):
+        write_shadow_report_once(_v2(), directory)

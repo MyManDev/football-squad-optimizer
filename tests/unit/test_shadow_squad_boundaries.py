@@ -60,6 +60,7 @@ from squadopt.experiments.shadow_squad_calibration import (
 )
 from squadopt.optimization import OptimizationConfig, OptimizationResult, SolverStatus
 from squadopt.prediction import PredictionProvenance, prepare_optimizer_projection
+from squadopt.prediction.in_season import InSeasonBlendConfig
 from squadopt.scenarios import (
     ScenarioConfig,
     ScenarioConfigurationError,
@@ -112,12 +113,20 @@ def _residuals() -> pd.DataFrame:
     return pd.DataFrame(
         {
             "fold_id": [
-                f"{season}-gw{gameweek:02d}" for season in FIT_SEASONS for gameweek in (2, 3)
+                f"{season}-gw{gameweek:02d}" for season in FIT_SEASONS for gameweek in (2, 3, 4)
             ],
-            "season": [season for season in FIT_SEASONS for _ in (2, 3)],
-            "gameweek": [gameweek for _ in FIT_SEASONS for gameweek in (2, 3)],
+            "season": [season for season in FIT_SEASONS for _ in (2, 3, 4)],
+            "gameweek": [gameweek for _ in FIT_SEASONS for gameweek in (2, 3, 4)],
         }
     )
+
+
+#: Every development fold the residual fixture names. The shift fit refuses a fold with
+#: fewer than ``min_history_folds`` priors, so a fixture needs a real history to reach
+#: the generator at all.
+DEVELOPMENT_FOLD_IDS: tuple[str, ...] = tuple(
+    f"{season}-gw{gameweek:02d}" for season in FIT_SEASONS for gameweek in (2, 3, 4)
+)
 
 
 def _fold(gameweek: int, season: str = EVALUATION_SEASON) -> SquadFold:
@@ -127,7 +136,7 @@ def _fold(gameweek: int, season: str = EVALUATION_SEASON) -> SquadFold:
         gameweek=gameweek,
         projections=PLAYERS.copy(deep=True),
         realized_points=PLAYERS.loc[:, ["player_id"]].assign(total_points=1.0),
-        prior_fold_ids=(),
+        prior_fold_ids=DEVELOPMENT_FOLD_IDS,
     )
 
 
@@ -713,6 +722,15 @@ def test_the_declared_parameters_record_every_field_at_its_pre_registered_type()
     # principle change a squad under load is exactly what a reader needs to see.
     assert parameters["optimizer_solver_time_limit_seconds"] == "10.0"
 
+    # The fifth configuration decides the projections, therefore the squad, therefore
+    # both gates; it reached nothing until an adversarial read of the runner found it.
+    assert parameters["projection_prior_gameweek_equivalent"] == "6"
+    assert parameters["projection_prior_minute_equivalent"] == "270"
+    # And two numbers that belong to no configuration object at all: the tolerance the
+    # bands are read with, and the rule that decides which gameweeks are folds.
+    assert parameters["protocol_bound_tolerance"] == "1e-09"
+    assert parameters["protocol_min_prior_gameweeks_in_season"] == "1"
+
     expected = {
         f"{prefix}_{entry.name}"
         for prefix, settings in (
@@ -720,8 +738,16 @@ def test_the_declared_parameters_record_every_field_at_its_pre_registered_type()
             ("generator", ScenarioConfig()),
             ("evaluation", ScenarioEvaluationConfig()),
             ("optimizer", OptimizationConfig()),
+            ("projection", InSeasonBlendConfig()),
         )
         for entry in fields(settings)
+    } | {
+        "protocol_bound_tolerance",
+        "protocol_min_prior_gameweeks_in_season",
+        "protocol_fit_seasons",
+        "protocol_evaluation_season",
+        "protocol_s1_bounds",
+        "protocol_s2_bounds",
     }
     assert set(parameters) == expected
 
