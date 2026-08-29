@@ -63,8 +63,11 @@ jobs:
       - name: Import boundaries
         run: lint-imports
 
+      # `--dist loadscope` groups a module onto one worker, so the eleven module-scoped
+      # fixtures are built once rather than per worker. Measured faster than the default
+      # `load` here; see docs/architecture/branching.md for the numbers.
       - name: Pytest (full suite is the merge gate)
-        run: python -m pytest -q -p no:cacheprovider --durations=15
+        run: python -m pytest -q -p no:cacheprovider -n auto --dist loadscope --durations=15
 
   web:
     name: web (node 22)
