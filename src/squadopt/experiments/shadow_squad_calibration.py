@@ -67,6 +67,7 @@ from squadopt.experiments.shadow_report import (
     ShadowExecutionMetadata,
     ShadowGateResult,
     ShadowResidualSource,
+    read_shadow_report,
 )
 from squadopt.optimization import OptimizationConfig, optimize_squad
 from squadopt.prediction import PredictionProvenance, prepare_optimizer_projection
@@ -140,6 +141,11 @@ def _belongs(gate: str, family: str) -> bool:
 
 S1_GATE: Final = "S1_squad_pit_location"
 S2_GATE: Final = "S2_squad_lower_tail"
+
+#: The family this instrument does not measure. P1 belongs to the player-level runner,
+#: and the full protocol's verdict merges that runner's recorded result rather than
+#: measuring it again — two measurements of one gate would be two answers to it.
+PLAYER_GATE_FAMILY: Final = PREREG_GATE_FAMILIES[0]
 
 
 class SquadShadowError(ValueError):
@@ -633,12 +639,124 @@ def bootstrap_diagnostics(
     return diagnostics
 
 
+@dataclass(frozen=True, slots=True)
+class PlayerEvidence:
+    """One recorded player-level measurement, already proved to be about this export."""
+
+    gates: tuple[ShadowGateResult, ...]
+    calibration_diagnostics: Mapping[str, float | None]
+    interval_diagnostics: Mapping[str, float | None]
+    provenance: Mapping[str, str]
+    abstentions: tuple[str, ...]
+    sample_size: int
+
+
+def load_bound_player_report(
+    path: Path, residual_source: ShadowResidualSource, config: SquadShadowConfig
+) -> PlayerEvidence:
+    """Read P1's recorded result, and refuse it unless it measured the same thing.
+
+    Clause 26 of the second amendment: the full-protocol verdict carries P1 as the
+    player-level runner measured it, and the merge is refused unless every field of
+    that artifact's residual provenance is identical to the one this run is bound to.
+    Two instruments' evidence may be added together only when they were pointed at the
+    same model, the same export and the same cutoff — otherwise the merged report is
+    an average of two different questions.
+
+    A mismatch raises. Everything else that could make P1's evidence unusable — no P1
+    gate at all, a gate with no observation, a population below the floor, a report
+    whose own provenance is missing or was produced from a modified tree — comes back
+    as an abstention reason instead, because those are missing evidence rather than a
+    contradiction. A P1 gate that failed as measured is neither: it is carried through
+    as it stands, and the report contract turns it into a failed verdict.
+    """
+
+    report, digest = read_shadow_report(path)
+    recorded = report.residual_source
+    for name in (
+        "export_label",
+        "model_name",
+        "model_version",
+        "feature_contract_version",
+        "table_sha256",
+        "seasons",
+        "cutoff_fold_id",
+    ):
+        theirs = getattr(recorded, name)
+        ours = getattr(residual_source, name)
+        _require(
+            theirs == ours,
+            f"the recorded player report at {path.name} was measured against a "
+            f"different {name} ({theirs!r}, against this run's {ours!r}). P1 and the "
+            "squad gates may only be merged when they measured the same export.",
+        )
+
+    gates = tuple(gate for gate in report.gate_results if _belongs(gate.gate, PLAYER_GATE_FAMILY))
+    abstentions: list[str] = []
+    if not gates:
+        abstentions.append(
+            f"the recorded player report at {path.name} carries no "
+            f"{PLAYER_GATE_FAMILY} gate, so P1 is unanswered here."
+        )
+    for gate in gates:
+        if gate.observed is None:
+            abstentions.append(
+                f"{gate.gate} carries no observation in the recorded player report; "
+                "an unread gate is missing evidence, not a negative result."
+            )
+    if report.sample_size < config.min_evaluation_folds:
+        abstentions.append(
+            f"the recorded player report measured {report.sample_size} folds, below "
+            f"the pre-registered floor of {config.min_evaluation_folds}."
+        )
+    dirty = report.provenance_fingerprints.get("working_tree_dirty")
+    if dirty is None:
+        abstentions.append(
+            "the recorded player report does not say whether its working tree was "
+            "clean; missing provenance is an abstention, never an assumption."
+        )
+    elif dirty != "false":
+        abstentions.append(
+            "the recorded player report was produced from a modified working tree, so "
+            "its numbers cannot be reproduced from a commit."
+        )
+    commit = report.provenance_fingerprints.get("repository_commit")
+    if not commit:
+        abstentions.append(
+            "the recorded player report names no repository commit, so what produced "
+            "its numbers cannot be recovered."
+        )
+
+    provenance = {
+        "player_report_file": path.name,
+        "player_report_sha256": digest,
+        "player_report_contract_version": report.contract_version,
+        "player_report_status": report.shadow_status,
+        "player_report_generated_at_utc": report.generated_at_utc,
+        "player_report_sample_size": str(report.sample_size),
+    }
+    if commit:
+        provenance["player_report_repository_commit"] = commit
+    return PlayerEvidence(
+        gates=gates,
+        calibration_diagnostics={
+            f"player_{name}": value for name, value in report.calibration_diagnostics.items()
+        },
+        interval_diagnostics={
+            f"player_{name}": value for name, value in report.interval_diagnostics.items()
+        },
+        provenance=provenance,
+        abstentions=tuple(abstentions),
+        sample_size=report.sample_size,
+    )
+
+
 def combine_full_protocol(
     *,
     generated_at_utc: str,
     execution: ShadowExecutionMetadata,
     residual_source: ShadowResidualSource,
-    player_gates: Sequence[ShadowGateResult],
+    player: PlayerEvidence,
     squad_gates: Sequence[ShadowGateResult],
     calibration_diagnostics: Mapping[str, float | None],
     interval_diagnostics: Mapping[str, float | None],
@@ -657,9 +775,19 @@ def combine_full_protocol(
     headline numbers — pooled coverage, mean PIT and the tail rate — and electing one
     of them as *the* estimate would privilege a gate; all three live in the
     diagnostics, where each carries its own name.
+
+    P1 arrives as a ``PlayerEvidence`` rather than as a sequence of gates, and there is
+    no default. A caller that has not loaded a bound player report cannot call this at
+    all — which is the point: an empty gate sequence is easy to pass by accident, and
+    it would leave P1 permanently unanswered while the two squad gates looked like a
+    protocol.
     """
 
-    gates = (*player_gates, *squad_gates)
+    gates = (*player.gates, *squad_gates)
+    calibration_diagnostics = {**player.calibration_diagnostics, **calibration_diagnostics}
+    interval_diagnostics = {**player.interval_diagnostics, **interval_diagnostics}
+    provenance_fingerprints = {**player.provenance, **provenance_fingerprints}
+    abstention_reasons = (*player.abstentions, *abstention_reasons)
     measured = {
         family for family in PREREG_GATE_FAMILIES if any(_belongs(g.gate, family) for g in gates)
     }
@@ -667,28 +795,23 @@ def combine_full_protocol(
     unevaluable = tuple(gate.gate for gate in gates if gate.observed is None)
     failing = tuple(gate.gate for gate in gates if not gate.passes and gate.observed is not None)
 
-    if unevaluable and not failing:
-        # A gate that could not be read is missing evidence, not a negative result, and
-        # the pre-registration files those under abstention.
-        return ShadowCalibrationReport(
-            generated_at_utc=generated_at_utc,
-            execution=execution,
-            horizon=1,
-            residual_source=residual_source,
-            sample_size=evaluation_folds,
-            point_estimate=None,
-            calibration_diagnostics=dict(calibration_diagnostics),
-            interval_diagnostics=dict(interval_diagnostics),
-            gate_results=gates,
-            shadow_status="abstained",
-            reasons=(
-                *abstention_reasons,
-                *(f"{gate} was not evaluable and carries no observation." for gate in unevaluable),
-            ),
-            provenance_fingerprints=dict(provenance_fingerprints),
-            declared_gates=PREREG_GATE_FAMILIES,
-            contract_version=SHADOW_CALIBRATION_CONTRACT_V2,
-        )
+    # Everything that is missing rather than negative, in one place. A gate that could
+    # not be read is missing evidence, and so is a family nobody asked; both belong in
+    # the record even when something else also went wrong, which is why this is built
+    # once rather than in whichever branch is reached first.
+    missing: tuple[str, ...] = (
+        *abstention_reasons,
+        *(f"{gate} was not evaluable and carries no observation." for gate in unevaluable),
+        *(
+            (
+                "A partial protocol is not a verdict: "
+                f"{', '.join(unasked)} was pre-registered but not evaluated, so "
+                "calibrated_internal is not claimable.",
+            )
+            if unasked
+            else ()
+        ),
+    )
 
     if failing:
         status = "failed"
@@ -696,21 +819,12 @@ def combine_full_protocol(
             *(f"{gate} failed as measured." for gate in failing),
             "A failing gate is the result. The thresholds do not move, and there is no "
             "retry, re-tune or reinterpretation without a new pre-registration.",
+            # A failure is the verdict, but it does not erase what else was missing.
+            *missing,
         )
-    elif unasked or abstention_reasons:
+    elif missing:
         status = "abstained"
-        reasons = (
-            *abstention_reasons,
-            *(
-                (
-                    "A partial protocol is not a verdict: "
-                    f"{', '.join(unasked)} was pre-registered but not evaluated, so "
-                    "calibrated_internal is not claimable.",
-                )
-                if unasked
-                else ()
-            ),
-        )
+        reasons = missing
     else:
         status = "calibrated_internal"
         reasons = (

@@ -19,6 +19,7 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from dataclasses import fields as dataclass_fields
 from pathlib import Path
 
 import pandas as pd
@@ -49,12 +50,14 @@ from squadopt.experiments.shadow_squad_calibration import (
     S1_GATE,
     S2_GATE,
     FrozenShift,
+    PlayerEvidence,
     SquadFold,
     SquadShadowConfig,
     SquadShadowError,
     bootstrap_diagnostics,
     build_squad_folds,
     combine_full_protocol,
+    declared_parameters,
     evaluate_squad_gates,
     fit_frozen_shift,
     frozen_history_fold_ids,
@@ -1051,6 +1054,23 @@ def _gate(name: str, *, passes: bool = True, observed: float = 0.5) -> ShadowGat
     return ShadowGateResult(gate=name, passes=passes, observed=observed, threshold="pre-registered")
 
 
+def _player(gates: tuple[ShadowGateResult, ...]) -> PlayerEvidence:
+    """A bound player-level record, standing in for the recorded artifact.
+
+    The merge takes evidence rather than a bare gate sequence, so a test cannot
+    accidentally reproduce the defect the signature exists to prevent.
+    """
+
+    return PlayerEvidence(
+        gates=gates,
+        calibration_diagnostics={},
+        interval_diagnostics={},
+        provenance={"player_report_sha256": "e" * 64},
+        abstentions=(),
+        sample_size=37,
+    )
+
+
 def _combine(**overrides: object) -> object:
     arguments: dict[str, object] = {
         "generated_at_utc": "2026-08-29T10:00:00+00:00",
@@ -1065,7 +1085,8 @@ def _combine(**overrides: object) -> object:
         "abstention_reasons": (),
     }
     arguments.update(overrides)
-    return combine_full_protocol(**arguments)  # type: ignore[arg-type]
+    gates = arguments.pop("player_gates")
+    return combine_full_protocol(player=_player(gates), **arguments)  # type: ignore[arg-type]
 
 
 def test_a_report_cannot_carry_an_empty_provenance_value() -> None:
@@ -1093,37 +1114,48 @@ def test_the_model_identity_travels_into_the_report_document() -> None:
 
 
 def _declared_fingerprints(**overrides: str) -> dict[str, str]:
-    """The runner's fingerprint set, including the three controls it must declare."""
+    """The runner's fingerprint set, including every parameter it constructed."""
 
-    values = _fingerprints(
-        declared_bench_weight="0.1",
-        declared_decision_universe="full_roster",
-        declared_min_history_folds="2",
-    )
+    values = _fingerprints(**declared_parameters(_config(), shift_points=-3.5))
     values.update(overrides)
     return values
 
 
-def test_the_declared_controls_separate_two_otherwise_identical_runs() -> None:
-    """The three unfixed controls are part of the measurement's identity, not commentary.
+def test_every_constructed_parameter_reaches_the_artifact() -> None:
+    """Clause 24: no parameter of any configuration the run built may stay unnamed.
 
-    The amendment's point is that ``bench_weight``, ``decision_universe`` and
-    ``min_history_folds`` are unfixed, so a run must name them. Naming them to the
-    console and to nothing else would leave the artifact with no trace of the three, and
-    ``replay_identity_of`` could then not tell two differently-declared runs apart: the
-    second would either read as a replay of the first or collide with it as an
-    unexplained conflict.
+    Three generator knobs used to reach the generator as library defaults and appear
+    in no artifact, so two runs taken under different shrinkage would have been
+    indistinguishable to a reader — and to ``replay_identity_of``, which would have
+    called them one measurement and read the second as an unexplained conflict. The
+    parameters are read off the constructed objects, so this also covers the fields
+    nobody thought to list: the optimizer's solver time limit is in here too.
     """
+
+    parameters = declared_parameters(_config(), shift_points=-3.5)
+    assert parameters["protocol_bench_weight"] == "0.1"
+    assert parameters["protocol_decision_universe"] == "full_roster"
+    assert parameters["optimizer_bench_weight"] == "0.1"
+    assert parameters["generator_min_history_folds"] == "8"
+    assert parameters["generator_min_player_observations"] == "8"
+    assert parameters["generator_player_scale_shrinkage"] == "10.0"
+    assert parameters["generator_player_location_shrinkage"] == "None"
+    assert parameters["evaluation_location_shift_points"] == "-3.5"
+    assert parameters["optimizer_solver_time_limit_seconds"] == "10.0"
+
+    # Every field of the protocol's own configuration is named, whatever it is called.
+    for entry in dataclass_fields(_config()):
+        assert f"protocol_{entry.name}" in parameters
 
     document = report_to_dict(_combine(provenance_fingerprints=_declared_fingerprints()))  # type: ignore[arg-type]
     fingerprints = document["provenance_fingerprints"]
     assert isinstance(fingerprints, dict)
-    assert fingerprints["declared_bench_weight"] == "0.1"
-    assert fingerprints["declared_decision_universe"] == "full_roster"
-    assert fingerprints["declared_min_history_folds"] == "2"
+    assert fingerprints["optimizer_bench_weight"] == "0.1"
 
+    # And they are part of the measurement's identity, not commentary beside it: a run
+    # under a different weight is a different measurement, not a replay of this one.
     other = report_to_dict(
-        _combine(provenance_fingerprints=_declared_fingerprints(declared_bench_weight="0.0"))  # type: ignore[arg-type]
+        _combine(provenance_fingerprints=_declared_fingerprints(optimizer_bench_weight="0.0"))  # type: ignore[arg-type]
     )
     assert replay_identity_of(document) != replay_identity_of(other)
 
@@ -1303,7 +1335,9 @@ def test_the_runner_binds_its_prediction_provenance_to_the_residual_digest() -> 
     assert isinstance(bound, ast.Attribute)
     assert bound.attr == "table_sha256"
     assert isinstance(bound.value, ast.Name)
-    assert bound.value.id == "manifest"
+    # The source record, not the manifest: it is the object the recorded player report
+    # was matched against, so the scenarios, the decision and P1 are bound to one thing.
+    assert bound.value.id == "residual_source"
 
     # The keyword set the runner passes is exactly what the dataclass requires, and the
     # bound value is the shape it demands: a lowercase 64-hex digest, as a manifest's is.
@@ -1313,33 +1347,41 @@ def test_the_runner_binds_its_prediction_provenance_to_the_residual_digest() -> 
     assert provenance.training_data_fingerprint == "0" * 64
 
 
-def test_the_runner_records_the_three_unfixed_controls_as_provenance() -> None:
-    """A run that declares the unfixed controls says so in the artifact, not only aloud.
+def test_the_runner_records_the_shift_fit_and_expands_every_parameter() -> None:
+    """The artifact states what produced it, and the runner does not curate that list.
 
-    ``bench_weight``, ``decision_universe`` and ``min_history_folds`` are the three the
-    amendment left unfixed, so two runs may differ in them legitimately. Printing them to
-    the console and nowhere else would leave the artifact unable to tell those two runs
-    apart — ``replay_identity_of`` would call them one measurement, and a conflict would
-    read as unexplained. The keys are taken from the runner's own source; the CLI is not
-    executed, because it needs the archive.
+    Clause 18 wants the shift fit's population named — ``min_history_folds`` drops the
+    earliest eligible folds, so the season list alone does not say which folds were
+    fitted — and clause 24 wants every constructed parameter recorded. The second is
+    checked structurally: the runner expands ``declared_parameters`` into its
+    fingerprints rather than listing keys of its own, so a parameter cannot be left out
+    by forgetting to add it here. The CLI is parsed, not executed, because running it
+    needs the archive.
     """
 
-    fingerprints = {
-        keyword.value
-        for keyword in _runner_call("combine_full_protocol").keywords
-        if keyword.arg == "provenance_fingerprints"
-    }
-    assert len(fingerprints) == 1
-    mapping = fingerprints.pop()
-    assert isinstance(mapping, ast.Dict)
-    recorded = {key.value for key in mapping.keys if isinstance(key, ast.Constant)}
+    mapping = _runner_call("_Measurement").keywords
+    provenance = {keyword.value for keyword in mapping if keyword.arg == "provenance"}
+    assert len(provenance) == 1
+    recorded = provenance.pop()
+    assert isinstance(recorded, ast.Dict)
+    keys = {key.value for key in recorded.keys if isinstance(key, ast.Constant)}
     assert {
-        "declared_bench_weight",
-        "declared_decision_universe",
-        "declared_min_history_folds",
-    } <= recorded
-    # The pinned constants are recorded too, so an artifact states the whole declaration.
-    assert {"scenario_count", "scenario_seed"} <= recorded
+        "frozen_shift_points",
+        "shift_fit_folds",
+        "shift_fit_first_fold",
+        "shift_fit_last_fold",
+    } <= keys
+
+    # A ``**declared_parameters(...)`` expansion, which argparse-style key lists cannot
+    # drift away from: the keys come from the configurations themselves.
+    expansions = [
+        value for key, value in zip(recorded.keys, recorded.values, strict=True) if key is None
+    ]
+    assert len(expansions) == 1
+    call = expansions[0]
+    assert isinstance(call, ast.Call)
+    assert isinstance(call.func, ast.Name)
+    assert call.func.id == "declared_parameters"
 
 
 # --------------------------------------------------------------------------------------
