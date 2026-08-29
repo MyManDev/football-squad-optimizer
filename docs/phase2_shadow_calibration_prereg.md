@@ -211,3 +211,93 @@ after seeing what it does to a gate is the failure this programme exists to prev
 Until that amendment exists, an implementation must refuse to supply these values by
 default: they are required inputs with no fallback, and a run that cannot name them
 does not start.
+
+**Closed by the second amendment below**, dated the same day and written before any
+S1/S2 number existed. The three controls are fixed there; this section is kept as the
+record of what was open and why, not as a live blocker.
+
+## Second squad-gate amendment (2026-08-29): the remaining controls, fixed
+
+**Written 2026-08-29, still before any target-model S1/S2 measurement exists.** The
+runner that would produce one has never been executed against the archive; no mean
+PIT and no tail rate for this model's squad has been read by anyone. The first
+amendment named three controls it refused to choose, and an implementation review then
+found three more that the generator was inheriting from its library defaults rather
+than declaring. This amendment fixes all six, plus the reporting rules they imply. It
+adds no gate, relaxes none, and moves no threshold.
+
+### What is frozen
+
+16. **`bench_weight` = 0.1.** The live optimizer's own default
+    (`OptimizationConfig.bench_weight`), which is the weight the product actually
+    decides under and the weight the in-season benchmark that produced this model's
+    residual export used. The scenario audit's 0.0 is deliberately not chosen:
+    calibrating a weight the product does not use would measure a squad no member is
+    ever shown.
+17. **Decision universe = the full roster.** The product's real selection space is
+    every eligible player in the fold, so that is what the scored decision is chosen
+    over. A reduced candidate pool is a different problem with a different answer.
+18. **`min_history_folds` = 8.** The canonical existing default of `ScenarioConfig`.
+    Because it drops the earliest eligible folds, the artifact must record the shift
+    fit's resulting fold count, first fold id and last fold id.
+19. **`min_player_observations` = 8.** The canonical default, now declared.
+20. **`player_scale_shrinkage` = 10.0.** The canonical default, now declared.
+21. **`player_location_shrinkage` = None.** The canonical default: every component
+    stays centred, and no per-player location term enters the scenarios.
+22. **Bootstrap, and what it may not decide.** Fold-level, 5000 resamples, 90%
+    interval, seed 0, over the evaluation folds' own per-fold values. It is
+    **diagnostic only**. The gate decision is taken on the pre-registered point
+    estimate — mean PIT for S1, the below-q10 rate for S2 — against the clause 14
+    bands. An interval that straddles a bound neither rescues a failing point
+    estimate nor overturns a passing one.
+23. **S2's bounds are unchanged, and the tail is reported as a count as well as a
+    rate.** The band stays [0.04, 0.16] exactly as clause 14 declared it. Because the
+    evaluation population is 37 folds, the attainable rates near that band are
+    1/37 ≈ 0.027, 2/37 ≈ 0.054, 5/37 ≈ 0.135 and 6/37 ≈ 0.162: S2 is therefore decided
+    by whether the number of below-q10 folds is between 2 and 5 inclusive. The
+    artifact records the count beside the rate so that a reader sees the granularity
+    the gate actually has. This is a disclosure about the instrument, not a change to
+    the gate.
+24. **No inherited default may stay unnamed.** Every parameter of the generator,
+    evaluation and optimizer configuration the run actually constructs is recorded in
+    the artifact's provenance, read from the constructed objects themselves rather
+    than from a hand-kept list, so a library default that changes underneath the
+    protocol shows up as a changed artifact instead of a silent difference.
+25. **Report contract.** The full-protocol verdict is written under
+    `shadow_calibration_report_v2`, which requires a report to declare the
+    pre-registered gate families it answers and refuses `calibrated_internal` unless
+    every declared family carries a measured, passing entry. The `v1` contract keeps
+    exactly the meaning it had when its artifacts were recorded and stays readable;
+    the two committed v1 reports are unaffected and still replay byte for byte.
+26. **P1 is merged from the recorded player-level artifact, and only if it is bound to
+    the same export.** The full-protocol report carries P1's gate results as measured
+    by the player-level runner, and the merge is refused unless that artifact's model
+    name, model version, feature contract version, residual table SHA-256, export
+    label, seasons and cutoff fold id are identical to the ones this run is bound to.
+    Two instruments' evidence may not be added together unless they measured the same
+    thing.
+
+### Scientific disclosure (II)
+
+The six values in clauses 16 to 21 are the live product default or the library canon,
+and were chosen for that reason alone. None of them was selected after observing its
+effect on S1 or S2, because no such observation exists: at the time of writing, the
+squad-level instrument has never been run against the archive for this model. The
+earlier mean PIT of 0.07 recorded in the first amendment's disclosure remains a
+different instrument's number under a different squad, a different weight and a
+different shift, and is not evidence about the values fixed here.
+
+### Still open, and recorded rather than chosen
+
+- **`solver_time_limit_seconds` = 10.0 is a wall-clock limit.** The squad comes from a
+  MILP solve that will stop at ten seconds regardless of where it is, so under machine
+  load a fold could in principle return a different squad than it does on an idle
+  machine, and the deterministic seed does not by itself rule that out. The alternative
+  control, `solver_deterministic_time_limit`, would change the solve, so it is not
+  switched on here. Both values are recorded in the artifact, and a re-run that
+  disagrees with a recorded result is caught by the create-once writer rather than
+  quietly overwriting it.
+- **`worst_fraction` = 0.10 and `points_threshold` = 40.0** are evaluation-config
+  knobs that produce summaries neither S1 nor S2 reads. They are pinned at their
+  defaults and recorded for completeness, so that a later protocol which does read
+  them cannot claim this run's numbers were taken under different ones.
