@@ -327,7 +327,16 @@ def _combine(
     }
     values.update(overrides)
     return squad.combine_full_protocol(
-        player_gates=player_gates,
+        # The merge takes bound evidence rather than a bare gate sequence: a caller
+        # with no recorded player report can no longer call it at all.
+        player=squad.PlayerEvidence(
+            gates=player_gates,
+            calibration_diagnostics={},
+            interval_diagnostics={},
+            provenance={"player_report_sha256": "e" * 64},
+            abstentions=(),
+            sample_size=37,
+        ),
         squad_gates=squad_gates,
         **values,  # type: ignore[arg-type]
     )
@@ -566,12 +575,20 @@ def test_one_failing_gate_fails_the_whole_protocol() -> None:
     assert "no retry, re-tune or reinterpretation" in report.reasons[-1]
 
 
-def test_a_failure_outranks_an_unasked_family() -> None:
-    """A negative is a result even when the protocol is incomplete: failed, not abstained."""
+def test_a_failure_outranks_an_unasked_family_without_hiding_it() -> None:
+    """A negative is the verdict even when the protocol is incomplete — and both are said.
+
+    The status is ``failed``: a measured negative is a result, not an abstention. But
+    the incompleteness does not stop being true because something else also went wrong,
+    and a reader of this report would otherwise be told S1 failed and never told that
+    P1 was never asked. The verdict leads; the missing family is still named.
+    """
 
     report = _combine((), (_gate(squad.S1_GATE, passes=False, observed=0.31),))
     assert report.shadow_status == "failed"
-    assert not any("partial protocol" in reason for reason in report.reasons)
+    assert "failed as measured" in report.reasons[0]
+    assert any("partial protocol" in reason for reason in report.reasons)
+    assert any("P1_player_coverage" in reason for reason in report.reasons)
 
 
 def test_failed_may_not_be_claimed_without_a_gate_that_failed_as_measured() -> None:
