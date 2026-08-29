@@ -58,6 +58,8 @@ from squadopt.evaluation.scoring import score_realized_squad_points
 from squadopt.experiments.shadow_calibration import (
     BOOTSTRAP_SEED,
     CONFIDENCE_LEVEL,
+    GROUP_COVERAGE_TOLERANCE,
+    POOLED_COVERAGE_TOLERANCE,
     bootstrap_interval,
 )
 from squadopt.experiments.shadow_report import (
@@ -71,6 +73,7 @@ from squadopt.experiments.shadow_report import (
 )
 from squadopt.optimization import OptimizationConfig, optimize_squad
 from squadopt.prediction import PredictionProvenance, prepare_optimizer_projection
+from squadopt.prediction.in_season import InSeasonBlendConfig
 from squadopt.scenarios import (
     ScenarioConfig,
     ScenarioEvaluationConfig,
@@ -131,6 +134,11 @@ MIN_EVALUATION_FOLDS: Final = 30
 FIT_SEASONS: Final = ("2021-22", "2022-23", "2023-24")
 EVALUATION_SEASON: Final = "2024-25"
 LOCKED_HOLDOUT_SEASON: Final = "2025-26"
+
+#: A gameweek becomes a decision point once the season has one behind it. It is a
+#: constant rather than a literal at two call sites because it decides which gameweeks
+#: are folds at all, and the artifact records it with everything else.
+MIN_PRIOR_GAMEWEEKS_IN_SEASON: Final = 1
 
 
 def _belongs(gate: str, family: str) -> bool:
@@ -353,15 +361,28 @@ def declared_parameters(config: SquadShadowConfig, *, shift_points: float) -> di
     artifact rather than as a silent difference.
     """
 
-    parameters: dict[str, str] = {}
+    parameters: dict[str, str] = {
+        # Two numbers that belong to no configuration object and still decide things:
+        # the representation tolerance the gates are read with, and the rule that makes
+        # a gameweek a fold.
+        "protocol_bound_tolerance": _readable(BOUND_TOLERANCE),
+        "protocol_min_prior_gameweeks_in_season": _readable(MIN_PRIOR_GAMEWEEKS_IN_SEASON),
+        "protocol_fit_seasons": ",".join(FIT_SEASONS),
+        "protocol_evaluation_season": EVALUATION_SEASON,
+        "protocol_s1_bounds": _readable(S1_PIT_BOUNDS),
+        "protocol_s2_bounds": _readable(S2_TAIL_BOUNDS),
+    }
     for prefix, settings in (
         # The protocol's own configuration first. Some of its fields — the decision
         # universe above all — belong to no library object, so a run that recorded only
-        # the three constructed configurations would leave them out of the artifact.
+        # the constructed library configurations would leave them out of the artifact.
         ("protocol", config),
         ("generator", _scenario_config(config)),
         ("evaluation", _evaluation_config(config, shift_points=shift_points)),
         ("optimizer", _optimizer_config(config)),
+        # The fifth configuration, and the one the review found missing: it decides the
+        # projections, therefore the squad, therefore both gates.
+        ("projection", InSeasonBlendConfig()),
     ):
         for entry in fields(settings):
             parameters[f"{prefix}_{entry.name}"] = _readable(getattr(settings, entry.name))
@@ -457,6 +478,41 @@ def fit_frozen_shift(
         "the frozen evaluation season may not enter the shift's fit.",
     )
     ordered = sorted(folds, key=lambda fold: (fold.season, fold.gameweek))
+
+    strangers = sorted(
+        {
+            fold_id
+            for fold in ordered
+            for fold_id in fold.prior_fold_ids
+            if not any(fold_id.startswith(f"{season}-") for season in FIT_SEASONS)
+        }
+    )
+    _require(
+        not strangers,
+        f"prior residual folds {strangers!r} are outside the declared fit seasons "
+        f"{list(FIT_SEASONS)!r}. The fit population is checked at the fold level and at "
+        "the history level, because a fold from the right season can still be handed a "
+        "history from the wrong one.",
+    )
+
+    thin = tuple(
+        fold.fold_id for fold in ordered if len(set(fold.prior_fold_ids)) < config.min_history_folds
+    )
+    # The message is built before the check runs, so the example has to survive an
+    # empty tuple.
+    example = thin[0] if thin else ""
+    _require(
+        not thin,
+        f"{len(thin)} of {len(ordered)} development folds carry fewer than "
+        f"{config.min_history_folds} prior residual folds, the first being {example!r}. "
+        "The generator refuses such a fold outright, and the pre-registration does not "
+        "say what should happen to it: whether these folds leave the shift fit, or "
+        "whether the residual history widens to cover them. This run will not decide "
+        "that. The choice moves the shift, therefore S1 and S2, and choosing it once "
+        "the crash has told you which folds are affected is exactly the control chosen "
+        "after the fact that this protocol exists to prevent. It needs an amendment.",
+    )
+
     gaps: list[float] = []
     for fold in ordered:
         _, gap = _read_fold(
@@ -526,6 +582,17 @@ def evaluate_squad_gates(
         not leaked,
         f"the frozen history contains evaluation-season folds {leaked!r}; the population "
         "is frozen at the end of the development seasons.",
+    )
+    # And again on the rows themselves. The check above reads fold ids, the selection
+    # reads the season column, and one residual fold id carrying rows from two seasons
+    # would otherwise satisfy both while smuggling the later season into the history.
+    selected = _history_for(residuals, history)
+    seasons = sorted({str(value) for value in selected["season"]})
+    _require(
+        set(seasons) <= set(FIT_SEASONS),
+        f"the frozen history's rows carry seasons {seasons!r}, outside the development "
+        f"population {list(FIT_SEASONS)!r}. A fold id is a label; the season column is "
+        "what the generator actually reads.",
     )
 
     identifiers = [fold.fold_id for fold in folds]
@@ -651,8 +718,32 @@ class PlayerEvidence:
     sample_size: int
 
 
+#: The one cell the pre-registration measures unconditionally. The per-group cells are
+#: gated only when a group clears its row floor, so a report may legitimately carry
+#: fewer of them — but a P1 answered without the pooled coverage is not P1.
+POOLED_CELL: Final = f"{PLAYER_GATE_FAMILY}_pooled"
+
+
+def _recomputed(gate: ShadowGateResult) -> bool:
+    """P1's verdict read from its own observation, against the pre-registered band.
+
+    The recorded ``passes`` flag is not evidence about anything: it is a claim the
+    artifact makes about its own number. The bands are pre-registered constants, so the
+    verdict can be recomputed, and a record whose flag disagrees with its observation is
+    refused rather than believed.
+    """
+
+    tolerance = POOLED_COVERAGE_TOLERANCE if gate.gate == POOLED_CELL else GROUP_COVERAGE_TOLERANCE
+    return abs(float(gate.observed or 0.0) - CONFIDENCE_LEVEL) <= tolerance
+
+
 def load_bound_player_report(
-    path: Path, residual_source: ShadowResidualSource, config: SquadShadowConfig
+    path: Path,
+    residual_source: ShadowResidualSource,
+    config: SquadShadowConfig,
+    *,
+    expect_sha256: str | None,
+    expect_fingerprints: Mapping[str, str],
 ) -> PlayerEvidence:
     """Read P1's recorded result, and refuse it unless it measured the same thing.
 
@@ -672,6 +763,12 @@ def load_bound_player_report(
     """
 
     report, digest = read_shadow_report(path)
+    _require(
+        expect_sha256 is None or digest == expect_sha256,
+        f"the player report at {path.name} has digest {digest}, not the pre-registered "
+        f"{expect_sha256}. Which recorded measurement P1 comes from is part of the "
+        "protocol, not a path the caller happens to pass.",
+    )
     recorded = report.residual_source
     for name in (
         "export_label",
@@ -691,12 +788,56 @@ def load_bound_player_report(
             "squad gates may only be merged when they measured the same export.",
         )
 
+    for key, expected in expect_fingerprints.items():
+        theirs = report.provenance_fingerprints.get(key)
+        _require(
+            theirs is None or theirs == expected,
+            f"the recorded player report was produced against a different {key} "
+            f"({theirs!r}, against this run's {expected!r}). The residual export is not "
+            "the only thing two instruments have to share.",
+        )
+
+    dropped = tuple(
+        gate.gate
+        for gate in report.gate_results
+        if not _belongs(gate.gate, PLAYER_GATE_FAMILY)
+        and not gate.passes
+        and gate.observed is not None
+    )
+    _require(
+        not dropped,
+        f"the recorded player report carries measured failures {list(dropped)!r} outside "
+        f"{PLAYER_GATE_FAMILY}. Merging it would keep the P1 cells and drop a recorded "
+        "negative, which is the one thing a merge may never do.",
+    )
+
     gates = tuple(gate for gate in report.gate_results if _belongs(gate.gate, PLAYER_GATE_FAMILY))
+    for gate in gates:
+        _require(
+            gate.observed is None or gate.passes == _recomputed(gate),
+            f"{gate.gate} records passes={gate.passes} for an observed coverage of "
+            f"{gate.observed}, which the pre-registered band does not support. A record "
+            "that disagrees with its own numbers is refused, not believed.",
+        )
+    _require(
+        report.shadow_status != "failed"
+        or any(not gate.passes and gate.observed is not None for gate in gates),
+        f"the recorded player report is 'failed' but carries no failing "
+        f"{PLAYER_GATE_FAMILY} cell; whatever failed in it is not what this merge would "
+        "carry forward.",
+    )
+
     abstentions: list[str] = []
     if not gates:
         abstentions.append(
             f"the recorded player report at {path.name} carries no "
             f"{PLAYER_GATE_FAMILY} gate, so P1 is unanswered here."
+        )
+    elif not any(gate.gate == POOLED_CELL for gate in gates):
+        abstentions.append(
+            f"the recorded player report carries no {POOLED_CELL} cell. The per-group "
+            "cells are gated only when a group clears its row floor, so P1 without its "
+            "pooled coverage is not P1 answered."
         )
     for gate in gates:
         if gate.observed is None:
@@ -737,6 +878,18 @@ def load_bound_player_report(
     }
     if commit:
         provenance["player_report_repository_commit"] = commit
+    # What produced the numbers on the other side of the merge. Dropping these would
+    # leave the merged artifact unable to say which archive snapshot, which residual
+    # generation and which model identity P1 was measured under.
+    for key in (
+        "dataset_snapshot_id",
+        "residual_generation_commit",
+        "model_identity",
+        "conformal_fingerprint",
+    ):
+        carried = report.provenance_fingerprints.get(key)
+        if carried:
+            provenance[f"player_report_{key}"] = carried
     return PlayerEvidence(
         gates=gates,
         calibration_diagnostics={
@@ -857,6 +1010,17 @@ def combine_full_protocol(
 HISTORY_SEASONS: Final = ("2020-21", *FIT_SEASONS, EVALUATION_SEASON)
 
 
+def loaded_seasons(panel: pd.DataFrame) -> tuple[str, ...]:
+    """Which seasons a loaded panel actually holds.
+
+    The pre-registration's holdout clause asks the artifact to record the seasons that
+    were actually read, not the ones that were requested. Those are the same thing only
+    if someone checks, which is what this is for.
+    """
+
+    return tuple(sorted({str(season) for season in panel["season"].unique()}))
+
+
 def load_panel_without_the_holdout(archive_root: Path) -> pd.DataFrame:
     """Load exactly the seasons this protocol declares, and prove it afterwards.
 
@@ -867,7 +1031,7 @@ def load_panel_without_the_holdout(archive_root: Path) -> pd.DataFrame:
     """
 
     panel = build_panel(archive_root, seasons=HISTORY_SEASONS)
-    loaded = tuple(sorted({str(season) for season in panel["season"].unique()}))
+    loaded = loaded_seasons(panel)
     _require(
         LOCKED_HOLDOUT_SEASON not in loaded,
         f"{LOCKED_HOLDOUT_SEASON} rows are present in the loaded panel; the run stops "
@@ -903,7 +1067,9 @@ def build_squad_folds(
     """
 
     decisions = walk_forward_decision_points(
-        panel, seasons=tuple(seasons), min_prior_gameweeks_in_season=1
+        panel,
+        seasons=tuple(seasons),
+        min_prior_gameweeks_in_season=MIN_PRIOR_GAMEWEEKS_IN_SEASON,
     )
     _require(bool(decisions), f"no decision points for seasons {list(seasons)!r}.")
     order = {

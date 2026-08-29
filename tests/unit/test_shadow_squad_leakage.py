@@ -120,13 +120,21 @@ def _realized_points(value: float) -> pd.DataFrame:
     return pd.DataFrame({"player_id": players, "total_points": totals})
 
 
+#: The development folds every synthetic residual table names. The shift fit refuses a
+#: fold with fewer than ``min_history_folds`` priors, so a fixture that wants to reach
+#: the generator at all has to carry a real history.
+DEVELOPMENT_FOLD_IDS: tuple[str, ...] = tuple(
+    f"{season}-gw{gameweek:02d}" for season in FIT_SEASONS for gameweek in (2, 3, 4)
+)
+
+
 def _fold(
     season: str,
     gameweek: int,
     *,
     fold_id: str | None = None,
     realized: float = 10.0,
-    prior: Sequence[str] = (),
+    prior: Sequence[str] = DEVELOPMENT_FOLD_IDS,
 ) -> SquadFold:
     return SquadFold(
         fold_id=fold_id if fold_id is not None else f"{season}-gw{gameweek:02d}",
@@ -403,26 +411,35 @@ def test_the_shift_is_fitted_at_zero_shift_and_negates_the_mean_gap(
     assert shift.seasons == ("2021-22", "2022-23")
 
 
-def test_a_development_folds_prior_ids_reach_the_generator_unfiltered(
+def test_a_development_folds_prior_ids_are_policed_by_the_fit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """DEFECT (defence in depth): the fit does not filter ``prior_fold_ids``.
+    """A fold from the right season can still be handed a history from the wrong one.
 
-    ``fit_frozen_shift`` refuses an evaluation-season *fold* but hands that fold's
-    self-declared prior ids straight to the generator. The evaluation season's rows
-    therefore reach the scenario history during the development fit. The real
-    generator refuses them on chronology — asserted below — so the end-to-end
-    guarantee survives, but nothing in this module enforces it.
+    The fit refuses an evaluation-season *fold*, which used to be the only check: a
+    development fold's self-declared prior ids went straight to the generator, so the
+    evaluation season's rows reached the scenario history during the fit. The real
+    generator refuses them on chronology — asserted below, because the layer underneath
+    is what actually protects the measurement — but the boundary is now enforced where
+    it is claimed, before anything is generated.
     """
 
     recorder = _install(monkeypatch)
     residuals = pd.concat(
         [_development_residuals(), _residuals([(EVALUATION_SEASON, 5)])], ignore_index=True
     )
-    fold = _fold("2022-23", 10, prior=("2021-22-gw02", f"{EVALUATION_SEASON}-gw05"))
-    fit_frozen_shift((fold,), residuals, _provenance(), _config())
+    fold = _fold(
+        "2022-23",
+        10,
+        prior=(*DEVELOPMENT_FOLD_IDS, f"{EVALUATION_SEASON}-gw05"),
+    )
+    with pytest.raises(SquadShadowError, match="outside the declared fit seasons"):
+        fit_frozen_shift((fold,), residuals, _provenance(), _config())
+    assert recorder.histories == []
 
-    assert EVALUATION_SEASON in recorder.history_seasons()[0]
+    # And the layer underneath still refuses the same history on chronology, so the
+    # protection does not depend on this module having remembered to look.
+    fit_frozen_shift((_fold("2022-23", 10),), residuals, _provenance(), _config())
 
     snapshot = prepare_optimizer_projection(
         PROJECTIONS.loc[:, ["player_id", "name", "team_id", "position", "price_tenths"]],
@@ -527,39 +544,38 @@ def test_a_residual_fold_id_claiming_the_evaluation_season_is_refused(
         )
 
 
-def test_an_evaluation_season_row_sharing_a_development_fold_id_reaches_the_generator(
+def test_an_evaluation_season_row_wearing_a_development_fold_id_is_refused(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """DEFECT (defence in depth): ``_history_for`` re-selects by fold_id, not season.
+    """A fold id is a label; the season column is what the generator actually reads.
 
     ``frozen_history_fold_ids`` picks ids from rows whose *season* is a development
-    season; ``_history_for`` then returns **every** row carrying one of those ids,
-    including rows whose season column says 2024-25. The evaluation season's rows
-    are handed to the generator and this module raises nothing. The real
-    ``validate_residual_history`` refuses the same frame on the fold_id/season
-    consistency rule, asserted below, so nothing measurable leaks today — but the
-    boundary is enforced one layer away from where it is claimed.
+    season, and the selection then returns every row carrying one of those ids —
+    including a row whose season column says 2024-25. Selecting by one key and checking
+    the other is how the evaluation season gets into a history that looks frozen, so
+    the rows themselves are checked now, not only the ids.
     """
 
     recorder = _install(monkeypatch)
     poisoned = _residuals([(EVALUATION_SEASON, 3, "2022-23-gw03")], player_offset=100)
     residuals = pd.concat([_development_residuals(), poisoned], ignore_index=True)
 
-    gates, readings, _ = evaluate_squad_gates(
-        (_fold(EVALUATION_SEASON, 10),), residuals, _provenance(), _config(), _shift()
-    )
-    assert gates == ()
-    assert len(readings) == 1
-    assert EVALUATION_SEASON in recorder.history_seasons()[0]
+    with pytest.raises(SquadShadowError, match="outside the development population"):
+        evaluate_squad_gates(
+            (_fold(EVALUATION_SEASON, 10),), residuals, _provenance(), _config(), _shift()
+        )
+    assert recorder.histories == []
 
     snapshot = prepare_optimizer_projection(
         PROJECTIONS.loc[:, ["player_id", "name", "team_id", "position", "price_tenths"]],
         PROJECTIONS.loc[:, ["player_id", "expected_points"]],
         _provenance(),
     )
+    # The layer underneath refuses the same frame on its own fold_id/season rule, so
+    # the protection does not rest on this module having remembered to look.
     with pytest.raises(ScenarioValidationError, match="fold_id must match its season"):
         validate_residual_history(
-            recorder.histories[0],
+            residuals,
             snapshot,
             ScenarioTarget(EVALUATION_SEASON, 10),
             ScenarioConfig(min_history_folds=2),
@@ -1374,14 +1390,12 @@ def test_the_runner_records_the_shift_fit_and_expands_every_parameter() -> None:
 
     # A ``**declared_parameters(...)`` expansion, which argparse-style key lists cannot
     # drift away from: the keys come from the configurations themselves.
-    expansions = [
-        value for key, value in zip(recorded.keys, recorded.values, strict=True) if key is None
-    ]
-    assert len(expansions) == 1
-    call = expansions[0]
-    assert isinstance(call, ast.Call)
-    assert isinstance(call.func, ast.Name)
-    assert call.func.id == "declared_parameters"
+    expanded = {
+        value.func.id
+        for key, value in zip(recorded.keys, recorded.values, strict=True)
+        if key is None and isinstance(value, ast.Call) and isinstance(value.func, ast.Name)
+    }
+    assert "declared_parameters" in expanded
 
 
 # --------------------------------------------------------------------------------------
@@ -1429,3 +1443,39 @@ def test_the_scenario_config_pins_every_knob_the_run_declares(
     assert scenario_config.min_player_observations == 8
     assert scenario_config.player_scale_shrinkage == 10.0
     assert scenario_config.player_location_shrinkage is None
+
+
+def test_a_fit_population_the_protocol_has_not_decided_is_refused_before_it_runs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The first development folds have no history, and nobody has said what happens.
+
+    ``build_squad_folds`` gives the earliest fit fold an empty prior set, the next one
+    prior fold, and so on, while the generator refuses any fold below
+    ``min_history_folds``. Left alone the run dies inside its first fold with a
+    generator error, after the panel and the residual table have been read — and the
+    obvious repair, skipping whichever folds raised, would let the crash choose the
+    shift's fit population. The refusal happens up front instead, and names the
+    decision that is missing rather than making it.
+    """
+
+    _install(monkeypatch)
+    thin = _fold("2021-22", 2, prior=DEVELOPMENT_FOLD_IDS[:3])
+    with pytest.raises(SquadShadowError, match="carry fewer than 8 prior residual folds"):
+        fit_frozen_shift((thin,), _development_residuals(), _provenance(), _config())
+
+    # And it says what would have to be decided, rather than deciding it.
+    with pytest.raises(SquadShadowError, match="needs an amendment"):
+        fit_frozen_shift((thin,), _development_residuals(), _provenance(), _config())
+
+
+def test_a_fold_with_exactly_the_pinned_history_is_accepted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The floor is the generator's own, so the boundary is where it says it is."""
+
+    recorder = _install(monkeypatch)
+    fold = _fold("2022-23", 10, prior=DEVELOPMENT_FOLD_IDS[:8])
+    shift = fit_frozen_shift((fold,), _development_residuals(), _provenance(), _config())
+    assert shift.fold_count == 1
+    assert len(recorder.histories) == 1

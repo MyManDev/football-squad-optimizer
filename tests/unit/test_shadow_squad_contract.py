@@ -388,7 +388,21 @@ def test_p1_and_s1_without_s2_cannot_claim_the_full_protocol() -> None:
 
 
 def test_a_declared_family_with_no_matching_entry_is_refused() -> None:
+    """The protocol is declared in full and one of its families is left unanswered."""
+
     with pytest.raises(ShadowReportError, match="has no entry in gate_results"):
+        _v2_claims_a_pass(gate_results=(*_p1_sub_gates(), _gate(squad.S1_GATE)))
+
+
+def test_a_declaration_naming_a_family_the_protocol_never_fixed_is_refused() -> None:
+    """Widening the declaration would let an off-protocol gate ride in as a member.
+
+    Declaring an extra family makes the "every gate matches a declared family" rule
+    admit exactly the gate that does not belong, so the declaration has to be the
+    pre-registered set itself rather than a superset of it.
+    """
+
+    with pytest.raises(ShadowReportError, match="does not pre-register"):
         _v2_claims_a_pass(
             gate_results=(*_p1_sub_gates(), *_squad_gate_pair()),
             declared_gates=(*PREREG_GATES, "S3_squad_upper_tail"),
@@ -446,12 +460,17 @@ def test_a_typo_in_a_sub_gate_id_does_not_satisfy_its_family() -> None:
 def test_a_family_prefix_without_the_separator_does_not_match() -> None:
     """``P1_player_coverage_pooled`` starts with ``P1_player_cov`` and must not count.
 
-    The truncation is declared *alongside* the complete pre-registered set, so the
-    refusal can only come from the family rule: the three P1 sub-gates already answer
-    ``P1_player_coverage``, and none of them answers ``P1_player_cov``.
+    A truncated family name cannot be declared at all now — the declaration must be
+    the pre-registered tuple — so the rule is exercised from the other side: a gate id
+    that shares a family's prefix without the separator answers no declared family, and
+    a family whose only candidate entry is that gate has no entry at all.
     """
 
-    with pytest.raises(ShadowReportError, match="has no entry in gate_results"):
+    with pytest.raises(ShadowReportError, match="matches no declared family"):
+        _v2_claims_a_pass(
+            gate_results=(_gate("P1_player_coverageX"), *_squad_gate_pair()),
+        )
+    with pytest.raises(ShadowReportError, match="does not pre-register"):
         _v2_claims_a_pass(
             gate_results=(*_p1_sub_gates(), *_squad_gate_pair()),
             declared_gates=(*PREREG_GATES, "P1_player_cov"),
@@ -812,7 +831,7 @@ def test_conflicting_content_at_an_occupied_path_is_refused(tmp_path: Path) -> N
 def test_an_occupied_path_that_is_not_the_contract_is_refused(tmp_path: Path) -> None:
     path = tmp_path / "squad.json"
     path.write_bytes(b"\xff\xfe not json at all")
-    with pytest.raises(ShadowReportError, match="not the recorded JSON contract"):
+    with pytest.raises(ShadowReportError, match="not a readable shadow report"):
         write_shadow_report_once(_report(), path)
     assert _residue(tmp_path) == []
 
@@ -820,7 +839,7 @@ def test_an_occupied_path_that_is_not_the_contract_is_refused(tmp_path: Path) ->
 def test_valid_json_that_is_not_this_measurement_is_refused(tmp_path: Path) -> None:
     path = tmp_path / "squad.json"
     path.write_text('{"contract_version": "something_else"}\n', encoding="utf-8")
-    with pytest.raises(ShadowReportError, match="already holds a different measurement"):
+    with pytest.raises(ShadowReportError, match=r"unrecognised fields|no execution block"):
         write_shadow_report_once(_report(), path)
     assert _residue(tmp_path) == []
 
@@ -955,16 +974,19 @@ def test_a_differing_declaration_is_a_conflict_not_a_replay(tmp_path: Path) -> N
     """What a report claims to have answered is part of the measurement, not metadata.
 
     This case is separated from the table above because it is only expressible under
-    v2: a v1 report cannot declare anything, so both runs are built at v2 and differ in
-    the declaration alone — a second run that widened it to a family the protocol never
-    fixed is a different result, not a replay of the first.
+    v2 now closes it from the other end: the declaration must be the pre-registered
+    tuple in its pre-registered order, so neither a widened nor a re-ordered declaration
+    can be written at all. Order matters because the declaration is serialized — two
+    runs of one measurement that listed the same three families differently would write
+    different bytes and read as a conflict rather than as a replay.
     """
 
     path = tmp_path / "declared_gates.json"
     assert write_shadow_report_once(_v2_report(), path) == "written"
-    widened = _v2_report(declared_gates=(*PREREG_GATE_FAMILIES, "S3_squad_upper_tail"))
-    with pytest.raises(ShadowReportError, match="already holds a different measurement"):
-        write_shadow_report_once(widened, path)
+    with pytest.raises(ShadowReportError, match="does not pre-register"):
+        _v2_report(declared_gates=(*PREREG_GATE_FAMILIES, "S3_squad_upper_tail"))
+    with pytest.raises(ShadowReportError, match="in another order"):
+        _v2_report(declared_gates=tuple(reversed(PREREG_GATE_FAMILIES)))
     assert _residue(tmp_path) == []
 
 
