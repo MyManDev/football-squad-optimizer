@@ -15,9 +15,12 @@ The three terminal statuses mirror ``docs/phase2_shadow_calibration_prereg.md``:
 say why).
 """
 
+import contextlib
 import json
 import math
+import os
 import re
+import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -26,6 +29,16 @@ from pathlib import Path
 SHADOW_CALIBRATION_CONTRACT_VERSION = "shadow_calibration_report_v1"
 LOCKED_HOLDOUT_SEASON = "2025-26"
 SHADOW_STATUSES: tuple[str, ...] = ("calibrated_internal", "failed", "abstained")
+
+#: The pre-registered gate families of the Phase 2 protocol. This lives in the contract
+#: rather than in a runner, because a report that may declare its own gate set can
+#: declare a subset of the protocol and pass it — which is the failure the completeness
+#: rule exists to prevent.
+PREREG_GATE_FAMILIES: tuple[str, ...] = (
+    "P1_player_coverage",
+    "S1_squad_pit_location",
+    "S2_squad_lower_tail",
+)
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _FOLD_ID = re.compile(r"^\d{4}-\d{2}-gw\d{2}$")
@@ -38,6 +51,18 @@ class ShadowReportError(ValueError):
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise ShadowReportError(message)
+
+
+def _matches_family(gate: str, family: str) -> bool:
+    """Does one measured gate id belong to a declared pre-registered family?
+
+    A family may be answered by one entry of its own name, or by several sub-gates
+    named ``<family>_<cell>`` — gate P1 is measured pooled and per fixture group. The
+    rule is exact-or-underscore-prefix so that a typo drops a gate loudly rather than
+    matching by accident.
+    """
+
+    return gate == family or gate.startswith(f"{family}_")
 
 
 def _finite_or_none(label: str, values: Mapping[str, float | None]) -> None:
@@ -166,6 +191,10 @@ class ShadowCalibrationReport:
     shadow_status: str
     reasons: tuple[str, ...]
     provenance_fingerprints: Mapping[str, str]
+    #: The pre-registered gate families this report claims to answer. Empty means the
+    #: report makes no completeness claim, which is what every report written before
+    #: this field existed does; such a report can never be ``calibrated_internal``.
+    declared_gates: tuple[str, ...] = field(default=())
     contract_version: str = field(default=SHADOW_CALIBRATION_CONTRACT_VERSION)
 
     def __post_init__(self) -> None:
@@ -188,6 +217,19 @@ class ShadowCalibrationReport:
             self.shadow_status in SHADOW_STATUSES,
             f"shadow_status must be one of {SHADOW_STATUSES!r}, got {self.shadow_status!r}.",
         )
+        _require(
+            not isinstance(self.declared_gates, str),
+            "declared_gates must be a sequence of names, not a single string.",
+        )
+        for family in self.declared_gates:
+            _require(
+                isinstance(family, str) and bool(family.strip()),
+                "a declared gate family must be a non-empty name.",
+            )
+        _require(
+            len(set(self.declared_gates)) == len(self.declared_gates),
+            f"declared_gates repeats a family: {self.declared_gates!r}.",
+        )
         if self.shadow_status == "calibrated_internal":
             _require(bool(self.gate_results), "calibrated_internal requires gate results.")
             _require(
@@ -195,6 +237,34 @@ class ShadowCalibrationReport:
                 "calibrated_internal requires every pre-registered gate to pass; a "
                 "failed gate is a failed report, not a caveat.",
             )
+            # A subset of the protocol is not a verdict. This lives in the contract
+            # rather than in one runner's prose, so a second runner inherits it
+            # instead of having to remember it.
+            _require(
+                bool(self.declared_gates),
+                "calibrated_internal requires declared_gates: a report that does not "
+                "say which gates the protocol required cannot claim to have passed it.",
+            )
+            missing = [
+                family for family in PREREG_GATE_FAMILIES if family not in set(self.declared_gates)
+            ]
+            _require(
+                not missing,
+                f"declared_gates omits pre-registered families {missing!r}. A report may "
+                "not declare a subset of the protocol and then pass its own subset.",
+            )
+            for family in self.declared_gates:
+                _require(
+                    any(_matches_family(gate.gate, family) for gate in self.gate_results),
+                    f"declared gate {family!r} has no entry in gate_results; a partial "
+                    "gate set cannot produce a complete pass verdict.",
+                )
+            for gate in self.gate_results:
+                _require(
+                    any(_matches_family(gate.gate, family) for family in self.declared_gates),
+                    f"gate {gate.gate!r} matches no declared family {self.declared_gates!r}; "
+                    "a measured gate outside the pre-registered set cannot count toward it.",
+                )
         else:
             _require(
                 bool(self.reasons),
@@ -212,7 +282,7 @@ def report_to_dict(report: ShadowCalibrationReport) -> dict[str, object]:
     """The report as one JSON-ready mapping, missing values kept as None."""
 
     source = report.residual_source
-    return {
+    document: dict[str, object] = {
         "contract_version": report.contract_version,
         "generated_at_utc": report.generated_at_utc,
         "execution": {
@@ -249,6 +319,12 @@ def report_to_dict(report: ShadowCalibrationReport) -> dict[str, object]:
         "reasons": list(report.reasons),
         "provenance_fingerprints": dict(report.provenance_fingerprints),
     }
+    if report.declared_gates:
+        # Omitted when empty so that a report written before this field existed
+        # serializes to the same bytes and still replays. A report that declares
+        # nothing makes no completeness claim, and says so by saying nothing.
+        document["declared_gates"] = list(report.declared_gates)
+    return document
 
 
 def write_shadow_report(report: ShadowCalibrationReport, path: Path) -> None:
@@ -264,3 +340,74 @@ def write_shadow_report(report: ShadowCalibrationReport, path: Path) -> None:
     resolved.parent.mkdir(parents=True, exist_ok=True)
     with resolved.open("w", encoding="utf-8", newline="\n") as handle:
         handle.write(payload + "\n")
+
+
+def write_shadow_report_once(report: ShadowCalibrationReport, path: Path) -> str:
+    """Publish a report atomically, exactly once, and say which of three happened.
+
+    The corrective amendment requires a writer that is crash-safe and safe under
+    concurrent writers: the bytes are completed and fsynced in a sibling temporary
+    file, published with a no-overwrite hard link, and the temporary removed on every
+    path. A losing writer compares its own bytes with the winner's and reports a
+    replay when they agree.
+
+    Returns ``"written"``, ``"replay"`` or raises. ``replay_identity_of`` decides what
+    a replay may differ by — only the wall clock.
+    """
+
+    resolved = path.resolve()
+    _require(
+        "web/public" not in resolved.as_posix(),
+        f"{resolved} sits inside a published site tree; shadow reports are internal.",
+    )
+    document = report_to_dict(report)
+    serialized = json.dumps(document, indent=2, sort_keys=True, allow_nan=False)
+    payload = (serialized + "\n").encode("utf-8")
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    temporary = resolved.with_name(f".{resolved.name}.tmp-{os.getpid()}-{secrets.token_hex(8)}")
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, resolved)
+            return "written"
+        except FileExistsError:
+            existing_bytes = resolved.read_bytes()
+            if existing_bytes == payload:
+                return "replay"
+            try:
+                existing = json.loads(existing_bytes)
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ShadowReportError(
+                    f"{resolved} already exists but is not the recorded JSON contract."
+                ) from error
+            if replay_identity_of(existing) == replay_identity_of(document):
+                return "replay"
+            raise ShadowReportError(
+                f"{resolved} already holds a different measurement. A recorded result is "
+                "not overwritten; move or delete it deliberately if it is superseded."
+            ) from None
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            temporary.unlink()
+
+
+def replay_identity_of(document: Mapping[str, object]) -> dict[str, object]:
+    """The part of a report two runs of the same measurement must agree on, byte for byte.
+
+    Only the wall clock is excluded — the top-level stamp and the three timing fields
+    inside ``execution``. Nothing else is exempt: a differing number is a differing
+    measurement, and a differing seed or warning is a differing run.
+    """
+
+    identity = {key: value for key, value in document.items() if key != "generated_at_utc"}
+    execution = identity.get("execution")
+    if isinstance(execution, Mapping):
+        identity["execution"] = {
+            key: value
+            for key, value in execution.items()
+            if key not in {"started_at_utc", "completed_at_utc", "elapsed_seconds"}
+        }
+    return identity

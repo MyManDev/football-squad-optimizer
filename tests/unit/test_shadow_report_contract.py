@@ -7,6 +7,7 @@ import pytest
 
 from squadopt.experiments.shadow_report import (
     LOCKED_HOLDOUT_SEASON,
+    PREREG_GATE_FAMILIES,
     SHADOW_CALIBRATION_CONTRACT_VERSION,
     ShadowCalibrationReport,
     ShadowExecutionMetadata,
@@ -50,17 +51,21 @@ def _report(**overrides: object) -> ShadowCalibrationReport:
         "point_estimate": 0.905,
         "calibration_diagnostics": {"empirical_coverage": 0.905, "mean_pit": None},
         "interval_diagnostics": {"mean_width": 6.85},
-        "gate_results": (
+        "gate_results": tuple(
             ShadowGateResult(
-                gate="player_coverage_pooled",
+                gate=f"{family}_measured",
                 passes=True,
                 observed=0.905,
-                threshold="|coverage - 0.90| <= 0.03",
-            ),
+                threshold="the pre-registered band",
+            )
+            for family in PREREG_GATE_FAMILIES
         ),
         "shadow_status": "calibrated_internal",
         "reasons": (),
         "provenance_fingerprints": {"repository_commit": "93fde86"},
+        # A pass must say which gates the protocol required. The fixture declares the
+        # whole set, because a report that declares less can no longer claim one.
+        "declared_gates": PREREG_GATE_FAMILIES,
     }
     values.update(overrides)
     return ShadowCalibrationReport(**values)  # type: ignore[arg-type]
@@ -142,14 +147,17 @@ def test_abstained_is_distinct_from_failed_and_both_need_reasons() -> None:
 
 
 def test_calibrated_internal_requires_every_gate_to_pass() -> None:
+    passing = _report().gate_results
     failing = ShadowGateResult(
-        gate="squad_pit_location",
+        gate=f"{PREREG_GATE_FAMILIES[1]}_measured",
         passes=False,
         observed=0.31,
         threshold="mean PIT in [0.43, 0.57]",
     )
+    # The declaration still covers the protocol, so the only thing left to refuse is
+    # the failing gate itself.
     with pytest.raises(ShadowReportError, match="every pre-registered gate"):
-        _report(gate_results=(_report().gate_results[0], failing))
+        _report(gate_results=(passing[0], failing, passing[2]))
 
 
 def test_an_unevaluable_gate_cannot_pass() -> None:
@@ -181,3 +189,65 @@ def test_the_public_site_schema_rejects_a_shadow_report() -> None:
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(report_to_dict(_report()), schema)
+
+
+def test_calibrated_internal_requires_the_declared_set_to_cover_the_protocol() -> None:
+    """A report may not declare a subset of the protocol and then pass its own subset.
+
+    The completeness rule lives here rather than in a runner precisely so that a second
+    runner inherits it. If the contract only cross-checked declared_gates against
+    gate_results, a report could name two of the three families, satisfy both, and read
+    as a full pass.
+    """
+
+    two_thirds = PREREG_GATE_FAMILIES[1:]
+    with pytest.raises(ShadowReportError, match="omits pre-registered families"):
+        _report(
+            declared_gates=two_thirds,
+            gate_results=tuple(
+                ShadowGateResult(
+                    gate=f"{family}_measured",
+                    passes=True,
+                    observed=0.5,
+                    threshold="the pre-registered band",
+                )
+                for family in two_thirds
+            ),
+        )
+
+
+def test_a_declared_family_with_no_measured_entry_is_refused() -> None:
+    """Declaring the protocol is not answering it."""
+
+    with pytest.raises(ShadowReportError, match="has no entry in gate_results"):
+        _report(gate_results=_report().gate_results[:2])
+
+
+def test_a_bare_string_declared_gate_set_is_refused() -> None:
+    """A string is a sequence of characters, and would shatter into one family each."""
+
+    with pytest.raises(ShadowReportError, match="not a single string"):
+        _report(declared_gates="S1_squad_pit_location")
+
+
+def test_a_blank_declared_family_name_is_refused() -> None:
+    """A whitespace name is as empty as an absent one, and is refused the same way."""
+
+    with pytest.raises(ShadowReportError, match="non-empty name"):
+        _report(declared_gates=(*PREREG_GATE_FAMILIES, "   "))
+
+
+def test_a_report_declaring_nothing_serializes_without_the_key(tmp_path: Path) -> None:
+    """Older artifacts must still replay: a report that declares nothing says nothing.
+
+    The two committed shadow artifacts predate ``declared_gates`` and are ``abstained``,
+    so omitting the key when it is empty is what keeps their bytes reproducible.
+    """
+
+    report = _report(shadow_status="abstained", reasons=("nothing was asked",), declared_gates=())
+    document = report_to_dict(report)
+    assert "declared_gates" not in document
+
+    out = tmp_path / "older.json"
+    write_shadow_report(report, out)
+    assert "declared_gates" not in json.loads(out.read_text(encoding="utf-8"))
