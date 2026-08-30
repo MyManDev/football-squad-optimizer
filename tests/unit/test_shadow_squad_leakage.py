@@ -1445,28 +1445,86 @@ def test_the_scenario_config_pins_every_knob_the_run_declares(
     assert scenario_config.player_location_shrinkage is None
 
 
-def test_a_fit_population_the_protocol_has_not_decided_is_refused_before_it_runs(
+#: One chronological development chain, long enough to have a burn-in and a remainder.
+_CHAIN_GAMEWEEKS = tuple(range(2, 14))
+_CHAIN = tuple(f"2021-22-gw{gameweek:02d}" for gameweek in _CHAIN_GAMEWEEKS)
+
+
+def _chain(*, missing: str | None = None) -> tuple[tuple[SquadFold, ...], pd.DataFrame]:
+    """The chain and its residual export, optionally with one fold absent from both.
+
+    Each fold's realized score is chosen so that its gap is 100 while it is burn-in and
+    1 once it is eligible, which makes the fitted shift say by itself which folds
+    entered the mean.
+    """
+
+    present = [fold_id for fold_id in _CHAIN if fold_id != missing]
+    residuals = _residuals(
+        [("2021-22", gameweek) for gameweek in _CHAIN_GAMEWEEKS if _CHAIN[gameweek - 2] != missing]
+    )
+    folds = tuple(
+        _fold(
+            "2021-22",
+            gameweek,
+            realized=-90.0 if index < 8 else 9.0,
+            prior=tuple(fold_id for fold_id in present if fold_id < _CHAIN[index]),
+        )
+        for index, gameweek in enumerate(_CHAIN_GAMEWEEKS)
+    )
+    return folds, residuals
+
+
+def test_the_burn_in_folds_are_excluded_and_the_remainder_is_what_is_recorded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The first development folds have no history, and nobody has said what happens.
+    """Clause 27, 28 and 30 in one reading.
 
-    ``build_squad_folds`` gives the earliest fit fold an empty prior set, the next one
-    prior fold, and so on, while the generator refuses any fold below
-    ``min_history_folds``. Left alone the run dies inside its first fold with a
-    generator error, after the panel and the residual table have been read — and the
-    obvious repair, skipping whichever folds raised, would let the crash choose the
-    shift's fit population. The refusal happens up front instead, and names the
-    decision that is missing rather than making it.
+    The chain's first eight folds carry less history than the declared depth, so they
+    are burn-in: their gaps do not enter the mean, and — because eligibility is decided
+    before anything is generated rather than by catching the generator's refusal — the
+    generator never sees them at all. What the artifact records is the remainder, not
+    the population that was handed in.
+    """
+
+    recorder = _install(monkeypatch)
+    folds, residuals = _chain()
+
+    shift = fit_frozen_shift(folds, residuals, _provenance(), _config())
+
+    # Every burn-in gap is 100 and every eligible gap is 1, so the fitted shift is the
+    # negated mean over the remainder alone.
+    assert shift.shift_points == pytest.approx(-1.0)
+    assert shift.fold_count == 4
+    assert shift.first_fold_id == "2021-22-gw10"
+    assert shift.last_fold_id == "2021-22-gw13"
+    assert len(recorder.histories) == 4
+
+
+def test_a_population_that_is_all_burn_in_is_refused_rather_than_averaged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A mean of nothing is not a shift."""
+
+    _install(monkeypatch)
+    folds, residuals = _chain()
+    with pytest.raises(SquadShadowError, match="mean of nothing"):
+        fit_frozen_shift(folds[:8], residuals, _provenance(), _config())
+
+
+def test_a_residual_export_missing_a_fold_stops_the_run_instead_of_dropping_more(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Clause 29: a longer burn-in is a gap in the export, not a smaller fit.
+
+    With one fold absent from the export every later fold's history is one shorter, so
+    the ninth fold of the chain no longer qualifies. Quietly fitting on three folds
+    instead of four would be dropping a fold nobody declared.
     """
 
     _install(monkeypatch)
-    thin = _fold("2021-22", 2, prior=DEVELOPMENT_FOLD_IDS[:3])
-    with pytest.raises(SquadShadowError, match="carry fewer than 8 prior residual folds"):
-        fit_frozen_shift((thin,), _development_residuals(), _provenance(), _config())
-
-    # And it says what would have to be decided, rather than deciding it.
-    with pytest.raises(SquadShadowError, match="needs an amendment"):
-        fit_frozen_shift((thin,), _development_residuals(), _provenance(), _config())
+    folds, residuals = _chain(missing="2021-22-gw04")
+    with pytest.raises(SquadShadowError, match="missing folds this population expected"):
+        fit_frozen_shift(folds, residuals, _provenance(), _config())
 
 
 def test_a_fold_with_exactly_the_pinned_history_is_accepted(

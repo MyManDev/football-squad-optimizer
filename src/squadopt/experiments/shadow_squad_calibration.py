@@ -468,6 +468,12 @@ def fit_frozen_shift(
     The fit runs at shift zero — the quantity being measured is exactly the gap a
     zero-shift evaluation leaves — and refuses any fold from the frozen evaluation
     season, so the number applied to 2024-25 cannot have been fitted on it.
+
+    Clause 27: the development population is one chronological chain, so its earliest
+    folds carry less residual history than ``min_history_folds`` declares. They are a
+    burn-in and do not enter the mean. Eligibility is read from each fold's own
+    declared history before anything is generated (clause 28), never from which folds
+    the generator happened to refuse.
     """
 
     _require(bool(folds), "the shift needs at least one development fold.")
@@ -495,26 +501,34 @@ def fit_frozen_shift(
         "history from the wrong one.",
     )
 
-    thin = tuple(
-        fold.fold_id for fold in ordered if len(set(fold.prior_fold_ids)) < config.min_history_folds
+    burn_in = tuple(
+        fold for fold in ordered if len(set(fold.prior_fold_ids)) < config.min_history_folds
     )
-    # The message is built before the check runs, so the example has to survive an
-    # empty tuple.
-    example = thin[0] if thin else ""
+    eligible = tuple(
+        fold for fold in ordered if len(set(fold.prior_fold_ids)) >= config.min_history_folds
+    )
     _require(
-        not thin,
-        f"{len(thin)} of {len(ordered)} development folds carry fewer than "
-        f"{config.min_history_folds} prior residual folds, the first being {example!r}. "
-        "The generator refuses such a fold outright, and the pre-registration does not "
-        "say what should happen to it: whether these folds leave the shift fit, or "
-        "whether the residual history widens to cover them. This run will not decide "
-        "that. The choice moves the shift, therefore S1 and S2, and choosing it once "
-        "the crash has told you which folds are affected is exactly the control chosen "
-        "after the fact that this protocol exists to prevent. It needs an amendment.",
+        [fold.fold_id for fold in burn_in] == [fold.fold_id for fold in ordered[: len(burn_in)]],
+        "the folds with too little history are not the earliest of the chain; the "
+        "development population is not the chronological chain this protocol declares.",
+    )
+    _require(
+        len(burn_in) <= config.min_history_folds,
+        f"the burn-in is {len(burn_in)} folds where the declared history depth of "
+        f"{config.min_history_folds} allows at most that many: the fold at position "
+        f"{config.min_history_folds} of the chain already has that much history behind "
+        "it. A longer burn-in means the residual export is missing folds this "
+        "population expected, so the run stops rather than dropping folds nobody "
+        "declared.",
+    )
+    _require(
+        bool(eligible),
+        f"every one of the {len(ordered)} development folds is burn-in, so the shift "
+        "would be a mean of nothing.",
     )
 
     gaps: list[float] = []
-    for fold in ordered:
+    for fold in eligible:
         _, gap = _read_fold(
             fold,
             residuals,
@@ -527,12 +541,13 @@ def fit_frozen_shift(
             ),
         )
         gaps.append(gap)
+    # Clause 30: the folds that actually entered the mean, not the folds handed in.
     return FrozenShift(
         shift_points=-float(np.mean(gaps)),
-        fold_count=len(ordered),
-        first_fold_id=ordered[0].fold_id,
-        last_fold_id=ordered[-1].fold_id,
-        seasons=tuple(sorted({fold.season for fold in ordered})),
+        fold_count=len(eligible),
+        first_fold_id=eligible[0].fold_id,
+        last_fold_id=eligible[-1].fold_id,
+        seasons=tuple(sorted({fold.season for fold in eligible})),
     )
 
 
