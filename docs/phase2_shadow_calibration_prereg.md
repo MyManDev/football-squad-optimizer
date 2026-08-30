@@ -381,3 +381,36 @@ quantile, bands and gates are untouched.
 The boundaries of the second amendment are unchanged and still bind: cross-season
 history may only be carried within the fit seasons, no 2024-25 fold may enter the shift
 fit, and 2025-26 is never read.
+
+## Corrective-execution amendment (2026-08-30): residual validation and serialization
+
+The first squad execution stopped without producing an S1 or S2 reading, and without
+writing an artifact. It refused during the first eligible development fold, on the
+residual history the generator validates before it draws anything.
+
+**The cause is two committed contracts disagreeing, not a measurement.** The residual
+export declares `predicted_points_decimals = 9` and rounds `predicted_points`,
+`realized_points` and `residual` to nine decimals **independently**, so the identity
+`residual = realized_points - predicted_points` can differ by one unit in the ninth
+decimal purely as a consequence of that serialization. `validate_residual_history`
+required the identity to hold to an absolute tolerance of `1e-10`, an order of
+magnitude tighter than the granularity the export is allowed to have. Exactly one row
+of 101,447 fell in the gap: `1.0 - 0.449414062 = 0.550585938` against a stored residual
+of `0.550585937`. The largest discrepancy anywhere in the export is `1.0e-09`.
+
+31. **Under nine-decimal serialization the accepted absolute tolerance for the residual
+    identity is `1e-9`.** That is the smallest difference the declared serialization can
+    represent, so it is the smallest difference that can be attributed to rounding
+    rather than to the numbers.
+32. **Nothing is corrected, recomputed or normalised.** No input value changes, no
+    column is recomputed, and the residual export is neither regenerated nor edited —
+    it remains bound by its recorded digest `17f88e6e…`, and the recorded P1 artifact
+    remains exactly as it was. The tolerance only stops refusing a difference the
+    serialization contract is entitled to produce.
+33. **A materially inconsistent history is still refused.** The identity is still
+    checked on every row; a discrepancy larger than the serialization can explain — at
+    `1e-8` and above — still stops the run.
+34. **Nothing else moves.** Gates, bands, split, seeds, scenario count, the model, the
+    optimizer's settings and the shift's fit population are unchanged, and this
+    amendment authorises one corrective execution under exactly the inputs the first
+    one used.
