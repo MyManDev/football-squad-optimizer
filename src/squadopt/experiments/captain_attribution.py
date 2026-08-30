@@ -50,8 +50,15 @@ from squadopt.experiments.tail_diagnostic import (
     _evaluation_config,
     optimize_squad_once,
 )
+from squadopt.optimization import OptimizationResult
 from squadopt.prediction import PredictionProvenance, prepare_optimizer_projection
-from squadopt.scenarios import ScenarioTarget, evaluate_fixed_decision, generate_scenarios
+from squadopt.scenarios import (
+    ScenarioEvaluationResult,
+    ScenarioSet,
+    ScenarioTarget,
+    evaluate_fixed_decision,
+    generate_scenarios,
+)
 
 CAPTAIN_ATTRIBUTION_CONTRACT_VERSION: Final = "phase2_captain_attribution_v1"
 
@@ -187,6 +194,7 @@ def read_fold(
         scenarios,
         evaluated,
         config,
+        captain_id=captain_id,
         full_scores=full_scores,
         ablated_scores=ablated_scores,
         ablated_realized=ablated_realized,
@@ -211,11 +219,12 @@ def read_fold(
 
 def _decomposition_holds(
     fold: SquadFold,
-    decision: object,
-    scenarios: object,
-    evaluated: object,
+    decision: OptimizationResult,
+    scenarios: ScenarioSet,
+    evaluated: ScenarioEvaluationResult,
     config: SquadShadowConfig,
     *,
+    captain_id: int,
     full_scores: np.ndarray,
     ablated_scores: np.ndarray,
     ablated_realized: float,
@@ -231,15 +240,11 @@ def _decomposition_holds(
     copy" would be removing him, and the whole framing would be a different study.
     """
 
-    starters = [
-        int(player_id)
-        for player_id in decision.starting_xi["player_id"]  # type: ignore[attr-defined]
-    ]
-    captain_id = int(decision.captain["player_id"])  # type: ignore[attr-defined]
-    if captain_id not in starters:
+    starters = [int(player_id) for player_id in decision.starting_xi["player_id"]]
+    if int(captain_id) not in starters:
         return False
 
-    matrix = scenarios.scenario_points  # type: ignore[attr-defined]
+    matrix = scenarios.scenario_points
     starter_scenario = matrix[starters].to_numpy(dtype="float64").sum(axis=1)
     realized = dict(
         zip(
@@ -252,7 +257,7 @@ def _decomposition_holds(
         return False
     starter_realized = float(sum(float(realized[player_id]) for player_id in starters))
 
-    metrics = evaluated.metrics  # type: ignore[attr-defined]
+    metrics = evaluated.metrics
     return bool(
         float(np.abs(ablated_scores - (starter_scenario + FROZEN_SHIFT_POINTS)).max())
         <= DECOMPOSITION_TOLERANCE

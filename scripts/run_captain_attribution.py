@@ -14,6 +14,7 @@ member-facing surface, and the locked 2025-26 season never reaches a loader.
 """
 
 import argparse
+import hashlib
 import sys
 import warnings
 from collections.abc import Mapping
@@ -55,6 +56,7 @@ from squadopt.experiments.shadow_squad_calibration import (
     MIN_PRIOR_GAMEWEEKS_IN_SEASON,
     SquadShadowConfig,
     SquadShadowError,
+    _require,
     build_squad_folds,
     declared_parameters,
     frozen_history_fold_ids,
@@ -98,8 +100,6 @@ def _parse_arguments() -> argparse.Namespace:
 
 
 def _digests() -> dict[str, str]:
-    import hashlib
-
     return {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in SOURCE_ARTIFACTS}
 
 
@@ -154,7 +154,11 @@ def _measure(arguments: argparse.Namespace, config: SquadShadowConfig) -> dict[s
     classification_population = [
         reading for reading in readings if reading.season == SENSITIVITY_SEASON
     ]
-    _require_population(classification_population)
+    _require(
+        bool(classification_population),
+        f"the classification population {SENSITIVITY_SEASON} carries no folds; the "
+        "attribution has nothing to classify.",
+    )
     arms = summarise(classification_population)
     _require_full_arm_reproduces_the_record(arms[FULL])
     classification, reasons = classify(arms)
@@ -200,24 +204,14 @@ def _require_full_arm_reproduces_the_record(full: Mapping[str, float | bool]) ->
 
     pit = float(full["mean_probability_integral_transform"])
     rate = float(full["below_lower_quantile_rate"])
-    if (
-        abs(pit - RECORDED_MEAN_PIT) > REPLAY_TOLERANCE
-        or abs(rate - RECORDED_BELOW_QUANTILE_RATE) > REPLAY_TOLERANCE
-    ):
-        raise SquadShadowError(
-            f"the full arm reads mean PIT {pit!r} and below-q10 rate {rate!r} on "
-            f"{SENSITIVITY_SEASON}, against the recorded {RECORDED_MEAN_PIT!r} and "
-            f"{RECORDED_BELOW_QUANTILE_RATE!r}. This study explains the recorded result, "
-            "so it stops rather than attributing a different one."
-        )
-
-
-def _require_population(population: list[CaptainReading]) -> None:
-    if not population:
-        raise SquadShadowError(
-            f"the classification population {SENSITIVITY_SEASON} carries no folds; the "
-            "attribution has nothing to classify."
-        )
+    _require(
+        abs(pit - RECORDED_MEAN_PIT) <= REPLAY_TOLERANCE
+        and abs(rate - RECORDED_BELOW_QUANTILE_RATE) <= REPLAY_TOLERANCE,
+        f"the full arm reads mean PIT {pit!r} and below-q10 rate {rate!r} on "
+        f"{SENSITIVITY_SEASON}, against the recorded {RECORDED_MEAN_PIT!r} and "
+        f"{RECORDED_BELOW_QUANTILE_RATE!r}. This study explains the recorded result, "
+        "so it stops rather than attributing a different one.",
+    )
 
 
 def main() -> int:
@@ -228,9 +222,7 @@ def main() -> int:
     dirty = _tree_dirty_ignoring(arguments.json_output)
 
     print(f"Study       {CAPTAIN_ATTRIBUTION_CONTRACT_VERSION}")
-    print("Arms        full and captain_bonus_removed, each shifted and unshifted")
     print(f"Classify on {SENSITIVITY_SEASON}   Sensitivity {', '.join(STUDY_SEASONS)}")
-    print(f"Shift       {FROZEN_SHIFT_POINTS} (frozen, not refitted)")
     print(f"Commit      {revision} (tree dirty: {str(dirty).lower()})")
     if dirty:
         print(

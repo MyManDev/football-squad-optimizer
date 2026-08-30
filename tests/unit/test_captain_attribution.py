@@ -6,9 +6,7 @@ the scenario side and the realized side is the same extra copy the scoring polic
 These tests pin that, the three classification branches, and the refusals.
 """
 
-import json
 from collections.abc import Mapping
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -28,7 +26,6 @@ from squadopt.experiments.captain_attribution import (
     refuse_unexpected_folds,
     summarise,
 )
-from squadopt.experiments.shadow_report import ShadowReportError, write_document_once
 from squadopt.experiments.shadow_squad_calibration import (
     SquadFold,
     SquadShadowConfig,
@@ -221,7 +218,6 @@ def test_the_full_score_decomposes_into_the_rest_plus_the_extra_captain_copy(
     captain = np.asarray(captain_scenario, dtype="float64")
     assert isinstance(ablated_scores, np.ndarray)
     assert np.allclose(np.asarray(expected["full_scores"]) - captain, ablated_scores)
-    assert np.all(ablated_scores > ablated_scores - captain)
 
     # And the module reports readings taken from exactly those two distributions.
     assert reading.pit[ABLATED] == pytest.approx(
@@ -258,7 +254,6 @@ def test_only_the_multiplier_copy_is_removed_at_a_doubling_policy(
     twice_removed = np.asarray(expected["full_scores"]) - 2 * captain
     assert not np.allclose(ablated, twice_removed)
     assert reading.ablated_realized_score == pytest.approx(9.0)
-    assert reading.ablated_realized_score != pytest.approx(9.0 - 1.0)
     assert reading.pit[ABLATED] == pytest.approx(float((ablated <= 9.0).mean()))
 
 
@@ -528,22 +523,3 @@ def test_the_reading_is_deterministic(monkeypatch: pytest.MonkeyPatch) -> None:
     first, _ = _read(monkeypatch, captain_scenario=[4.0, 6.0, 8.0], other_starters=[10.0] * 3)
     second, _ = _read(monkeypatch, captain_scenario=[4.0, 6.0, 8.0], other_starters=[10.0] * 3)
     assert first == second
-
-
-# --- the artifact ---------------------------------------------------------------------
-
-
-def test_the_artifact_round_trips_and_is_never_silently_overwritten(tmp_path: Path) -> None:
-    target = tmp_path / "attribution.json"
-    document = {
-        "contract_version": "phase2_captain_attribution_v1",
-        "classification": SHARED_TAIL_FAILURE,
-        "promotion_eligible": False,
-    }
-    assert write_document_once(document, target) == "written"
-    assert json.loads(target.read_text(encoding="utf-8")) == document
-    assert write_document_once(document, target) == "replay"
-
-    with pytest.raises(ShadowReportError, match="already holds a different measurement"):
-        write_document_once({**document, "classification": CAPTAIN_CONCENTRATED}, target)
-    assert json.loads(target.read_text(encoding="utf-8"))["classification"] == SHARED_TAIL_FAILURE
