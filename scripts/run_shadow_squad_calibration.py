@@ -104,7 +104,7 @@ CUTOFF_FOLD_ID: Final = "2023-24-gw38"
 #: recorded artifact" a fact rather than whichever file a path happens to reach; a new
 #: P1 measurement is a new protocol input, and updating this is a deliberate act.
 PLAYER_REPORT: Final = REPOSITORY_ROOT / "docs" / "shadow_calibration_in_season_corrected.json"
-PLAYER_REPORT_SHA256: Final = "a689617bda79703a6cfd8681d06781bb4ddfc0cad1737b9507996cd46dbfaef2"
+PLAYER_REPORT_SHA256: Final = "9dd3ec75d11924a1390e1086974cb0243ae1a44791b4b9e6f1477aaa137f0139"
 
 #: Its own file. The player-level runner's default path holds that runner's artifact;
 #: sharing it would turn every first run into a conflict rather than a record.
@@ -327,6 +327,18 @@ def main() -> int:
     print(f"Scenarios   {config.scenario_count} at seed {config.scenario_seed}")
     print(f"Commit      {revision} (tree dirty: {str(dirty).lower()})")
 
+    if dirty:
+        # The corrective amendment makes a clean tree a condition of an eligible
+        # execution, and the artifact path is written once. Measuring anyway would
+        # spend that path on an abstention and leave the eligible run with nowhere to
+        # record itself, so this stops before anything is read.
+        print(
+            "\nRefused: the working tree carries changes this run did not write, so "
+            "its numbers could not be reproduced from the commit it would record. "
+            "Nothing was measured and nothing was written."
+        )
+        return 1
+
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:
@@ -345,15 +357,6 @@ def main() -> int:
             f"{len(readings)} evaluation folds are fewer than the pre-registered "
             f"minimum of {config.min_evaluation_folds}."
         )
-    if dirty:
-        # Symmetric with the rule applied to the recorded player report: a run whose
-        # own tree was modified cannot be reproduced from the commit it names, and the
-        # corrective amendment makes a clean tree a condition of an eligible execution.
-        abstentions.append(
-            "this run was executed from a modified working tree, so its numbers cannot "
-            "be reproduced from the commit it records."
-        )
-
     report = combine_full_protocol(
         generated_at_utc=started.isoformat(timespec="seconds"),
         execution=ShadowExecutionMetadata(
