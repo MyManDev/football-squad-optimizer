@@ -137,3 +137,39 @@ No new threshold is invented; the existing S2 band is the only one used.
 No outcome promotes anything, changes any member-facing surface, published field,
 contract or evidence status, or publishes a probability, percentage or `P(...)`
 anywhere. The 2025-26 holdout stays closed under every outcome.
+
+## Amendment (2026-08-30, before any number was computed)
+
+An adversarial read of the implementation found two places where the wording above was
+narrower than the purpose it stated. Both are tightened here, before the study ran.
+
+**A. The veto compares where the ablated tail sits, not merely whether it is inside the
+band.** As written, the disagreement rule fired only when the two location conventions
+disagreed about `s2_within_band`. Two conventions can disagree maximally and still agree
+on that flag: one placing the ablated rate *above* the band and the other *below* the
+floor are both "not inside", so the rule would have stayed silent and the study would
+have emitted `shared_tail_failure` — a confident word resting entirely on which
+convention was chosen, which is what the rule exists to prevent. The comparison is
+therefore on the three-state verdict — inside the band, above it, or below the floor —
+and any disagreement between the conventions yields `inconclusive`.
+
+**B. The decomposition check verifies the identity it is named for.** The check as first
+written compared the study's quantile and mean against the evaluator's own, which is
+worth doing, but its third term compared a quantity with itself and so could not fail.
+The identity is now checked against the canonical scenario matrix and the fold's own
+realized frame: the captain-bonus-removed scenario score must equal the sum of the
+starting XI's own columns plus the frozen shift, and the captain-bonus-removed realized
+score must equal the sum of the starting XI's realized points. The captain must be a
+member of the starting XI, and a fold where either identity fails stops the study rather
+than being reported.
+
+**C. The correlation is reported twice, because one of the two is inflated by
+construction.** The full-squad score error mechanically contains the captain's error
+twice — once through his starter copy and once through the bonus — so its correlation
+with the captain bonus error is partly an autocorrelation and cannot be read as evidence
+that the captain explains the squad error. The correlation against the
+captain-bonus-removed score error, which contains the captain only as a starter, is
+reported beside it. Neither decides anything.
+
+No band, seed, fold, decision or arm changes. Every tightening here can only make the
+study refuse more often or report more, never claim more.
