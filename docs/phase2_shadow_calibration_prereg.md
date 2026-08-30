@@ -346,3 +346,38 @@ draw a stronger conclusion than the numbers support.
   pooled cell is required by name and every recorded cell's verdict is recomputed from
   its own observation — but a reader should know that "P1 answered" is a statement
   about the family, and that the cells are what the recorded artifact happens to carry.
+
+## Third squad-gate amendment (2026-08-30): the frozen shift's fit population
+
+**Written 2026-08-30, still before any target-model S1/S2 measurement exists.** It
+settles the one question the second amendment left open and nothing else: which
+development folds enter the frozen shift's mean. Thresholds, seeds, scenario count,
+quantile, bands and gates are untouched.
+
+27. **A fold with less history than the declared depth does not enter the shift fit.**
+    The development population is one chronological chain across the fit seasons, and
+    each fold's residual history is the folds of that chain before it. `ScenarioConfig`
+    is pre-registered at `min_history_folds = 8`, so the earliest folds of the chain
+    have less history than the generator is declared to use. They are a **burn-in**:
+    they are excluded from the mean, and the shift is the negated mean gap over the
+    remainder. The alternative — widening the residual history so that every fold
+    qualifies — is rejected: 2020-21 is loaded as projection and feature history, not
+    as residual calibration history, and admitting it would calibrate the shift against
+    a population the residual export does not describe.
+28. **Eligibility is decided before any scenario is generated.** It is read from the
+    fold's own declared history, deterministically, before scenario generation and gate
+    computation. It is not discovered by running a fold and catching the generator's
+    refusal: a population chosen by which folds happened to raise is a population
+    chosen after the fact.
+29. **The excluded folds are the earliest of the chain, and there are exactly as many
+    of them as the declared depth.** Any other count means the residual export is
+    missing folds the population expected, so the run stops and says so rather than
+    quietly dropping folds nobody declared. An empty remainder is likewise a refusal,
+    never an empty mean.
+30. **The remainder is recorded, not implied.** The fold count, first fold id and last
+    fold id already required by clause 18 describe the folds that actually entered the
+    mean.
+
+The boundaries of the second amendment are unchanged and still bind: cross-season
+history may only be carried within the fit seasons, no 2024-25 fold may enter the shift
+fit, and 2025-26 is never read.
