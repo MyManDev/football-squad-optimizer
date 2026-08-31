@@ -529,7 +529,8 @@ def plan_transfer_horizon(
     transition model, so accepting changing prices here would make later sale proceeds
     depend on an unversioned forecast.
 
-    The default allows at most one transfer per gameweek. That is the measured rolling
+    A one-week horizon reuses the uncapped operational transfer policy exactly. Longer
+    horizons default to at most one transfer per gameweek. That is the measured rolling
     discipline in ``docs/transfer_discipline_note.md``: the uncapped rolling planner
     churned, while the cap removed the mechanism. Callers may provide another explicit
     policy, whose configuration fingerprint remains in the result.
@@ -541,6 +542,7 @@ def plan_transfer_horizon(
 
     if not isinstance(projection_horizon, ProjectionHorizon):
         raise DataSourceError("projection_horizon must be a ProjectionHorizon.")
+    projection_horizon.assert_fingerprint()
     if not isinstance(held, HeldSquad):
         raise DataSourceError("held must be a HeldSquad.")
     first_gameweek = projection_horizon.target_gameweeks[0]
@@ -606,7 +608,9 @@ def plan_transfer_horizon(
     planning_policy = (
         TransferPlanningConfig(
             max_free_transfers=rules.transfers.max_free_transfers,
-            max_transfers_per_gameweek=1,
+            max_transfers_per_gameweek=(
+                None if len(projection_horizon.target_gameweeks) == 1 else 1
+            ),
         )
         if transfer_config is None
         else transfer_config

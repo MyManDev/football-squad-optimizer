@@ -19,7 +19,7 @@ from squadopt.application.horizon_plans import (
 )
 from squadopt.data.errors import DataError
 
-HORIZON_BATCH_CONTRACT_VERSION: Final = "live_transfer_horizon_batch_v1"
+HORIZON_BATCH_CONTRACT_VERSION: Final = "live_transfer_horizon_batch_v2"
 DEFAULT_HORIZONS: Final = (1, 3, 5)
 DEFAULT_SHADOW_HORIZONS: Final = frozenset({3, 5})
 
@@ -60,10 +60,12 @@ class HorizonBatchRequest:
             isinstance(value, bool) or not isinstance(value, int) for value in self.shadow_horizons
         ):
             raise DataError("shadow_horizons must be a frozenset of integers.")
-        if not self.shadow_horizons.issubset(self.horizons):
-            raise DataError("shadow_horizons must be a subset of horizons.")
-        if 1 in self.shadow_horizons:
-            raise DataError("The one-week live control cannot be a shadow horizon.")
+        expected_shadows = frozenset(value for value in self.horizons if value > 1)
+        if self.shadow_horizons != expected_shadows:
+            raise DataError(
+                "shadow_horizons must contain every requested horizon longer than one "
+                f"and no others; expected {sorted(expected_shadows)!r}."
+            )
         for name in ("deterministic_time_per_gameweek", "solver_wall_ceiling_seconds"):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int | float) or value <= 0:
@@ -106,14 +108,11 @@ def _manifest(
         rows.append(
             {
                 "horizon": result.last_gameweek - result.first_gameweek + 1,
-                "decision_role": (
-                    "live_control"
-                    if result.last_gameweek == result.first_gameweek
-                    else "research_shadow"
-                ),
+                "decision_role": str(result.document["decision_role"]),
                 "target_gameweeks": list(range(result.first_gameweek, result.last_gameweek + 1)),
                 "solver_status": result.solver_status.name,
-                "solver_proof_status": result.publication_status,
+                "solver_proof_status": str(result.document["solver_proof_status"]),
+                "publication_status": result.publication_status,
                 "relative_optimality_gap": (float(str(gap)) if gap is not None else None),
                 "artifact_fingerprint": result.artifact_fingerprint,
                 "artifact_path": _relative_artifact(result.artifact_path, request.artifact_root),
@@ -125,6 +124,8 @@ def _manifest(
         "season": first.season,
         "source_snapshot_id": first.snapshot_id,
         "first_gameweek": first.first_gameweek,
+        "projection_handoff_fingerprint": first.document["projection_handoff_fingerprint"],
+        "initial_state_fingerprint": first.document["initial_state_fingerprint"],
         "decision_horizon": 1,
         "shadow_horizons": sorted(request.shadow_horizons),
         "public_advice_policy": "only_the_one_week_control_is_decision_eligible",
@@ -170,6 +171,12 @@ def plan_horizon_batch(
         )
     completed = tuple(plans)
     first = completed[0]
+    for expected_horizon, result in zip(request.horizons, completed, strict=True):
+        actual_horizon = result.last_gameweek - result.first_gameweek + 1
+        if actual_horizon != expected_horizon:
+            raise DataError(
+                f"Planner returned horizon {actual_horizon}, expected {expected_horizon}."
+            )
     if any(
         result.season != first.season
         or result.snapshot_id != first.snapshot_id
@@ -177,6 +184,15 @@ def plan_horizon_batch(
         for result in completed[1:]
     ):
         raise DataError("Every horizon in a batch must share season, snapshot, and origin.")
+    lineage_fields = ("projection_handoff_fingerprint", "initial_state_fingerprint")
+    first_lineage = tuple(first.document.get(field) for field in lineage_fields)
+    if any(value is None for value in first_lineage) or any(
+        tuple(result.document.get(field) for field in lineage_fields) != first_lineage
+        for result in completed[1:]
+    ):
+        raise DataError(
+            "Every horizon in a batch must share one projection handoff and initial ledger state."
+        )
     manifest = _manifest(request, completed)
     fingerprint = str(manifest["batch_fingerprint"])
     destination = (

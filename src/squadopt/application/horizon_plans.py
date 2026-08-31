@@ -23,6 +23,9 @@ import pandas as pd
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.live import (
+    CONTROL_MODEL_NAME,
+    IN_SEASON_CONTROL_MODEL_VERSIONS,
+    HeldSquad,
     build_projection_horizon,
     held_squad_from_ledger,
     infer_season,
@@ -34,7 +37,7 @@ from squadopt.live import (
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import ProjectionHorizon, TransferPlanningConfig, TransferPlanResult
 
-HORIZON_PLAN_ARTIFACT_CONTRACT_VERSION: Final = "live_transfer_horizon_v1"
+HORIZON_PLAN_ARTIFACT_CONTRACT_VERSION: Final = "live_transfer_horizon_v2"
 SUPPORTED_HORIZON_LENGTHS: Final = frozenset({1, 3, 5})
 _RUNTIME_DIAGNOSTICS: Final = frozenset(
     {
@@ -145,6 +148,9 @@ def horizon_plan_document(
     horizon: ProjectionHorizon,
     plan: TransferPlanResult,
     transfer_config: TransferPlanningConfig,
+    *,
+    projection_handoff_fingerprint: str,
+    initial_state_fingerprint: str,
 ) -> dict[str, object]:
     """Serialize a planner result as a deterministic operational artifact."""
 
@@ -154,6 +160,19 @@ def horizon_plan_document(
         raise TypeError("plan must be a TransferPlanResult.")
     if not isinstance(transfer_config, TransferPlanningConfig):
         raise TypeError("transfer_config must be a TransferPlanningConfig.")
+    for name, value in (
+        ("projection_handoff_fingerprint", projection_handoff_fingerprint),
+        ("initial_state_fingerprint", initial_state_fingerprint),
+    ):
+        if not isinstance(value, str) or not value.strip():
+            raise TypeError(f"{name} must be non-empty text.")
+    horizon_length = len(horizon.target_gameweeks)
+    solver_proof_status = "proven" if plan.solver_status is SolverStatus.OPTIMAL else "unproven"
+    decision_role = (
+        "live_control"
+        if horizon_length == 1 and plan.solver_status is SolverStatus.OPTIMAL
+        else "research_shadow"
+    )
     diagnostics = {
         key: value for key, value in plan.diagnostics.items() if key not in _RUNTIME_DIAGNOSTICS
     }
@@ -164,6 +183,8 @@ def horizon_plan_document(
         "source_snapshot_id": horizon.source_snapshot_id,
         "projection_horizon_contract_version": horizon.contract_version,
         "projection_horizon_fingerprint": horizon.horizon_fingerprint,
+        "projection_handoff_fingerprint": projection_handoff_fingerprint,
+        "initial_state_fingerprint": initial_state_fingerprint,
         "model_name": horizon.model_name,
         "model_version": horizon.model_version,
         "feature_contract_version": horizon.feature_contract_version,
@@ -177,8 +198,10 @@ def horizon_plan_document(
             "banked_transfer_value_points": transfer_config.banked_transfer_value_points,
         },
         "solver_status": plan.solver_status.name,
+        "decision_role": decision_role,
+        "solver_proof_status": solver_proof_status,
         "publication_status": (
-            "proven" if plan.solver_status is SolverStatus.OPTIMAL else "shadow_unproven"
+            "decision_eligible" if decision_role == "live_control" else "shadow_only"
         ),
         "objective_value": plan.objective_value,
         "total_projected_score": plan.total_projected_score,
@@ -244,8 +267,8 @@ def write_horizon_plan(path: Path, document: Mapping[str, object]) -> bool:
         except FileExistsError:
             if destination.read_text(encoding="utf-8") != serialized:
                 raise DataError(
-                    f"Refusing to overwrite {destination}: an artifact with different content "
-                    "already exists at this immutable path."
+                    f"Refusing to overwrite {destination}: an artifact with different "
+                    "content already exists at this immutable path."
                 ) from None
             return False
         return True
@@ -254,12 +277,38 @@ def write_horizon_plan(path: Path, document: Mapping[str, object]) -> bool:
             temporary_path.unlink(missing_ok=True)
 
 
+def _initial_state_fingerprint(held: HeldSquad) -> str:
+    payload = {
+        "season": held.season,
+        "decided_gameweek": held.decided_gameweek,
+        "squad_player_ids": list(held.squad_player_ids),
+        "purchase_prices": {
+            str(player): int(price) for player, price in sorted(held.purchase_prices.items())
+        },
+        "bank_tenths": held.bank_tenths,
+        "free_transfers": held.free_transfers,
+        "chips_used": {str(name): list(weeks) for name, weeks in sorted(held.chips_used.items())},
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def plan_horizon(request: HorizonPlanRequest) -> HorizonPlanResult:
     """Plan, validate, and immutably record one deterministic transfer horizon."""
 
     snapshot_id, snapshot = _resolve_snapshot(request.snapshot_root, request.snapshot_id)
     season = request.season or infer_season(snapshot)
     handoff = read_projection_handoff(request.in_season_projection)
+    if handoff.model_name != CONTROL_MODEL_NAME:
+        raise DataError(
+            f"Projection handoff model {handoff.model_name!r} is not the operational "
+            f"control {CONTROL_MODEL_NAME!r}."
+        )
+    if handoff.model_version not in IN_SEASON_CONTROL_MODEL_VERSIONS:
+        raise DataError(
+            f"Projection handoff model version {handoff.model_version!r} is not a promoted "
+            "in-season control."
+        )
     first = request.from_gameweek or handoff.gameweek
     targets = tuple(range(first, first + request.gameweeks))
     inputs = read_inputs(snapshot, season=season, gameweek=first)
@@ -301,7 +350,13 @@ def plan_horizon(request: HorizonPlanRequest) -> HorizonPlanResult:
             f"optimal (deterministic time {used!r}, relative gap {gap!r}). It may only "
             "be written explicitly with allow_feasible_shadow=True."
         )
-    document = horizon_plan_document(horizon, plan, transfer_config)
+    document = horizon_plan_document(
+        horizon,
+        plan,
+        transfer_config,
+        projection_handoff_fingerprint=handoff.fingerprint,
+        initial_state_fingerprint=_initial_state_fingerprint(held),
+    )
     fingerprint = str(document["artifact_fingerprint"])
     destination = request.output_path or (
         request.artifact_root

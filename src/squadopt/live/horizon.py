@@ -14,13 +14,12 @@ gameweek ahead.
 
 Two consequences are stated rather than buried.
 
-**Expected points scale linearly with fixture count.** A blank gameweek projects exactly
-zero, a double projects twice a single. That is not a new rule invented here — the
-expected-minutes stage already scales by fixture count and caps at that many full matches
-(`prediction/minutes.py`). Reusing it keeps one treatment of the calendar rather than two.
-But the operational control that produces the base projection is calendar-blind, so the
-scaling is post-processing applied on top of it, and it is named in the horizon's
-post-processing contract instead of hiding inside the number.
+**The first gameweek preserves the operational control exactly.** Calendar scaling is
+applied only to later shadow weeks. This keeps H1 bit-for-bit identical even when the
+captured calendar contains a blank or double gameweek; changing the decision week's
+numbers here would create a second, unpromoted live policy. Later weeks still scale
+linearly with fixture count, and that uncalibrated extrapolation remains explicit in the
+horizon's post-processing contract.
 
 **The horizon is not gate evidence.** The frozen evaluation objective is single-gameweek
 realized squad points. Nothing measures how far a multi-gameweek projection drifts, and it
@@ -43,6 +42,7 @@ from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
     fixture_snapshot,
+    gameweek_deadlines,
     player_snapshot,
     team_codes,
     team_names,
@@ -67,7 +67,7 @@ from squadopt.prediction.config import BaselineProjectionConfig
 # The calendar rule applied on top of the calendar-blind control. Named in the horizon's
 # post-processing contract so a consumer can tell that the scaling happened outside the
 # model rather than inside it.
-FIXTURE_SCALING_RULE_VERSION: Final = "linear_fixture_count_scaling_v1"
+FIXTURE_SCALING_RULE_VERSION: Final = "first_week_control_future_fixture_scaling_v2"
 HORIZON_POST_PROCESSING_CONTRACT_VERSION: Final = (
     f"{AVAILABILITY_RULE_CONTRACT_VERSION}+{FIXTURE_SCALING_RULE_VERSION}"
 )
@@ -202,6 +202,13 @@ def build_projection_horizon(
     # The information state. Read once, at the first target, and reused unchanged for
     # every later gameweek — which is the whole claim this module makes.
     inputs = read_inputs(decision_snapshot, season=resolved_season, gameweek=gameweeks[0])
+    published_gameweeks = {deadline.gameweek for deadline in gameweek_deadlines(bootstrap)}
+    unavailable_gameweeks = sorted(set(gameweeks) - published_gameweeks)
+    if unavailable_gameweeks:
+        raise DataSourceError(
+            "Projection horizon targets gameweeks absent from the captured season: "
+            f"{unavailable_gameweeks!r}."
+        )
     projection = project(
         inputs,
         panel,
@@ -230,7 +237,15 @@ def build_projection_horizon(
         )
     base["team_code"] = base["team_id"].astype("string").map(bridge).astype("int64")
 
-    frames = [_gameweek_rows(base, calendar, gameweek) for gameweek in gameweeks]
+    frames = [
+        _gameweek_rows(
+            base,
+            calendar,
+            gameweek,
+            preserve_expected_points=gameweek == gameweeks[0],
+        )
+        for gameweek in gameweeks
+    ]
     table = pd.concat(frames, ignore_index=True).loc[:, list(PROJECTION_HORIZON_COLUMNS)]
 
     return ProjectionHorizon(
@@ -259,6 +274,8 @@ def _gameweek_rows(
     base: pd.DataFrame,
     calendar: pd.DataFrame,
     gameweek: int,
+    *,
+    preserve_expected_points: bool,
 ) -> pd.DataFrame:
     """Apply one gameweek's calendar to the shared information state.
 
@@ -280,11 +297,18 @@ def _gameweek_rows(
     rows["gameweek"] = int(gameweek)
     rows["fixture_count"] = fixture_count
     rows["home_fixture_count"] = home_count
+    points = rows["expected_points"].astype("float64")
+    if preserve_expected_points and bool(((fixture_count == 0) & (points > 0.0)).any()):
+        players = rows.loc[(fixture_count == 0) & (points > 0.0), "player_id"].tolist()
+        raise DataSourceError(
+            "The operational control assigns positive points to players with no fixture "
+            f"in the decision gameweek (players: {players[:5]!r}); refusing to create a "
+            "different H1 policy inside the horizon builder."
+        )
     rows["expected_points"] = (
-        rows["expected_points"]
-        .astype("float64")
-        .mul(fixture_count.astype("float64"))
-        .clip(lower=0.0)
+        points.clip(lower=0.0)
+        if preserve_expected_points
+        else points.mul(fixture_count.astype("float64")).clip(lower=0.0)
     )
     return rows
 

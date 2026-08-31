@@ -194,7 +194,7 @@ def main() -> int:
         lines += [
             "The calendar is uneven across this horizon, so the per-gameweek totals differ. "
             "Blank rows project exactly zero; double rows scale linearly with fixture count "
-            "under `linear_fixture_count_scaling_v1`.",
+            "under `first_week_control_future_fixture_scaling_v2`.",
         ]
     lines += [
         "",

@@ -53,6 +53,14 @@ def test_batch_joins_control_and_shadow_without_publishing_local_paths(tmp_path:
         "live_control",
         "research_shadow",
     ]
+    assert [row["solver_proof_status"] for row in payload["horizons"]] == [
+        "proven",
+        "proven",
+    ]
+    assert [row["publication_status"] for row in payload["horizons"]] == [
+        "decision_eligible",
+        "shadow_only",
+    ]
     assert payload["public_advice_policy"] == "only_the_one_week_control_is_decision_eligible"
     assert str(tmp_path) not in raw
     assert "%" not in raw
@@ -82,8 +90,12 @@ def test_a_failed_shadow_leaves_reusable_evidence_but_no_batch_manifest(tmp_path
         ({"horizons": (1, 3, 3)}, "unique"),
         ({"horizons": (3, 1)}, "increasing"),
         ({"horizons": (1, 2)}, "Unsupported"),
-        ({"shadow_horizons": frozenset({5})}, "subset"),
-        ({"shadow_horizons": frozenset({1})}, "live control"),
+        ({"shadow_horizons": frozenset({5})}, "every requested horizon"),
+        ({"shadow_horizons": frozenset({1})}, "every requested horizon"),
+        (
+            {"horizons": (1, 3), "shadow_horizons": frozenset()},
+            "every requested horizon",
+        ),
     ],
 )
 def test_batch_contract_rejects_ambiguous_policy(
@@ -105,3 +117,34 @@ def test_cli_horizon_parser_is_explicit() -> None:
     assert _horizons("1,3,5") == (1, 3, 5)
     with pytest.raises(argparse.ArgumentTypeError, match="integers"):
         _horizons("one,three")
+
+
+def test_batch_rejects_mixed_handoff_or_ledger_lineage(tmp_path: Path) -> None:
+    request = _batch_request(tmp_path)
+
+    def change_second_lineage(single: HorizonPlanRequest) -> HorizonPlanResult:
+        result = plan_horizon(single)
+        if single.gameweeks == 3:
+            return replace(
+                result,
+                document={**dict(result.document), "initial_state_fingerprint": "changed"},
+            )
+        return result
+
+    with pytest.raises(DataError, match="one projection handoff and initial ledger state"):
+        plan_horizon_batch(request, planner=change_second_lineage)
+    assert not list(request.artifact_root.rglob("horizon_batch_*.json"))
+
+
+def test_batch_refuses_a_result_for_the_wrong_horizon(tmp_path: Path) -> None:
+    request = _batch_request(tmp_path)
+
+    def wrong_second_horizon(single: HorizonPlanRequest) -> HorizonPlanResult:
+        result = plan_horizon(single)
+        if single.gameweeks == 3:
+            return replace(result, last_gameweek=result.last_gameweek + 1)
+        return result
+
+    with pytest.raises(DataError, match="returned horizon 4, expected 3"):
+        plan_horizon_batch(request, planner=wrong_second_horizon)
+    assert not list(request.artifact_root.rglob("horizon_batch_*.json"))
