@@ -9,9 +9,15 @@ from squadopt.evaluation.models import (
     EvaluationSummary,
     EvaluationValidationError,
     FoldEvaluationResult,
+    FrozenSquadDecision,
+    RealizedSquadScore,
     ScoringPolicy,
 )
-from squadopt.evaluation.scoring import score_realized_squad_points
+from squadopt.evaluation.scoring import (
+    complete_optimization_decision,
+    score_frozen_squad_decision,
+    score_realized_squad_points,
+)
 
 __all__ = [
     "EvaluationConfig",
@@ -21,7 +27,11 @@ __all__ = [
     "EvaluationSummary",
     "EvaluationValidationError",
     "FoldEvaluationResult",
+    "FrozenSquadDecision",
+    "RealizedSquadScore",
     "ScoringPolicy",
+    "complete_optimization_decision",
     "evaluate_prepared_folds",
+    "score_frozen_squad_decision",
     "score_realized_squad_points",
 ]
