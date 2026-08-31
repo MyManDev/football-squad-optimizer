@@ -87,14 +87,18 @@ differences are:
 
 - `delta_projection = Brier(position_x_expected_points_full) - Brier(position_full)`;
 - `delta_recent = Brier(position_x_expected_points_recent8) -
-  Brier(position_x_expected_points_full)`.
+  Brier(position_x_expected_points_full)`;
+- `delta_recent_total = Brier(position_x_expected_points_recent8) -
+  Brier(position_full)`.
 
 Intervals are paired fold-cluster bootstraps with 5,000 resamples, 90% confidence and seed 0.
 An arm improves only when the interval's upper bound is strictly below zero.
 
 For tail non-regression, each arm records the absolute per-fold q25 calibration gap. A candidate
 arm is non-regressing only when the paired interval for
-`absolute gap(candidate) - absolute gap(control)` has an upper bound at or below zero.
+`absolute gap(candidate) - absolute gap(position_full)` has an upper bound at or below zero.
+The incremental recent-versus-full comparison remains descriptive; it cannot substitute for
+the direct recent-versus-position control comparison.
 
 Projection localization is measured under the `position_full` probabilities. For the ordinary
 return state `{2,3}`, compute each fold's observed-minus-predicted gap separately for target
@@ -117,11 +121,13 @@ sensitivity as diagnostics only. No cell, player or season is allowed to select 
 Only 2023-24 assigns one label:
 
 - `projection_and_recency_signal`: support passes, projection is localized, both ordered Brier
-  comparisons improve, and both conditional arms pass q25 non-regression;
+  comparisons and the direct recent-versus-position comparison improve, and both conditional
+  arms pass q25 non-regression against position;
 - `projection_conditional_shape_candidate`: support passes, projection is localized, the full
   conditional arm improves and passes q25 non-regression, while the recent arm does not improve;
 - `recency_weighted_shape_candidate`: support passes, the full conditional arm does not improve,
-  the recent arm improves and passes q25 non-regression;
+  while the recent arm improves directly over position and passes q25 non-regression against
+  position;
 - `conditional_shape_not_localized`: support passes but none of the preceding rules holds;
 - `diagnostic_inconclusive`: a support, reconciliation or required-metric condition fails.
 
@@ -130,6 +136,17 @@ shape-only expected-points candidate study; the third may open a separate recenc
 No candidate is implemented until this artifact has been written and its exact classification
 has selected one branch. A negative or inconclusive result is final for this study and is not
 followed by alternate bands, state definitions, history lengths or support thresholds.
+
+## Pre-execution review amendment
+
+An independent implementation review was completed before any measurement execution. It found
+that the original recency rule compared the recent arm only with the full conditional arm. A
+recent arm could therefore have received a candidate label while still being worse than the
+position control. The direct comparison above closes that gap. The same review clarified that
+reported arm means are fold-weighted, an empty localization population produces
+`diagnostic_inconclusive` rather than aborting the run, and the artifact records the bootstrap
+resamples, confidence level and seed explicitly. These changes select no result and precede the
+implementation commit and binding execution.
 
 ## Interpretation limits
 
