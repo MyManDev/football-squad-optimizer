@@ -104,6 +104,26 @@ different bytes may never overwrite an existing artifact.
 `python -m scripts.plan_transfer_horizon` is only the CLI adapter over this operation.
 It contains argument parsing and presentation, not planning or artifact business logic.
 
+## Batch evidence
+
+`squadopt.application.plan_horizon_batch(...)` runs the supported horizons against the
+same season, snapshot, handoff, ledger origin, and solver-budget policy. Its immutable
+`live_transfer_horizon_batch_v1` manifest links the fingerprinted child artifacts by
+paths relative to the artifact root, so workstation directories never enter portable
+evidence.
+
+The one-week result is the only decision-eligible control. Three- and five-week results
+are labelled `research_shadow` even when the solver proves their mathematical optimum:
+solver proof is not evidence that a longer forecast is calibrated. A failed child leaves
+already completed immutable artifacts available for replay but produces no batch
+manifest, preventing a partial run from looking complete.
+
+```powershell
+.venv\Scripts\python -m scripts.run_transfer_horizon_batch `
+  --horizons 1,3,5 `
+  --in-season-projection data/handoffs/2026-27-gw02.json
+```
+
 ## What this contract does not claim
 
 - It does not predict information that becomes known after the capture. Availability and

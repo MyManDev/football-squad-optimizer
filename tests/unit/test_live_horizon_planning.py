@@ -147,7 +147,23 @@ def test_the_operational_document_is_structured_and_contains_no_percentage_claim
     assert document["target_gameweeks"] == [2]
     assert len(document["weeks"]) == 1
     assert len(str(document["artifact_fingerprint"])) == 64
-    assert "solve_time_seconds" not in document["diagnostics"]
+    assert {
+        "solve_time_seconds",
+        "deterministic_time_used",
+        "tiebreak_deterministic_time",
+        "tiebreak_deterministic_time_limit",
+    }.isdisjoint(document["diagnostics"])
+    nudged = replace(
+        plan,
+        diagnostics={
+            **dict(plan.diagnostics),
+            "solve_time_seconds": 99.0,
+            "deterministic_time_used": 0.015177973877980358,
+            "tiebreak_deterministic_time": 0.008758917086667175,
+            "tiebreak_deterministic_time_limit": 59.993580943208684,
+        },
+    )
+    assert horizon_plan_document(horizon, nudged, config) == document
     assert "%" not in encoded
 
 
