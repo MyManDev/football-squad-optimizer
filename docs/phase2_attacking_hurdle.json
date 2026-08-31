@@ -1,0 +1,442 @@
+{
+  "classification": "diagnostic_inconclusive",
+  "classification_population": "2023-24",
+  "component_rows": 126737,
+  "contract_version": "phase2_attacking_hurdle_v1",
+  "control_replay": {
+    "measured_below_lower_quantile_rate": 0.21621621621621623,
+    "measured_mean_probability_integral_transform": 0.4921621621621622,
+    "recorded_below_lower_quantile_rate": 0.21621621621621623,
+    "recorded_mean_probability_integral_transform": 0.4921621621621622,
+    "reproduced": true,
+    "tolerance": 1e-12
+  },
+  "created_utc": "2026-08-31T11:38:29+00:00",
+  "development_reuse_exploratory": true,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "execution": {
+    "completed_at_utc": "2026-08-31T11:47:02+00:00",
+    "deterministic_seed": 11,
+    "elapsed_seconds": 513.130012,
+    "started_at_utc": "2026-08-31T11:38:29+00:00",
+    "warnings": []
+  },
+  "fold_universe": {
+    "folds_by_season": {
+      "2021-22": 29,
+      "2022-23": 36,
+      "2023-24": 37,
+      "2024-25": 37
+    },
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "starter_rows": 1529,
+    "total_folds": 139
+  },
+  "independent_confirmation": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "observation_support": {
+    "2021-22": {
+      "eligible_folds": 1,
+      "excluded_fold_reasons": {
+        "phase2h_pool_has_1_to_4_positives": 28
+      },
+      "excluded_folds": 28,
+      "history_positive_support": {
+        "five_plus": 224,
+        "one_to_four": 72,
+        "zero": 23
+      },
+      "maximum_absolute_fold_identity_error": 8.881784197001252e-16,
+      "maximum_absolute_player_identity_error": 1.7763568394002505e-15,
+      "minutes": {
+        "completed_60_plus": 271,
+        "partial_1_to_59": 16,
+        "zero": 32
+      },
+      "selected_starters": 319,
+      "severity_reference_positive_support": {
+        "five_plus": 247,
+        "one_to_four": 72,
+        "zero": 0
+      },
+      "severity_source_counts": {
+        "phase2h_player_position": 296,
+        "pooled_zero_positive_fallback": 22,
+        "position_zero_positive_fallback": 1
+      },
+      "supported_starters": 247,
+      "target_fixture_counts": {
+        "1": 294,
+        "2": 25
+      },
+      "target_positive_returns": 92,
+      "target_zero_returns": 227,
+      "unsupported_player_reasons": {
+        "phase2h_pool_has_1_to_4_positives": 72
+      },
+      "unsupported_starters": 72,
+      "zero_positive_fallback_folds": 22,
+      "zero_positive_fallback_rows": 23,
+      "zero_positive_history_rows": 23
+    },
+    "2022-23": {
+      "eligible_folds": 12,
+      "excluded_fold_reasons": {
+        "phase2h_pool_has_1_to_4_positives": 24
+      },
+      "excluded_folds": 24,
+      "history_positive_support": {
+        "five_plus": 341,
+        "one_to_four": 37,
+        "zero": 18
+      },
+      "maximum_absolute_fold_identity_error": 5.329070518200751e-15,
+      "maximum_absolute_player_identity_error": 1.7763568394002505e-15,
+      "minutes": {
+        "completed_60_plus": 351,
+        "partial_1_to_59": 19,
+        "zero": 26
+      },
+      "selected_starters": 396,
+      "severity_reference_positive_support": {
+        "five_plus": 359,
+        "one_to_four": 37,
+        "zero": 0
+      },
+      "severity_source_counts": {
+        "phase2h_player_position": 371,
+        "phase2h_position": 7,
+        "pooled_zero_positive_fallback": 5,
+        "position_zero_positive_fallback": 13
+      },
+      "supported_starters": 359,
+      "target_fixture_counts": {
+        "1": 371,
+        "2": 25
+      },
+      "target_positive_returns": 143,
+      "target_zero_returns": 253,
+      "unsupported_player_reasons": {
+        "phase2h_pool_has_1_to_4_positives": 37
+      },
+      "unsupported_starters": 37,
+      "zero_positive_fallback_folds": 18,
+      "zero_positive_fallback_rows": 18,
+      "zero_positive_history_rows": 18
+    },
+    "2023-24": {
+      "eligible_folds": 5,
+      "excluded_fold_reasons": {
+        "phase2h_pool_has_1_to_4_positives": 32
+      },
+      "excluded_folds": 32,
+      "history_positive_support": {
+        "five_plus": 353,
+        "one_to_four": 46,
+        "zero": 8
+      },
+      "maximum_absolute_fold_identity_error": 0.0,
+      "maximum_absolute_player_identity_error": 1.7763568394002505e-15,
+      "minutes": {
+        "completed_60_plus": 347,
+        "partial_1_to_59": 21,
+        "zero": 39
+      },
+      "selected_starters": 407,
+      "severity_reference_positive_support": {
+        "five_plus": 361,
+        "one_to_four": 46,
+        "zero": 0
+      },
+      "severity_source_counts": {
+        "phase2h_player_position": 398,
+        "phase2h_position": 1,
+        "position_zero_positive_fallback": 8
+      },
+      "supported_starters": 361,
+      "target_fixture_counts": {
+        "1": 395,
+        "2": 12
+      },
+      "target_positive_returns": 130,
+      "target_zero_returns": 277,
+      "unsupported_player_reasons": {
+        "phase2h_pool_has_1_to_4_positives": 46
+      },
+      "unsupported_starters": 46,
+      "zero_positive_fallback_folds": 8,
+      "zero_positive_fallback_rows": 8,
+      "zero_positive_history_rows": 8
+    },
+    "2024-25": {
+      "eligible_folds": 10,
+      "excluded_fold_reasons": {
+        "phase2h_pool_has_1_to_4_positives": 27
+      },
+      "excluded_folds": 27,
+      "history_positive_support": {
+        "five_plus": 339,
+        "one_to_four": 47,
+        "zero": 21
+      },
+      "maximum_absolute_fold_identity_error": 3.552713678800501e-15,
+      "maximum_absolute_player_identity_error": 3.552713678800501e-15,
+      "minutes": {
+        "completed_60_plus": 358,
+        "partial_1_to_59": 24,
+        "zero": 25
+      },
+      "selected_starters": 407,
+      "severity_reference_positive_support": {
+        "five_plus": 360,
+        "one_to_four": 47,
+        "zero": 0
+      },
+      "severity_source_counts": {
+        "phase2h_player_position": 369,
+        "phase2h_position": 17,
+        "position_zero_positive_fallback": 21
+      },
+      "supported_starters": 360,
+      "target_fixture_counts": {
+        "1": 401,
+        "2": 6
+      },
+      "target_positive_returns": 130,
+      "target_zero_returns": 277,
+      "unsupported_player_reasons": {
+        "phase2h_pool_has_1_to_4_positives": 47
+      },
+      "unsupported_starters": 47,
+      "zero_positive_fallback_folds": 21,
+      "zero_positive_fallback_rows": 21,
+      "zero_positive_history_rows": 21
+    }
+  },
+  "panel_seasons_loaded": [
+    "2020-21",
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "panel_seasons_requested": [
+    "2020-21",
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "promotion_eligible": false,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "attacking_event": "player_gameweek_attacking_points_gt_0",
+    "bootstrap_confidence_level": 0.9,
+    "bootstrap_resamples": 5000,
+    "bootstrap_seed": 0,
+    "evaluation_dispersion_scale": "1.0",
+    "evaluation_location_shift_points": "-7.430702271879578",
+    "evaluation_lower_quantile": "0.1",
+    "evaluation_points_threshold": "40.0",
+    "evaluation_worst_fraction": "0.1",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "generator_deterministic_seed": "11",
+    "generator_double_gameweek_scale": "1.0",
+    "generator_min_history_folds": "8",
+    "generator_min_player_observations": "8",
+    "generator_player_location_shrinkage": "None",
+    "generator_player_scale_shrinkage": "10.0",
+    "generator_scenario_count": "200",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "identity_tolerance": 1e-09,
+    "minimum_positive_history": 5,
+    "optimizer_bench_weight": "0.1",
+    "optimizer_budget_tenths": "1000",
+    "optimizer_deterministic_seed": "0",
+    "optimizer_expected_points_scale": "1000",
+    "optimizer_max_players_per_team": "3",
+    "optimizer_solver_deterministic_time_limit": "None",
+    "optimizer_solver_time_limit_seconds": "10.0",
+    "optimizer_squad_position_limits": "{DEF=5, FWD=3, GK=2, MID=5}",
+    "optimizer_squad_size": "15",
+    "optimizer_starting_position_max": "{DEF=5, FWD=3, GK=1, MID=5}",
+    "optimizer_starting_position_min": "{DEF=3, FWD=1, GK=1, MID=2}",
+    "optimizer_starting_size": "11",
+    "projection_prior_gameweek_equivalent": "6",
+    "projection_prior_minute_equivalent": "270",
+    "protocol_bench_weight": "0.1",
+    "protocol_bootstrap_resamples": "5000",
+    "protocol_bootstrap_seed": "0",
+    "protocol_bound_tolerance": "1e-09",
+    "protocol_confidence_level": "0.9",
+    "protocol_decision_universe": "full_roster",
+    "protocol_dispersion_scale": "1.0",
+    "protocol_double_gameweek_scale": "1.0",
+    "protocol_evaluation_season": "2024-25",
+    "protocol_fit_seasons": "2021-22,2022-23,2023-24",
+    "protocol_lower_quantile": "0.1",
+    "protocol_min_evaluation_folds": "30",
+    "protocol_min_history_folds": "8",
+    "protocol_min_player_observations": "8",
+    "protocol_min_prior_gameweeks_in_season": "1",
+    "protocol_player_location_shrinkage": "None",
+    "protocol_player_scale_shrinkage": "10.0",
+    "protocol_points_threshold": "40.0",
+    "protocol_s1_bounds": "(0.43, 0.57)",
+    "protocol_s2_bounds": "(0.04, 0.16)",
+    "protocol_scenario_count": "200",
+    "protocol_scenario_seed": "11",
+    "protocol_worst_fraction": "0.1",
+    "repository_commit": "75a18d50e1653590f31abc8f07e6b6d8a53a9864",
+    "working_tree_dirty": false
+  },
+  "residual_source": {
+    "export_label": "in_season_carry_over_blend",
+    "model_identity": "squadopt-deterministic-baseline/in-season-carry-over-v1",
+    "table_sha256": "17f88e6e75618adc01ec6357317a6849bdb053e7eeed1cd6627c8eceab15fc7a"
+  },
+  "season_sensitivity": {
+    "2021-22": {
+      "maximum_absolute_identity_error": 8.881784197001252e-16,
+      "parts": {
+        "occurrence": null,
+        "severity": null
+      },
+      "support": {
+        "eligible_folds": 1,
+        "folds": 29,
+        "non_tail_folds": 1,
+        "positive_target_returns": 3,
+        "tail_folds": 0,
+        "zero_target_returns": 8
+      }
+    },
+    "2022-23": {
+      "maximum_absolute_identity_error": 5.329070518200751e-15,
+      "parts": {
+        "occurrence": null,
+        "severity": null
+      },
+      "support": {
+        "eligible_folds": 12,
+        "folds": 36,
+        "non_tail_folds": 12,
+        "positive_target_returns": 52,
+        "tail_folds": 0,
+        "zero_target_returns": 80
+      }
+    },
+    "2023-24": {
+      "maximum_absolute_identity_error": 0.0,
+      "parts": {
+        "occurrence": {
+          "q10_failure_reduction": {
+            "bootstrap_high": 0.8,
+            "bootstrap_low": 0.0,
+            "mean": 0.4
+          },
+          "tail_minus_other_surprise": {
+            "bootstrap_high": -14.771333156295087,
+            "bootstrap_low": -39.01022335409996,
+            "mean": -27.05064380990534
+          }
+        },
+        "severity": {
+          "q10_failure_reduction": {
+            "bootstrap_high": 0.0,
+            "bootstrap_low": 0.0,
+            "mean": 0.0
+          },
+          "tail_minus_other_surprise": {
+            "bootstrap_high": 2.077361673414305,
+            "bootstrap_low": -12.106724721819063,
+            "mean": -5.259327432341336
+          }
+        }
+      },
+      "support": {
+        "eligible_folds": 5,
+        "folds": 37,
+        "non_tail_folds": 3,
+        "positive_target_returns": 17,
+        "tail_folds": 2,
+        "zero_target_returns": 38
+      }
+    },
+    "2024-25": {
+      "maximum_absolute_identity_error": 3.552713678800501e-15,
+      "parts": {
+        "occurrence": {
+          "q10_failure_reduction": {
+            "bootstrap_high": 0.2,
+            "bootstrap_low": -0.2,
+            "mean": 0.0
+          },
+          "tail_minus_other_surprise": {
+            "bootstrap_high": -10.61914742520962,
+            "bootstrap_low": -26.984669367162635,
+            "mean": -19.020318744894904
+          }
+        },
+        "severity": {
+          "q10_failure_reduction": {
+            "bootstrap_high": 0.0,
+            "bootstrap_low": -0.3,
+            "mean": -0.1
+          },
+          "tail_minus_other_surprise": {
+            "bootstrap_high": 2.875362374867433,
+            "bootstrap_low": -6.604909347422306,
+            "mean": -1.7723052659551142
+          }
+        }
+      },
+      "support": {
+        "eligible_folds": 10,
+        "folds": 37,
+        "non_tail_folds": 8,
+        "positive_target_returns": 38,
+        "tail_folds": 2,
+        "zero_target_returns": 72
+      }
+    }
+  },
+  "source_artifact_digests": {
+    "phase2_attacking_structure.json": "0ee1dafa085b7ce417ec7be603c30ad299a015cc5fe34d676353a9592b834fc2",
+    "phase2_component_attribution.json": "4023b06b637f3968e762cf7af3b0a9d7b0f45334d8be61d4a0603c1cbe96a3f8",
+    "phase2_marginal_downside_sources.json": "92d8f3618b7ea19a257fbd5b05fc95be91cb91592cf1d8b9e600128500e46183",
+    "phase2_projection_conditional_returns.json": "0062518a878a87ddb73b9b1b50d0e8a01b7bc8d6c19f2b56b1b565c2a0bf61db",
+    "shadow_calibration_squad.json": "c690efd5ce2efa8d60802c55585c53cd46ac07397b078aae9fd764660d0a7556"
+  },
+  "source_reconciliation": {
+    "phase2h_artifact_sha256": "4023b06b637f3968e762cf7af3b0a9d7b0f45334d8be61d4a0603c1cbe96a3f8",
+    "phase2h_per_fold_attacking_surprise_reproduced": true,
+    "phase2h_seasonal_summaries_reproduced": true,
+    "phase2i_artifact_sha256": "0ee1dafa085b7ce417ec7be603c30ad299a015cc5fe34d676353a9592b834fc2",
+    "phase2i_seasonal_structure_reproduced": true
+  },
+  "study": "fixed selected-XI attacking occurrence/severity attribution"
+}
