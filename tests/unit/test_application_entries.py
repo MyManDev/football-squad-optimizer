@@ -26,6 +26,7 @@ def _picks(**overrides: object) -> EntryPicks:
         "squad": SQUAD,
         "starting_xi": XI,
         "captain": XI[0],
+        "vice_captain": XI[1],
         "bank_tenths": 5,
         "free_transfers": 1,
         "chips_used": {"wildcard": (1,)},

@@ -145,6 +145,20 @@ answering for the same decision.
 **Before the opening deadline there is nothing to read.** Gameweek 0 does not exist, so a
 capture open for gameweek 1 reads no picks at all rather than reading an empty document.
 
+**The picks name players in the platform's per-season space, not the canonical one.** An
+entry document identifies a player by his **element** id, which is assigned per season; the
+canonical panel, the prices, the projection and the ledger all identify him by **code**,
+which survives a transfer window. Both are plain integers, so handing one where the other is
+meant does not raise — it **matches nothing**, and the caller gets a full squad it cannot
+price. That is not hypothetical: it is what #265 spent a day on, with fifteen members, "no
+current price for players [1, 8, …]", and zero rows rendered.
+
+The translation is `player_codes`, and it belongs **at the capture boundary, once** — the
+element space must not reach a consumer that means codes. `reconcile_player_identity` is the
+guard that turns this class of silent mismatch into a stated one, and its refusal message
+already names this exact confusion; a path that joins a captured roster against known history
+should run it rather than discover the mismatch downstream as missing prices.
+
 **The standings page is a membership record, not a schema.** A captured
 `league-{id}-standings.json` states who was in the league at that instant. It seeds the
 registry; it is not a source of player-gameweek rows and no feature reads it.
@@ -159,6 +173,20 @@ declared unknowns rather than filled in:
 
 Both flags exist so a consumer that spends real budget or plans real transfers on these
 numbers has to acknowledge the limit rather than discover it.
+
+**Pick order is data, not presentation.** `squad` holds the fifteen picks in the platform's
+own positions 1 to 15. `squad[:11]` is the named eleven and **`squad[11:]` is the bench in
+substitution order** — the sequence the platform walks when it replaces a starter who played
+no minutes (#262). Sorting that tuple would keep every member and destroy the rule, which is
+why a test pins the order rather than only the membership.
+
+**The vice-captain is carried, not derived.** `vice_captain` is a required field with no
+default: it decides who inherits the multiplier when the captain plays no minutes, so a
+guessed value would hand the armband to the wrong player in exactly the weeks the captain
+blanked. The adapter requires him to be in the squad and to differ from the captain, and
+deliberately does **not** require him to be in the starting eleven — six real entries were
+checked and all six named theirs inside the eleven, but six is not a rule, and refusing a
+real capture is a worse failure for an adapter than accepting a bench vice.
 
 **The manager's own name is not captured into the registry.** The standings page publishes
 it beside the team name; only the team name becomes the registry label, and the registry
@@ -190,9 +218,23 @@ refuses a second write for a gameweek that already has one. Recording a pre-bonu
 through that path would therefore permanently prevent the real settle from ever being
 recorded. Live points may be *derived into a view*; they may not be written as an outcome.
 
-**Automatic substitutions are not applied here.** This payload yields points per player.
-Which eleven those points are counted for belongs to the ledger, which scores the eleven
-that were named because that is what the projection was for.
+**Automatic substitutions are not applied here — but their inputs are read.** This payload
+yields points *and minutes* per player. Which eleven those points are counted for belongs to
+the ledger, which scores the eleven that were **named** because that is what the projection
+was for; the platform's own score replaces a starter who played no minutes and is a second,
+equally real number (#262). Supplying an input is not applying a rule, and keeping the two
+apart is what lets one caller score the named eleven and another the platform's from one
+reading of one payload.
+
+**Minutes come from this document and not from `bootstrap-static`.** The bootstrap's
+`minutes` is season-cumulative: it equals the gameweek's for gameweek one and for no other,
+because that is the only gameweek with nothing behind it. Reading it as a per-gameweek figure
+would be right once and silently wrong from gameweek two onward. The two mappings must also
+cover exactly the same players, and the adapter refuses a payload where they do not — a
+player whose minutes went missing reads as *did not play*, which is how a substitution gets
+fabricated for someone who was on the pitch. For the same reason a `stats` object with no
+`minutes` key is refused rather than defaulted to zero, and no upper bound is imposed: a
+double gameweek legitimately reaches 180.
 
 ## 4. Guarantees
 
