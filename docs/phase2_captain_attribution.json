@@ -1,0 +1,426 @@
+{
+  "arms": {
+    "captain_bonus_removed": {
+      "below_lower_quantile_folds": 7.0,
+      "below_lower_quantile_rate": 0.1891891891891892,
+      "fold_count": 37.0,
+      "mean_probability_integral_transform": 0.5045945945945944,
+      "s1_within_band": true,
+      "s2_fails_above_band": true,
+      "s2_within_band": false
+    },
+    "captain_bonus_removed_unshifted": {
+      "below_lower_quantile_folds": 13.0,
+      "below_lower_quantile_rate": 0.35135135135135137,
+      "fold_count": 37.0,
+      "mean_probability_integral_transform": 0.35405405405405405,
+      "s1_within_band": false,
+      "s2_fails_above_band": true,
+      "s2_within_band": false
+    },
+    "full": {
+      "below_lower_quantile_folds": 8.0,
+      "below_lower_quantile_rate": 0.21621621621621623,
+      "fold_count": 37.0,
+      "mean_probability_integral_transform": 0.4921621621621622,
+      "s1_within_band": true,
+      "s2_fails_above_band": true,
+      "s2_within_band": false
+    },
+    "full_unshifted": {
+      "below_lower_quantile_folds": 10.0,
+      "below_lower_quantile_rate": 0.2702702702702703,
+      "fold_count": 37.0,
+      "mean_probability_integral_transform": 0.37094594594594604,
+      "s1_within_band": false,
+      "s2_fails_above_band": true,
+      "s2_within_band": false
+    }
+  },
+  "captain_component": {
+    "decomposition_holds_folds": 139,
+    "elsewhere": {
+      "fold_count": 112.0,
+      "mean": 0.15374669539993033,
+      "median": -1.2464157799542326
+    },
+    "fold_count": 139,
+    "mean_bonus_error": -1.0676957276131125,
+    "mean_realized_bonus": 6.870503597122302,
+    "mean_scenario_bonus": 7.938199324735415,
+    "negative_bonus_error_folds": 94,
+    "on_full_score_tail_failures": {
+      "fold_count": 27.0,
+      "mean": -6.134419852704253,
+      "median": -6.598446082164955
+    },
+    "pearson_correlation_with_captain_bonus_removed_score_error": 0.3951913007936307,
+    "pearson_correlation_with_full_score_error": 0.6489756680867664
+  },
+  "classification": "shared_tail_failure",
+  "classification_population": "2024-25",
+  "classification_reasons": [],
+  "contract_version": "phase2_captain_attribution_v1",
+  "created_utc": "2026-08-30T18:35:40+00:00",
+  "development_reuse_exploratory": true,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "execution": {
+    "completed_at_utc": "2026-08-30T18:43:22+00:00",
+    "deterministic_seed": 11,
+    "elapsed_seconds": 462.367435,
+    "started_at_utc": "2026-08-30T18:35:40+00:00",
+    "warnings": []
+  },
+  "fold_universe": {
+    "folds_by_season": {
+      "2021-22": 29,
+      "2022-23": 36,
+      "2023-24": 37,
+      "2024-25": 37
+    },
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "total_folds": 139
+  },
+  "frozen_shift_points": -7.430702271879578,
+  "independent_confirmation": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "panel_seasons_loaded": [
+    "2020-21",
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "promotion_eligible": false,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "evaluation_dispersion_scale": "1.0",
+    "evaluation_location_shift_points": "-7.430702271879578",
+    "evaluation_lower_quantile": "0.1",
+    "evaluation_points_threshold": "40.0",
+    "evaluation_worst_fraction": "0.1",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "generator_deterministic_seed": "11",
+    "generator_double_gameweek_scale": "1.0",
+    "generator_min_history_folds": "8",
+    "generator_min_player_observations": "8",
+    "generator_player_location_shrinkage": "None",
+    "generator_player_scale_shrinkage": "10.0",
+    "generator_scenario_count": "200",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "optimizer_bench_weight": "0.1",
+    "optimizer_budget_tenths": "1000",
+    "optimizer_deterministic_seed": "0",
+    "optimizer_expected_points_scale": "1000",
+    "optimizer_max_players_per_team": "3",
+    "optimizer_solver_deterministic_time_limit": "None",
+    "optimizer_solver_time_limit_seconds": "10.0",
+    "optimizer_squad_position_limits": "{DEF=5, FWD=3, GK=2, MID=5}",
+    "optimizer_squad_size": "15",
+    "optimizer_starting_position_max": "{DEF=5, FWD=3, GK=1, MID=5}",
+    "optimizer_starting_position_min": "{DEF=3, FWD=1, GK=1, MID=2}",
+    "optimizer_starting_size": "11",
+    "projection_prior_gameweek_equivalent": "6",
+    "projection_prior_minute_equivalent": "270",
+    "protocol_bench_weight": "0.1",
+    "protocol_bootstrap_resamples": "5000",
+    "protocol_bootstrap_seed": "0",
+    "protocol_bound_tolerance": "1e-09",
+    "protocol_confidence_level": "0.9",
+    "protocol_decision_universe": "full_roster",
+    "protocol_dispersion_scale": "1.0",
+    "protocol_double_gameweek_scale": "1.0",
+    "protocol_evaluation_season": "2024-25",
+    "protocol_fit_seasons": "2021-22,2022-23,2023-24",
+    "protocol_lower_quantile": "0.1",
+    "protocol_min_evaluation_folds": "30",
+    "protocol_min_history_folds": "8",
+    "protocol_min_player_observations": "8",
+    "protocol_min_prior_gameweeks_in_season": "1",
+    "protocol_player_location_shrinkage": "None",
+    "protocol_player_scale_shrinkage": "10.0",
+    "protocol_points_threshold": "40.0",
+    "protocol_s1_bounds": "(0.43, 0.57)",
+    "protocol_s2_bounds": "(0.04, 0.16)",
+    "protocol_scenario_count": "200",
+    "protocol_scenario_seed": "11",
+    "protocol_worst_fraction": "0.1",
+    "repository_commit": "447cac2d25666506c9448993ef860b7853951915",
+    "working_tree_dirty": "false"
+  },
+  "residual_source": {
+    "export_label": "in_season_carry_over_blend",
+    "model_identity": "squadopt-deterministic-baseline/in-season-carry-over-v1",
+    "table_sha256": "17f88e6e75618adc01ec6357317a6849bdb053e7eeed1cd6627c8eceab15fc7a"
+  },
+  "season_sensitivity": {
+    "2021-22": {
+      "arms": {
+        "captain_bonus_removed": {
+          "below_lower_quantile_folds": 4.0,
+          "below_lower_quantile_rate": 0.13793103448275862,
+          "fold_count": 29.0,
+          "mean_probability_integral_transform": 0.5725862068965516,
+          "s1_within_band": false,
+          "s2_fails_above_band": false,
+          "s2_within_band": true
+        },
+        "captain_bonus_removed_unshifted": {
+          "below_lower_quantile_folds": 7.0,
+          "below_lower_quantile_rate": 0.2413793103448276,
+          "fold_count": 29.0,
+          "mean_probability_integral_transform": 0.42000000000000004,
+          "s1_within_band": false,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        },
+        "full": {
+          "below_lower_quantile_folds": 6.0,
+          "below_lower_quantile_rate": 0.20689655172413793,
+          "fold_count": 29.0,
+          "mean_probability_integral_transform": 0.5232758620689655,
+          "s1_within_band": true,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        },
+        "full_unshifted": {
+          "below_lower_quantile_folds": 7.0,
+          "below_lower_quantile_rate": 0.2413793103448276,
+          "fold_count": 29.0,
+          "mean_probability_integral_transform": 0.39431034482758615,
+          "s1_within_band": false,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        }
+      },
+      "captain_component": {
+        "decomposition_holds_folds": 29,
+        "elsewhere": {
+          "fold_count": 23.0,
+          "mean": -0.7869795576735024,
+          "median": -1.8513414037769227
+        },
+        "fold_count": 29,
+        "mean_bonus_error": -1.9444494302525628,
+        "mean_realized_bonus": 6.206896551724138,
+        "mean_scenario_bonus": 8.1513459819767,
+        "negative_bonus_error_folds": 24,
+        "on_full_score_tail_failures": {
+          "fold_count": 6.0,
+          "mean": -6.381417275138959,
+          "median": -6.565163599933474
+        },
+        "pearson_correlation_with_captain_bonus_removed_score_error": 0.3708417563618624,
+        "pearson_correlation_with_full_score_error": 0.6419802561870684
+      }
+    },
+    "2022-23": {
+      "arms": {
+        "captain_bonus_removed": {
+          "below_lower_quantile_folds": 3.0,
+          "below_lower_quantile_rate": 0.08333333333333333,
+          "fold_count": 36.0,
+          "mean_probability_integral_transform": 0.5570833333333334,
+          "s1_within_band": true,
+          "s2_fails_above_band": false,
+          "s2_within_band": true
+        },
+        "captain_bonus_removed_unshifted": {
+          "below_lower_quantile_folds": 9.0,
+          "below_lower_quantile_rate": 0.25,
+          "fold_count": 36.0,
+          "mean_probability_integral_transform": 0.4076388888888889,
+          "s1_within_band": false,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        },
+        "full": {
+          "below_lower_quantile_folds": 2.0,
+          "below_lower_quantile_rate": 0.05555555555555555,
+          "fold_count": 36.0,
+          "mean_probability_integral_transform": 0.5516666666666667,
+          "s1_within_band": true,
+          "s2_fails_above_band": false,
+          "s2_within_band": true
+        },
+        "full_unshifted": {
+          "below_lower_quantile_folds": 9.0,
+          "below_lower_quantile_rate": 0.25,
+          "fold_count": 36.0,
+          "mean_probability_integral_transform": 0.4209722222222222,
+          "s1_within_band": false,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        }
+      },
+      "captain_component": {
+        "decomposition_holds_folds": 36,
+        "elsewhere": {
+          "fold_count": 34.0,
+          "mean": 0.26203473452142784,
+          "median": -0.6207847022859783
+        },
+        "fold_count": 36,
+        "mean_bonus_error": 0.031820383798240655,
+        "mean_realized_bonus": 7.166666666666667,
+        "mean_scenario_bonus": 7.134846282868427,
+        "negative_bonus_error_folds": 22,
+        "on_full_score_tail_failures": {
+          "fold_count": 2.0,
+          "mean": -3.8818235784959447,
+          "median": -3.8818235784959447
+        },
+        "pearson_correlation_with_captain_bonus_removed_score_error": 0.17809559432824285,
+        "pearson_correlation_with_full_score_error": 0.49525981731860635
+      }
+    },
+    "2023-24": {
+      "arms": {
+        "captain_bonus_removed": {
+          "below_lower_quantile_folds": 9.0,
+          "below_lower_quantile_rate": 0.24324324324324326,
+          "fold_count": 37.0,
+          "mean_probability_integral_transform": 0.4486486486486486,
+          "s1_within_band": true,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        },
+        "captain_bonus_removed_unshifted": {
+          "below_lower_quantile_folds": 15.0,
+          "below_lower_quantile_rate": 0.40540540540540543,
+          "fold_count": 37.0,
+          "mean_probability_integral_transform": 0.32337837837837835,
+          "s1_within_band": false,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        },
+        "full": {
+          "below_lower_quantile_folds": 11.0,
+          "below_lower_quantile_rate": 0.2972972972972973,
+          "fold_count": 37.0,
+          "mean_probability_integral_transform": 0.4235135135135135,
+          "s1_within_band": false,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        },
+        "full_unshifted": {
+          "below_lower_quantile_folds": 16.0,
+          "below_lower_quantile_rate": 0.43243243243243246,
+          "fold_count": 37.0,
+          "mean_probability_integral_transform": 0.3232432432432432,
+          "s1_within_band": false,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        }
+      },
+      "captain_component": {
+        "decomposition_holds_folds": 37,
+        "elsewhere": {
+          "fold_count": 26.0,
+          "mean": -0.5624955551574161,
+          "median": -2.6552057516745124
+        },
+        "fold_count": 37,
+        "mean_bonus_error": -2.1019365392902976,
+        "mean_realized_bonus": 5.162162162162162,
+        "mean_scenario_bonus": 7.264098701452459,
+        "negative_bonus_error_folds": 27,
+        "on_full_score_tail_failures": {
+          "fold_count": 11.0,
+          "mean": -5.740615229058927,
+          "median": -5.6709967232750795
+        },
+        "pearson_correlation_with_captain_bonus_removed_score_error": 0.5246248679789973,
+        "pearson_correlation_with_full_score_error": 0.7040068182992442
+      }
+    },
+    "2024-25": {
+      "arms": {
+        "captain_bonus_removed": {
+          "below_lower_quantile_folds": 7.0,
+          "below_lower_quantile_rate": 0.1891891891891892,
+          "fold_count": 37.0,
+          "mean_probability_integral_transform": 0.5045945945945944,
+          "s1_within_band": true,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        },
+        "captain_bonus_removed_unshifted": {
+          "below_lower_quantile_folds": 13.0,
+          "below_lower_quantile_rate": 0.35135135135135137,
+          "fold_count": 37.0,
+          "mean_probability_integral_transform": 0.35405405405405405,
+          "s1_within_band": false,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        },
+        "full": {
+          "below_lower_quantile_folds": 8.0,
+          "below_lower_quantile_rate": 0.21621621621621623,
+          "fold_count": 37.0,
+          "mean_probability_integral_transform": 0.4921621621621622,
+          "s1_within_band": true,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        },
+        "full_unshifted": {
+          "below_lower_quantile_folds": 10.0,
+          "below_lower_quantile_rate": 0.2702702702702703,
+          "fold_count": 37.0,
+          "mean_probability_integral_transform": 0.37094594594594604,
+          "s1_within_band": false,
+          "s2_fails_above_band": true,
+          "s2_within_band": false
+        }
+      },
+      "captain_component": {
+        "decomposition_holds_folds": 37,
+        "elsewhere": {
+          "fold_count": 29.0,
+          "mean": 1.4150297645395526,
+          "median": 1.0789451936771162
+        },
+        "fold_count": 37,
+        "mean_bonus_error": -0.4160690411863238,
+        "mean_realized_bonus": 8.81081081081081,
+        "mean_scenario_bonus": 9.226879851997134,
+        "negative_bonus_error_folds": 21,
+        "on_full_score_tail_failures": {
+          "fold_count": 8.0,
+          "mean": -7.053802211942625,
+          "median": -7.334608393961328
+        },
+        "pearson_correlation_with_captain_bonus_removed_score_error": 0.47881496329081263,
+        "pearson_correlation_with_full_score_error": 0.7246239156193098
+      }
+    }
+  },
+  "source_artifact_digests": {
+    "phase2_tail_diagnostic.json": "b2855bce336622a472cd881a9d0aee274f7a677d8e6d444d70092be0d47920df",
+    "shadow_calibration_squad.json": "c690efd5ce2efa8d60802c55585c53cd46ac07397b078aae9fd764660d0a7556"
+  },
+  "study": "is the squad tail failure the captain's second copy"
+}
