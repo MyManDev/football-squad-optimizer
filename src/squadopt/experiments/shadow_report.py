@@ -42,7 +42,7 @@ import math
 import os
 import re
 import secrets
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -511,13 +511,57 @@ def write_shadow_report_once(report: ShadowCalibrationReport, path: Path) -> str
     by — only the wall clock.
     """
 
+    resolved = _internal_destination(path, "shadow reports")
+    payload = _validated_payload(report)
+    # The occupant is compared through the reader, so a document this contract would
+    # refuse cannot certify as a replay of one it accepts.
+    return _publish_once(
+        payload,
+        resolved,
+        parse=lambda raw: report_to_dict(load_shadow_bytes(raw, label=str(resolved))),
+    )
+
+
+def write_document_once(document: Mapping[str, object], path: Path) -> str:
+    """Publish one plain measurement document under the same create-once rule.
+
+    Experiment artifacts that are not gate reports still have to be written exactly
+    once, atomically, and never silently replaced. They share this module's writer
+    rather than growing a second, weaker copy of it; what they do not share is the
+    report contract, so an occupant here is compared as JSON.
+    """
+
+    resolved = _internal_destination(path, "measurement artifacts")
+    payload = (json.dumps(dict(document), indent=2, sort_keys=True, allow_nan=False) + "\n").encode(
+        "utf-8"
+    )
+    return _publish_once(payload, resolved, parse=lambda raw: json.loads(raw))
+
+
+def _internal_destination(path: Path, what: str) -> Path:
+    """Resolve a destination and refuse the published site tree."""
+
     resolved = path.resolve()
     _require(
         "web/public" not in resolved.as_posix(),
-        f"{resolved} sits inside a published site tree; shadow reports are internal.",
+        f"{resolved} sits inside a published site tree; {what} are internal.",
     )
-    payload = _validated_payload(report)
-    document = json.loads(payload)
+    return resolved
+
+
+def _publish_once(
+    payload: bytes, resolved: Path, *, parse: Callable[[bytes], Mapping[str, object]]
+) -> str:
+    """Create a file exactly once, atomically, and say which of two happened.
+
+    The corrective amendment requires a writer that is crash-safe and safe under
+    concurrent writers: the bytes are completed and fsynced in a sibling temporary
+    file, published with a no-overwrite hard link, and the temporary removed on every
+    path. A losing writer compares its own bytes with the winner's and reports a replay
+    when they agree, falling back to ``replay_identity_of`` when only the wall clock
+    differs. ``parse`` decides how an occupant is read back.
+    """
+
     resolved.parent.mkdir(parents=True, exist_ok=True)
     temporary = resolved.with_name(f".{resolved.name}.tmp-{os.getpid()}-{secrets.token_hex(8)}")
     try:
@@ -537,10 +581,13 @@ def write_shadow_report_once(report: ShadowCalibrationReport, path: Path) -> str
                 ) from error
             if existing_bytes == payload:
                 return "replay"
-            # The occupant is compared through the reader, so a document this contract
-            # would refuse cannot certify as a replay of one it accepts.
-            existing = report_to_dict(load_shadow_bytes(existing_bytes, label=str(resolved)))
-            if replay_identity_of(existing) == replay_identity_of(document):
+            try:
+                existing = parse(existing_bytes)
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ShadowReportError(
+                    f"{resolved} already exists but is not readable JSON."
+                ) from error
+            if replay_identity_of(existing) == replay_identity_of(json.loads(payload)):
                 return "replay"
             raise ShadowReportError(
                 f"{resolved} already holds a different measurement. A recorded result is "
