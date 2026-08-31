@@ -17,6 +17,7 @@ annotated-types==0.8.0
 anyio==4.14.2
 attrs==26.1.0
 click==8.4.2
+execnet==2.1.2
 fastapi==0.141.1
 grimp==3.15
 h11==0.16.0
@@ -41,6 +42,7 @@ protobuf==6.33.6
 pydantic==2.13.4
 pydantic-core==2.46.4
 pytest==9.1.1
+pytest-xdist==3.8.0
 python-dateutil==2.9.0.post0
 referencing==0.37.0
 rpds-py==2026.6.3

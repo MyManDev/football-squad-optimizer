@@ -39,6 +39,7 @@ def _held(world: dict[str, Any], inputs: Any, squad: list[int]) -> HeldSquad:
         squad=tuple(squad),
         starting_xi=tuple(squad[:11]),
         captain=squad[0],
+        vice_captain=squad[1],
         bank_tenths=5,
         free_transfers=1,
         free_transfers_known=False,
