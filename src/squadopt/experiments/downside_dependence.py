@@ -109,6 +109,19 @@ def read_fold(
 ) -> DownsideReading:
     """Read simultaneous starter downside from one unchanged decision and scenario set."""
 
+    reading, _ = read_fold_with_starters(fold, residuals, history_fold_ids, provenance, config)
+    return reading
+
+
+def read_fold_with_starters(
+    fold: SquadFold,
+    residuals: pd.DataFrame,
+    history_fold_ids: Sequence[str],
+    provenance: PredictionProvenance,
+    config: SquadShadowConfig,
+) -> tuple[DownsideReading, pd.DataFrame]:
+    """Return the fold reading and the starter rows from the same scenario draw."""
+
     _require(
         config.dispersion_scale == CONTROL_SCALE,
         "the downside diagnostic is defined only at the recorded control dispersion.",
@@ -172,7 +185,7 @@ def read_fold(
 
     full_scores = np.asarray(evaluated.scenario_scores, dtype="float64")
     full_realized = score_realized_squad_points(decision, fold.realized_points)
-    return DownsideReading(
+    reading = DownsideReading(
         fold_id=fold.fold_id,
         season=fold.season,
         realized_marginal_rate=realized_count / STARTER_COUNT,
@@ -196,6 +209,18 @@ def read_fold(
             full_realized < float(np.quantile(full_scores, config.lower_quantile, method="linear"))
         ),
     )
+    starter_rows = projection_rows.loc[
+        starters, ["team_id", "position", "expected_points"]
+    ].reset_index()
+    starter_rows.insert(0, "fold_id", fold.fold_id)
+    starter_rows.insert(1, "season", fold.season)
+    starter_rows.insert(2, "gameweek", fold.gameweek)
+    starter_rows["realized_points"] = realized
+    starter_rows["realized_residual"] = realized - expected
+    starter_rows["downside_threshold"] = thresholds
+    starter_rows["scenario_downside_rate"] = scenario_events.mean(axis=0)
+    starter_rows["realized_downside"] = realized_events
+    return reading, starter_rows
 
 
 def _gap_summary(values: Sequence[float]) -> dict[str, float]:
