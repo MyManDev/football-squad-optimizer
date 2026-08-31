@@ -1,0 +1,383 @@
+{
+  "classification": "conditional_marginal_shape_unresolved",
+  "classification_population": "2023-24",
+  "contract_version": "phase2_conditional_marginal_shape_v1",
+  "control_replay": {
+    "measured_below_lower_quantile_rate": 0.21621621621621623,
+    "measured_mean_probability_integral_transform": 0.4921621621621622,
+    "recorded_below_lower_quantile_rate": 0.21621621621621623,
+    "recorded_mean_probability_integral_transform": 0.4921621621621622,
+    "reproduced": true,
+    "tolerance": 1e-12
+  },
+  "created_utc": "2026-08-31T07:16:23+00:00",
+  "development_reuse_exploratory": true,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "execution": {
+    "completed_at_utc": "2026-08-31T07:39:37+00:00",
+    "deterministic_seed": 11,
+    "elapsed_seconds": 1393.640914,
+    "started_at_utc": "2026-08-31T07:16:23+00:00",
+    "warnings": []
+  },
+  "fold_universe": {
+    "completed_starter_rows_per_arm": 1327,
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "total_folds": 139
+  },
+  "independent_confirmation": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "panel_seasons_loaded": [
+    "2020-21",
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "pooled": {
+    "arms": {
+      "canonical": {
+        "fold_count": 139,
+        "gap": {
+          "bootstrap_high": 0.16984250885006283,
+          "bootstrap_low": 0.10936717820548754,
+          "mean": 0.13993135880905666
+        },
+        "mean_threshold": -2.609016482146639,
+        "realized_event_rate": 0.3911077618688772,
+        "source_counts": {
+          "canonical_scenarios": 1327
+        },
+        "source_expected_event_rate": 0.24998492840994727,
+        "starter_rows": 1327
+      },
+      "raw_completed_appearance": {
+        "fold_count": 139,
+        "gap": {
+          "bootstrap_high": 0.2397838591321048,
+          "bootstrap_low": 0.1811381689253512,
+          "mean": 0.21069457414556872
+        },
+        "mean_threshold": -1.7359746598980785,
+        "realized_event_rate": 0.4642049736247174,
+        "source_counts": {
+          "player": 1285,
+          "position": 42
+        },
+        "source_expected_event_rate": 0.25360225260857466,
+        "starter_rows": 1327
+      },
+      "raw_unconditional": {
+        "fold_count": 139,
+        "gap": {
+          "bootstrap_high": 0.20589137786428277,
+          "bootstrap_low": 0.14897480029304663,
+          "mean": 0.1773538825958466
+        },
+        "mean_threshold": -2.295598916046722,
+        "realized_event_rate": 0.42803315749811605,
+        "source_counts": {
+          "player": 1305,
+          "position": 22
+        },
+        "source_expected_event_rate": 0.25172175503867816,
+        "starter_rows": 1327
+      }
+    }
+  },
+  "promotion_eligible": false,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "empirical_quantile": "0.25_linear_strict_below",
+    "evaluation_dispersion_scale": "1.0",
+    "evaluation_location_shift_points": "-7.430702271879578",
+    "evaluation_lower_quantile": "0.1",
+    "evaluation_points_threshold": "40.0",
+    "evaluation_worst_fraction": "0.1",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "generator_deterministic_seed": "11",
+    "generator_double_gameweek_scale": "1.0",
+    "generator_min_history_folds": "8",
+    "generator_min_player_observations": "8",
+    "generator_player_location_shrinkage": "None",
+    "generator_player_scale_shrinkage": "10.0",
+    "generator_scenario_count": "200",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "optimizer_bench_weight": "0.1",
+    "optimizer_budget_tenths": "1000",
+    "optimizer_deterministic_seed": "0",
+    "optimizer_expected_points_scale": "1000",
+    "optimizer_max_players_per_team": "3",
+    "optimizer_solver_deterministic_time_limit": "None",
+    "optimizer_solver_time_limit_seconds": "10.0",
+    "optimizer_squad_position_limits": "{DEF=5, FWD=3, GK=2, MID=5}",
+    "optimizer_squad_size": "15",
+    "optimizer_starting_position_max": "{DEF=5, FWD=3, GK=1, MID=5}",
+    "optimizer_starting_position_min": "{DEF=3, FWD=1, GK=1, MID=2}",
+    "optimizer_starting_size": "11",
+    "projection_prior_gameweek_equivalent": "6",
+    "projection_prior_minute_equivalent": "270",
+    "protocol_bench_weight": "0.1",
+    "protocol_bootstrap_resamples": "5000",
+    "protocol_bootstrap_seed": "0",
+    "protocol_bound_tolerance": "1e-09",
+    "protocol_confidence_level": "0.9",
+    "protocol_decision_universe": "full_roster",
+    "protocol_dispersion_scale": "1.0",
+    "protocol_double_gameweek_scale": "1.0",
+    "protocol_evaluation_season": "2024-25",
+    "protocol_fit_seasons": "2021-22,2022-23,2023-24",
+    "protocol_lower_quantile": "0.1",
+    "protocol_min_evaluation_folds": "30",
+    "protocol_min_history_folds": "8",
+    "protocol_min_player_observations": "8",
+    "protocol_min_prior_gameweeks_in_season": "1",
+    "protocol_player_location_shrinkage": "None",
+    "protocol_player_scale_shrinkage": "10.0",
+    "protocol_points_threshold": "40.0",
+    "protocol_s1_bounds": "(0.43, 0.57)",
+    "protocol_s2_bounds": "(0.04, 0.16)",
+    "protocol_scenario_count": "200",
+    "protocol_scenario_seed": "11",
+    "protocol_worst_fraction": "0.1",
+    "repository_commit": "32849c624e55e18d3bd7bd29567144712dcb9c60",
+    "working_tree_dirty": "false"
+  },
+  "residual_source": {
+    "export_label": "in_season_carry_over_blend",
+    "model_identity": "squadopt-deterministic-baseline/in-season-carry-over-v1",
+    "table_sha256": "17f88e6e75618adc01ec6357317a6849bdb053e7eeed1cd6627c8eceab15fc7a"
+  },
+  "season_sensitivity": {
+    "2021-22": {
+      "arms": {
+        "canonical": {
+          "fold_count": 29,
+          "gap": {
+            "bootstrap_high": 0.05169949494949495,
+            "bootstrap_low": -0.05348745210727969,
+            "mean": -0.0013483106931382787
+          },
+          "mean_threshold": -2.8517460533529286,
+          "realized_event_rate": 0.25092250922509224,
+          "source_counts": {
+            "canonical_scenarios": 271
+          },
+          "source_expected_event_rate": 0.24994464944649447,
+          "starter_rows": 271
+        },
+        "raw_completed_appearance": {
+          "fold_count": 29,
+          "gap": {
+            "bootstrap_high": 0.17351762732334605,
+            "bootstrap_low": 0.03991617043289441,
+            "mean": 0.10511264095393766
+          },
+          "mean_threshold": -2.225731844960332,
+          "realized_event_rate": 0.36162361623616235,
+          "source_counts": {
+            "player": 256,
+            "position": 15
+          },
+          "source_expected_event_rate": 0.25633154712592987,
+          "starter_rows": 271
+        },
+        "raw_unconditional": {
+          "fold_count": 29,
+          "gap": {
+            "bootstrap_high": 0.0975966018513176,
+            "bootstrap_low": -0.014489199581175227,
+            "mean": 0.041193098524382535
+          },
+          "mean_threshold": -2.869861874516605,
+          "realized_event_rate": 0.2952029520295203,
+          "source_counts": {
+            "player": 271
+          },
+          "source_expected_event_rate": 0.2557799841606445,
+          "starter_rows": 271
+        }
+      }
+    },
+    "2022-23": {
+      "arms": {
+        "canonical": {
+          "fold_count": 36,
+          "gap": {
+            "bootstrap_high": 0.19802523248356585,
+            "bootstrap_low": 0.07074852693602694,
+            "mean": 0.13547438672438672
+          },
+          "mean_threshold": -2.644447882225778,
+          "realized_event_rate": 0.3903133903133903,
+          "source_counts": {
+            "canonical_scenarios": 351
+          },
+          "source_expected_event_rate": 0.249985754985755,
+          "starter_rows": 351
+        },
+        "raw_completed_appearance": {
+          "fold_count": 36,
+          "gap": {
+            "bootstrap_high": 0.2649398015340234,
+            "bootstrap_low": 0.14427596264951167,
+            "mean": 0.20510187289997603
+          },
+          "mean_threshold": -1.5067577244779204,
+          "realized_event_rate": 0.46438746438746437,
+          "source_counts": {
+            "player": 341,
+            "position": 10
+          },
+          "source_expected_event_rate": 0.2535227308917537,
+          "starter_rows": 351
+        },
+        "raw_unconditional": {
+          "fold_count": 36,
+          "gap": {
+            "bootstrap_high": 0.23029200415089793,
+            "bootstrap_low": 0.11246417797161605,
+            "mean": 0.17141359541907994
+          },
+          "mean_threshold": -2.0345098888076922,
+          "realized_event_rate": 0.42450142450142453,
+          "source_counts": {
+            "player": 346,
+            "position": 5
+          },
+          "source_expected_event_rate": 0.24945510399892115,
+          "starter_rows": 351
+        }
+      }
+    },
+    "2023-24": {
+      "arms": {
+        "canonical": {
+          "fold_count": 37,
+          "gap": {
+            "bootstrap_high": 0.21074329199329203,
+            "bootstrap_low": 0.10933578058578057,
+            "mean": 0.16077278577278575
+          },
+          "mean_threshold": -2.673807151923464,
+          "realized_event_rate": 0.4092219020172911,
+          "source_counts": {
+            "canonical_scenarios": 347
+          },
+          "source_expected_event_rate": 0.25,
+          "starter_rows": 347
+        },
+        "raw_completed_appearance": {
+          "fold_count": 37,
+          "gap": {
+            "bootstrap_high": 0.2946822579231346,
+            "bootstrap_low": 0.19130658438752893,
+            "mean": 0.24224657814013462
+          },
+          "mean_threshold": -1.9519669829207493,
+          "realized_event_rate": 0.4899135446685879,
+          "source_counts": {
+            "player": 347
+          },
+          "source_expected_event_rate": 0.25182495138430966,
+          "starter_rows": 347
+        },
+        "raw_unconditional": {
+          "fold_count": 37,
+          "gap": {
+            "bootstrap_high": 0.26414482200114453,
+            "bootstrap_low": 0.16753021376776467,
+            "mean": 0.21625903473712196
+          },
+          "mean_threshold": -2.348864624759366,
+          "realized_event_rate": 0.46397694524495675,
+          "source_counts": {
+            "player": 347
+          },
+          "source_expected_event_rate": 0.25163375256659515,
+          "starter_rows": 347
+        }
+      }
+    },
+    "2024-25": {
+      "arms": {
+        "canonical": {
+          "fold_count": 37,
+          "gap": {
+            "bootstrap_high": 0.29011568386568387,
+            "bootstrap_low": 0.17775262275262274,
+            "mean": 0.2341591591591592
+          },
+          "mean_threshold": -2.3277357624895427,
+          "realized_event_rate": 0.48044692737430167,
+          "source_counts": {
+            "canonical_scenarios": 358
+          },
+          "source_expected_event_rate": 0.25,
+          "starter_rows": 358
+        },
+        "raw_completed_appearance": {
+          "fold_count": 37,
+          "gap": {
+            "bootstrap_high": 0.3169743518944352,
+            "bootstrap_low": 0.21645190465293526,
+            "mean": 0.2673375244050202
+          },
+          "mean_threshold": -1.3806160316627096,
+          "realized_event_rate": 0.5167597765363129,
+          "source_counts": {
+            "player": 341,
+            "position": 17
+          },
+          "source_expected_event_rate": 0.2533368806343312,
+          "starter_rows": 358
+        },
+        "raw_unconditional": {
+          "fold_count": 37,
+          "gap": {
+            "bootstrap_high": 0.30161811758033036,
+            "bootstrap_low": 0.19867904298177147,
+            "mean": 0.25094908387176207
+          },
+          "mean_threshold": -2.0652463626731845,
+          "realized_event_rate": 0.4972067039106145,
+          "source_counts": {
+            "player": 341,
+            "position": 17
+          },
+          "source_expected_event_rate": 0.2509573731412332,
+          "starter_rows": 358
+        }
+      }
+    }
+  },
+  "source_artifact_digests": {
+    "phase2_downside_dependence.json": "154f91ad9e09b66d76f284273a9381266ba6619ef3fc4c702080c7404c799d36",
+    "phase2_marginal_downside_sources.json": "92d8f3618b7ea19a257fbd5b05fc95be91cb91592cf1d8b9e600128500e46183",
+    "shadow_calibration_squad.json": "c690efd5ce2efa8d60802c55585c53cd46ac07397b078aae9fd764660d0a7556"
+  },
+  "study": "selected-XI completed-appearance marginal shape"
+}
