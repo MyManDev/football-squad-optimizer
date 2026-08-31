@@ -576,6 +576,24 @@ against that gameweek and each of the next few, applying the same fixture-count 
 the horizon ships. See [the recorded measurement](docs/horizon_decay.md). It reports what
 the drift is; choosing a horizon length on that evidence is a separate decision.
 
+### Plan transfers from an in-season horizon
+
+Once a `projection_handoff_v1` exists for the current capture, the held squad in the
+ledger can be planned over 1, 3 or 5 weeks:
+
+```powershell
+.venv\Scripts\python -m scripts.plan_transfer_horizon `
+  --gameweeks 3 `
+  --in-season-projection data/handoffs/2026-27-gw02.json
+```
+
+The multi-week policy defaults to at most one transfer per gameweek, the discipline
+supported by the recorded rolling-horizon measurement. It does not select chips and it
+does not invent future prices. The command publishes only a proven `OPTIMAL` artifact by
+default. A deterministic-budget `FEASIBLE` result can be recorded for research with
+`--allow-feasible-shadow`; that artifact is marked `shadow_unproven` and is not a live
+recommendation.
+
 ## Signal the control has not spent
 
 Opponent strength is estimated from shifted results in `squadopt.features.strength` and no
