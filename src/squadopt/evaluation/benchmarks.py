@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from numbers import Integral
 from types import MappingProxyType
@@ -18,7 +18,6 @@ from squadopt.optimization.coefficients import scale_expected_points, sort_playe
 from squadopt.optimization.config import POSITIONS
 from squadopt.optimization.optimizer import configure_solver
 from squadopt.optimization.validation import validate_players
-from squadopt.scenarios.evaluation import RivalSquad
 
 OWNERSHIP_TEMPLATE_V2: Final = "ownership_template_v2"
 OWNERSHIP_COLUMN: Final = "ownership"
@@ -232,25 +231,28 @@ def build_constrained_ownership_template(
 
 def audit_unconstrained_template_v1(
     pool: pd.DataFrame,
-    rival: RivalSquad,
+    starter_ids: Sequence[object],
     config: OptimizationConfig | None = None,
 ) -> Mapping[str, object]:
     """Report what V1 can prove about its XI without inventing a missing bench."""
 
     settings = OptimizationConfig() if config is None else config
     players = _validated_ownership_pool(pool, settings).set_index("player_id")
-    missing = [player_id for player_id in rival.starter_ids if player_id not in players.index]
+    starters = tuple(starter_ids)
+    if not starters or len(starters) != len(set(starters)):
+        raise EvaluationValidationError("V1 starter_ids must be distinct and non-empty.")
+    missing = [player_id for player_id in starters if player_id not in players.index]
     if missing:
         raise EvaluationValidationError(
             f"Ownership pool does not cover V1 starters: {missing[:10]!r}."
         )
-    xi = players.loc[list(rival.starter_ids)]
+    xi = players.loc[list(starters)]
     team_counts = xi["team_id"].value_counts()
     xi_cost = int(xi["price_tenths"].sum())
     return MappingProxyType(
         {
             "contract_version": "ownership_template_v1_feasibility_audit",
-            "starter_count": len(rival.starter_ids),
+            "starter_count": len(starters),
             "xi_cost_tenths": xi_cost,
             "xi_exceeds_full_squad_budget": xi_cost > settings.budget_tenths,
             "max_players_from_one_team": int(team_counts.max()),

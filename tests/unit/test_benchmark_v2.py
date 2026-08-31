@@ -127,7 +127,7 @@ def test_v1_audit_reports_team_limit_but_not_full_squad_feasibility() -> None:
     pool.loc[pool["player_id"] <= 12, "team_id"] = 99
     rival = template_rival_from_ownership(pool)
 
-    audit = audit_unconstrained_template_v1(pool, rival)
+    audit = audit_unconstrained_template_v1(pool, rival.starter_ids)
 
     assert audit["team_limit_violated"] is True
     assert int(audit["max_players_from_one_team"]) > 3
@@ -139,7 +139,7 @@ def test_v1_audit_only_claims_a_budget_breach_when_the_xi_alone_exceeds_it() -> 
     pool["price_tenths"] = 100
     rival = template_rival_from_ownership(pool)
 
-    audit = audit_unconstrained_template_v1(pool, rival)
+    audit = audit_unconstrained_template_v1(pool, rival.starter_ids)
 
     assert audit["xi_cost_tenths"] == 1100
     assert audit["xi_exceeds_full_squad_budget"] is True
