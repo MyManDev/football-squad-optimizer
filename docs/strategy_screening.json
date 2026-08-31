@@ -1,0 +1,220 @@
+{
+  "contract_version": "strategy_screening_v1",
+  "created_utc": "2026-08-28T17:41:44+00:00",
+  "elapsed_seconds": 67.8,
+  "feasibility_floor": 0.75,
+  "holdout_untouched": true,
+  "interval_policy": {
+    "bootstrap_resamples": 5000,
+    "confidence_level": 0.9,
+    "deterministic_seed": 0,
+    "moving_block_length": 2
+  },
+  "metadata": {
+    "created_utc": "2026-08-28T17:41:44+00:00",
+    "environment": {
+      "logical_cpu_count": 32,
+      "ortools": "9.15.6755",
+      "pandas": "3.0.5",
+      "platform": "Windows-11-10.0.26200-SP0",
+      "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+      "python": "3.13.5"
+    },
+    "provenance": {
+      "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+      "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+      "archive_repository": "vaastav/Fantasy-Premier-League",
+      "experiment_contract_version": "screening_doe_v1",
+      "feature_generation_contract_version": "form_window_v1",
+      "history_rows": 126737,
+      "history_seasons": [
+        "2020-21",
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25"
+      ],
+      "repository_commit": "df6c3e32870209ac7577844155a19d3664b69eae",
+      "working_tree_dirty": false
+    }
+  },
+  "population": {
+    "built_folds": 16,
+    "control_proven_folds": 16,
+    "declared_folds": 16,
+    "horizon": 1,
+    "origins": [
+      5,
+      15,
+      25,
+      33
+    ],
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ]
+  },
+  "prereg": "docs/strategy_screening_prereg.md",
+  "strategies": {
+    "fark-yarat": {
+      "default_feasibility_share": 1.0,
+      "default_level": 5,
+      "design_fingerprint": "b585a240b23210c334f2f885172ce3cc1ad5aee40f6627baf4e68b0a81b5aeaa",
+      "knob": "overlap_ceiling",
+      "levels": [
+        {
+          "feasibility_share": 1.0,
+          "interval_90": [
+            -0.6875,
+            -0.15312500000000018
+          ],
+          "level": 3,
+          "mean_cost": 0.4343749999999993,
+          "mean_expected_points": 90.31458333333333,
+          "moves": true,
+          "paired_delta_vs_default": -0.4093749999999998
+        },
+        {
+          "feasibility_share": 1.0,
+          "interval_90": [
+            -0.16875000000000107,
+            0.0
+          ],
+          "level": 4,
+          "mean_cost": 0.109375,
+          "mean_expected_points": 90.63958333333333,
+          "moves": false,
+          "paired_delta_vs_default": -0.08437500000000053
+        },
+        {
+          "feasibility_share": 1.0,
+          "interval_90": null,
+          "level": 5,
+          "mean_cost": 0.024999999999999467,
+          "mean_expected_points": 90.72395833333333,
+          "moves": null,
+          "paired_delta_vs_default": null
+        },
+        {
+          "feasibility_share": 1.0,
+          "interval_90": [
+            0.0,
+            0.049999999999998934
+          ],
+          "level": 6,
+          "mean_cost": 0.0,
+          "mean_expected_points": 90.74895833333333,
+          "moves": false,
+          "paired_delta_vs_default": 0.024999999999999467
+        },
+        {
+          "feasibility_share": 1.0,
+          "interval_90": [
+            0.0,
+            0.049999999999998934
+          ],
+          "level": 7,
+          "mean_cost": 0.0,
+          "mean_expected_points": 90.74895833333333,
+          "moves": false,
+          "paired_delta_vs_default": 0.024999999999999467
+        },
+        {
+          "feasibility_share": 1.0,
+          "interval_90": [
+            0.0,
+            0.049999999999998934
+          ],
+          "level": 8,
+          "mean_cost": 0.0,
+          "mean_expected_points": 90.74895833333333,
+          "moves": false,
+          "paired_delta_vs_default": 0.024999999999999467
+        }
+      ],
+      "objective_fingerprint": "e1f4a6f1782a4f42cba0b4c70768f6b22076ca8d2b395aab7ae5e172d2003083",
+      "verdict": "search"
+    },
+    "ortak-koru": {
+      "default_feasibility_share": 1.0,
+      "default_level": 9,
+      "design_fingerprint": "72c2a5ae17b2ac41e294a2009db2c72222060c4cd3c025f8b6ae4792d3ec0c37",
+      "knob": "overlap_floor",
+      "levels": [
+        {
+          "feasibility_share": 1.0,
+          "interval_90": [
+            4.113541666666665,
+            7.4385416666666675
+          ],
+          "level": 6,
+          "mean_cost": 0.71875,
+          "mean_expected_points": 90.03020833333333,
+          "moves": true,
+          "paired_delta_vs_default": 6.001041666666666
+        },
+        {
+          "feasibility_share": 1.0,
+          "interval_90": [
+            3.5354166666666638,
+            6.804166666666661
+          ],
+          "level": 7,
+          "mean_cost": 1.3281250000000009,
+          "mean_expected_points": 89.42083333333333,
+          "moves": true,
+          "paired_delta_vs_default": 5.391666666666664
+        },
+        {
+          "feasibility_share": 1.0,
+          "interval_90": [
+            1.9072916666666657,
+            4.307291666666665
+          ],
+          "level": 8,
+          "mean_cost": 3.513541666666666,
+          "mean_expected_points": 87.23541666666667,
+          "moves": true,
+          "paired_delta_vs_default": 3.2062499999999994
+        },
+        {
+          "feasibility_share": 1.0,
+          "interval_90": null,
+          "level": 9,
+          "mean_cost": 6.719791666666666,
+          "mean_expected_points": 84.02916666666667,
+          "moves": null,
+          "paired_delta_vs_default": null
+        },
+        {
+          "feasibility_share": 0.6875,
+          "interval_90": [
+            -8.553030303030303,
+            -4.969696969696972
+          ],
+          "level": 10,
+          "mean_cost": 11.675757575757576,
+          "mean_expected_points": 78.31818181818181,
+          "moves": false,
+          "paired_delta_vs_default": -7.096969696969699
+        },
+        {
+          "feasibility_share": 0.125,
+          "interval_90": [
+            -8.125,
+            -8.125
+          ],
+          "level": 11,
+          "mean_cost": 10.041666666666671,
+          "mean_expected_points": 80.125,
+          "moves": false,
+          "paired_delta_vs_default": -8.125
+        }
+      ],
+      "objective_fingerprint": "c0fc1221e365de63bfbe05d7510f4f3acdaeb30b4cb0b166220865b04bad79c0",
+      "verdict": "search"
+    }
+  }
+}
