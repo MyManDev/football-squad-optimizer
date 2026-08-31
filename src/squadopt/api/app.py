@@ -6,10 +6,10 @@ import logging
 from pathlib import Path
 from typing import Annotated, Final
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi import Path as ApiPath
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHttpException
 
 from squadopt.api.views import (
@@ -20,6 +20,15 @@ from squadopt.api.views import (
     PublishedViewStore,
 )
 from squadopt.platform import BACKEND_API_VERSION, ApiError, ApiErrorResponse, ApiServiceInfo
+from squadopt.platform.advice_documents import AdviceDocumentError
+from squadopt.platform.advice_read import (
+    AdviceBackendNotReadyError,
+    AdviceNotComputedError,
+    AdviceReadStore,
+    LeagueNotConnectedError,
+    UnknownEntryError,
+    UnknownStrategyError,
+)
 
 DEFAULT_SITE_DATA_ROOT: Final = Path("web") / "public" / "data"
 _SEASON_PATTERN: Final = r"^[0-9]{4}-[0-9]{2}$"
@@ -50,8 +59,14 @@ def create_app(
     *,
     data_root: str | Path = DEFAULT_SITE_DATA_ROOT,
     view_store: PublishedViewStore | None = None,
+    advice_store: AdviceReadStore | None = None,
 ) -> FastAPI:
-    """Build the API with an injectable read adapter and no solver startup work."""
+    """Build the API with an injectable read adapter and no solver startup work.
+
+    ``advice_store`` is the on-demand read side; without one (the default, and the
+    whole app before this existed) the advice routes answer 503 with an explicit
+    code rather than pretending an empty cache is a computed absence.
+    """
 
     store = view_store if view_store is not None else FilePublishedViewStore(data_root)
     application = FastAPI(
@@ -99,6 +114,74 @@ def create_app(
     async def unexpected_error(request: Request, error: Exception) -> JSONResponse:
         _log_exception("api.unexpected_error", request, error)
         return _contract_error(500, "INTERNAL_ERROR", "The request failed unexpectedly.")
+
+    @application.exception_handler(LeagueNotConnectedError)
+    async def league_not_connected(
+        _request: Request, error: LeagueNotConnectedError
+    ) -> JSONResponse:
+        return _contract_error(404, "LEAGUE_NOT_CONNECTED", str(error))
+
+    @application.exception_handler(UnknownEntryError)
+    async def unknown_entry(_request: Request, error: UnknownEntryError) -> JSONResponse:
+        return _contract_error(404, "UNKNOWN_ENTRY", str(error))
+
+    @application.exception_handler(UnknownStrategyError)
+    async def unknown_strategy(_request: Request, error: UnknownStrategyError) -> JSONResponse:
+        return _contract_error(404, "UNKNOWN_STRATEGY", str(error))
+
+    @application.exception_handler(AdviceNotComputedError)
+    async def advice_not_computed(_request: Request, error: AdviceNotComputedError) -> JSONResponse:
+        return _contract_error(404, "NOT_COMPUTED", str(error))
+
+    @application.exception_handler(AdviceDocumentError)
+    async def advice_document_invalid(request: Request, error: AdviceDocumentError) -> JSONResponse:
+        _log_exception("api.advice_document_invalid", request, error)
+        return _contract_error(500, "INTERNAL_ERROR", "The stored advice is unavailable.")
+
+    @application.exception_handler(AdviceBackendNotReadyError)
+    async def advice_not_ready(
+        _request: Request, error: AdviceBackendNotReadyError
+    ) -> JSONResponse:
+        return _contract_error(503, "NOT_READY", str(error))
+
+    @application.get("/api/v1/leagues/{league_id}", response_class=JSONResponse)
+    def league_state(league_id: Annotated[int, ApiPath(ge=1)]) -> JSONResponse:
+        if advice_store is None:
+            return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
+        return JSONResponse(
+            content=advice_store.league_state(league_id),
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    @application.get(
+        "/api/v1/leagues/{league_id}/entries/{entry_id}/advice",
+        response_class=Response,
+    )
+    def read_advice(
+        league_id: Annotated[int, ApiPath(ge=1)],
+        entry_id: Annotated[int, ApiPath(ge=1)],
+        strategy: Annotated[str, Query(pattern=r"^[a-z][a-z0-9._-]{0,63}$")],
+        window: Annotated[int, Query()],
+        rival: Annotated[int | None, Query(ge=1)] = None,
+    ) -> Response:
+        if advice_store is None:
+            return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
+        if window not in (1, 3, 5):
+            return _contract_error(422, "VALIDATION_FAILED", "window must be 1, 3, or 5.")
+        payload = advice_store.read_advice(
+            league_id=league_id,
+            entry_id=entry_id,
+            strategy=strategy,
+            window=window,
+            rival_entry_id=rival,
+        )
+        # The cache holds the exact published bytes; serving them unparsed keeps the
+        # api a reader and the answer identical wherever it is read from.
+        return Response(
+            content=payload,
+            media_type="application/json",
+            headers={"Cache-Control": "no-cache"},
+        )
 
     @application.get("/health", response_class=JSONResponse)
     def health() -> JSONResponse:
