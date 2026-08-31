@@ -64,7 +64,7 @@ function Moves({ view }: { view: RecommendationView }) {
         ) : null}
       </header>
 
-      <DecisionControls />
+      <DecisionControls horizonEvidence={view.metadata.horizon_evidence} />
 
       {!t ? (
         <EmptyState title={copy.openingTitle}>

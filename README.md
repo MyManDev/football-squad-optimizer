@@ -554,8 +554,9 @@ target gameweek instead of silently falling back to completed-season history:
 One information state covers the whole horizon: player features come from the decision
 point and never move, and only the calendar varies per gameweek. A blank gameweek is a row
 with zero fixtures projecting exactly zero points; a double scales linearly, under
-`linear_fixture_count_scaling_v1`, which is post-processing applied on top of a
-calendar-blind control rather than something the model learned.
+`first_week_control_future_fixture_scaling_v2`, which preserves the decision week's
+operational control and applies fixture-count post-processing only to later shadow weeks,
+instead of changing the calendar-blind control inside the horizon builder.
 
 A one-gameweek horizon reproduces the shared live projection exactly, for both the
 opening control and a validated in-season handoff. See
@@ -587,12 +588,13 @@ ledger can be planned over 1, 3 or 5 weeks:
   --in-season-projection data/handoffs/2026-27-gw02.json
 ```
 
-The multi-week policy defaults to at most one transfer per gameweek, the discipline
-supported by the recorded rolling-horizon measurement. It does not select chips and it
-does not invent future prices. The command publishes only a proven `OPTIMAL` artifact by
-default. A deterministic-budget `FEASIBLE` result can be recorded for research with
-`--allow-feasible-shadow`; that artifact is marked `shadow_unproven` and is not a live
-recommendation.
+H1 reuses the uncapped operational transfer policy. Longer horizons default to at most
+one transfer per gameweek, the discipline supported by the recorded rolling-horizon
+measurement. The planner does not select chips and does not invent future prices. The
+command publishes only a proven `OPTIMAL` artifact by default. A deterministic-budget
+`FEASIBLE` result can be recorded for research with
+`--allow-feasible-shadow`; that artifact is marked `shadow_only` with an `unproven`
+solver proof and is not a live recommendation.
 
 To run the decision control and longer research horizons under one replay-safe lineage:
 
@@ -605,6 +607,20 @@ To run the decision control and longer research horizons under one replay-safe l
 The batch manifest links child artifacts without absolute workstation paths. H1 remains
 the only decision-eligible control; H3 and H5 remain research shadows even when their
 solver status is `OPTIMAL`.
+
+The static site may expose the existence and solver status of that evidence without
+publishing alternative actions:
+
+```powershell
+.venv\Scripts\python -m scripts.build_site `
+  --season 2026-27 `
+  --horizon-manifest artifacts/live/2026-27/gw02/batches/horizon_batch_<fingerprint>.json
+```
+
+Publication first verifies the manifest and every child fingerprint, then requires its
+H1 squad, XI, captain, transfers, score, model, and snapshot to reproduce the immutable
+ledger decision. A mismatch stops the build. Only sanitized status fields are attached
+to the recommendation metadata; H3/H5 actions never enter the public view.
 
 ## Signal the control has not spent
 
