@@ -6,6 +6,16 @@ from squadopt.evaluation.benchmarks import (
     audit_unconstrained_template_v1,
     build_constrained_ownership_template,
 )
+from squadopt.evaluation.cohorts import (
+    TOP_MANAGER_COHORT_SIZE,
+    TOP_MANAGER_COHORT_VERSION,
+    TOP_MANAGER_MINIMUM_COVERAGE_COUNT,
+    AsOfTop100Cohort,
+    RankedManager,
+    Top100BenchmarkResult,
+    aggregate_top_100_scores,
+    select_as_of_top_100,
+)
 from squadopt.evaluation.evaluator import evaluate_prepared_folds
 from squadopt.evaluation.models import (
     EvaluationConfig,
@@ -27,6 +37,10 @@ from squadopt.evaluation.scoring import (
 
 __all__ = [
     "OWNERSHIP_TEMPLATE_V2",
+    "TOP_MANAGER_COHORT_SIZE",
+    "TOP_MANAGER_COHORT_VERSION",
+    "TOP_MANAGER_MINIMUM_COVERAGE_COUNT",
+    "AsOfTop100Cohort",
     "EvaluationConfig",
     "EvaluationError",
     "EvaluationFold",
@@ -36,12 +50,16 @@ __all__ = [
     "FoldEvaluationResult",
     "FrozenSquadDecision",
     "OwnershipTemplateResult",
+    "RankedManager",
     "RealizedSquadScore",
     "ScoringPolicy",
+    "Top100BenchmarkResult",
+    "aggregate_top_100_scores",
     "audit_unconstrained_template_v1",
     "build_constrained_ownership_template",
     "complete_optimization_decision",
     "evaluate_prepared_folds",
     "score_frozen_squad_decision",
     "score_realized_squad_points",
+    "select_as_of_top_100",
 ]
