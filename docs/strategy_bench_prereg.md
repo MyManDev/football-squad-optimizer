@@ -92,3 +92,43 @@ the naming rule structurally, not editorially.
 Measurement only; nothing here touches the live decision path, and `prediction/` is
 not involved. The bench harness itself arrives in later PRs (`experiments/design.py`,
 the registry, banded candidate generation); this document precedes them all.
+
+---
+
+## Post-run protocol amendment (2026-08-28): the first run crossed the load boundary
+
+**Labelled amendment, written after the first run and before the corrective rerun. It
+changes the data-access mechanics only; no gate, threshold, band, horizon, solver
+limit, bootstrap rule, seed or declared season moves, and the measured gates are not
+reinterpreted here.**
+
+- **First (invalid) run**: commit `8f8d3cba7efd93b27ef81851389a5d8304be34fb`, executed
+  2026-08-27T18:47:19Z → 19:50:39Z, exit 0.
+- **Discovered**: 2026-08-28, on post-run inspection.
+- **Exact defect**: `scripts/measure_strategy_bench.py` called
+  `build_panel(archive_root)` without a `seasons` argument; the loader's default is
+  every `SUPPORTED_SEASONS` entry, which includes the locked 2025-26 holdout, and the
+  script's own holdout check ran only after the panel was already loaded. The artifact
+  recorded the access itself (`metadata.provenance.history_seasons` lists 2025-26)
+  while hard-coding `holdout_untouched: true`.
+- **Why the first run is procedurally invalid**: the declared boundary above is "the
+  spent 2025-26 holdout is not reused; the current season is never touched" — a
+  no-read protocol. Reading the files is the violation; whether the rows influenced
+  any number is a separate question. A run that crossed the declared boundary cannot
+  stand as the binding measurement.
+- **Downstream-influence evidence**: `build_control_residual_table` drops every row
+  beyond the last development season before feature or outcome computation (the rank
+  filter producing `visible_panel`), fold construction selects panel rows by
+  development season only, and enrichment loads an explicit `DEVELOPMENT_SEASONS`
+  list — so the loaded holdout rows appear in no fold, no residual and no score, and
+  the corrective run is expected to reproduce the first run's numbers identically.
+  The corrective run will report any difference.
+- **Corrective data-access boundary**: evaluation seasons are parsed and validated
+  before any loader call; requesting 2025-26 refuses before `build_panel` can run;
+  the panel is loaded from an explicit history list — 2020-21 as prior cross-season
+  history plus 2021-22..2024-25 — and 2025-26 is never requested; provenance records
+  the actually loaded seasons; `holdout_untouched` derives from the loaded panel and
+  the run aborts without writing artifacts if the holdout is ever present.
+- **Rerun declaration**: exactly one corrective binding rerun is allowed, with every
+  gate and analytical parameter unchanged. Its result is binding whatever it says.
+  The first run's artifacts remain in Git history as the record of the invalid run.
