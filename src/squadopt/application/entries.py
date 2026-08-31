@@ -47,8 +47,14 @@ class EntryPicks:
     gameweek: int
     """The last gameweek whose picks are known (the squad held going into the next)."""
     squad: tuple[int, ...]
+    """The fifteen picks in the platform's order; ``squad[11:]`` is the bench in the
+    substitution order the platform walks when a starter plays no minutes (#262)."""
     starting_xi: tuple[int, ...]
     captain: int
+    vice_captain: int
+    """Who inherits the multiplier when the captain plays no minutes. Required rather than
+    defaulted: a guessed vice hands the armband to the wrong player in exactly the weeks the
+    captain blanked. Held in the squad, not necessarily in the starting eleven."""
     bank_tenths: int
     free_transfers: int
     free_transfers_known: bool = True
