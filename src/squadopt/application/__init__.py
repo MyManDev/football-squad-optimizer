@@ -48,6 +48,11 @@ from squadopt.application.horizon_plans import (
     plan_horizon,
     write_horizon_plan,
 )
+from squadopt.application.horizon_publish import (
+    HORIZON_EVIDENCE_CONTRACT_VERSION,
+    PublicHorizonEvidence,
+    load_public_horizon_evidence,
+)
 from squadopt.application.league import (
     LeagueError,
     LeagueView,
@@ -91,6 +96,7 @@ __all__ = [
     "DEFAULT_HORIZONS",
     "DEFAULT_SHADOW_HORIZONS",
     "HORIZON_BATCH_CONTRACT_VERSION",
+    "HORIZON_EVIDENCE_CONTRACT_VERSION",
     "HORIZON_PLAN_ARTIFACT_CONTRACT_VERSION",
     "TEMPLATE_RIVAL_SOURCE",
     "UI_VIEW_CONTRACT_VERSION",
@@ -114,6 +120,7 @@ __all__ = [
     "PlayerView",
     "PoolPlayerView",
     "PoolView",
+    "PublicHorizonEvidence",
     "RecommendationView",
     "RiskView",
     "SettleRequest",
@@ -134,6 +141,7 @@ __all__ = [
     "iter_rivals",
     "league_view",
     "ledger_view",
+    "load_public_horizon_evidence",
     "ownership_by_player",
     "ownership_view",
     "plan_horizon",

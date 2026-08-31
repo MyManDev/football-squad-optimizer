@@ -8,6 +8,9 @@
     data/<season>/gw<NN>/recommendation.json     RecommendationView
     data/<season>/gw<NN>/pool.json               PoolView (why these players)
 
+An explicitly supplied horizon batch may add sanitized solver evidence to the matching
+recommendation's metadata. The ledger decision remains the rendered action.
+
 Every file is a ``ViewEnvelope``; the tree is deterministic for a given ledger and clock
 (sorted keys, fixed indent, LF line ends) and each file lands through a temporary file
 and one rename, so a reader never sees a half-written JSON.
@@ -17,7 +20,7 @@ import contextlib
 import json
 import os
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -28,6 +31,7 @@ from squadopt.application.build import (
     status_view,
 )
 from squadopt.application.contract import UI_VIEW_CONTRACT_VERSION, ui_view_schema
+from squadopt.application.horizon_publish import load_public_horizon_evidence
 from squadopt.application.league import league_view, ownership_view
 from squadopt.application.views import (
     JsonValue,
@@ -37,6 +41,7 @@ from squadopt.application.views import (
     ViewEnvelope,
     utc_now_iso,
 )
+from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.live.ledger import LedgerEntry, load_ledger
 from squadopt.live.tick import LedgerState, TickPlan
@@ -55,6 +60,7 @@ class SiteBuildReport:
     settled_gameweeks: tuple[int, ...]
     status_written: bool
     league_written: bool
+    horizon_evidence_gameweek: int | None
 
 
 def _write_json(path: Path, payload: dict[str, JsonValue]) -> None:
@@ -81,6 +87,7 @@ def build_site(
     plan: TickPlan | None = None,
     runlog_root: Path | None = None,
     snapshot: CapturedSnapshot | None = None,
+    horizon_manifest: Path | None = None,
     now: datetime | None = None,
 ) -> SiteBuildReport:
     """Render the season's ledger (and, if given, a tick plan) as the site's data tree.
@@ -103,8 +110,25 @@ def build_site(
         written.append(relative)
 
     entries: tuple[LedgerEntry, ...] = load_ledger(Path(ledger_root), season)
+    evidence = (
+        load_public_horizon_evidence(Path(horizon_manifest), ledger_root=Path(ledger_root))
+        if horizon_manifest is not None
+        else None
+    )
+    if evidence is not None and evidence.season != season:
+        raise DataError(
+            f"Horizon evidence belongs to {evidence.season!r}, not requested season {season!r}."
+        )
     for entry in entries:
         view = recommendation_view_from_ledger(entry)
+        if evidence is not None and entry.gameweek == evidence.gameweek:
+            view = replace(
+                view,
+                metadata={
+                    **dict(view.metadata),
+                    "horizon_evidence": dict(evidence.payload),
+                },
+            )
         emit(f"{season}/gw{entry.gameweek:02d}/recommendation.json", view.to_dict())
         emit(f"{season}/gw{entry.gameweek:02d}/pool.json", pool_view(entry).to_dict())
 
@@ -168,4 +192,5 @@ def build_site(
         settled_gameweeks=tuple(row.gameweek for row in ledger.rows if row.settled),
         status_written=status_written,
         league_written=league_written,
+        horizon_evidence_gameweek=(evidence.gameweek if evidence is not None else None),
     )
