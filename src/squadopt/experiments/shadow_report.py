@@ -20,6 +20,7 @@ import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 SHADOW_CALIBRATION_CONTRACT_VERSION = "shadow_calibration_report_v1"
@@ -107,10 +108,54 @@ class ShadowGateResult:
 
 
 @dataclass(frozen=True, slots=True)
+class ShadowExecutionMetadata:
+    """The reproducibility facts for one concrete shadow execution."""
+
+    started_at_utc: str
+    completed_at_utc: str
+    elapsed_seconds: float
+    deterministic_seed: int
+    warnings: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        def instant(label: str, value: str) -> datetime:
+            try:
+                parsed = datetime.fromisoformat(value)
+            except ValueError as error:
+                raise ShadowReportError(f"{label} must be an ISO-8601 timestamp.") from error
+            _require(
+                parsed.tzinfo is not None and parsed.utcoffset() == UTC.utcoffset(parsed),
+                f"{label} must describe a UTC instant.",
+            )
+            return parsed
+
+        started = instant("started_at_utc", self.started_at_utc)
+        completed = instant("completed_at_utc", self.completed_at_utc)
+        _require(completed >= started, "completed_at_utc cannot precede started_at_utc.")
+        _require(
+            isinstance(self.elapsed_seconds, float)
+            and math.isfinite(self.elapsed_seconds)
+            and self.elapsed_seconds >= 0.0,
+            "elapsed_seconds must be a finite non-negative float.",
+        )
+        _require(
+            isinstance(self.deterministic_seed, int)
+            and not isinstance(self.deterministic_seed, bool)
+            and self.deterministic_seed >= 0,
+            "deterministic_seed must be a non-negative integer.",
+        )
+        _require(
+            all(isinstance(item, str) and bool(item.strip()) for item in self.warnings),
+            "warnings must contain only non-empty strings; no warnings is an empty tuple.",
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ShadowCalibrationReport:
     """One shadow measurement's complete, internal-only record."""
 
     generated_at_utc: str
+    execution: ShadowExecutionMetadata
     horizon: int
     residual_source: ShadowResidualSource
     sample_size: int
@@ -170,6 +215,13 @@ def report_to_dict(report: ShadowCalibrationReport) -> dict[str, object]:
     return {
         "contract_version": report.contract_version,
         "generated_at_utc": report.generated_at_utc,
+        "execution": {
+            "started_at_utc": report.execution.started_at_utc,
+            "completed_at_utc": report.execution.completed_at_utc,
+            "elapsed_seconds": report.execution.elapsed_seconds,
+            "deterministic_seed": report.execution.deterministic_seed,
+            "warnings": list(report.execution.warnings),
+        },
         "horizon": report.horizon,
         "residual_source": {
             "export_label": source.export_label,
