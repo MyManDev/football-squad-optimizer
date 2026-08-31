@@ -41,6 +41,7 @@ def _member_picks(world: dict[str, Any], entry_id: int, squad_codes: list[int]) 
         squad=tuple(squad_codes),
         starting_xi=tuple(squad_codes[:11]),
         captain=squad_codes[0],
+        vice_captain=squad_codes[1],
         bank_tenths=5,
         free_transfers=1,
         free_transfers_known=False,

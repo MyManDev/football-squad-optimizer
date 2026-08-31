@@ -153,6 +153,7 @@ class _CapturePicks:
             squad=tuple(self._code(player) for player in record.squad),
             starting_xi=tuple(self._code(player) for player in record.starting_xi),
             captain=self._code(record.captain),
+            vice_captain=self._code(record.vice_captain),
             bank_tenths=record.bank_tenths,
             free_transfers=record.free_transfers,
             free_transfers_known=record.free_transfers_known,

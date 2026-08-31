@@ -93,6 +93,7 @@ def _picks(entry_id: int, *, captain: int = 1) -> EntryPicks:
         squad=tuple(PLAYERS),
         starting_xi=tuple(PLAYERS[:11]),
         captain=captain,
+        vice_captain=next(player for player in PLAYERS if player != captain),
         bank_tenths=0,
         free_transfers=1,
         free_transfers_known=False,

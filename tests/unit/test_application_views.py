@@ -111,6 +111,46 @@ def test_a_recommendation_view_matches_the_ledger_view_of_the_same_decision(
     assert from_ledger.risk.stated_limits and in_memory.risk.reason
 
 
+def test_the_public_recommendation_only_exposes_allowlisted_ledger_metadata(
+    world: tuple[Recommendation, Projection, Path, Any], tmp_path: Path
+) -> None:
+    recommendation, projection, root, _ = world
+    fingerprint = "a" * 64
+    windows_handoff = r"C:\Users\alice\private\handoff.json"
+    posix_residuals = "/home/alice/private/residuals.csv"
+    record_decision(
+        root,
+        recommendation,
+        projection,
+        report_text="report",
+        metadata={
+            "mode": "replay",
+            "projection_handoff_fingerprint": fingerprint,
+            "projection_handoff_path": windows_handoff,
+            "risk_residuals_source": posix_residuals,
+            "risk_residuals_path": posix_residuals,
+            "unreviewed_future_key": {"private_path": "/Users/alice/private/secret.csv"},
+        },
+    )
+
+    entry = load_entry(root, SEASON, 1)
+    raw_metadata = entry.decision["metadata"]
+    assert isinstance(raw_metadata, dict)
+    assert raw_metadata["projection_handoff_path"] == windows_handoff
+    assert raw_metadata["risk_residuals_path"] == posix_residuals
+
+    metadata = recommendation_view_from_ledger(entry).metadata
+
+    assert metadata == {
+        "mode": "replay",
+        "projection_handoff_fingerprint": fingerprint,
+        "risk_residuals_source": ".../private/residuals.csv",
+    }
+    assert "projection_handoff_path" not in metadata
+    assert "risk_residuals_path" not in metadata
+    assert "unreviewed_future_key" not in metadata
+
+
 def test_the_ledger_view_totals_settled_and_unsettled_rows_separately(
     world: tuple[Recommendation, Projection, Path, Any],
 ) -> None:
@@ -194,7 +234,18 @@ def test_build_site_writes_a_deterministic_validated_tree(
     world: tuple[Recommendation, Projection, Path, Any], tmp_path: Path
 ) -> None:
     recommendation, projection, root, snapshot = world
-    record_decision(root, recommendation, projection, report_text="report")
+    record_decision(
+        root,
+        recommendation,
+        projection,
+        report_text="report",
+        metadata={
+            "mode": "replay",
+            "projection_handoff_path": r"C:\Users\alice\private\handoff.json",
+            "risk_residuals_path": "/home/alice/private/residuals.csv",
+            "future": {"private_path": "/Users/alice/private/secret.csv"},
+        },
+    )
     held = [HeldSnapshot(snapshot.metadata.snapshot_id, snapshot.metadata.captured_at_utc)]
     plan = plan_tick(
         now_utc="2026-08-21T15:30:00Z",
@@ -256,6 +307,14 @@ def test_build_site_writes_a_deterministic_validated_tree(
         "path": f"{SEASON}/gw01/recommendation.json",
     }
     assert index["gameweeks"] == {SEASON: [1]}
+    public_recommendation = json.loads(
+        (tmp_path / "one" / "data" / SEASON / "gw01" / "recommendation.json").read_text("utf-8")
+    )["payload"]
+    assert public_recommendation["metadata"] == {"mode": "replay"}
+    public_text = json.dumps(public_recommendation)
+    assert "alice" not in public_text
+    assert "projection_handoff_path" not in public_text
+    assert "risk_residuals_path" not in public_text
     assert first.status_written is True and first.decided_gameweeks == (1,)
     assert first.league_written is True
     # No leftover temporary files from the atomic writes.
