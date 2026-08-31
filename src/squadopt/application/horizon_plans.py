@@ -36,6 +36,14 @@ from squadopt.planning import ProjectionHorizon, TransferPlanningConfig, Transfe
 
 HORIZON_PLAN_ARTIFACT_CONTRACT_VERSION: Final = "live_transfer_horizon_v1"
 SUPPORTED_HORIZON_LENGTHS: Final = frozenset({1, 3, 5})
+_RUNTIME_DIAGNOSTICS: Final = frozenset(
+    {
+        "solve_time_seconds",
+        "deterministic_time_used",
+        "tiebreak_deterministic_time",
+        "tiebreak_deterministic_time_limit",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,7 +155,7 @@ def horizon_plan_document(
     if not isinstance(transfer_config, TransferPlanningConfig):
         raise TypeError("transfer_config must be a TransferPlanningConfig.")
     diagnostics = {
-        key: value for key, value in plan.diagnostics.items() if key != "solve_time_seconds"
+        key: value for key, value in plan.diagnostics.items() if key not in _RUNTIME_DIAGNOSTICS
     }
     document: dict[str, object] = {
         "artifact_type": "live_transfer_horizon",
