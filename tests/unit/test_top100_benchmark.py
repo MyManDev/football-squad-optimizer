@@ -149,3 +149,14 @@ def test_non_finite_manager_scores_are_rejected(value: float) -> None:
             {cohort.entry_ids[0]: value},
             system_points=55.0,
         )
+
+
+def test_non_integer_manager_score_key_is_a_domain_error() -> None:
+    cohort = _cohort()
+
+    with pytest.raises(EvaluationValidationError, match="integer entry ids"):
+        aggregate_top_100_scores(
+            cohort,
+            {"not-an-entry": 50.0},  # type: ignore[dict-item]
+            system_points=55.0,
+        )

@@ -143,3 +143,10 @@ def test_v1_audit_only_claims_a_budget_breach_when_the_xi_alone_exceeds_it() -> 
 
     assert audit["xi_cost_tenths"] == 1100
     assert audit["xi_exceeds_full_squad_budget"] is True
+
+
+def test_v1_audit_requires_exactly_eleven_distinct_starters() -> None:
+    pool = _pool()
+
+    with pytest.raises(EvaluationValidationError, match="11 distinct"):
+        audit_unconstrained_template_v1(pool, tuple(pool["player_id"].head(10)))

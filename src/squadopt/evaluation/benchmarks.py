@@ -13,7 +13,7 @@ import pandas as pd
 from ortools.sat.python import cp_model
 
 from squadopt.evaluation.models import EvaluationValidationError, FrozenSquadDecision
-from squadopt.optimization import OptimizationConfig
+from squadopt.optimization import OptimizationConfig, SquadOptimizationError
 from squadopt.optimization.coefficients import scale_expected_points, sort_players_by_id
 from squadopt.optimization.config import POSITIONS
 from squadopt.optimization.optimizer import configure_solver
@@ -57,7 +57,7 @@ def _validated_ownership_pool(
     prepared["expected_points"] = prepared[OWNERSHIP_COLUMN]
     try:
         validated = validate_players(prepared, config)
-    except Exception as error:
+    except SquadOptimizationError as error:
         raise EvaluationValidationError(f"Invalid ownership pool: {error}") from error
     return sort_players_by_id(validated)
 
@@ -239,8 +239,10 @@ def audit_unconstrained_template_v1(
     settings = OptimizationConfig() if config is None else config
     players = _validated_ownership_pool(pool, settings).set_index("player_id")
     starters = tuple(starter_ids)
-    if not starters or len(starters) != len(set(starters)):
-        raise EvaluationValidationError("V1 starter_ids must be distinct and non-empty.")
+    if len(starters) != settings.starting_size or len(starters) != len(set(starters)):
+        raise EvaluationValidationError(
+            f"V1 starter_ids must contain {settings.starting_size} distinct players."
+        )
     missing = [player_id for player_id in starters if player_id not in players.index]
     if missing:
         raise EvaluationValidationError(

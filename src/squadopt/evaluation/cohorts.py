@@ -154,17 +154,22 @@ def aggregate_top_100_scores(
     if not math.isfinite(normalized_system):
         raise EvaluationValidationError("system_points must be a finite number.")
 
+    invalid_keys = [
+        entry_id
+        for entry_id in manager_scores
+        if isinstance(entry_id, bool) or not isinstance(entry_id, Integral)
+    ]
+    if invalid_keys:
+        raise EvaluationValidationError("manager_scores keys must be integer entry ids.")
     cohort_ids = set(cohort.entry_ids)
-    outside = sorted(set(manager_scores) - cohort_ids)
+    outside = sorted(entry_id for entry_id in manager_scores if entry_id not in cohort_ids)
     if outside:
         raise EvaluationValidationError(
             "manager_scores contains entries outside the frozen Top-100 cohort; "
             f"examples: {outside[:10]!r}."
         )
     scores: list[float] = []
-    for entry_id, value in manager_scores.items():
-        if isinstance(entry_id, bool) or not isinstance(entry_id, Integral):
-            raise EvaluationValidationError("manager_scores keys must be integer entry ids.")
+    for value in manager_scores.values():
         if isinstance(value, bool) or not isinstance(value, Real):
             raise EvaluationValidationError("manager_scores values must be finite numbers.")
         score = float(value)
