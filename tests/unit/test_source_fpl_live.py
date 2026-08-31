@@ -39,6 +39,7 @@ from squadopt.data.sources.fpl_live import (
     live_endpoint_path,
     live_payload,
     next_open_deadline,
+    player_codes,
     player_snapshot,
     team_codes,
     team_names,
@@ -594,6 +595,79 @@ def test_team_codes_map_the_per_season_integer_to_the_persistent_code() -> None:
     assert dict(team_codes(_payload())) == {1: 3, 14: 14}
 
 
+# --- player codes -----------------------------------------------------------
+#
+# The same problem one level down, and the one that actually bit: the entry endpoints
+# name a player by his per-season element id while everything downstream of a capture
+# names him by code. Both are integers, so a mismatch matches nothing instead of raising
+# (#265). What these tests pin is that the translation cannot be quietly incomplete —
+# every way of losing a row here produces lookups that still *look* correct.
+
+
+def test_player_codes_map_the_per_season_element_id_to_the_persistent_code() -> None:
+    payload = _payload([_element(id=5, code=118748), _element(id=9, code=154043)])
+
+    assert dict(player_codes(payload)) == {5: 118748, 9: 154043}
+
+
+def test_player_codes_agree_with_the_snapshot_on_the_same_payload() -> None:
+    """Two readings of one document must not drift into different identity spaces."""
+
+    payload = _payload([_element(id=5, code=118748), _element(id=9, code=154043)])
+
+    mapping = player_codes(payload)
+    snapshot = player_snapshot(payload)
+
+    assert sorted(mapping.values()) == sorted(snapshot["player_id"].tolist())
+
+
+def test_an_element_without_a_code_stops_the_run_rather_than_shrinking_the_map() -> None:
+    """The regression this function exists for.
+
+    A translation table built by skipping the rows it cannot read comes back shorter, and
+    the failure then surfaces as "the capture does not name element 9" — blaming one
+    player for a renamed field. A missing field is a changed payload and has to say so.
+    """
+
+    element = _element(id=9, code=154043)
+    del element["code"]
+
+    with pytest.raises(DataSourceError, match="missing fields"):
+        player_codes(_payload([_element(id=5, code=118748), element]))
+
+
+def test_a_repeated_element_id_is_refused_because_the_mapping_would_be_ambiguous() -> None:
+    payload = _payload([_element(id=5, code=118748), _element(id=5, code=154043)])
+
+    with pytest.raises(DuplicateRecordsError, match="element id 5"):
+        player_codes(payload)
+
+
+def test_a_repeated_code_is_refused_because_it_would_merge_two_players() -> None:
+    """The more expensive duplicate: the key stays unique and two people become one."""
+
+    payload = _payload([_element(id=5, code=118748), _element(id=9, code=118748)])
+
+    with pytest.raises(DuplicateRecordsError, match="merge two of them"):
+        player_codes(payload)
+
+
+def test_a_manager_element_is_translated_rather_than_filtered_out() -> None:
+    """A translation table, not a roster.
+
+    `player_snapshot` drops non-players deliberately. Doing the same here would surface
+    downstream as "the capture does not name element N" for a document that legitimately
+    contains one — blaming the payload for a filter applied on this side.
+    """
+
+    payload = _payload(
+        [_element(id=5, code=118748, element_type=3), _element(id=7, code=99, element_type=5)]
+    )
+
+    assert dict(player_codes(payload)) == {5: 118748, 7: 99}
+    assert 99 not in player_snapshot(payload)["player_id"].tolist()
+
+
 # --- availability -----------------------------------------------------------
 
 
@@ -1060,6 +1134,7 @@ def test_points_are_read_per_player_with_the_gameweeks_progress_beside_them() ->
     )
 
     assert result.points_by_player == {1: 6, 2: 2}
+    assert result.minutes_by_player == {1: 90, 2: 90}
     assert (result.fixtures_finished, result.fixtures_total) == (6, 10)
     assert result.bonus_confirmed is False
     assert result.source_snapshot_id == "fpl-live-20260822T140000Z-abc"
@@ -1146,6 +1221,7 @@ def test_the_record_refuses_to_claim_confirmed_bonus_while_fixtures_are_unfinish
         LiveEventPoints(
             gameweek=1,
             points_by_player={1: 6},
+            minutes_by_player={1: 90},
             bonus_confirmed=True,
             fixtures_finished=9,
             fixtures_total=10,
@@ -1261,3 +1337,80 @@ def test_a_bootstrap_without_the_checked_flag_is_refused_by_name() -> None:
 
     with pytest.raises(DataSourceError, match="data_checked"):
         scored_gameweeks(_events_payload([{"id": 1, "finished": True}]))
+
+
+# --- minutes, because points alone cannot say which eleven they belong to ------------
+#
+# The platform's own score replaces a starter who played no minutes with a bench player
+# (#262). That rule lives in the ledger; what these tests pin is that its input arrives
+# intact, because every way of losing it produces a *wrong eleven* rather than a gap.
+
+
+def test_minutes_are_read_beside_the_points_and_sorted_with_them() -> None:
+    payload = _live_payload([_live_element(2, 2, minutes=45), _live_element(1, 6, minutes=90)])
+
+    result = fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+    assert result.minutes_by_player == {1: 90, 2: 45}
+    assert list(result.minutes_by_player) == sorted(result.minutes_by_player)
+    assert set(result.minutes_by_player) == set(result.points_by_player)
+
+
+def test_a_stats_object_without_minutes_is_refused_rather_than_defaulted_to_zero() -> None:
+    """Zero is the one value that must never be guessed: it means 'substitute him'."""
+
+    element = _live_element(1, 6)
+    del element["stats"]["minutes"]
+
+    # Absent and non-integer land on the same guard as `total_points` does, and the
+    # message names the field rather than the record, so the payload change is legible.
+    with pytest.raises(InvalidValueError, match="'minutes' must be an integer"):
+        fpl_live_event_points(_live_payload([element]), _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_non_integer_minutes_are_refused() -> None:
+    payload = _live_payload([_live_element(1, 6), _live_element(2, 2, minutes="90")])
+
+    with pytest.raises(InvalidValueError, match="minutes"):
+        fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_a_double_gameweek_player_may_exceed_ninety_minutes() -> None:
+    """No upper bound, deliberately: 180 is legal and a cap would encode a false rule."""
+
+    payload = _live_payload([_live_element(1, 12, minutes=180)])
+
+    result = fpl_live_event_points(payload, _gameweek_fixtures(2, 2), gameweek=1)
+
+    assert result.minutes_by_player == {1: 180}
+
+
+def test_negative_minutes_are_refused() -> None:
+    with pytest.raises(InvalidValueError, match="negative minutes"):
+        LiveEventPoints(
+            gameweek=1,
+            points_by_player={1: 6},
+            minutes_by_player={1: -1},
+            bonus_confirmed=False,
+            fixtures_finished=0,
+            fixtures_total=1,
+        )
+
+
+def test_points_and_minutes_must_describe_the_same_players() -> None:
+    """A player with points and no minutes reads as 'did not play' downstream.
+
+    That is not a missing value a caller can route around: the substitution rule would
+    field a bench player for someone who was on the pitch, and the resulting eleven looks
+    entirely plausible. So the record refuses to exist rather than let a caller assemble it.
+    """
+
+    with pytest.raises(InvalidValueError, match="different players"):
+        LiveEventPoints(
+            gameweek=1,
+            points_by_player={1: 6, 2: 2},
+            minutes_by_player={1: 90},
+            bonus_confirmed=False,
+            fixtures_finished=0,
+            fixtures_total=1,
+        )
