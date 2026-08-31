@@ -21,6 +21,13 @@ from squadopt.scenarios.models import (
 
 _SCALE_EPSILON = 1e-12
 
+#: A residual export is serialized to nine decimals, and ``predicted_points``,
+#: ``realized_points`` and ``residual`` are rounded independently, so the identity
+#: between them can miss by one unit in the ninth decimal with no number being wrong.
+#: This is the difference that serialization is entitled to produce; anything larger is
+#: an inconsistency in the history itself and is still refused.
+_RESIDUAL_IDENTITY_TOLERANCE = 1e-9
+
 
 def _identifier_kind(value: object) -> str | None:
     if isinstance(value, bool):
@@ -143,7 +150,7 @@ def validate_residual_history(
             calculated.to_numpy(),
             frame["residual"].to_numpy(),
             rtol=1e-10,
-            atol=1e-10,
+            atol=_RESIDUAL_IDENTITY_TOLERANCE,
         )
     ):
         raise ScenarioValidationError(
