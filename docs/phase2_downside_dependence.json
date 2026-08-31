@@ -1,0 +1,390 @@
+{
+  "classification": "marginal_and_joint_downside_miss",
+  "classification_population": "2023-24",
+  "contract_version": "phase2_downside_dependence_v1",
+  "control_replay": {
+    "measured_below_lower_quantile_rate": 0.21621621621621623,
+    "measured_mean_probability_integral_transform": 0.4921621621621622,
+    "recorded_below_lower_quantile_rate": 0.21621621621621623,
+    "recorded_mean_probability_integral_transform": 0.4921621621621622,
+    "reproduced": true,
+    "tolerance": 1e-12
+  },
+  "created_utc": "2026-08-31T05:39:16+00:00",
+  "development_reuse_exploratory": true,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "execution": {
+    "completed_at_utc": "2026-08-31T06:00:02+00:00",
+    "deterministic_seed": 11,
+    "elapsed_seconds": 1246.00182,
+    "started_at_utc": "2026-08-31T05:39:16+00:00",
+    "warnings": []
+  },
+  "fold_universe": {
+    "folds_by_season": {
+      "2021-22": 29,
+      "2022-23": 36,
+      "2023-24": 37,
+      "2024-25": 37
+    },
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "total_folds": 139
+  },
+  "full_score_tail_split": {
+    "below_q10": {
+      "all_pair_joint_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.3959402356902356,
+          "bootstrap_low": 0.30432626262626256,
+          "mean": 0.3507744107744107
+        },
+        "realized": 0.4141414141414141,
+        "scenario_expected": 0.06336700336700338
+      },
+      "count_above_scenario_q90_folds": 25,
+      "different_team_joint_downside_gap": {
+        "bootstrap_high": 0.38718968100602846,
+        "bootstrap_low": 0.29535252660783917,
+        "mean": 0.3416065580774048
+      },
+      "fold_count": 27,
+      "full_score_below_q10_folds": 27,
+      "marginal_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.4335521885521885,
+          "bootstrap_low": 0.36284427609427605,
+          "mean": 0.39986531986531987
+        },
+        "realized": 0.6498316498316498,
+        "scenario_expected": 0.24996632996632998
+      },
+      "mean_count_mid_pit": 0.9827777777777778,
+      "mean_realized_downside_count": 7.148148148148148,
+      "mean_scenario_covariance_contribution": -0.7753340217838506,
+      "same_team_joint_downside_gap": {
+        "bootstrap_high": 0.5573939153439154,
+        "bootstrap_low": 0.35201933421516757,
+        "mean": 0.4557835097001764
+      }
+    },
+    "elsewhere": {
+      "all_pair_joint_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.1399145292207792,
+          "bootstrap_low": 0.09347207792207791,
+          "mean": 0.11628652597402597
+        },
+        "realized": 0.18019480519480519,
+        "scenario_expected": 0.06390827922077923
+      },
+      "count_above_scenario_q90_folds": 35,
+      "different_team_joint_downside_gap": {
+        "bootstrap_high": 0.13734211407915053,
+        "bootstrap_low": 0.09109131036063846,
+        "mean": 0.11380446856737067
+      },
+      "fold_count": 112,
+      "full_score_below_q10_folds": 0,
+      "marginal_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.18913555194805193,
+          "bootstrap_low": 0.1347524350649351,
+          "mean": 0.16234577922077922
+        },
+        "realized": 0.41233766233766234,
+        "scenario_expected": 0.2499918831168831
+      },
+      "mean_count_mid_pit": 0.7609821428571429,
+      "mean_realized_downside_count": 4.535714285714286,
+      "mean_scenario_covariance_contribution": 6.376554636781809,
+      "same_team_joint_downside_gap": {
+        "bootstrap_high": 0.19017338946088944,
+        "bootstrap_low": 0.10636949270699271,
+        "mean": 0.14763134563134564
+      }
+    }
+  },
+  "independent_confirmation": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "panel_seasons_loaded": [
+    "2020-21",
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "pooled_development": {
+    "all_pair_joint_downside_rate": {
+      "gap": {
+        "bootstrap_high": 0.1868998364944408,
+        "bootstrap_low": 0.13735768476128188,
+        "mean": 0.1618345323741007
+      },
+      "realized": 0.22563767168083718,
+      "scenario_expected": 0.06380313930673642
+    },
+    "count_above_scenario_q90_folds": 60,
+    "different_team_joint_downside_gap": {
+      "bootstrap_high": 0.18264463365627778,
+      "bootstrap_low": 0.1337794022140598,
+      "mean": 0.1580537953067298
+    },
+    "fold_count": 139,
+    "full_score_below_q10_folds": 27,
+    "marginal_downside_rate": {
+      "gap": {
+        "bootstrap_high": 0.2352912034009156,
+        "bootstrap_low": 0.18166432308698494,
+        "mean": 0.20848266841072594
+      },
+      "realized": 0.4584695879659908,
+      "scenario_expected": 0.2499869195552649
+    },
+    "mean_count_mid_pit": 0.8040647482014388,
+    "mean_realized_downside_count": 5.043165467625899,
+    "mean_scenario_covariance_contribution": 4.987338854182724,
+    "same_team_joint_downside_gap": {
+      "bootstrap_high": 0.25092517972164713,
+      "bootstrap_low": 0.16671861916264086,
+      "mean": 0.20792198642742124
+    }
+  },
+  "promotion_eligible": false,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "downside_quantile": "0.25",
+    "evaluation_dispersion_scale": "1.0",
+    "evaluation_location_shift_points": "-7.430702271879578",
+    "evaluation_lower_quantile": "0.1",
+    "evaluation_points_threshold": "40.0",
+    "evaluation_worst_fraction": "0.1",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "generator_deterministic_seed": "11",
+    "generator_double_gameweek_scale": "1.0",
+    "generator_min_history_folds": "8",
+    "generator_min_player_observations": "8",
+    "generator_player_location_shrinkage": "None",
+    "generator_player_scale_shrinkage": "10.0",
+    "generator_scenario_count": "200",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "optimizer_bench_weight": "0.1",
+    "optimizer_budget_tenths": "1000",
+    "optimizer_deterministic_seed": "0",
+    "optimizer_expected_points_scale": "1000",
+    "optimizer_max_players_per_team": "3",
+    "optimizer_solver_deterministic_time_limit": "None",
+    "optimizer_solver_time_limit_seconds": "10.0",
+    "optimizer_squad_position_limits": "{DEF=5, FWD=3, GK=2, MID=5}",
+    "optimizer_squad_size": "15",
+    "optimizer_starting_position_max": "{DEF=5, FWD=3, GK=1, MID=5}",
+    "optimizer_starting_position_min": "{DEF=3, FWD=1, GK=1, MID=2}",
+    "optimizer_starting_size": "11",
+    "projection_prior_gameweek_equivalent": "6",
+    "projection_prior_minute_equivalent": "270",
+    "protocol_bench_weight": "0.1",
+    "protocol_bootstrap_resamples": "5000",
+    "protocol_bootstrap_seed": "0",
+    "protocol_bound_tolerance": "1e-09",
+    "protocol_confidence_level": "0.9",
+    "protocol_decision_universe": "full_roster",
+    "protocol_dispersion_scale": "1.0",
+    "protocol_double_gameweek_scale": "1.0",
+    "protocol_evaluation_season": "2024-25",
+    "protocol_fit_seasons": "2021-22,2022-23,2023-24",
+    "protocol_lower_quantile": "0.1",
+    "protocol_min_evaluation_folds": "30",
+    "protocol_min_history_folds": "8",
+    "protocol_min_player_observations": "8",
+    "protocol_min_prior_gameweeks_in_season": "1",
+    "protocol_player_location_shrinkage": "None",
+    "protocol_player_scale_shrinkage": "10.0",
+    "protocol_points_threshold": "40.0",
+    "protocol_s1_bounds": "(0.43, 0.57)",
+    "protocol_s2_bounds": "(0.04, 0.16)",
+    "protocol_scenario_count": "200",
+    "protocol_scenario_seed": "11",
+    "protocol_worst_fraction": "0.1",
+    "repository_commit": "7d4888226409907fc17a2bc60dd38a5c2a3a0cc8",
+    "working_tree_dirty": "false"
+  },
+  "residual_source": {
+    "export_label": "in_season_carry_over_blend",
+    "model_identity": "squadopt-deterministic-baseline/in-season-carry-over-v1",
+    "table_sha256": "17f88e6e75618adc01ec6357317a6849bdb053e7eeed1cd6627c8eceab15fc7a"
+  },
+  "season_sensitivity": {
+    "2021-22": {
+      "all_pair_joint_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.10704999999999999,
+          "bootstrap_low": 0.03511567398119122,
+          "mean": 0.07009090909090908
+        },
+        "realized": 0.1335423197492163,
+        "scenario_expected": 0.06345141065830721
+      },
+      "count_above_scenario_q90_folds": 6,
+      "different_team_joint_downside_gap": {
+        "bootstrap_high": 0.10537015500231924,
+        "bootstrap_low": 0.03378938807419519,
+        "mean": 0.06835872042450931
+      },
+      "fold_count": 29,
+      "full_score_below_q10_folds": 6,
+      "marginal_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.15449843260188084,
+          "bootstrap_low": 0.05724137931034484,
+          "mean": 0.10741379310344827
+        },
+        "realized": 0.35736677115987453,
+        "scenario_expected": 0.2499529780564263
+      },
+      "mean_count_mid_pit": 0.6922413793103448,
+      "mean_realized_downside_count": 3.9310344827586206,
+      "mean_scenario_covariance_contribution": 8.111461372431593,
+      "same_team_joint_downside_gap": {
+        "bootstrap_high": 0.15871516830870283,
+        "bootstrap_low": 0.02656013957307061,
+        "mean": 0.09043431855500822
+      }
+    },
+    "2022-23": {
+      "all_pair_joint_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.19619646464646465,
+          "bootstrap_low": 0.10316073232323232,
+          "mean": 0.14970202020202017
+        },
+        "realized": 0.2141414141414141,
+        "scenario_expected": 0.06443939393939394
+      },
+      "count_above_scenario_q90_folds": 15,
+      "different_team_joint_downside_gap": {
+        "bootstrap_high": 0.18677126643570535,
+        "bootstrap_low": 0.0955300634819455,
+        "mean": 0.1408341951239185
+      },
+      "fold_count": 36,
+      "full_score_below_q10_folds": 2,
+      "marginal_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.24747474747474746,
+          "bootstrap_low": 0.13385101010101008,
+          "mean": 0.19193181818181815
+        },
+        "realized": 0.4419191919191918,
+        "scenario_expected": 0.24998737373737376
+      },
+      "mean_count_mid_pit": 0.7760416666666667,
+      "mean_realized_downside_count": 4.861111111111111,
+      "mean_scenario_covariance_contribution": 9.135780237198025,
+      "same_team_joint_downside_gap": {
+        "bootstrap_high": 0.36788224206349207,
+        "bootstrap_low": 0.1737657352292769,
+        "mean": 0.2700574294532628
+      }
+    },
+    "2023-24": {
+      "all_pair_joint_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.2229590909090909,
+          "bootstrap_low": 0.13407506142506143,
+          "mean": 0.17864864864864863
+        },
+        "realized": 0.2422604422604422,
+        "scenario_expected": 0.06361179361179362
+      },
+      "count_above_scenario_q90_folds": 19,
+      "different_team_joint_downside_gap": {
+        "bootstrap_high": 0.2217503251315333,
+        "bootstrap_low": 0.13287980688303178,
+        "mean": 0.17771615820730513
+      },
+      "fold_count": 37,
+      "full_score_below_q10_folds": 11,
+      "marginal_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.2782555282555283,
+          "bootstrap_low": 0.17997542997542998,
+          "mean": 0.23157248157248161
+        },
+        "realized": 0.4815724815724816,
+        "scenario_expected": 0.25
+      },
+      "mean_count_mid_pit": 0.8343918918918918,
+      "mean_realized_downside_count": 5.297297297297297,
+      "mean_scenario_covariance_contribution": 5.04080528529299,
+      "same_team_joint_downside_gap": {
+        "bootstrap_high": 0.2805144675925925,
+        "bootstrap_low": 0.13228020833333332,
+        "mean": 0.2046087962962963
+      }
+    },
+    "2024-25": {
+      "all_pair_joint_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.28514742014742017,
+          "bootstrap_low": 0.17329828009828008,
+          "mean": 0.22873218673218668
+        },
+        "realized": 0.2923832923832924,
+        "scenario_expected": 0.06365110565110565
+      },
+      "count_above_scenario_q90_folds": 20,
+      "different_team_joint_downside_gap": {
+        "bootstrap_high": 0.28185870517942985,
+        "bootstrap_low": 0.17014306676760058,
+        "mean": 0.2254471831673869
+      },
+      "fold_count": 37,
+      "full_score_below_q10_folds": 8,
+      "marginal_downside_rate": {
+        "gap": {
+          "bootstrap_high": 0.3323095823095823,
+          "bootstrap_low": 0.22911547911547914,
+          "mean": 0.2807125307125307
+        },
+        "realized": 0.5307125307125307,
+        "scenario_expected": 0.25
+      },
+      "mean_count_mid_pit": 0.8886486486486486,
+      "mean_realized_downside_count": 5.837837837837838,
+      "mean_scenario_covariance_contribution": -1.5510854909212763,
+      "same_team_joint_downside_gap": {
+        "bootstrap_high": 0.3280390765765766,
+        "bootstrap_low": 0.157256435006435,
+        "mean": 0.24277445302445302
+      }
+    }
+  },
+  "source_artifact_digests": {
+    "phase2_captain_attribution.json": "7eda85f8f36518a639ae66e8ffc1f45eea9e781893de85c14ec32192dbb0f9c8",
+    "phase2_tail_diagnostic.json": "f09f418234398ea07a10cd4bd41fa9babef7dab308107786340f61f258076407",
+    "shadow_calibration_squad.json": "c690efd5ce2efa8d60802c55585c53cd46ac07397b078aae9fd764660d0a7556"
+  },
+  "study": "selected-XI simultaneous downside against canonical scenarios"
+}
