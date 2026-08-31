@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+import os
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Final
@@ -23,6 +24,7 @@ from squadopt.api.views import (
 )
 from squadopt.platform import BACKEND_API_VERSION, ApiError, ApiErrorResponse, ApiServiceInfo
 from squadopt.platform.advice_documents import AdviceDocumentError
+from squadopt.platform.advice_observability import AdviceMetrics
 from squadopt.platform.advice_read import (
     AdviceBackendNotReadyError,
     AdviceNotComputedError,
@@ -97,6 +99,9 @@ def create_app(
     advice_store: AdviceReadStore | None = None,
     advice_submit: AdviceSubmitService | None = None,
     allowed_origins: tuple[str, ...] = (),
+    metrics: AdviceMetrics | None = None,
+    queue_depth: Callable[[], int] | None = None,
+    readiness: Callable[[], tuple[bool, Mapping[str, bool]]] | None = None,
     utc_now: Callable[[], datetime] | None = None,
 ) -> FastAPI:
     """Build the API with an injectable read adapter and no solver startup work.
@@ -230,13 +235,24 @@ def create_app(
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
         if window not in (1, 3, 5):
             return _contract_error(422, "VALIDATION_FAILED", "window must be 1, 3, or 5.")
-        payload = advice_store.read_advice(
-            league_id=league_id,
-            entry_id=entry_id,
-            strategy=strategy,
-            window=window,
-            rival_entry_id=rival,
-        )
+        try:
+            payload = advice_store.read_advice(
+                league_id=league_id,
+                entry_id=entry_id,
+                strategy=strategy,
+                window=window,
+                rival_entry_id=rival,
+            )
+        except AdviceNotComputedError:
+            if metrics is not None:
+                metrics.cache_miss()
+            raise
+        except (LeagueNotConnectedError, UnknownEntryError, UnknownStrategyError) as error:
+            if metrics is not None:
+                metrics.rejected(type(error).__name__)
+            raise
+        if metrics is not None:
+            metrics.cache_hit()
         # The cache holds the exact published bytes; serving them unparsed keeps the
         # api a reader and the answer identical wherever it is read from.
         return Response(
@@ -279,12 +295,17 @@ def create_app(
             at_utc=current.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
         if outcome.kind == "hit" and outcome.payload is not None:
+            if metrics is not None:
+                metrics.cache_hit()
             return Response(
                 content=outcome.payload,
                 media_type="application/json",
                 headers={"Cache-Control": "no-cache"},
             )
         assert outcome.job is not None
+        if metrics is not None:
+            metrics.cache_miss()
+            metrics.increment("advice_jobs_submitted_total")
         return JSONResponse(
             status_code=202,
             content={"job_id": outcome.job.job_id, "status": outcome.job.status},
@@ -301,6 +322,44 @@ def create_app(
         if view is None:
             return _contract_error(404, "NOT_FOUND", "No such advice job.")
         return JSONResponse(content=view, headers={"Cache-Control": "no-cache"})
+
+    @application.get("/metrics", response_class=Response)
+    def metrics_endpoint() -> Response:
+        if metrics is None:
+            return _contract_error(404, "NOT_FOUND", "Metrics are not enabled here.")
+        depth = queue_depth() if queue_depth is not None else None
+        return Response(
+            content=metrics.render(queue_depth=depth),
+            media_type="text/plain; version=0.0.4",
+        )
+
+    @application.get("/ready", response_class=JSONResponse)
+    def ready() -> JSONResponse:
+        """Readiness, apart from liveness: folded into one, a full disk looks healthy.
+
+        Without an injected probe the endpoint still looks before it answers: the
+        read-only deployment serves the published tree, so an unreadable data root
+        means not ready, whatever the process's own health says. Deployments with an
+        advice backend inject the full probe (context, cache, queue) and this default
+        never applies to them.
+        """
+
+        if readiness is None:
+            root = Path(data_root)
+            data_root_readable = root.is_dir() and os.access(root, os.R_OK)
+            return JSONResponse(
+                status_code=200 if data_root_readable else 503,
+                content={
+                    "ready": data_root_readable,
+                    "mode": "static",
+                    "checks": {"site_data_root": data_root_readable},
+                },
+            )
+        ok, checks = readiness()
+        return JSONResponse(
+            status_code=200 if ok else 503,
+            content={"ready": ok, "checks": dict(checks)},
+        )
 
     @application.get("/health", response_class=JSONResponse)
     def health() -> JSONResponse:

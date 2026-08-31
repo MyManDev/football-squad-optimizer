@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import Final, Protocol
 
 from squadopt.platform.advice_cache import AdviceCacheError, AdviceCacheRepository
+from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics
 from squadopt.platform.jobs_contract import (
     _JOB_ID_PATTERN,
     AdviceJob,
@@ -320,6 +321,8 @@ def run_advice_worker_once(
     compute: Callable[[AdviceJob], bytes],
     *,
     at_utc: str,
+    metrics: AdviceMetrics | None = None,
+    log: AdviceLog | None = None,
 ) -> AdviceJob | None:
     """Claim one job, compute it, cache the answer, record the terminal state.
 
@@ -330,9 +333,25 @@ def run_advice_worker_once(
     when the queue is empty.
     """
 
+    from time import perf_counter
+
     job = queue.claim(at_utc=at_utc)
     if job is None:
         return None
+    if metrics is not None:
+        from squadopt.platform.jobs_contract import _instant
+
+        wait = (_instant(job.updated_at_utc) - _instant(job.created_at_utc)).total_seconds()
+        metrics.job_wait_seconds(max(0.0, wait))
+    if log is not None:
+        log.event(
+            "advice_job_claimed",
+            job_id=job.job_id,
+            cache_key=job.cache_key,
+            request_fingerprint=job.request_fingerprint,
+            attempt=job.attempt,
+        )
+    started = perf_counter()
     try:
         payload = compute(job)
         if not isinstance(payload, bytes) or not payload:
@@ -347,6 +366,11 @@ def run_advice_worker_once(
             error=JobError(code="DETERMINISM_DEFECT", message=sanitize_error_message(str(error))),
         )
         queue.store(failed)
+        if metrics is not None:
+            metrics.solve_seconds(perf_counter() - started)
+            metrics.increment("advice_jobs_total", outcome="determinism_defect")
+        if log is not None:
+            log.event("advice_job_failed", job_id=job.job_id, code="DETERMINISM_DEFECT")
         return failed
     except BackendJobsContractError:
         raise
@@ -360,7 +384,34 @@ def run_advice_worker_once(
             ),
         )
         queue.store(failed)
+        if metrics is not None:
+            # Solve latency includes failures: omitting them biases the distribution
+            # toward the happy path, exactly when the operator most needs the truth.
+            metrics.solve_seconds(perf_counter() - started)
+            metrics.increment("advice_jobs_total", outcome="failed")
+        if log is not None:
+            log.event("advice_job_failed", job_id=job.job_id, code="ADVICE_FAILED")
         return failed
     completed = job.transition("completed", at_utc=at_utc, result_ref=job.cache_key)
     queue.store(completed)
+    if metrics is not None:
+        metrics.solve_seconds(perf_counter() - started)
+        metrics.increment("advice_jobs_total", outcome="completed")
+        # The FEASIBLE share is a product metric: a budget regression shows up here.
+        # The completed payload is the served advice document, whose solver_status
+        # field the read contract requires when present.
+        import json as _json
+
+        with contextlib.suppress(Exception):
+            document = _json.loads(payload)
+            status = document.get("payload", {}).get("solver_status")
+            if isinstance(status, str) and status:
+                metrics.solver_status(status)
+    if log is not None:
+        log.event(
+            "advice_job_completed",
+            job_id=job.job_id,
+            cache_key=job.cache_key,
+            wall_seconds=round(perf_counter() - started, 3),
+        )
     return completed
