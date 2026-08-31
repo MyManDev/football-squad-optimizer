@@ -413,6 +413,57 @@ def team_codes(bootstrap: bytes) -> Mapping[int, int]:
     return MappingProxyType(mapping)
 
 
+def player_codes(bootstrap: bytes) -> Mapping[int, int]:
+    """Return the per-season element id to persistent player code mapping.
+
+    The same problem as :func:`team_codes` and the same shape, one level down. The
+    per-entry endpoints name a player by his **element** id, which is assigned per season;
+    the canonical panel, the prices, the projection and the ledger all name him by
+    ``code``, which survives a transfer window. Both are plain integers, so handing one
+    where the other is meant does not raise -- it **matches nothing**, and the caller sees
+    a full squad of players it cannot price. That is the failure
+    :func:`squadopt.data.identity.reconcile_player_identity` was written to turn into a
+    stated one, and its refusal message names this exact confusion.
+
+    Two things this deliberately is not.
+
+    It is **not a roster**. Unlike :func:`player_snapshot` it does not drop entries whose
+    ``element_type`` is outside :data:`POSITION_CODES`, because it is a translation table:
+    every element the payload names can appear in a document that needs translating, and
+    silently omitting one would surface downstream as "the capture does not name element
+    N" -- blaming a player for a filter applied here.
+
+    It is **not tolerant of a thinner payload**. A missing or renamed field stops the run
+    and names itself, rather than yielding a shorter mapping: a translation table that is
+    quietly incomplete is worse than none, because the lookups that survive it look
+    correct. For the same reason a repeated ``code`` is refused as well as a repeated
+    ``id`` -- a duplicate key makes the mapping ambiguous, and a duplicate value silently
+    merges two people into one identity, which is the more expensive half.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, ("id", "code"), "Element")
+
+    mapping: dict[int, int] = {}
+    owner: dict[int, int] = {}
+    for record in records:
+        identifier = _integer(record, "id", "Element")
+        if identifier in mapping:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload declares element id {identifier} more than once."
+            )
+        code = _integer(record, "code", "Element")
+        if code in owner:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload gives player code {code} to element ids "
+                f"{owner[code]} and {identifier}; one code is one player, so a repeated "
+                "code would merge two of them into one identity."
+            )
+        mapping[identifier] = code
+        owner[code] = identifier
+    return MappingProxyType(mapping)
+
+
 def _require_season(season: object) -> str:
     if not isinstance(season, str) or not _SEASON_PATTERN.match(season):
         raise InvalidValueError(f"season must be spelled like '2026-27', got {season!r}.")
@@ -864,10 +915,19 @@ class LiveEventPoints:
     - ``fixtures_finished`` against ``fixtures_total`` says how much of the gameweek is
       actually in the number, which is the difference between "your team scored 41" and
       "your team has scored 41 of what will be a larger figure".
+
+    ``minutes_by_player`` travels here rather than in an object of its own because the two
+    come out of one ``stats`` blob and because neither is sufficient alone: the platform's
+    own score replaces a starter who played no minutes with a bench player, so a caller
+    holding the points and not the minutes cannot say which eleven the points belong to.
+    Which is why the key sets must match exactly -- a player whose minutes were dropped
+    would read as "did not play", and the rule would field a substitute for a man who was
+    on the pitch. This object supplies that rule's inputs; it does not apply it.
     """
 
     gameweek: int
     points_by_player: Mapping[int, int]
+    minutes_by_player: Mapping[int, int]
     bonus_confirmed: bool
     fixtures_finished: int
     fixtures_total: int
@@ -877,6 +937,22 @@ class LiveEventPoints:
         if not self.points_by_player:
             raise InvalidValueError(
                 f"Live payload for gameweek {self.gameweek} carries no player points."
+            )
+        if set(self.minutes_by_player) != set(self.points_by_player):
+            scored = set(self.points_by_player) - set(self.minutes_by_player)
+            timed = set(self.minutes_by_player) - set(self.points_by_player)
+            raise InvalidValueError(
+                f"Gameweek {self.gameweek} reports points and minutes for different "
+                f"players: {len(scored)} with points and no minutes "
+                f"({format_examples(sorted(scored))}), {len(timed)} the other way "
+                f"({format_examples(sorted(timed))}). A missing minute count reads as "
+                "'did not play', which is how a substitution gets fabricated."
+            )
+        negative = sorted(player for player, played in self.minutes_by_player.items() if played < 0)
+        if negative:
+            raise InvalidValueError(
+                f"Gameweek {self.gameweek} reports negative minutes for "
+                f"{format_examples(negative)}."
             )
         if self.fixtures_total < 1:
             raise InvalidValueError(
@@ -904,7 +980,7 @@ def fpl_live_event_points(
     gameweek: int,
     source_snapshot_id: str | None = None,
 ) -> LiveEventPoints:
-    """Return one gameweek's running player points from its captured live document.
+    """Return one gameweek's running player points and minutes from its captured live document.
 
     Both documents are required, and the second one is the point. The live payload is a
     bare ``{"elements": [...]}`` with **no gameweek of its own** -- the platform identifies
@@ -913,9 +989,17 @@ def fpl_live_event_points(
     than saying it. What the fixtures payload does give is the gameweek's own progress,
     which is the caveat a reader of these points actually needs.
 
-    Auto-substitutions are deliberately not modelled here. This returns points per player;
-    which eleven those points are counted for is a decision the ledger owns, and it scores
-    the eleven that were named because that is what the projection was for.
+    Auto-substitutions are deliberately not modelled here, and the minutes do not change
+    that. This returns points *and* minutes per player, which is what a substitution rule
+    needs; which eleven those points are counted for stays a decision the ledger owns.
+    Supplying an input is not the same as applying a rule, and keeping the two apart is
+    what lets one caller score the named eleven and another the platform's, from one
+    reading of one payload.
+
+    ``minutes`` comes from the live document rather than from ``bootstrap-static`` because
+    the bootstrap's counter is season-cumulative. It equals the gameweek's minutes for
+    gameweek one and for no other, and a rule built on that coincidence would be silently
+    wrong from gameweek two onward.
     """
 
     week = _positive(gameweek, "gameweek")
@@ -923,24 +1007,30 @@ def fpl_live_event_points(
     _require_fields(records, _LIVE_ELEMENT_FIELDS, "Live element")
 
     points: dict[int, int] = {}
+    minutes: dict[int, int] = {}
     for record in records:
         player = _integer(record, "id", "Live element")
         stats = record.get("stats")
         if not isinstance(stats, dict):
             raise DataSourceError(
                 f"Live element {player} carries a {type(stats).__name__} 'stats' section "
-                "rather than an object; the adapter reads its total_points."
+                "rather than an object; the adapter reads its total_points and minutes."
             )
         if player in points:
             raise DuplicateRecordsError(
                 f"Live payload for gameweek {week} declares player {player} more than once."
             )
         points[player] = _integer(stats, "total_points", f"Live element {player} stats")
+        # Read rather than defaulted when absent. A player silently given zero minutes
+        # reads as "did not play", and the substitution rule downstream would field a
+        # bench player for someone who was on the pitch -- a wrong eleven, not a gap.
+        minutes[player] = _integer(stats, "minutes", f"Live element {player} stats")
 
     finished, total = _gameweek_fixture_progress(fixtures, gameweek=week)
     return LiveEventPoints(
         gameweek=week,
         points_by_player=MappingProxyType(dict(sorted(points.items()))),
+        minutes_by_player=MappingProxyType(dict(sorted(minutes.items()))),
         bonus_confirmed=finished == total,
         fixtures_finished=finished,
         fixtures_total=total,
