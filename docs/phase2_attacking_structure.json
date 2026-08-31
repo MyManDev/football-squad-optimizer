@@ -1,0 +1,418 @@
+{
+  "classification": "attacking_structure_not_localized",
+  "classification_population": "2023-24",
+  "component_rows": 126737,
+  "contract_version": "phase2_attacking_structure_v1",
+  "control_replay": {
+    "measured_below_lower_quantile_rate": 0.21621621621621623,
+    "measured_mean_probability_integral_transform": 0.4921621621621622,
+    "recorded_below_lower_quantile_rate": 0.21621621621621623,
+    "recorded_mean_probability_integral_transform": 0.4921621621621622,
+    "reproduced": true,
+    "tolerance": 1e-12
+  },
+  "created_utc": "2026-08-31T10:11:57+00:00",
+  "development_reuse_exploratory": true,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "execution": {
+    "completed_at_utc": "2026-08-31T10:19:41+00:00",
+    "deterministic_seed": 11,
+    "elapsed_seconds": 464.040117,
+    "started_at_utc": "2026-08-31T10:11:57+00:00",
+    "warnings": []
+  },
+  "fold_universe": {
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "starter_rows": 1529,
+    "total_folds": 139
+  },
+  "independent_confirmation": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "observation_support": {
+    "2021-22": {
+      "completed_appearance_starters": 271,
+      "effective_history_pool_fixture_counts": {
+        "1": 16196,
+        "2": 194
+      },
+      "history_source_counts": {
+        "ineligible": 48,
+        "player_position": 256,
+        "pooled": 0,
+        "position": 15
+      },
+      "partial_appearance_starters": 16,
+      "selected_starters": 319,
+      "target_fixture_counts": {
+        "1": 294,
+        "2": 25
+      },
+      "zero_minute_starters": 32
+    },
+    "2022-23": {
+      "completed_appearance_starters": 351,
+      "effective_history_pool_fixture_counts": {
+        "1": 36216,
+        "2": 3793
+      },
+      "history_source_counts": {
+        "ineligible": 45,
+        "player_position": 339,
+        "pooled": 0,
+        "position": 12
+      },
+      "partial_appearance_starters": 19,
+      "selected_starters": 396,
+      "target_fixture_counts": {
+        "1": 371,
+        "2": 25
+      },
+      "zero_minute_starters": 26
+    },
+    "2023-24": {
+      "completed_appearance_starters": 347,
+      "effective_history_pool_fixture_counts": {
+        "1": 23418,
+        "2": 1572
+      },
+      "history_source_counts": {
+        "ineligible": 60,
+        "player_position": 346,
+        "pooled": 0,
+        "position": 1
+      },
+      "partial_appearance_starters": 21,
+      "selected_starters": 407,
+      "target_fixture_counts": {
+        "1": 395,
+        "2": 12
+      },
+      "zero_minute_starters": 39
+    },
+    "2024-25": {
+      "completed_appearance_starters": 358,
+      "effective_history_pool_fixture_counts": {
+        "1": 151315,
+        "2": 11864
+      },
+      "history_source_counts": {
+        "ineligible": 49,
+        "player_position": 341,
+        "pooled": 0,
+        "position": 17
+      },
+      "partial_appearance_starters": 24,
+      "selected_starters": 407,
+      "target_fixture_counts": {
+        "1": 401,
+        "2": 6
+      },
+      "zero_minute_starters": 25
+    }
+  },
+  "panel_seasons_loaded": [
+    "2020-21",
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "phase2h_reconciliation": {
+    "artifact_sha256": "4023b06b637f3968e762cf7af3b0a9d7b0f45334d8be61d4a0603c1cbe96a3f8",
+    "per_fold_attacking_surprise_reproduced": true,
+    "seasonal_control_and_attacking_summaries_reproduced": true
+  },
+  "pooled": {
+    "metrics": {
+      "G": {
+        "bootstrap_high": 0.02504977249150878,
+        "bootstrap_low": -0.016237207152937985,
+        "mean": 0.004554131254565717
+      },
+      "K": {
+        "bootstrap_high": 0.038497866679460584,
+        "bootstrap_low": 0.006371982820265486,
+        "mean": 0.02203938198275533
+      },
+      "O": {
+        "bootstrap_high": 0.5096995391981033,
+        "bootstrap_low": -0.08811117731019923,
+        "mean": 0.1978084550274326
+      },
+      "U": {
+        "bootstrap_high": 0.0038132180874465137,
+        "bootstrap_low": -0.0045883493999196445,
+        "mean": -0.00044285409303100256
+      }
+    },
+    "support": {
+      "blank_observations": 847,
+      "different_team_pairs": 5306,
+      "eligible_players": 1327,
+      "folds": 139,
+      "metric_folds": {
+        "G": 139,
+        "K": 137,
+        "O": 139,
+        "U": 139
+      },
+      "non_blank_observations": 480,
+      "same_team_pairs": 460
+    }
+  },
+  "promotion_eligible": false,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "attacking_event": "player_gameweek_minutes_gte_60_and_attacking_points_eq_0",
+    "bootstrap_confidence_level": 0.9,
+    "bootstrap_resamples": 5000,
+    "bootstrap_seed": 0,
+    "evaluation_dispersion_scale": "1.0",
+    "evaluation_location_shift_points": "-7.430702271879578",
+    "evaluation_lower_quantile": "0.1",
+    "evaluation_points_threshold": "40.0",
+    "evaluation_worst_fraction": "0.1",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "generator_deterministic_seed": "11",
+    "generator_double_gameweek_scale": "1.0",
+    "generator_min_history_folds": "8",
+    "generator_min_player_observations": "8",
+    "generator_player_location_shrinkage": "None",
+    "generator_player_scale_shrinkage": "10.0",
+    "generator_scenario_count": "200",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "marginal_equivalence_bounds": [
+      -0.05,
+      0.05
+    ],
+    "minimum_player_history": 8,
+    "optimizer_bench_weight": "0.1",
+    "optimizer_budget_tenths": "1000",
+    "optimizer_deterministic_seed": "0",
+    "optimizer_expected_points_scale": "1000",
+    "optimizer_max_players_per_team": "3",
+    "optimizer_solver_deterministic_time_limit": "None",
+    "optimizer_solver_time_limit_seconds": "10.0",
+    "optimizer_squad_position_limits": "{DEF=5, FWD=3, GK=2, MID=5}",
+    "optimizer_squad_size": "15",
+    "optimizer_starting_position_max": "{DEF=5, FWD=3, GK=1, MID=5}",
+    "optimizer_starting_position_min": "{DEF=3, FWD=1, GK=1, MID=2}",
+    "optimizer_starting_size": "11",
+    "projection_prior_gameweek_equivalent": "6",
+    "projection_prior_minute_equivalent": "270",
+    "protocol_bench_weight": "0.1",
+    "protocol_bootstrap_resamples": "5000",
+    "protocol_bootstrap_seed": "0",
+    "protocol_bound_tolerance": "1e-09",
+    "protocol_confidence_level": "0.9",
+    "protocol_decision_universe": "full_roster",
+    "protocol_dispersion_scale": "1.0",
+    "protocol_double_gameweek_scale": "1.0",
+    "protocol_evaluation_season": "2024-25",
+    "protocol_fit_seasons": "2021-22,2022-23,2023-24",
+    "protocol_lower_quantile": "0.1",
+    "protocol_min_evaluation_folds": "30",
+    "protocol_min_history_folds": "8",
+    "protocol_min_player_observations": "8",
+    "protocol_min_prior_gameweeks_in_season": "1",
+    "protocol_player_location_shrinkage": "None",
+    "protocol_player_scale_shrinkage": "10.0",
+    "protocol_points_threshold": "40.0",
+    "protocol_s1_bounds": "(0.43, 0.57)",
+    "protocol_s2_bounds": "(0.04, 0.16)",
+    "protocol_scenario_count": "200",
+    "protocol_scenario_seed": "11",
+    "protocol_worst_fraction": "0.1",
+    "repository_commit": "8ea2dec6337aca6101dfd20d878d36fc01538dce",
+    "working_tree_dirty": "false"
+  },
+  "residual_source": {
+    "export_label": "in_season_carry_over_blend",
+    "model_identity": "squadopt-deterministic-baseline/in-season-carry-over-v1",
+    "table_sha256": "17f88e6e75618adc01ec6357317a6849bdb053e7eeed1cd6627c8eceab15fc7a"
+  },
+  "season_sensitivity": {
+    "2021-22": {
+      "metrics": {
+        "G": {
+          "bootstrap_high": 0.08938555579846014,
+          "bootstrap_low": 0.00860216571965804,
+          "mean": 0.049180182803230804
+        },
+        "K": {
+          "bootstrap_high": 0.05447335187431581,
+          "bootstrap_low": -0.0037534035383638663,
+          "mean": 0.024512677928298525
+        },
+        "O": {
+          "bootstrap_high": 0.3891961932764793,
+          "bootstrap_low": -0.43703202005889125,
+          "mean": -0.02859018837157398
+        },
+        "U": {
+          "bootstrap_high": 0.0032934837120244683,
+          "bootstrap_low": -0.01206022864328536,
+          "mean": -0.004423278033984737
+        }
+      },
+      "support": {
+        "blank_observations": 180,
+        "different_team_pairs": 1046,
+        "eligible_players": 271,
+        "folds": 29,
+        "metric_folds": {
+          "G": 29,
+          "K": 29,
+          "O": 29,
+          "U": 29
+        },
+        "non_blank_observations": 91,
+        "same_team_pairs": 103
+      }
+    },
+    "2022-23": {
+      "metrics": {
+        "G": {
+          "bootstrap_high": 0.026196731721619047,
+          "bootstrap_low": -0.06020456134151843,
+          "mean": -0.01748822395132926
+        },
+        "K": {
+          "bootstrap_high": 0.11125484774335012,
+          "bootstrap_low": 0.031065721524960847,
+          "mean": 0.06944048545393564
+        },
+        "O": {
+          "bootstrap_high": 1.312025306702319,
+          "bootstrap_low": -0.15474459984181568,
+          "mean": 0.5601724012698033
+        },
+        "U": {
+          "bootstrap_high": 0.0104444945934847,
+          "bootstrap_low": -0.008841295647107245,
+          "mean": 0.0006515955409293964
+        }
+      },
+      "support": {
+        "blank_observations": 214,
+        "different_team_pairs": 1402,
+        "eligible_players": 351,
+        "folds": 36,
+        "metric_folds": {
+          "G": 36,
+          "K": 35,
+          "O": 36,
+          "U": 36
+        },
+        "non_blank_observations": 137,
+        "same_team_pairs": 160
+      }
+    },
+    "2023-24": {
+      "metrics": {
+        "G": {
+          "bootstrap_high": 0.049339167963091214,
+          "bootstrap_low": -0.03252612915881171,
+          "mean": 0.0078152762506042
+        },
+        "K": {
+          "bootstrap_high": 0.04267878498919635,
+          "bootstrap_low": -0.016121591794137937,
+          "mean": 0.013376390394097385
+        },
+        "O": {
+          "bootstrap_high": 0.839335501972331,
+          "bootstrap_low": -0.3757815344111273,
+          "mean": 0.2251523323615859
+        },
+        "U": {
+          "bootstrap_high": 0.012349117703231903,
+          "bootstrap_low": -0.004681632126525495,
+          "mean": 0.003725427045562188
+        }
+      },
+      "support": {
+        "blank_observations": 221,
+        "different_team_pairs": 1384,
+        "eligible_players": 347,
+        "folds": 37,
+        "metric_folds": {
+          "G": 37,
+          "K": 36,
+          "O": 37,
+          "U": 37
+        },
+        "non_blank_observations": 126,
+        "same_team_pairs": 96
+      }
+    },
+    "2024-25": {
+      "metrics": {
+        "G": {
+          "bootstrap_high": 0.022996096820255732,
+          "bootstrap_low": -0.04772882045121209,
+          "mean": -0.012237573403609743
+        },
+        "K": {
+          "bootstrap_high": 0.008357006453039257,
+          "bootstrap_low": -0.0415219993602478,
+          "mean": -0.016309172252930552
+        },
+        "O": {
+          "bootstrap_high": 0.4940401055214564,
+          "bootstrap_low": -0.466953747035107,
+          "mean": -0.004658163013589561
+        },
+        "U": {
+          "bootstrap_high": 0.004103635445392767,
+          "bootstrap_low": -0.008739919969738812,
+          "mean": -0.0025562134082435474
+        }
+      },
+      "support": {
+        "blank_observations": 232,
+        "different_team_pairs": 1474,
+        "eligible_players": 358,
+        "folds": 37,
+        "metric_folds": {
+          "G": 37,
+          "K": 37,
+          "O": 37,
+          "U": 37
+        },
+        "non_blank_observations": 126,
+        "same_team_pairs": 101
+      }
+    }
+  },
+  "source_artifact_digests": {
+    "phase2_component_attribution.json": "4023b06b637f3968e762cf7af3b0a9d7b0f45334d8be61d4a0603c1cbe96a3f8",
+    "phase2_marginal_downside_sources.json": "92d8f3618b7ea19a257fbd5b05fc95be91cb91592cf1d8b9e600128500e46183",
+    "phase2_projection_conditional_returns.json": "0062518a878a87ddb73b9b1b50d0e8a01b7bc8d6c19f2b56b1b565c2a0bf61db",
+    "shadow_calibration_squad.json": "c690efd5ce2efa8d60802c55585c53cd46ac07397b078aae9fd764660d0a7556"
+  },
+  "study": "fixed selected-XI attacking downside structure"
+}
