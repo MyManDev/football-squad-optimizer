@@ -197,6 +197,40 @@ def test_invalid_residual_history_is_rejected(mutation: object, message: str) ->
         generate_scenarios(snapshot, transform(_residual_history(snapshot)), TARGET, SMALL_CONFIG)
 
 
+def test_a_nine_decimal_serialization_difference_is_accepted() -> None:
+    """The identity is checked at the granularity the export is serialized to.
+
+    An export rounds ``predicted_points``, ``realized_points`` and ``residual`` to nine
+    decimals independently, so the identity between them can miss by one unit in the
+    ninth decimal without any number being wrong. These are the values that stopped the
+    first squad calibration: 1.0 - 0.449414062 is 0.550585938, and the export stores
+    0.550585937.
+    """
+
+    snapshot = _snapshot()
+    history = _residual_history(snapshot)
+    history.loc[0, ["predicted_points", "realized_points", "residual"]] = [
+        0.449414062,
+        1.0,
+        0.550585937,
+    ]
+
+    result = generate_scenarios(snapshot, history, TARGET, SMALL_CONFIG)
+
+    assert len(result.scenario_ids) == SMALL_CONFIG.scenario_count
+
+
+def test_a_difference_larger_than_serialization_can_explain_is_refused() -> None:
+    """Ten times the granularity nine decimals can produce is the history being wrong."""
+
+    snapshot = _snapshot()
+    history = _residual_history(snapshot)
+    history.loc[0, "residual"] = float(history.loc[0, "residual"]) + 1e-8
+
+    with pytest.raises(ScenarioValidationError, match="must equal"):
+        generate_scenarios(snapshot, history, TARGET, SMALL_CONFIG)
+
+
 def test_target_or_future_residuals_are_rejected() -> None:
     snapshot = _snapshot()
     history = _residual_history(snapshot)

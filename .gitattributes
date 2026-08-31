@@ -1,3 +1,10 @@
 # The web app is authored and formatted with LF line endings on every platform
 # (prettier, generated types, committed data); keep the working tree the same.
 web/** text eol=lf
+
+# Read by digest, so their bytes have to be the same on every checkout. Under
+# core.autocrlf a Windows tree holds CRLF while the object database holds LF, and a
+# measurement would then record a P1 digest and an archive-manifest digest that no
+# other checkout can reproduce - and refuse to start on a tree that has them right.
+docs/shadow_calibration_*.json text eol=lf
+data/sources/vaastav_fpl_manifest.json text eol=lf
