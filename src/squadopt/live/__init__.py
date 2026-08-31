@@ -103,6 +103,7 @@ from squadopt.live.transfers import (
     HeldSquad,
     TransferDecision,
     plan_transfers,
+    plan_transfers_with_overlap,
 )
 
 __all__ = [
@@ -173,6 +174,7 @@ __all__ = [
     "measure_live_calibration",
     "plan_tick",
     "plan_transfers",
+    "plan_transfers_with_overlap",
     "project",
     "projection_fingerprint",
     "read_inputs",
