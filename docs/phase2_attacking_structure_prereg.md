@@ -23,6 +23,12 @@ The residual export and manifest, archive pin, projection model, fold universe, 
 settings, selected squad, starting XI, captain, scenario configuration, seed and chronological
 history are exactly those used by `phase2_component_attribution_v1`.
 
+One optimizer decision object is created per fold and supplies the component attribution,
+starter identities, captain and pre-match `team_id` values. A second solve may not supply the
+structural rows. The weighted attacking surprise reconstructed from the player rows must match
+the Phase 2H component diagnostic on every fold within `1e-9`; a seasonal mean alone is not a
+sufficient reconciliation.
+
 Roles remain:
 
 - 2021-22 and 2022-23: descriptive screening;
@@ -86,7 +92,7 @@ O[f] = (N[f] - mu[f]) ** 2 - V[f]
 ```
 
 `O` is excess blank-count dispersion relative to independent heterogeneous Bernoulli
-marginals. It is supported by the mean centred product among different-team pairs:
+marginal references. It is supported by the mean centred product among different-team pairs:
 
 ```text
 U[f] = mean_(team_i != team_j) e[f,i] * e[f,j]
@@ -136,17 +142,20 @@ The tree is evaluated in this order:
 4. If the interval is not wholly inside `[-0.05, +0.05]` and neither prior directional rule
    applies, return `diagnostic_inconclusive`. Common and same-team metrics remain descriptive
    because incorrect marginals confound their interpretation.
-5. With equivalent marginals, common-gameweek dependence passes only when the lower bounds of
+5. With equivalent marginals, common-week reference excess passes only when the lower bounds of
    both 2023-24 mean `O` and mean `U` are strictly above zero, and both 2024-25 point estimates
    are non-negative.
-6. With equivalent marginals, same-team clustering passes only when the 2023-24 mean `K` lower
+6. With equivalent marginals, same-team reference excess passes only when the 2023-24 mean `K` lower
    bound is strictly above zero and its 2024-25 point estimate is non-negative.
 
-The resulting classes are:
+The resulting classes are deliberately descriptive because `q` is estimated from finite
+historical pools rather than known. Estimation error, particularly shared position fallback,
+can contribute to `O`, `U` and `K`; this study does not propagate that uncertainty through a
+generative null. The resulting classes are:
 
-- `shared_attacking_structure` when common-gameweek and same-team gates both pass;
-- `common_gameweek_attacking_shock` when only the common-gameweek gate passes;
-- `same_team_attacking_cluster` when only the same-team gate passes;
+- `shared_attacking_reference_excess` when common-week and same-team gates both pass;
+- `common_week_attacking_reference_excess` when only the common-week gate passes;
+- `same_team_attacking_reference_excess` when only the same-team gate passes;
 - `attacking_structure_not_localized` when neither gate passes;
 - the marginal, wrong-direction or inconclusive classes defined above.
 
@@ -156,7 +165,10 @@ This is a descriptive structural diagnostic. The completed-appearance restrictio
 minutes and therefore is not a live feature. Estimated historical blank probabilities are a
 transparent reference, not a claim that they are the best forecast. `O` and `U` are consistency
 checks derived from the same blank vector, not independent experiments. Same-team membership is
-not proof of a fixture mechanism.
+not proof of a fixture mechanism. Player-gameweek aggregation also means two shorter
+double-gameweek appearances can cross the 60-minute eligibility boundary; fixture count and
+source coverage are therefore recorded, and no fixture-level or start-probability claim is
+made.
 
 Exactly one binding run is authorized after this document is committed and the implementation
 passes the full quality suite. The result chooses at most the subject of a separate
