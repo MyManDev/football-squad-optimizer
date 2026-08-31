@@ -13,6 +13,7 @@ the league capture, which contains neither the requesting user's secrets nor our
 paper entry, so nothing a member is told can depend on the system's own squad.
 """
 
+import math
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,6 +35,7 @@ from squadopt.live import (
     plan_transfers_with_overlap,
 )
 from squadopt.live.transfers import TransferDecision
+from squadopt.optimization import SolverStatus
 from squadopt.planning import FirstWeekOverlap
 
 #: The one combination computed today: the deterministic planner's own answer.
@@ -288,12 +290,30 @@ def _advise_against_rival(
     picks = provider.picks(request.entry_id, request.season, request.gameweek - 1)
     rival_picks = provider.picks(rival_entry_id, request.season, request.gameweek - 1)
     rival_eleven = frozenset(int(value) for value in rival_picks.starting_xi)
+    rival_captain = int(rival_picks.captain)
+    if rival_captain not in rival_eleven:
+        raise EntryError(f"Rival entry {rival_entry_id} captain is not in its starting XI.")
+    expected = {
+        int(str(row["player_id"])): float(str(row["expected_points"]))
+        for _, row in projection.table.iterrows()
+    }
+    missing_rival = sorted({*rival_eleven, rival_captain} - set(expected))
+    if missing_rival:
+        raise EntryError(
+            f"The projection is missing rival entry {rival_entry_id} players "
+            f"{missing_rival[:5]!r}; a rival score cannot treat missing players as zero."
+        )
     prices = {
         int(str(row["player_id"])): int(str(row["price_tenths"]))
         for _, row in inputs.players.iterrows()
     }
     held = held_squad_from_picks(picks, current_prices=prices)
     control_plan, _control_decision, _ = plan_transfers(inputs, projection, held, rules)
+    if control_plan.solver_status is not SolverStatus.OPTIMAL:
+        raise EntryError(
+            "The unconstrained control plan must be OPTIMAL before publishing an "
+            "expected-points cost against it."
+        )
     band = FirstWeekOverlap(player_ids=rival_eleven, minimum=floor, maximum=ceiling)
     try:
         plan, decision, _config = plan_transfers_with_overlap(inputs, projection, held, rules, band)
@@ -303,6 +323,15 @@ def _advise_against_rival(
             f"entry {rival_entry_id}: no provable plan exists."
         ) from error
     raw_gap = plan.diagnostics.get("absolute_optimality_gap")
+    control_score = control_plan.total_projected_score
+    strategy_score = plan.total_projected_score
+    if (
+        control_score is None
+        or strategy_score is None
+        or not math.isfinite(control_score)
+        or not math.isfinite(strategy_score)
+    ):
+        raise EntryError("A solved rival comparison must carry finite projected scores.")
     payload = build_advice_payload(
         picks,
         inputs,
@@ -311,27 +340,22 @@ def _advise_against_rival(
         league_id=request.league_id,
         mode=request.strategy,
         decision=decision,
-        expected_points_cost=(
-            float(control_plan.total_projected_score or 0.0)
-            - float(plan.total_projected_score or 0.0)
-        ),
+        expected_points_cost=float(control_score) - float(strategy_score),
         rival_label=f"entry-{rival_entry_id}",
         solver_status=plan.solver_status.name,
         optimality_gap=float(str(raw_gap)) if raw_gap is not None else None,
     )
-    expected = {
-        int(str(row["player_id"])): float(str(row["expected_points"]))
-        for _, row in projection.table.iterrows()
-    }
     week = plan.weeks[0]
     squad_ids = {int(str(value)) for value in week.selected_squad["player_id"]}
     my_eleven = [int(str(value)) for value in week.starting_xi["player_id"]]
     my_captain = int(str(week.captain["player_id"]))
-    rival_captain = int(rival_picks.captain)
-    my_expected = sum(expected.get(p, 0.0) for p in my_eleven) + expected.get(my_captain, 0.0)
-    rival_expected = sum(expected.get(p, 0.0) for p in sorted(rival_eleven)) + expected.get(
-        rival_captain, 0.0
-    )
+    missing_plan = sorted({*my_eleven, my_captain} - set(expected))
+    if missing_plan:
+        raise EntryError(
+            f"The solved plan references players absent from its projection: {missing_plan[:5]!r}."
+        )
+    my_expected = sum(expected[p] for p in my_eleven) + expected[my_captain]
+    rival_expected = sum(expected[p] for p in sorted(rival_eleven)) + expected[rival_captain]
     payload["rival_entry_id"] = rival_entry_id
     payload["overlap_count"] = len(squad_ids & rival_eleven)
     # A mean and only a mean: shared players cancel exactly in the fixed-decision

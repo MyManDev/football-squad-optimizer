@@ -14,9 +14,11 @@ from tests.unit.test_league_views import (
     _world_context,
 )
 
+from squadopt.application import advice as advice_service
 from squadopt.application.advice import AdviseEntryRequest, advise_entry
 from squadopt.application.entries import EntryError, EntryRegistration
 from squadopt.application.league_views import build_league_views
+from squadopt.optimization import SolverStatus
 
 world = league_views_tests.world  # re-register the fixture in this module
 
@@ -167,6 +169,62 @@ def test_a_rival_strategy_computes_against_the_named_rival(world: dict[str, Any]
     assert isinstance(payload["captain_agreement"], bool)
     assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
     assert not any("probab" in key or key.startswith("p_") for key in payload)
+
+
+def test_a_rival_missing_from_the_projection_is_refused_not_scored_as_zero(
+    world: dict[str, Any],
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    rival = _rival_squad(world)
+    provider = _Provider(
+        {
+            101: _member_picks(world, 101, _legal_squad(world)),
+            202: _member_picks(world, 202, rival),
+        }
+    )
+    incomplete = dataclasses.replace(
+        projection,
+        table=projection.table.loc[projection.table["player_id"] != rival[0]].reset_index(
+            drop=True
+        ),
+    )
+
+    with pytest.raises(EntryError, match="cannot treat missing players as zero"):
+        advise_entry(
+            _request(strategy="fark-yarat", rival_entry_id=202),
+            provider=provider,
+            inputs=inputs,
+            projection=incomplete,
+            rules=rules,
+        )
+
+
+def test_an_unproven_control_does_not_publish_an_expected_points_cost(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider(
+        {
+            101: _member_picks(world, 101, _legal_squad(world)),
+            202: _member_picks(world, 202, _rival_squad(world)),
+        }
+    )
+    original = advice_service.plan_transfers
+
+    def feasible_control(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
+        plan, decision, config = original(*args, **kwargs)
+        return dataclasses.replace(plan, solver_status=SolverStatus.FEASIBLE), decision, config
+
+    monkeypatch.setattr(advice_service, "plan_transfers", feasible_control)
+
+    with pytest.raises(EntryError, match="control plan must be OPTIMAL"):
+        advise_entry(
+            _request(strategy="fark-yarat", rival_entry_id=202),
+            provider=provider,
+            inputs=inputs,
+            projection=projection,
+            rules=rules,
+        )
 
 
 def test_the_rival_changes_labels_not_the_baseline(world: dict[str, Any]) -> None:
