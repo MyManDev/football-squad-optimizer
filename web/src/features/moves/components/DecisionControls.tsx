@@ -6,6 +6,7 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { loadLeagueMembers } from "../../league/data";
 import { useDecisionSelection } from "../decisionSelection";
+import { readHorizonEvidence } from "../horizonEvidence";
 import { MODE_PRICE_FOLDS, WINDOWS, getPlayModes } from "../modePrices";
 import styles from "./DecisionControls.module.css";
 
@@ -24,7 +25,13 @@ type LeagueFieldState =
   | { kind: "unavailable" }
   | { kind: "mismatch"; publishedId: number };
 
-export function DecisionControls({ variant = "default" }: { variant?: "default" | "entry" }) {
+export function DecisionControls({
+  variant = "default",
+  horizonEvidence,
+}: {
+  variant?: "default" | "entry";
+  horizonEvidence?: unknown;
+}) {
   const { locale, messages } = useLanguage();
   const copy = messages.decision;
   const navigate = useNavigate();
@@ -56,6 +63,16 @@ export function DecisionControls({ variant = "default" }: { variant?: "default" 
   }
 
   const competitive = mode !== "saf-puan";
+  const liveControl = windowSize === 1;
+  const evidence = readHorizonEvidence(horizonEvidence);
+  const evidenceRow = evidence?.horizons.find((row) => row.horizon === windowSize);
+  const horizonBody = liveControl
+    ? evidenceRow && evidence?.ledger_control_verified
+      ? copy.liveEvidenceBody
+      : copy.liveControlBody
+    : evidenceRow
+      ? copy.shadowEvidenceBody(evidenceRow.solver_status, evidenceRow.solver_proof_status)
+      : copy.researchShadowBody;
 
   return (
     <Card title={copy.title} aside={<Badge tone="accent">{copy.shareable}</Badge>}>
@@ -141,6 +158,24 @@ export function DecisionControls({ variant = "default" }: { variant?: "default" 
             )}
           </form>
         ) : null}
+      </div>
+
+      <div
+        className={`${styles.horizonStatus} ${
+          liveControl ? styles.horizonControl : styles.horizonShadow
+        }`}
+        role="note"
+        aria-live="polite"
+      >
+        <Badge tone={liveControl ? "good" : "warn"}>
+          {liveControl ? copy.liveControl : copy.researchShadow}
+        </Badge>
+        <span>
+          <strong>
+            {liveControl ? copy.liveControlTitle : copy.researchShadowTitle(windowSize)}
+          </strong>{" "}
+          {horizonBody}
+        </span>
       </div>
 
       {competitive ? (

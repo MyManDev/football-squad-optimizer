@@ -236,6 +236,14 @@ class ProjectionHorizon:
 
         return tuple(sorted(int(value) for value in self.table["gameweek"].unique().tolist()))
 
+    def assert_fingerprint(self) -> None:
+        """Refuse a table mutated after its immutable provenance was computed."""
+
+        if self._fingerprint(self.table) != self.horizon_fingerprint:
+            raise TransferPlanningValidationError(
+                "Projection horizon table changed after its fingerprint was computed."
+            )
+
 
 class ProjectionHorizonBuilder(Protocol):
     """The prediction-side builder that produces multi-gameweek projections.
@@ -265,6 +273,7 @@ def to_planning_horizon(horizon: ProjectionHorizon) -> PlanningHorizon:
 
     if not isinstance(horizon, ProjectionHorizon):
         raise TransferPlanningValidationError("horizon must be a ProjectionHorizon.")
+    horizon.assert_fingerprint()
     table = horizon.table.loc[
         :, ["gameweek", "player_id", "name", "team_id", "position", "expected_points"]
     ].copy(deep=True)

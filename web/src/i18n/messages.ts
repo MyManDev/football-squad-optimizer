@@ -149,6 +149,17 @@ const en = {
       "The horizon and play mode select this member's example advice. These controls describe a point trade-off; they never claim how likely you are to beat the league.",
     horizon: "Planning Horizon",
     week: (count: number) => `${count} week${count === 1 ? "" : "s"}`,
+    liveControl: "live control",
+    researchShadow: "research shadow",
+    liveControlTitle: "H1 drives the current decision.",
+    liveControlBody: "Only the one-week control is eligible to become the live recommendation.",
+    liveEvidenceBody:
+      "The batch H1 reproduced the frozen ledger decision; the ledger remains authoritative.",
+    researchShadowTitle: (weeks: number) => `H${weeks} is reserved for shadow evidence.`,
+    researchShadowBody:
+      "A result appears after the batch runs and cannot replace the live recommendation until its forecast and solver gates pass.",
+    shadowEvidenceBody: (status: string, proof: string) =>
+      `The batch computed this shadow (${status}; solver proof: ${proof}). It is evidence, not live advice.`,
     mode: "Play Mode",
     leagueId: "League ID",
     leaguePlaceholder: "League number or FPL link",
@@ -670,6 +681,17 @@ const tr: MessageSchema<typeof en> = {
       "Pencere ve oyun modu bu üyenin örnek önerisini seçer. Bu kontroller bir puan ödünleşimini anlatır; ligi geçme olasılığı iddia etmez.",
     horizon: "Planlama Penceresi",
     week: (count) => `${count} hafta`,
+    liveControl: "canlı kontrol",
+    researchShadow: "araştırma gölgesi",
+    liveControlTitle: "H1 mevcut kararı belirler.",
+    liveControlBody: "Yalnız bir haftalık kontrol canlı öneri olmaya uygundur.",
+    liveEvidenceBody:
+      "Toplu koşudaki H1, dondurulmuş ledger kararını aynen üretti; karar otoritesi ledger'dır.",
+    researchShadowTitle: (weeks) => `H${weeks} gölge kanıt için ayrılmıştır.`,
+    researchShadowBody:
+      "Sonuç toplu koşudan sonra oluşur; tahmin ve çözücü kapılarını geçene kadar canlı önerinin yerini alamaz.",
+    shadowEvidenceBody: (status, proof) =>
+      `Toplu koşu bu gölgeyi hesapladı (${status}; çözücü kanıtı: ${proof}). Bu kanıttır, canlı öneri değildir.`,
     mode: "Oyun Modu",
     leagueId: "Lig Numarası",
     leaguePlaceholder: "Lig numarası ya da FPL bağlantısı",

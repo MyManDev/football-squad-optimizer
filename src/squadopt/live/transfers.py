@@ -31,8 +31,10 @@ from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import (
     CHIP_NAMES,
     ChipAvailability,
+    FirstWeekOverlap,
     InitialSquadState,
     PlanningHorizon,
+    ProjectionHorizon,
     TransferPlanningConfig,
     TransferPlanResult,
     optimize_transfer_plan,
@@ -456,3 +458,180 @@ def plan_transfers(
         prepared.fee,
     )
     return plan, decision, prepared.transfer_config
+
+
+def plan_transfers_with_overlap(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    held: HeldSquad,
+    rules: SeasonRules,
+    first_week_overlap: FirstWeekOverlap,
+    *,
+    optimization: OptimizationConfig | None = None,
+) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
+    """``plan_transfers`` under a first-week overlap band against a rival's eleven.
+
+    Same preparation, same solver, same decision packaging — the only difference is
+    the band handed to ``optimize_transfer_plan``. Kept as its own entry point rather
+    than a parameter on ``plan_transfers`` so the baseline call sites cannot change
+    behavior by accident: the saf-puan path stays byte-identical by construction.
+
+    As in ``plan_transfers``, an unproven plan is returned rather than raised on: a
+    banded plan the solver found but could not prove is publishable **with its status**
+    (the member-solver-status rule), and the caller decides. Only no solution at all,
+    or a solution with no weeks, is an error. The contrast is with ``plan_menu``, which
+    stops at the first non-OPTIMAL plan because a menu entry has to be proven before it
+    can be offered.
+    """
+
+    prepared = _prepare_planning(
+        inputs, projection, held, rules, optimization=optimization, chip=None
+    )
+    plan = optimize_transfer_plan(
+        prepared.horizon,
+        prepared.state,
+        prepared.settings,
+        prepared.transfer_config,
+        chips=prepared.availability,
+        first_week_overlap=first_week_overlap,
+    )
+    if not plan.has_solution or not plan.weeks:
+        raise DataSourceError(
+            f"The banded transfer planner returned {plan.solver_status.name} with no plan "
+            f"for {inputs.season} gameweek {prepared.gameweek}."
+        )
+    decision = _package_decision(
+        plan,
+        held,
+        prepared.availability,
+        prepared.transfer_config,
+        prepared.sell_prices,
+        prepared.current,
+        prepared.fee,
+    )
+    return plan, decision, prepared.transfer_config
+
+
+def plan_transfer_horizon(
+    inputs: RecommendationInputs,
+    projection_horizon: ProjectionHorizon,
+    held: HeldSquad,
+    rules: SeasonRules,
+    *,
+    optimization: OptimizationConfig | None = None,
+    transfer_config: TransferPlanningConfig | None = None,
+) -> tuple[TransferPlanResult, TransferPlanningConfig]:
+    """Plan several gameweeks from the held squad and one projection horizon.
+
+    The first projected week must be the live decision deadline and every provenance
+    boundary must name the same season and capture. Prices are frozen at the captured
+    values across the horizon: the projection contract deliberately carries no price
+    transition model, so accepting changing prices here would make later sale proceeds
+    depend on an unversioned forecast.
+
+    A one-week horizon reuses the uncapped operational transfer policy exactly. Longer
+    horizons default to at most one transfer per gameweek. That is the measured rolling
+    discipline in ``docs/transfer_discipline_note.md``: the uncapped rolling planner
+    churned, while the cap removed the mechanism. Callers may provide another explicit
+    policy, whose configuration fingerprint remains in the result.
+
+    Chips are not offered automatically. A finite horizon would otherwise spend a chip
+    because its option value after the horizon is unknown; explicit chip scheduling is a
+    separate operating decision, as it is in the one-week live path.
+    """
+
+    if not isinstance(projection_horizon, ProjectionHorizon):
+        raise DataSourceError("projection_horizon must be a ProjectionHorizon.")
+    projection_horizon.assert_fingerprint()
+    if not isinstance(held, HeldSquad):
+        raise DataSourceError("held must be a HeldSquad.")
+    first_gameweek = projection_horizon.target_gameweeks[0]
+    for name, expected, actual in (
+        ("season", inputs.season, projection_horizon.season),
+        ("snapshot", inputs.snapshot_id, projection_horizon.source_snapshot_id),
+        ("first gameweek", inputs.deadline.gameweek, first_gameweek),
+        ("held season", inputs.season, held.season),
+        ("rules season", inputs.season, rules.season),
+        ("rules snapshot", inputs.snapshot_id, rules.source_snapshot_id),
+    ):
+        if expected != actual:
+            raise DataSourceError(
+                f"Transfer horizon {name} is {actual!r}; this decision requires {expected!r}."
+            )
+    if held.decided_gameweek != first_gameweek - 1:
+        raise DataSourceError(
+            f"The held squad was decided for GW{held.decided_gameweek}; this horizon "
+            f"starts at GW{first_gameweek}."
+        )
+
+    table = projection_horizon.table
+    price_counts = table.groupby("player_id", sort=False)["price_tenths"].nunique()
+    changing = price_counts.loc[price_counts > 1]
+    if not changing.empty:
+        examples = sorted(changing.index.tolist(), key=str)[:5]
+        raise DataSourceError(
+            "The live multi-gameweek path has no versioned price-transition model; "
+            f"captured prices must stay fixed across the horizon (players: {examples!r})."
+        )
+
+    first = table.loc[table["gameweek"] == first_gameweek]
+    current = {
+        int(player): int(price)
+        for player, price in zip(
+            first["player_id"].tolist(), first["price_tenths"].tolist(), strict=True
+        )
+    }
+    departed = sorted(set(held.squad_player_ids) - set(current))
+    if departed:
+        raise DataSourceError(
+            f"Held players {departed[:5]!r} are not on the projection horizon; resolve "
+            "the removed players before planning."
+        )
+    fee = float(rules.transfers.sell_on_fee)
+    held_sell_prices = {
+        player: sell_price_tenths(current[player], held.purchase_prices[player], sell_on_fee=fee)
+        for player in held.squad_player_ids
+    }
+
+    planning_table = table.loc[
+        :, ["gameweek", "player_id", "name", "team_id", "position", "expected_points"]
+    ].copy(deep=True)
+    planning_table["buy_price_tenths"] = table["price_tenths"].astype("int64")
+    planning_table["sell_price_tenths"] = [
+        held_sell_prices.get(int(player), int(price))
+        for player, price in zip(
+            table["player_id"].tolist(), table["price_tenths"].tolist(), strict=True
+        )
+    ]
+
+    settings = OptimizationConfig() if optimization is None else optimization
+    planning_policy = (
+        TransferPlanningConfig(
+            max_free_transfers=rules.transfers.max_free_transfers,
+            max_transfers_per_gameweek=(
+                None if len(projection_horizon.target_gameweeks) == 1 else 1
+            ),
+        )
+        if transfer_config is None
+        else transfer_config
+    )
+    state = InitialSquadState(
+        held.squad_player_ids,
+        bank_tenths=held.bank_tenths,
+        free_transfers=min(held.free_transfers, planning_policy.max_free_transfers),
+    )
+    plan = optimize_transfer_plan(
+        PlanningHorizon(planning_table),
+        state,
+        settings,
+        planning_policy,
+    )
+    if not plan.has_solution or not plan.weeks:
+        used = plan.diagnostics.get("deterministic_time_used")
+        relative_gap = plan.diagnostics.get("relative_optimality_gap")
+        raise DataSourceError(
+            f"The transfer planner produced no {len(projection_horizon.target_gameweeks)}-"
+            f"week solution; solver status was {plan.solver_status.name}, "
+            f"deterministic time used was {used!r}, relative gap was {relative_gap!r}."
+        )
+    return plan, planning_policy

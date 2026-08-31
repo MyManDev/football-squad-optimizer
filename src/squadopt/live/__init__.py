@@ -102,7 +102,9 @@ from squadopt.live.transfers import (
     LEDGER_TRANSFERS_CONTRACT_VERSION,
     HeldSquad,
     TransferDecision,
+    plan_transfer_horizon,
     plan_transfers,
+    plan_transfers_with_overlap,
 )
 
 __all__ = [
@@ -172,7 +174,9 @@ __all__ = [
     "make_projection_horizon_builder",
     "measure_live_calibration",
     "plan_tick",
+    "plan_transfer_horizon",
     "plan_transfers",
+    "plan_transfers_with_overlap",
     "project",
     "projection_fingerprint",
     "read_inputs",

@@ -2,6 +2,8 @@
 
     python -m scripts.build_projection_horizon
     python -m scripts.build_projection_horizon --from-gameweek 1 --gameweeks 4
+    python -m scripts.build_projection_horizon --from-gameweek 2 --gameweeks 5 \
+        --in-season-projection data/handoffs/2026-27-gw02.json
 
 Reads a captured decision snapshot, projects every requested gameweek from that single
 information state, and writes a summary the transfer planner's inputs can be checked
@@ -37,6 +39,7 @@ from squadopt.live import (
     build_projection_horizon,
     gameweek_fixture_fingerprints,
     infer_season,
+    read_projection_handoff,
 )
 
 SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
@@ -45,10 +48,16 @@ ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
 
 def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--snapshot-root", type=Path, default=SNAPSHOT_ROOT)
     parser.add_argument("--snapshot-id", help="replay a named capture; omitted, the latest")
     parser.add_argument("--from-gameweek", type=int, default=1)
     parser.add_argument("--gameweeks", type=int, default=4, help="how many consecutive weeks")
     parser.add_argument("--archive-root", type=Path, default=ARCHIVE_ROOT)
+    parser.add_argument(
+        "--in-season-projection",
+        type=Path,
+        help="projection_handoff_v1 for a horizon beginning after gameweek 1",
+    )
     parser.add_argument("--season", help="override; omitted, derived from the capture")
     parser.add_argument(
         "--output-dir", type=Path, default=REPOSITORY_ROOT / "artifacts" / "horizon"
@@ -64,20 +73,31 @@ def _parse_arguments() -> argparse.Namespace:
 def main() -> int:
     arguments = _parse_arguments()
     try:
-        identifiers = list_snapshot_ids(SNAPSHOT_ROOT)
+        identifiers = list_snapshot_ids(arguments.snapshot_root)
         if not identifiers:
-            print(f"No snapshots under {SNAPSHOT_ROOT}. Capture one first.")
+            print(f"No snapshots under {arguments.snapshot_root}. Capture one first.")
             return 1
         snapshot_id = arguments.snapshot_id or identifiers[-1]
-        snapshot = read_snapshot(SNAPSHOT_ROOT, snapshot_id)
+        snapshot = read_snapshot(arguments.snapshot_root, snapshot_id)
         season = arguments.season or infer_season(snapshot)
 
         first = int(arguments.from_gameweek)
         targets = tuple(range(first, first + int(arguments.gameweeks)))
         print(f"snapshot {snapshot_id}, season {season}, gameweeks {targets}")
 
-        panel = build_panel(arguments.archive_root)
-        horizon = build_projection_horizon(snapshot, targets, panel=panel, season=season)
+        handoff = (
+            read_projection_handoff(arguments.in_season_projection)
+            if arguments.in_season_projection is not None
+            else None
+        )
+        panel = None if handoff is not None else build_panel(arguments.archive_root)
+        horizon = build_projection_horizon(
+            snapshot,
+            targets,
+            panel=panel,
+            season=season,
+            in_season=handoff,
+        )
 
         calendar = aggregate_team_gameweek(
             fixture_snapshot(
@@ -174,7 +194,7 @@ def main() -> int:
         lines += [
             "The calendar is uneven across this horizon, so the per-gameweek totals differ. "
             "Blank rows project exactly zero; double rows scale linearly with fixture count "
-            "under `linear_fixture_count_scaling_v1`.",
+            "under `first_week_control_future_fixture_scaling_v2`.",
         ]
     lines += [
         "",

@@ -32,6 +32,27 @@ from squadopt.application.contract import (
     ui_view_schema,
     write_ui_view_schema,
 )
+from squadopt.application.horizon_batch import (
+    DEFAULT_HORIZONS,
+    DEFAULT_SHADOW_HORIZONS,
+    HORIZON_BATCH_CONTRACT_VERSION,
+    HorizonBatchRequest,
+    HorizonBatchResult,
+    plan_horizon_batch,
+)
+from squadopt.application.horizon_plans import (
+    HORIZON_PLAN_ARTIFACT_CONTRACT_VERSION,
+    HorizonPlanRequest,
+    HorizonPlanResult,
+    horizon_plan_document,
+    plan_horizon,
+    write_horizon_plan,
+)
+from squadopt.application.horizon_publish import (
+    HORIZON_EVIDENCE_CONTRACT_VERSION,
+    PublicHorizonEvidence,
+    load_public_horizon_evidence,
+)
 from squadopt.application.league import (
     LeagueError,
     LeagueView,
@@ -72,6 +93,11 @@ from squadopt.application.views import (
 )
 
 __all__ = [
+    "DEFAULT_HORIZONS",
+    "DEFAULT_SHADOW_HORIZONS",
+    "HORIZON_BATCH_CONTRACT_VERSION",
+    "HORIZON_EVIDENCE_CONTRACT_VERSION",
+    "HORIZON_PLAN_ARTIFACT_CONTRACT_VERSION",
     "TEMPLATE_RIVAL_SOURCE",
     "UI_VIEW_CONTRACT_VERSION",
     "UI_VIEW_SCHEMA_PATH",
@@ -79,6 +105,10 @@ __all__ = [
     "DecideResult",
     "DecisionVerificationError",
     "DecisionVerifier",
+    "HorizonBatchRequest",
+    "HorizonBatchResult",
+    "HorizonPlanRequest",
+    "HorizonPlanResult",
     "LeagueError",
     "LeagueRivalProvider",
     "LeagueView",
@@ -90,6 +120,7 @@ __all__ = [
     "PlayerView",
     "PoolPlayerView",
     "PoolView",
+    "PublicHorizonEvidence",
     "RecommendationView",
     "RiskView",
     "SettleRequest",
@@ -106,11 +137,15 @@ __all__ = [
     "ViewEnvelope",
     "build_site",
     "decide",
+    "horizon_plan_document",
     "iter_rivals",
     "league_view",
     "ledger_view",
+    "load_public_horizon_evidence",
     "ownership_by_player",
     "ownership_view",
+    "plan_horizon",
+    "plan_horizon_batch",
     "plan_season_tick",
     "pool_view",
     "recommendation_view",
@@ -120,5 +155,6 @@ __all__ = [
     "status_view",
     "ui_view_schema",
     "verify_decision",
+    "write_horizon_plan",
     "write_ui_view_schema",
 ]

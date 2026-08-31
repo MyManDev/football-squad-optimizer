@@ -36,8 +36,12 @@ from squadopt.live.horizon import (
     gameweek_fixture_fingerprints,
     make_projection_horizon_builder,
 )
-from squadopt.live.recommendation import project, read_inputs
+from squadopt.live.recommendation import InSeasonProjection, project, read_inputs
 from squadopt.planning.horizon import PROJECTION_HORIZON_COLUMNS, to_planning_horizon
+from squadopt.prediction.in_season import (
+    IN_SEASON_FEATURE_CONTRACT_VERSION,
+    IN_SEASON_MODEL_VERSION,
+)
 
 CLUBS = tuple(range(1, 7))
 PLAYER_CODES = tuple(record["code"] for record in _elements())
@@ -57,7 +61,12 @@ def _fixture(identifier: int, gameweek: int, home: int, away: int) -> dict[str, 
     }
 
 
-def _calendar(*, blank_club: int | None = None, double_club: int | None = None) -> bytes:
+def _calendar(
+    *,
+    blank_club: int | None = None,
+    double_club: int | None = None,
+    gameweeks: tuple[int, ...] = (1, 2),
+) -> bytes:
     """Two gameweeks of fixtures, with an optional blank and an optional double in GW2.
 
     GW1 pairs every club once. GW2 does the same, then drops the blank club's fixture and
@@ -67,7 +76,7 @@ def _calendar(*, blank_club: int | None = None, double_club: int | None = None) 
 
     records: list[dict[str, Any]] = []
     identifier = 0
-    for gameweek in (1, 2):
+    for gameweek in gameweeks:
         for home, away in ((1, 2), (3, 4), (5, 6)):
             if gameweek == 2 and blank_club in (home, away):
                 continue
@@ -101,6 +110,20 @@ def _capture(
 
 def _history() -> pd.DataFrame:
     return _panel(players=PLAYER_CODES)
+
+
+def _in_season_handoff(capture: Any, *, gameweek: int = 2) -> InSeasonProjection:
+    return InSeasonProjection(
+        season=SEASON,
+        gameweek=gameweek,
+        source_snapshot_id=capture.metadata.snapshot_id,
+        model_name="squadopt-deterministic-baseline",
+        model_version=IN_SEASON_MODEL_VERSION,
+        feature_contract_version=IN_SEASON_FEATURE_CONTRACT_VERSION,
+        expected_points={
+            int(player): 1.0 + index / 100.0 for index, player in enumerate(PLAYER_CODES)
+        },
+    )
 
 
 def _horizon(tmp_path: Path, gameweeks: tuple[int, ...] = (1, 2), **kwargs: Any) -> Any:
@@ -140,7 +163,9 @@ def test_the_post_processing_contract_names_the_scaling_rule(tmp_path: Path) -> 
     horizon = _horizon(tmp_path)
 
     assert "captured_availability_rule_v1" in horizon.post_processing_contract_version
-    assert "linear_fixture_count_scaling_v1" in horizon.post_processing_contract_version
+    assert (
+        "first_week_control_future_fixture_scaling_v2" in horizon.post_processing_contract_version
+    )
 
 
 def test_the_horizon_converts_to_a_planning_horizon(tmp_path: Path) -> None:
@@ -348,17 +373,85 @@ def test_a_capture_without_a_fixtures_payload_is_refused(tmp_path: Path) -> None
         build_projection_horizon(capture, (1,), panel=_history(), season=SEASON)
 
 
-def test_a_horizon_starting_after_the_opening_gameweek_is_refused(tmp_path: Path) -> None:
-    """The calendar may vary ahead of the decision point; the decision point may not move.
+def test_a_horizon_starting_after_the_opening_gameweek_needs_a_handoff(tmp_path: Path) -> None:
+    """Moving the decision point without current-season history remains forbidden."""
 
-    The base projection carries completed seasons into a season with no played gameweeks.
-    Starting at gameweek two would apply that to a decision point where a gameweek had
-    already been played, silently ignoring it — the same defect the single-gameweek
-    recommendation refuses.
-    """
+    with pytest.raises(DataSourceError, match="needs the current season's played history"):
+        _horizon(tmp_path, (2,))
 
-    with pytest.raises(DataSourceError, match="must start at gameweek 1"):
-        _horizon(tmp_path, (2, 3))
+
+@pytest.mark.parametrize("fixtures", [_calendar(), _calendar(double_club=1)])
+def test_a_midseason_horizon_matches_the_live_projection_at_its_first_week(
+    tmp_path: Path,
+    fixtures: bytes,
+) -> None:
+    capture = _capture(tmp_path, fixtures=fixtures)
+    handoff = _in_season_handoff(capture)
+    live = project(
+        read_inputs(capture, season=SEASON, gameweek=2),
+        in_season=handoff,
+    ).table
+
+    horizon = build_projection_horizon(
+        capture,
+        (2,),
+        season=SEASON,
+        in_season=handoff,
+    )
+    merged = horizon.table.merge(
+        live.loc[:, ["player_id", "expected_points"]],
+        on="player_id",
+        suffixes=("_horizon", "_live"),
+    )
+
+    assert len(merged) == len(live)
+    difference = (merged["expected_points_horizon"] - merged["expected_points_live"]).abs()
+    assert float(difference.max()) == 0.0
+    assert horizon.model_version == IN_SEASON_MODEL_VERSION
+    assert horizon.feature_contract_version == IN_SEASON_FEATURE_CONTRACT_VERSION
+
+
+def test_a_blank_first_week_abstains_if_the_control_assigns_positive_points(
+    tmp_path: Path,
+) -> None:
+    capture = _capture(tmp_path, fixtures=_calendar(blank_club=1))
+
+    with pytest.raises(DataSourceError, match="no fixture"):
+        build_projection_horizon(
+            capture,
+            (2,),
+            season=SEASON,
+            in_season=_in_season_handoff(capture),
+        )
+
+
+def test_a_horizon_refuses_gameweeks_absent_from_the_captured_season(tmp_path: Path) -> None:
+    with pytest.raises(DataSourceError, match="absent from the captured season"):
+        _horizon(tmp_path, (1, 2, 3))
+
+
+def test_a_midseason_horizon_refuses_a_handoff_for_another_capture(tmp_path: Path) -> None:
+    capture = _capture(tmp_path / "decision")
+    other = _capture(tmp_path / "other", captured_at="2026-08-20T20:11:43Z")
+
+    with pytest.raises(DataSourceError, match="another capture"):
+        build_projection_horizon(
+            capture,
+            (2,),
+            season=SEASON,
+            in_season=_in_season_handoff(other),
+        )
+
+
+def test_the_bound_builder_accepts_a_midseason_handoff(tmp_path: Path) -> None:
+    capture = _capture(tmp_path)
+    handoff = _in_season_handoff(capture)
+    builder = make_projection_horizon_builder(season=SEASON, in_season=handoff)
+
+    built = builder(capture, (2,))
+
+    assert built.target_gameweeks == (2,)
+    assert built.model_version == IN_SEASON_MODEL_VERSION
 
 
 def test_fixture_counts_by_player_read_the_capture_calendar(tmp_path: Path) -> None:

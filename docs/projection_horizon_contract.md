@@ -22,8 +22,11 @@ class ProjectionHorizonBuilder(Protocol):
 ```
 
 One call projects every requested target gameweek from a single captured decision
-snapshot. The implementation must be leakage-safe with respect to the snapshot's capture
-time and deterministic for identical inputs.
+snapshot. At gameweek one, the base projection is built from completed history. Later in
+the season, the first target must have a validated `projection_handoff_v1` produced for
+that exact season, gameweek and snapshot. The same captured information state is then
+held fixed across the requested calendar. The implementation must be leakage-safe with
+respect to the snapshot's capture time and deterministic for identical inputs.
 
 ## Table
 
@@ -84,11 +87,67 @@ are modeled; inventing them in the conversion would smuggle an unversioned price
 into the planner. A future price-transition contract replaces this conversion rather
 than widening it.
 
+## Application operation
+
+`squadopt.application.plan_horizon(HorizonPlanRequest(...))` is the transport-neutral
+operation used by command-line, worker, and later HTTP adapters. It resolves the named
+capture, validates the in-season handoff against that capture, reads the held squad from
+the previous immutable ledger entry, builds the horizon, solves it, and writes one
+fingerprinted artifact.
+
+The operation returns `HorizonPlanResult`; callers do not scrape console text. An
+`OPTIMAL` plan has a `proven` solver proof, but only an optimal H1 artifact is
+`decision_eligible`. Longer horizons remain `shadow_only`. A `FEASIBLE` plan is refused
+by default and may be recorded only when the caller explicitly enables shadow output,
+in which case it is `shadow_only` with an `unproven` solver proof. Replaying identical
+inputs reuses the same bytes and path;
+different bytes may never overwrite an existing artifact.
+
+`python -m scripts.plan_transfer_horizon` is only the CLI adapter over this operation.
+It contains argument parsing and presentation, not planning or artifact business logic.
+
+## Batch evidence
+
+`squadopt.application.plan_horizon_batch(...)` runs the supported horizons against the
+same season, snapshot, handoff, ledger origin, and solver-budget policy. Its immutable
+`live_transfer_horizon_batch_v2` manifest links the fingerprinted child artifacts by
+paths relative to the artifact root, so workstation directories never enter portable
+evidence.
+
+The one-week result is the only decision-eligible control. Three- and five-week results
+are labelled `research_shadow` even when the solver proves their mathematical optimum:
+solver proof is not evidence that a longer forecast is calibrated. A failed child leaves
+already completed immutable artifacts available for replay but produces no batch
+manifest, preventing a partial run from looking complete.
+
+H1 uses the same uncapped transfer policy as the operational one-week command. Longer
+horizons use the measured one-transfer-per-gameweek discipline by default. This avoids a
+second H1 policy hiding inside the evidence batch.
+
+```powershell
+.venv\Scripts\python -m scripts.run_transfer_horizon_batch `
+  --horizons 1,3,5 `
+  --in-season-projection data/handoffs/2026-27-gw02.json
+```
+
+## Public evidence boundary
+
+`squadopt.application.load_public_horizon_evidence(...)` is the only route from a batch
+manifest into the static UI. It verifies the manifest and child fingerprints, path
+containment, lineage, and the H1 decision against the immutable ledger. Squad, XI,
+captain, bench order, transfers, projected score, model, and snapshot must agree. The
+sanitized `public_horizon_evidence_v1` block exposes solver status and proof status only;
+it never exposes H3/H5 actions or turns a research shadow into advice.
+
+`scripts.build_site --horizon-manifest <path>` attaches this block to the matching
+recommendation metadata. Omitting the option preserves the existing site output. A
+mismatch is a hard build failure rather than a warning.
+
 ## What this contract does not claim
 
-- It does not implement the builder; that is the prediction side's deliverable, and the
-  contract is exercised by synthetic horizons in `tests/unit/test_projection_horizon.py`
-  until the real builder exists.
+- It does not predict information that becomes known after the capture. Availability and
+  the player projection are frozen at the first target gameweek; only the captured
+  fixture calendar varies across the horizon.
 - It does not model price changes, injuries, or postponements over the horizon.
 - It does not carry uncertainty; scenario-aware multi-week planning is a later stage and
   will extend, not reinterpret, this handoff.
