@@ -1,0 +1,77 @@
+{
+  "calibration_diagnostics": {
+    "double_plus_empirical_coverage": 0.8736263736263736,
+    "double_plus_observations": 364.0,
+    "pooled_empirical_coverage": 0.9061703988138236,
+    "pooled_observations": 26303.0,
+    "single_empirical_coverage": 0.9029646478275956,
+    "single_observations": 25939.0
+  },
+  "contract_version": "shadow_calibration_report_v1",
+  "execution": {
+    "completed_at_utc": "2026-08-28T17:24:30+00:00",
+    "deterministic_seed": 0,
+    "elapsed_seconds": 3.451693,
+    "started_at_utc": "2026-08-28T17:24:27+00:00",
+    "warnings": []
+  },
+  "gate_results": [
+    {
+      "gate": "P1_player_coverage_pooled",
+      "observed": 0.9061703988138236,
+      "passes": true,
+      "threshold": "|coverage - 0.9| <= 0.03 over 26303 player-gameweek rows"
+    },
+    {
+      "gate": "P1_player_coverage_single",
+      "observed": 0.9029646478275956,
+      "passes": true,
+      "threshold": "|coverage - 0.9| <= 0.05 over 25939 rows (>= 200 to gate)"
+    },
+    {
+      "gate": "P1_player_coverage_double_plus",
+      "observed": 0.8736263736263736,
+      "passes": true,
+      "threshold": "|coverage - 0.9| <= 0.05 over 364 rows (>= 200 to gate)"
+    }
+  ],
+  "generated_at_utc": "2026-08-28T17:24:27+00:00",
+  "horizon": 1,
+  "interval_diagnostics": {
+    "double_plus_mean_interval_width": 10.557761714582417,
+    "pooled_mean_absolute_error": 1.4414525396844085,
+    "pooled_mean_interval_width": 6.052147963995286,
+    "single_mean_interval_width": 5.853393562362697
+  },
+  "point_estimate": 0.9061703988138236,
+  "provenance_fingerprints": {
+    "conformal_fingerprint": "16bd620a497c1106ca3c554b4ebc26599b1ae542674a112524f8b0344757760d",
+    "dataset_snapshot_id": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "model_identity": "squadopt-deterministic-baseline/in-season-carry-over-v1",
+    "repository_commit": "82711b9886fac8d4a940c84fb1a5b24a77d29b8e",
+    "residual_export_label": "in_season_carry_over_blend",
+    "residual_generation_commit": "1f12d46ec345d4fa29c087c1f910ad764445ba27",
+    "residual_table_sha256": "17f88e6e75618adc01ec6357317a6849bdb053e7eeed1cd6627c8eceab15fc7a",
+    "run_contract_version": "shadow_calibration_run_v1",
+    "working_tree_dirty": "false"
+  },
+  "reasons": [
+    "Gate P1 passed as measured, but a partial protocol is not a verdict: S1_squad_pit_location, S2_squad_lower_tail belong to the squad-level instrument and were not evaluated by this player-level runner, so calibrated_internal is not claimable."
+  ],
+  "residual_source": {
+    "cutoff_fold_id": "2023-24-gw38",
+    "export_label": "in_season_carry_over_blend",
+    "feature_contract_version": "in-season-carry-over-features-v1",
+    "model_name": "squadopt-deterministic-baseline",
+    "model_version": "in-season-carry-over-v1",
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "table_sha256": "17f88e6e75618adc01ec6357317a6849bdb053e7eeed1cd6627c8eceab15fc7a"
+  },
+  "sample_size": 37,
+  "shadow_status": "abstained"
+}

@@ -9,6 +9,7 @@ from squadopt.experiments.shadow_report import (
     LOCKED_HOLDOUT_SEASON,
     SHADOW_CALIBRATION_CONTRACT_VERSION,
     ShadowCalibrationReport,
+    ShadowExecutionMetadata,
     ShadowGateResult,
     ShadowReportError,
     ShadowResidualSource,
@@ -36,6 +37,13 @@ def _source(**overrides: object) -> ShadowResidualSource:
 def _report(**overrides: object) -> ShadowCalibrationReport:
     values: dict[str, object] = {
         "generated_at_utc": "2026-08-28T12:00:00+00:00",
+        "execution": ShadowExecutionMetadata(
+            started_at_utc="2026-08-28T12:00:00+00:00",
+            completed_at_utc="2026-08-28T12:00:01+00:00",
+            elapsed_seconds=1.0,
+            deterministic_seed=0,
+            warnings=(),
+        ),
         "horizon": 1,
         "residual_source": _source(),
         "sample_size": 37,
@@ -67,6 +75,27 @@ def test_a_valid_report_round_trips_with_missing_kept_as_null(tmp_path: Path) ->
     # The unmeasured diagnostic stayed null — missing is not zero.
     assert document["calibration_diagnostics"]["mean_pit"] is None
     assert document["calibration_diagnostics"]["empirical_coverage"] == 0.905
+    assert document["execution"]["deterministic_seed"] == 0
+    assert document["execution"]["warnings"] == []
+
+
+def test_execution_metadata_refuses_invalid_provenance() -> None:
+    with pytest.raises(ShadowReportError, match="cannot precede"):
+        ShadowExecutionMetadata(
+            started_at_utc="2026-08-28T12:00:01+00:00",
+            completed_at_utc="2026-08-28T12:00:00+00:00",
+            elapsed_seconds=1.0,
+            deterministic_seed=0,
+            warnings=(),
+        )
+    with pytest.raises(ShadowReportError, match="deterministic_seed"):
+        ShadowExecutionMetadata(
+            started_at_utc="2026-08-28T12:00:00+00:00",
+            completed_at_utc="2026-08-28T12:00:01+00:00",
+            elapsed_seconds=1.0,
+            deterministic_seed=True,  # type: ignore[arg-type]
+            warnings=(),
+        )
 
 
 def test_the_locked_holdout_is_refused_in_residual_provenance() -> None:
