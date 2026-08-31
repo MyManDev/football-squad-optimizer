@@ -45,6 +45,16 @@ CHIPS_OFFERED: Final[Mapping[str, tuple[str, ...]]] = {
     "chain_tuned": ("bboost", "3xc", "wildcard", "freehit"),
 }
 #: The season-chain value-mode holding constants, fixed in the pre-registration.
+#:
+#: Recorded discrepancy, deliberately not silently aligned: the season-chain CLI's
+#: ``--chip-holding-values`` default (``run_season_chain_seasons.py``) carries
+#: ``freehit=15`` while this table carries ``freehit=20.0``. The committed chain
+#: artifacts were produced with the CLI's 15; this module's 20.0 is what the GP
+#: terminal-value study compared against. Neither number changes any recorded
+#: verdict (the study lost pooled and in all four seasons either way), but two
+#: sources for one constant is how a future run measures something other than
+#: what it says — so the difference is written here, at both sites, until one of
+#: them is retired by a measured decision rather than an edit.
 HOLDING_VALUE_POINTS: Final[Mapping[str, float]] = {
     "bboost": 20.0,
     "3xc": 18.0,

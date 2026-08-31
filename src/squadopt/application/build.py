@@ -40,6 +40,18 @@ from squadopt.live.risk import LiveRiskDiagnostics
 from squadopt.live.tick import LedgerState, TickPlan
 
 _PROJECTIONS_FILE = "projections.csv"
+_PUBLIC_RECOMMENDATION_METADATA_KEYS = frozenset(
+    {
+        "awards_defensive_contribution",
+        "held_squad_decided_gameweek",
+        "mode",
+        "ops_phase",
+        "projection_handoff_fingerprint",
+        "risk_residuals_source",
+        "season_rules_contract_version",
+        "season_rules_fingerprint",
+    }
+)
 
 
 def _ints(value: object) -> list[int]:
@@ -58,6 +70,17 @@ def _int_map(value: object) -> dict[int, int]:
 
 def _mapping(value: JsonValue) -> dict[str, JsonValue]:
     return value if isinstance(value, dict) else {}
+
+
+def _public_recommendation_metadata(value: object) -> dict[str, JsonValue]:
+    """Return the explicit, path-free ledger metadata allowed in a public view."""
+
+    metadata = _mapping(jsonable(value))
+    return {
+        key: _scrub_value(metadata[key])
+        for key in sorted(_PUBLIC_RECOMMENDATION_METADATA_KEYS)
+        if key in metadata
+    }
 
 
 def _pair(value: object) -> tuple[float, float] | None:
@@ -328,7 +351,7 @@ def recommendation_view_from_ledger(
         outcome_net_score=(None if outcome is None else float(str(outcome["realized_net_score"]))),
         settled=outcome is not None,
         captain_multiplier=3 if chip == "3xc" else 2,
-        metadata=_mapping(jsonable(decision.get("metadata", {}))),
+        metadata=_public_recommendation_metadata(decision.get("metadata", {})),
     )
 
 
