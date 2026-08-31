@@ -40,6 +40,7 @@ from squadopt.experiments.residual_manifest import (
     ResidualSourceManifest,
 )
 from squadopt.experiments.shadow_report import (
+    PREREG_GATE_FAMILIES,
     ShadowCalibrationReport,
     ShadowExecutionMetadata,
     ShadowGateResult,
@@ -63,7 +64,9 @@ BOOTSTRAP_SEED: Final = 0
 
 #: The prereg's full gate set. P1 is this runner's; S1 and S2 belong to the
 #: squad-level instrument and are named here so their absence is stated, not implied.
-PREREG_GATES: Final = ("P1_player_coverage", "S1_squad_pit_location", "S2_squad_lower_tail")
+#: It is the contract's own tuple rather than a second copy: two lists of the same
+#: pre-registered families are two lists that can drift apart.
+PREREG_GATES: Final = PREREG_GATE_FAMILIES
 RUNNER_GATES: Final = ("P1_player_coverage",)
 
 
