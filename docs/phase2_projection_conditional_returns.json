@@ -1,0 +1,2185 @@
+{
+  "classification": "diagnostic_inconclusive",
+  "classification_population": "2023-24",
+  "contract_version": "phase2_projection_conditional_returns_v1",
+  "control_replay": {
+    "measured_below_lower_quantile_rate": 0.21621621621621623,
+    "measured_mean_probability_integral_transform": 0.4921621621621622,
+    "recorded_below_lower_quantile_rate": 0.21621621621621623,
+    "recorded_mean_probability_integral_transform": 0.4921621621621622,
+    "reproduced": true,
+    "tolerance": 1e-12
+  },
+  "created_utc": "2026-08-31T08:09:25+00:00",
+  "development_reuse_exploratory": true,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "execution": {
+    "completed_at_utc": "2026-08-31T08:16:54+00:00",
+    "deterministic_seed": 11,
+    "elapsed_seconds": 448.691026,
+    "started_at_utc": "2026-08-31T08:09:25+00:00",
+    "warnings": []
+  },
+  "fold_universe": {
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "target_rows_per_arm": 1327,
+    "total_folds": 139
+  },
+  "independent_confirmation": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "panel_seasons_loaded": [
+    "2020-21",
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "pooled": {
+    "arms": {
+      "position_full": {
+        "direct_cell_coverage": 0.0,
+        "fold_count": 139,
+        "mean_absolute_fold_q25_gap": 0.304798094108469,
+        "mean_brier": 0.6923506648380398,
+        "mean_q25_threshold": -0.92613078801997,
+        "realized_downside_rate": 0.5501130369253956,
+        "source_counts": {
+          "position": 1327
+        },
+        "source_expected_downside_rate": 0.2500542430117929,
+        "target_rows": 1327,
+        "unique_players": 114
+      },
+      "position_x_expected_points_full": {
+        "direct_cell_coverage": 0.9314242652599849,
+        "fold_count": 139,
+        "mean_absolute_fold_q25_gap": 0.14229595451328955,
+        "mean_brier": 0.6566876307462146,
+        "mean_q25_threshold": -3.0420911345356068,
+        "realized_downside_rate": 0.306706857573474,
+        "source_counts": {
+          "position": 3,
+          "position_adjacent_bands": 88,
+          "position_band": 1236
+        },
+        "source_expected_downside_rate": 0.25133056259036046,
+        "target_rows": 1327,
+        "unique_players": 114
+      },
+      "position_x_expected_points_recent8": {
+        "direct_cell_coverage": 0.31951770911831195,
+        "fold_count": 139,
+        "mean_absolute_fold_q25_gap": 0.21448266021182172,
+        "mean_brier": 0.6701191423649876,
+        "mean_q25_threshold": -1.9224479480623589,
+        "realized_downside_rate": 0.44385832705350414,
+        "source_counts": {
+          "position": 350,
+          "position_adjacent_bands": 553,
+          "position_band": 424
+        },
+        "source_expected_downside_rate": 0.25170451049447856,
+        "target_rows": 1327,
+        "unique_players": 114
+      }
+    },
+    "projection_comparison": {
+      "absolute_q25_gap_delta": {
+        "bootstrap_high": -0.13987313613738794,
+        "bootstrap_low": -0.18546828614891753,
+        "mean": -0.1625021395951794
+      },
+      "brier_delta": {
+        "bootstrap_high": -0.019897585015775408,
+        "bootstrap_low": -0.051774800617106057,
+        "mean": -0.0356630340918252
+      }
+    },
+    "projection_localization": {
+      "groups": {
+        "high": {
+          "ordinary_observed_rate": 0.39258114374034003,
+          "ordinary_predicted_rate": 0.5391965316043921,
+          "target_rows": 647,
+          "unique_players": 55
+        },
+        "low": {
+          "ordinary_observed_rate": 0.3588235294117647,
+          "ordinary_predicted_rate": 0.41670512470316134,
+          "target_rows": 680,
+          "unique_players": 100
+        }
+      },
+      "high_minus_low_ordinary_gap": {
+        "bootstrap_high": -0.06942916724533302,
+        "bootstrap_low": -0.15794922265632239,
+        "mean": -0.11302416584034737
+      },
+      "paired_fold_count": 139
+    },
+    "recency_comparison": {
+      "absolute_q25_gap_delta": {
+        "bootstrap_high": 0.09284230057441212,
+        "bootstrap_low": 0.05362283317352719,
+        "mean": 0.07218670569853218
+      },
+      "brier_delta": {
+        "bootstrap_high": 0.02588265996402213,
+        "bootstrap_low": 0.0007914393717176288,
+        "mean": 0.01343151161877309
+      }
+    },
+    "recent_vs_position_comparison": {
+      "absolute_q25_gap_delta": {
+        "bootstrap_high": -0.07499377609582926,
+        "bootstrap_low": -0.10612942056630946,
+        "mean": -0.09031543389664722
+      },
+      "brier_delta": {
+        "bootstrap_high": -0.010458041654942015,
+        "bootstrap_low": -0.03392433600202091,
+        "mean": -0.022231522473052108
+      }
+    },
+    "state_tables": {
+      "position_full": {
+        "0": {
+          "points_2_3": {
+            "observed_rate": 0.0,
+            "predicted_rate": 0.2539744592129268
+          },
+          "points_4_5": {
+            "observed_rate": 0.0,
+            "predicted_rate": 0.06111545478238207
+          },
+          "points_ge_6": {
+            "observed_rate": 0.0,
+            "predicted_rate": 0.2873338545738858
+          },
+          "points_le_1": {
+            "observed_rate": 1.0,
+            "predicted_rate": 0.39757623143080534
+          },
+          "target_rows": 1
+        },
+        "1": {
+          "points_2_3": {
+            "observed_rate": 0.3333333333333333,
+            "predicted_rate": 0.3166646186355753
+          },
+          "points_4_5": {
+            "observed_rate": 0.06565656565656566,
+            "predicted_rate": 0.06437946892398277
+          },
+          "points_ge_6": {
+            "observed_rate": 0.30808080808080807,
+            "predicted_rate": 0.290525669318372
+          },
+          "points_le_1": {
+            "observed_rate": 0.29292929292929293,
+            "predicted_rate": 0.3284302431220699
+          },
+          "target_rows": 198
+        },
+        "2": {
+          "points_2_3": {
+            "observed_rate": 0.3700623700623701,
+            "predicted_rate": 0.45822435727462135
+          },
+          "points_4_5": {
+            "observed_rate": 0.0997920997920998,
+            "predicted_rate": 0.07069930980649329
+          },
+          "points_ge_6": {
+            "observed_rate": 0.36382536382536385,
+            "predicted_rate": 0.26653180129457843
+          },
+          "points_le_1": {
+            "observed_rate": 0.16632016632016633,
+            "predicted_rate": 0.2045445316243069
+          },
+          "target_rows": 481
+        },
+        "3": {
+          "points_2_3": {
+            "observed_rate": 0.3974358974358974,
+            "predicted_rate": 0.5217201859773279
+          },
+          "points_4_5": {
+            "observed_rate": 0.07435897435897436,
+            "predicted_rate": 0.07781303166291162
+          },
+          "points_ge_6": {
+            "observed_rate": 0.41025641025641024,
+            "predicted_rate": 0.24850965676298553
+          },
+          "points_le_1": {
+            "observed_rate": 0.11794871794871795,
+            "predicted_rate": 0.15195712559677493
+          },
+          "target_rows": 390
+        },
+        "4": {
+          "points_2_3": {
+            "observed_rate": 0.3852140077821012,
+            "predicted_rate": 0.5657170560968239
+          },
+          "points_4_5": {
+            "observed_rate": 0.07782101167315175,
+            "predicted_rate": 0.08391573063815477
+          },
+          "points_ge_6": {
+            "observed_rate": 0.5136186770428015,
+            "predicted_rate": 0.24056878863735393
+          },
+          "points_le_1": {
+            "observed_rate": 0.023346303501945526,
+            "predicted_rate": 0.10979842462766759
+          },
+          "target_rows": 257
+        }
+      },
+      "position_x_expected_points_full": {
+        "0": {
+          "points_2_3": {
+            "observed_rate": 0.0,
+            "predicted_rate": 0.25309933988085653
+          },
+          "points_4_5": {
+            "observed_rate": 0.0,
+            "predicted_rate": 0.05812268555788118
+          },
+          "points_ge_6": {
+            "observed_rate": 0.0,
+            "predicted_rate": 0.27274190951537597
+          },
+          "points_le_1": {
+            "observed_rate": 1.0,
+            "predicted_rate": 0.4160360650458863
+          },
+          "target_rows": 1
+        },
+        "1": {
+          "points_2_3": {
+            "observed_rate": 0.3333333333333333,
+            "predicted_rate": 0.31924017276331296
+          },
+          "points_4_5": {
+            "observed_rate": 0.06565656565656566,
+            "predicted_rate": 0.07072545581356593
+          },
+          "points_ge_6": {
+            "observed_rate": 0.30808080808080807,
+            "predicted_rate": 0.3376380121133701
+          },
+          "points_le_1": {
+            "observed_rate": 0.29292929292929293,
+            "predicted_rate": 0.272396359309751
+          },
+          "target_rows": 198
+        },
+        "2": {
+          "points_2_3": {
+            "observed_rate": 0.3700623700623701,
+            "predicted_rate": 0.4189865599458092
+          },
+          "points_4_5": {
+            "observed_rate": 0.0997920997920998,
+            "predicted_rate": 0.09661753177081565
+          },
+          "points_ge_6": {
+            "observed_rate": 0.36382536382536385,
+            "predicted_rate": 0.32163665725145957
+          },
+          "points_le_1": {
+            "observed_rate": 0.16632016632016633,
+            "predicted_rate": 0.16275925103191555
+          },
+          "target_rows": 481
+        },
+        "3": {
+          "points_2_3": {
+            "observed_rate": 0.3974358974358974,
+            "predicted_rate": 0.3739790045713144
+          },
+          "points_4_5": {
+            "observed_rate": 0.07435897435897436,
+            "predicted_rate": 0.07652984768933788
+          },
+          "points_ge_6": {
+            "observed_rate": 0.41025641025641024,
+            "predicted_rate": 0.4383110560367117
+          },
+          "points_le_1": {
+            "observed_rate": 0.11794871794871795,
+            "predicted_rate": 0.11118009170263599
+          },
+          "target_rows": 390
+        },
+        "4": {
+          "points_2_3": {
+            "observed_rate": 0.3852140077821012,
+            "predicted_rate": 0.3010698486627396
+          },
+          "points_4_5": {
+            "observed_rate": 0.07782101167315175,
+            "predicted_rate": 0.09879278975441916
+          },
+          "points_ge_6": {
+            "observed_rate": 0.5136186770428015,
+            "predicted_rate": 0.5223386031701595
+          },
+          "points_le_1": {
+            "observed_rate": 0.023346303501945526,
+            "predicted_rate": 0.0777987584126817
+          },
+          "target_rows": 257
+        }
+      },
+      "position_x_expected_points_recent8": {
+        "0": {
+          "points_2_3": {
+            "observed_rate": 0.0,
+            "predicted_rate": 0.23063063063063063
+          },
+          "points_4_5": {
+            "observed_rate": 0.0,
+            "predicted_rate": 0.07207207207207207
+          },
+          "points_ge_6": {
+            "observed_rate": 0.0,
+            "predicted_rate": 0.209009009009009
+          },
+          "points_le_1": {
+            "observed_rate": 1.0,
+            "predicted_rate": 0.4882882882882883
+          },
+          "target_rows": 1
+        },
+        "1": {
+          "points_2_3": {
+            "observed_rate": 0.3333333333333333,
+            "predicted_rate": 0.3024254338832089
+          },
+          "points_4_5": {
+            "observed_rate": 0.06565656565656566,
+            "predicted_rate": 0.06709320970840392
+          },
+          "points_ge_6": {
+            "observed_rate": 0.30808080808080807,
+            "predicted_rate": 0.3328262001714486
+          },
+          "points_le_1": {
+            "observed_rate": 0.29292929292929293,
+            "predicted_rate": 0.2976551562369386
+          },
+          "target_rows": 198
+        },
+        "2": {
+          "points_2_3": {
+            "observed_rate": 0.3700623700623701,
+            "predicted_rate": 0.39586677533485626
+          },
+          "points_4_5": {
+            "observed_rate": 0.0997920997920998,
+            "predicted_rate": 0.0842173769629813
+          },
+          "points_ge_6": {
+            "observed_rate": 0.36382536382536385,
+            "predicted_rate": 0.34275850948896996
+          },
+          "points_le_1": {
+            "observed_rate": 0.16632016632016633,
+            "predicted_rate": 0.17715733821319243
+          },
+          "target_rows": 481
+        },
+        "3": {
+          "points_2_3": {
+            "observed_rate": 0.3974358974358974,
+            "predicted_rate": 0.40599229907481765
+          },
+          "points_4_5": {
+            "observed_rate": 0.07435897435897436,
+            "predicted_rate": 0.08939583435722978
+          },
+          "points_ge_6": {
+            "observed_rate": 0.41025641025641024,
+            "predicted_rate": 0.3753978798891574
+          },
+          "points_le_1": {
+            "observed_rate": 0.11794871794871795,
+            "predicted_rate": 0.1292139866787951
+          },
+          "target_rows": 390
+        },
+        "4": {
+          "points_2_3": {
+            "observed_rate": 0.3852140077821012,
+            "predicted_rate": 0.5048839517042593
+          },
+          "points_4_5": {
+            "observed_rate": 0.07782101167315175,
+            "predicted_rate": 0.09656950323583574
+          },
+          "points_ge_6": {
+            "observed_rate": 0.5136186770428015,
+            "predicted_rate": 0.299375749692089
+          },
+          "points_le_1": {
+            "observed_rate": 0.023346303501945526,
+            "predicted_rate": 0.09917079536781591
+          },
+          "target_rows": 257
+        }
+      }
+    },
+    "top_player_diagnostic": {
+      "player_id": "118748",
+      "projection_brier_delta_without_top": -0.0236898914975494,
+      "recency_brier_delta_without_top": 0.006106433688691852,
+      "row_share": 0.0587792012057272
+    }
+  },
+  "promotion_eligible": false,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "bootstrap_confidence_level": 0.9,
+    "bootstrap_resamples": 5000,
+    "bootstrap_seed": 0,
+    "brier_definition": "sum_squared_four_class_error_fold_mean",
+    "empirical_quantile": "0.25_linear_strict_below",
+    "evaluation_dispersion_scale": "1.0",
+    "evaluation_location_shift_points": "-7.430702271879578",
+    "evaluation_lower_quantile": "0.1",
+    "evaluation_points_threshold": "40.0",
+    "evaluation_worst_fraction": "0.1",
+    "expected_points_edges": [
+      3.0,
+      4.0,
+      5.0,
+      6.0
+    ],
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "generator_deterministic_seed": "11",
+    "generator_double_gameweek_scale": "1.0",
+    "generator_min_history_folds": "8",
+    "generator_min_player_observations": "8",
+    "generator_player_location_shrinkage": "None",
+    "generator_player_scale_shrinkage": "10.0",
+    "generator_scenario_count": "200",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "minimum_direct_cell_coverage": 0.8,
+    "minimum_group_players": 20,
+    "minimum_group_rows": 50,
+    "minimum_source_observations": 30,
+    "optimizer_bench_weight": "0.1",
+    "optimizer_budget_tenths": "1000",
+    "optimizer_deterministic_seed": "0",
+    "optimizer_expected_points_scale": "1000",
+    "optimizer_max_players_per_team": "3",
+    "optimizer_solver_deterministic_time_limit": "None",
+    "optimizer_solver_time_limit_seconds": "10.0",
+    "optimizer_squad_position_limits": "{DEF=5, FWD=3, GK=2, MID=5}",
+    "optimizer_squad_size": "15",
+    "optimizer_starting_position_max": "{DEF=5, FWD=3, GK=1, MID=5}",
+    "optimizer_starting_position_min": "{DEF=3, FWD=1, GK=1, MID=2}",
+    "optimizer_starting_size": "11",
+    "projection_prior_gameweek_equivalent": "6",
+    "projection_prior_minute_equivalent": "270",
+    "protocol_bench_weight": "0.1",
+    "protocol_bootstrap_resamples": "5000",
+    "protocol_bootstrap_seed": "0",
+    "protocol_bound_tolerance": "1e-09",
+    "protocol_confidence_level": "0.9",
+    "protocol_decision_universe": "full_roster",
+    "protocol_dispersion_scale": "1.0",
+    "protocol_double_gameweek_scale": "1.0",
+    "protocol_evaluation_season": "2024-25",
+    "protocol_fit_seasons": "2021-22,2022-23,2023-24",
+    "protocol_lower_quantile": "0.1",
+    "protocol_min_evaluation_folds": "30",
+    "protocol_min_history_folds": "8",
+    "protocol_min_player_observations": "8",
+    "protocol_min_prior_gameweeks_in_season": "1",
+    "protocol_player_location_shrinkage": "None",
+    "protocol_player_scale_shrinkage": "10.0",
+    "protocol_points_threshold": "40.0",
+    "protocol_s1_bounds": "(0.43, 0.57)",
+    "protocol_s2_bounds": "(0.04, 0.16)",
+    "protocol_scenario_count": "200",
+    "protocol_scenario_seed": "11",
+    "protocol_worst_fraction": "0.1",
+    "recent_history_folds": 8,
+    "repository_commit": "782646ee7774d3c9e71e8a7abe753ba60dcf6f6d",
+    "return_states": [
+      "points_le_1",
+      "points_2_3",
+      "points_4_5",
+      "points_ge_6"
+    ],
+    "working_tree_dirty": "false"
+  },
+  "residual_source": {
+    "export_label": "in_season_carry_over_blend",
+    "model_identity": "squadopt-deterministic-baseline/in-season-carry-over-v1",
+    "table_sha256": "17f88e6e75618adc01ec6357317a6849bdb053e7eeed1cd6627c8eceab15fc7a"
+  },
+  "season_sensitivity": {
+    "2021-22": {
+      "arms": {
+        "position_full": {
+          "direct_cell_coverage": 0.0,
+          "fold_count": 29,
+          "mean_absolute_fold_q25_gap": 0.27982917473069935,
+          "mean_brier": 0.7341920261840775,
+          "mean_q25_threshold": -1.026453040165129,
+          "realized_downside_rate": 0.5313653136531366,
+          "source_counts": {
+            "position": 271
+          },
+          "source_expected_downside_rate": 0.25012245203334704,
+          "target_rows": 271,
+          "unique_players": 37
+        },
+        "position_x_expected_points_full": {
+          "direct_cell_coverage": 0.8228782287822878,
+          "fold_count": 29,
+          "mean_absolute_fold_q25_gap": 0.13464353544456775,
+          "mean_brier": 0.6749565270908204,
+          "mean_q25_threshold": -2.880719958659594,
+          "realized_downside_rate": 0.2693726937269373,
+          "source_counts": {
+            "position": 3,
+            "position_adjacent_bands": 45,
+            "position_band": 223
+          },
+          "source_expected_downside_rate": 0.2523587356886442,
+          "target_rows": 271,
+          "unique_players": 37
+        },
+        "position_x_expected_points_recent8": {
+          "direct_cell_coverage": 0.42435424354243545,
+          "fold_count": 29,
+          "mean_absolute_fold_q25_gap": 0.183209602116906,
+          "mean_brier": 0.6885315492556756,
+          "mean_q25_threshold": -1.9795679226291512,
+          "realized_downside_rate": 0.4059040590405904,
+          "source_counts": {
+            "position": 55,
+            "position_adjacent_bands": 101,
+            "position_band": 115
+          },
+          "source_expected_downside_rate": 0.25198529319273805,
+          "target_rows": 271,
+          "unique_players": 37
+        }
+      },
+      "projection_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": -0.09559472191266477,
+          "bootstrap_low": -0.19365929919799182,
+          "mean": -0.1451856392861316
+        },
+        "brier_delta": {
+          "bootstrap_high": -0.0336319533442965,
+          "bootstrap_low": -0.08530615945191986,
+          "mean": -0.05923549909325715
+        }
+      },
+      "projection_localization": {
+        "groups": {
+          "high": {
+            "ordinary_observed_rate": 0.29357798165137616,
+            "ordinary_predicted_rate": 0.4486974622359588,
+            "target_rows": 109,
+            "unique_players": 11
+          },
+          "low": {
+            "ordinary_observed_rate": 0.4012345679012346,
+            "ordinary_predicted_rate": 0.4670348471632664,
+            "target_rows": 162,
+            "unique_players": 32
+          }
+        },
+        "high_minus_low_ordinary_gap": {
+          "bootstrap_high": -0.023778430944391728,
+          "bootstrap_low": -0.22419190588463617,
+          "mean": -0.12423204899832066
+        },
+        "paired_fold_count": 29
+      },
+      "recency_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": 0.09405764662361056,
+          "bootstrap_low": 0.00576135520701525,
+          "mean": 0.04856606667233828
+        },
+        "brier_delta": {
+          "bootstrap_high": 0.03835183142537225,
+          "bootstrap_low": -0.010740353329804053,
+          "mean": 0.013575022164855018
+        }
+      },
+      "recent_vs_position_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": -0.06250445592548191,
+          "bootstrap_low": -0.13116983721649533,
+          "mean": -0.0966195726137933
+        },
+        "brier_delta": {
+          "bootstrap_high": -0.026707607118626166,
+          "bootstrap_low": -0.06479467875008389,
+          "mean": -0.04566047692840213
+        }
+      },
+      "state_tables": {
+        "position_full": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_4_5": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_ge_6": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_le_1": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "target_rows": 0
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.46153846153846156,
+              "predicted_rate": 0.40411551194395856
+            },
+            "points_4_5": {
+              "observed_rate": 0.10256410256410256,
+              "predicted_rate": 0.07811136506470205
+            },
+            "points_ge_6": {
+              "observed_rate": 0.28205128205128205,
+              "predicted_rate": 0.2839461869939307
+            },
+            "points_le_1": {
+              "observed_rate": 0.15384615384615385,
+              "predicted_rate": 0.23382693599740867
+            },
+            "target_rows": 39
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.3821138211382114,
+              "predicted_rate": 0.4869848802815836
+            },
+            "points_4_5": {
+              "observed_rate": 0.13008130081300814,
+              "predicted_rate": 0.0629861584992666
+            },
+            "points_ge_6": {
+              "observed_rate": 0.34146341463414637,
+              "predicted_rate": 0.24930719190237013
+            },
+            "points_le_1": {
+              "observed_rate": 0.14634146341463414,
+              "predicted_rate": 0.20072176931677974
+            },
+            "target_rows": 123
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.29411764705882354,
+              "predicted_rate": 0.40841205831736976
+            },
+            "points_4_5": {
+              "observed_rate": 0.10294117647058823,
+              "predicted_rate": 0.06448007018090365
+            },
+            "points_ge_6": {
+              "observed_rate": 0.47058823529411764,
+              "predicted_rate": 0.26294107010491735
+            },
+            "points_le_1": {
+              "observed_rate": 0.1323529411764706,
+              "predicted_rate": 0.2641668013968093
+            },
+            "target_rows": 68
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.2926829268292683,
+              "predicted_rate": 0.5155122784911798
+            },
+            "points_4_5": {
+              "observed_rate": 0.0975609756097561,
+              "predicted_rate": 0.06236840781804281
+            },
+            "points_ge_6": {
+              "observed_rate": 0.5853658536585366,
+              "predicted_rate": 0.22876126398548735
+            },
+            "points_le_1": {
+              "observed_rate": 0.024390243902439025,
+              "predicted_rate": 0.19335804970529014
+            },
+            "target_rows": 41
+          }
+        },
+        "position_x_expected_points_full": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_4_5": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_ge_6": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_le_1": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "target_rows": 0
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.46153846153846156,
+              "predicted_rate": 0.40512607718617016
+            },
+            "points_4_5": {
+              "observed_rate": 0.10256410256410256,
+              "predicted_rate": 0.07454188218961869
+            },
+            "points_ge_6": {
+              "observed_rate": 0.28205128205128205,
+              "predicted_rate": 0.3171932664934671
+            },
+            "points_le_1": {
+              "observed_rate": 0.15384615384615385,
+              "predicted_rate": 0.20313877413074416
+            },
+            "target_rows": 39
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.3821138211382114,
+              "predicted_rate": 0.4821077063642298
+            },
+            "points_4_5": {
+              "observed_rate": 0.13008130081300814,
+              "predicted_rate": 0.08965064810816953
+            },
+            "points_ge_6": {
+              "observed_rate": 0.34146341463414637,
+              "predicted_rate": 0.2797886954735813
+            },
+            "points_le_1": {
+              "observed_rate": 0.14634146341463414,
+              "predicted_rate": 0.14845295005401946
+            },
+            "target_rows": 123
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.29411764705882354,
+              "predicted_rate": 0.29097329858597026
+            },
+            "points_4_5": {
+              "observed_rate": 0.10294117647058823,
+              "predicted_rate": 0.0964431757491592
+            },
+            "points_ge_6": {
+              "observed_rate": 0.47058823529411764,
+              "predicted_rate": 0.4438138208576951
+            },
+            "points_le_1": {
+              "observed_rate": 0.1323529411764706,
+              "predicted_rate": 0.1687697048071754
+            },
+            "target_rows": 68
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.2926829268292683,
+              "predicted_rate": 0.26077866411568645
+            },
+            "points_4_5": {
+              "observed_rate": 0.0975609756097561,
+              "predicted_rate": 0.09736387543976892
+            },
+            "points_ge_6": {
+              "observed_rate": 0.5853658536585366,
+              "predicted_rate": 0.5044594176133883
+            },
+            "points_le_1": {
+              "observed_rate": 0.024390243902439025,
+              "predicted_rate": 0.1373980428311563
+            },
+            "target_rows": 41
+          }
+        },
+        "position_x_expected_points_recent8": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_4_5": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_ge_6": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_le_1": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "target_rows": 0
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.46153846153846156,
+              "predicted_rate": 0.3736745313710585
+            },
+            "points_4_5": {
+              "observed_rate": 0.10256410256410256,
+              "predicted_rate": 0.0848692895894015
+            },
+            "points_ge_6": {
+              "observed_rate": 0.28205128205128205,
+              "predicted_rate": 0.3732659383070536
+            },
+            "points_le_1": {
+              "observed_rate": 0.15384615384615385,
+              "predicted_rate": 0.16819024073248642
+            },
+            "target_rows": 39
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.3821138211382114,
+              "predicted_rate": 0.4384399461886778
+            },
+            "points_4_5": {
+              "observed_rate": 0.13008130081300814,
+              "predicted_rate": 0.08637539088983452
+            },
+            "points_ge_6": {
+              "observed_rate": 0.34146341463414637,
+              "predicted_rate": 0.33078788148909666
+            },
+            "points_le_1": {
+              "observed_rate": 0.14634146341463414,
+              "predicted_rate": 0.14439678143239104
+            },
+            "target_rows": 123
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.29411764705882354,
+              "predicted_rate": 0.35184275927017206
+            },
+            "points_4_5": {
+              "observed_rate": 0.10294117647058823,
+              "predicted_rate": 0.08715092978971226
+            },
+            "points_ge_6": {
+              "observed_rate": 0.47058823529411764,
+              "predicted_rate": 0.36415360434796346
+            },
+            "points_le_1": {
+              "observed_rate": 0.1323529411764706,
+              "predicted_rate": 0.19685270659215215
+            },
+            "target_rows": 68
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.2926829268292683,
+              "predicted_rate": 0.44890628113481007
+            },
+            "points_4_5": {
+              "observed_rate": 0.0975609756097561,
+              "predicted_rate": 0.08364870524420448
+            },
+            "points_ge_6": {
+              "observed_rate": 0.5853658536585366,
+              "predicted_rate": 0.2855627571766315
+            },
+            "points_le_1": {
+              "observed_rate": 0.024390243902439025,
+              "predicted_rate": 0.18188225644435396
+            },
+            "target_rows": 41
+          }
+        }
+      },
+      "top_player_diagnostic": {
+        "player_id": "121145",
+        "projection_brier_delta_without_top": -0.06135399024763158,
+        "recency_brier_delta_without_top": 0.015554377595181468,
+        "row_share": 0.0959409594095941
+      }
+    },
+    "2022-23": {
+      "arms": {
+        "position_full": {
+          "direct_cell_coverage": 0.0,
+          "fold_count": 36,
+          "mean_absolute_fold_q25_gap": 0.2962593140072458,
+          "mean_brier": 0.7048291480441713,
+          "mean_q25_threshold": -0.9227367413931624,
+          "realized_downside_rate": 0.5299145299145299,
+          "source_counts": {
+            "position": 351
+          },
+          "source_expected_downside_rate": 0.2500829390341772,
+          "target_rows": 351,
+          "unique_players": 46
+        },
+        "position_x_expected_points_full": {
+          "direct_cell_coverage": 0.8945868945868946,
+          "fold_count": 36,
+          "mean_absolute_fold_q25_gap": 0.15317458763628153,
+          "mean_brier": 0.6538401979929989,
+          "mean_q25_threshold": -3.0184642275242166,
+          "realized_downside_rate": 0.29914529914529914,
+          "source_counts": {
+            "position_adjacent_bands": 37,
+            "position_band": 314
+          },
+          "source_expected_downside_rate": 0.251899854008596,
+          "target_rows": 351,
+          "unique_players": 46
+        },
+        "position_x_expected_points_recent8": {
+          "direct_cell_coverage": 0.32763532763532766,
+          "fold_count": 36,
+          "mean_absolute_fold_q25_gap": 0.20846332320898492,
+          "mean_brier": 0.6901342359841987,
+          "mean_q25_threshold": -1.960342624486467,
+          "realized_downside_rate": 0.41025641025641024,
+          "source_counts": {
+            "position": 98,
+            "position_adjacent_bands": 138,
+            "position_band": 115
+          },
+          "source_expected_downside_rate": 0.25198403740797115,
+          "target_rows": 351,
+          "unique_players": 46
+        }
+      },
+      "projection_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": -0.09788245451419647,
+          "bootstrap_low": -0.18942227468527145,
+          "mean": -0.14308472637096425
+        },
+        "brier_delta": {
+          "bootstrap_high": -0.01382462921526194,
+          "bootstrap_low": -0.0881406561923996,
+          "mean": -0.050988950051172405
+        }
+      },
+      "projection_localization": {
+        "groups": {
+          "high": {
+            "ordinary_observed_rate": 0.39226519337016574,
+            "ordinary_predicted_rate": 0.5374431515916096,
+            "target_rows": 181,
+            "unique_players": 29
+          },
+          "low": {
+            "ordinary_observed_rate": 0.3235294117647059,
+            "ordinary_predicted_rate": 0.4107239464435512,
+            "target_rows": 170,
+            "unique_players": 34
+          }
+        },
+        "high_minus_low_ordinary_gap": {
+          "bootstrap_high": 0.00260169220824139,
+          "bootstrap_low": -0.2055618617471302,
+          "mean": -0.10217955820655164
+        },
+        "paired_fold_count": 36
+      },
+      "recency_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": 0.09296336374550851,
+          "bootstrap_low": 0.01953774010496054,
+          "mean": 0.05528873557270337
+        },
+        "brier_delta": {
+          "bootstrap_high": 0.06599553715064008,
+          "bootstrap_low": 0.006632277820067256,
+          "mean": 0.03629403799119982
+        }
+      },
+      "recent_vs_position_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": -0.054669961882836425,
+          "bootstrap_low": -0.1200650544940835,
+          "mean": -0.08779599079826084
+        },
+        "brier_delta": {
+          "bootstrap_high": 0.010066762390338407,
+          "bootstrap_low": -0.0404005985992592,
+          "mean": -0.014694912059972594
+        }
+      },
+      "state_tables": {
+        "position_full": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_4_5": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_ge_6": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_le_1": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "target_rows": 0
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.40476190476190477,
+              "predicted_rate": 0.27958569587122933
+            },
+            "points_4_5": {
+              "observed_rate": 0.047619047619047616,
+              "predicted_rate": 0.05995749147223032
+            },
+            "points_ge_6": {
+              "observed_rate": 0.2619047619047619,
+              "predicted_rate": 0.307470529783957
+            },
+            "points_le_1": {
+              "observed_rate": 0.2857142857142857,
+              "predicted_rate": 0.35298628287258343
+            },
+            "target_rows": 42
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.296875,
+              "predicted_rate": 0.45375368491259427
+            },
+            "points_4_5": {
+              "observed_rate": 0.109375,
+              "predicted_rate": 0.07005468734724649
+            },
+            "points_ge_6": {
+              "observed_rate": 0.40625,
+              "predicted_rate": 0.2730453808321347
+            },
+            "points_le_1": {
+              "observed_rate": 0.1875,
+              "predicted_rate": 0.20314624690802455
+            },
+            "target_rows": 128
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.4608695652173913,
+              "predicted_rate": 0.5423584728505592
+            },
+            "points_4_5": {
+              "observed_rate": 0.05217391304347826,
+              "predicted_rate": 0.07799057732023844
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3565217391304348,
+              "predicted_rate": 0.24351638993183475
+            },
+            "points_le_1": {
+              "observed_rate": 0.13043478260869565,
+              "predicted_rate": 0.13613455989736784
+            },
+            "target_rows": 115
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.2727272727272727,
+              "predicted_rate": 0.5288785766707128
+            },
+            "points_4_5": {
+              "observed_rate": 0.045454545454545456,
+              "predicted_rate": 0.10158802624164757
+            },
+            "points_ge_6": {
+              "observed_rate": 0.6363636363636364,
+              "predicted_rate": 0.27032219986593814
+            },
+            "points_le_1": {
+              "observed_rate": 0.045454545454545456,
+              "predicted_rate": 0.09921119722170152
+            },
+            "target_rows": 66
+          }
+        },
+        "position_x_expected_points_full": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_4_5": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_ge_6": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_le_1": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "target_rows": 0
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.40476190476190477,
+              "predicted_rate": 0.27167895613356513
+            },
+            "points_4_5": {
+              "observed_rate": 0.047619047619047616,
+              "predicted_rate": 0.06963542376598628
+            },
+            "points_ge_6": {
+              "observed_rate": 0.2619047619047619,
+              "predicted_rate": 0.36969950482585123
+            },
+            "points_le_1": {
+              "observed_rate": 0.2857142857142857,
+              "predicted_rate": 0.28898611527459733
+            },
+            "target_rows": 42
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.296875,
+              "predicted_rate": 0.40155578421602056
+            },
+            "points_4_5": {
+              "observed_rate": 0.109375,
+              "predicted_rate": 0.09400909449059851
+            },
+            "points_ge_6": {
+              "observed_rate": 0.40625,
+              "predicted_rate": 0.336839161152156
+            },
+            "points_le_1": {
+              "observed_rate": 0.1875,
+              "predicted_rate": 0.1675959601412249
+            },
+            "target_rows": 128
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.4608695652173913,
+              "predicted_rate": 0.39903343552694254
+            },
+            "points_4_5": {
+              "observed_rate": 0.05217391304347826,
+              "predicted_rate": 0.07998594731714094
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3565217391304348,
+              "predicted_rate": 0.42313396259605573
+            },
+            "points_le_1": {
+              "observed_rate": 0.13043478260869565,
+              "predicted_rate": 0.09784665455986069
+            },
+            "target_rows": 115
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.2727272727272727,
+              "predicted_rate": 0.23791561447132425
+            },
+            "points_4_5": {
+              "observed_rate": 0.045454545454545456,
+              "predicted_rate": 0.06094849386184387
+            },
+            "points_ge_6": {
+              "observed_rate": 0.6363636363636364,
+              "predicted_rate": 0.5996016758369364
+            },
+            "points_le_1": {
+              "observed_rate": 0.045454545454545456,
+              "predicted_rate": 0.10153421582989541
+            },
+            "target_rows": 66
+          }
+        },
+        "position_x_expected_points_recent8": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_4_5": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_ge_6": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_le_1": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "target_rows": 0
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.40476190476190477,
+              "predicted_rate": 0.2862178190888484
+            },
+            "points_4_5": {
+              "observed_rate": 0.047619047619047616,
+              "predicted_rate": 0.06976968321764525
+            },
+            "points_ge_6": {
+              "observed_rate": 0.2619047619047619,
+              "predicted_rate": 0.3283193777897927
+            },
+            "points_le_1": {
+              "observed_rate": 0.2857142857142857,
+              "predicted_rate": 0.3156931199037136
+            },
+            "target_rows": 42
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.296875,
+              "predicted_rate": 0.4133234928921512
+            },
+            "points_4_5": {
+              "observed_rate": 0.109375,
+              "predicted_rate": 0.07412286505957931
+            },
+            "points_ge_6": {
+              "observed_rate": 0.40625,
+              "predicted_rate": 0.3337217724620126
+            },
+            "points_le_1": {
+              "observed_rate": 0.1875,
+              "predicted_rate": 0.1788318695862568
+            },
+            "target_rows": 128
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.4608695652173913,
+              "predicted_rate": 0.38704878686307304
+            },
+            "points_4_5": {
+              "observed_rate": 0.05217391304347826,
+              "predicted_rate": 0.0911125314715663
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3565217391304348,
+              "predicted_rate": 0.3982312900455421
+            },
+            "points_le_1": {
+              "observed_rate": 0.13043478260869565,
+              "predicted_rate": 0.12360739161981851
+            },
+            "target_rows": 115
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.2727272727272727,
+              "predicted_rate": 0.5137818856461477
+            },
+            "points_4_5": {
+              "observed_rate": 0.045454545454545456,
+              "predicted_rate": 0.09914805380115316
+            },
+            "points_ge_6": {
+              "observed_rate": 0.6363636363636364,
+              "predicted_rate": 0.30369997080110367
+            },
+            "points_le_1": {
+              "observed_rate": 0.045454545454545456,
+              "predicted_rate": 0.08337008975159553
+            },
+            "target_rows": 66
+          }
+        }
+      },
+      "top_player_diagnostic": {
+        "player_id": "78830",
+        "projection_brier_delta_without_top": -0.02511888349113059,
+        "recency_brier_delta_without_top": 0.01677898522344691,
+        "row_share": 0.09116809116809117
+      }
+    },
+    "2023-24": {
+      "arms": {
+        "position_full": {
+          "direct_cell_coverage": 0.0,
+          "fold_count": 37,
+          "mean_absolute_fold_q25_gap": 0.3095832948510228,
+          "mean_brier": 0.6908318292359485,
+          "mean_q25_threshold": -0.8853073621520173,
+          "realized_downside_rate": 0.5590778097982709,
+          "source_counts": {
+            "position": 347
+          },
+          "source_expected_downside_rate": 0.2500343721176528,
+          "target_rows": 347,
+          "unique_players": 43
+        },
+        "position_x_expected_points_full": {
+          "direct_cell_coverage": 0.9971181556195965,
+          "fold_count": 37,
+          "mean_absolute_fold_q25_gap": 0.1561980665703644,
+          "mean_brier": 0.6722371577914065,
+          "mean_q25_threshold": -3.1177978117608074,
+          "realized_downside_rate": 0.3515850144092219,
+          "source_counts": {
+            "position_adjacent_bands": 1,
+            "position_band": 346
+          },
+          "source_expected_downside_rate": 0.25083423200159216,
+          "target_rows": 347,
+          "unique_players": 43
+        },
+        "position_x_expected_points_recent8": {
+          "direct_cell_coverage": 0.2910662824207493,
+          "fold_count": 37,
+          "mean_absolute_fold_q25_gap": 0.19262822765727608,
+          "mean_brier": 0.6687008386460532,
+          "mean_q25_threshold": -2.2658796491455333,
+          "realized_downside_rate": 0.4322766570605187,
+          "source_counts": {
+            "position": 62,
+            "position_adjacent_bands": 184,
+            "position_band": 101
+          },
+          "source_expected_downside_rate": 0.25220713007311146,
+          "target_rows": 347,
+          "unique_players": 43
+        }
+      },
+      "projection_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": -0.11325958843169562,
+          "bootstrap_low": -0.19492698465541894,
+          "mean": -0.15338522828065843
+        },
+        "brier_delta": {
+          "bootstrap_high": 0.013984092195336277,
+          "bootstrap_low": -0.05065259421468763,
+          "mean": -0.018594671444542174
+        }
+      },
+      "projection_localization": {
+        "groups": {
+          "high": {
+            "ordinary_observed_rate": 0.366120218579235,
+            "ordinary_predicted_rate": 0.5708309173275788,
+            "target_rows": 183,
+            "unique_players": 21
+          },
+          "low": {
+            "ordinary_observed_rate": 0.3475609756097561,
+            "ordinary_predicted_rate": 0.3974126395327589,
+            "target_rows": 164,
+            "unique_players": 31
+          }
+        },
+        "high_minus_low_ordinary_gap": {
+          "bootstrap_high": -0.08833796709208816,
+          "bootstrap_low": -0.2517400284079056,
+          "mean": -0.1697580677972387
+        },
+        "paired_fold_count": 37
+      },
+      "recency_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": 0.06683414593600692,
+          "bootstrap_low": 0.008151280274434586,
+          "mean": 0.036430161086911696
+        },
+        "brier_delta": {
+          "bootstrap_high": 0.01938694017218188,
+          "bootstrap_low": -0.02663988319336521,
+          "mean": -0.0035363191453531575
+        }
+      },
+      "recent_vs_position_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": -0.08768063390605217,
+          "bootstrap_low": -0.14645759230380723,
+          "mean": -0.11695506719374668
+        },
+        "brier_delta": {
+          "bootstrap_high": -9.467079217060349e-05,
+          "bootstrap_low": -0.04485821214599031,
+          "mean": -0.022130990589895337
+        }
+      },
+      "state_tables": {
+        "position_full": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.2539744592129268
+            },
+            "points_4_5": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.06111545478238207
+            },
+            "points_ge_6": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.2873338545738858
+            },
+            "points_le_1": {
+              "observed_rate": 1.0,
+              "predicted_rate": 0.39757623143080534
+            },
+            "target_rows": 1
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.24561403508771928,
+              "predicted_rate": 0.32386843679748534
+            },
+            "points_4_5": {
+              "observed_rate": 0.03508771929824561,
+              "predicted_rate": 0.061576260052624385
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3333333333333333,
+              "predicted_rate": 0.28905473217144095
+            },
+            "points_le_1": {
+              "observed_rate": 0.38596491228070173,
+              "predicted_rate": 0.32550057097844914
+            },
+            "target_rows": 57
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.4056603773584906,
+              "predicted_rate": 0.4383131842141779
+            },
+            "points_4_5": {
+              "observed_rate": 0.07547169811320754,
+              "predicted_rate": 0.07605233791336113
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3490566037735849,
+              "predicted_rate": 0.2770145107924432
+            },
+            "points_le_1": {
+              "observed_rate": 0.16981132075471697,
+              "predicted_rate": 0.2086199670800177
+            },
+            "target_rows": 106
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.3173076923076923,
+              "predicted_rate": 0.564527905902087
+            },
+            "points_4_5": {
+              "observed_rate": 0.08653846153846154,
+              "predicted_rate": 0.07510944971514882
+            },
+            "points_ge_6": {
+              "observed_rate": 0.4423076923076923,
+              "predicted_rate": 0.2294114786708918
+            },
+            "points_le_1": {
+              "observed_rate": 0.15384615384615385,
+              "predicted_rate": 0.13095116571187235
+            },
+            "target_rows": 104
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.43037974683544306,
+              "predicted_rate": 0.5791285526218973
+            },
+            "points_4_5": {
+              "observed_rate": 0.1518987341772152,
+              "predicted_rate": 0.08672709647580566
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3924050632911392,
+              "predicted_rate": 0.24245838434286954
+            },
+            "points_le_1": {
+              "observed_rate": 0.02531645569620253,
+              "predicted_rate": 0.09168596655942736
+            },
+            "target_rows": 79
+          }
+        },
+        "position_x_expected_points_full": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.25309933988085653
+            },
+            "points_4_5": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.05812268555788118
+            },
+            "points_ge_6": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.27274190951537597
+            },
+            "points_le_1": {
+              "observed_rate": 1.0,
+              "predicted_rate": 0.4160360650458863
+            },
+            "target_rows": 1
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.24561403508771928,
+              "predicted_rate": 0.3315791825621588
+            },
+            "points_4_5": {
+              "observed_rate": 0.03508771929824561,
+              "predicted_rate": 0.06849155890697065
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3333333333333333,
+              "predicted_rate": 0.3284017207720354
+            },
+            "points_le_1": {
+              "observed_rate": 0.38596491228070173,
+              "predicted_rate": 0.27152753775883515
+            },
+            "target_rows": 57
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.4056603773584906,
+              "predicted_rate": 0.3916028981177283
+            },
+            "points_4_5": {
+              "observed_rate": 0.07547169811320754,
+              "predicted_rate": 0.10433050155364158
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3490566037735849,
+              "predicted_rate": 0.3305784502167807
+            },
+            "points_le_1": {
+              "observed_rate": 0.16981132075471697,
+              "predicted_rate": 0.17348815011184948
+            },
+            "target_rows": 106
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.3173076923076923,
+              "predicted_rate": 0.4056948731962781
+            },
+            "points_4_5": {
+              "observed_rate": 0.08653846153846154,
+              "predicted_rate": 0.06852109983572462
+            },
+            "points_ge_6": {
+              "observed_rate": 0.4423076923076923,
+              "predicted_rate": 0.42931560980762357
+            },
+            "points_le_1": {
+              "observed_rate": 0.15384615384615385,
+              "predicted_rate": 0.09646841716037374
+            },
+            "target_rows": 104
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.43037974683544306,
+              "predicted_rate": 0.3054069246406516
+            },
+            "points_4_5": {
+              "observed_rate": 0.1518987341772152,
+              "predicted_rate": 0.10663389941374872
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3924050632911392,
+              "predicted_rate": 0.530307800523636
+            },
+            "points_le_1": {
+              "observed_rate": 0.02531645569620253,
+              "predicted_rate": 0.05765137542196367
+            },
+            "target_rows": 79
+          }
+        },
+        "position_x_expected_points_recent8": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.23063063063063063
+            },
+            "points_4_5": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.07207207207207207
+            },
+            "points_ge_6": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.209009009009009
+            },
+            "points_le_1": {
+              "observed_rate": 1.0,
+              "predicted_rate": 0.4882882882882883
+            },
+            "target_rows": 1
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.24561403508771928,
+              "predicted_rate": 0.32154913620513037
+            },
+            "points_4_5": {
+              "observed_rate": 0.03508771929824561,
+              "predicted_rate": 0.05909502161975291
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3333333333333333,
+              "predicted_rate": 0.2773105447666547
+            },
+            "points_le_1": {
+              "observed_rate": 0.38596491228070173,
+              "predicted_rate": 0.34204529740846207
+            },
+            "target_rows": 57
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.4056603773584906,
+              "predicted_rate": 0.38849846870012095
+            },
+            "points_4_5": {
+              "observed_rate": 0.07547169811320754,
+              "predicted_rate": 0.08306522702150644
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3490566037735849,
+              "predicted_rate": 0.33059810813679785
+            },
+            "points_le_1": {
+              "observed_rate": 0.16981132075471697,
+              "predicted_rate": 0.19783819614157472
+            },
+            "target_rows": 106
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.3173076923076923,
+              "predicted_rate": 0.4273182877383863
+            },
+            "points_4_5": {
+              "observed_rate": 0.08653846153846154,
+              "predicted_rate": 0.06944497506230045
+            },
+            "points_ge_6": {
+              "observed_rate": 0.4423076923076923,
+              "predicted_rate": 0.36707250310173234
+            },
+            "points_le_1": {
+              "observed_rate": 0.15384615384615385,
+              "predicted_rate": 0.13616423409758097
+            },
+            "target_rows": 104
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.43037974683544306,
+              "predicted_rate": 0.46601399584832526
+            },
+            "points_4_5": {
+              "observed_rate": 0.1518987341772152,
+              "predicted_rate": 0.10606404118020205
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3924050632911392,
+              "predicted_rate": 0.3527272046337533
+            },
+            "points_le_1": {
+              "observed_rate": 0.02531645569620253,
+              "predicted_rate": 0.07519475833771931
+            },
+            "target_rows": 79
+          }
+        }
+      },
+      "top_player_diagnostic": {
+        "player_id": "178301",
+        "projection_brier_delta_without_top": -0.02515399617099712,
+        "recency_brier_delta_without_top": 0.001017909938726159,
+        "row_share": 0.09221902017291066
+      }
+    },
+    "2024-25": {
+      "arms": {
+        "position_full": {
+          "direct_cell_coverage": 0.0,
+          "fold_count": 37,
+          "mean_absolute_fold_q25_gap": 0.32789112973346535,
+          "mean_brier": 0.6489336930224059,
+          "mean_q25_threshold": -0.8930852819050279,
+          "realized_downside_rate": 0.5754189944134078,
+          "source_counts": {
+            "position": 358
+          },
+          "source_expected_downside_rate": 0.24999373533460992,
+          "target_rows": 358,
+          "unique_players": 43
+        },
+        "position_x_expected_points_full": {
+          "direct_cell_coverage": 0.9860335195530726,
+          "fold_count": 37,
+          "mean_absolute_fold_q25_gap": 0.12380706841743701,
+          "mean_brier": 0.6295897141097309,
+          "mean_q25_threshold": -3.1140308441061455,
+          "realized_downside_rate": 0.2988826815642458,
+          "source_counts": {
+            "position_adjacent_bands": 5,
+            "position_band": 353
+          },
+          "source_expected_downside_rate": 0.25047517297267063,
+          "target_rows": 358,
+          "unique_players": 43
+        },
+        "position_x_expected_points_recent8": {
+          "direct_cell_coverage": 0.25977653631284914,
+          "fold_count": 37,
+          "mean_absolute_fold_q25_gap": 0.26670506078946704,
+          "mean_brier": 0.637631954999556,
+          "mean_q25_threshold": -1.5091760351899444,
+          "realized_downside_rate": 0.5167597765363129,
+          "source_counts": {
+            "position": 135,
+            "position_adjacent_bands": 130,
+            "position_band": 93
+          },
+          "source_expected_downside_rate": 0.2507307254340044,
+          "target_rows": 358,
+          "unique_players": 43
+        }
+      },
+      "projection_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": -0.1587509588414786,
+          "bootstrap_low": -0.24704384234807444,
+          "mean": -0.2040840613160283
+        },
+        "brier_delta": {
+          "bootstrap_high": 0.007798891913518233,
+          "bootstrap_low": -0.047941439823669225,
+          "mean": -0.019343978912675093
+        }
+      },
+      "projection_localization": {
+        "groups": {
+          "high": {
+            "ordinary_observed_rate": 0.4827586206896552,
+            "ordinary_predicted_rate": 0.5644417485936427,
+            "target_rows": 174,
+            "unique_players": 21
+          },
+          "low": {
+            "ordinary_observed_rate": 0.3641304347826087,
+            "ordinary_predicted_rate": 0.39511465097241527,
+            "target_rows": 184,
+            "unique_players": 33
+          }
+        },
+        "high_minus_low_ordinary_gap": {
+          "bootstrap_high": 0.007154143560197269,
+          "bootstrap_low": -0.12539706914942264,
+          "mean": -0.05805721694387284
+        },
+        "paired_fold_count": 37
+      },
+      "recency_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": 0.1817352982848526,
+          "bootstrap_low": 0.10372178460743132,
+          "mean": 0.14289799237202996
+        },
+        "brier_delta": {
+          "bootstrap_high": 0.029674110572668798,
+          "bootstrap_low": -0.013876364684995392,
+          "mean": 0.00804224088982533
+        }
+      },
+      "recent_vs_position_comparison": {
+        "absolute_q25_gap_delta": {
+          "bootstrap_high": -0.03745789428810839,
+          "bootstrap_low": -0.08566700969638276,
+          "mean": -0.06118606894399837
+        },
+        "brier_delta": {
+          "bootstrap_high": 0.010254885264380065,
+          "bootstrap_low": -0.033241358394135626,
+          "mean": -0.011301738022849755
+        }
+      },
+      "state_tables": {
+        "position_full": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_4_5": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_ge_6": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_le_1": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "target_rows": 0
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.2833333333333333,
+              "predicted_rate": 0.27893315666635377
+            },
+            "points_4_5": {
+              "observed_rate": 0.08333333333333333,
+              "predicted_rate": 0.06121216907653246
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3333333333333333,
+              "predicted_rate": 0.2843383207929339
+            },
+            "points_le_1": {
+              "observed_rate": 0.3,
+              "predicted_rate": 0.37551635346417983
+            },
+            "target_rows": 60
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.4032258064516129,
+              "predicted_rate": 0.4513315030559934
+            },
+            "points_4_5": {
+              "observed_rate": 0.08064516129032258,
+              "predicted_rate": 0.07443969937298107
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3548387096774194,
+              "predicted_rate": 0.2679327816789393
+            },
+            "points_le_1": {
+              "observed_rate": 0.16129032258064516,
+              "predicted_rate": 0.20629601589208618
+            },
+            "target_rows": 124
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.47572815533980584,
+              "predicted_rate": 0.5302594754751981
+            },
+            "points_4_5": {
+              "observed_rate": 0.06796116504854369,
+              "predicted_rate": 0.08914697489350666
+            },
+            "points_ge_6": {
+              "observed_rate": 0.39805825242718446,
+              "predicted_rate": 0.26384072569413825
+            },
+            "points_le_1": {
+              "observed_rate": 0.05825242718446602,
+              "predicted_rate": 0.11675282393715707
+            },
+            "target_rows": 103
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.49295774647887325,
+              "predicted_rate": 0.6140301166387102
+            },
+            "points_4_5": {
+              "observed_rate": 0.014084507042253521,
+              "predicted_rate": 0.07680264366096666
+            },
+            "points_ge_6": {
+              "observed_rate": 0.49295774647887325,
+              "predicted_rate": 0.21762660988952626
+            },
+            "points_le_1": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.09154062981079739
+            },
+            "target_rows": 71
+          }
+        },
+        "position_x_expected_points_full": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_4_5": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_ge_6": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_le_1": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "target_rows": 0
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.2833333333333333,
+              "predicted_rate": 0.2849851272203761
+            },
+            "points_4_5": {
+              "observed_rate": 0.08333333333333333,
+              "predicted_rate": 0.07113000316370287
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3333333333333333,
+              "predicted_rate": 0.3372585286418381
+            },
+            "points_le_1": {
+              "observed_rate": 0.3,
+              "predicted_rate": 0.30662634097408276
+            },
+            "target_rows": 60
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.4032258064516129,
+              "predicted_rate": 0.39777612799196893
+            },
+            "points_4_5": {
+              "observed_rate": 0.08064516129032258,
+              "predicted_rate": 0.09962746616915209
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3548387096774194,
+              "predicted_rate": 0.33981043745360356
+            },
+            "points_le_1": {
+              "observed_rate": 0.16129032258064516,
+              "predicted_rate": 0.16278596838527537
+            },
+            "target_rows": 124
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.47572815533980584,
+              "predicted_rate": 0.368781704669469
+            },
+            "points_4_5": {
+              "observed_rate": 0.06796116504854369,
+              "predicted_rate": 0.0676109351797318
+            },
+            "points_ge_6": {
+              "observed_rate": 0.39805825242718446,
+              "predicted_rate": 0.4607062419170393
+            },
+            "points_le_1": {
+              "observed_rate": 0.05825242718446602,
+              "predicted_rate": 0.1029011182337598
+            },
+            "target_rows": 103
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.49295774647887325,
+              "predicted_rate": 0.3782175813501699
+            },
+            "points_4_5": {
+              "observed_rate": 0.014084507042253521,
+              "predicted_rate": 0.12607252711672326
+            },
+            "points_ge_6": {
+              "observed_rate": 0.49295774647887325,
+              "predicted_rate": 0.45197405698559173
+            },
+            "points_le_1": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.043735834547514986
+            },
+            "target_rows": 71
+          }
+        },
+        "position_x_expected_points_recent8": {
+          "0": {
+            "points_2_3": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_4_5": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_ge_6": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "points_le_1": {
+              "observed_rate": null,
+              "predicted_rate": null
+            },
+            "target_rows": 0
+          },
+          "1": {
+            "points_2_3": {
+              "observed_rate": 0.2833333333333333,
+              "predicted_rate": 0.24929133366633366
+            },
+            "points_4_5": {
+              "observed_rate": 0.08333333333333333,
+              "predicted_rate": 0.061263505013505005
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3333333333333333,
+              "predicted_rate": 0.36243501868501876
+            },
+            "points_le_1": {
+              "observed_rate": 0.3,
+              "predicted_rate": 0.32701014263514266
+            },
+            "target_rows": 60
+          },
+          "2": {
+            "points_2_3": {
+              "observed_rate": 0.4032258064516129,
+              "predicted_rate": 0.34191581276169597
+            },
+            "points_4_5": {
+              "observed_rate": 0.08064516129032258,
+              "predicted_rate": 0.09348181006321393
+            },
+            "points_ge_6": {
+              "observed_rate": 0.3548387096774194,
+              "predicted_rate": 0.37435602664030226
+            },
+            "points_le_1": {
+              "observed_rate": 0.16129032258064516,
+              "predicted_rate": 0.19024635053478778
+            },
+            "target_rows": 124
+          },
+          "3": {
+            "points_2_3": {
+              "observed_rate": 0.47572815533980584,
+              "predicted_rate": 0.4413589960656468
+            },
+            "points_4_5": {
+              "observed_rate": 0.06796116504854369,
+              "predicted_rate": 0.10910576357193996
+            },
+            "points_ge_6": {
+              "observed_rate": 0.39805825242718446,
+              "predicted_rate": 0.3657338775076928
+            },
+            "points_le_1": {
+              "observed_rate": 0.05825242718446602,
+              "predicted_rate": 0.08380136285472038
+            },
+            "target_rows": 103
+          },
+          "4": {
+            "points_2_3": {
+              "observed_rate": 0.49295774647887325,
+              "predicted_rate": 0.5721874357296332
+            },
+            "points_4_5": {
+              "observed_rate": 0.014084507042253521,
+              "predicted_rate": 0.09106950158430045
+            },
+            "points_ge_6": {
+              "observed_rate": 0.49295774647887325,
+              "predicted_rate": 0.243969681516699
+            },
+            "points_le_1": {
+              "observed_rate": 0.0,
+              "predicted_rate": 0.09277338116936684
+            },
+            "target_rows": 71
+          }
+        }
+      },
+      "top_player_diagnostic": {
+        "player_id": "446008",
+        "projection_brier_delta_without_top": -0.013428598143216747,
+        "recency_brier_delta_without_top": 0.01032818117831899,
+        "row_share": 0.1005586592178771
+      }
+    }
+  },
+  "source_artifact_digests": {
+    "phase2_conditional_marginal_shape.json": "2c34452f9d835a7298e42038abeec7d60aae205cd99fbe09807b4b7d9dd40ec7",
+    "phase2_downside_dependence.json": "154f91ad9e09b66d76f284273a9381266ba6619ef3fc4c702080c7404c799d36",
+    "phase2_marginal_downside_sources.json": "92d8f3618b7ea19a257fbd5b05fc95be91cb91592cf1d8b9e600128500e46183",
+    "shadow_calibration_squad.json": "c690efd5ce2efa8d60802c55585c53cd46ac07397b078aae9fd764660d0a7556"
+  },
+  "study": "selected-XI completed-appearance projection-conditional returns"
+}
