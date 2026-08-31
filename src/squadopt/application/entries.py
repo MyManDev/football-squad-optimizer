@@ -23,7 +23,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
+import pandas as pd
+
 from squadopt.application.views import _View
+from squadopt.evaluation import FrozenSquadDecision
 from squadopt.live.transfers import HeldSquad
 
 ENTRY_REGISTRY_CONTRACT_VERSION = "entry_registry_v1"
@@ -183,6 +186,55 @@ def held_squad_from_picks(picks: EntryPicks, *, current_prices: Mapping[int, int
         chips_used={
             str(name): tuple(int(w) for w in weeks) for name, weeks in picks.chips_used.items()
         },
+    )
+
+
+def frozen_decision_from_picks(
+    picks: EntryPicks,
+    *,
+    player_pool: pd.DataFrame,
+    player_codes: Mapping[int, object],
+) -> FrozenSquadDecision:
+    """Translate one captured entry from seasonal element ids to persistent player ids."""
+
+    if not isinstance(picks, EntryPicks):
+        raise EntryError("picks must be an EntryPicks instance.")
+    if not isinstance(player_pool, pd.DataFrame):
+        raise EntryError("player_pool must be a pandas DataFrame.")
+    missing_columns = [
+        column for column in ("player_id", "position") if column not in player_pool.columns
+    ]
+    if missing_columns:
+        raise EntryError(f"player_pool is missing columns {missing_columns!r}.")
+    if bool(player_pool[["player_id", "position"]].isna().any().any()):
+        raise EntryError("player_pool player_id and position cannot be missing.")
+    if bool(player_pool["player_id"].duplicated().any()):
+        raise EntryError("player_pool player_id values must be unique.")
+
+    missing_elements = [element for element in picks.squad if element not in player_codes]
+    if missing_elements:
+        raise EntryError(
+            f"No persistent player code for captured elements {missing_elements[:5]!r}."
+        )
+    translated = {element: player_codes[element] for element in picks.squad}
+    squad_ids = tuple(translated[element] for element in picks.squad)
+    if len(set(squad_ids)) != len(squad_ids):
+        raise EntryError("Captured element ids do not map to distinct persistent player codes.")
+
+    indexed = player_pool.set_index("player_id", drop=False)
+    missing_players = [player_id for player_id in squad_ids if player_id not in indexed.index]
+    if missing_players:
+        raise EntryError(
+            f"player_pool does not cover translated squad players {missing_players[:5]!r}."
+        )
+    squad = indexed.loc[list(squad_ids)].reset_index(drop=True).copy(deep=True)
+    return FrozenSquadDecision(
+        squad=squad,
+        starting_xi=tuple(translated[element] for element in picks.starting_xi),
+        bench=tuple(translated[element] for element in picks.squad[11:]),
+        captain_id=translated[picks.captain],
+        vice_captain_id=translated[picks.vice_captain],
+        completion_policy="captured_entry_v1",
     )
 
 

@@ -3,7 +3,9 @@
 import json
 from pathlib import Path
 
+import pandas as pd
 import pytest
+from pandas.testing import assert_frame_equal
 
 from squadopt.application.entries import (
     ENTRY_REGISTRY_CONTRACT_VERSION,
@@ -11,6 +13,7 @@ from squadopt.application.entries import (
     EntryPicks,
     EntryPicksProvider,
     EntryRegistry,
+    frozen_decision_from_picks,
     held_squad_from_picks,
 )
 
@@ -134,3 +137,57 @@ def test_capture_built_picks_state_their_two_unknowns() -> None:
     assert picks.free_transfers_known is False
     assert picks.purchase_prices_known is False
     assert dict(picks.purchase_prices) == {}
+
+
+def _scoring_pool() -> pd.DataFrame:
+    positions = (
+        "GK",
+        "DEF",
+        "DEF",
+        "DEF",
+        "MID",
+        "MID",
+        "MID",
+        "MID",
+        "FWD",
+        "FWD",
+        "FWD",
+        "GK",
+        "DEF",
+        "DEF",
+        "MID",
+    )
+    return pd.DataFrame(
+        {
+            "player_id": [element + 5000 for element in SQUAD],
+            "position": positions,
+        }
+    )
+
+
+def test_entry_picks_translate_once_into_a_frozen_scoring_decision() -> None:
+    picks = _picks()
+    pool = _scoring_pool()
+    original = pool.copy(deep=True)
+    codes = {element: element + 5000 for element in SQUAD}
+
+    decision = frozen_decision_from_picks(picks, player_pool=pool, player_codes=codes)
+
+    assert decision.starting_xi == tuple(codes[element] for element in XI)
+    assert decision.bench == tuple(codes[element] for element in SQUAD[11:])
+    assert decision.captain_id == codes[picks.captain]
+    assert decision.vice_captain_id == codes[picks.vice_captain]
+    assert decision.completion_policy == "captured_entry_v1"
+    assert_frame_equal(pool, original)
+
+
+def test_entry_picks_refuse_an_incomplete_or_colliding_identity_map() -> None:
+    picks = _picks()
+    pool = _scoring_pool()
+    incomplete = {element: element + 5000 for element in SQUAD[:-1]}
+    with pytest.raises(EntryError, match="persistent player code"):
+        frozen_decision_from_picks(picks, player_pool=pool, player_codes=incomplete)
+
+    colliding = {element: 5001 for element in SQUAD}
+    with pytest.raises(EntryError, match="distinct persistent"):
+        frozen_decision_from_picks(picks, player_pool=pool, player_codes=colliding)
