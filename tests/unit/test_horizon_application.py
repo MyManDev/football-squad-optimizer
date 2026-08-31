@@ -41,6 +41,9 @@ def _world(tmp_path: Path) -> dict[str, Any]:
         dict(transfer_world.EVENTS[0], finished=True),
         transfer_world.EVENTS[1],
         transfer_world.EVENTS[2],
+        {"id": 4, "deadline_time": "2026-09-19T17:30:00Z", "finished": False},
+        {"id": 5, "deadline_time": "2026-09-26T17:30:00Z", "finished": False},
+        {"id": 6, "deadline_time": "2026-10-03T17:30:00Z", "finished": False},
     ]
     deadline = write_snapshot(
         snapshot_root,
@@ -55,7 +58,7 @@ def _world(tmp_path: Path) -> dict[str, Any]:
                     injured=(1005,),
                 ),
             ),
-            FIXTURES_PAYLOAD: _calendar(),
+            FIXTURES_PAYLOAD: _calendar(gameweeks=(1, 2, 3, 4, 5, 6)),
         },
     )
     world = {
@@ -98,7 +101,9 @@ def test_plan_horizon_returns_a_structured_replay_safe_result(tmp_path: Path) ->
 
     assert isinstance(first, HorizonPlanResult)
     assert first.solver_status is SolverStatus.OPTIMAL
-    assert first.publication_status == "proven"
+    assert first.publication_status == "decision_eligible"
+    assert first.document["decision_role"] == "live_control"
+    assert first.document["solver_proof_status"] == "proven"
     assert (first.first_gameweek, first.last_gameweek) == (2, 2)
     assert first.created is True and second.created is False
     assert first.artifact_path == second.artifact_path
@@ -168,8 +173,82 @@ def test_feasible_output_requires_an_explicit_shadow_request(
     assert not request.artifact_root.exists()
 
     shadow = plan_horizon(replace(request, allow_feasible_shadow=True))
-    assert shadow.publication_status == "shadow_unproven"
+    assert shadow.publication_status == "shadow_only"
+    assert shadow.document["decision_role"] == "research_shadow"
+    assert shadow.document["solver_proof_status"] == "unproven"
     assert shadow.artifact_path.is_file()
+
+
+def test_horizon_rejects_an_unpromoted_handoff_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = _world(tmp_path)
+    request = _request(world, tmp_path)
+    original = horizon_service.read_projection_handoff(request.in_season_projection)
+    monkeypatch.setattr(
+        horizon_service,
+        "read_projection_handoff",
+        lambda _path: replace(original, model_version="unpromoted-candidate-v1"),
+    )
+
+    with pytest.raises(DataError, match="not a promoted in-season control"):
+        plan_horizon(request)
+    assert not request.artifact_root.exists()
+
+
+@pytest.mark.parametrize("status", [SolverStatus.INFEASIBLE, SolverStatus.UNKNOWN])
+def test_horizon_does_not_write_an_artifact_without_a_complete_plan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    status: SolverStatus,
+) -> None:
+    world = _world(tmp_path)
+    request = _request(world, tmp_path)
+    original = horizon_service.plan_transfer_horizon
+    cached: list[tuple[TransferPlanResult, TransferPlanningConfig]] = []
+
+    def incomplete_plan(
+        *args: Any, **kwargs: Any
+    ) -> tuple[TransferPlanResult, TransferPlanningConfig]:
+        if not cached:
+            cached.append(original(*args, **kwargs))
+        plan, config = cached[0]
+        return (
+            replace(
+                plan,
+                solver_status=status,
+                weeks=(),
+                total_projected_score=None,
+                total_projected_bench_points=None,
+                total_transfer_hit_points=None,
+                objective_value=None,
+            ),
+            config,
+        )
+
+    monkeypatch.setattr(horizon_service, "plan_transfer_horizon", incomplete_plan)
+
+    with pytest.raises(DataError, match=f"returned {status.name}"):
+        plan_horizon(request)
+    assert not request.artifact_root.exists()
+
+
+def test_five_week_horizon_remains_a_shadow_artifact(tmp_path: Path) -> None:
+    world = _world(tmp_path)
+    result = plan_horizon(
+        replace(
+            _request(world, tmp_path),
+            gameweeks=5,
+            solver_deterministic_time_limit=100.0,
+            allow_feasible_shadow=True,
+        )
+    )
+
+    assert (result.first_gameweek, result.last_gameweek) == (2, 6)
+    assert result.publication_status == "shadow_only"
+    assert result.document["decision_role"] == "research_shadow"
+    assert len(result.plan.weeks) == 5
+    assert result.artifact_path.is_file()
 
 
 @pytest.mark.parametrize("gameweeks", [True, 0, 2, 4, 5.0])
