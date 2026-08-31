@@ -1,0 +1,522 @@
+{
+  "classification": "full_appearance_performance_dominant",
+  "classification_population": "2023-24",
+  "contract_version": "phase2_marginal_downside_sources_v1",
+  "control_replay": {
+    "measured_below_lower_quantile_rate": 0.21621621621621623,
+    "measured_mean_probability_integral_transform": 0.4921621621621622,
+    "recorded_below_lower_quantile_rate": 0.21621621621621623,
+    "recorded_mean_probability_integral_transform": 0.4921621621621622,
+    "reproduced": true,
+    "tolerance": 1e-12
+  },
+  "created_utc": "2026-08-31T06:27:31+00:00",
+  "development_reuse_exploratory": true,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "execution": {
+    "completed_at_utc": "2026-08-31T06:51:35+00:00",
+    "deterministic_seed": 11,
+    "elapsed_seconds": 1444.090559,
+    "started_at_utc": "2026-08-31T06:27:31+00:00",
+    "warnings": []
+  },
+  "fold_universe": {
+    "folds_by_season": {
+      "2021-22": 29,
+      "2022-23": 36,
+      "2023-24": 37,
+      "2024-25": 37
+    },
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "starter_rows": 1529,
+    "total_folds": 139
+  },
+  "independent_confirmation": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "panel_seasons_loaded": [
+    "2020-21",
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "pooled": {
+    "fold_count": 139,
+    "minute_buckets": {
+      "minutes_0": {
+        "excess_contribution": 91.5,
+        "mean_excess_per_fold": {
+          "bootstrap_high": 0.7607913669064749,
+          "bootstrap_low": 0.5557553956834532,
+          "mean": 0.658273381294964
+        },
+        "mean_expected_points": 5.101426928980522,
+        "mean_realized_points": 0.0,
+        "mean_realized_residual": -5.101426928980522,
+        "positive_excess_share": 0.287040813125451,
+        "realized_downside_count": 122,
+        "realized_downside_rate": 1.0,
+        "scenario_expected_downside_count": 30.5,
+        "scenario_expected_downside_rate": 0.25,
+        "starter_rows": 122,
+        "starter_share": 0.07979071288423806
+      },
+      "minutes_1_59": {
+        "excess_contribution": 40.0,
+        "mean_excess_per_fold": {
+          "bootstrap_high": 0.3471223021582734,
+          "bootstrap_low": 0.2302158273381295,
+          "mean": 0.28776978417266186
+        },
+        "mean_expected_points": 4.972013179615023,
+        "mean_realized_points": 2.0,
+        "mean_realized_residual": -2.972013179615023,
+        "positive_excess_share": 0.12548232267779277,
+        "realized_downside_count": 60,
+        "realized_downside_rate": 0.75,
+        "scenario_expected_downside_count": 20.0,
+        "scenario_expected_downside_rate": 0.25,
+        "starter_rows": 80,
+        "starter_share": 0.052321778940483975
+      },
+      "minutes_60_plus": {
+        "excess_contribution": 187.26999999999998,
+        "mean_excess_per_fold": {
+          "bootstrap_high": 1.6367320143884891,
+          "bootstrap_low": 1.0557464028776975,
+          "mean": 1.3472661870503595
+        },
+        "mean_expected_points": 5.187927361563256,
+        "mean_realized_points": 5.143933685003768,
+        "mean_realized_residual": -0.04399367655948818,
+        "positive_excess_share": 0.5874768641967563,
+        "realized_downside_count": 519,
+        "realized_downside_rate": 0.3911077618688772,
+        "scenario_expected_downside_count": 331.73,
+        "scenario_expected_downside_rate": 0.24998492840994727,
+        "starter_rows": 1327,
+        "starter_share": 0.8678875081752779
+      }
+    },
+    "omitted_player_location": {
+      "coverage": 0.9888816219751472,
+      "elsewhere": {
+        "mean_omitted_location": 0.6987203337034363,
+        "starter_rows": 822
+      },
+      "mean_omitted_location": 0.689385356672238,
+      "measurable": true,
+      "negative_location_share": 0.11507936507936507,
+      "on_realized_downside": {
+        "mean_omitted_location": 0.6782645579481149,
+        "starter_rows": 690
+      },
+      "pearson_correlation_with_realized_residual": 0.01128044303810147,
+      "starter_rows": 1512
+    },
+    "starter_rows": 1529,
+    "total_downside_excess": 318.77
+  },
+  "promotion_eligible": false,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "evaluation_dispersion_scale": "1.0",
+    "evaluation_location_shift_points": "-7.430702271879578",
+    "evaluation_lower_quantile": "0.1",
+    "evaluation_points_threshold": "40.0",
+    "evaluation_worst_fraction": "0.1",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "generator_deterministic_seed": "11",
+    "generator_double_gameweek_scale": "1.0",
+    "generator_min_history_folds": "8",
+    "generator_min_player_observations": "8",
+    "generator_player_location_shrinkage": "None",
+    "generator_player_scale_shrinkage": "10.0",
+    "generator_scenario_count": "200",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "optimizer_bench_weight": "0.1",
+    "optimizer_budget_tenths": "1000",
+    "optimizer_deterministic_seed": "0",
+    "optimizer_expected_points_scale": "1000",
+    "optimizer_max_players_per_team": "3",
+    "optimizer_solver_deterministic_time_limit": "None",
+    "optimizer_solver_time_limit_seconds": "10.0",
+    "optimizer_squad_position_limits": "{DEF=5, FWD=3, GK=2, MID=5}",
+    "optimizer_squad_size": "15",
+    "optimizer_starting_position_max": "{DEF=5, FWD=3, GK=1, MID=5}",
+    "optimizer_starting_position_min": "{DEF=3, FWD=1, GK=1, MID=2}",
+    "optimizer_starting_size": "11",
+    "projection_prior_gameweek_equivalent": "6",
+    "projection_prior_minute_equivalent": "270",
+    "protocol_bench_weight": "0.1",
+    "protocol_bootstrap_resamples": "5000",
+    "protocol_bootstrap_seed": "0",
+    "protocol_bound_tolerance": "1e-09",
+    "protocol_confidence_level": "0.9",
+    "protocol_decision_universe": "full_roster",
+    "protocol_dispersion_scale": "1.0",
+    "protocol_double_gameweek_scale": "1.0",
+    "protocol_evaluation_season": "2024-25",
+    "protocol_fit_seasons": "2021-22,2022-23,2023-24",
+    "protocol_lower_quantile": "0.1",
+    "protocol_min_evaluation_folds": "30",
+    "protocol_min_history_folds": "8",
+    "protocol_min_player_observations": "8",
+    "protocol_min_prior_gameweeks_in_season": "1",
+    "protocol_player_location_shrinkage": "None",
+    "protocol_player_scale_shrinkage": "10.0",
+    "protocol_points_threshold": "40.0",
+    "protocol_s1_bounds": "(0.43, 0.57)",
+    "protocol_s2_bounds": "(0.04, 0.16)",
+    "protocol_scenario_count": "200",
+    "protocol_scenario_seed": "11",
+    "protocol_worst_fraction": "0.1",
+    "repository_commit": "b624208b56116497f1af1e45ea3077422d5ef371",
+    "working_tree_dirty": "false"
+  },
+  "residual_source": {
+    "export_label": "in_season_carry_over_blend",
+    "model_identity": "squadopt-deterministic-baseline/in-season-carry-over-v1",
+    "table_sha256": "17f88e6e75618adc01ec6357317a6849bdb053e7eeed1cd6627c8eceab15fc7a"
+  },
+  "season_sensitivity": {
+    "2021-22": {
+      "fold_count": 29,
+      "minute_buckets": {
+        "minutes_0": {
+          "excess_contribution": 24.0,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 1.0862068965517242,
+            "bootstrap_low": 0.5948275862068966,
+            "mean": 0.8275862068965517
+          },
+          "mean_expected_points": 5.0557950919609675,
+          "mean_realized_points": 0.0,
+          "mean_realized_residual": -5.0557950919609675,
+          "positive_excess_share": 0.7004231723332847,
+          "realized_downside_count": 32,
+          "realized_downside_rate": 1.0,
+          "scenario_expected_downside_count": 8.0,
+          "scenario_expected_downside_rate": 0.25,
+          "starter_rows": 32,
+          "starter_share": 0.10031347962382445
+        },
+        "minutes_1_59": {
+          "excess_contribution": 10.0,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 0.46551724137931033,
+            "bootstrap_low": 0.22413793103448276,
+            "mean": 0.3448275862068966
+          },
+          "mean_expected_points": 4.851962452558201,
+          "mean_realized_points": 1.25,
+          "mean_realized_residual": -3.6019624525582,
+          "positive_excess_share": 0.29184298847220197,
+          "realized_downside_count": 14,
+          "realized_downside_rate": 0.875,
+          "scenario_expected_downside_count": 4.0,
+          "scenario_expected_downside_rate": 0.25,
+          "starter_rows": 16,
+          "starter_share": 0.050156739811912224
+        },
+        "minutes_60_plus": {
+          "excess_contribution": 0.26500000000000057,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 0.5177672413793104,
+            "bootstrap_low": -0.4910344827586207,
+            "mean": 0.009137931034482748
+          },
+          "mean_expected_points": 5.040855289909485,
+          "mean_realized_points": 5.324723247232472,
+          "mean_realized_residual": 0.28386795732298764,
+          "positive_excess_share": 0.007733839194513368,
+          "realized_downside_count": 68,
+          "realized_downside_rate": 0.25092250922509224,
+          "scenario_expected_downside_count": 67.735,
+          "scenario_expected_downside_rate": 0.24994464944649447,
+          "starter_rows": 271,
+          "starter_share": 0.8495297805642633
+        }
+      },
+      "omitted_player_location": {
+        "coverage": 1.0,
+        "elsewhere": {
+          "mean_omitted_location": 0.7258503774594492,
+          "starter_rows": 205
+        },
+        "mean_omitted_location": 0.6655042952175698,
+        "measurable": true,
+        "negative_location_share": 0.23197492163009403,
+        "on_realized_downside": {
+          "mean_omitted_location": 0.5569872175019093,
+          "starter_rows": 114
+        },
+        "pearson_correlation_with_realized_residual": 0.041368217060204104,
+        "starter_rows": 319
+      },
+      "starter_rows": 319,
+      "total_downside_excess": 34.265
+    },
+    "2022-23": {
+      "fold_count": 36,
+      "minute_buckets": {
+        "minutes_0": {
+          "excess_contribution": 19.5,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 0.7291666666666666,
+            "bootstrap_low": 0.3541666666666667,
+            "mean": 0.5416666666666666
+          },
+          "mean_expected_points": 4.931971168002178,
+          "mean_realized_points": 0.0,
+          "mean_realized_residual": -4.931971168002178,
+          "positive_excess_share": 0.2565620682849813,
+          "realized_downside_count": 26,
+          "realized_downside_rate": 1.0,
+          "scenario_expected_downside_count": 6.5,
+          "scenario_expected_downside_rate": 0.25,
+          "starter_rows": 26,
+          "starter_share": 0.06565656565656566
+        },
+        "minutes_1_59": {
+          "excess_contribution": 7.25,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 0.3055555555555556,
+            "bootstrap_low": 0.09722222222222222,
+            "mean": 0.2013888888888889
+          },
+          "mean_expected_points": 5.143857102735791,
+          "mean_realized_points": 2.736842105263158,
+          "mean_realized_residual": -2.4070149974726345,
+          "positive_excess_share": 0.09538846128544175,
+          "realized_downside_count": 12,
+          "realized_downside_rate": 0.631578947368421,
+          "scenario_expected_downside_count": 4.75,
+          "scenario_expected_downside_rate": 0.25,
+          "starter_rows": 19,
+          "starter_share": 0.047979797979797977
+        },
+        "minutes_60_plus": {
+          "excess_contribution": 49.254999999999995,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 2.0002847222222218,
+            "bootstrap_low": 0.7016597222222222,
+            "mean": 1.3681944444444443
+          },
+          "mean_expected_points": 5.1432786441299445,
+          "mean_realized_points": 5.182336182336182,
+          "mean_realized_residual": 0.03905753820623867,
+          "positive_excess_share": 0.648049470429577,
+          "realized_downside_count": 137,
+          "realized_downside_rate": 0.3903133903133903,
+          "scenario_expected_downside_count": 87.745,
+          "scenario_expected_downside_rate": 0.249985754985755,
+          "starter_rows": 351,
+          "starter_share": 0.8863636363636364
+        }
+      },
+      "omitted_player_location": {
+        "coverage": 1.0,
+        "elsewhere": {
+          "mean_omitted_location": 0.9692981165243104,
+          "starter_rows": 221
+        },
+        "mean_omitted_location": 0.9890563591194707,
+        "measurable": true,
+        "negative_location_share": 0.050505050505050504,
+        "on_realized_downside": {
+          "mean_omitted_location": 1.014008196911073,
+          "starter_rows": 175
+        },
+        "pearson_correlation_with_realized_residual": -0.002755030426623133,
+        "starter_rows": 396
+      },
+      "starter_rows": 396,
+      "total_downside_excess": 76.005
+    },
+    "2023-24": {
+      "fold_count": 37,
+      "minute_buckets": {
+        "minutes_0": {
+          "excess_contribution": 29.25,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 0.9932432432432432,
+            "bootstrap_low": 0.5878378378378378,
+            "mean": 0.7905405405405406
+          },
+          "mean_expected_points": 5.3574216223304445,
+          "mean_realized_points": 0.0,
+          "mean_realized_residual": -5.3574216223304445,
+          "positive_excess_share": 0.3103448275862069,
+          "realized_downside_count": 39,
+          "realized_downside_rate": 1.0,
+          "scenario_expected_downside_count": 9.75,
+          "scenario_expected_downside_rate": 0.25,
+          "starter_rows": 39,
+          "starter_share": 0.09582309582309582
+        },
+        "minutes_1_59": {
+          "excess_contribution": 9.75,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 0.3783783783783784,
+            "bootstrap_low": 0.14864864864864866,
+            "mean": 0.2635135135135135
+          },
+          "mean_expected_points": 5.045978820501958,
+          "mean_realized_points": 1.9523809523809523,
+          "mean_realized_residual": -3.0935978681210052,
+          "positive_excess_share": 0.10344827586206896,
+          "realized_downside_count": 15,
+          "realized_downside_rate": 0.7142857142857143,
+          "scenario_expected_downside_count": 5.25,
+          "scenario_expected_downside_rate": 0.25,
+          "starter_rows": 21,
+          "starter_share": 0.051597051597051594
+        },
+        "minutes_60_plus": {
+          "excess_contribution": 55.25,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 1.9662162162162162,
+            "bootstrap_low": 1.0067567567567568,
+            "mean": 1.4932432432432432
+          },
+          "mean_expected_points": 5.164820743383938,
+          "mean_realized_points": 4.982708933717579,
+          "mean_realized_residual": -0.18211180966635893,
+          "positive_excess_share": 0.5862068965517241,
+          "realized_downside_count": 142,
+          "realized_downside_rate": 0.4092219020172911,
+          "scenario_expected_downside_count": 86.75,
+          "scenario_expected_downside_rate": 0.25,
+          "starter_rows": 347,
+          "starter_share": 0.8525798525798526
+        }
+      },
+      "omitted_player_location": {
+        "coverage": 1.0,
+        "elsewhere": {
+          "mean_omitted_location": 0.5853814130683174,
+          "starter_rows": 211
+        },
+        "mean_omitted_location": 0.6126538476084264,
+        "measurable": true,
+        "negative_location_share": 0.05896805896805897,
+        "on_realized_downside": {
+          "mean_omitted_location": 0.6420134582612989,
+          "starter_rows": 196
+        },
+        "pearson_correlation_with_realized_residual": -0.021804034980645134,
+        "starter_rows": 407
+      },
+      "starter_rows": 407,
+      "total_downside_excess": 94.25
+    },
+    "2024-25": {
+      "fold_count": 37,
+      "minute_buckets": {
+        "minutes_0": {
+          "excess_contribution": 18.75,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 0.7297297297297297,
+            "bootstrap_low": 0.32432432432432434,
+            "mean": 0.5067567567567568
+          },
+          "mean_expected_points": 4.936717950157157,
+          "mean_realized_points": 0.0,
+          "mean_realized_residual": -4.936717950157157,
+          "positive_excess_share": 0.16411378555798686,
+          "realized_downside_count": 25,
+          "realized_downside_rate": 1.0,
+          "scenario_expected_downside_count": 6.25,
+          "scenario_expected_downside_rate": 0.25,
+          "starter_rows": 25,
+          "starter_share": 0.06142506142506143
+        },
+        "minutes_1_59": {
+          "excess_contribution": 13.0,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 0.4797297297297297,
+            "bootstrap_low": 0.22972972972972974,
+            "mean": 0.35135135135135137
+          },
+          "mean_expected_points": 4.8512839560728915,
+          "mean_realized_points": 1.9583333333333333,
+          "mean_realized_residual": -2.8929506227395585,
+          "positive_excess_share": 0.1137855579868709,
+          "realized_downside_count": 19,
+          "realized_downside_rate": 0.7916666666666666,
+          "scenario_expected_downside_count": 6.0,
+          "scenario_expected_downside_rate": 0.25,
+          "starter_rows": 24,
+          "starter_share": 0.05896805896805897
+        },
+        "minutes_60_plus": {
+          "excess_contribution": 82.5,
+          "mean_excess_per_fold": {
+            "bootstrap_high": 2.75,
+            "bootstrap_low": 1.695945945945946,
+            "mean": 2.22972972972973
+          },
+          "mean_expected_points": 5.365430791019926,
+          "mean_realized_points": 5.125698324022347,
+          "mean_realized_residual": -0.23973246699757997,
+          "positive_excess_share": 0.7221006564551422,
+          "realized_downside_count": 172,
+          "realized_downside_rate": 0.48044692737430167,
+          "scenario_expected_downside_count": 89.5,
+          "scenario_expected_downside_rate": 0.25,
+          "starter_rows": 358,
+          "starter_share": 0.8796068796068796
+        }
+      },
+      "omitted_player_location": {
+        "coverage": 0.9582309582309583,
+        "elsewhere": {
+          "mean_omitted_location": 0.4746941892743243,
+          "starter_rows": 185
+        },
+        "mean_omitted_location": 0.48471373057969025,
+        "measurable": true,
+        "negative_location_share": 0.14358974358974358,
+        "on_realized_downside": {
+          "mean_omitted_location": 0.49375575566014274,
+          "starter_rows": 205
+        },
+        "pearson_correlation_with_realized_residual": -0.014720376991087507,
+        "starter_rows": 390
+      },
+      "starter_rows": 407,
+      "total_downside_excess": 114.25
+    }
+  },
+  "source_artifact_digests": {
+    "phase2_captain_attribution.json": "7eda85f8f36518a639ae66e8ffc1f45eea9e781893de85c14ec32192dbb0f9c8",
+    "phase2_downside_dependence.json": "154f91ad9e09b66d76f284273a9381266ba6619ef3fc4c702080c7404c799d36",
+    "phase2_tail_diagnostic.json": "f09f418234398ea07a10cd4bd41fa9babef7dab308107786340f61f258076407",
+    "shadow_calibration_squad.json": "c690efd5ce2efa8d60802c55585c53cd46ac07397b078aae9fd764660d0a7556"
+  },
+  "study": "selected-XI marginal downside source accounting"
+}
