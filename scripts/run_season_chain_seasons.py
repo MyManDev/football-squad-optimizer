@@ -94,6 +94,11 @@ def _parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--chip-holding-values",
+        # Recorded discrepancy: freehit is 15 here and 20.0 in
+        # experiments/terminal_value.py's HOLDING_VALUE_POINTS. The committed chain
+        # artifacts used this 15; the GP study compared against the module's 20.0.
+        # Neither changes a recorded verdict, and neither is silently edited to match
+        # the other — see the note beside HOLDING_VALUE_POINTS.
         default="bboost=20,3xc=18,wildcard=12,freehit=15",
         help="terminal value of an unplayed chip under --chips value, points per chip",
     )

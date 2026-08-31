@@ -59,7 +59,9 @@ describe("DecisionControls", () => {
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Aşırı Agresif/ })).toBeChecked();
     expect(screen.getByText("diagnostik")).toBeInTheDocument();
-    expect(screen.getByText(/Lig-içi 5 haftalık sonuç bir olasılık değildir/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Lig-içi 5 haftalık sonuç bir teşhis göstergesidir/),
+    ).toBeInTheDocument();
     expect(screen.getByText(/P\(5\+ önde\) %19/)).toBeInTheDocument();
   });
 

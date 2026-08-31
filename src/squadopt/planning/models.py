@@ -275,6 +275,40 @@ class InitialSquadState:
 
 
 @dataclass(frozen=True, slots=True)
+class FirstWeekOverlap:
+    """Bound the decided week's squad overlap with a rival's known players.
+
+    ``player_ids`` names the rival's known players in the horizon's own id vocabulary;
+    ``minimum`` / ``maximum`` bound how many of them the first-week fifteen must / may
+    hold. Players the horizon does not carry cannot be held, so a floor above the
+    carried count is structurally unsatisfiable — the solver reports that as INFEASIBLE
+    rather than this object guessing, and a caller building a menu drops the band.
+    """
+
+    player_ids: frozenset[object]
+    minimum: int | None = None
+    maximum: int | None = None
+
+    def __post_init__(self) -> None:
+        players = frozenset(self.player_ids)
+        if not players:
+            raise TransferPlanningValidationError("player_ids must name at least one player.")
+        object.__setattr__(self, "player_ids", players)
+        if self.minimum is None and self.maximum is None:
+            raise TransferPlanningValidationError("An overlap band needs at least one bound.")
+        for name in ("minimum", "maximum"):
+            value = getattr(self, name)
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+            ):
+                raise TransferPlanningValidationError(
+                    f"{name} must be None or a non-negative integer."
+                )
+        if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
+            raise TransferPlanningValidationError("minimum may not exceed maximum.")
+
+
+@dataclass(frozen=True, slots=True)
 class ChipAvailability:
     """Which chips the planner may play in which gameweeks of one horizon.
 
