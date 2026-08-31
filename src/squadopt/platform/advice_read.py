@@ -158,7 +158,7 @@ class AdviceReadStore:
         validate_league_state(document)  # the route serves only what the contract names
         return document
 
-    def read_advice(
+    def resolve_key(
         self,
         *,
         league_id: int,
@@ -166,8 +166,13 @@ class AdviceReadStore:
         strategy: str,
         window: int,
         rival_entry_id: int | None = None,
-    ) -> bytes:
-        """The cached answer under the complete key, or a typed refusal."""
+    ) -> tuple[str, AdviceRequestContext]:
+        """Validate one request against what this deployment knows and address it.
+
+        The same validation and the same key serve the GET and the POST: a request the
+        reader would refuse is a request the writer must refuse, or the two sides of
+        the cache disagree about what exists.
+        """
 
         if strategy not in self._strategies:
             raise UnknownStrategyError(f"Strategy {strategy!r} is not computed here.")
@@ -196,6 +201,31 @@ class AdviceReadStore:
             configuration_fingerprint=context.configuration_fingerprint,
             rival_entry_id=rival_entry_id,
             strategy_uses_rival=self._strategies[strategy],
+        )
+        return key, context
+
+    def cached(self, key: str) -> bytes | None:
+        """The exact cached bytes under a resolved key, or None."""
+
+        return self._cache.get(key)
+
+    def read_advice(
+        self,
+        *,
+        league_id: int,
+        entry_id: int,
+        strategy: str,
+        window: int,
+        rival_entry_id: int | None = None,
+    ) -> bytes:
+        """The cached answer under the complete key, or a typed refusal."""
+
+        key, _context = self.resolve_key(
+            league_id=league_id,
+            entry_id=entry_id,
+            strategy=strategy,
+            window=window,
+            rival_entry_id=rival_entry_id,
         )
         cached = self._cache.get(key)
         if cached is None:

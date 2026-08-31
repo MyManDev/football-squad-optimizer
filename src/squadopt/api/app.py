@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Final
 
@@ -29,6 +31,12 @@ from squadopt.platform.advice_read import (
     UnknownEntryError,
     UnknownStrategyError,
 )
+from squadopt.platform.advice_submit import (
+    AdviceSubmitService,
+    IdempotencyConflictError,
+    RateLimitedError,
+)
+from squadopt.platform.api_contract import BackendApiContractError
 
 DEFAULT_SITE_DATA_ROOT: Final = Path("web") / "public" / "data"
 _SEASON_PATTERN: Final = r"^[0-9]{4}-[0-9]{2}$"
@@ -55,11 +63,41 @@ def _log_exception(message: str, request: Request, error: Exception) -> None:
     )
 
 
+def _parse_advise_body(body: object) -> tuple[str, int, int | None]:
+    """The AdviseRequestBody schema, enforced in one place.
+
+    Exactly the declared keys (additionalProperties: false), a string strategy, an
+    integer window of 1/3/5 with bool explicitly refused, and a rival that is null or
+    a positive integer. Every refusal is a contract error the route maps onto 422 —
+    a malformed body is the client's mistake, never this process's 500.
+    """
+
+    if not isinstance(body, dict):
+        raise BackendApiContractError("The POST body must be an object.")
+    allowed = {"strategy", "window", "rival_entry_id"}
+    unexpected = set(body) - allowed
+    if unexpected:
+        raise BackendApiContractError(f"Unexpected body fields: {sorted(unexpected)!r}.")
+    strategy = body.get("strategy")
+    if not isinstance(strategy, str) or not strategy.strip():
+        raise BackendApiContractError("strategy must be a non-empty string.")
+    window = body.get("window")
+    if isinstance(window, bool) or window not in (1, 3, 5):
+        raise BackendApiContractError("window must be 1, 3, or 5.")
+    rival = body.get("rival_entry_id")
+    if rival is not None and (isinstance(rival, bool) or not isinstance(rival, int) or rival < 1):
+        raise BackendApiContractError("rival_entry_id must be null or a positive integer.")
+    return strategy, window, rival
+
+
 def create_app(
     *,
     data_root: str | Path = DEFAULT_SITE_DATA_ROOT,
     view_store: PublishedViewStore | None = None,
     advice_store: AdviceReadStore | None = None,
+    advice_submit: AdviceSubmitService | None = None,
+    allowed_origins: tuple[str, ...] = (),
+    utc_now: Callable[[], datetime] | None = None,
 ) -> FastAPI:
     """Build the API with an injectable read adapter and no solver startup work.
 
@@ -74,6 +112,20 @@ def create_app(
         description="Read-only access to published SquadOpt application views.",
         version=BACKEND_API_VERSION,
     )
+    if allowed_origins:
+        # An allowlist, never a wildcard: the origins are the Pages domains, read from
+        # configuration by the composition root. No origins configured means no CORS
+        # headers at all, which fails closed.
+        if "*" in allowed_origins:
+            raise ValueError("The CORS allowlist may not contain a wildcard.")
+        from starlette.middleware.cors import CORSMiddleware
+
+        application.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(allowed_origins),
+            allow_methods=["GET", "POST"],
+            allow_headers=["Content-Type", "Idempotency-Key"],
+        )
 
     @application.exception_handler(PublishedViewNotFoundError)
     async def published_view_not_found(
@@ -144,6 +196,16 @@ def create_app(
     ) -> JSONResponse:
         return _contract_error(503, "NOT_READY", str(error))
 
+    @application.exception_handler(IdempotencyConflictError)
+    async def idempotency_conflict(
+        _request: Request, error: IdempotencyConflictError
+    ) -> JSONResponse:
+        return _contract_error(409, "IDEMPOTENCY_CONFLICT", str(error))
+
+    @application.exception_handler(RateLimitedError)
+    async def rate_limited(_request: Request, error: RateLimitedError) -> JSONResponse:
+        return _contract_error(429, "RATE_LIMITED", str(error))
+
     @application.get("/api/v1/leagues/{league_id}", response_class=JSONResponse)
     def league_state(league_id: Annotated[int, ApiPath(ge=1)]) -> JSONResponse:
         if advice_store is None:
@@ -182,6 +244,63 @@ def create_app(
             media_type="application/json",
             headers={"Cache-Control": "no-cache"},
         )
+
+    @application.post(
+        "/api/v1/leagues/{league_id}/entries/{entry_id}/advice",
+        response_class=Response,
+    )
+    async def request_advice(
+        request: Request,
+        league_id: Annotated[int, ApiPath(ge=1)],
+        entry_id: Annotated[int, ApiPath(ge=1)],
+    ) -> Response:
+        if advice_submit is None:
+            return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
+        try:
+            body = await request.json()
+        except Exception:
+            return _contract_error(422, "VALIDATION_FAILED", "The POST body must be JSON.")
+        try:
+            strategy, window, rival = _parse_advise_body(body)
+        except BackendApiContractError as error:
+            return _contract_error(422, "VALIDATION_FAILED", str(error))
+        current = datetime.now(UTC) if utc_now is None else utc_now()
+        if current.tzinfo is None or current.utcoffset() is None:
+            raise ValueError("utc_now must return a timezone-aware datetime.")
+
+        outcome = advice_submit.submit(
+            league_id=league_id,
+            entry_id=entry_id,
+            strategy=strategy,
+            window=window,
+            rival_entry_id=rival,
+            idempotency_key=request.headers.get("Idempotency-Key"),
+            client_bucket=request.client.host if request.client else "unknown",
+            at_utc=current.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+        if outcome.kind == "hit" and outcome.payload is not None:
+            return Response(
+                content=outcome.payload,
+                media_type="application/json",
+                headers={"Cache-Control": "no-cache"},
+            )
+        assert outcome.job is not None
+        return JSONResponse(
+            status_code=202,
+            content={"job_id": outcome.job.job_id, "status": outcome.job.status},
+        )
+
+    @application.get("/api/v1/advice-jobs/{job_id}", response_class=JSONResponse)
+    def advice_job(job_id: str) -> JSONResponse:
+        if advice_submit is None:
+            return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
+        try:
+            view = advice_submit.public_job_view(job_id)
+        except Exception:
+            return _contract_error(404, "NOT_FOUND", "No such advice job.")
+        if view is None:
+            return _contract_error(404, "NOT_FOUND", "No such advice job.")
+        return JSONResponse(content=view, headers={"Cache-Control": "no-cache"})
 
     @application.get("/health", response_class=JSONResponse)
     def health() -> JSONResponse:

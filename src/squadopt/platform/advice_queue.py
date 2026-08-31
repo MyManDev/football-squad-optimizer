@@ -41,6 +41,7 @@ from squadopt.platform.jobs_contract import (
 
 #: How stale a claim's heartbeat must be before recovery may treat it as abandoned.
 DEFAULT_LEASE_SECONDS: Final = 300.0
+INDEX_PUBLICATION_WAIT_SECONDS: Final = 2.0
 
 _SANITIZE_PATTERNS: Final = (
     re.compile(r"[A-Za-z]:[\\/][^\s'\"]*"),  # windows paths
@@ -72,11 +73,15 @@ class JobQueue(Protocol):
 
     def submit(self, job: AdviceJob) -> None: ...
 
+    def submit_unique(self, job: AdviceJob) -> tuple[AdviceJob, bool]: ...
+
     def claim(self, *, at_utc: str) -> AdviceJob | None: ...
 
     def store(self, job: AdviceJob) -> None: ...
 
     def load(self, job_id: str) -> AdviceJob | None: ...
+
+    def jobs(self) -> tuple[AdviceJob, ...]: ...
 
     def recover(
         self, *, at_utc: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
@@ -108,6 +113,63 @@ class FileJobQueue:
         if not isinstance(job_id, str) or not _JOB_ID_PATTERN.fullmatch(job_id):
             raise AdviceQueueError(f"job_id has an invalid format: {job_id!r}.")
         return job_id
+
+    def _open_index(self, fingerprint: str) -> Path:
+        return self._root / f"open-{fingerprint}.idx"
+
+    def submit_unique(self, job: AdviceJob) -> tuple[AdviceJob, bool]:
+        """Enqueue at most one open job per request fingerprint, atomically.
+
+        The reviewed race: a scan followed by submit lets two api processes enqueue
+        duplicates. The open-job index file is created with the same link-once
+        primitive as everything else here; the loser reads the winner's job id and
+        returns that job with ``created=False``. The index is released when the job
+        reaches a terminal state, so a failed request can be asked again.
+        """
+
+        index = self._open_index(job.request_fingerprint)
+        self._root.mkdir(parents=True, exist_ok=True)
+        import tempfile
+
+        descriptor, temporary = tempfile.mkstemp(dir=self._root, suffix=".tmp")
+        owns_index = False
+        deadline = time.monotonic() + INDEX_PUBLICATION_WAIT_SECONDS
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(job.job_id.encode("utf-8"))
+            while not owns_index:
+                try:
+                    os.link(temporary, index)
+                    owns_index = True
+                except FileExistsError:
+                    try:
+                        winner_id = index.read_text(encoding="utf-8").strip()
+                    except FileNotFoundError:
+                        continue  # terminal cleanup raced this read; try the link again
+                    winner = self.load(winner_id)
+                    if winner is not None and not winner.is_terminal:
+                        return winner, False
+                    if time.monotonic() >= deadline:
+                        raise AdviceQueueError(
+                            "The open-job index did not publish a readable open job; "
+                            "refusing to create a duplicate."
+                        ) from None
+                    # The index is visible before its winner's job file by design:
+                    # publishing the reservation first prevents a duplicate. Wait for
+                    # the winning writer (or terminal cleanup), never unlink its claim.
+                    time.sleep(0.001)
+        finally:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(temporary)
+        try:
+            self.submit(job)
+        except BaseException:
+            # A failed winner must not leave a reservation that can never resolve.
+            with contextlib.suppress(FileNotFoundError):
+                if index.read_text(encoding="utf-8").strip() == job.job_id:
+                    index.unlink()
+            raise
+        return job, True
 
     def submit(self, job: AdviceJob) -> None:
         """Create the record atomically: at most one submission ever wins an id.
@@ -143,6 +205,11 @@ class FileJobQueue:
         self._write(path, job)
         if job.is_terminal:
             self._claim_marker(job.job_id).unlink(missing_ok=True)
+            # Release the open-job index so the same request can be asked again.
+            index = self._open_index(job.request_fingerprint)
+            with contextlib.suppress(FileNotFoundError):
+                if index.read_text(encoding="utf-8").strip() == job.job_id:
+                    index.unlink(missing_ok=True)
 
     def load(self, job_id: str) -> AdviceJob | None:
         try:
@@ -152,6 +219,19 @@ class FileJobQueue:
         import json
 
         return AdviceJob.from_payload(json.loads(raw))
+
+    def jobs(self) -> tuple[AdviceJob, ...]:
+        """Every record in the store, oldest first; league-scale, so a scan is fine."""
+
+        if not self._root.exists():
+            return ()
+        found = [self.load(path.stem) for path in sorted(self._root.glob("*.json"))]
+        return tuple(
+            sorted(
+                (job for job in found if job is not None),
+                key=lambda item: (item.created_at_utc, item.job_id),
+            )
+        )
 
     def claim(self, *, at_utc: str) -> AdviceJob | None:
         """Move the oldest queued job to running, or return None.
