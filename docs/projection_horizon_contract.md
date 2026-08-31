@@ -22,8 +22,11 @@ class ProjectionHorizonBuilder(Protocol):
 ```
 
 One call projects every requested target gameweek from a single captured decision
-snapshot. The implementation must be leakage-safe with respect to the snapshot's capture
-time and deterministic for identical inputs.
+snapshot. At gameweek one, the base projection is built from completed history. Later in
+the season, the first target must have a validated `projection_handoff_v1` produced for
+that exact season, gameweek and snapshot. The same captured information state is then
+held fixed across the requested calendar. The implementation must be leakage-safe with
+respect to the snapshot's capture time and deterministic for identical inputs.
 
 ## Table
 
@@ -86,9 +89,9 @@ than widening it.
 
 ## What this contract does not claim
 
-- It does not implement the builder; that is the prediction side's deliverable, and the
-  contract is exercised by synthetic horizons in `tests/unit/test_projection_horizon.py`
-  until the real builder exists.
+- It does not predict information that becomes known after the capture. Availability and
+  the player projection are frozen at the first target gameweek; only the captured
+  fixture calendar varies across the horizon.
 - It does not model price changes, injuries, or postponements over the horizon.
 - It does not carry uncertainty; scenario-aware multi-week planning is a later stage and
   will extend, not reinterpret, this handoff.

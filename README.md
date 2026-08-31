@@ -542,13 +542,23 @@ single captured decision snapshot:
 .venv\Scripts\python -m scripts.build_projection_horizon --from-gameweek 1 --gameweeks 4
 ```
 
+After the season starts, use the projection handoff built for the same capture and first
+target gameweek instead of silently falling back to completed-season history:
+
+```powershell
+.venv\Scripts\python -m scripts.build_projection_horizon `
+  --from-gameweek 2 --gameweeks 5 `
+  --in-season-projection data/handoffs/2026-27-gw02.json
+```
+
 One information state covers the whole horizon: player features come from the decision
 point and never move, and only the calendar varies per gameweek. A blank gameweek is a row
 with zero fixtures projecting exactly zero points; a double scales linearly, under
 `linear_fixture_count_scaling_v1`, which is post-processing applied on top of a
 calendar-blind control rather than something the model learned.
 
-A one-gameweek horizon reproduces `recommend_current_squad`'s projection exactly. See
+A one-gameweek horizon reproduces the shared live projection exactly, for both the
+opening control and a validated in-season handoff. See
 [the recorded run](docs/projection_horizon_run.md) — including why an opening capture
 produces a flat horizon, which is the honest answer rather than a defect.
 
