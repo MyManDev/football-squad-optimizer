@@ -31,6 +31,7 @@ from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import (
     CHIP_NAMES,
     ChipAvailability,
+    FirstWeekOverlap,
     InitialSquadState,
     PlanningHorizon,
     TransferPlanningConfig,
@@ -445,6 +446,58 @@ def plan_transfers(
         raise DataSourceError(
             f"The transfer planner returned {plan.solver_status.name} with no plan for "
             f"{inputs.season} gameweek {prepared.gameweek}."
+        )
+    decision = _package_decision(
+        plan,
+        held,
+        prepared.availability,
+        prepared.transfer_config,
+        prepared.sell_prices,
+        prepared.current,
+        prepared.fee,
+    )
+    return plan, decision, prepared.transfer_config
+
+
+def plan_transfers_with_overlap(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    held: HeldSquad,
+    rules: SeasonRules,
+    first_week_overlap: FirstWeekOverlap,
+    *,
+    optimization: OptimizationConfig | None = None,
+) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
+    """``plan_transfers`` under a first-week overlap band against a rival's eleven.
+
+    Same preparation, same solver, same decision packaging — the only difference is
+    the band handed to ``optimize_transfer_plan``. Kept as its own entry point rather
+    than a parameter on ``plan_transfers`` so the baseline call sites cannot change
+    behavior by accident: the saf-puan path stays byte-identical by construction.
+
+    As in ``plan_transfers``, an unproven plan is returned rather than raised on: a
+    banded plan the solver found but could not prove is publishable **with its status**
+    (the member-solver-status rule), and the caller decides. Only no solution at all,
+    or a solution with no weeks, is an error. The contrast is with ``plan_menu``, which
+    stops at the first non-OPTIMAL plan because a menu entry has to be proven before it
+    can be offered.
+    """
+
+    prepared = _prepare_planning(
+        inputs, projection, held, rules, optimization=optimization, chip=None
+    )
+    plan = optimize_transfer_plan(
+        prepared.horizon,
+        prepared.state,
+        prepared.settings,
+        prepared.transfer_config,
+        chips=prepared.availability,
+        first_week_overlap=first_week_overlap,
+    )
+    if not plan.has_solution or not plan.weeks:
+        raise DataSourceError(
+            f"The banded transfer planner returned {plan.solver_status.name} with no plan "
+            f"for {inputs.season} gameweek {prepared.gameweek}."
         )
     decision = _package_decision(
         plan,
