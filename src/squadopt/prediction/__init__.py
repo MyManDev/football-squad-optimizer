@@ -60,6 +60,7 @@ from squadopt.prediction.production import (
     ProductionProjection,
     ProductionProjectionConfig,
     expected_points_per_90,
+    production_component_prediction,
     production_projection,
 )
 from squadopt.prediction.projection import build_projection_table
@@ -106,6 +107,7 @@ __all__ = [
     "predict_ridge_expected_points",
     "prepare_component_prediction",
     "prepare_optimizer_projection",
+    "production_component_prediction",
     "production_projection",
     "required_feature_columns",
 ]
