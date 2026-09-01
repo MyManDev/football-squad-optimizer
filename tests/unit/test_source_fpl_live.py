@@ -32,9 +32,12 @@ from squadopt.data.sources.fpl_live import (
     fixture_snapshot,
     fpl_entry_picks,
     fpl_league_standings,
+    fpl_league_standings_page,
     fpl_live_event_points,
     gameweek_deadlines,
     league_standings_endpoint_path,
+    league_standings_page_endpoint_path,
+    league_standings_page_payload,
     league_standings_payload,
     live_endpoint_path,
     live_payload,
@@ -824,6 +827,26 @@ def _standings_payload(
     return json.dumps(document).encode("utf-8")
 
 
+def _paged_standings_payload(*, page: int = 1, start_rank: int = 1, has_next: bool = True) -> bytes:
+    rows = [
+        {
+            "entry": 1000 + rank_sort,
+            "entry_name": f"Entry {rank_sort}",
+            "player_name": f"Manager {rank_sort}",
+            "rank": start_rank,
+            "rank_sort": rank_sort,
+        }
+        for rank_sort in range(start_rank, start_rank + 50)
+    ]
+    return json.dumps(
+        {
+            "league": {"id": 314, "name": "Overall"},
+            "standings": {"has_next": has_next, "page": page, "results": rows},
+            "last_updated_data": "2026-09-01T03:34:24Z",
+        }
+    ).encode("utf-8")
+
+
 def _entry_payload(*, entry_id: int = 11, name: str = "First XI") -> bytes:
     return json.dumps({"id": entry_id, "name": name, "current_event": 1}).encode("utf-8")
 
@@ -834,6 +857,7 @@ def test_every_built_payload_name_stays_inside_the_snapshot_grammar() -> None:
         entry_history_payload(11),
         entry_picks_payload(11, 2),
         league_standings_payload(352490),
+        league_standings_page_payload(314, 2),
         live_payload(2),
     ]
     assert names == [
@@ -841,6 +865,7 @@ def test_every_built_payload_name_stays_inside_the_snapshot_grammar() -> None:
         "entry-11-history.json",
         "entry-11-picks-gw02.json",
         "league-352490-standings.json",
+        "league-314-standings-page-02.json",
         "event-gw02-live.json",
     ]
     for name in names:
@@ -870,7 +895,39 @@ def test_the_endpoint_map_carries_paths_rather_than_urls() -> None:
 
     paths = list(entry_endpoint_paths([11], gameweek=2).values())
     paths += list(league_standings_endpoint_path(352490).values())
+    paths += list(league_standings_page_endpoint_path(314, 2).values())
     assert not any(path.startswith("http") for path in paths)
+
+
+def test_a_numbered_standings_page_preserves_the_sources_total_order() -> None:
+    page = fpl_league_standings_page(
+        _paged_standings_payload(page=2, start_rank=51),
+        league_id=314,
+        expected_page=2,
+    )
+
+    assert page.page == 2
+    assert page.has_next is True
+    assert page.last_updated_data == "2026-09-01T03:34:24Z"
+    assert [member.rank_sort for member in page.members] == list(range(51, 101))
+
+
+def test_a_numbered_standings_page_rejects_the_wrong_page_or_repeated_order() -> None:
+    with pytest.raises(DataSourceError, match="not requested page"):
+        fpl_league_standings_page(
+            _paged_standings_payload(page=2, start_rank=51),
+            league_id=314,
+            expected_page=1,
+        )
+
+    document = json.loads(_paged_standings_payload().decode("utf-8"))
+    document["standings"]["results"][1]["rank_sort"] = 1
+    with pytest.raises(DuplicateRecordsError, match="rank_sort 1"):
+        fpl_league_standings_page(
+            json.dumps(document).encode("utf-8"),
+            league_id=314,
+            expected_page=1,
+        )
 
 
 def test_a_registry_that_lists_an_entry_twice_is_rejected() -> None:
