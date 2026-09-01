@@ -24,6 +24,42 @@ class ScoringPolicy(StrEnum):
     """Versioned realized-points policies supported by the evaluator."""
 
     STARTING_XI_CAPTAIN_V1 = "realized_squad_points_v1"
+    OFFICIAL_AUTOSUB_CAPTAIN_V2 = "official_autosub_captain_v2"
+
+
+@dataclass(frozen=True, slots=True)
+class FrozenSquadDecision:
+    """A complete, ordered squad decision that can be scored after settlement."""
+
+    squad: pd.DataFrame
+    starting_xi: tuple[object, ...]
+    bench: tuple[object, ...]
+    captain_id: object
+    vice_captain_id: object
+    completion_policy: str = "captured_entry_v1"
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.squad, pd.DataFrame):
+            raise EvaluationValidationError("squad must be a pandas DataFrame.")
+        if not isinstance(self.completion_policy, str) or not self.completion_policy.strip():
+            raise EvaluationValidationError("completion_policy must be a non-empty string.")
+        object.__setattr__(self, "squad", self.squad.copy(deep=True))
+        object.__setattr__(self, "starting_xi", tuple(self.starting_xi))
+        object.__setattr__(self, "bench", tuple(self.bench))
+        object.__setattr__(self, "completion_policy", self.completion_policy.strip())
+
+
+@dataclass(frozen=True, slots=True)
+class RealizedSquadScore:
+    """Auditable result of applying one realized scoring policy."""
+
+    policy: ScoringPolicy
+    total_points: float
+    final_xi: tuple[object, ...]
+    autosubs: tuple[tuple[object, object], ...]
+    captain_bonus_player_id: object | None
+    captain_bonus_points: float
+    autosub_points: float
 
 
 def _freeze_metadata_value(value: object, path: str) -> object:

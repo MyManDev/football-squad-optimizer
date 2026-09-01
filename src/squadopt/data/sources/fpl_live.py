@@ -87,6 +87,15 @@ def league_standings_payload(league_id: int) -> str:
     return f"league-{_positive(league_id, 'league id')}-standings.json"
 
 
+def league_standings_page_payload(league_id: int, page: int) -> str:
+    """Payload name for one explicitly numbered classic-league standings page."""
+
+    return (
+        f"league-{_positive(league_id, 'league id')}-standings-"
+        f"page-{_positive(page, 'standings page'):02d}.json"
+    )
+
+
 def live_payload(gameweek: int) -> str:
     """Payload name for one gameweek's live scoring document."""
 
@@ -893,6 +902,20 @@ def league_standings_endpoint_path(league_id: int) -> Mapping[str, str]:
     )
 
 
+def league_standings_page_endpoint_path(league_id: int, page: int) -> Mapping[str, str]:
+    """Payload name to API path for one numbered classic-league standings page."""
+
+    identifier = _positive(league_id, "league id")
+    page_number = _positive(page, "standings page")
+    return MappingProxyType(
+        {
+            league_standings_page_payload(identifier, page_number): (
+                f"leagues-classic/{identifier}/standings/?page_standings={page_number}"
+            )
+        }
+    )
+
+
 def live_endpoint_path(gameweek: int) -> Mapping[str, str]:
     """Payload name to API path for one gameweek's live scoring document."""
 
@@ -1056,6 +1079,81 @@ class LeagueStanding:
     entry_name: str
     player_name: str
     rank: int
+    rank_sort: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LeagueStandingsPage:
+    """One verified page of a classic league's ordered standings."""
+
+    page: int
+    has_next: bool
+    members: tuple[LeagueStanding, ...]
+    last_updated_data: str
+
+
+def fpl_league_standings_page(
+    standings: bytes,
+    *,
+    league_id: int,
+    expected_page: int,
+) -> LeagueStandingsPage:
+    """Read one numbered standings page while preserving the source's total order."""
+
+    identifier = _positive(league_id, "league id")
+    requested_page = _positive(expected_page, "standings page")
+    document = _document(standings, "League standings")
+    league = document.get("league")
+    if not isinstance(league, dict) or league.get("id") != identifier:
+        raise DataSourceError(f"League standings page must declare league {identifier}.")
+    section = document.get("standings")
+    if not isinstance(section, dict):
+        raise DataSourceError("League standings payload must carry a 'standings' object.")
+    page = _integer(section, "page", "League standings")
+    if page != requested_page:
+        raise DataSourceError(
+            f"League standings payload is page {page}, not requested page {requested_page}."
+        )
+    has_next = _boolean(section, "has_next", "League standings")
+    records = _records(section, "results", "League standing")
+    _require_fields(records, (*_STANDING_FIELDS, "rank_sort"), "League standing")
+
+    members: list[LeagueStanding] = []
+    seen_entries: set[int] = set()
+    seen_order: set[int] = set()
+    for record in records:
+        entry_id = _positive(_integer(record, "entry", "League standing"), "entry id")
+        rank_sort = _positive(_integer(record, "rank_sort", "League standing"), "rank_sort")
+        if entry_id in seen_entries:
+            raise DuplicateRecordsError(
+                f"League {identifier} page {page} lists entry {entry_id} more than once."
+            )
+        if rank_sort in seen_order:
+            raise DuplicateRecordsError(
+                f"League {identifier} page {page} repeats rank_sort {rank_sort}."
+            )
+        seen_entries.add(entry_id)
+        seen_order.add(rank_sort)
+        members.append(
+            LeagueStanding(
+                entry_id=entry_id,
+                entry_name=_text(record, "entry_name", "League standing"),
+                player_name=_text(record, "player_name", "League standing"),
+                rank=_positive(_integer(record, "rank", "League standing"), "rank"),
+                rank_sort=rank_sort,
+            )
+        )
+    updated = document.get("last_updated_data")
+    if not isinstance(updated, str) or not updated.strip():
+        raise DataSourceError(
+            "League standings payload must carry a non-empty last_updated_data timestamp."
+        )
+    return LeagueStandingsPage(
+        page=page,
+        has_next=has_next,
+        members=tuple(members),
+        last_updated_data=updated.strip(),
+    )
 
 
 def fpl_league_standings(standings: bytes, *, league_id: int) -> tuple[LeagueStanding, ...]:

@@ -262,7 +262,10 @@ def test_the_scoring_contract_supports_one_multiplier_and_the_study_invents_no_o
 
     from squadopt.evaluation.scoring import ScoringPolicy
 
-    assert [policy.name for policy in ScoringPolicy] == ["STARTING_XI_CAPTAIN_V1"]
+    assert [policy.name for policy in ScoringPolicy] == [
+        "STARTING_XI_CAPTAIN_V1",
+        "OFFICIAL_AUTOSUB_CAPTAIN_V2",
+    ]
 
 
 def test_the_decision_is_untouched_by_the_ablation(monkeypatch: pytest.MonkeyPatch) -> None:

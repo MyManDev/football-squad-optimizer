@@ -1,5 +1,21 @@
 """Public prepared-fold evaluation interface."""
 
+from squadopt.evaluation.benchmarks import (
+    OWNERSHIP_TEMPLATE_V2,
+    OwnershipTemplateResult,
+    audit_unconstrained_template_v1,
+    build_constrained_ownership_template,
+)
+from squadopt.evaluation.cohorts import (
+    TOP_MANAGER_COHORT_SIZE,
+    TOP_MANAGER_COHORT_VERSION,
+    TOP_MANAGER_MINIMUM_COVERAGE_COUNT,
+    AsOfTop100Cohort,
+    RankedManager,
+    Top100BenchmarkResult,
+    aggregate_top_100_scores,
+    select_as_of_top_100,
+)
 from squadopt.evaluation.evaluator import evaluate_prepared_folds
 from squadopt.evaluation.models import (
     EvaluationConfig,
@@ -9,11 +25,22 @@ from squadopt.evaluation.models import (
     EvaluationSummary,
     EvaluationValidationError,
     FoldEvaluationResult,
+    FrozenSquadDecision,
+    RealizedSquadScore,
     ScoringPolicy,
 )
-from squadopt.evaluation.scoring import score_realized_squad_points
+from squadopt.evaluation.scoring import (
+    complete_optimization_decision,
+    score_frozen_squad_decision,
+    score_realized_squad_points,
+)
 
 __all__ = [
+    "OWNERSHIP_TEMPLATE_V2",
+    "TOP_MANAGER_COHORT_SIZE",
+    "TOP_MANAGER_COHORT_VERSION",
+    "TOP_MANAGER_MINIMUM_COVERAGE_COUNT",
+    "AsOfTop100Cohort",
     "EvaluationConfig",
     "EvaluationError",
     "EvaluationFold",
@@ -21,7 +48,18 @@ __all__ = [
     "EvaluationSummary",
     "EvaluationValidationError",
     "FoldEvaluationResult",
+    "FrozenSquadDecision",
+    "OwnershipTemplateResult",
+    "RankedManager",
+    "RealizedSquadScore",
     "ScoringPolicy",
+    "Top100BenchmarkResult",
+    "aggregate_top_100_scores",
+    "audit_unconstrained_template_v1",
+    "build_constrained_ownership_template",
+    "complete_optimization_decision",
     "evaluate_prepared_folds",
+    "score_frozen_squad_decision",
     "score_realized_squad_points",
+    "select_as_of_top_100",
 ]
