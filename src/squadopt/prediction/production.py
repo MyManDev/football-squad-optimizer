@@ -26,14 +26,24 @@ from squadopt.features import (
     PRIOR_RATE_COLUMN,
     per_90_feature_name,
 )
+from squadopt.prediction.components import (
+    COMPONENT_MODEL_ROUTE,
+    DIRECT_CONTROL_ROUTE,
+    EVIDENCE_NOT_REQUESTED,
+    ComponentPredictionSnapshot,
+    prepare_component_prediction,
+)
 from squadopt.prediction.config import (
     FITTED_OPENING_PRICE_COEFFICIENT,
     PredictionConfigurationError,
 )
+from squadopt.prediction.integration import PredictionProvenance
 from squadopt.prediction.minutes import (
+    FIXTURE_COUNT_COLUMN,
     MINUTES_BLANK_GAMEWEEK,
     ExpectedMinutesConfig,
     MinutesProjection,
+    appearance_probability,
     expected_minutes,
 )
 
@@ -313,3 +323,68 @@ def production_projection(
         rate_source=rate_source,
         points_source=source.astype("string"),
     )
+
+
+def production_component_prediction(
+    features: pd.DataFrame,
+    provenance: PredictionProvenance,
+    *,
+    decision_timestamp_utc: str,
+    config: ProductionProjectionConfig | None = None,
+) -> ComponentPredictionSnapshot:
+    """Expose the operational control through the Phase C component boundary."""
+
+    settings = ProductionProjectionConfig() if config is None else config
+    if not isinstance(settings, ProductionProjectionConfig):
+        raise PredictionConfigurationError("config must be a ProductionProjectionConfig.")
+    if not isinstance(features, pd.DataFrame):
+        raise PredictionConfigurationError(
+            "production_component_prediction expects a pandas DataFrame."
+        )
+    if "player_id" not in features.columns:
+        raise PredictionConfigurationError("Component features must carry 'player_id'.")
+
+    projection = production_projection(features, config=settings)
+    probability = appearance_probability(features, config=settings.minutes)
+    if FIXTURE_COUNT_COLUMN in features.columns:
+        fixtures = (
+            pd.to_numeric(features[FIXTURE_COUNT_COLUMN], errors="raise").fillna(1).astype(int)
+        )
+    else:
+        fixtures = pd.Series(1, index=features.index, dtype="int64")
+
+    positive = projection.points_source.eq(POINTS_FROM_TWO_STAGE) & probability.gt(0.0)
+    zero = projection.points_source.eq(POINTS_FROM_TWO_STAGE) & probability.eq(0.0)
+    conditional_minutes = projection.expected_minutes.div(probability)
+    conditional_points = projection.expected_points.div(probability)
+    supported = positive & conditional_minutes.le(fixtures.mul(float(MINUTES_PER_FULL_MATCH)))
+    component = zero | supported
+    conditional_minutes = conditional_minutes.mask(zero, 0.0).where(component)
+    conditional_points = conditional_points.mask(zero, 0.0).where(component)
+
+    rows = pd.DataFrame(
+        {
+            "player_id": features["player_id"].to_numpy(),
+            "fixture_count": fixtures.to_numpy(),
+            "appearance_probability": probability.where(component).to_numpy(),
+            "expected_minutes_if_appearance": conditional_minutes.to_numpy(),
+            "expected_points_if_appearance": conditional_points.to_numpy(),
+            "fallback_expected_points": projection.expected_points.where(~component).to_numpy(),
+            "composition_route": pd.Series(DIRECT_CONTROL_ROUTE, index=features.index)
+            .mask(component, COMPONENT_MODEL_ROUTE)
+            .to_numpy(),
+            "evidence_status": EVIDENCE_NOT_REQUESTED,
+        }
+    )
+    snapshot = prepare_component_prediction(
+        rows,
+        provenance,
+        decision_timestamp_utc=decision_timestamp_utc,
+    )
+    expected = projection.expected_points.set_axis(features["player_id"]).sort_index()
+    actual = snapshot.table.set_index("player_id")["expected_points"]
+    if bool(actual.sub(expected).abs().gt(1e-12).any()):
+        raise PredictionConfigurationError(
+            "Component decomposition changed the operational expected-points control."
+        )
+    return snapshot
