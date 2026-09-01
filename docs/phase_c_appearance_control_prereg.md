@@ -91,7 +91,8 @@ No binding evaluation is authorized by this document. A later measurement contra
 
 - Brier score as the primary player-level metric;
 - log loss with fixed clipping epsilon `1e-6`;
-- calibration-in-the-large and ten fixed equal-width reliability bins;
+- mean calibration bias `mean(p_control) - mean(A)`, where a positive value means
+  overprediction, and ten fixed equal-width reliability bins;
 - probability coverage and explicit direct-control fallback counts;
 - season, position, single-fixture and double-plus-fixture slices.
 
