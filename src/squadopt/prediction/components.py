@@ -45,6 +45,7 @@ _COMPONENT_VALUES: Final = (
     "expected_minutes_if_appearance",
     "expected_points_if_appearance",
 )
+_DERIVED_VALUES: Final = ("start_probability", "expected_minutes", "expected_points")
 
 
 def _missing(value: object) -> bool:
@@ -91,14 +92,26 @@ def _validate_ids(frame: pd.DataFrame) -> None:
         raise PredictionConfigurationError(f"Repeated player_id values: {repeated[:10]!r}.")
 
 
-def _same(actual: object, expected: float | None) -> bool:
-    if _missing(actual):
-        return expected is None
+def _same_number(actual: object, expected: object) -> bool:
+    if _missing(actual) or _missing(expected):
+        return _missing(actual) and _missing(expected)
     return (
-        expected is not None
-        and not isinstance(actual, bool)
+        not isinstance(actual, bool)
+        and not isinstance(expected, bool)
         and isinstance(actual, (Real, Decimal))
-        and math.isclose(float(actual), expected, rel_tol=0.0, abs_tol=1e-12)
+        and isinstance(expected, (Real, Decimal))
+        and math.isclose(float(actual), float(expected), rel_tol=0.0, abs_tol=1e-12)
+    )
+
+
+def _derived_values_match(value: pd.DataFrame, composed: pd.DataFrame) -> bool:
+    if any(column not in value for column in _DERIVED_VALUES):
+        return False
+    actual = value.set_index("player_id")
+    return all(
+        _same_number(actual.at[row.player_id, column], getattr(row, column))
+        for row in composed.itertuples(index=False)
+        for column in _DERIVED_VALUES
     )
 
 
@@ -185,7 +198,7 @@ def _compose(value: object) -> pd.DataFrame:
                 raise PredictionConfigurationError(
                     "direct_control rows require fallback_expected_points."
                 )
-            if any(numbers[column] is not None for column in _COMPONENT_VALUES):
+            if fixtures > 0 and any(numbers[column] is not None for column in _COMPONENT_VALUES):
                 raise PredictionConfigurationError(
                     "direct_control rows must leave component numeric inputs missing."
                 )
@@ -196,21 +209,13 @@ def _compose(value: object) -> pd.DataFrame:
                 raise PredictionConfigurationError(
                     "A zero-fixture row must contain only zero-valued numeric predictions."
                 )
-            start = 0.0
+            for column in _COMPONENT_VALUES:
+                frame.iat[offset, list(frame.columns).index(column)] = 0.0
+            start, expected_minutes, expected_points = 0.0, 0.0, 0.0
         start_output.append(start)
         minutes_output.append(expected_minutes)
         points_output.append(expected_points)
 
-    for column, computed in (
-        ("start_probability", start_output),
-        ("expected_minutes", minutes_output),
-        ("expected_points", points_output),
-    ):
-        if column in value and any(
-            not _same(actual, expected)
-            for actual, expected in zip(value[column].tolist(), computed, strict=True)
-        ):
-            raise PredictionConfigurationError(f"{column} does not match its components.")
     frame["start_probability"] = pd.Series(start_output, index=frame.index, dtype="float64")
     frame["expected_minutes"] = pd.Series(minutes_output, index=frame.index, dtype="float64")
     frame["expected_points"] = pd.Series(points_output, index=frame.index, dtype="float64")
@@ -283,6 +288,8 @@ class ComponentPredictionSnapshot:
         if not isinstance(self.provenance, PredictionProvenance):
             raise PredictionConfigurationError("provenance must be a PredictionProvenance.")
         timestamp, table = _utc(self.decision_timestamp_utc), _compose(self.table)
+        if not _derived_values_match(self.table, table):
+            raise PredictionConfigurationError("Derived values do not match their components.")
         if self.component_fingerprint != _fingerprint(table, self.provenance, timestamp):
             raise PredictionConfigurationError("component_fingerprint does not match the snapshot.")
         if not isinstance(self.diagnostics, Mapping):
