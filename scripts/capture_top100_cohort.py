@@ -22,6 +22,7 @@ from squadopt.data.cohorts import (
     nested_cohorts,
     pages_for_cohort_size,
     ranked_entries_from_pages,
+    require_pre_deadline_capture,
 )
 from squadopt.data.errors import DataError, DataSourceError
 from squadopt.data.snapshots import write_snapshot
@@ -123,6 +124,12 @@ def main() -> int:
         # Refuses on a missing or repeated rank rather than returning a shorter ordering.
         ordered_entry_ids = ranked_entries_from_pages(pages, expected_ranks=size)
         captured_at = _utc_now()
+        # Validate timing before the identity-bearing payloads reach disk. A late capture
+        # is not merely unusable evidence; it must not leave a misleading snapshot record.
+        require_pre_deadline_capture(
+            captured_at_utc=captured_at,
+            deadline_timestamp_utc=target.deadline_utc,
+        )
         metadata = write_snapshot(
             arguments.snapshot_root,
             source=SNAPSHOT_SOURCES[size],

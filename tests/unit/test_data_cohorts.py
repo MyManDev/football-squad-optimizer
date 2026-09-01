@@ -5,7 +5,12 @@ names are placeholders, because a committed test that carried a real manager's n
 entry id would leak exactly what the capture keeps out of git.
 """
 
+import json
+import sys
+from pathlib import Path
+
 import pytest
+from scripts import capture_top100_cohort as capture
 
 from squadopt.data.cohorts import (
     CONTRACT_VERSION,
@@ -132,6 +137,18 @@ def test_the_same_page_twice_is_refused() -> None:
         ranked_entries_from_pages([_page(1), _page(1)], expected_ranks=50)
 
 
+def test_the_exact_numbered_pages_are_required_in_order() -> None:
+    with pytest.raises(DataSourceError, match="require standings pages"):
+        ranked_entries_from_pages([_page(1), _page(3)], expected_ranks=100)
+
+
+def test_a_rank_outside_the_requested_prefix_is_refused() -> None:
+    members = list(_page(4).members)
+    members[-1] = _member(201)
+    with pytest.raises(DataSourceError, match=r"outside=.*201"):
+        ranked_entries_from_pages([*_pages(3), _page(4, members=members)], expected_ranks=200)
+
+
 # --- nesting -----------------------------------------------------------------
 
 
@@ -195,6 +212,59 @@ def test_a_capture_after_the_deadline_is_refused_too() -> None:
         _cohorts(captured_at_utc="2026-09-04T18:00:00Z")
 
 
+def test_a_late_capture_writes_no_identity_bearing_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    deadline = "2026-09-04T17:30:00Z"
+    bootstrap = json.dumps(
+        {"events": [{"id": 3, "deadline_time": deadline, "finished": False}]}
+    ).encode()
+    payloads: dict[str, bytes] = {"bootstrap": bootstrap}
+    for page in range(1, 5):
+        first = (page - 1) * MEMBERS_PER_PAGE + 1
+        payloads[f"page-{page}"] = json.dumps(
+            {
+                "league": {"id": 314, "name": "Overall"},
+                "standings": {
+                    "page": page,
+                    "has_next": page < 4,
+                    "results": [
+                        {
+                            "entry": FIRST_SYNTHETIC_ENTRY + rank,
+                            "entry_name": f"Synthetic Squad {rank}",
+                            "player_name": f"Synthetic Manager {rank}",
+                            "rank": rank,
+                            "rank_sort": rank,
+                        }
+                        for rank in range(first, first + MEMBERS_PER_PAGE)
+                    ],
+                },
+                "last_updated_data": "2026-09-01T03:30:00Z",
+            }
+        ).encode()
+
+    reads = iter([bootstrap, *(payloads[f"page-{page}"] for page in range(1, 5))])
+    clocks = iter(["2026-09-01T12:00:00Z", deadline])
+    monkeypatch.setattr(capture, "fetch", lambda _: next(reads))
+    monkeypatch.setattr(capture, "_utc_now", lambda: next(clocks))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "capture_top100_cohort",
+            "--target-gameweek",
+            "3",
+            "--cohort-size",
+            "200",
+            "--snapshot-root",
+            str(tmp_path),
+        ],
+    )
+
+    assert capture.main() == 1
+    assert list(tmp_path.iterdir()) == []
+
+
 # --- determinism and privacy -------------------------------------------------
 
 
@@ -236,3 +306,8 @@ def test_a_cohort_carries_no_manager_or_squad_names() -> None:
 
 def test_the_contract_version_is_declared() -> None:
     assert CONTRACT_VERSION == "nested_elite_cohorts_v1"
+
+
+def test_missing_provenance_is_refused() -> None:
+    with pytest.raises(DataSourceError, match="source_snapshot_id"):
+        _cohorts(source_snapshot_id="  ")

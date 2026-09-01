@@ -14,8 +14,9 @@ One rule governs everything below:
 > **`captured_at_utc < deadline_timestamp_utc`, or the data is not pre-deadline evidence.**
 
 It is enforced where the evidence is assembled, not documented and hoped for:
-`RankedCohort.__post_init__` refuses a cohort whose capture instant is at or after the
-deadline it is offered for. The refusal is deliberate rather than a filter — a cohort built
+the capture command refuses a capture instant at or after the deadline before any raw payload
+is written, and `RankedCohort.__post_init__` repeats the check when evidence is assembled. The
+refusal is deliberate rather than a filter — a cohort built
 from a post-deadline read is not a slightly worse cohort, it is a different cohort that
 knows the answer.
 
@@ -44,7 +45,7 @@ Overall league's first N ranks at one instant before one deadline.
 The labels differ on purpose. A snapshot id reading `top100` while carrying two hundred
 ranks is the quiet mislabel this repository refuses elsewhere, and the primary cohort is
 frozen — the two kinds must not be confusable at a glance. The first 200-rank capture taken
-during this work, `fpl-top200-20260901T163641Z-e2cf9cb0938b`, carried the old label; it is
+during this work, `fpl-top100-20260901T163641Z-e2cf9cb0938b`, carried the old label; it is
 superseded by the one recorded in §6 and is not the handoff source.
 
 **Nested cohorts are derived, not stored.** `scripts/capture_top100_cohort.py --cohort-size
