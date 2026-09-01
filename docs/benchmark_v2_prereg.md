@@ -202,3 +202,18 @@ so the first artifact records `pending_settlement` and the overall phase remains
 
 No threshold, scoring rule, season, cohort member or exclusion may be changed in
 response to the resulting numbers.
+
+## Serialization corrective-run amendment
+
+**Amended:** 2026-09-01, after the first binding execution stopped during JSON
+serialization and before any corrective execution. The failed execution wrote no
+JSON, Markdown, index entry or temporary artifact, and exposed no Benchmark V2
+measurement result. Its inputs and measurement calculations remain unchanged.
+
+The failure was an output-boundary defect: two vice-captain recovery comparisons
+retained NumPy boolean scalars, which Python's standard JSON encoder refuses. The
+correction may only normalize those two already-computed truth values to built-in
+`bool` values and add a JSON-serialization regression test. It may not change an
+input, fold, optimizer result, score, exclusion, cohort, threshold or interpretation.
+After that correction is committed and the quality gates pass, exactly one corrective
+execution with the original command and immutable inputs is authorized.
