@@ -24,7 +24,7 @@ from typing import Final
 
 from squadopt.data.errors import DataSourceError, DuplicateRecordsError, InvalidValueError
 from squadopt.data.sources.fpl_live import LeagueStandingsPage
-from squadopt.data.timestamps import as_instant
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 
 CONTRACT_VERSION: Final = "nested_elite_cohorts_v1"
 
@@ -33,6 +33,17 @@ NESTED_COHORT_SIZES: Final = (50, 100, 200)
 
 # The platform serves fifty ranked members per standings page.
 MEMBERS_PER_PAGE: Final = 50
+
+
+def require_pre_deadline_capture(*, captured_at_utc: str, deadline_timestamp_utc: str) -> None:
+    """Refuse a capture taken at or after the decision deadline."""
+
+    captured = normalize_utc_timestamp(captured_at_utc, label="captured_at_utc")
+    deadline = normalize_utc_timestamp(deadline_timestamp_utc, label="deadline_timestamp_utc")
+    if as_instant(captured) >= as_instant(deadline):
+        raise DataSourceError(
+            f"A capture at {captured} is not pre-deadline evidence for a deadline at {deadline}."
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +63,8 @@ class RankedCohort:
     source_snapshot_id: str
 
     def __post_init__(self) -> None:
+        if isinstance(self.target_gameweek, bool) or self.target_gameweek < 1:
+            raise InvalidValueError("target_gameweek must be a positive integer.")
         if self.size != len(self.entry_ids):
             raise InvalidValueError(
                 f"A Top-{self.size} cohort must hold {self.size} entries, got "
@@ -61,11 +74,23 @@ class RankedCohort:
             raise DuplicateRecordsError(
                 f"The Top-{self.size} cohort lists the same entry more than once."
             )
-        if as_instant(self.captured_at_utc) >= as_instant(self.deadline_timestamp_utc):
-            raise DataSourceError(
-                f"A Top-{self.size} cohort captured at {self.captured_at_utc} is not "
-                f"pre-deadline evidence for a deadline at {self.deadline_timestamp_utc}."
-            )
+        require_pre_deadline_capture(
+            captured_at_utc=self.captured_at_utc,
+            deadline_timestamp_utc=self.deadline_timestamp_utc,
+        )
+        if not isinstance(self.source_snapshot_id, str) or not self.source_snapshot_id.strip():
+            raise DataSourceError("source_snapshot_id must be a non-empty string.")
+        object.__setattr__(
+            self,
+            "captured_at_utc",
+            normalize_utc_timestamp(self.captured_at_utc, label="captured_at_utc"),
+        )
+        object.__setattr__(
+            self,
+            "deadline_timestamp_utc",
+            normalize_utc_timestamp(self.deadline_timestamp_utc, label="deadline_timestamp_utc"),
+        )
+        object.__setattr__(self, "source_snapshot_id", self.source_snapshot_id.strip())
 
 
 def ranked_entries_from_pages(
@@ -105,11 +130,22 @@ def ranked_entries_from_pages(
                 )
             by_rank[member.rank_sort] = member.entry_id
 
-    missing = [rank for rank in range(1, expected_ranks + 1) if rank not in by_rank]
-    if missing:
+    expected_pages = pages_for_cohort_size(expected_ranks)
+    actual_pages = tuple(seen_pages)
+    if actual_pages != expected_pages:
+        raise DataSourceError(
+            f"Ranks 1 to {expected_ranks} require standings pages {expected_pages!r} "
+            f"in order, got {actual_pages!r}."
+        )
+
+    expected = set(range(1, expected_ranks + 1))
+    actual = set(by_rank)
+    missing = sorted(expected - actual)
+    outside = sorted(actual - expected)
+    if missing or outside:
         raise DataSourceError(
             f"The captured standings pages do not cover ranks 1 to {expected_ranks}; "
-            f"{len(missing)} are missing, first {missing[:5]}."
+            f"missing={missing[:5]!r}, outside={outside[:5]!r}."
         )
 
     ordered = tuple(by_rank[rank] for rank in range(1, expected_ranks + 1))

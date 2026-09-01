@@ -39,7 +39,11 @@ AFTER = "2026-09-04T18:00:00Z"
 
 FIRST_ENTRY = 900_001
 FIRST_CODE = 700_001
-COHORT = 4  # four synthetic "elite" members; the rule does not depend on the size
+# A synthetic standings page carries a full fifty, because the page reader checks that a
+# capture is *whole* -- pages 1..k covering ranks 1..50k -- and that check is separate from
+# how many of those ranks a cohort is cut to. COHORT is the cut.
+PAGE_MEMBERS = 50
+COHORT = 4
 
 
 def _element(index: int, **overrides: Any) -> dict[str, Any]:
@@ -76,7 +80,7 @@ def _bootstrap(elements: list[dict[str, Any]] | None = None) -> bytes:
     return json.dumps(document).encode("utf-8")
 
 
-def _standings_page(count: int = COHORT) -> bytes:
+def _standings_page(count: int = PAGE_MEMBERS) -> bytes:
     document = {
         "league": {"id": 314, "name": "Overall"},
         "last_updated_data": "2026-09-01T03:30:00Z",
@@ -131,7 +135,7 @@ def _snapshot(source: str, captured_at: str, payloads: Mapping[str, bytes]) -> C
     )
 
 
-def _cohort_snapshot(captured_at: str = BEFORE, count: int = COHORT) -> CapturedSnapshot:
+def _cohort_snapshot(captured_at: str = BEFORE, count: int = PAGE_MEMBERS) -> CapturedSnapshot:
     return _snapshot(
         "fpl-top200",
         captured_at,
@@ -281,8 +285,10 @@ def test_a_cohort_snapshot_without_standings_pages_is_refused() -> None:
 
 
 def test_a_cohort_larger_than_the_capture_is_refused() -> None:
-    with pytest.raises(DataSourceError, match="do not cover ranks"):
-        _build(cohort_size=COHORT + 1)
+    """Larger than the ordering the capture actually holds, not larger than the cut."""
+
+    with pytest.raises(DataSourceError, match="needs 51 ranked entries"):
+        _build(cohort_size=PAGE_MEMBERS + 1)
 
 
 # --- 6 and 7. missing is not zero -------------------------------------------

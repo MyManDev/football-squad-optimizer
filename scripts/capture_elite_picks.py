@@ -17,7 +17,11 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from squadopt.data.cohorts import nested_cohorts, ranked_entries_from_pages
+from squadopt.data.cohorts import (
+    nested_cohorts,
+    ranked_entries_from_pages,
+    require_pre_deadline_capture,
+)
 from squadopt.data.errors import DataError, DataSourceError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import (
@@ -101,11 +105,13 @@ def main() -> int:
                 f"gameweek {lag} picks."
             )
         captured_at = _utc_now()
-        if captured_at >= arguments.deadline_utc:
-            raise DataSourceError(
-                f"Capture finished at {captured_at}, at or after the "
-                f"{arguments.deadline_utc} deadline; this is not pre-deadline evidence."
-            )
+        # Timing is validated before the picks -- which carry entry ids -- reach disk, and
+        # through the shared instant comparison rather than a string compare: two ISO
+        # spellings of the same moment do not order correctly as text.
+        require_pre_deadline_capture(
+            captured_at_utc=captured_at,
+            deadline_timestamp_utc=arguments.deadline_utc,
+        )
         metadata = write_snapshot(
             arguments.snapshot_root,
             source=SNAPSHOT_SOURCE,

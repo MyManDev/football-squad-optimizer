@@ -14,8 +14,9 @@ One rule governs everything below:
 > **`captured_at_utc < deadline_timestamp_utc`, or the data is not pre-deadline evidence.**
 
 It is enforced where the evidence is assembled, not documented and hoped for:
-`RankedCohort.__post_init__` refuses a cohort whose capture instant is at or after the
-deadline it is offered for. The refusal is deliberate rather than a filter — a cohort built
+the capture command refuses a capture instant at or after the deadline before any raw payload
+is written, and `RankedCohort.__post_init__` repeats the check when evidence is assembled. The
+refusal is deliberate rather than a filter — a cohort built
 from a post-deadline read is not a slightly worse cohort, it is a different cohort that
 knows the answer.
 
@@ -44,7 +45,7 @@ Overall league's first N ranks at one instant before one deadline.
 The labels differ on purpose. A snapshot id reading `top100` while carrying two hundred
 ranks is the quiet mislabel this repository refuses elsewhere, and the primary cohort is
 frozen — the two kinds must not be confusable at a glance. The first 200-rank capture taken
-during this work, `fpl-top200-20260901T163641Z-e2cf9cb0938b`, carried the old label; it is
+during this work, `fpl-top100-20260901T163641Z-e2cf9cb0938b`, carried the old label; it is
 superseded by the one recorded in §6 and is not the handoff source.
 
 **Nested cohorts are derived, not stored.** `scripts/capture_top100_cohort.py --cohort-size
@@ -249,3 +250,31 @@ and a share of 1.0 over a hundred are the same number and not the same evidence.
 - Capturing 100 members' picks costs 100 requests. At Top-200 it is 200, which is where the
   per-request retry ceiling in #235 starts to matter.
 - No model is fitted and no probability is produced anywhere in this layer.
+
+### Reading a smaller cohort out of a larger capture
+
+Two different questions live here and they are answered in two places.
+
+`ranked_entries_from_pages` asks whether the **capture is whole**: pages 1..k present, in
+order, covering ranks 1..50k with no gap, no repeat and nothing outside. It therefore reads the
+full ordering the capture holds and refuses to be asked for fewer ranks than the pages it was
+handed — being asked to ignore a page it was given is exactly the shape of a capture defect.
+
+`nested_cohorts` then **cuts**. Top-50, Top-100 and Top-200 out of one 200-rank capture are
+prefixes of that single validated ordering.
+
+Keeping the cut out of the page reader is what lets one capture answer for three sizes. Asking
+the reader for `expected_ranks=100` against a four-page capture is refused, and correctly so.
+
+Measured on the real captures, with picks captured for the Top-100 only:
+
+```text
+cohort_size=50   elite_members_observed 50    squad counts sum 750  = 15 x 50
+cohort_size=100  elite_members_observed 100   squad counts sum 1500 = 15 x 100
+cohort_size=200  elite_members_observed 100   squad counts sum 1500  <- 100 of 200 observed
+```
+
+The last row is the missingness policy rather than a bug: the denominator is the hundred
+members whose picks were read, not the two hundred in the cohort, and
+`elite_members_missing_picks` records the other hundred. A share of 0.30 there means "thirty of
+the hundred observed", and a consumer that ignores `elite_members_observed` will misread it.

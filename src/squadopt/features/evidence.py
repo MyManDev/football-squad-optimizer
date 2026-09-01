@@ -30,7 +30,12 @@ from typing import Final
 
 import pandas as pd
 
-from squadopt.data.cohorts import RankedCohort, nested_cohorts, ranked_entries_from_pages
+from squadopt.data.cohorts import (
+    MEMBERS_PER_PAGE,
+    RankedCohort,
+    nested_cohorts,
+    ranked_entries_from_pages,
+)
 from squadopt.data.errors import DataSourceError, InvalidValueError
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.data.sources.fpl_live import (
@@ -181,7 +186,16 @@ def _cohort(
             "The cohort snapshot carries no Overall standings pages, so cohort membership "
             "cannot be established."
         )
-    ordered = ranked_entries_from_pages(pages, expected_ranks=cohort_size)
+    # Read the ordering the *capture* holds, then cut. Asking the page reader for a smaller
+    # number would be asking it to ignore pages it was given, which it rightly refuses: the
+    # page-completeness check is about whether the capture is whole, and the cut is a separate
+    # question. This is what makes one 200-rank capture answer for Top-50, 100 and 200.
+    ordered = ranked_entries_from_pages(pages, expected_ranks=MEMBERS_PER_PAGE * len(pages))
+    if cohort_size > len(ordered):
+        raise DataSourceError(
+            f"A Top-{cohort_size} cohort needs {cohort_size} ranked entries; the cohort "
+            f"capture carries {len(ordered)}."
+        )
     return nested_cohorts(
         ordered,
         target_gameweek=target_gameweek,
