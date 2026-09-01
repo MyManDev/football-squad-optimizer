@@ -233,7 +233,32 @@ def _canonical(value: object) -> str | None:
     return "0" if number == 0 else format(number.normalize(), "f")
 
 
-def _fingerprint(table: pd.DataFrame, provenance: PredictionProvenance, timestamp: str) -> str:
+def _decision_context(value: object) -> Mapping[str, str]:
+    if value is None:
+        return MappingProxyType({})
+    if not isinstance(value, Mapping):
+        raise PredictionConfigurationError("decision_context must be a mapping of strings.")
+    context: dict[str, str] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or not key.strip():
+            raise PredictionConfigurationError("decision_context keys must be non-empty strings.")
+        if not isinstance(item, str) or not item.strip():
+            raise PredictionConfigurationError("decision_context values must be non-empty strings.")
+        normalized_key = key.strip()
+        if normalized_key in context:
+            raise PredictionConfigurationError(
+                "decision_context keys must remain unique after trimming."
+            )
+        context[normalized_key] = item.strip()
+    return MappingProxyType(context)
+
+
+def _fingerprint(
+    table: pd.DataFrame,
+    provenance: PredictionProvenance,
+    timestamp: str,
+    decision_context: Mapping[str, str],
+) -> str:
     numeric = (
         "fixture_count",
         *_COMPONENT_VALUES,
@@ -256,12 +281,16 @@ def _fingerprint(table: pd.DataFrame, provenance: PredictionProvenance, timestam
                 "evidence_status": str(row["evidence_status"]),
             }
         )
-    payload = {
+    payload: dict[str, object] = {
         "contract_version": COMPONENT_PREDICTION_CONTRACT_VERSION,
         "decision_timestamp_utc": timestamp,
         "provenance_fingerprint": provenance.provenance_fingerprint,
         "rows": rows,
     }
+    # Empty context preserves the original v1 fingerprint. Context is an optional,
+    # backwards-compatible lineage binding for consumers with a verified as-of source.
+    if decision_context:
+        payload["decision_context"] = dict(decision_context)
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
@@ -283,20 +312,24 @@ class ComponentPredictionSnapshot:
     decision_timestamp_utc: str
     component_fingerprint: str
     diagnostics: Mapping[str, object] = field(default_factory=dict)
+    decision_context: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not isinstance(self.provenance, PredictionProvenance):
             raise PredictionConfigurationError("provenance must be a PredictionProvenance.")
-        timestamp, table = _utc(self.decision_timestamp_utc), _compose(self.table)
+        timestamp = _utc(self.decision_timestamp_utc)
+        context = _decision_context(self.decision_context)
+        table = _compose(self.table)
         if not _derived_values_match(self.table, table):
             raise PredictionConfigurationError("Derived values do not match their components.")
-        if self.component_fingerprint != _fingerprint(table, self.provenance, timestamp):
+        if self.component_fingerprint != _fingerprint(table, self.provenance, timestamp, context):
             raise PredictionConfigurationError("component_fingerprint does not match the snapshot.")
         if not isinstance(self.diagnostics, Mapping):
             raise PredictionConfigurationError("diagnostics must be a mapping.")
         object.__setattr__(self, "table", table)
         object.__setattr__(self, "decision_timestamp_utc", timestamp)
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
+        object.__setattr__(self, "decision_context", context)
 
     @property
     def contract_version(self) -> str:
@@ -312,11 +345,12 @@ class ComponentPredictionSnapshot:
         """Revalidate mutable table state and return an independent copy."""
 
         return ComponentPredictionSnapshot(
-            self.table,
-            self.provenance,
-            self.decision_timestamp_utc,
-            self.component_fingerprint,
-            self.diagnostics,
+            table=self.table,
+            provenance=self.provenance,
+            decision_timestamp_utc=self.decision_timestamp_utc,
+            component_fingerprint=self.component_fingerprint,
+            diagnostics=self.diagnostics,
+            decision_context=self.decision_context,
         )
 
 
@@ -325,13 +359,16 @@ def prepare_component_prediction(
     provenance: PredictionProvenance,
     *,
     decision_timestamp_utc: str,
+    decision_context: Mapping[str, str] | None = None,
 ) -> ComponentPredictionSnapshot:
     """Validate and compose one deterministic component snapshot."""
 
     if not isinstance(provenance, PredictionProvenance):
         raise PredictionConfigurationError("provenance must be a PredictionProvenance.")
-    timestamp, table = _utc(decision_timestamp_utc), _compose(components)
-    fingerprint = _fingerprint(table, provenance, timestamp)
+    timestamp = _utc(decision_timestamp_utc)
+    context = _decision_context(decision_context)
+    table = _compose(components)
+    fingerprint = _fingerprint(table, provenance, timestamp, context)
     routes, evidence = (
         table["composition_route"].value_counts(),
         table["evidence_status"].value_counts(),
@@ -343,4 +380,11 @@ def prepare_component_prediction(
         **{f"route:{name}": int(routes.get(name, 0)) for name in COMPONENT_PREDICTION_ROUTES},
         **{f"evidence:{name}": int(evidence.get(name, 0)) for name in COMPONENT_EVIDENCE_STATUSES},
     }
-    return ComponentPredictionSnapshot(table, provenance, timestamp, fingerprint, diagnostics)
+    return ComponentPredictionSnapshot(
+        table=table,
+        provenance=provenance,
+        decision_timestamp_utc=timestamp,
+        component_fingerprint=fingerprint,
+        diagnostics=diagnostics,
+        decision_context=context,
+    )

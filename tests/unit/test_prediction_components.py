@@ -44,11 +44,16 @@ def _components() -> pd.DataFrame:
     )
 
 
-def _prepare(frame: pd.DataFrame | None = None) -> ComponentPredictionSnapshot:
+def _prepare(
+    frame: pd.DataFrame | None = None,
+    *,
+    decision_context: dict[str, str] | None = None,
+) -> ComponentPredictionSnapshot:
     return prepare_component_prediction(
         _components() if frame is None else frame,
         _provenance(),
         decision_timestamp_utc=DECISION_TIMESTAMP,
+        decision_context=decision_context,
     )
 
 
@@ -267,6 +272,45 @@ def test_input_is_not_mutated_and_row_order_does_not_change_the_fingerprint() ->
     assert_frame_equal(first.table, second.table)
     assert first.component_fingerprint == second.component_fingerprint
     assert len(first.component_fingerprint) == 64
+
+
+def test_decision_context_is_immutable_and_bound_to_the_fingerprint() -> None:
+    context = {"fixture_snapshot_id": "capture-a"}
+    snapshot = _prepare(decision_context=context)
+    changed = _prepare(decision_context={"fixture_snapshot_id": "capture-b"})
+
+    context["fixture_snapshot_id"] = "changed-after-construction"
+    assert snapshot.decision_context["fixture_snapshot_id"] == "capture-a"
+    assert snapshot.component_fingerprint != changed.component_fingerprint
+    with pytest.raises(TypeError):
+        snapshot.decision_context["fixture_snapshot_id"] = "mutated"  # type: ignore[index]
+
+
+def test_changed_decision_context_invalidates_an_existing_fingerprint() -> None:
+    snapshot = _prepare(decision_context={"fixture_snapshot_id": "capture-a"})
+
+    with pytest.raises(PredictionConfigurationError, match="component_fingerprint"):
+        ComponentPredictionSnapshot(
+            table=snapshot.table,
+            provenance=snapshot.provenance,
+            decision_timestamp_utc=snapshot.decision_timestamp_utc,
+            component_fingerprint=snapshot.component_fingerprint,
+            diagnostics=snapshot.diagnostics,
+            decision_context={"fixture_snapshot_id": "capture-b"},
+        )
+
+
+@pytest.mark.parametrize("decision_context", [{"": "value"}, {"key": ""}, {"key": 1}])
+def test_decision_context_requires_non_empty_strings(
+    decision_context: dict[str, object],
+) -> None:
+    with pytest.raises(PredictionConfigurationError, match="decision_context"):
+        prepare_component_prediction(
+            _components(),
+            _provenance(),
+            decision_timestamp_utc=DECISION_TIMESTAMP,
+            decision_context=decision_context,  # type: ignore[arg-type]
+        )
 
 
 def test_validated_copy_detects_mutable_result_corruption() -> None:

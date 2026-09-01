@@ -15,6 +15,7 @@ is exactly the position the two-stage split exists to avoid.
 """
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from numbers import Integral, Real
 from typing import Final
@@ -331,6 +332,7 @@ def production_component_prediction(
     *,
     decision_timestamp_utc: str,
     config: ProductionProjectionConfig | None = None,
+    decision_context: Mapping[str, str] | None = None,
 ) -> ComponentPredictionSnapshot:
     """Expose the operational control through the Phase C component boundary."""
 
@@ -380,6 +382,7 @@ def production_component_prediction(
         rows,
         provenance,
         decision_timestamp_utc=decision_timestamp_utc,
+        decision_context=decision_context,
     )
     expected = projection.expected_points.set_axis(features["player_id"]).sort_index()
     actual = snapshot.table.set_index("player_id")["expected_points"]

@@ -14,6 +14,7 @@ from squadopt.backtest.production import (
     PRODUCTION_FEATURE_CONTRACT_VERSION,
     PRODUCTION_MODEL_NAME,
     PRODUCTION_MODEL_VERSION,
+    build_production_component_prediction_snapshot,
     build_production_prediction_snapshot,
     make_production_projection_builder,
     production_feature_config,
@@ -30,6 +31,8 @@ CONFIG = ProductionProjectionConfig(
 SEASONS = ("2024-25", "2025-26")
 TARGET_SEASON = "2025-26"
 TARGET_GAMEWEEK = 5
+DECISION_TIMESTAMP_UTC = "2025-09-12T17:30:00Z"
+CAPTURE_TIMESTAMP_UTC = "2025-09-12T12:00:00Z"
 
 TEAMS = ("Arsenal", "Liverpool")
 TEAM_CODES = pd.DataFrame(
@@ -78,7 +81,13 @@ def _panel(
     return pd.DataFrame(rows)
 
 
-def _fixtures(*, gameweeks: int = 6, doubles: tuple[int, ...] = ()) -> pd.DataFrame:
+def _fixtures(
+    *,
+    gameweeks: int = 6,
+    doubles: tuple[int, ...] = (),
+    captured_at_utc: object = pd.NA,
+    deadline_timestamp_utc: object = pd.NA,
+) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     fixture_id = 0
     for season in SEASONS:
@@ -88,12 +97,12 @@ def _fixtures(*, gameweeks: int = 6, doubles: tuple[int, ...] = ()) -> pd.DataFr
                 fixture_id += 1
                 shared: dict[str, Any] = {
                     "snapshot_id": "vaastav-8c97b2a",
-                    "captured_at_utc": pd.NA,
+                    "captured_at_utc": captured_at_utc,
                     "season": season,
                     "gameweek": gameweek,
                     "fixture_id": fixture_id,
                     "kickoff_time_utc": "2025-08-15T19:00:00Z",
-                    "deadline_timestamp_utc": pd.NA,
+                    "deadline_timestamp_utc": deadline_timestamp_utc,
                     "status": "final",
                 }
                 rows.append(
@@ -140,6 +149,23 @@ def _snapshot(panel: pd.DataFrame | None = None, **kwargs: Any) -> Any:
         _panel() if panel is None else panel,
         kwargs.pop("decision", _decision()),
         fixtures=kwargs.pop("fixtures", _fixtures()),
+        team_codes=kwargs.pop("team_codes", TEAM_CODES),
+        config=kwargs.pop("config", CONFIG),
+    )
+
+
+def _component_snapshot(panel: pd.DataFrame | None = None, **kwargs: Any) -> Any:
+    return build_production_component_prediction_snapshot(
+        _panel() if panel is None else panel,
+        kwargs.pop("decision", _decision()),
+        decision_timestamp_utc=kwargs.pop("decision_timestamp_utc", DECISION_TIMESTAMP_UTC),
+        fixtures=kwargs.pop(
+            "fixtures",
+            _fixtures(
+                captured_at_utc=CAPTURE_TIMESTAMP_UTC,
+                deadline_timestamp_utc=DECISION_TIMESTAMP_UTC,
+            ),
+        ),
         team_codes=kwargs.pop("team_codes", TEAM_CODES),
         config=kwargs.pop("config", CONFIG),
     )
@@ -291,6 +317,111 @@ def test_the_input_panel_is_not_modified() -> None:
     _snapshot(panel)
 
     assert panel.equals(before)
+
+
+# --- private component bridge ----------------------------------------------
+
+
+def test_component_snapshot_preserves_the_operational_point_estimate() -> None:
+    point = _snapshot().table.set_index("player_id")["expected_points"]
+    component = _component_snapshot().table.set_index("player_id")["expected_points"]
+
+    pd.testing.assert_series_equal(component, point, check_names=False, atol=1e-12, rtol=0.0)
+    assert "appearance_probability" not in _snapshot().table.columns
+
+
+def test_component_snapshot_uses_the_same_provenance_as_the_optimizer_snapshot() -> None:
+    point = _snapshot()
+    component = _component_snapshot()
+
+    assert component.provenance == point.provenance
+    assert component.decision_timestamp_utc == DECISION_TIMESTAMP_UTC
+    assert component.diagnostics["fixture_timing_status"] == "verified_as_of"
+    assert component.diagnostics["fixture_snapshot_id"] == "vaastav-8c97b2a"
+    assert component.decision_context == {
+        "fixture_timing_status": "verified_as_of",
+        "fixture_snapshot_id": "vaastav-8c97b2a",
+        "fixture_captured_at_utc": CAPTURE_TIMESTAMP_UTC,
+        "fixture_deadline_timestamp_utc": DECISION_TIMESTAMP_UTC,
+    }
+
+
+def test_component_snapshot_rejects_post_hoc_archive_fixture_context() -> None:
+    with pytest.raises(BacktestConfigurationError, match="captured_at_utc"):
+        _component_snapshot(fixtures=_fixtures())
+
+
+def test_component_snapshot_rejects_partially_missing_fixture_lineage() -> None:
+    fixtures = _fixtures(
+        captured_at_utc=CAPTURE_TIMESTAMP_UTC,
+        deadline_timestamp_utc=DECISION_TIMESTAMP_UTC,
+    )
+    target = (fixtures["season"] == TARGET_SEASON) & (fixtures["gameweek"] == TARGET_GAMEWEEK)
+    fixtures.loc[fixtures.index[target][0], "captured_at_utc"] = pd.NA
+
+    with pytest.raises(BacktestConfigurationError, match="captured_at_utc"):
+        _component_snapshot(fixtures=fixtures)
+
+
+@pytest.mark.parametrize(
+    ("decision_timestamp_utc", "captured_at_utc", "deadline_timestamp_utc"),
+    [
+        ("2025-09-12T11:00:00Z", CAPTURE_TIMESTAMP_UTC, DECISION_TIMESTAMP_UTC),
+        ("2025-09-12T18:00:00Z", CAPTURE_TIMESTAMP_UTC, DECISION_TIMESTAMP_UTC),
+    ],
+)
+def test_component_snapshot_rejects_fixture_context_outside_the_decision_window(
+    decision_timestamp_utc: str,
+    captured_at_utc: str,
+    deadline_timestamp_utc: str,
+) -> None:
+    with pytest.raises(BacktestConfigurationError, match="captured_at_utc <="):
+        _component_snapshot(
+            decision_timestamp_utc=decision_timestamp_utc,
+            fixtures=_fixtures(
+                captured_at_utc=captured_at_utc,
+                deadline_timestamp_utc=deadline_timestamp_utc,
+            ),
+        )
+
+
+def test_component_snapshot_cannot_see_the_target_outcome() -> None:
+    baseline = _component_snapshot()
+    tampered = _panel()
+    target = (tampered["season"] == TARGET_SEASON) & (tampered["gameweek"] == TARGET_GAMEWEEK)
+    tampered.loc[target, "minutes"] = 0
+    tampered.loc[target, "total_points"] = 1000
+
+    assert _component_snapshot(tampered).component_fingerprint == baseline.component_fingerprint
+
+
+def test_component_snapshot_cannot_see_future_outcomes() -> None:
+    baseline = _component_snapshot()
+    tampered = _panel()
+    future = (tampered["season"] == TARGET_SEASON) & (tampered["gameweek"] > TARGET_GAMEWEEK)
+    tampered.loc[future, "minutes"] = 0
+    tampered.loc[future, "total_points"] = 1000
+
+    assert _component_snapshot(tampered).component_fingerprint == baseline.component_fingerprint
+
+
+def test_component_snapshot_changes_when_visible_history_changes() -> None:
+    baseline = _component_snapshot()
+    altered = _panel()
+    history = (altered["season"] == TARGET_SEASON) & (altered["gameweek"] < TARGET_GAMEWEEK)
+    altered.loc[history, "minutes"] = 0
+
+    assert _component_snapshot(altered).component_fingerprint != baseline.component_fingerprint
+
+
+def test_component_snapshot_is_order_independent_and_does_not_mutate_input() -> None:
+    panel = _panel()
+    before = panel.copy(deep=True)
+    baseline = _component_snapshot(panel)
+    shuffled = panel.sample(frac=1.0, random_state=17).reset_index(drop=True)
+
+    assert _component_snapshot(shuffled).component_fingerprint == baseline.component_fingerprint
+    pd.testing.assert_frame_equal(panel, before)
 
 
 # --- the calendar -----------------------------------------------------------
