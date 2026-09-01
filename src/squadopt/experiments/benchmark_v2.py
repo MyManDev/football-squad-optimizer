@@ -387,11 +387,11 @@ def measure_historical_v1_v2(
                 ),
                 "system_autosub_points": system_v2_detail.autosub_points,
                 "template_autosub_points": template_v2_detail.autosub_points,
-                "system_vice_recovered": (
+                "system_vice_recovered": bool(
                     system_v2_detail.captain_bonus_player_id == neutral_decision.vice_captain_id
                     and system_v2_detail.captain_bonus_player_id != neutral.captain["player_id"]
                 ),
-                "template_vice_recovered": (
+                "template_vice_recovered": bool(
                     template_v2_detail.captain_bonus_player_id
                     == template_v2.decision.vice_captain_id
                     and template_v2_detail.captain_bonus_player_id

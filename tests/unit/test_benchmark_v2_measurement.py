@@ -228,6 +228,7 @@ def test_historical_comparison_keeps_v1_and_v2_on_the_same_fold() -> None:
     assert row["overall_gap_change"] == pytest.approx(
         row["v2_gap_template_minus_system"] - row["v1_gap_template_minus_system"]
     )
+    json.dumps(result)
 
 
 def test_historical_comparison_rejects_a_holdout_season() -> None:
