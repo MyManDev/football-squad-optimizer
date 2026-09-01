@@ -166,3 +166,39 @@ a `docs/measurements_index.md` row and records repository commit, input snapshot
 ids, decision timestamps, policy versions, paired fold ids, exclusions and
 coverage. Raw captures remain outside git. The 2025-26 holdout is never loaded,
 listed internally, hashed or scored by this protocol.
+
+## Binding execution amendment
+
+**Amended:** 2026-09-01, before the Benchmark V2 runner or any Benchmark V2
+measurement was executed.
+
+The historical paired population is frozen to the development seasons
+`2021-22`, `2022-23`, `2023-24` and `2024-25`, using gameweeks 2-38 that the
+existing control-fold builder can prepare. `2020-21` may supply prior history but
+does not produce a scored decision. `2025-26` remains a no-read holdout. V1 and V2
+must use the identical fold, projection, ownership and realized-outcome rows.
+Because the archive does not prove when its ownership column was captured, all
+historical ownership-template results are descriptive and cannot promote a model.
+When an otherwise valid historical player row has no ownership observation, the
+existing V1 convention supplies ownership zero in both paired arms. Missing price,
+team, position, projection or realized-outcome context remains a refusal rather than
+being imputed. This keeps the V1/V2 comparison paired without broadening its claims.
+
+The real-rule parity check uses the earliest complete local settled-entry capture:
+gameweek 1 from snapshot
+`fpl-live-20260826T083133Z-d45f1bea8b68`. It compares the normalized normal-week
+V2 score with the official entry score only for entries with no active chip and no
+transfer hit. Missing inputs are exclusions, not zeroes. The report commits only
+aggregate parity counts and differences; entry ids and names remain outside git.
+
+The first prospective strong-manager cohort targets gameweek 3. Membership is the
+first 100 entries in the official Overall league (`league_id=314`) as ordered by
+the source's unique `rank_sort` values 1-100, captured before the gameweek 3
+deadline. The two required standings pages are one atomic snapshot. Membership is
+frozen even if a later member becomes unavailable; rank 101 never backfills it.
+Picks and scores cannot be read until the deadline and settlement respectively,
+so the first artifact records `pending_settlement` and the overall phase remains
+`insufficient_evidence` until those prospective outcomes exist.
+
+No threshold, scoring rule, season, cohort member or exclusion may be changed in
+response to the resulting numbers.
