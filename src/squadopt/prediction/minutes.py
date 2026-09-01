@@ -26,6 +26,7 @@ from dataclasses import dataclass
 from numbers import Integral, Real
 from typing import Final
 
+import numpy as np
 import pandas as pd
 
 from squadopt.features import (
@@ -142,7 +143,12 @@ def _numeric(features: pd.DataFrame, column: str) -> pd.Series:
             f"Feature dataset is missing column {column!r}, which the expected-minutes "
             "stage reads. Build features with a matching appearance window."
         )
-    return pd.to_numeric(features[column], errors="coerce").astype("float64")
+    values = features[column]
+    if isinstance(values, pd.DataFrame):
+        raise PredictionConfigurationError(
+            f"Feature dataset contains duplicate {column!r} columns."
+        )
+    return pd.to_numeric(values, errors="coerce").astype("float64")
 
 
 def _fixture_count(features: pd.DataFrame) -> pd.Series:
@@ -156,13 +162,61 @@ def _fixture_count(features: pd.DataFrame) -> pd.Series:
 
     if FIXTURE_COUNT_COLUMN not in features.columns:
         return pd.Series(float(DEFAULT_FIXTURE_COUNT), index=features.index, dtype="float64")
-    counts = pd.to_numeric(features[FIXTURE_COUNT_COLUMN], errors="coerce").astype("float64")
-    if bool(counts.lt(0.0).any()):
+    raw = features[FIXTURE_COUNT_COLUMN]
+    if isinstance(raw, pd.DataFrame):
+        raise PredictionConfigurationError(
+            f"Feature dataset contains duplicate {FIXTURE_COUNT_COLUMN!r} columns."
+        )
+    counts = pd.to_numeric(raw, errors="coerce").astype("float64")
+    negative = counts.notna() & counts.map(math.isfinite) & counts.lt(0.0)
+    if bool(negative.any()):
         raise PredictionConfigurationError(
             f"{FIXTURE_COUNT_COLUMN!r} may not be negative; a club cannot play fewer than "
             "no fixtures."
         )
+    invalid = raw.notna() & counts.isna()
+    invalid |= raw.map(lambda value: isinstance(value, (bool, np.bool_))).fillna(False)
+    invalid |= counts.notna() & (~counts.map(math.isfinite) | counts.mod(1.0).ne(0.0))
+    if bool(invalid.any()):
+        raise PredictionConfigurationError(
+            f"{FIXTURE_COUNT_COLUMN!r} must contain only missing values or non-negative "
+            "integer fixture counts."
+        )
     return counts.fillna(float(DEFAULT_FIXTURE_COUNT))
+
+
+def appearance_probability(
+    features: pd.DataFrame,
+    *,
+    config: ExpectedMinutesConfig | None = None,
+) -> pd.Series:
+    """Return the shifted empirical probability of any gameweek appearance.
+
+    Missing history remains missing, while an empty target calendar overrides history
+    with zero. A double gameweek does not multiply the probability: the event is still
+    whether the player appears at least once in the gameweek.
+    """
+
+    settings = ExpectedMinutesConfig() if config is None else config
+    if not isinstance(settings, ExpectedMinutesConfig):
+        raise PredictionConfigurationError("config must be an ExpectedMinutesConfig.")
+    if not isinstance(features, pd.DataFrame):
+        raise PredictionConfigurationError("appearance_probability expects a pandas DataFrame.")
+
+    raw = features.get(settings.appearance_rate_column)
+    probability = _numeric(features, settings.appearance_rate_column)
+    assert raw is not None  # _numeric has already reported a missing column.
+    invalid = raw.notna() & probability.isna()
+    invalid |= raw.map(lambda value: isinstance(value, (bool, np.bool_))).fillna(False)
+    invalid |= probability.notna() & (~probability.map(math.isfinite) | ~probability.between(0, 1))
+    if bool(invalid.any()):
+        raise PredictionConfigurationError(
+            f"{settings.appearance_rate_column!r} must contain only missing values or finite "
+            "probabilities in [0, 1]."
+        )
+
+    blank = _fixture_count(features).le(0.0)
+    return probability.mask(blank, 0.0).astype("float64")
 
 
 def expected_minutes(
@@ -207,7 +261,7 @@ def expected_minutes(
     if not isinstance(features, pd.DataFrame):
         raise PredictionConfigurationError("expected_minutes expects a pandas DataFrame.")
 
-    rate = _numeric(features, settings.appearance_rate_column)
+    rate = appearance_probability(features, config=settings)
     per_appearance = _numeric(features, settings.minutes_per_appearance_column)
 
     index = features.index

@@ -49,6 +49,7 @@ from squadopt.prediction.learned import (
 from squadopt.prediction.minutes import (
     ExpectedMinutesConfig,
     MinutesProjection,
+    appearance_probability,
     expected_minutes,
 )
 from squadopt.prediction.opening import (
@@ -95,6 +96,7 @@ __all__ = [
     "ProductionProjection",
     "ProductionProjectionConfig",
     "RidgeProjectionConfig",
+    "appearance_probability",
     "baseline_expected_points",
     "build_opening_projection_table",
     "build_projection_table",
