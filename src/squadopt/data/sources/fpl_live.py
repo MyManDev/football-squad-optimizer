@@ -136,6 +136,7 @@ _AVAILABILITY_FIELDS: Final = (
     "chance_of_playing_next_round",
     "news_added",
 )
+_PLAYER_EVIDENCE_FIELDS: Final = ("code", "element_type")
 _EVENT_FIELDS: Final = ("id", "deadline_time", "finished")
 _FIXTURE_FIELDS: Final = (
     "id",
@@ -398,6 +399,94 @@ def availability_snapshot(bootstrap: bytes) -> pd.DataFrame:
     frame["chance_of_playing"] = frame["chance_of_playing"].astype("Int64")
     frame["news_added_utc"] = frame["news_added_utc"].astype("string")
     return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
+def player_evidence_snapshot(bootstrap: bytes) -> pd.DataFrame:
+    """Read optional decision-time market and availability evidence per player.
+
+    Identity and player type are mandatory because a row cannot be keyed without them.
+    Evidence fields are optional by design: a missing source value remains missing and is
+    paired with an observed flag by the Phase B builder. Raw news text is reduced to a
+    presence boolean here and never leaves the adapter.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _PLAYER_EVIDENCE_FIELDS, "Element")
+    rows: list[dict[str, object]] = []
+    seen: set[int] = set()
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        player_id = _integer(record, "code", "Element")
+        if player_id in seen:
+            raise DuplicateRecordsError(
+                f"Bootstrap evidence lists persistent player code {player_id} more than once."
+            )
+        seen.add(player_id)
+
+        selected = record.get("selected_by_percent")
+        if selected is None or (isinstance(selected, str) and not selected.strip()):
+            selected_value: object = pd.NA
+        elif isinstance(selected, bool):
+            raise InvalidValueError("selected_by_percent must be numeric or absent.")
+        else:
+            try:
+                selected_value = float(selected)  # type: ignore[arg-type]
+            except (TypeError, ValueError) as error:
+                raise InvalidValueError(
+                    f"selected_by_percent must be numeric or absent, got {selected!r}."
+                ) from error
+
+        status = record.get("status")
+        if status is None:
+            status_value: object = pd.NA
+        elif not isinstance(status, str):
+            raise InvalidValueError(f"status must be text or absent, got {status!r}.")
+        else:
+            status_value = status.strip() or pd.NA
+
+        news = record.get("news")
+        if news is None:
+            news_present: object = pd.NA
+        elif not isinstance(news, str):
+            raise InvalidValueError(f"news must be text or absent, got {news!r}.")
+        else:
+            news_present = bool(news.strip())
+
+        rows.append(
+            {
+                "player_id": player_id,
+                "overall_selected_by_percent": selected_value,
+                "transfers_in_event": _optional_integer(record, "transfers_in_event"),
+                "transfers_out_event": _optional_integer(record, "transfers_out_event"),
+                "availability_status": status_value,
+                "chance_of_playing_next_round": _optional_integer(
+                    record, "chance_of_playing_next_round"
+                ),
+                "official_news_present": news_present,
+            }
+        )
+
+    if not rows:
+        raise DataSourceError("Bootstrap payload declares no squad-eligible evidence rows.")
+    frame = pd.DataFrame(rows)
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["overall_selected_by_percent"] = frame["overall_selected_by_percent"].astype("Float64")
+    frame["transfers_in_event"] = frame["transfers_in_event"].astype("Int64")
+    frame["transfers_out_event"] = frame["transfers_out_event"].astype("Int64")
+    frame["availability_status"] = frame["availability_status"].astype("string")
+    frame["chance_of_playing_next_round"] = frame["chance_of_playing_next_round"].astype("Int64")
+    frame["official_news_present"] = frame["official_news_present"].astype("boolean")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
+def _optional_integer(record: Mapping[str, object], field: str) -> object:
+    value = record.get(field)
+    if value is None:
+        return pd.NA
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise InvalidValueError(f"{field} must be an integer or absent, got {value!r}.")
+    return value
 
 
 def team_codes(bootstrap: bytes) -> Mapping[int, int]:

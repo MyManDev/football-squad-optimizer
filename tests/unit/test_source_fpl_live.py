@@ -43,6 +43,7 @@ from squadopt.data.sources.fpl_live import (
     live_payload,
     next_open_deadline,
     player_codes,
+    player_evidence_snapshot,
     player_snapshot,
     team_codes,
     team_names,
@@ -741,6 +742,63 @@ def test_a_renamed_availability_field_stops_the_run(field: str) -> None:
 
     with pytest.raises(DataSourceError, match=field):
         availability_snapshot(_payload([record]))
+
+
+# --- Phase B optional evidence ---------------------------------------------
+
+
+def test_player_evidence_uses_persistent_identity_and_explicit_dtypes() -> None:
+    frame = player_evidence_snapshot(
+        _payload(
+            [
+                _element(
+                    id=5,
+                    code=118748,
+                    selected_by_percent="41.2",
+                    transfers_in_event=123,
+                    transfers_out_event=45,
+                    news="Minor doubt",
+                )
+            ]
+        )
+    )
+
+    assert frame["player_id"].tolist() == [118748]
+    assert str(frame["overall_selected_by_percent"].dtype) == "Float64"
+    assert str(frame["transfers_in_event"].dtype) == "Int64"
+    assert str(frame["official_news_present"].dtype) == "boolean"
+    assert bool(frame.loc[0, "official_news_present"]) is True
+
+
+def test_optional_evidence_is_missing_instead_of_zero() -> None:
+    element = _element()
+    for field in (
+        "selected_by_percent",
+        "transfers_in_event",
+        "transfers_out_event",
+        "status",
+        "chance_of_playing_next_round",
+        "news",
+    ):
+        element.pop(field, None)
+
+    frame = player_evidence_snapshot(_payload([element]))
+
+    assert frame.drop(columns="player_id").isna().all(axis=None)
+
+
+def test_player_evidence_never_carries_raw_news_text() -> None:
+    frame = player_evidence_snapshot(_payload([_element(news="Private-ish source text")]))
+
+    assert "news" not in frame.columns
+    assert frame["official_news_present"].tolist() == [True]
+
+
+def test_duplicate_persistent_evidence_identity_is_rejected() -> None:
+    with pytest.raises(DuplicateRecordsError, match="persistent player code"):
+        player_evidence_snapshot(
+            _payload([_element(id=5, code=118748), _element(id=6, code=118748)])
+        )
 
 
 # --- registered entries and their league ----------------------------------------------

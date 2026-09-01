@@ -1,7 +1,7 @@
 # Phase B — Deadline-safe Evidence Contract
 
-Owner: data / data mining. Status: **capture half complete (PR B1); evidence table follows
-in PR B2.**
+Owner: data / data mining. Status: **engineering complete in stacked PRs B1 and B2;
+operational elite-picks coverage is reported explicitly below.**
 
 What this layer delivers is *evidence*, not a model. Nothing here trains, promotes, or
 publishes a probability. Phase C reads the table this contract describes; it does not read
@@ -66,7 +66,27 @@ entry at two ranks, or the same page twice all stop the capture. A cohort missin
 has a composition that depends on which page failed, and every share computed against it
 would be wrong by an amount nobody can state.
 
-## 3. Missingness
+## 3. Evidence assembly and missingness
+
+The Phase C boundary is deliberately one narrow function:
+
+```python
+build_player_evidence_table(
+    *,
+    target_gameweek: int,
+    deadline_timestamp_utc: str,
+    snapshots: Sequence[CapturedSnapshot],
+    cohort_snapshot: CapturedSnapshot,
+) -> pandas.DataFrame
+```
+
+`cohort_snapshot` alone freezes membership. Standings pages found in later snapshots are
+never consulted for membership. Among verified snapshots strictly before the target
+deadline, the latest bootstrap supplies ownership, transfers and availability. For each
+cohort member, the latest eligible snapshot carrying bootstrap, history and GW N-1 picks
+supplies squad/start/captain evidence. A picks snapshot taken before the N-1 deadline is
+not public evidence yet and is skipped. Payload checksums, the full snapshot fingerprint
+and the snapshot id are recomputed before any payload is parsed.
 
 Missing is not zero. The evidence table (PR B2) separates:
 
@@ -119,7 +139,57 @@ element→code    629 mappings, from the bootstrap in the same capture
 fingerprint     reproduces byte for byte on re-read
 ```
 
-## 7. Known limitations
+The separate local verification capture used while developing B2 was
+`fpl-top200-20260901T165747Z-fcf21642ff8c`. It yielded 629 unique persistent player rows:
+629 ownership observations, 629 transfer observations and 629 availability observations.
+It carries no entry-picks payloads, so `elite_members_observed` is honestly 0/200 and all
+three elite shares are missing. Raw snapshots and entry identities remain git-ignored.
+
+## 7. Output schema and dtypes
+
+Every row has contract version `player_evidence_v1`. `source_snapshot_ids` is a sorted,
+comma-separated set of the snapshot ids actually used for cohort, market and elite-picks
+evidence; `captured_at_utc` is the latest capture time in that set.
+
+| Columns | Pandas dtype | Meaning/source |
+| --- | --- | --- |
+| `contract_version`, `season`, `captured_at_utc`, `deadline_timestamp_utc`, `source_snapshot_ids` | `string` | Contract and verified provenance |
+| `target_gameweek`, `player_id`, `elite_cohort_size`, `elite_members_observed` | `int64` | Decision key, persistent FPL code and explicit denominator |
+| `timing_verified` | `boolean` | All used captures passed the strict pre-deadline rule |
+| `elite_squad_count_lag1`, `elite_start_count_lag1`, `elite_captain_count_lag1` | `int64` | Counts from observed GW N-1 picks only |
+| `elite_squad_share_lag1`, `elite_start_share_lag1`, `elite_captain_share_lag1` | `Float64` | Count divided by `elite_members_observed`; missing at denominator zero |
+| `overall_selected_by_percent` | `Float64` | Latest eligible bootstrap value at capture time |
+| `transfers_in_event`, `transfers_out_event`, `net_transfers_event` | `Int64` | Latest eligible bootstrap values; net exists only when both operands exist |
+| `availability_status` | `string` | Official FPL status at capture time |
+| `chance_of_playing_next_round` | `Int64` | Official FPL chance at capture time |
+| `official_news_present` | `boolean` | Whether official news was non-empty; raw text is discarded |
+| four `*_evidence_observed` columns | `boolean` | Whether each evidence family is observed, independently of its value |
+
+Counts are real zero when at least one cohort member was observed and did not select the
+player. When no member was observed, counts remain zero but `elite_evidence_observed` is
+false and shares are missing; consumers must use the flag and denominator together.
+
+## 8. Phase C handoff
+
+```python
+from squadopt.features.evidence import build_player_evidence_table
+
+table = build_player_evidence_table(
+    target_gameweek=3,
+    deadline_timestamp_utc="2026-09-04T17:30:00Z",
+    snapshots=verified_snapshots,
+    cohort_snapshot=verified_top200_snapshot,
+)
+```
+
+Phase C reads this table directly. It must not reopen raw standings or picks, replace
+missing values with zero, reinterpret capture-time market fields as deadline values, or
+use GW N picks. This layer produces no probability and trains or promotes no model.
+
+The locked 2025-26 holdout is refused immediately after deriving the season from the
+deadline and before snapshot inputs are iterated, validated, listed or hashed.
+
+## 9. Known limitations
 
 - **The primary Top-100 snapshot is not on this machine.** `fpl-top100-20260901T040725Z-5813e06fe096`
   was captured elsewhere, raw snapshots do not enter git (rule 6), and the primary cohort is
@@ -132,3 +202,10 @@ fingerprint     reproduces byte for byte on re-read
 - Cohort membership is frozen at capture; outcomes for gameweek 3 do not exist yet, so no
   performance statement is available or attempted.
 - The capture is a single instant. It does not describe how the first 200 ranks churn.
+- The captured B1 snapshot has no GW2 picks payloads, so real elite ownership coverage is
+  currently 0/200. Producing those payloads is an operational capture step, not permission
+  to treat missing members as zero or to use GW3 picks.
+- Market and availability fields describe their chosen capture instant, not the exact
+  deadline. The exact chosen snapshot and time travel with every row.
+- Official news is represented only by a presence boolean. Text modelling, scraping and
+  LLM classification are explicitly outside Phase B.
