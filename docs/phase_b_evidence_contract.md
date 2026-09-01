@@ -131,3 +131,121 @@ fingerprint     reproduces byte for byte on re-read
 - Cohort membership is frozen at capture; outcomes for gameweek 3 do not exist yet, so no
   performance statement is available or attempted.
 - The capture is a single instant. It does not describe how the first 200 ranks churn.
+
+## 8. The evidence table (PR B2)
+
+One row is one player for one decision week.
+
+```python
+from squadopt.features.evidence import build_player_evidence_table
+
+table = build_player_evidence_table(
+    season="2026-27",
+    target_gameweek=3,
+    deadline_timestamp_utc="2026-09-04T17:30:00Z",
+    snapshots=[cohort_snapshot, elite_picks_snapshot],  # any pre-deadline captures
+    cohort_snapshot=cohort_snapshot,  # where membership is frozen
+    cohort_size=100,
+)
+```
+
+`season` is required and **not** derived. The captured payloads publish no season label, and
+inferring one needs a model of the calendar that lives above this layer; guessing it would
+mislabel every row.
+
+### Output schema
+
+| Column | Dtype | Source | Missing means |
+| --- | --- | --- | --- |
+| `contract_version` | object | this module (`player_evidence_v1`) | — |
+| `season` | object | caller | — |
+| `target_gameweek` | int64 | caller | — |
+| `player_id` | int64 | `player_codes(bootstrap)` — persistent code | — |
+| `captured_at_utc` | object | the ownership capture | — |
+| `deadline_timestamp_utc` | object | caller | — |
+| `source_snapshot_ids` | object | every pre-deadline capture used, `;`-joined | — |
+| `timing_verified` | bool | this module | — |
+| `elite_cohort_size` | int64 | cohort snapshot | — |
+| `elite_members_observed` | int64 | count of members with readable N−1 picks | — |
+| `elite_squad_count_lag1` | Int64/object | N−1 picks | no member was observed |
+| `elite_squad_share_lag1` | float64 | count ÷ observed | no member was observed |
+| `elite_start_count_lag1` | Int64/object | N−1 picks, positions 1–11 | as above |
+| `elite_start_share_lag1` | float64 | count ÷ observed | as above |
+| `elite_captain_count_lag1` | Int64/object | N−1 picks, `is_captain` | as above |
+| `elite_captain_share_lag1` | float64 | count ÷ observed | as above |
+| `overall_selected_by_percent` | float64 | bootstrap | the source value did not parse |
+| `transfers_in_event` | Int64/object | bootstrap | the field was absent or not an integer |
+| `transfers_out_event` | Int64/object | bootstrap | as above |
+| `net_transfers_event` | Int64/object | in − out | either side missing |
+| `availability_status` | object | bootstrap `status` | absent or empty |
+| `chance_of_playing_next_round` | Int64/object | bootstrap | the platform publishes `null` when it has nothing to say |
+| `official_news_present` | boolean/object | `bool(news)` | `news` was not a string |
+| `elite_evidence_observed` | bool | `elite_members_observed > 0` | — |
+| `ownership_evidence_observed` | bool | ownership parsed | — |
+| `transfer_evidence_observed` | bool | both transfer counts present | — |
+| `availability_evidence_observed` | bool | a non-empty status | — |
+
+Rows are sorted by `player_id` with a reset index, so the table is byte-identical across runs
+on identical input.
+
+Diagnostics that are not per-player ride on `DataFrame.attrs`: `cohort_snapshot_id`,
+`ownership_snapshot_id`, `elite_members_missing_picks`, `unmapped_picked_elements`,
+`deadline_timestamp_utc`, `hours_pre_deadline`. An unrecognised picked element is counted
+there, never dropped in silence.
+
+### Which snapshot each column comes from
+
+- **Elite columns** — the N−1 entry-picks capture, cross-referenced with cohort membership
+  from the standings capture. Gameweek N picks are not read even when they are present in a
+  supplied capture.
+- **Ownership, transfer and availability columns** — the **newest pre-deadline** capture that
+  carries a bootstrap. Newest among the *legal* ones: the timing filter runs first, so a later
+  capture can never be preferred into the table.
+- **Identity** — `player_codes` from that same bootstrap, so codes and ownership always come
+  from one reading.
+
+### Observed coverage, on the real captures
+
+```text
+cohort          fpl-top200-20260901T163712Z-8711990a9dca   (Top-100 cut, 72.9 h pre-deadline)
+elite picks     fpl-elite-picks-20260901T171603Z-d4b04d078d67   (GW2 picks, 100/100 readable)
+rows            629 players
+elite           elite_members_observed = 100, elite_evidence_observed = True
+                squad counts sum 1500 = 15 x 100
+                start counts sum 1100 = 11 x 100
+                captain shares sum 1.000  (one captain per member)
+                most-held: two players at 100/100; one of them captained by 100/100
+ownership       629/629 observed, selected_by_percent 0.0 .. 70.3
+transfers       629/629 observed, net -363,855 .. +1,005,866
+availability    629/629 observed, 138 players carrying news
+diagnostics     0 members missing picks, 0 unmapped picked elements
+```
+
+Without the picks capture the same call returns the identical 629 rows with
+`elite_members_observed = 0` and **every** elite count and share missing rather than zero.
+That is the missingness policy working, not a degraded table.
+
+### Phase C handoff
+
+Phase C reads this table and nothing under `data/snapshots/`. What it may rely on:
+
+- `player_id` is the persistent code, stable across seasons and transfers.
+- Every row was assembled from captures that provably preceded the deadline named in the row.
+- A missing value is missing. It is never a zero standing in for one.
+- The same inputs give the same table; the builder mutates nothing it is given.
+
+What it must **not** do: treat `elite_*_share_lag1` as an ownership probability, or read a
+share without also reading `elite_members_observed`. A share of 1.0 over two observed members
+and a share of 1.0 over a hundred are the same number and not the same evidence.
+
+### Known limitations of the evidence table
+
+- Elite evidence is one week lagged by construction. It describes what the cohort held going
+  into gameweek N−1's fixtures, not what they will hold for N.
+- Availability uses only the official `status`, `chance_of_playing_next_round` and whether news
+  exists. Raw news text is deliberately not a feature: no scraping, no classification, no LLM.
+- Ownership and transfer counts are capture-time values, not deadline values. The table records
+  `captured_at_utc` and `hours_pre_deadline` so a consumer can price that gap.
+- Capturing 100 members' picks costs 100 requests. At Top-200 it is 200, which is where the
+  per-request retry ceiling in #235 starts to matter.
+- No model is fitted and no probability is produced anywhere in this layer.

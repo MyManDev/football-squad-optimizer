@@ -1405,31 +1405,26 @@ class EntryPicksRecord:
             )
 
 
-def fpl_entry_picks(
-    picks: bytes,
-    history: bytes,
-    *,
-    entry_id: int,
-    season: str,
-    gameweek: int,
-    source_snapshot_id: str | None = None,
-) -> EntryPicksRecord:
-    """Return one entry's squad at one gameweek from its two captured documents.
+@dataclass(frozen=True, slots=True)
+class EntrySquad:
+    """One entry's fifteen picks at one gameweek: who, in what order, and who wore what.
 
-    Two limits are recorded rather than papered over, because both change what a consumer
-    may claim.
-
-    ``purchase_prices`` is empty and flagged unknown: the public endpoints publish no
-    purchase price, so a squad built from this values every player at his current price,
-    which overstates the budget for anyone who has risen since he was bought.
-
-    ``free_transfers`` is the rule-implied floor of one, flagged unknown. The endpoints
-    never state the banked count. It is *derivable* from the history's per-event transfers
-    and costs, but only through a model of the banking rules -- which changed in 2024-25 --
-    and of the chip weeks that consume no transfer. That model is a reviewed decision with
-    its own tests, not a side effect of parsing a capture, so this adapter reports the
-    honest unknown instead of a plausible number.
+    The part of a picks document that needs no season history. It exists so a consumer that
+    only wants squad membership -- counting how many of an elite cohort held a player -- does
+    not have to capture the history payload it will never read, and so that consumer and
+    ``fpl_entry_picks`` share one parser instead of two copies that drift.
     """
+
+    entry_id: int
+    gameweek: int
+    squad: tuple[int, ...]
+    starting_xi: tuple[int, ...]
+    captain: int
+    vice_captain: int
+
+
+def entry_squad_from_picks(picks: bytes, *, entry_id: int, gameweek: int) -> EntrySquad:
+    """Parse one ``event/{gw}/picks`` document into its squad, order and armbands."""
 
     identifier = _positive(entry_id, "entry id")
     week = _positive(gameweek, "gameweek")
@@ -1470,6 +1465,47 @@ def fpl_entry_picks(
         )
 
     squad = tuple(by_position[position] for position in sorted(by_position))
+    return EntrySquad(
+        entry_id=identifier,
+        gameweek=week,
+        squad=squad,
+        starting_xi=squad[:_STARTING_SIZE],
+        captain=captains[0],
+        vice_captain=vice_captains[0],
+    )
+
+
+def fpl_entry_picks(
+    picks: bytes,
+    history: bytes,
+    *,
+    entry_id: int,
+    season: str,
+    gameweek: int,
+    source_snapshot_id: str | None = None,
+) -> EntryPicksRecord:
+    """Return one entry's squad at one gameweek from its two captured documents.
+
+    Two limits are recorded rather than papered over, because both change what a consumer
+    may claim.
+
+    ``purchase_prices`` is empty and flagged unknown: the public endpoints publish no
+    purchase price, so a squad built from this values every player at his current price,
+    which overstates the budget for anyone who has risen since he was bought.
+
+    ``free_transfers`` is the rule-implied floor of one, flagged unknown. The endpoints
+    never state the banked count. It is *derivable* from the history's per-event transfers
+    and costs, but only through a model of the banking rules -- which changed in 2024-25 --
+    and of the chip weeks that consume no transfer. That model is a reviewed decision with
+    its own tests, not a side effect of parsing a capture, so this adapter reports the
+    honest unknown instead of a plausible number.
+    """
+
+    named = entry_squad_from_picks(picks, entry_id=entry_id, gameweek=gameweek)
+    identifier = named.entry_id
+    week = named.gameweek
+    squad = named.squad
+    document = _document(picks, "Entry picks")
     entry_history = document.get("entry_history")
     if not isinstance(entry_history, dict):
         raise DataSourceError(
@@ -1482,9 +1518,9 @@ def fpl_entry_picks(
         season=_require_season(season),
         gameweek=week,
         squad=squad,
-        starting_xi=squad[:_STARTING_SIZE],
-        captain=captains[0],
-        vice_captain=vice_captains[0],
+        starting_xi=named.starting_xi,
+        captain=named.captain,
+        vice_captain=named.vice_captain,
         bank_tenths=_integer(entry_history, "bank", "Entry history"),
         free_transfers=1,
         free_transfers_known=False,
