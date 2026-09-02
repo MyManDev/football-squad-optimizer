@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from squadopt.data.cohorts import (
+    MEMBERS_PER_PAGE,
     nested_cohorts,
     ranked_entries_from_pages,
     require_pre_deadline_capture,
@@ -78,7 +79,12 @@ def main() -> int:
             raise DataSourceError(
                 f"Snapshot {arguments.cohort_snapshot} carries no Overall standings pages."
             )
-        ordered = ranked_entries_from_pages(pages, expected_ranks=arguments.cohort_size)
+        # Validate the ordering the *capture* holds, then cut. The page reader refuses to
+        # be asked for fewer ranks than the pages it was handed -- that shape is a capture
+        # defect -- so asking it for the cohort size meant a four-page Top-200 capture
+        # could never yield a Top-100 here. The cut is nested_cohorts' job, and it refuses
+        # a size the capture cannot cover.
+        ordered = ranked_entries_from_pages(pages, expected_ranks=MEMBERS_PER_PAGE * len(pages))
         cohort = nested_cohorts(
             ordered,
             target_gameweek=arguments.target_gameweek,

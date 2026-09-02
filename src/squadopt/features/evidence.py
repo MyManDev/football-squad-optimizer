@@ -92,6 +92,38 @@ EVIDENCE_COLUMNS: Final = (
     "availability_evidence_observed",
 )
 
+# The pandas dtype each column is cast to. The nullable families carry ``pd.NA`` rather
+# than a sentinel, so a missing count is never a zero and a missing flag is never False.
+_EVIDENCE_DTYPES: Final = {
+    "contract_version": "string",
+    "season": "string",
+    "target_gameweek": "int64",
+    "player_id": "int64",
+    "captured_at_utc": "string",
+    "deadline_timestamp_utc": "string",
+    "source_snapshot_ids": "string",
+    "timing_verified": "boolean",
+    "elite_cohort_size": "int64",
+    "elite_members_observed": "int64",
+    "elite_squad_count_lag1": "Int64",
+    "elite_squad_share_lag1": "Float64",
+    "elite_start_count_lag1": "Int64",
+    "elite_start_share_lag1": "Float64",
+    "elite_captain_count_lag1": "Int64",
+    "elite_captain_share_lag1": "Float64",
+    "overall_selected_by_percent": "Float64",
+    "transfers_in_event": "Int64",
+    "transfers_out_event": "Int64",
+    "net_transfers_event": "Int64",
+    "availability_status": "string",
+    "chance_of_playing_next_round": "Int64",
+    "official_news_present": "boolean",
+    "elite_evidence_observed": "boolean",
+    "ownership_evidence_observed": "boolean",
+    "transfer_evidence_observed": "boolean",
+    "availability_evidence_observed": "boolean",
+}
+
 _ELEMENT_EVIDENCE_FIELDS: Final = (
     "code",
     "id",
@@ -114,6 +146,8 @@ class _EliteCounts:
     captained: Mapping[int, int]
     members_missing_picks: tuple[int, ...]
     unmapped_elements: tuple[int, ...]
+    snapshot_ids: tuple[str, ...]
+    """The captures a member's picks were actually read from, sorted and deduplicated."""
 
 
 def _pre_deadline(
@@ -226,18 +260,19 @@ def _elite_counts(
     captained: dict[int, int] = {}
     missing: list[int] = []
     unmapped: set[int] = set()
+    used: set[str] = set()
     observed = 0
 
     for entry_id in cohort.entry_ids:
         name = entry_picks_payload(entry_id, lag_gameweek)
-        payload = next(
-            (snapshot.payloads[name] for snapshot in reversed(legal) if name in snapshot.payloads),
-            None,
-        )
-        if payload is None:
+        source = next((snapshot for snapshot in reversed(legal) if name in snapshot.payloads), None)
+        if source is None:
             missing.append(entry_id)
             continue
-        named = entry_squad_from_picks(payload, entry_id=entry_id, gameweek=lag_gameweek)
+        used.add(source.metadata.snapshot_id)
+        named = entry_squad_from_picks(
+            source.payloads[name], entry_id=entry_id, gameweek=lag_gameweek
+        )
         observed += 1
         for element in named.squad:
             code = element_to_code.get(element)
@@ -260,6 +295,7 @@ def _elite_counts(
         captained=captained,
         members_missing_picks=tuple(missing),
         unmapped_elements=tuple(sorted(unmapped)),
+        snapshot_ids=tuple(sorted(used)),
     )
 
 
@@ -354,16 +390,15 @@ def build_player_evidence_table(
 
     document = ownership.payloads[BOOTSTRAP_PAYLOAD]
     elements = _bootstrap_elements(document)
+    # Provenance names the captures that were *read*: the cohort's, the ownership one, and
+    # every capture a member's picks came from. A legal capture that contributed nothing is
+    # not a source, and listing it would let a table claim an input it never used.
     snapshot_ids = ";".join(
         sorted(
             {
-                *(
-                    snapshot.metadata.snapshot_id
-                    for snapshot in _pre_deadline(
-                        snapshots, deadline_timestamp_utc=deadline_timestamp_utc
-                    )
-                ),
                 cohort_snapshot.metadata.snapshot_id,
+                ownership.metadata.snapshot_id,
+                *counts.snapshot_ids,
             }
         )
     )
@@ -423,6 +458,11 @@ def build_player_evidence_table(
         )
 
     table = pd.DataFrame(rows, columns=list(EVIDENCE_COLUMNS))
+    # One dtype per column whatever the capture covered. Left to inference, a count column
+    # is int64 when picks were observed and object when none were, and a nullable column
+    # turns object the moment one value is missing -- the same contract would then carry
+    # different dtypes across snapshot scopes. astype raises on a value it cannot hold.
+    table = table.astype(_EVIDENCE_DTYPES)
     table = table.sort_values("player_id", kind="stable").reset_index(drop=True)
     table.attrs["cohort_snapshot_id"] = cohort_snapshot.metadata.snapshot_id
     table.attrs["ownership_snapshot_id"] = ownership.metadata.snapshot_id
