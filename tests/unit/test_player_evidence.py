@@ -479,3 +479,150 @@ def test_every_row_names_the_captures_it_came_from() -> None:
     assert picks.metadata.snapshot_id in ids[0]
     assert table["timing_verified"].all()
     assert table.attrs["hours_pre_deadline"] > 0
+
+
+# --- 15. the dtype contract ---------------------------------------------------
+
+
+_EXPECTED_DTYPES = {
+    "contract_version": "string",
+    "season": "string",
+    "target_gameweek": "int64",
+    "player_id": "int64",
+    "captured_at_utc": "string",
+    "deadline_timestamp_utc": "string",
+    "source_snapshot_ids": "string",
+    "timing_verified": "boolean",
+    "elite_cohort_size": "int64",
+    "elite_members_observed": "int64",
+    "elite_squad_count_lag1": "Int64",
+    "elite_squad_share_lag1": "Float64",
+    "elite_start_count_lag1": "Int64",
+    "elite_start_share_lag1": "Float64",
+    "elite_captain_count_lag1": "Int64",
+    "elite_captain_share_lag1": "Float64",
+    "overall_selected_by_percent": "Float64",
+    "transfers_in_event": "Int64",
+    "transfers_out_event": "Int64",
+    "net_transfers_event": "Int64",
+    "availability_status": "string",
+    "chance_of_playing_next_round": "Int64",
+    "official_news_present": "boolean",
+    "elite_evidence_observed": "boolean",
+    "ownership_evidence_observed": "boolean",
+    "transfer_evidence_observed": "boolean",
+    "availability_evidence_observed": "boolean",
+}
+
+
+def _sparse_cohort_snapshot() -> CapturedSnapshot:
+    """Element 1 arrives with no transfers, no chance, no news and an empty status."""
+
+    elements = [_element(i) for i in range(1, 21)]
+    elements[0] = _element(
+        1, transfers_in_event=None, chance_of_playing_next_round=None, news=None, status=""
+    )
+    return _snapshot(
+        "fpl-top200",
+        BEFORE,
+        {
+            BOOTSTRAP_PAYLOAD: _bootstrap(elements),
+            league_standings_page_payload(314, 1): _standings_page(),
+        },
+    )
+
+
+def test_the_table_carries_one_dtype_per_column_whatever_was_observed() -> None:
+    """The contract is the dtypes as much as the names; left to inference they drift.
+
+    A count column came out int64 when picks were observed and object when none were, and
+    a nullable column turned object the moment one value was missing. The same contract
+    across three capture scopes must carry the same dtypes.
+    """
+
+    cohort = _cohort_snapshot()
+    sparse = _sparse_cohort_snapshot()
+    tables = (
+        _build(),
+        _build(snapshots=[cohort], cohort_snapshot=cohort),
+        _build(snapshots=[sparse, _picks_snapshot(TARGET - 1)], cohort_snapshot=sparse),
+    )
+
+    for table in tables:
+        assert {name: str(dtype) for name, dtype in table.dtypes.items()} == _EXPECTED_DTYPES
+        assert tuple(table.columns) == EVIDENCE_COLUMNS
+
+
+def test_missing_evidence_is_typed_missing_rather_than_zero_or_false() -> None:
+    """With no picks read and a sparse element, every nullable cell is ``pd.NA`` -- not 0,
+    not False, not an empty string -- and the flags that say so are real booleans."""
+
+    sparse = _sparse_cohort_snapshot()
+
+    table = _build(snapshots=[sparse], cohort_snapshot=sparse)
+    row = table.loc[table["player_id"] == FIRST_CODE].iloc[0]
+
+    for column in (
+        "elite_squad_count_lag1",
+        "elite_squad_share_lag1",
+        "elite_captain_count_lag1",
+        "transfers_in_event",
+        "net_transfers_event",
+        "chance_of_playing_next_round",
+        "official_news_present",
+        "availability_status",
+    ):
+        assert row[column] is pd.NA, column
+    flags = table.loc[table["player_id"] == FIRST_CODE]
+    assert flags["elite_evidence_observed"].tolist() == [False]
+    assert flags["transfer_evidence_observed"].tolist() == [False]
+    assert flags["availability_evidence_observed"].tolist() == [False]
+    assert table["elite_squad_count_lag1"].isna().all()
+
+
+# --- 16. exact provenance -----------------------------------------------------
+
+
+def test_provenance_names_only_the_captures_that_were_read() -> None:
+    """A legal capture that contributed nothing is not a source.
+
+    Listing every pre-deadline input would let a table claim an input it never used. The
+    cohort capture, the ownership capture and every capture a member's picks came from are
+    named; an idle one is not.
+    """
+
+    cohort = _cohort_snapshot()
+    first = _snapshot(
+        "fpl-elite-picks",
+        BEFORE,
+        {
+            entry_picks_payload(FIRST_ENTRY + rank, TARGET - 1): _picks(
+                elements=list(range(1, 16)), captain=1, vice=2
+            )
+            for rank in (1, 2)
+        },
+    )
+    second = _snapshot(
+        "fpl-elite-picks",
+        "2026-09-01T17:00:00Z",
+        {
+            entry_picks_payload(FIRST_ENTRY + rank, TARGET - 1): _picks(
+                elements=list(range(1, 16)), captain=1, vice=2
+            )
+            for rank in (3, 4)
+        },
+    )
+    # Legal, and carrying a bootstrap -- but older than the cohort capture, so it loses the
+    # newest-wins ownership choice and nothing is read from it.
+    idle = _snapshot("fpl-live", "2026-09-01T10:00:00Z", {BOOTSTRAP_PAYLOAD: _bootstrap()})
+
+    table = _build(snapshots=[idle, first, cohort, second], cohort_snapshot=cohort)
+    ids = set(table["source_snapshot_ids"].iloc[0].split(";"))
+
+    assert idle.metadata.snapshot_id not in ids
+    assert ids == {
+        cohort.metadata.snapshot_id,  # membership, and the newest legal bootstrap
+        first.metadata.snapshot_id,
+        second.metadata.snapshot_id,
+    }
+    assert table["source_snapshot_ids"].nunique() == 1

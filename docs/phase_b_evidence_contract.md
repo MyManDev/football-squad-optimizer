@@ -1,7 +1,7 @@
 # Phase B — Deadline-safe Evidence Contract
 
-Owner: data / data mining. Status: **capture half complete (PR B1); evidence table follows
-in PR B2.**
+Owner: data / data mining. Status: **capture (PR B1) and evidence table (PR B2)
+implemented.**
 
 What this layer delivers is *evidence*, not a model. Nothing here trains, promotes, or
 publishes a probability. Phase C reads the table this contract describes; it does not read
@@ -158,36 +158,38 @@ mislabel every row.
 
 | Column | Dtype | Source | Missing means |
 | --- | --- | --- | --- |
-| `contract_version` | object | this module (`player_evidence_v1`) | — |
-| `season` | object | caller | — |
+| `contract_version` | string | this module (`player_evidence_v1`) | — |
+| `season` | string | caller | — |
 | `target_gameweek` | int64 | caller | — |
 | `player_id` | int64 | `player_codes(bootstrap)` — persistent code | — |
-| `captured_at_utc` | object | the ownership capture | — |
-| `deadline_timestamp_utc` | object | caller | — |
-| `source_snapshot_ids` | object | every pre-deadline capture used, `;`-joined | — |
-| `timing_verified` | bool | this module | — |
-| `elite_cohort_size` | int64 | cohort snapshot | — |
+| `captured_at_utc` | string | the ownership capture | — |
+| `deadline_timestamp_utc` | string | caller | — |
+| `source_snapshot_ids` | string | the captures actually read — cohort, ownership, and each capture a member's N−1 picks came from — sorted, `;`-joined | — |
+| `timing_verified` | boolean | this module | — |
+| `elite_cohort_size` | int64 | caller `cohort_size`, cut from the cohort capture | — |
 | `elite_members_observed` | int64 | count of members with readable N−1 picks | — |
-| `elite_squad_count_lag1` | Int64/object | N−1 picks | no member was observed |
-| `elite_squad_share_lag1` | float64 | count ÷ observed | no member was observed |
-| `elite_start_count_lag1` | Int64/object | N−1 picks, positions 1–11 | as above |
-| `elite_start_share_lag1` | float64 | count ÷ observed | as above |
-| `elite_captain_count_lag1` | Int64/object | N−1 picks, `is_captain` | as above |
-| `elite_captain_share_lag1` | float64 | count ÷ observed | as above |
-| `overall_selected_by_percent` | float64 | bootstrap | the source value did not parse |
-| `transfers_in_event` | Int64/object | bootstrap | the field was absent or not an integer |
-| `transfers_out_event` | Int64/object | bootstrap | as above |
-| `net_transfers_event` | Int64/object | in − out | either side missing |
-| `availability_status` | object | bootstrap `status` | absent or empty |
-| `chance_of_playing_next_round` | Int64/object | bootstrap | the platform publishes `null` when it has nothing to say |
-| `official_news_present` | boolean/object | `bool(news)` | `news` was not a string |
-| `elite_evidence_observed` | bool | `elite_members_observed > 0` | — |
-| `ownership_evidence_observed` | bool | ownership parsed | — |
-| `transfer_evidence_observed` | bool | both transfer counts present | — |
-| `availability_evidence_observed` | bool | a non-empty status | — |
+| `elite_squad_count_lag1` | Int64 | N−1 picks | no member was observed |
+| `elite_squad_share_lag1` | Float64 | count ÷ observed | no member was observed |
+| `elite_start_count_lag1` | Int64 | N−1 picks, positions 1–11 | as above |
+| `elite_start_share_lag1` | Float64 | count ÷ observed | as above |
+| `elite_captain_count_lag1` | Int64 | N−1 picks, `is_captain` | as above |
+| `elite_captain_share_lag1` | Float64 | count ÷ observed | as above |
+| `overall_selected_by_percent` | Float64 | bootstrap | the source value did not parse |
+| `transfers_in_event` | Int64 | bootstrap | the field was absent or not an integer |
+| `transfers_out_event` | Int64 | bootstrap | as above |
+| `net_transfers_event` | Int64 | in − out | either side missing |
+| `availability_status` | string | bootstrap `status` | absent or empty |
+| `chance_of_playing_next_round` | Int64 | bootstrap | the platform publishes `null` when it has nothing to say |
+| `official_news_present` | boolean | `bool(news)` | `news` was not a string |
+| `elite_evidence_observed` | boolean | `elite_members_observed > 0` | — |
+| `ownership_evidence_observed` | boolean | ownership parsed | — |
+| `transfer_evidence_observed` | boolean | both transfer counts present | — |
+| `availability_evidence_observed` | boolean | a non-empty status | — |
 
 Rows are sorted by `player_id` with a reset index, so the table is byte-identical across runs
-on identical input.
+on identical input. Every column is cast to the dtype above rather than left to inference,
+so the same contract carries the same dtypes whatever the capture covered; the nullable
+families hold `pd.NA`, and a missing count is never a zero nor a missing flag `False`.
 
 Diagnostics that are not per-player ride on `DataFrame.attrs`: `cohort_snapshot_id`,
 `ownership_snapshot_id`, `elite_members_missing_picks`, `unmapped_picked_elements`,
@@ -196,14 +198,17 @@ there, never dropped in silence.
 
 ### Which snapshot each column comes from
 
-- **Elite columns** — the N−1 entry-picks capture, cross-referenced with cohort membership
-  from the standings capture. Gameweek N picks are not read even when they are present in a
-  supplied capture.
+- **Elite columns** — the pre-deadline capture(s) carrying each member's N−1 picks (the newest
+  legal one per member), cross-referenced with cohort membership from the standings capture.
+  Gameweek N picks are not read even when they are present in a supplied capture.
 - **Ownership, transfer and availability columns** — the **newest pre-deadline** capture that
   carries a bootstrap. Newest among the *legal* ones: the timing filter runs first, so a later
   capture can never be preferred into the table.
 - **Identity** — `player_codes` from that same bootstrap, so codes and ownership always come
   from one reading.
+- **Provenance** — `source_snapshot_ids` names exactly the captures that were read: the cohort
+  capture, the ownership capture, and every capture a member's N−1 picks were taken from. A
+  pre-deadline capture that contributed nothing is not listed.
 
 ### Observed coverage, on the real captures
 
@@ -262,6 +267,10 @@ handed — being asked to ignore a page it was given is exactly the shape of a c
 
 `nested_cohorts` then **cuts**. Top-50, Top-100 and Top-200 out of one 200-rank capture are
 prefixes of that single validated ordering.
+
+`scripts/capture_elite_picks.py` follows the same order: it validates every standings page the
+cohort capture carries, then cuts `--cohort-size` with `nested_cohorts`, so one Top-200
+capture serves all three sizes and a size the capture cannot cover is refused.
 
 Keeping the cut out of the page reader is what lets one capture answer for three sizes. Asking
 the reader for `expected_ranks=100` against a four-page capture is refused, and correctly so.
