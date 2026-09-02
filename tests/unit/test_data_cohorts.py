@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from scripts import capture_elite_picks as elite_capture
 from scripts import capture_top100_cohort as capture
 
 from squadopt.data.cohorts import (
@@ -22,7 +23,13 @@ from squadopt.data.cohorts import (
     ranked_entries_from_pages,
 )
 from squadopt.data.errors import DataSourceError, DuplicateRecordsError, InvalidValueError
-from squadopt.data.sources.fpl_live import LeagueStanding, LeagueStandingsPage
+from squadopt.data.snapshots import read_snapshot, write_snapshot
+from squadopt.data.sources.fpl_live import (
+    LeagueStanding,
+    LeagueStandingsPage,
+    entry_picks_payload,
+    league_standings_page_payload,
+)
 
 CAPTURED = "2026-09-01T04:07:25Z"
 DEADLINE = "2026-09-04T17:30:00Z"
@@ -311,3 +318,141 @@ def test_the_contract_version_is_declared() -> None:
 def test_missing_provenance_is_refused() -> None:
     with pytest.raises(DataSourceError, match="source_snapshot_id"):
         _cohorts(source_snapshot_id="  ")
+
+
+# --- the elite picks capture cuts the requested prefix from the whole capture ------------
+
+_PICKS_PAYLOAD = b'{"picks": []}'
+
+
+def _standings_page_payload(page: int, *, first_rank: int | None = None) -> bytes:
+    """One Overall standings page as the platform serialises it, synthetic ids only."""
+
+    first = (page - 1) * MEMBERS_PER_PAGE + 1 if first_rank is None else first_rank
+    return json.dumps(
+        {
+            "league": {"id": 314, "name": "Overall"},
+            "standings": {
+                "page": page,
+                "has_next": page < 4,
+                "results": [
+                    {
+                        "entry": FIRST_SYNTHETIC_ENTRY + rank,
+                        "entry_name": f"Synthetic Squad {rank}",
+                        "player_name": f"Synthetic Manager {rank}",
+                        "rank": rank,
+                        "rank_sort": rank,
+                    }
+                    for rank in range(first, first + MEMBERS_PER_PAGE)
+                ],
+            },
+            "last_updated_data": "2026-09-01T03:30:00Z",
+        }
+    ).encode()
+
+
+def _write_cohort_snapshot(root: Path, pages: dict[int, bytes]) -> str:
+    """A cohort capture in the on-disk store, so the script reads it the way it reads a real one."""
+
+    payloads = {league_standings_page_payload(314, page): body for page, body in pages.items()}
+    return write_snapshot(
+        root, source="fpl-top200", captured_at_utc=CAPTURED, payloads=payloads
+    ).snapshot_id
+
+
+def _run_elite_capture(
+    monkeypatch: pytest.MonkeyPatch, root: Path, cohort_id: str, *, cohort_size: int
+) -> tuple[int, list[int]]:
+    """Run the script against ``root`` with the network replaced; return (exit, ids fetched)."""
+
+    fetched: list[int] = []
+
+    def _fetch(url: str) -> bytes:
+        fetched.append(int(url.split("/entry/", 1)[1].split("/", 1)[0]))
+        return _PICKS_PAYLOAD
+
+    monkeypatch.setattr(elite_capture, "fetch", _fetch)
+    monkeypatch.setattr(elite_capture, "_utc_now", lambda: "2026-09-02T12:00:00Z")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "capture_elite_picks",
+            "--cohort-snapshot",
+            cohort_id,
+            "--target-gameweek",
+            "3",
+            "--deadline-utc",
+            DEADLINE,
+            "--cohort-size",
+            str(cohort_size),
+            "--snapshot-root",
+            str(root),
+        ],
+    )
+    return elite_capture.main(), fetched
+
+
+def test_the_elite_picks_capture_cuts_top_100_out_of_a_four_page_capture(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A four-page capture is the whole ordering; the cut is a separate question.
+
+    The script used to ask the page reader for ranks 1..100 against four pages, which the
+    reader refuses as a capture defect -- so a Top-200 capture could never yield a Top-100
+    cohort here. It now validates the whole ordering and lets nested_cohorts cut the prefix.
+    """
+
+    cohort_id = _write_cohort_snapshot(
+        tmp_path, {page: _standings_page_payload(page) for page in range(1, 5)}
+    )
+
+    exit_code, fetched = _run_elite_capture(monkeypatch, tmp_path, cohort_id, cohort_size=100)
+
+    assert exit_code == 0
+    assert fetched == [FIRST_SYNTHETIC_ENTRY + rank for rank in range(1, 101)]
+    written = [path.name for path in tmp_path.iterdir() if path.name != cohort_id]
+    assert len(written) == 1
+    picks = read_snapshot(tmp_path, written[0])
+    assert sorted(picks.payloads) == sorted(
+        entry_picks_payload(FIRST_SYNTHETIC_ENTRY + rank, 2) for rank in range(1, 101)
+    )
+
+
+def test_the_elite_picks_capture_still_refuses_a_capture_missing_a_page(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Pages 1, 2 and 4 are read as a two-page capture, which cannot cover a Top-200."""
+
+    cohort_id = _write_cohort_snapshot(
+        tmp_path, {page: _standings_page_payload(page) for page in (1, 2, 4)}
+    )
+
+    exit_code, fetched = _run_elite_capture(monkeypatch, tmp_path, cohort_id, cohort_size=200)
+
+    assert exit_code == 1
+    assert "needs 200 ranked entries" in capsys.readouterr().out
+    assert fetched == []
+    assert [path.name for path in tmp_path.iterdir()] == [cohort_id]
+
+
+def test_the_elite_picks_capture_still_refuses_a_capture_with_a_broken_ordering(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Page two repeating page one's ranks is a capture defect, not a shorter cohort."""
+
+    cohort_id = _write_cohort_snapshot(
+        tmp_path,
+        {
+            1: _standings_page_payload(1),
+            2: _standings_page_payload(2, first_rank=1),
+            3: _standings_page_payload(3),
+            4: _standings_page_payload(4),
+        },
+    )
+
+    exit_code, fetched = _run_elite_capture(monkeypatch, tmp_path, cohort_id, cohort_size=100)
+
+    assert exit_code == 1
+    assert fetched == []
+    assert [path.name for path in tmp_path.iterdir()] == [cohort_id]
