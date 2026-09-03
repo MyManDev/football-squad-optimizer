@@ -372,6 +372,8 @@ def decide(
         )
         metadata["projection_handoff_fingerprint"] = handoff.fingerprint
         metadata["projection_handoff_path"] = str(request.in_season_projection)
+        if handoff.evidence_fingerprint is not None:
+            metadata["projection_evidence_fingerprint"] = handoff.evidence_fingerprint
         metadata["held_squad_decided_gameweek"] = held.decided_gameweek
 
     failures = verifier(

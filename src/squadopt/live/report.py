@@ -31,6 +31,10 @@ from squadopt.live.rules import SeasonRules
 from squadopt.live.transfers import HeldSquad, TransferDecision, plan_transfers
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
 from squadopt.optimization.models import OptimizationResult
+from squadopt.prediction.elite_evidence import (
+    ELITE_EVIDENCE_MODEL_VERSION,
+    ELITE_EVIDENCE_POLICY_VERSION,
+)
 from squadopt.scenarios import RivalSquad, ScenarioConfig, ScenarioEvaluationConfig
 
 REPORT_CONTRACT_VERSION: Final = "live_recommendation_v3"
@@ -402,6 +406,20 @@ def render(recommendation: Recommendation) -> str:
     ]
 
     diagnostics = recommendation.diagnostics
+    if recommendation.model_version == ELITE_EVIDENCE_MODEL_VERSION:
+        model_explanation = [
+            "  This decision uses the bounded Top-100 XI-support adjustment on the",
+            "  operational control projection. It is an owner-approved evidence rule,",
+            "  not a calibrated superiority or probability claim. Live availability is",
+            "  applied once after the handoff.",
+            f"  policy                     {ELITE_EVIDENCE_POLICY_VERSION}",
+        ]
+    else:
+        model_explanation = [
+            "  The projection is the operational control, the deterministic baseline. The",
+            "  two-stage production candidate was measured against the pre-registered gates",
+            "  and did not clear them, so it does not decide a real squad.",
+        ]
     lines += [
         "",
         "Projection provenance",
@@ -412,8 +430,6 @@ def render(recommendation: Recommendation) -> str:
         f"  ruled out by availability {diagnostics.get('availability_unavailable')}",
         f"  reduced by availability   {diagnostics.get('availability_reduced')}",
         "",
-        "  The projection is the operational control, the deterministic baseline. The",
-        "  two-stage production candidate was measured against the pre-registered gates",
-        "  and did not clear them, so it does not decide a real squad.",
+        *model_explanation,
     ]
     return "\n".join(lines) + "\n"

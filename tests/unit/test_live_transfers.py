@@ -33,6 +33,7 @@ from squadopt.live import (
     write_projection_handoff,
 )
 from squadopt.live import recommendation as live_recommendation
+from squadopt.prediction.elite_evidence import ELITE_EVIDENCE_MODEL_VERSION
 
 SEASON = "2026-27"
 HISTORY_SEASON = "2025-26"
@@ -233,6 +234,7 @@ def _handoff(
     exclude: tuple[int, ...] = (),
     version: str = IN_SEASON_VERSION,
     snapshot_id: str | None = None,
+    evidence_fingerprint: str | None = None,
 ) -> Path:
     """A producer's GW2 handoff: every roster player projected unless excluded.
 
@@ -259,6 +261,7 @@ def _handoff(
         model_version=version,
         feature_contract_version="synthetic-in-season-features-v0",
         expected_points=expected,
+        evidence_fingerprint=evidence_fingerprint,
         diagnostics={"producer": "test"},
     )
     return write_projection_handoff(world["handoffs"] / "gw02.json", projection)
@@ -329,6 +332,18 @@ def test_a_handoff_round_trips_and_a_tampered_one_is_refused(
     document = json.loads(path.read_text(encoding="utf-8"))
     document["expected_points"]["1024"] = 90.0
     path.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(DataSourceError, match="recorded fingerprint"):
+        read_projection_handoff(path)
+
+
+def test_an_evidence_digest_is_bound_into_the_handoff_fingerprint(
+    world: dict[str, Any],
+) -> None:
+    path = _handoff(world, evidence_fingerprint="a" * 64)
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["evidence_fingerprint"] = "b" * 64
+    path.write_text(json.dumps(document), encoding="utf-8")
+
     with pytest.raises(DataSourceError, match="recorded fingerprint"):
         read_projection_handoff(path)
 
@@ -405,6 +420,26 @@ def test_gameweek_two_is_decided_from_the_held_squad_and_frozen(
     assert decision["metadata"]["held_squad_decided_gameweek"] == 1
     report = (world["ledger_root"] / SEASON / "gw02" / "report.txt").read_text(encoding="utf-8")
     assert "Transfers" in report and "from gameweek       1 squad" in report
+
+
+def test_the_elite_evidence_identity_reaches_the_immutable_decision(
+    monkeypatch: pytest.MonkeyPatch, world: dict[str, Any]
+) -> None:
+    _decide_gw1(monkeypatch, world)
+    evidence_fingerprint = "a" * 64
+    handoff = _handoff(
+        world,
+        version=ELITE_EVIDENCE_MODEL_VERSION,
+        evidence_fingerprint=evidence_fingerprint,
+    )
+
+    assert _decide_gw2(monkeypatch, world, handoff) == 0
+
+    decision = json.loads(
+        (world["ledger_root"] / SEASON / "gw02" / "decision.json").read_text(encoding="utf-8")
+    )
+    assert decision["model_version"] == ELITE_EVIDENCE_MODEL_VERSION
+    assert decision["metadata"]["projection_evidence_fingerprint"] == evidence_fingerprint
 
 
 def test_the_sell_price_rule_is_applied_to_held_players(

@@ -44,6 +44,7 @@ from squadopt.prediction.availability import (
     apply_availability,
 )
 from squadopt.prediction.config import BaselineProjectionConfig
+from squadopt.prediction.elite_evidence import ELITE_EVIDENCE_MODEL_VERSION
 from squadopt.prediction.opening import build_opening_projection_from_snapshot
 
 # Named so a report cannot describe itself as coming from a model that was never promoted.
@@ -61,7 +62,10 @@ PROJECTION_HANDOFF_CONTRACT_VERSION: Final = "projection_handoff_v1"
 # until an in-season control clears its gates: pinning a version here is the promotion
 # decision, made in a reviewed change, and until then a mid-season decision is refused at
 # verification rather than made from an unpromoted model.
-IN_SEASON_CONTROL_MODEL_VERSIONS: Final[tuple[str, ...]] = ("in-season-carry-over-v1",)
+IN_SEASON_CONTROL_MODEL_VERSIONS: Final[tuple[str, ...]] = (
+    "in-season-carry-over-v1",
+    ELITE_EVIDENCE_MODEL_VERSION,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +87,7 @@ class InSeasonProjection:
     model_version: str
     feature_contract_version: str
     expected_points: Mapping[int, float]
+    evidence_fingerprint: str | None = None
     diagnostics: Mapping[str, object] = field(default_factory=dict)
     contract_version: str = PROJECTION_HANDOFF_CONTRACT_VERSION
 
@@ -111,6 +116,13 @@ class InSeasonProjection:
             points[int(player)] = number
         if not points:
             raise DataSourceError("Projection handoff carries no rows.")
+        if self.evidence_fingerprint is not None and (
+            len(self.evidence_fingerprint) != 64
+            or any(character not in "0123456789abcdef" for character in self.evidence_fingerprint)
+        ):
+            raise DataSourceError(
+                "Projection handoff evidence_fingerprint must be a lowercase SHA-256 digest."
+            )
         object.__setattr__(self, "expected_points", MappingProxyType(points))
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
@@ -128,6 +140,8 @@ class InSeasonProjection:
                 for player, value in sorted(self.expected_points.items())
             },
         }
+        if self.evidence_fingerprint is not None:
+            payload["evidence_fingerprint"] = self.evidence_fingerprint
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
@@ -149,6 +163,8 @@ def write_projection_handoff(path: Path, projection: InSeasonProjection) -> Path
         "diagnostics": dict(projection.diagnostics),
         "fingerprint": projection.fingerprint,
     }
+    if projection.evidence_fingerprint is not None:
+        document["evidence_fingerprint"] = projection.evidence_fingerprint
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
@@ -174,6 +190,11 @@ def read_projection_handoff(path: Path) -> InSeasonProjection:
             model_version=str(document.get("model_version", "")),
             feature_contract_version=str(document.get("feature_contract_version", "")),
             expected_points={int(player): float(value) for player, value in rows.items()},
+            evidence_fingerprint=(
+                str(document["evidence_fingerprint"])
+                if document.get("evidence_fingerprint") is not None
+                else None
+            ),
             diagnostics=dict(document.get("diagnostics") or {}),
             contract_version=str(document.get("contract_version", "")),
         )
@@ -425,6 +446,7 @@ def _project_in_season(
             "feature_contract_version": handoff.feature_contract_version,
             "projection_handoff_contract_version": handoff.contract_version,
             "projection_handoff_fingerprint": handoff.fingerprint,
+            "projection_evidence_fingerprint": handoff.evidence_fingerprint,
             "projection_source": "in_season_handoff",
             **{f"handoff_{key}": value for key, value in handoff.diagnostics.items()},
         },

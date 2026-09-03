@@ -25,6 +25,10 @@ from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import CONTROL_MODEL_NAME, handoff_path_for, read_projection_handoff
+from squadopt.prediction.elite_evidence import (
+    ELITE_EVIDENCE_MODEL_VERSION,
+    ELITE_EVIDENCE_POLICY_VERSION,
+)
 from squadopt.prediction.in_season import (
     IN_SEASON_FEATURE_CONTRACT_VERSION,
     IN_SEASON_MODEL_VERSION,
@@ -252,6 +256,119 @@ def test_the_declared_weights_travel_with_the_handoff(world: dict[str, Any]) -> 
     assert projection.diagnostics["gameweeks_played"] == 1
     assert projection.diagnostics["in_season_weight"] == pytest.approx(1 / 7)
     assert projection.diagnostics["carry_over_weight"] == pytest.approx(6 / 7)
+
+
+def test_verified_elite_evidence_changes_identity_and_round_trips(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    control, _, _ = _build(world, snapshot_id=world["after"], dry_run=True)
+    rows = []
+    ordered_players = sorted(control.expected_points)
+    for offset, player_id in enumerate(ordered_players):
+        count = 100 if offset < 11 else 0
+        rows.append(
+            {
+                "season": SEASON,
+                "target_gameweek": 2,
+                "captured_at_utc": "2026-08-27T08:00:00Z",
+                "deadline_timestamp_utc": EVENTS[1]["deadline_time"],
+                "player_id": player_id,
+                "elite_cohort_size": 100,
+                "elite_members_observed": 100,
+                "elite_start_count_lag1": count,
+                "elite_start_share_lag1": count / 100,
+                "elite_evidence_observed": True,
+            }
+        )
+    evidence = pd.DataFrame(rows)
+    evidence.attrs.update(
+        {
+            "elite_members_missing_picks": 0,
+            "unmapped_picked_elements": (),
+            "table_sha256": "a" * 64,
+        }
+    )
+    monkeypatch.setattr(producer, "read_player_evidence_artifact", lambda *_: evidence)
+    table_path = tmp_path / "evidence.csv"
+    manifest_path = tmp_path / "evidence.json"
+    table_path.write_text("unused\n", encoding="utf-8")
+    manifest_path.write_text("{}\n", encoding="utf-8")
+
+    projection, written, report = _build(
+        world,
+        snapshot_id=world["after"],
+        evidence_table_path=table_path,
+        evidence_manifest_path=manifest_path,
+    )
+
+    assert written is not None
+    reread = read_projection_handoff(written)
+    assert reread.fingerprint == projection.fingerprint
+    assert projection.model_version == ELITE_EVIDENCE_MODEL_VERSION
+    assert projection.expected_points[1001] == pytest.approx(control.expected_points[1001] * 1.05)
+    last_player = ordered_players[-1]
+    assert projection.expected_points[last_player] == pytest.approx(
+        control.expected_points[last_player]
+    )
+    assert report["elite_evidence_policy_version"] == ELITE_EVIDENCE_POLICY_VERSION
+    assert report["elite_evidence_manifest_sha256"]
+    assert report["version_is_promoted"] is True
+
+
+def test_evidence_paths_are_an_explicit_pair(world: dict[str, Any], tmp_path: Path) -> None:
+    with pytest.raises(SystemExit, match="requires both"):
+        _build(
+            world,
+            snapshot_id=world["after"],
+            evidence_table_path=tmp_path / "evidence.csv",
+        )
+
+
+def test_the_command_requires_evidence_unless_control_only_is_explicit(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["build_projection_handoff"])
+
+    with pytest.raises(SystemExit) as raised:
+        producer.main()
+
+    assert raised.value.code == 2
+    assert "use --control-only" in capsys.readouterr().err
+
+
+def test_the_command_forwards_the_verified_evidence_pair(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    table_path = tmp_path / "evidence.csv"
+    manifest_path = tmp_path / "evidence.json"
+
+    class Called(Exception):
+        pass
+
+    def fake_build(*_args: object, **kwargs: object) -> None:
+        assert kwargs["evidence_table_path"] == table_path
+        assert kwargs["evidence_manifest_path"] == manifest_path
+        raise Called
+
+    monkeypatch.setattr(producer, "build", fake_build)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "build_projection_handoff",
+            "--snapshot-root",
+            str(tmp_path),
+            "--archive-root",
+            str(tmp_path),
+            "--evidence-table",
+            str(table_path),
+            "--evidence-manifest",
+            str(manifest_path),
+        ],
+    )
+
+    with pytest.raises(Called):
+        producer.main()
 
 
 # --- refusals ---------------------------------------------------------------
