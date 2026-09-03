@@ -2,12 +2,20 @@
 
 from collections.abc import Mapping
 
-from squadopt.evaluation import BinaryMetrics, ComponentMetricSet, ErrorMetrics
+from squadopt.evaluation import (
+    BinaryMetrics,
+    ComponentMetricSet,
+    ErrorMetrics,
+    EvaluationResult,
+    PhaseCDecisionComparison,
+)
 from squadopt.experiments.config import ExperimentExecutionError
 from squadopt.experiments.phase_c_ablation import (
     PhaseCAblationEvaluation,
     PhaseCArmEvaluation,
 )
+
+PHASE_C_DECISION_REPORT_VERSION = "phase_c_decision_comparison_v1"
 
 
 def _binary(metrics: BinaryMetrics) -> dict[str, object]:
@@ -105,4 +113,89 @@ def phase_c_ablation_to_dict(result: PhaseCAblationEvaluation) -> dict[str, obje
     }
 
 
-__all__ = ["phase_c_ablation_to_dict"]
+def _decision_summary(result: EvaluationResult) -> dict[str, object]:
+    summary = result.summary
+    return {
+        "attempted_folds": summary.attempted_folds,
+        "feasible_folds": summary.feasible_folds,
+        "scored_folds": summary.scored_folds,
+        "mean_realized_squad_points": summary.mean_realized_squad_points,
+    }
+
+
+def phase_c_decision_comparison_to_dict(
+    result: PhaseCDecisionComparison,
+) -> dict[str, object]:
+    """Serialize one descriptive paired decision comparison without promoting an arm."""
+
+    if not isinstance(result, PhaseCDecisionComparison):
+        raise ExperimentExecutionError("result must be a PhaseCDecisionComparison.")
+    control_folds = result.control.folds
+    candidate_folds = result.component_base.folds
+    if [item.fold_id for item in control_folds] != [item.fold_id for item in candidate_folds]:
+        raise ExperimentExecutionError("Phase C decision result fold orders differ.")
+    table_digests = {item.metadata.get("phase_c_table_sha256") for item in candidate_folds}
+    roster_digests = {item.metadata.get("phase_c_roster_sha256") for item in candidate_folds}
+    if (
+        len(table_digests) != 1
+        or len(roster_digests) != 1
+        or not all(isinstance(value, str) and len(value) == 64 for value in table_digests)
+        or not all(isinstance(value, str) and len(value) == 64 for value in roster_digests)
+    ):
+        raise ExperimentExecutionError("Phase C decision result has inconsistent source digests.")
+
+    paired: list[dict[str, object]] = []
+    for control, candidate in zip(control_folds, candidate_folds, strict=True):
+        control_score = control.realized_squad_points
+        candidate_score = candidate.realized_squad_points
+        paired.append(
+            {
+                "fold_id": control.fold_id,
+                "control_solver_status": control.optimization_result.solver_status.value,
+                "component_solver_status": candidate.optimization_result.solver_status.value,
+                "control_realized_score": control_score,
+                "component_realized_score": candidate_score,
+                "difference": (
+                    None
+                    if control_score is None or candidate_score is None
+                    else candidate_score - control_score
+                ),
+            }
+        )
+    diagnostics = result.diagnostics
+    return {
+        "artifact_type": "phase_c_decision_comparison",
+        "contract_version": PHASE_C_DECISION_REPORT_VERSION,
+        "promotion_decision": "not_evaluated",
+        "scoring_policy": result.control.config.scoring_policy.value,
+        "source": {
+            "table_sha256": next(iter(table_digests)),
+            "roster_sha256": next(iter(roster_digests)),
+        },
+        "control": _decision_summary(result.control),
+        "component_base": _decision_summary(result.component_base),
+        "diagnostics": {
+            "attempted_folds": diagnostics.attempted_folds,
+            "comparable_folds": diagnostics.comparable_folds,
+            "candidate_wins": diagnostics.candidate_wins,
+            "ties": diagnostics.ties,
+            "candidate_losses": diagnostics.candidate_losses,
+            "mean_difference": diagnostics.mean_difference,
+            "median_difference": diagnostics.median_difference,
+            "season_mean_differences": dict(diagnostics.season_mean_differences),
+            "candidate_zero_minute_starters": diagnostics.candidate_zero_minute_starters,
+            "control_zero_minute_starters": diagnostics.control_zero_minute_starters,
+            "candidate_autosub_points": diagnostics.candidate_autosub_points,
+            "control_autosub_points": diagnostics.control_autosub_points,
+            "candidate_vice_captain_recoveries": (diagnostics.candidate_vice_captain_recoveries),
+            "control_vice_captain_recoveries": diagnostics.control_vice_captain_recoveries,
+        },
+        "folds": paired,
+    }
+
+
+__all__ = [
+    "PHASE_C_DECISION_REPORT_VERSION",
+    "phase_c_ablation_to_dict",
+    "phase_c_decision_comparison_to_dict",
+]
