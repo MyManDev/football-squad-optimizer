@@ -194,14 +194,39 @@ def test_a_blank_gameweek_overrides_history_with_zero() -> None:
 # --- missingness and routes -------------------------------------------------
 
 
-def test_the_start_component_is_missing_rather_than_zero() -> None:
-    """Its label does not exist and the admissible model is conditional, so there is none."""
+def test_both_halves_of_the_start_component_are_missing_rather_than_zero() -> None:
+    """The label does not exist and the admissible model is conditional, so neither exists.
+
+    Both are named rather than absent, so a consumer meets an explicit missing value
+    instead of a missing column -- the evaluation side asked for exactly that.
+    """
 
     frame = _frame(8, 20)
     models = _fitted(frame)
 
     predicted = predict_components(models, frame, feature_columns=FEATURES)
 
+    assert bool(predicted["q_start_given_appearance"].isna().all())
+    assert bool(predicted["start_probability"].isna().all())
+
+
+def test_a_blank_gameweek_leaves_the_start_component_missing_not_zero() -> None:
+    """The calendar override zeroes what exists; it cannot zero what is unavailable.
+
+    A conditional start probability given no appearance is undefined rather than zero, and
+    writing 0.0 here would make the column mean "evaluated to zero" on blank rows and
+    "unavailable" everywhere else -- one column, two meanings, told apart only by
+    fixture_count.
+    """
+
+    frame = _frame(8, 20)
+    models = _fitted(frame)
+    blank = frame.assign(fixture_count=pd.Series(0, index=frame.index, dtype="int64"))
+
+    predicted = predict_components(models, blank, feature_columns=FEATURES)
+
+    assert predicted["appearance_probability"].tolist() == [0.0] * len(blank)
+    assert bool(predicted["q_start_given_appearance"].isna().all())
     assert bool(predicted["start_probability"].isna().all())
 
 

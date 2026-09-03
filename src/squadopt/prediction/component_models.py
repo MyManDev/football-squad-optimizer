@@ -59,6 +59,7 @@ RANDOM_STATE: Final = 0
 
 COMPONENT_PREDICTION_COLUMNS: Final = (
     "appearance_probability",
+    "q_start_given_appearance",
     "start_probability",
     "expected_minutes_if_appearance",
     "raw_expected_points_if_appearance",
@@ -279,8 +280,12 @@ def predict_components(
     return pd.DataFrame(
         {
             "appearance_probability": appearance,
-            # The admissible start model is conditional and its label does not exist in
-            # this panel, so the component is unavailable rather than zero.
+            # The admissible start model is conditional -- the pre-registration requires
+            # `p_start = p_appearance * q_start_given_appearance` and forbids composing two
+            # independently fitted probabilities -- and its label does not exist in this
+            # panel. Both halves are therefore unavailable rather than zero, and both are
+            # named so a consumer finds an explicit absence instead of a missing column.
+            "q_start_given_appearance": pd.Series(pd.NA, index=index, dtype="Float64"),
             "start_probability": pd.Series(pd.NA, index=index, dtype="Float64"),
             "expected_minutes_if_appearance": minutes,
             "raw_expected_points_if_appearance": raw_points,

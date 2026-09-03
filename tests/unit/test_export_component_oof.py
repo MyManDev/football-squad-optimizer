@@ -9,9 +9,14 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 from scripts.export_component_oof import (
+    _DERIVED_FLOAT_COLUMNS,
     LOCKED_HOLDOUT_SEASON,
     OOF_COLUMNS,
     OOF_CONTRACT_VERSION,
+    PUBLIC_POINTS_BOUND,
+    ROSTER_COLUMNS,
+    ROSTER_CONTRACT_VERSION,
+    build_decision_roster,
     build_oof_table,
     main,
 )
@@ -33,14 +38,16 @@ FEATURES = component_feature_columns()
 SMALL = ComponentModelConfig(minimum_training_rows=10)
 
 
-def _frame(gameweeks: int, players: int) -> pd.DataFrame:
+def _panel_for(gameweeks: int, players: int) -> pd.DataFrame:
+    """The canonical panel the frame and the roster are both built from."""
+
     rows = []
     for gameweek in range(1, gameweeks + 1):
         for player in range(1, players + 1):
             plays = (player + gameweek) % 5 != 0
             rows.append((gameweek, player, 90 if plays else 0, 3 + player % 4 if plays else 0))
     raw = pd.DataFrame(rows, columns=["gameweek", "player_id", "minutes", "total_points"])
-    panel = pd.DataFrame(
+    return pd.DataFrame(
         {
             "season": pd.Series(SEASON, index=raw.index, dtype="string"),
             "gameweek": raw["gameweek"].astype("int64"),
@@ -53,6 +60,11 @@ def _frame(gameweeks: int, players: int) -> pd.DataFrame:
             "total_points": raw["total_points"].astype("int64"),
         }
     )
+
+
+def _frame(gameweeks: int, players: int) -> pd.DataFrame:
+    panel = _panel_for(gameweeks, players)
+    raw = panel.loc[:, ["gameweek", "player_id"]]
     features = panel.loc[:, ["season", "gameweek", "player_id", "price_tenths"]].copy(deep=True)
     for offset, column in enumerate(FEATURES, start=1):
         if column == "price_tenths":
@@ -256,3 +268,150 @@ def test_no_phase_b_evidence_column_reaches_the_export() -> None:
 
     assert evidence_only
     assert set(OOF_COLUMNS) & evidence_only == set()
+
+
+# --- per-fold provenance ----------------------------------------------------
+
+
+def test_a_fold_is_never_in_its_own_training_set() -> None:
+    """The record the chronology check reads, asserted rather than trusted."""
+
+    _, walk = build_oof_table(
+        _frame(8, 20), _decisions(range(2, 9)), season_order=SEASON_ORDER, config=SMALL
+    )
+
+    assert walk.folds
+    for record in walk.folds:
+        assert record.fold_id not in record.training_fold_ids
+
+
+def test_the_training_cutoff_is_the_last_fold_before_the_decision() -> None:
+    """The ordinal analogue of training_cutoff_utc, which the archive cannot supply."""
+
+    _, walk = build_oof_table(
+        _frame(8, 20), _decisions(range(2, 9)), season_order=SEASON_ORDER, config=SMALL
+    )
+    by_id = {record.fold_id: record for record in walk.folds}
+
+    assert by_id[f"{SEASON}-gw05"].training_cutoff_fold_id == f"{SEASON}-gw04"
+    assert by_id[f"{SEASON}-gw05"].training_fold_ids == tuple(
+        f"{SEASON}-gw0{gameweek}" for gameweek in range(1, 5)
+    )
+
+
+def test_both_utc_timestamps_are_absent_and_that_is_recorded_not_forged() -> None:
+    """`data/schema.py` refuses to recover a deadline from a kickoff time; so does this."""
+
+    _, walk = build_oof_table(
+        _frame(6, 20), _decisions(range(2, 7)), season_order=SEASON_ORDER, config=SMALL
+    )
+
+    for record in walk.folds:
+        assert record.decision_timestamp_utc is None
+        assert record.training_cutoff_utc is None
+
+
+def test_the_training_key_digest_covers_the_rows_not_only_the_fold_labels() -> None:
+    """Two frames agreeing on folds but differing in rows must not share a digest."""
+
+    decisions = _decisions(range(2, 7))
+    _, first = build_oof_table(_frame(6, 20), decisions, season_order=SEASON_ORDER, config=SMALL)
+    _, fewer = build_oof_table(_frame(6, 19), decisions, season_order=SEASON_ORDER, config=SMALL)
+
+    same_fold = f"{SEASON}-gw05"
+    first_digest = next(r.training_key_digest for r in first.folds if r.fold_id == same_fold)
+    fewer_digest = next(r.training_key_digest for r in fewer.folds if r.fold_id == same_fold)
+    assert first_digest != fewer_digest
+
+
+def test_each_record_carries_the_three_contract_versions() -> None:
+    _, walk = build_oof_table(
+        _frame(6, 20), _decisions(range(2, 7)), season_order=SEASON_ORDER, config=SMALL
+    )
+
+    for record in walk.folds:
+        assert record.model_version
+        assert record.feature_contract_version
+        assert record.target_contract_version
+
+
+# --- the public points bound -------------------------------------------------
+
+
+def test_the_public_bound_holds_on_the_exported_values() -> None:
+    """max(0, p * raw), recomputable from the file rather than only from memory.
+
+    Every column is written at nine decimals, so the derived columns are composed from the
+    *rounded* independent ones. Deriving them from unrounded inputs left a discrepancy near
+    1e-9 on the real table, which a reader recomputing the identity would have found.
+    """
+
+    table, _ = build_oof_table(
+        _frame(8, 20), _decisions(range(2, 9)), season_order=SEASON_ORDER, config=SMALL
+    )
+    modelled = table.loc[table["composition_route"] == "component_model"]
+
+    expected = (
+        (
+            modelled["appearance_probability"].astype("float64")
+            * modelled["raw_expected_points_if_appearance"].astype("float64")
+        )
+        .clip(lower=0.0)
+        .round(9)
+    )
+    assert modelled["control_expected_points"].astype("float64").tolist() == expected.tolist()
+    assert bool((modelled["control_expected_points"].astype("float64") >= 0.0).all())
+    assert _DERIVED_FLOAT_COLUMNS == (
+        "expected_points_if_appearance",
+        "control_expected_points",
+    )
+    assert "max(0, appearance_probability" in PUBLIC_POINTS_BOUND
+
+
+def test_the_conditional_start_column_is_present_and_missing() -> None:
+    table, _ = build_oof_table(
+        _frame(6, 20), _decisions(range(2, 7)), season_order=SEASON_ORDER, config=SMALL
+    )
+
+    assert "q_start_given_appearance" in table.columns
+    assert bool(table["q_start_given_appearance"].isna().all())
+
+
+# --- the decision roster ----------------------------------------------------
+
+
+def test_the_roster_covers_exactly_the_scored_population() -> None:
+    """Same key, same rows: a decision-level comparison cannot score a different set."""
+
+    frame = _frame(6, 20)
+    table, _ = build_oof_table(
+        frame, _decisions(range(2, 7)), season_order=SEASON_ORDER, config=SMALL
+    )
+    roster = build_decision_roster(_panel_for(6, 20), table)
+
+    keys = ["season", "target_gameweek", "player_id"]
+    assert tuple(roster.columns) == ROSTER_COLUMNS
+    assert len(roster) == len(table)
+    assert roster.loc[:, keys].equals(table.loc[:, keys])
+    assert roster["contract_version"].unique().tolist() == [ROSTER_CONTRACT_VERSION]
+
+
+def test_the_roster_carries_no_ownership_column() -> None:
+    """selected_by_percent's snapshot timing is unproven, so it fails the condition."""
+
+    assert "selected_by_percent" not in ROSTER_COLUMNS
+    assert not any(column.endswith("selected_by_percent") for column in ROSTER_COLUMNS)
+
+
+def test_a_scored_row_with_no_roster_record_is_refused() -> None:
+    """Scoring a player the roster cannot describe would compare two populations."""
+
+    frame = _frame(6, 20)
+    table, _ = build_oof_table(
+        frame, _decisions(range(2, 7)), season_order=SEASON_ORDER, config=SMALL
+    )
+    thinned = _panel_for(6, 20)
+    thinned = thinned.loc[thinned["player_id"] != 7]
+
+    with pytest.raises(DataError, match="no roster record"):
+        build_decision_roster(thinned, table)
