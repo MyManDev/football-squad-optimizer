@@ -16,26 +16,31 @@ from squadopt.experiments.phase_c_reporting import phase_c_ablation_to_dict
 def _component_rows() -> pd.DataFrame:
     return pd.DataFrame(
         {
+            "contract_version": ["phase_c_component_oof_v1"] * 4,
+            "model_version": ["phase-c-component-control-v1"] * 4,
+            "feature_contract_version": ["phase_c_component_form_window_v1"] * 4,
+            "target_contract_version": ["phase_c_component_targets_v1"] * 4,
+            "dataset_contract_version": ["phase_c_component_dataset_v1"] * 4,
             "season": ["2022-23", "2022-23", "2023-24", "2023-24"],
             "target_gameweek": [2, 2, 2, 2],
             "player_id": ["p1", "p2", "p1", "p2"],
+            "decision_timestamp_utc": [pd.NA] * 4,
             "fold_id": ["2022-23-gw02"] * 2 + ["2023-24-gw02"] * 2,
             "position": ["GK", "MID", "GK", "MID"],
             "fixture_count": [1, 1, 1, 1],
             "appearance_target": [1, 0, 1, 0],
             "start_target": [1, 0, 1, 0],
-            "minutes_target": [90, 0, 80, 0],
-            "points_target": [6, 0, 4, 0],
+            "minutes_target": [90, pd.NA, 80, pd.NA],
+            "points_target": [6, pd.NA, 4, pd.NA],
             "composition_route": ["component_model"] * 4,
             "evidence_status": ["not_requested"] * 4,
             "appearance_probability": [0.8, 0.2, 0.7, 0.3],
             "q_start_given_appearance": [0.75, 0.5, 0.8, 0.5],
             "start_probability": [0.6, 0.1, 0.56, 0.15],
             "expected_minutes_if_appearance": [80, 30, 75, 30],
-            "expected_minutes": [64, 6, 52.5, 9],
+            "raw_expected_points_if_appearance": [6, 2, 5, 2],
             "expected_points_if_appearance": [6, 2, 5, 2],
-            "fallback_expected_points": [pd.NA] * 4,
-            "expected_points": [4.8, 0.4, 3.5, 0.6],
+            "control_expected_points": [4.8, 0.4, 3.5, 0.6],
         }
     )
 
@@ -45,13 +50,13 @@ def _declaration(
     arm_id: str,
     family: str,
     *,
-    target_contract: str = "phase-c-targets-v1",
+    target_contract: str = "phase_c_component_targets_v1",
 ) -> PhaseCArmDeclaration:
     return PhaseCArmDeclaration(
         arm_id=arm_id,
         evidence_family=family,
-        model_version=f"{arm_id}-v1",
-        feature_contract_version=f"{arm_id}-features-v1",
+        model_version=str(rows["model_version"].iloc[0]),
+        feature_contract_version=str(rows["feature_contract_version"].iloc[0]),
         target_contract_version=target_contract,
         evaluation_rows_sha256=phase_c_evaluation_rows_sha256(rows),
     )
@@ -77,11 +82,8 @@ def test_scores_single_family_arm_on_exact_component_base_keys() -> None:
     elite = base.copy(deep=True)
     elite["appearance_probability"] = [0.9, 0.1, 0.8, 0.2]
     elite["start_probability"] = elite["appearance_probability"] * elite["q_start_given_appearance"]
-    elite["expected_minutes"] = (
-        elite["appearance_probability"] * elite["expected_minutes_if_appearance"]
-    )
-    elite["expected_points"] = (
-        elite["appearance_probability"] * elite["expected_points_if_appearance"]
+    elite["control_expected_points"] = (
+        elite["appearance_probability"] * elite["raw_expected_points_if_appearance"]
     )
 
     result = _evaluate(base, elite)
@@ -109,8 +111,7 @@ def test_declared_digest_is_bound_to_the_exact_rows() -> None:
     declaration = _declaration(candidate, "component_plus_elite", "elite")
     candidate.loc[0, "appearance_probability"] = 0.9
     candidate.loc[0, "start_probability"] = 0.675
-    candidate.loc[0, "expected_minutes"] = 72
-    candidate.loc[0, "expected_points"] = 5.4
+    candidate.loc[0, "control_expected_points"] = 5.4
 
     with pytest.raises(ExperimentExecutionError, match="does not match"):
         evaluate_phase_c_ablations(
@@ -167,8 +168,7 @@ def test_missing_evidence_must_reproduce_the_component_base_row() -> None:
     candidate.loc[0, "evidence_status"] = "missing"
     candidate.loc[0, "appearance_probability"] = 0.9
     candidate.loc[0, "start_probability"] = 0.675
-    candidate.loc[0, "expected_minutes"] = 72
-    candidate.loc[0, "expected_points"] = 5.4
+    candidate.loc[0, "control_expected_points"] = 5.4
 
     with pytest.raises(ExperimentExecutionError, match="reproduce component_base"):
         evaluate_phase_c_ablations(
