@@ -8,8 +8,9 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 - **Phase A — Engineering complete; prospective evidence accumulating.**
 - **Phase B — Complete.** The deadline-safe evidence layer is built and its first real
   handoff is produced and verified.
-- **Phase C — In progress.** Component player-model work may proceed now that the frozen
-  evidence handoff exists; it respects that handoff rather than reading raw captures.
+- **Phase C — Operational v1 active; evaluation continues.** The in-season handoff can
+  consume the verified Top-100 evidence artifact under a frozen, bounded rule. Richer
+  component fitting and prospective accuracy gates remain in progress.
 - **Phases D–H — Planned.** Later phases do not become product claims until their own
   calibration and evaluation gates pass.
 
@@ -79,7 +80,7 @@ Exit criteria:
 
 ## Phase C — Probabilistic player model
 
-**Status: next; may progress in parallel with Phase B.**
+**Status: operational v1 available; component evaluation in progress.**
 
 Goal: replace a single undifferentiated point estimate with explicit, testable components.
 
@@ -93,6 +94,12 @@ Goal: replace a single undifferentiated point estimate with explicit, testable c
 - Evaluate minutes with out-of-sample error metrics.
 - Evaluate points and final squad decisions on chronological walk-forward folds.
 - Ablate ownership, elite, transfer and availability evidence separately before combining them.
+
+The first operational slice is intentionally narrower than the final component model. It uses
+the previous-gameweek Top-100 XI count as a bounded five-per-cent uplift to the existing
+in-season expected-points handoff, while live availability remains a separate, single
+post-processing step. The exact rule, rollback and limitations are frozen in
+[`docs/phase_c_operational_elite_policy.md`](docs/phase_c_operational_elite_policy.md).
 
 No probability from this phase is member-facing. Publication requires the later scenario and
 calibration gates.

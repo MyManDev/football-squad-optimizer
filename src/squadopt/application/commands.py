@@ -238,11 +238,13 @@ def verify_decision(
         )
 
     unavailable = {int(player) for player in projection.unavailable_players}
-    selected_unavailable = sorted(squad_ids & unavailable)
-    if selected_unavailable:
+    bench_ids = {int(value) for value in recommendation.bench["player_id"]}
+    held_bench = (set(held.squad_player_ids) & bench_ids) if held is not None else set()
+    disallowed_unavailable = sorted((squad_ids & unavailable) - held_bench)
+    if disallowed_unavailable:
         failures.append(
-            f"Availability rule violated: unavailable players {selected_unavailable!r} "
-            "were selected."
+            f"Availability rule violated: unavailable players {disallowed_unavailable!r} "
+            "were selected outside the held bench."
         )
     if risk_requested:
         if recommendation.risk.status is LiveRiskStatus.NOT_REQUESTED:
@@ -372,6 +374,8 @@ def decide(
         )
         metadata["projection_handoff_fingerprint"] = handoff.fingerprint
         metadata["projection_handoff_path"] = str(request.in_season_projection)
+        if handoff.evidence_fingerprint is not None:
+            metadata["projection_evidence_fingerprint"] = handoff.evidence_fingerprint
         metadata["held_squad_decided_gameweek"] = held.decided_gameweek
 
     failures = verifier(

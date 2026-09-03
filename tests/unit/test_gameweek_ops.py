@@ -17,6 +17,7 @@ import scripts.run_gameweek_ops as ops
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import (
+    HeldSquad,
     Projection,
     Recommendation,
     build_recommendation,
@@ -297,16 +298,56 @@ def test_a_budget_breach_is_refused(
     assert any("over the" in failure for failure in failures)
 
 
-def test_a_selected_unavailable_player_is_refused(
+def test_an_unavailable_starter_is_refused(
     verified_pair: tuple[Recommendation, Projection],
 ) -> None:
     recommendation, projection = verified_pair
-    selected = int(recommendation.squad["player_id"].iloc[0])
+    selected = int(recommendation.starting_xi["player_id"].iloc[0])
     flagged = replace(projection, unavailable_players=(selected,))
 
     failures = ops.verify_decision(recommendation, flagged)
 
     assert any("Availability rule violated" in failure for failure in failures)
+
+
+def test_an_unavailable_player_cannot_be_newly_selected_on_the_bench(
+    verified_pair: tuple[Recommendation, Projection],
+) -> None:
+    recommendation, projection = verified_pair
+    benched = int(recommendation.bench["player_id"].iloc[0])
+    flagged = replace(projection, unavailable_players=(benched,))
+
+    failures = ops.verify_decision(recommendation, flagged)
+
+    assert any("Availability rule violated" in failure for failure in failures)
+
+
+def test_an_unavailable_held_player_may_remain_on_the_bench(
+    verified_pair: tuple[Recommendation, Projection],
+) -> None:
+    recommendation, projection = verified_pair
+    benched = int(recommendation.bench["player_id"].iloc[0])
+    held = HeldSquad(
+        season=recommendation.season,
+        decided_gameweek=recommendation.gameweek - 1,
+        squad_player_ids=tuple(int(value) for value in recommendation.squad["player_id"]),
+        purchase_prices={
+            int(player): int(price)
+            for player, price in zip(
+                recommendation.squad["player_id"],
+                recommendation.squad["price_tenths"],
+                strict=True,
+            )
+        },
+        bank_tenths=0,
+        free_transfers=1,
+        chips_used={},
+    )
+    flagged = replace(projection, unavailable_players=(benched,))
+
+    failures = ops.verify_decision(recommendation, flagged, held)
+
+    assert not any("Availability rule violated" in failure for failure in failures)
 
 
 # --- settle -----------------------------------------------------------------

@@ -30,6 +30,7 @@ Nothing is fetched. The capture is already on disk.
 """
 
 import argparse
+import hashlib
 import sys
 from pathlib import Path
 from typing import Final
@@ -47,6 +48,7 @@ from squadopt.data.sources.fpl_live import (
 )
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.features.cross_season import carry_over_as_of
+from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.live import (
     CONTROL_MODEL_NAME,
     IN_SEASON_CONTROL_MODEL_VERSIONS,
@@ -55,6 +57,11 @@ from squadopt.live import (
     infer_season,
     read_projection_handoff,
     write_projection_handoff,
+)
+from squadopt.prediction.elite_evidence import (
+    ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION,
+    ELITE_EVIDENCE_MODEL_VERSION,
+    apply_elite_evidence,
 )
 from squadopt.prediction.in_season import (
     IN_SEASON_FEATURE_CONTRACT_VERSION,
@@ -89,6 +96,8 @@ def build(
     snapshot_id: str | None = None,
     gameweek: int | None = None,
     config: InSeasonBlendConfig | None = None,
+    evidence_table_path: Path | None = None,
+    evidence_manifest_path: Path | None = None,
     dry_run: bool = False,
 ) -> tuple[InSeasonProjection, Path | None, dict[str, object]]:
     """Project one capture's open deadline and write the handoff for it."""
@@ -103,11 +112,15 @@ def build(
     # The deadline this capture is open for, read from the capture rather than supplied,
     # for the same reason the season is: a hand-passed gameweek can be the wrong one, and
     # the live path would then refuse the handoff after the work was done.
-    target = (
-        next_open_deadline(gameweek_deadlines(bootstrap), as_of_utc=captured_at).gameweek
-        if gameweek is None
-        else gameweek
-    )
+    deadlines = gameweek_deadlines(bootstrap)
+    if gameweek is None:
+        target_deadline = next_open_deadline(deadlines, as_of_utc=captured_at)
+    else:
+        matches = [entry for entry in deadlines if entry.gameweek == gameweek]
+        if not matches:
+            raise SystemExit(f"Capture {identifier} publishes no gameweek {gameweek} deadline.")
+        target_deadline = matches[0]
+    target = target_deadline.gameweek
     # Every gameweek before the target has been played, so that is the in-season sample.
     played = target - 1
 
@@ -124,11 +137,40 @@ def build(
         roster, carried, history, fallback, gameweeks_played=played, config=config
     )
 
+    if (evidence_table_path is None) != (evidence_manifest_path is None):
+        raise SystemExit("Evidence requires both --evidence-table and --evidence-manifest.")
+
+    projected_table = blend.table
+    model_version = IN_SEASON_MODEL_VERSION
+    feature_contract_version = IN_SEASON_FEATURE_CONTRACT_VERSION
+    diagnostics = dict(blend.diagnostics)
+    if evidence_table_path is not None and evidence_manifest_path is not None:
+        evidence = read_player_evidence_artifact(evidence_table_path, evidence_manifest_path)
+        adjusted = apply_elite_evidence(
+            projected_table,
+            evidence,
+            season=season,
+            target_gameweek=target,
+            deadline_timestamp_utc=target_deadline.deadline_utc,
+            decision_captured_at_utc=captured_at,
+        )
+        projected_table = adjusted.table
+        model_version = ELITE_EVIDENCE_MODEL_VERSION
+        feature_contract_version = ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION
+        diagnostics.update(adjusted.diagnostics)
+        manifest_digest = hashlib.sha256(evidence_manifest_path.read_bytes()).hexdigest()
+        diagnostics["elite_evidence_manifest_sha256"] = manifest_digest
+        evidence_fingerprint = hashlib.sha256(
+            f"{evidence.attrs['table_sha256']}:{manifest_digest}".encode()
+        ).hexdigest()
+    else:
+        evidence_fingerprint = None
+
     expected = {
         int(code): float(points)
         for code, points in zip(
-            blend.table["player_id"].astype("int64").tolist(),
-            blend.table["expected_points"].astype("float64").tolist(),
+            projected_table["player_id"].astype("int64").tolist(),
+            projected_table["expected_points"].astype("float64").tolist(),
             strict=True,
         )
     }
@@ -137,10 +179,11 @@ def build(
         gameweek=target,
         source_snapshot_id=identifier,
         model_name=CONTROL_MODEL_NAME,
-        model_version=IN_SEASON_MODEL_VERSION,
-        feature_contract_version=IN_SEASON_FEATURE_CONTRACT_VERSION,
+        model_version=model_version,
+        feature_contract_version=feature_contract_version,
         expected_points=expected,
-        diagnostics=blend.diagnostics,
+        evidence_fingerprint=evidence_fingerprint,
+        diagnostics=diagnostics,
     )
 
     path = handoff_path_for(handoff_root, season, target)
@@ -162,9 +205,9 @@ def build(
         "handoff_path": str(path),
         "fingerprint": projection.fingerprint,
         "model_name": CONTROL_MODEL_NAME,
-        "model_version": IN_SEASON_MODEL_VERSION,
-        "version_is_promoted": IN_SEASON_MODEL_VERSION in IN_SEASON_CONTROL_MODEL_VERSIONS,
-        **blend.diagnostics,
+        "model_version": model_version,
+        "version_is_promoted": model_version in IN_SEASON_CONTROL_MODEL_VERSIONS,
+        **diagnostics,
     }
     return projection, written, report
 
@@ -178,13 +221,43 @@ def main() -> int:
         "--snapshot-id", default=None, help="capture to project (default: the most recent)"
     )
     parser.add_argument(
+        "--control-only",
+        action="store_true",
+        help="explicitly produce the previous control without Phase C evidence",
+    )
+    parser.add_argument(
         "--gameweek",
         type=int,
         default=None,
         help="override the deadline read from the capture; normally unnecessary",
     )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
+    parser.add_argument(
+        "--evidence-table",
+        type=Path,
+        default=None,
+        help="verified player_evidence_v1 CSV; requires --evidence-manifest",
+    )
+    parser.add_argument(
+        "--evidence-manifest",
+        type=Path,
+        default=None,
+        help="manifest paired with --evidence-table",
+    )
     arguments = parser.parse_args()
+
+    evidence_requested = (
+        arguments.evidence_table is not None and arguments.evidence_manifest is not None
+    )
+    if arguments.control_only and (
+        arguments.evidence_table is not None or arguments.evidence_manifest is not None
+    ):
+        parser.error("--control-only cannot be combined with evidence artifact arguments")
+    if not arguments.control_only and not evidence_requested:
+        parser.error(
+            "the operational Phase C path requires --evidence-table and --evidence-manifest; "
+            "use --control-only for the explicit rollback"
+        )
 
     if not arguments.snapshot_root.is_dir():
         print(f"No snapshot directory at {arguments.snapshot_root}.")
@@ -202,6 +275,8 @@ def main() -> int:
         arguments.handoff_root,
         snapshot_id=arguments.snapshot_id,
         gameweek=arguments.gameweek,
+        evidence_table_path=arguments.evidence_table,
+        evidence_manifest_path=arguments.evidence_manifest,
         dry_run=arguments.dry_run,
     )
 
@@ -221,6 +296,19 @@ def main() -> int:
         print(f"  {key:42} {report[key]}")
     print(f"  {'in_season_weight':42} {report['in_season_weight']}")
     print(f"  {'carry_over_weight':42} {report['carry_over_weight']}")
+    if "elite_evidence_policy_version" in report:
+        print()
+        print("Phase C elite evidence")
+        for key in (
+            "elite_evidence_policy_version",
+            "elite_evidence_cohort_size",
+            "elite_evidence_players_uplifted",
+            "elite_evidence_mean_points_delta",
+            "elite_evidence_max_points_delta",
+            "elite_evidence_table_sha256",
+            "elite_evidence_manifest_sha256",
+        ):
+            print(f"  {key:42} {report[key]}")
     print()
     print(f"Identity  {report['model_name']} / {report['model_version']}")
     if not report["version_is_promoted"]:
