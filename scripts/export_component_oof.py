@@ -582,15 +582,32 @@ def main() -> int:
             "gameweek, and no outcome column is in the feature set."
         ),
         "archive_commit": ARCHIVE_COMMIT,
+        "reproduce": (
+            "This artifact reads only the pinned public archive, so it can be rebuilt "
+            "rather than transferred: python -m scripts.fetch_historical_data (verifies "
+            "against the committed checksum manifest), then python -m "
+            "scripts.export_component_oof, at the repository_commit below. Byte-identical "
+            "output is the check -- compare table_sha256 and roster_sha256. Only "
+            "generated_at_utc differs between runs."
+        ),
         "repository_commit": revision,
         "working_tree_dirty": dirty,
         "generated_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "table_file": table_path.name,
         "table_sha256": digest,
+        # Reported from the frame that was written rather than declared separately, so the
+        # manifest cannot claim a schema the file does not carry. A CSV has no dtypes, and
+        # a plain read_csv turns the nullable columns into float64 -- a consumer aligning
+        # its evaluator schema needs the declared ones, not the inferred ones.
+        "table_columns": list(OOF_COLUMNS),
+        "table_column_dtypes": {str(column): str(dtype) for column, dtype in table.dtypes.items()},
         "roster_file": roster_path.name,
         "roster_sha256": roster_digest,
         "roster_row_count": len(roster),
         "roster_columns": list(ROSTER_COLUMNS),
+        "roster_column_dtypes": {
+            str(column): str(dtype) for column, dtype in roster.dtypes.items()
+        },
         "roster_ownership_policy": (
             "Omitted. selected_by_percent is the only ownership column the panel carries "
             "and data/schema.py classifies it in AMBIGUOUS_TIMING_COLUMNS, so its snapshot "

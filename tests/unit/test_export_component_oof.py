@@ -415,3 +415,27 @@ def test_a_scored_row_with_no_roster_record_is_refused() -> None:
 
     with pytest.raises(DataError, match="no roster record"):
         build_decision_roster(thinned, table)
+
+
+# --- what the manifest has to let a consumer do without the file -------------
+
+
+def test_the_declared_dtypes_are_the_ones_the_written_frame_carries() -> None:
+    """A CSV has no dtypes, so the manifest is where the declared ones live.
+
+    Read back with a plain `read_csv`, the nullable columns become float64 and one Int64
+    column becomes float64 the moment a value is missing. An evaluator aligning its schema
+    needs what was declared, and the manifest reports it from the frame that was written
+    rather than from a second list that could drift.
+    """
+
+    table, _ = build_oof_table(
+        _frame(8, 20), _decisions(range(2, 9)), season_order=SEASON_ORDER, config=SMALL
+    )
+    declared = {str(column): str(dtype) for column, dtype in table.dtypes.items()}
+
+    assert set(declared) == set(OOF_COLUMNS)
+    assert declared["appearance_probability"] == "Float64"
+    assert declared["q_start_given_appearance"] == "Float64"
+    assert declared["start_target"] == "Int64"
+    assert declared["composition_route"] == "string"
