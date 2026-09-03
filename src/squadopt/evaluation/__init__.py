@@ -26,6 +26,7 @@ from squadopt.evaluation.cohorts import (
 )
 from squadopt.evaluation.component_metrics import (
     PHASE_C_COMPONENT_METRICS_VERSION,
+    PHASE_C_LOCKED_HOLDOUT_SEASONS,
     PHASE_C_OOF_KEY,
     PHASE_C_OOF_REQUIRED_COLUMNS,
     BinaryMetrics,
@@ -59,6 +60,7 @@ __all__ = [
     "APPEARANCE_RELIABILITY_BIN_COUNT",
     "OWNERSHIP_TEMPLATE_V2",
     "PHASE_C_COMPONENT_METRICS_VERSION",
+    "PHASE_C_LOCKED_HOLDOUT_SEASONS",
     "PHASE_C_OOF_KEY",
     "PHASE_C_OOF_REQUIRED_COLUMNS",
     "TOP_MANAGER_COHORT_SIZE",
