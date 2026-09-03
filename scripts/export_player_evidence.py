@@ -49,9 +49,9 @@ from squadopt.features.evidence import (
     EVIDENCE_COLUMNS,
     build_player_evidence_table,
 )
+from squadopt.features.evidence_artifact import ARTIFACT_CONTRACT_VERSION
 from squadopt.preflight.validator import compute_table_sha256
 
-ARTIFACT_CONTRACT_VERSION: Final = "player_evidence_export_v1"
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
 DEFAULT_OUTPUT_DIR = REPOSITORY_ROOT / "artifacts" / "phase_b"
