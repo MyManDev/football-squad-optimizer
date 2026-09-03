@@ -24,6 +24,12 @@ from squadopt.evaluation.cohorts import (
     aggregate_top_100_scores,
     select_as_of_top_100,
 )
+from squadopt.evaluation.component_decisions import (
+    PhaseCDecisionComparison,
+    PhaseCDecisionDiagnostics,
+    evaluate_phase_c_component_decisions,
+    prepare_phase_c_component_folds,
+)
 from squadopt.evaluation.component_handoff import (
     HANDOFF_KEY,
     OOF_ARTIFACT_COLUMNS,
@@ -99,6 +105,8 @@ __all__ = [
     "OwnershipTemplateResult",
     "PhaseCComponentEvaluation",
     "PhaseCComponentHandoff",
+    "PhaseCDecisionComparison",
+    "PhaseCDecisionDiagnostics",
     "RankedManager",
     "RealizedSquadScore",
     "ScoringPolicy",
@@ -109,7 +117,9 @@ __all__ = [
     "complete_optimization_decision",
     "evaluate_appearance_snapshot",
     "evaluate_component_oof",
+    "evaluate_phase_c_component_decisions",
     "evaluate_prepared_folds",
+    "prepare_phase_c_component_folds",
     "read_phase_c_component_handoff",
     "score_frozen_squad_decision",
     "score_realized_squad_points",

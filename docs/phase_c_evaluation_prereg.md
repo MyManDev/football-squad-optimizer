@@ -107,6 +107,25 @@ Minutes and points report MAE, RMSE and signed mean error. Conditional and uncon
 metrics are never merged. Results are sliced descriptively by season, position and fixture
 group (`blank`, `single`, `double_plus`) without treating the slices as independent tests.
 
+### Decision-scoring execution amendment
+
+This amendment was recorded before any complete 147-fold Phase C decision comparison. It
+clarifies execution semantics exposed by the frozen handoff; it changes no arm, metric, gate or
+threshold.
+
+`points_target` and `minutes_target` are conditional component targets and are therefore absent
+when `appearance_target == 0`. They are not a substitute for the canonical settled-outcome
+table: an official `total_points` value can be non-zero even when recorded minutes are zero.
+Decision scoring consequently uses exact-key canonical `total_points` from the historical
+control fold and minutes implied by the handoff appearance target. Appeared-player points must
+agree across both sources. Missing, extra, duplicated or contradictory rows refuse the entire
+comparison; no silent intersection or zero imputation is allowed.
+
+For `component_model` rows, the component-base decision uses the handoff's composed
+`control_expected_points`. For `direct_control` rows, where the component handoff deliberately
+carries no invented prediction, it uses the exact-key historical control projection. Both arms
+must contain the same complete ordered fold and player populations before either is optimized.
+
 ## Evidence ablations
 
 Each evidence arm is compared with the same `component_base` on exactly identical ordered keys,
