@@ -244,6 +244,41 @@ What it must **not** do: treat `elite_*_share_lag1` as an ownership probability,
 share without also reading `elite_members_observed`. A share of 1.0 over two observed members
 and a share of 1.0 over a hundred are the same number and not the same evidence.
 
+### The export artifact (`player_evidence_export_v1`)
+
+What actually crosses to Phase C is a pair of files, written by
+`scripts/export_player_evidence.py` from the table above:
+
+```text
+<name>.csv             the 27 contract columns, in that order, rows sorted by player_id,
+                       LF line endings, no index column; a missing value is an empty cell
+<name>.manifest.json   the aggregates and provenance a bare CSV would lose
+```
+
+The manifest carries `contract_version`, `artifact_contract_version`, `season`,
+`target_gameweek`, `deadline_timestamp_utc`, `generated_at_utc`, `repository_commit`,
+`table_file`, `table_sha256`, `row_count`, `cohort_size`, `elite_members_observed`,
+`elite_members_missing_picks`, `unmapped_picked_elements`, `cohort_snapshot_id`,
+`ownership_snapshot_id` and `source_snapshot_ids`. The last five are the `DataFrame.attrs`
+and provenance diagnostics, so the missingness denominator travels with the table.
+
+Three rules hold at export time. The table is validated against its own contract first
+(exact columns, one week, unique `player_id`, timing verified, provenance consistent with the
+diagnostics), and a missing diagnostic refuses the export rather than becoming a zero. The
+same table produces the same CSV bytes and the same `table_sha256`; only `generated_at_utc`
+differs between runs. Writing is create-once: the CSV lands through a temporary file, the
+digest is taken from the final bytes, and an existing artifact with different content is
+never overwritten.
+
+```console
+python -m scripts.export_player_evidence --season 2026-27 --target-gameweek 3 \
+    --deadline-utc 2026-09-04T17:30:00Z --cohort-snapshot <fpl-top200-...> \
+    --snapshot <fpl-elite-picks-...> --cohort-size 100 --output-dir artifacts/phase_b
+```
+
+The command prints counts and the digest only. Neither file names an entry or a manager;
+raw snapshots stay under `data/snapshots/` and are not part of the handoff.
+
 ### Known limitations of the evidence table
 
 - Elite evidence is one week lagged by construction. It describes what the cohort held going
