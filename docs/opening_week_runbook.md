@@ -57,8 +57,9 @@ neither of which the development seasons had.
    (`projection_source: operational_control`); an unpromoted candidate on a live
    decision is a stop-everything defect.
 2. **Availability is applied, not predicted** — unavailable players appear zeroed
-   with the captured rule (`captured_availability_rule_v1`), never silently dropped,
-   and no unavailable player may be selected.
+   with the captured rule (`captured_availability_rule_v1`), never silently dropped.
+   The opening squad cannot select one. In later weeks an already-held unavailable
+   player may remain on the bench, but cannot start or be transferred in.
 3. **Squad sanity** — 15 players, budget respected, ≤3 per club, captain in the XI,
    solver-proven optimality.
 4. **Prior dependence is stated** — GW1 projections lean on carry-over and the

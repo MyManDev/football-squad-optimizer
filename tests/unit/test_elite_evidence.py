@@ -47,6 +47,7 @@ def _evidence() -> pd.DataFrame:
             "elite_members_missing_picks": 0,
             "unmapped_picked_elements": (),
             "table_sha256": "a" * 64,
+            "generated_at_utc": "2026-09-03T06:40:42Z",
         }
     )
     return table
@@ -154,6 +155,14 @@ def test_evidence_captured_after_the_decision_snapshot_is_rejected() -> None:
     evidence["captured_at_utc"] = "2026-09-03T13:00:00Z"
 
     with pytest.raises(PredictionConfigurationError, match="after the decision snapshot"):
+        _apply(evidence=evidence)
+
+
+def test_an_artifact_generated_after_the_decision_snapshot_is_rejected() -> None:
+    evidence = _evidence()
+    evidence.attrs["generated_at_utc"] = "2026-09-03T13:00:00Z"
+
+    with pytest.raises(PredictionConfigurationError, match="artifact was generated after"):
         _apply(evidence=evidence)
 
 

@@ -39,6 +39,7 @@ uncertainty.
 The following conditions fail closed:
 
 - evidence season, target gameweek or deadline differs from the decision;
+- the evidence artifact was generated after the decision snapshot;
 - cohort size or observed-member count is not exactly 100;
 - any cohort member is missing, or any picked element is unmapped;
 - an elite evidence flag is not true;

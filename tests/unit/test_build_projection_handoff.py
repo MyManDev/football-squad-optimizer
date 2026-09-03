@@ -286,6 +286,7 @@ def test_verified_elite_evidence_changes_identity_and_round_trips(
             "elite_members_missing_picks": 0,
             "unmapped_picked_elements": (),
             "table_sha256": "a" * 64,
+            "generated_at_utc": "2026-08-27T09:00:00Z",
         }
     )
     monkeypatch.setattr(producer, "read_player_evidence_artifact", lambda *_: evidence)

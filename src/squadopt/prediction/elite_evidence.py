@@ -119,6 +119,14 @@ def apply_elite_evidence(
         raise PredictionConfigurationError(
             "Evidence was captured after the decision snapshot and cannot be used in its replay."
         )
+    generated_at = evidence.attrs.get("generated_at_utc")
+    if not isinstance(generated_at, str):
+        raise PredictionConfigurationError("Evidence generated_at_utc provenance is required.")
+    if as_instant(generated_at) > as_instant(decision_captured_at_utc):
+        raise PredictionConfigurationError(
+            "The evidence artifact was generated after the decision snapshot and cannot "
+            "be used in its replay."
+        )
 
     cohort = _single(evidence, "elite_cohort_size", "Evidence")
     observed = _single(evidence, "elite_members_observed", "Evidence")

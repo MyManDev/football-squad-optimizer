@@ -44,7 +44,11 @@ from squadopt.prediction.availability import (
     apply_availability,
 )
 from squadopt.prediction.config import BaselineProjectionConfig
-from squadopt.prediction.elite_evidence import ELITE_EVIDENCE_MODEL_VERSION
+from squadopt.prediction.elite_evidence import (
+    ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION,
+    ELITE_EVIDENCE_MODEL_VERSION,
+)
+from squadopt.prediction.in_season import IN_SEASON_MODEL_VERSION
 from squadopt.prediction.opening import build_opening_projection_from_snapshot
 
 # Named so a report cannot describe itself as coming from a model that was never promoted.
@@ -63,7 +67,7 @@ PROJECTION_HANDOFF_CONTRACT_VERSION: Final = "projection_handoff_v1"
 # decision, made in a reviewed change, and until then a mid-season decision is refused at
 # verification rather than made from an unpromoted model.
 IN_SEASON_CONTROL_MODEL_VERSIONS: Final[tuple[str, ...]] = (
-    "in-season-carry-over-v1",
+    IN_SEASON_MODEL_VERSION,
     ELITE_EVIDENCE_MODEL_VERSION,
 )
 
@@ -122,6 +126,18 @@ class InSeasonProjection:
         ):
             raise DataSourceError(
                 "Projection handoff evidence_fingerprint must be a lowercase SHA-256 digest."
+            )
+        if self.model_version == ELITE_EVIDENCE_MODEL_VERSION and (
+            self.evidence_fingerprint is None
+            or self.feature_contract_version != ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION
+        ):
+            raise DataSourceError(
+                "The operational elite model requires its evidence fingerprint and exact "
+                f"feature contract {ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION!r}."
+            )
+        if self.model_version == IN_SEASON_MODEL_VERSION and self.evidence_fingerprint is not None:
+            raise DataSourceError(
+                "The legacy in-season control cannot claim an elite evidence fingerprint."
             )
         object.__setattr__(self, "expected_points", MappingProxyType(points))
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
