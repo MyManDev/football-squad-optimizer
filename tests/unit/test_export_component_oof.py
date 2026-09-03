@@ -210,9 +210,15 @@ def test_the_locked_holdout_is_refused_before_anything_is_read(
 def test_a_dirty_working_tree_is_refused(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A recorded commit only reproduces an artifact if that commit was the tree."""
+    """A recorded commit only reproduces an artifact if that commit was the tree.
 
-    monkeypatch.setattr("sys.argv", ["export_component_oof"])
+    The archive root is deliberately absent, which is what proves the refusal precedes the
+    archive check. A precondition that only fires when a data store happens to be present
+    is one this suite cannot test -- and the first version of this test passed locally and
+    failed in CI for exactly that reason.
+    """
+
+    monkeypatch.setattr("sys.argv", ["export_component_oof", "--archive-root", "does-not-exist"])
     monkeypatch.setattr("scripts.export_component_oof._git_revision", lambda: ("abc1234", True))
 
     assert main() == 1

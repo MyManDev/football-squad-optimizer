@@ -262,11 +262,6 @@ def main() -> int:
             "measured here; spending it is a three-owner decision under its own protocol."
         )
         return 1
-    archive_root: Path = arguments.archive_root
-    if not archive_root.is_dir():
-        print(f"Archive not found at {archive_root}.")
-        return 1
-
     revision, dirty = _git_revision()
     if dirty:
         # The manifest records the commit this artifact came from, and a commit reproduces
@@ -277,6 +272,15 @@ def main() -> int:
             "The working tree has uncommitted changes, so the recorded commit would not "
             "reproduce this artifact. Commit or stash them first."
         )
+        return 1
+
+    # The archive check comes last of the preconditions. The three above cost nothing and
+    # depend on nothing outside the process, so ordering them first is what lets them be
+    # tested without a data store -- the suite is offline by design, and a refusal that
+    # only fires when the archive happens to be present is a refusal nobody can test.
+    archive_root: Path = arguments.archive_root
+    if not archive_root.is_dir():
+        print(f"Archive not found at {archive_root}.")
         return 1
     config = ComponentModelConfig(minimum_training_rows=int(arguments.minimum_training_rows))
 
