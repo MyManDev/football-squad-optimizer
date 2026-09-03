@@ -42,9 +42,11 @@ MANIFEST_KEYS = {
 }
 
 
-def _export(table: pd.DataFrame, directory: Path, name: str = "evidence") -> export.ExportResult:
+def _export(
+    table: pd.DataFrame, directory: Path, name: str = "evidence", *, generated_at_utc: str = WHEN
+) -> export.ExportResult:
     return export.write_evidence_artifact(
-        table, directory, name, repository_commit=COMMIT, generated_at_utc=WHEN
+        table, directory, name, repository_commit=COMMIT, generated_at_utc=generated_at_utc
     )
 
 
@@ -197,18 +199,21 @@ def test_an_existing_different_artifact_is_never_overwritten(tmp_path: Path) -> 
 
     first = _export(observed, tmp_path)
     original = first.table_path.read_bytes()
-    again = _export(observed, tmp_path)
+    again = _export(observed, tmp_path, generated_at_utc="2026-09-02T13:00:00Z")
     with pytest.raises(DataError, match="never overwritten"):
         _export(unobserved, tmp_path)
 
     assert again.table_sha256 == first.table_sha256
+    # The manifest on disk is the record: a no-op re-export returns it, first timestamp and all.
+    assert again.manifest == _read_manifest(again.manifest_path)
+    assert again.manifest["generated_at_utc"] == WHEN
     assert first.table_path.read_bytes() == original
     assert not list(tmp_path.glob(".*.tmp-*")), "no temporary file survives"
 
 
-def test_the_cli_exports_from_the_snapshot_store_and_names_no_identity(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
+def _cli_arguments(tmp_path: Path) -> list[str]:
+    """A synthetic snapshot store on disk, and the argv that exports from it."""
+
     root = tmp_path / "snapshots"
     cohort_id = write_snapshot(
         root,
@@ -225,30 +230,46 @@ def test_the_cli_exports_from_the_snapshot_store_and_names_no_identity(
         captured_at_utc=evidence_tests.BEFORE,
         payloads=dict(evidence_tests._picks_snapshot(evidence_tests.TARGET - 1).payloads),
     ).snapshot_id
+    return [
+        "export_player_evidence",
+        "--season",
+        evidence_tests.SEASON,
+        "--target-gameweek",
+        str(evidence_tests.TARGET),
+        "--deadline-utc",
+        evidence_tests.DEADLINE,
+        "--snapshot-root",
+        str(root),
+        "--cohort-snapshot",
+        cohort_id,
+        "--snapshot",
+        picks_id,
+        "--cohort-size",
+        "50",
+        "--output-dir",
+        str(tmp_path / "out"),
+    ]
+
+
+def test_the_cli_refuses_to_export_from_a_dirty_working_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A commit hash reproduces an artifact only if the tree it came from was that commit."""
+
+    monkeypatch.setattr(export, "_git_revision", lambda: (COMMIT, True))
+    monkeypatch.setattr(sys, "argv", _cli_arguments(tmp_path))
+
+    assert export.main() == 1
+
+    assert "uncommitted changes" in capsys.readouterr().out
+    assert not (tmp_path / "out").exists()
+
+
+def test_the_cli_exports_from_the_snapshot_store_and_names_no_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.setattr(export, "_git_revision", lambda: (COMMIT, False))
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "export_player_evidence",
-            "--season",
-            evidence_tests.SEASON,
-            "--target-gameweek",
-            str(evidence_tests.TARGET),
-            "--deadline-utc",
-            evidence_tests.DEADLINE,
-            "--snapshot-root",
-            str(root),
-            "--cohort-snapshot",
-            cohort_id,
-            "--snapshot",
-            picks_id,
-            "--cohort-size",
-            "50",
-            "--output-dir",
-            str(tmp_path / "out"),
-        ],
-    )
+    monkeypatch.setattr(sys, "argv", _cli_arguments(tmp_path))
 
     assert export.main() == 0
 

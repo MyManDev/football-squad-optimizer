@@ -260,6 +260,8 @@ def write_evidence_artifact(
                 f"{manifest_path} already exists and describes a different artifact; "
                 "refusing to overwrite it."
             )
+        # The artifact on disk is the record; its manifest, timestamp included, is returned.
+        manifest = existing
     else:
         temporary_manifest = _temporary(manifest_path)
         try:
@@ -303,6 +305,12 @@ def main() -> int:
         f"_top{arguments.cohort_size}"
     )
     try:
+        revision, dirty = _git_revision()
+        if dirty:
+            raise DataError(
+                "the working tree has uncommitted changes, so the artifact could not be "
+                "reproduced from the commit it would record; commit or stash them first."
+            )
         cohort_snapshot = read_snapshot(arguments.snapshot_root, arguments.cohort_snapshot)
         snapshot_ids = list(dict.fromkeys(arguments.snapshot))
         if arguments.cohort_snapshot not in snapshot_ids:
@@ -318,7 +326,6 @@ def main() -> int:
             cohort_snapshot=cohort_snapshot,
             cohort_size=arguments.cohort_size,
         )
-        revision, _dirty = _git_revision()
         result = write_evidence_artifact(
             table, arguments.output_dir, table_name, repository_commit=revision
         )
