@@ -22,7 +22,13 @@ PHASE_C_LOCKED_HOLDOUT_SEASONS: Final = frozenset(("2025-26",))
 PHASE_C_EVIDENCE_STATUSES: Final = frozenset(("not_requested", "available", "missing"))
 PHASE_C_OOF_KEY: Final = ("season", "target_gameweek", "player_id")
 PHASE_C_OOF_REQUIRED_COLUMNS: Final = (
+    "contract_version",
+    "model_version",
+    "feature_contract_version",
+    "target_contract_version",
+    "dataset_contract_version",
     *PHASE_C_OOF_KEY,
+    "decision_timestamp_utc",
     "fold_id",
     "position",
     "fixture_count",
@@ -36,10 +42,9 @@ PHASE_C_OOF_REQUIRED_COLUMNS: Final = (
     "q_start_given_appearance",
     "start_probability",
     "expected_minutes_if_appearance",
-    "expected_minutes",
+    "raw_expected_points_if_appearance",
     "expected_points_if_appearance",
-    "fallback_expected_points",
-    "expected_points",
+    "control_expected_points",
 )
 _POSITIONS: Final = frozenset(("GK", "DEF", "MID", "FWD"))
 _PROBABILITIES: Final = (
@@ -49,9 +54,8 @@ _PROBABILITIES: Final = (
 )
 _NON_NEGATIVE_PREDICTIONS: Final = (
     "expected_minutes_if_appearance",
-    "expected_minutes",
-    "fallback_expected_points",
-    "expected_points",
+    "expected_points_if_appearance",
+    "control_expected_points",
 )
 _COMPOSITION_TOLERANCE: Final = 1e-9
 
@@ -214,9 +218,22 @@ def _validate_oof(value: object) -> pd.DataFrame:
         "points_target",
         *_PROBABILITIES,
         *_NON_NEGATIVE_PREDICTIONS,
-        "expected_points_if_appearance",
+        "raw_expected_points_if_appearance",
     ):
         frame[column] = _numeric(frame, column)
+
+    for column in (
+        "contract_version",
+        "model_version",
+        "feature_contract_version",
+        "target_contract_version",
+        "dataset_contract_version",
+    ):
+        values = frame[column]
+        if bool(values.map(lambda item: not isinstance(item, str) or not item.strip()).any()):
+            raise EvaluationValidationError(f"{column} must contain non-empty strings.")
+        if values.nunique(dropna=False) != 1:
+            raise EvaluationValidationError(f"{column} must be constant within one OOF table.")
 
     valid_routes = {COMPONENT_MODEL_ROUTE, DIRECT_CONTROL_ROUTE}
     if bool((~frame["composition_route"].isin(valid_routes)).any()):
@@ -230,20 +247,19 @@ def _validate_oof(value: object) -> pd.DataFrame:
 
     if bool(frame["minutes_target"].dropna().lt(0.0).any()):
         raise EvaluationValidationError("minutes_target must be non-negative when observed.")
-    known_minutes = frame["minutes_target"].notna()
-    expected_appearance = frame["minutes_target"].gt(0.0).astype("float64")
-    if bool(
-        frame.loc[known_minutes, "appearance_target"].isna().any()
-        or (
-            frame.loc[known_minutes, "appearance_target"] != expected_appearance.loc[known_minutes]
-        ).any()
-    ):
+    appeared_target = frame["appearance_target"].eq(1.0)
+    did_not_appear = frame["appearance_target"].eq(0.0)
+    if bool(frame.loc[appeared_target, ["minutes_target", "points_target"]].isna().any().any()):
         raise EvaluationValidationError(
-            "appearance_target must equal one exactly when minutes > 0."
+            "Appeared rows require conditional minutes_target and points_target."
         )
-    if bool((frame["appearance_target"].notna() & frame["minutes_target"].isna()).any()):
+    if bool(frame.loc[appeared_target, "minutes_target"].le(0.0).any()):
         raise EvaluationValidationError(
-            "An observed appearance_target requires observed minutes_target."
+            "appearance_target must equal one exactly when minutes are positive."
+        )
+    if bool(frame.loc[did_not_appear, ["minutes_target", "points_target"]].notna().any().any()):
+        raise EvaluationValidationError(
+            "Non-appearance rows must leave conditional minutes and points targets missing."
         )
     if bool(frame.loc[frame["start_target"].eq(1.0), "appearance_target"].ne(1.0).any()):
         raise EvaluationValidationError("A verified start must imply an appearance.")
@@ -285,62 +301,46 @@ def _validate_oof(value: object) -> pd.DataFrame:
     component_inputs = (
         "appearance_probability",
         "expected_minutes_if_appearance",
-        "expected_minutes",
+        "raw_expected_points_if_appearance",
         "expected_points_if_appearance",
-        "expected_points",
+        "control_expected_points",
     )
     if bool(frame.loc[component_non_blank, list(component_inputs)].isna().any().any()):
         raise EvaluationValidationError(
             "component_model rows require appearance, minutes and points component predictions."
-        )
-    if bool(frame.loc[component_non_blank, "fallback_expected_points"].notna().any()):
-        raise EvaluationValidationError(
-            "component_model rows must not carry fallback_expected_points."
         )
     direct_component_inputs = (
         "appearance_probability",
         "q_start_given_appearance",
         "start_probability",
         "expected_minutes_if_appearance",
-        "expected_minutes",
+        "raw_expected_points_if_appearance",
         "expected_points_if_appearance",
+        "control_expected_points",
     )
     if bool(frame.loc[direct_non_blank, list(direct_component_inputs)].notna().any().any()):
         raise EvaluationValidationError(
             "direct_control rows must leave component predictions missing."
         )
+    clipped_conditional = frame["raw_expected_points_if_appearance"].clip(lower=0.0)
     if bool(
-        frame.loc[direct_non_blank, ["fallback_expected_points", "expected_points"]]
-        .isna()
-        .any()
-        .any()
-    ):
-        raise EvaluationValidationError(
-            "direct_control rows require fallback_expected_points and expected_points."
-        )
-
-    composed_minutes = frame["appearance_probability"] * frame["expected_minutes_if_appearance"]
-    if bool(
-        ~frame.loc[component_non_blank, "expected_minutes"]
+        ~frame.loc[component_non_blank, "expected_points_if_appearance"]
         .combine(
-            composed_minutes.loc[component_non_blank],
+            clipped_conditional.loc[component_non_blank],
             lambda actual, wanted: math.isclose(
-                float(actual),
-                float(wanted),
-                rel_tol=0.0,
-                abs_tol=_COMPOSITION_TOLERANCE,
+                float(actual), float(wanted), rel_tol=0.0, abs_tol=_COMPOSITION_TOLERANCE
             ),
         )
         .all()
     ):
         raise EvaluationValidationError(
-            "expected_minutes must equal appearance_probability * expected_minutes_if_appearance."
+            "expected_points_if_appearance must be the non-negative raw conditional value."
         )
     composed_points = (
-        frame["appearance_probability"] * frame["expected_points_if_appearance"]
+        frame["appearance_probability"] * frame["raw_expected_points_if_appearance"]
     ).clip(lower=0.0)
     if bool(
-        ~frame.loc[component_non_blank, "expected_points"]
+        ~frame.loc[component_non_blank, "control_expected_points"]
         .combine(
             composed_points.loc[component_non_blank],
             lambda actual, wanted: math.isclose(
@@ -353,54 +353,46 @@ def _validate_oof(value: object) -> pd.DataFrame:
         .all()
     ):
         raise EvaluationValidationError(
-            "expected_points must equal the non-negative component composition."
-        )
-    if bool(
-        ~frame.loc[direct_non_blank, "expected_points"]
-        .combine(
-            frame.loc[direct_non_blank, "fallback_expected_points"],
-            lambda actual, fallback: math.isclose(
-                float(actual),
-                float(fallback),
-                rel_tol=0.0,
-                abs_tol=_COMPOSITION_TOLERANCE,
-            ),
-        )
-        .all()
-    ):
-        raise EvaluationValidationError(
-            "direct_control expected_points must equal fallback_expected_points."
+            "control_expected_points must equal the non-negative component composition."
         )
 
     for column in _NON_NEGATIVE_PREDICTIONS:
         if bool(frame[column].dropna().lt(0.0).any()):
             raise EvaluationValidationError(f"{column} must be non-negative when available.")
     minute_limit = frame["fixture_count"].mul(90.0)
-    for column in ("expected_minutes", "expected_minutes_if_appearance"):
-        observed = frame[column].notna()
-        if bool(frame.loc[observed, column].gt(minute_limit.loc[observed]).any()):
-            raise EvaluationValidationError(f"{column} cannot exceed 90 * fixture_count.")
+    observed_minutes = frame["expected_minutes_if_appearance"].notna()
+    if bool(
+        frame.loc[observed_minutes, "expected_minutes_if_appearance"]
+        .gt(minute_limit.loc[observed_minutes])
+        .any()
+    ):
+        raise EvaluationValidationError(
+            "expected_minutes_if_appearance cannot exceed 90 * fixture_count."
+        )
 
     for column in (
         "appearance_probability",
         "q_start_given_appearance",
         "start_probability",
         "expected_minutes_if_appearance",
-        "expected_minutes",
+        "raw_expected_points_if_appearance",
         "expected_points_if_appearance",
-        "fallback_expected_points",
-        "expected_points",
+        "control_expected_points",
     ):
         if bool(frame.loc[blank, column].dropna().ne(0.0).any()):
             raise EvaluationValidationError(f"Blank-gameweek {column} must be zero when available.")
     for column in (
         "appearance_target",
         "start_target",
-        "minutes_target",
-        "points_target",
     ):
         if bool(frame.loc[blank, column].dropna().ne(0.0).any()):
             raise EvaluationValidationError(f"Blank-gameweek {column} must be zero when observed.")
+
+    frame["expected_minutes"] = (
+        frame["appearance_probability"] * frame["expected_minutes_if_appearance"]
+    )
+    frame["realized_minutes"] = frame["minutes_target"].where(appeared_target, 0.0)
+    frame["realized_points"] = frame["points_target"].where(appeared_target, 0.0)
 
     decision_keys = frame.loc[:, ["season", "target_gameweek", "fold_id"]].drop_duplicates()
     if bool(decision_keys.duplicated(subset=["season", "target_gameweek"]).any()) or bool(
@@ -509,13 +501,25 @@ def _score(frame: pd.DataFrame) -> ComponentMetricSet:
         missing_start_prediction_rows=int(
             (non_blank["start_target"].notna() & non_blank["start_probability"].isna()).sum()
         ),
-        missing_minutes_target_rows=int(non_blank["minutes_target"].isna().sum()),
-        missing_minutes_prediction_rows=int(
-            (non_blank["minutes_target"].notna() & non_blank["expected_minutes"].isna()).sum()
+        missing_minutes_target_rows=int(
+            (
+                non_blank["appearance_target"].isna()
+                | (non_blank["appearance_target"].eq(1.0) & non_blank["minutes_target"].isna())
+            ).sum()
         ),
-        missing_points_target_rows=int(non_blank["points_target"].isna().sum()),
+        missing_minutes_prediction_rows=int(
+            (non_blank["appearance_target"].notna() & non_blank["expected_minutes"].isna()).sum()
+        ),
+        missing_points_target_rows=int(
+            (
+                non_blank["appearance_target"].isna()
+                | (non_blank["appearance_target"].eq(1.0) & non_blank["points_target"].isna())
+            ).sum()
+        ),
         missing_points_prediction_rows=int(
-            (non_blank["points_target"].notna() & non_blank["expected_points"].isna()).sum()
+            (
+                non_blank["appearance_target"].notna() & non_blank["control_expected_points"].isna()
+            ).sum()
         ),
         appearance=_binary_metrics(
             non_blank, "appearance_probability", "appearance_target", reliability=True
@@ -524,13 +528,13 @@ def _score(frame: pd.DataFrame) -> ComponentMetricSet:
         start_given_appearance=_binary_metrics(
             appeared, "q_start_given_appearance", "start_target"
         ),
-        minutes=_error_metrics(non_blank, "expected_minutes", "minutes_target"),
+        minutes=_error_metrics(non_blank, "expected_minutes", "realized_minutes"),
         minutes_if_appearance=_error_metrics(
             appeared, "expected_minutes_if_appearance", "minutes_target"
         ),
-        points=_error_metrics(non_blank, "expected_points", "points_target"),
+        points=_error_metrics(non_blank, "control_expected_points", "realized_points"),
         points_if_appearance=_error_metrics(
-            appeared, "expected_points_if_appearance", "points_target"
+            appeared, "raw_expected_points_if_appearance", "points_target"
         ),
     )
 

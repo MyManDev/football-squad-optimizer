@@ -22,6 +22,10 @@ PHASE_C_ABLATION_CONTRACT_VERSION: Final = "phase_c_evidence_ablation_v1"
 COMPONENT_BASE_ARM: Final = "component_base"
 PHASE_C_EVIDENCE_FAMILIES: Final = ("none", "availability", "ownership_transfer", "elite")
 _PAIR_COLUMNS: Final = (
+    "contract_version",
+    "dataset_contract_version",
+    "target_contract_version",
+    "decision_timestamp_utc",
     "fold_id",
     "position",
     "fixture_count",
@@ -36,10 +40,9 @@ _PREDICTION_COLUMNS: Final = (
     "q_start_given_appearance",
     "start_probability",
     "expected_minutes_if_appearance",
-    "expected_minutes",
+    "raw_expected_points_if_appearance",
     "expected_points_if_appearance",
-    "fallback_expected_points",
-    "expected_points",
+    "control_expected_points",
 )
 _DIGEST_CHARACTERS: Final = frozenset("0123456789abcdef")
 
@@ -151,6 +154,16 @@ def _validate_declared_table(
     declaration: PhaseCArmDeclaration, rows: pd.DataFrame
 ) -> PhaseCComponentEvaluation:
     metrics = evaluate_component_oof(rows)
+    for field, column in (
+        ("model_version", "model_version"),
+        ("feature_contract_version", "feature_contract_version"),
+        ("target_contract_version", "target_contract_version"),
+    ):
+        actual_identity = str(rows[column].iloc[0])
+        if getattr(declaration, field) != actual_identity:
+            raise ExperimentExecutionError(
+                f"Phase C arm {declaration.arm_id!r} {field} does not match its OOF rows."
+            )
     actual = phase_c_evaluation_rows_sha256(rows)
     if actual != declaration.evaluation_rows_sha256:
         raise ExperimentExecutionError(
