@@ -6,9 +6,10 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 ## Current position
 
 - **Phase A — Engineering complete; prospective evidence accumulating.**
-- **Phase B — In progress.** Deadline-safe evidence-layer work is assigned to the data side.
-- **Phase C — Next, in parallel with Phase B.** Component player-model work may proceed once
-  it respects the frozen evidence handoff.
+- **Phase B — Complete.** The deadline-safe evidence layer is built and its first real
+  handoff is produced and verified.
+- **Phase C — In progress.** Component player-model work may proceed now that the frozen
+  evidence handoff exists; it respects that handoff rather than reading raw captures.
 - **Phases D–H — Planned.** Later phases do not become product claims until their own
   calibration and evaluation gates pass.
 
@@ -40,7 +41,7 @@ least eight gameweeks, with twelve or more preferred for a stable-season interpr
 
 ## Phase B — Deadline-safe evidence layer
 
-**Status: in progress.**
+**Status: complete.**
 
 Goal: provide the player model with information that was genuinely available before each
 decision deadline.
@@ -56,6 +57,18 @@ decision deadline.
 - Distinguish missing evidence from a genuine zero.
 - Keep manager identities and raw captures outside committed artifacts.
 - Produce one deterministic player-by-decision evidence table for Phase C.
+
+Recorded result:
+
+- The first real handoff: **629 player rows for 2026-27 gameweek 3**, built from a Top-200
+  standings capture taken **72.88 hours** before the deadline and gameweek 2 elite picks.
+- **100/100** cohort members readable, **0** missing picks, **0** unmapped elements.
+- Internal consistency holds: squad counts sum to 1500, starting counts to 1100, captain
+  shares to 1.000.
+- The export is deterministic and create-once; the record is in
+  [`phase_b_evidence_contract.md`](docs/phase_b_evidence_contract.md).
+- The cohort is the **sensitivity** Top-100 cut from the Top-200 capture. The frozen Phase A
+  primary Top-100 is a different cohort and carries the benchmark claims.
 
 Exit criteria:
 

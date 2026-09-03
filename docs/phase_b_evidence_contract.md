@@ -1,7 +1,8 @@
 # Phase B — Deadline-safe Evidence Contract
 
-Owner: data / data mining. Status: **capture (PR B1) and evidence table (PR B2)
-implemented.**
+Owner: data / data mining. Status: **complete** — capture (PR B1), evidence table
+(PR B2) and export (PR B3) implemented, and the real gameweek 3 handoff produced and
+verified (see "The produced GW3 artifact").
 
 What this layer delivers is *evidence*, not a model. Nothing here trains, promotes, or
 publishes a probability. Phase C reads the table this contract describes; it does not read
@@ -278,6 +279,66 @@ python -m scripts.export_player_evidence --season 2026-27 --target-gameweek 3 \
 
 The command prints counts and the digest only. Neither file names an entry or a manager;
 raw snapshots stay under `data/snapshots/` and are not part of the handoff.
+
+### The produced GW3 artifact
+
+The pair above, produced from real captures rather than described. Recorded here because the
+files themselves are not committed: they derive from licence-restricted third-party captures,
+which is why `data/snapshots/` and `data/handoffs/` are git-ignored, and ADR 0003 puts a
+per-player expansion in the evidence tier. This section is the record; the artifact is the
+evidence.
+
+```text
+files           player_evidence_v1_2026-27_gw03_top100.csv          (158,945 bytes)
+                player_evidence_v1_2026-27_gw03_top100.manifest.json
+contract        player_evidence_v1 / player_evidence_export_v1
+week            2026-27 gameweek 3, deadline 2026-09-04T17:30:00Z
+commit          330a9b8d8061d56eed070adf70e90497ffda17d3, clean tree
+table_sha256    a1ec611ceef5567b43944c0aeba45229ba13cc7efde4deccd79cba3e61a625c0
+rows            629 players
+cohort          Top-100 cut from fpl-top200-20260901T163712Z-8711990a9dca
+ownership       fpl-top200-20260901T163712Z-8711990a9dca   (the same capture's bootstrap)
+elite picks     fpl-elite-picks-20260901T171603Z-d4b04d078d67   (gameweek 2, 100 members)
+captured_at     2026-09-01T16:37:12.388574Z   (72.88 h pre-deadline)
+```
+
+Eleven checks, all passing. The first six are what the command prints; the rest are read back
+off the written CSV, because the command deliberately prints counts and a digest rather than
+the table:
+
+```text
+row_count                        629
+elite_members_observed           100   on every row
+elite_members_missing_picks      0
+unmapped_picked_elements         []
+timing_verified                  true on every row
+exit code                        0
+elite_squad_count_lag1 sum       1500  = 15 x 100
+elite_start_count_lag1 sum       1100  = 11 x 100
+elite_captain_share_lag1 sum     1.000 = one captain per member
+sha256(csv bytes)                equals the manifest's table_sha256
+columns                          the 27 player_evidence_v1 columns, in order, no identity column
+```
+
+The three sums are the table's internal consistency, not a restatement of the counts: each
+observed member contributes exactly fifteen squad places, eleven starting places and one
+captaincy, so the totals can only hold if membership, the element-to-code bridge and the
+denominator agree. All four evidence families are observed on 629/629 rows —
+`selected_by_percent` 0.0 to 70.3, `net_transfers_event` −363,855 to +1,005,866, 138 players
+carrying news, two players held by 100/100 members and one of them captained by 100/100.
+
+Re-running the same command reproduces the same digest and writes nothing: create-once saw an
+identical artifact and kept it.
+
+**This is the sensitivity Top-100, not the frozen primary.** It is the Top-100 prefix of the
+Top-200 capture, so §7 applies unchanged — the frozen primary
+`fpl-top100-20260901T040725Z-5813e06fe096` is a different cohort, is not on the machine this
+export ran on, and no benchmark claim moves onto this one. What this artifact is for is Phase
+C evidence, which is exactly the role §2 gives the nested capture.
+
+Top-50 and Top-200 exports are not part of closing Phase B. They would need picks for members
+101–200, which the capture does not carry: at `--cohort-size 200` the denominator stays at the
+hundred observed members and `elite_members_missing_picks` records the other hundred.
 
 ### Known limitations of the evidence table
 
