@@ -25,6 +25,7 @@ _PAIR_COLUMNS: Final = (
     "fold_id",
     "position",
     "fixture_count",
+    "composition_route",
     "appearance_target",
     "start_target",
     "minutes_target",
@@ -37,6 +38,7 @@ _PREDICTION_COLUMNS: Final = (
     "expected_minutes_if_appearance",
     "expected_minutes",
     "expected_points_if_appearance",
+    "fallback_expected_points",
     "expected_points",
 )
 _DIGEST_CHARACTERS: Final = frozenset("0123456789abcdef")
@@ -66,7 +68,7 @@ class PhaseCArmDeclaration:
     model_version: str
     feature_contract_version: str
     target_contract_version: str
-    table_sha256: str
+    evaluation_rows_sha256: str
 
     def __post_init__(self) -> None:
         for name in (
@@ -82,7 +84,11 @@ class PhaseCArmDeclaration:
                 f"evidence_family must be one of {list(PHASE_C_EVIDENCE_FAMILIES)!r}."
             )
         object.__setattr__(self, "evidence_family", family)
-        object.__setattr__(self, "table_sha256", _digest(self.table_sha256, "table_sha256"))
+        object.__setattr__(
+            self,
+            "evaluation_rows_sha256",
+            _digest(self.evaluation_rows_sha256, "evaluation_rows_sha256"),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,7 +107,6 @@ class PhaseCAblationEvaluation:
     candidates: tuple[PhaseCArmEvaluation, ...]
     paired_rows: int
     comparison_fingerprint: str
-    promotion_decision: str = "not_evaluated"
     contract_version: str = PHASE_C_ABLATION_CONTRACT_VERSION
 
 
@@ -128,8 +133,8 @@ def _canonical_rows(rows: pd.DataFrame) -> list[dict[str, object]]:
     ]
 
 
-def phase_c_table_sha256(rows: pd.DataFrame) -> str:
-    """Return a deterministic digest of the exact rows accepted by the scorer."""
+def phase_c_evaluation_rows_sha256(rows: pd.DataFrame) -> str:
+    """Digest the canonical scorer columns; this is not a source-file checksum."""
 
     evaluate_component_oof(rows)
     payload = json.dumps(
@@ -146,17 +151,21 @@ def _validate_declared_table(
     declaration: PhaseCArmDeclaration, rows: pd.DataFrame
 ) -> PhaseCComponentEvaluation:
     metrics = evaluate_component_oof(rows)
-    actual = phase_c_table_sha256(rows)
-    if actual != declaration.table_sha256:
+    actual = phase_c_evaluation_rows_sha256(rows)
+    if actual != declaration.evaluation_rows_sha256:
         raise ExperimentExecutionError(
-            f"Phase C arm {declaration.arm_id!r} table_sha256 does not match its exact rows."
+            f"Phase C arm {declaration.arm_id!r} evaluation_rows_sha256 does not match "
+            "its exact scorer rows."
         )
     return metrics
 
 
 def _comparable_rows(rows: pd.DataFrame) -> pd.DataFrame:
     return (
-        rows.loc[:, [*PHASE_C_OOF_KEY, *_PAIR_COLUMNS, *_PREDICTION_COLUMNS]]
+        rows.loc[
+            :,
+            [*PHASE_C_OOF_KEY, *_PAIR_COLUMNS, "evidence_status", *_PREDICTION_COLUMNS],
+        ]
         .sort_values(list(PHASE_C_OOF_KEY), kind="stable")
         .reset_index(drop=True)
     )
@@ -174,6 +183,16 @@ def _pair_exactly(base: pd.DataFrame, candidate: pd.DataFrame, arm_id: str) -> N
         if base[column].notna().tolist() != candidate[column].notna().tolist():
             raise ExperimentExecutionError(
                 f"Phase C arm {arm_id!r} changes the {column!r} eligibility mask."
+            )
+    missing_evidence = candidate["evidence_status"].eq("missing")
+    for column in ("composition_route", *_PREDICTION_COLUMNS):
+        left = [_canonical_value(value) for value in base.loc[missing_evidence, column].tolist()]
+        right = [
+            _canonical_value(value) for value in candidate.loc[missing_evidence, column].tolist()
+        ]
+        if left != right:
+            raise ExperimentExecutionError(
+                f"Phase C arm {arm_id!r} must reproduce component_base for missing evidence."
             )
 
 
@@ -197,6 +216,8 @@ def evaluate_phase_c_ablations(
 
     base_metrics = _validate_declared_table(base_declaration, base_rows)
     paired_base = _comparable_rows(base_rows)
+    if set(paired_base["evidence_status"].tolist()) != {"not_requested"}:
+        raise ExperimentExecutionError("component_base evidence must be not_requested.")
     seen_arm_ids = {base_declaration.arm_id}
     seen_families: set[str] = set()
     evaluated: list[PhaseCArmEvaluation] = []
@@ -220,7 +241,12 @@ def evaluate_phase_c_ablations(
         if declaration.target_contract_version != base_declaration.target_contract_version:
             raise ExperimentExecutionError("All arms must share one target_contract_version.")
         metrics = _validate_declared_table(declaration, rows)
-        _pair_exactly(paired_base, _comparable_rows(rows), declaration.arm_id)
+        paired_candidate = _comparable_rows(rows)
+        if "not_requested" in set(paired_candidate["evidence_status"].tolist()):
+            raise ExperimentExecutionError(
+                "Evidence candidate rows must declare available or missing evidence."
+            )
+        _pair_exactly(paired_base, paired_candidate, declaration.arm_id)
         evaluated.append(PhaseCArmEvaluation(declaration, metrics))
         seen_arm_ids.add(declaration.arm_id)
         seen_families.add(declaration.evidence_family)
@@ -250,5 +276,5 @@ __all__ = [
     "PhaseCArmDeclaration",
     "PhaseCArmEvaluation",
     "evaluate_phase_c_ablations",
-    "phase_c_table_sha256",
+    "phase_c_evaluation_rows_sha256",
 ]

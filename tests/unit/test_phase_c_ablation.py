@@ -8,7 +8,7 @@ from squadopt.experiments import ExperimentExecutionError
 from squadopt.experiments.phase_c_ablation import (
     PhaseCArmDeclaration,
     evaluate_phase_c_ablations,
-    phase_c_table_sha256,
+    phase_c_evaluation_rows_sha256,
 )
 from squadopt.experiments.phase_c_reporting import phase_c_ablation_to_dict
 
@@ -26,12 +26,15 @@ def _component_rows() -> pd.DataFrame:
             "start_target": [1, 0, 1, 0],
             "minutes_target": [90, 0, 80, 0],
             "points_target": [6, 0, 4, 0],
+            "composition_route": ["component_model"] * 4,
+            "evidence_status": ["not_requested"] * 4,
             "appearance_probability": [0.8, 0.2, 0.7, 0.3],
             "q_start_given_appearance": [0.75, 0.5, 0.8, 0.5],
             "start_probability": [0.6, 0.1, 0.56, 0.15],
             "expected_minutes_if_appearance": [80, 30, 75, 30],
             "expected_minutes": [64, 6, 52.5, 9],
             "expected_points_if_appearance": [6, 2, 5, 2],
+            "fallback_expected_points": [pd.NA] * 4,
             "expected_points": [4.8, 0.4, 3.5, 0.6],
         }
     )
@@ -50,15 +53,22 @@ def _declaration(
         model_version=f"{arm_id}-v1",
         feature_contract_version=f"{arm_id}-features-v1",
         target_contract_version=target_contract,
-        table_sha256=phase_c_table_sha256(rows),
+        evaluation_rows_sha256=phase_c_evaluation_rows_sha256(rows),
     )
 
 
 def _evaluate(base: pd.DataFrame, candidate: pd.DataFrame):
+    candidate_rows = candidate.copy(deep=True)
+    candidate_rows["evidence_status"] = "available"
     return evaluate_phase_c_ablations(
         _declaration(base, "component_base", "none"),
         base,
-        [(_declaration(candidate, "component_plus_elite", "elite"), candidate)],
+        [
+            (
+                _declaration(candidate_rows, "component_plus_elite", "elite"),
+                candidate_rows,
+            )
+        ],
     )
 
 
@@ -79,7 +89,6 @@ def test_scores_single_family_arm_on_exact_component_base_keys() -> None:
     assert result.paired_rows == 4
     assert result.base.metrics.overall.appearance.brier_score == pytest.approx(0.065)
     assert result.candidates[0].metrics.overall.appearance.brier_score == pytest.approx(0.025)
-    assert result.promotion_decision == "not_evaluated"
     assert len(result.comparison_fingerprint) == 64
 
 
@@ -90,7 +99,7 @@ def test_row_order_does_not_change_table_or_comparison_identity() -> None:
     first = _evaluate(base, base.copy(deep=True))
     second = _evaluate(reversed_rows, reversed_rows.copy(deep=True))
 
-    assert phase_c_table_sha256(base) == phase_c_table_sha256(reversed_rows)
+    assert phase_c_evaluation_rows_sha256(base) == phase_c_evaluation_rows_sha256(reversed_rows)
     assert first.comparison_fingerprint == second.comparison_fingerprint
 
 
@@ -122,16 +131,8 @@ def test_candidate_cannot_change_target_population() -> None:
 def test_candidate_cannot_shrink_a_prediction_eligibility_mask() -> None:
     candidate = _component_rows()
     candidate.loc[0, ["appearance_probability", "q_start_given_appearance"]] = pd.NA
-    candidate.loc[
-        0,
-        [
-            "start_probability",
-            "expected_minutes_if_appearance",
-            "expected_minutes",
-            "expected_points_if_appearance",
-            "expected_points",
-        ],
-    ] = pd.NA
+    candidate.loc[0, "appearance_probability"] = 0.8
+    candidate.loc[0, "start_probability"] = pd.NA
 
     with pytest.raises(ExperimentExecutionError, match="eligibility mask"):
         _evaluate(_component_rows(), candidate)
@@ -159,10 +160,30 @@ def test_all_arms_must_share_the_target_contract() -> None:
         )
 
 
+def test_missing_evidence_must_reproduce_the_component_base_row() -> None:
+    base = _component_rows()
+    candidate = base.copy(deep=True)
+    candidate["evidence_status"] = "available"
+    candidate.loc[0, "evidence_status"] = "missing"
+    candidate.loc[0, "appearance_probability"] = 0.9
+    candidate.loc[0, "start_probability"] = 0.675
+    candidate.loc[0, "expected_minutes"] = 72
+    candidate.loc[0, "expected_points"] = 5.4
+
+    with pytest.raises(ExperimentExecutionError, match="reproduce component_base"):
+        evaluate_phase_c_ablations(
+            _declaration(base, "component_base", "none"),
+            base,
+            [(_declaration(candidate, "component_plus_elite", "elite"), candidate)],
+        )
+
+
 def test_only_one_candidate_per_evidence_family_is_allowed() -> None:
     base = _component_rows()
     first = _component_rows()
     second = _component_rows()
+    first["evidence_status"] = "available"
+    second["evidence_status"] = "available"
 
     with pytest.raises(ExperimentExecutionError, match="one candidate"):
         evaluate_phase_c_ablations(
@@ -183,6 +204,7 @@ def test_report_is_descriptive_and_contains_missingness() -> None:
     assert record["promotion_decision"] == "not_evaluated"
     overall = record["base"]["metrics"]["overall"]
     assert overall["missing_points_prediction_rows"] == 0
+    assert len(overall["appearance"]["reliability_bins"]) == 10
 
 
 def test_inputs_are_not_mutated() -> None:

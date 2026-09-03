@@ -15,9 +15,11 @@ from squadopt.evaluation.appearance import (
     AppearanceReliabilityBin,
 )
 from squadopt.evaluation.models import EvaluationValidationError
+from squadopt.prediction import COMPONENT_MODEL_ROUTE, DIRECT_CONTROL_ROUTE
 
 PHASE_C_COMPONENT_METRICS_VERSION: Final = "phase_c_component_metrics_v1"
 PHASE_C_LOCKED_HOLDOUT_SEASONS: Final = frozenset(("2025-26",))
+PHASE_C_EVIDENCE_STATUSES: Final = frozenset(("not_requested", "available", "missing"))
 PHASE_C_OOF_KEY: Final = ("season", "target_gameweek", "player_id")
 PHASE_C_OOF_REQUIRED_COLUMNS: Final = (
     *PHASE_C_OOF_KEY,
@@ -28,12 +30,15 @@ PHASE_C_OOF_REQUIRED_COLUMNS: Final = (
     "start_target",
     "minutes_target",
     "points_target",
+    "composition_route",
+    "evidence_status",
     "appearance_probability",
     "q_start_given_appearance",
     "start_probability",
     "expected_minutes_if_appearance",
     "expected_minutes",
     "expected_points_if_appearance",
+    "fallback_expected_points",
     "expected_points",
 )
 _POSITIONS: Final = frozenset(("GK", "DEF", "MID", "FWD"))
@@ -45,6 +50,7 @@ _PROBABILITIES: Final = (
 _NON_NEGATIVE_PREDICTIONS: Final = (
     "expected_minutes_if_appearance",
     "expected_minutes",
+    "fallback_expected_points",
     "expected_points",
 )
 _COMPOSITION_TOLERANCE: Final = 1e-9
@@ -161,8 +167,20 @@ def _validate_oof(value: object) -> pd.DataFrame:
         raise EvaluationValidationError("Phase C OOF keys must be unique.")
     frame["target_gameweek"] = _integer_column(frame, "target_gameweek", minimum=1)
     frame["fixture_count"] = _integer_column(frame, "fixture_count", minimum=0)
-    if bool(frame["season"].map(lambda item: not isinstance(item, str) or not item.strip()).any()):
-        raise EvaluationValidationError("season must contain non-empty strings.")
+    if bool(
+        frame["season"]
+        .map(
+            lambda item: (
+                not isinstance(item, str)
+                or item != item.strip()
+                or len(item) != 7
+                or item[4] != "-"
+                or not (item[:4] + item[5:]).isdigit()
+            )
+        )
+        .any()
+    ):
+        raise EvaluationValidationError("season must use canonical YYYY-YY labels.")
     if bool(frame["fold_id"].map(lambda item: not isinstance(item, str) or not item.strip()).any()):
         raise EvaluationValidationError("fold_id must contain non-empty strings.")
     if bool((~frame["position"].isin(_POSITIONS)).any()):
@@ -199,6 +217,16 @@ def _validate_oof(value: object) -> pd.DataFrame:
         "expected_points_if_appearance",
     ):
         frame[column] = _numeric(frame, column)
+
+    valid_routes = {COMPONENT_MODEL_ROUTE, DIRECT_CONTROL_ROUTE}
+    if bool((~frame["composition_route"].isin(valid_routes)).any()):
+        raise EvaluationValidationError(
+            f"composition_route must contain only {sorted(valid_routes)!r}."
+        )
+    if bool((~frame["evidence_status"].isin(PHASE_C_EVIDENCE_STATUSES)).any()):
+        raise EvaluationValidationError(
+            f"evidence_status must contain only {sorted(PHASE_C_EVIDENCE_STATUSES)!r}."
+        )
 
     if bool(frame["minutes_target"].dropna().lt(0.0).any()):
         raise EvaluationValidationError("minutes_target must be non-negative when observed.")
@@ -249,36 +277,100 @@ def _validate_oof(value: object) -> pd.DataFrame:
             "start_probability must equal appearance_probability * q_start_given_appearance."
         )
 
-    appearance_prediction = frame["appearance_probability"].notna()
-    for conditional, composed in (
-        ("expected_minutes_if_appearance", "expected_minutes"),
-        ("expected_points_if_appearance", "expected_points"),
+    blank = frame["fixture_count"].eq(0)
+    component = frame["composition_route"].eq(COMPONENT_MODEL_ROUTE)
+    direct = frame["composition_route"].eq(DIRECT_CONTROL_ROUTE)
+    component_non_blank = component & ~blank
+    direct_non_blank = direct & ~blank
+    component_inputs = (
+        "appearance_probability",
+        "expected_minutes_if_appearance",
+        "expected_minutes",
+        "expected_points_if_appearance",
+        "expected_points",
+    )
+    if bool(frame.loc[component_non_blank, list(component_inputs)].isna().any().any()):
+        raise EvaluationValidationError(
+            "component_model rows require appearance, minutes and points component predictions."
+        )
+    if bool(frame.loc[component_non_blank, "fallback_expected_points"].notna().any()):
+        raise EvaluationValidationError(
+            "component_model rows must not carry fallback_expected_points."
+        )
+    direct_component_inputs = (
+        "appearance_probability",
+        "q_start_given_appearance",
+        "start_probability",
+        "expected_minutes_if_appearance",
+        "expected_minutes",
+        "expected_points_if_appearance",
+    )
+    if bool(frame.loc[direct_non_blank, list(direct_component_inputs)].notna().any().any()):
+        raise EvaluationValidationError(
+            "direct_control rows must leave component predictions missing."
+        )
+    if bool(
+        frame.loc[direct_non_blank, ["fallback_expected_points", "expected_points"]]
+        .isna()
+        .any()
+        .any()
     ):
-        if bool(frame[conditional].notna().ne(appearance_prediction).any()):
-            raise EvaluationValidationError(
-                f"{conditional} must be available exactly when appearance_probability is available."
-            )
-        if bool(frame[composed].notna().ne(appearance_prediction).any()):
-            raise EvaluationValidationError(
-                f"{composed} must be available exactly when appearance_probability is available."
-            )
-        expected = frame["appearance_probability"] * frame[conditional]
-        if bool(
-            ~frame.loc[appearance_prediction, composed]
-            .combine(
-                expected.loc[appearance_prediction],
-                lambda actual, wanted: math.isclose(
-                    float(actual),
-                    float(wanted),
-                    rel_tol=0.0,
-                    abs_tol=_COMPOSITION_TOLERANCE,
-                ),
-            )
-            .all()
-        ):
-            raise EvaluationValidationError(
-                f"{composed} must equal appearance_probability * {conditional}."
-            )
+        raise EvaluationValidationError(
+            "direct_control rows require fallback_expected_points and expected_points."
+        )
+
+    composed_minutes = frame["appearance_probability"] * frame["expected_minutes_if_appearance"]
+    if bool(
+        ~frame.loc[component_non_blank, "expected_minutes"]
+        .combine(
+            composed_minutes.loc[component_non_blank],
+            lambda actual, wanted: math.isclose(
+                float(actual),
+                float(wanted),
+                rel_tol=0.0,
+                abs_tol=_COMPOSITION_TOLERANCE,
+            ),
+        )
+        .all()
+    ):
+        raise EvaluationValidationError(
+            "expected_minutes must equal appearance_probability * expected_minutes_if_appearance."
+        )
+    composed_points = (
+        frame["appearance_probability"] * frame["expected_points_if_appearance"]
+    ).clip(lower=0.0)
+    if bool(
+        ~frame.loc[component_non_blank, "expected_points"]
+        .combine(
+            composed_points.loc[component_non_blank],
+            lambda actual, wanted: math.isclose(
+                float(actual),
+                float(wanted),
+                rel_tol=0.0,
+                abs_tol=_COMPOSITION_TOLERANCE,
+            ),
+        )
+        .all()
+    ):
+        raise EvaluationValidationError(
+            "expected_points must equal the non-negative component composition."
+        )
+    if bool(
+        ~frame.loc[direct_non_blank, "expected_points"]
+        .combine(
+            frame.loc[direct_non_blank, "fallback_expected_points"],
+            lambda actual, fallback: math.isclose(
+                float(actual),
+                float(fallback),
+                rel_tol=0.0,
+                abs_tol=_COMPOSITION_TOLERANCE,
+            ),
+        )
+        .all()
+    ):
+        raise EvaluationValidationError(
+            "direct_control expected_points must equal fallback_expected_points."
+        )
 
     for column in _NON_NEGATIVE_PREDICTIONS:
         if bool(frame[column].dropna().lt(0.0).any()):
@@ -289,7 +381,6 @@ def _validate_oof(value: object) -> pd.DataFrame:
         if bool(frame.loc[observed, column].gt(minute_limit.loc[observed]).any()):
             raise EvaluationValidationError(f"{column} cannot exceed 90 * fixture_count.")
 
-    blank = frame["fixture_count"].eq(0)
     for column in (
         "appearance_probability",
         "q_start_given_appearance",
@@ -297,6 +388,7 @@ def _validate_oof(value: object) -> pd.DataFrame:
         "expected_minutes_if_appearance",
         "expected_minutes",
         "expected_points_if_appearance",
+        "fallback_expected_points",
         "expected_points",
     ):
         if bool(frame.loc[blank, column].dropna().ne(0.0).any()):
@@ -466,6 +558,7 @@ def evaluate_component_oof(oof_rows: pd.DataFrame) -> PhaseCComponentEvaluation:
 
 __all__ = [
     "PHASE_C_COMPONENT_METRICS_VERSION",
+    "PHASE_C_EVIDENCE_STATUSES",
     "PHASE_C_LOCKED_HOLDOUT_SEASONS",
     "PHASE_C_OOF_KEY",
     "PHASE_C_OOF_REQUIRED_COLUMNS",
