@@ -17,6 +17,7 @@ from squadopt.evaluation.appearance import (
 from squadopt.evaluation.models import EvaluationValidationError
 
 PHASE_C_COMPONENT_METRICS_VERSION: Final = "phase_c_component_metrics_v1"
+PHASE_C_LOCKED_HOLDOUT_SEASONS: Final = frozenset(("2025-26",))
 PHASE_C_OOF_KEY: Final = ("season", "target_gameweek", "player_id")
 PHASE_C_OOF_REQUIRED_COLUMNS: Final = (
     *PHASE_C_OOF_KEY,
@@ -46,6 +47,7 @@ _NON_NEGATIVE_PREDICTIONS: Final = (
     "expected_minutes",
     "expected_points",
 )
+_COMPOSITION_TOLERANCE: Final = 1e-9
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,9 +79,14 @@ class ComponentMetricSet:
 
     population_rows: int
     blank_rows: int
+    missing_appearance_target_rows: int
     missing_appearance_prediction_rows: int
     missing_start_label_rows: int
     missing_start_prediction_rows: int
+    missing_minutes_target_rows: int
+    missing_minutes_prediction_rows: int
+    missing_points_target_rows: int
+    missing_points_prediction_rows: int
     appearance: BinaryMetrics
     start: BinaryMetrics
     start_given_appearance: BinaryMetrics
@@ -158,8 +165,29 @@ def _validate_oof(value: object) -> pd.DataFrame:
         raise EvaluationValidationError("season must contain non-empty strings.")
     if bool(frame["fold_id"].map(lambda item: not isinstance(item, str) or not item.strip()).any()):
         raise EvaluationValidationError("fold_id must contain non-empty strings.")
-    if bool(~frame["position"].isin(_POSITIONS).any()):
+    if bool((~frame["position"].isin(_POSITIONS)).any()):
         raise EvaluationValidationError("position must contain only GK, DEF, MID or FWD.")
+    if bool(frame["season"].isin(PHASE_C_LOCKED_HOLDOUT_SEASONS).any()):
+        raise EvaluationValidationError("The locked 2025-26 holdout must not be evaluated.")
+
+    player_ids = frame["player_id"].tolist()
+    if any(isinstance(value, bool) for value in player_ids):
+        raise EvaluationValidationError("player_id must not contain bool values.")
+    player_id_kinds = {
+        "integer"
+        if isinstance(value, Integral)
+        else "string"
+        if isinstance(value, str)
+        else "other"
+        for value in player_ids
+    }
+    if player_id_kinds == {"string"}:
+        if any(not value.strip() for value in player_ids):
+            raise EvaluationValidationError("player_id strings must not be empty.")
+    elif player_id_kinds != {"integer"}:
+        raise EvaluationValidationError(
+            "player_id must use one consistent representation: non-empty strings or integers."
+        )
 
     frame["appearance_target"] = _validate_binary_target(frame, "appearance_target")
     frame["start_target"] = _validate_binary_target(frame, "start_target")
@@ -185,6 +213,10 @@ def _validate_oof(value: object) -> pd.DataFrame:
         raise EvaluationValidationError(
             "appearance_target must equal one exactly when minutes > 0."
         )
+    if bool((frame["appearance_target"].notna() & frame["minutes_target"].isna()).any()):
+        raise EvaluationValidationError(
+            "An observed appearance_target requires observed minutes_target."
+        )
     if bool(frame.loc[frame["start_target"].eq(1.0), "appearance_target"].ne(1.0).any()):
         raise EvaluationValidationError("A verified start must imply an appearance.")
 
@@ -205,7 +237,10 @@ def _validate_oof(value: object) -> pd.DataFrame:
         .combine(
             composed_start.loc[paired_start],
             lambda actual, expected: math.isclose(
-                float(actual), float(expected), rel_tol=0.0, abs_tol=1e-12
+                float(actual),
+                float(expected),
+                rel_tol=0.0,
+                abs_tol=_COMPOSITION_TOLERANCE,
             ),
         )
         .all()
@@ -213,6 +248,37 @@ def _validate_oof(value: object) -> pd.DataFrame:
         raise EvaluationValidationError(
             "start_probability must equal appearance_probability * q_start_given_appearance."
         )
+
+    appearance_prediction = frame["appearance_probability"].notna()
+    for conditional, composed in (
+        ("expected_minutes_if_appearance", "expected_minutes"),
+        ("expected_points_if_appearance", "expected_points"),
+    ):
+        if bool(frame[conditional].notna().ne(appearance_prediction).any()):
+            raise EvaluationValidationError(
+                f"{conditional} must be available exactly when appearance_probability is available."
+            )
+        if bool(frame[composed].notna().ne(appearance_prediction).any()):
+            raise EvaluationValidationError(
+                f"{composed} must be available exactly when appearance_probability is available."
+            )
+        expected = frame["appearance_probability"] * frame[conditional]
+        if bool(
+            ~frame.loc[appearance_prediction, composed]
+            .combine(
+                expected.loc[appearance_prediction],
+                lambda actual, wanted: math.isclose(
+                    float(actual),
+                    float(wanted),
+                    rel_tol=0.0,
+                    abs_tol=_COMPOSITION_TOLERANCE,
+                ),
+            )
+            .all()
+        ):
+            raise EvaluationValidationError(
+                f"{composed} must equal appearance_probability * {conditional}."
+            )
 
     for column in _NON_NEGATIVE_PREDICTIONS:
         if bool(frame[column].dropna().lt(0.0).any()):
@@ -226,12 +292,31 @@ def _validate_oof(value: object) -> pd.DataFrame:
     blank = frame["fixture_count"].eq(0)
     for column in (
         "appearance_probability",
+        "q_start_given_appearance",
         "start_probability",
+        "expected_minutes_if_appearance",
         "expected_minutes",
+        "expected_points_if_appearance",
         "expected_points",
     ):
         if bool(frame.loc[blank, column].dropna().ne(0.0).any()):
             raise EvaluationValidationError(f"Blank-gameweek {column} must be zero when available.")
+    for column in (
+        "appearance_target",
+        "start_target",
+        "minutes_target",
+        "points_target",
+    ):
+        if bool(frame.loc[blank, column].dropna().ne(0.0).any()):
+            raise EvaluationValidationError(f"Blank-gameweek {column} must be zero when observed.")
+
+    decision_keys = frame.loc[:, ["season", "target_gameweek", "fold_id"]].drop_duplicates()
+    if bool(decision_keys.duplicated(subset=["season", "target_gameweek"]).any()) or bool(
+        decision_keys.duplicated(subset=["fold_id"]).any()
+    ):
+        raise EvaluationValidationError(
+            "fold_id and (season, target_gameweek) must identify each other uniquely."
+        )
 
     frame["fixture_group"] = frame["fixture_count"].map(
         lambda count: "blank" if count == 0 else "single" if count == 1 else "double_plus"
@@ -322,6 +407,7 @@ def _score(frame: pd.DataFrame) -> ComponentMetricSet:
     return ComponentMetricSet(
         population_rows=len(frame),
         blank_rows=int(frame["fixture_count"].eq(0).sum()),
+        missing_appearance_target_rows=int(non_blank["appearance_target"].isna().sum()),
         missing_appearance_prediction_rows=int(
             (
                 non_blank["appearance_target"].notna() & non_blank["appearance_probability"].isna()
@@ -330,6 +416,14 @@ def _score(frame: pd.DataFrame) -> ComponentMetricSet:
         missing_start_label_rows=int(non_blank["start_target"].isna().sum()),
         missing_start_prediction_rows=int(
             (non_blank["start_target"].notna() & non_blank["start_probability"].isna()).sum()
+        ),
+        missing_minutes_target_rows=int(non_blank["minutes_target"].isna().sum()),
+        missing_minutes_prediction_rows=int(
+            (non_blank["minutes_target"].notna() & non_blank["expected_minutes"].isna()).sum()
+        ),
+        missing_points_target_rows=int(non_blank["points_target"].isna().sum()),
+        missing_points_prediction_rows=int(
+            (non_blank["points_target"].notna() & non_blank["expected_points"].isna()).sum()
         ),
         appearance=_binary_metrics(
             non_blank, "appearance_probability", "appearance_target", reliability=True
@@ -359,7 +453,7 @@ def _slices(frame: pd.DataFrame, column: str) -> Mapping[str, ComponentMetricSet
 
 
 def evaluate_component_oof(oof_rows: pd.DataFrame) -> PhaseCComponentEvaluation:
-    """Score one already-produced chronological OOF arm without making a promotion decision."""
+    """Score validated component rows without independently proving OOF chronology."""
 
     frame = _validate_oof(oof_rows)
     return PhaseCComponentEvaluation(
@@ -372,6 +466,7 @@ def evaluate_component_oof(oof_rows: pd.DataFrame) -> PhaseCComponentEvaluation:
 
 __all__ = [
     "PHASE_C_COMPONENT_METRICS_VERSION",
+    "PHASE_C_LOCKED_HOLDOUT_SEASONS",
     "PHASE_C_OOF_KEY",
     "PHASE_C_OOF_REQUIRED_COLUMNS",
     "BinaryMetrics",

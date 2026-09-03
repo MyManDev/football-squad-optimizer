@@ -26,9 +26,9 @@ def _rows() -> pd.DataFrame:
             "q_start_given_appearance": [0.75, 0.25, 0.5, pd.NA, 0.0, pd.NA],
             "start_probability": [0.6, 0.1, 0.1, pd.NA, 0.0, pd.NA],
             "expected_minutes_if_appearance": [80, 50, 50, 150, 0, pd.NA],
-            "expected_minutes": [70, 20, 10, 110, 0, pd.NA],
-            "expected_points_if_appearance": [6, 5, 2.5, -0.5, 0, pd.NA],
-            "expected_points": [5, 2, 0.5, 0, 0, 3],
+            "expected_minutes": [64, 20, 10, 75, 0, pd.NA],
+            "expected_points_if_appearance": [6, 5, 2.5, 0, 0, pd.NA],
+            "expected_points": [4.8, 2, 0.5, 0, 0, pd.NA],
         }
     )
 
@@ -47,10 +47,10 @@ def test_scores_component_metrics_without_merging_conditional_populations() -> N
     assert result.overall.start_given_appearance.observations == 2
     assert result.overall.start_given_appearance.brier_score == pytest.approx(0.0625)
     assert result.overall.minutes.observations == 4
-    assert result.overall.minutes.mean_absolute_error == pytest.approx(12.5)
-    assert result.overall.minutes.root_mean_squared_error == pytest.approx(math.sqrt(175.0))
+    assert result.overall.minutes.mean_absolute_error == pytest.approx(22.75)
+    assert result.overall.minutes.root_mean_squared_error == pytest.approx(math.sqrt(725.25))
     assert result.overall.minutes_if_appearance.observations == 3
-    assert result.overall.points.observations == 5
+    assert result.overall.points.observations == 4
     assert result.overall.points_if_appearance.observations == 3
 
 
@@ -68,6 +68,18 @@ def test_reports_fixed_appearance_bins_and_descriptive_slices() -> None:
 def test_start_probability_must_be_structurally_composed() -> None:
     rows = _rows()
     rows.loc[0, "start_probability"] = 0.7
+
+    with pytest.raises(EvaluationValidationError, match="must equal"):
+        evaluate_component_oof(rows)
+
+
+@pytest.mark.parametrize(
+    "column,value",
+    [("expected_minutes", 63.0), ("expected_points", 4.7)],
+)
+def test_reduced_form_predictions_must_be_structurally_composed(column: str, value: float) -> None:
+    rows = _rows()
+    rows.loc[0, column] = value
 
     with pytest.raises(EvaluationValidationError, match="must equal"):
         evaluate_component_oof(rows)
@@ -99,7 +111,7 @@ def test_appearance_label_must_match_realized_minutes() -> None:
 
 def test_blank_gameweek_predictions_must_be_zero() -> None:
     rows = _rows()
-    rows.loc[4, "expected_points"] = 0.1
+    rows.loc[4, "points_target"] = 1
 
     with pytest.raises(EvaluationValidationError, match="Blank-gameweek"):
         evaluate_component_oof(rows)
@@ -108,6 +120,7 @@ def test_blank_gameweek_predictions_must_be_zero() -> None:
 def test_minutes_predictions_respect_multi_fixture_support() -> None:
     rows = _rows()
     rows.loc[3, "expected_minutes_if_appearance"] = 181
+    rows.loc[3, "expected_minutes"] = 90.5
 
     with pytest.raises(EvaluationValidationError, match=r"90 \* fixture_count"):
         evaluate_component_oof(rows)
@@ -117,6 +130,22 @@ def test_oof_keys_must_be_unique() -> None:
     rows = pd.concat([_rows(), _rows().iloc[[0]]], ignore_index=True)
 
     with pytest.raises(EvaluationValidationError, match="keys must be unique"):
+        evaluate_component_oof(rows)
+
+
+def test_locked_holdout_is_rejected() -> None:
+    rows = _rows()
+    rows["season"] = "2025-26"
+
+    with pytest.raises(EvaluationValidationError, match="locked 2025-26"):
+        evaluate_component_oof(rows)
+
+
+def test_mixed_valid_and_invalid_positions_are_rejected() -> None:
+    rows = _rows()
+    rows.loc[0, "position"] = "WING"
+
+    with pytest.raises(EvaluationValidationError, match="position"):
         evaluate_component_oof(rows)
 
 
