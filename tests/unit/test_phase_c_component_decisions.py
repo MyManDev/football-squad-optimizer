@@ -14,6 +14,7 @@ from squadopt.evaluation import (
     evaluate_phase_c_component_decisions,
     prepare_phase_c_component_folds,
 )
+from squadopt.experiments.phase_c_reporting import phase_c_decision_comparison_to_dict
 from squadopt.optimization import OptimizationConfig
 
 
@@ -121,6 +122,12 @@ def test_comparison_uses_official_scoring_and_reports_no_promotion() -> None:
     assert result.diagnostics.ties == 1
     assert isinstance(result.diagnostics.candidate_vice_captain_recoveries, int)
     assert result.control.config.scoring_policy is ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2
+
+    report = phase_c_decision_comparison_to_dict(result)
+    assert report["promotion_decision"] == "not_evaluated"
+    assert report["scoring_policy"] == "official_autosub_captain_v2"
+    assert report["source"] == {"table_sha256": "a" * 64, "roster_sha256": "b" * 64}
+    assert report["folds"][0]["difference"] == 0.0
 
 
 def test_control_pool_must_match_the_handoff_exactly() -> None:
