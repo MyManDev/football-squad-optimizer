@@ -159,6 +159,16 @@ def test_nonappearance_keeps_the_official_outcome_instead_of_inventing_zero() ->
     assert realized.loc[15, "minutes"] == 0
 
 
+def test_fractional_realized_minutes_are_refused_instead_of_truncated() -> None:
+    handoff = _handoff()
+    rows = handoff.rows.copy(deep=True)
+    rows["minutes_target"] = rows["minutes_target"].astype("float64")
+    rows.loc[0, "minutes_target"] = 89.5
+
+    with pytest.raises(EvaluationValidationError, match="non-negative integers"):
+        prepare_phase_c_component_folds(replace(handoff, rows=rows), [_control()])
+
+
 def test_decision_comparison_requires_official_scoring_v2() -> None:
     with pytest.raises(EvaluationValidationError, match="official_autosub_captain_v2"):
         evaluate_phase_c_component_decisions(

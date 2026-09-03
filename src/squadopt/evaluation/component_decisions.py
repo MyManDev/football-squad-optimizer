@@ -124,9 +124,28 @@ def _outcomes(rows: pd.DataFrame, actual: pd.DataFrame, fold_id: str) -> pd.Data
         raise EvaluationValidationError(
             f"Control fold {fold_id!r} changes handoff appeared-player points outcomes."
         )
-    minutes = merged["minutes_target"].where(appeared, 0).astype("int64")
+    minute_values = pd.to_numeric(
+        merged["minutes_target"].where(appeared, 0), errors="raise"
+    ).astype("float64")
+    if bool(minute_values.lt(0.0).any() or minute_values.mod(1.0).ne(0.0).any()):
+        raise EvaluationValidationError(
+            f"Phase C fold {fold_id!r} realized minutes must be non-negative integers."
+        )
+    minutes = minute_values.astype("int64")
     if "minutes" in actual:
         actual_minutes = actual.loc[:, ["player_id", "minutes"]]
+        numeric_actual_minutes = pd.to_numeric(actual_minutes["minutes"], errors="raise").astype(
+            "float64"
+        )
+        if bool(
+            numeric_actual_minutes.isna().any()
+            or numeric_actual_minutes.lt(0.0).any()
+            or numeric_actual_minutes.mod(1.0).ne(0.0).any()
+        ):
+            raise EvaluationValidationError(
+                f"Control fold {fold_id!r} realized minutes must be non-negative integers."
+            )
+        actual_minutes = actual_minutes.assign(minutes=numeric_actual_minutes.astype("int64"))
         compared = (
             merged.loc[:, ["player_id"]]
             .assign(minutes=minutes)
@@ -137,7 +156,7 @@ def _outcomes(rows: pd.DataFrame, actual: pd.DataFrame, fold_id: str) -> pd.Data
                 validate="one_to_one",
             )
         )
-        if not compared["minutes_handoff"].equals(compared["minutes_control"].astype("int64")):
+        if not compared["minutes_handoff"].equals(compared["minutes_control"]):
             raise EvaluationValidationError(
                 f"Control fold {fold_id!r} changes handoff minutes outcomes."
             )
