@@ -15,6 +15,8 @@ The start component therefore remains unavailable.
 Official availability continues to be applied exactly once by the existing live rule after
 the handoff is read. The Phase B availability columns are validated as part of the artifact
 but are not applied by this policy; applying them here would count the same evidence twice.
+An unavailable held player may remain on the bench, as the game permits, but the live
+verifier does not allow one in the starting XI.
 
 ## Frozen rule
 

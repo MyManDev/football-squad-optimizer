@@ -297,16 +297,28 @@ def test_a_budget_breach_is_refused(
     assert any("over the" in failure for failure in failures)
 
 
-def test_a_selected_unavailable_player_is_refused(
+def test_an_unavailable_starter_is_refused(
     verified_pair: tuple[Recommendation, Projection],
 ) -> None:
     recommendation, projection = verified_pair
-    selected = int(recommendation.squad["player_id"].iloc[0])
+    selected = int(recommendation.starting_xi["player_id"].iloc[0])
     flagged = replace(projection, unavailable_players=(selected,))
 
     failures = ops.verify_decision(recommendation, flagged)
 
     assert any("Availability rule violated" in failure for failure in failures)
+
+
+def test_an_unavailable_bench_player_is_allowed(
+    verified_pair: tuple[Recommendation, Projection],
+) -> None:
+    recommendation, projection = verified_pair
+    benched = int(recommendation.bench["player_id"].iloc[0])
+    flagged = replace(projection, unavailable_players=(benched,))
+
+    failures = ops.verify_decision(recommendation, flagged)
+
+    assert not any("Availability rule violated" in failure for failure in failures)
 
 
 # --- settle -----------------------------------------------------------------

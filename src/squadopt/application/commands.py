@@ -238,11 +238,11 @@ def verify_decision(
         )
 
     unavailable = {int(player) for player in projection.unavailable_players}
-    selected_unavailable = sorted(squad_ids & unavailable)
-    if selected_unavailable:
+    starting_unavailable = sorted(xi_ids & unavailable)
+    if starting_unavailable:
         failures.append(
-            f"Availability rule violated: unavailable players {selected_unavailable!r} "
-            "were selected."
+            f"Availability rule violated: unavailable players {starting_unavailable!r} "
+            "were selected in the starting XI."
         )
     if risk_requested:
         if recommendation.risk.status is LiveRiskStatus.NOT_REQUESTED:
