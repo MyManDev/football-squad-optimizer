@@ -18,6 +18,17 @@ def _binary(metrics: BinaryMetrics) -> dict[str, object]:
         "mean_prediction": metrics.mean_prediction,
         "event_rate": metrics.event_rate,
         "mean_calibration_bias": metrics.mean_calibration_bias,
+        "reliability_bins": [
+            {
+                "index": item.index,
+                "lower_bound": item.lower_bound,
+                "upper_bound": item.upper_bound,
+                "observations": item.observations,
+                "mean_probability": item.mean_probability,
+                "event_rate": item.appearance_rate,
+            }
+            for item in metrics.reliability_bins
+        ],
     }
 
 
@@ -66,7 +77,7 @@ def _arm(item: PhaseCArmEvaluation) -> dict[str, object]:
             "model_version": declaration.model_version,
             "feature_contract_version": declaration.feature_contract_version,
             "target_contract_version": declaration.target_contract_version,
-            "table_sha256": declaration.table_sha256,
+            "evaluation_rows_sha256": declaration.evaluation_rows_sha256,
         },
         "metrics": {
             "contract_version": metrics.contract_version,
@@ -88,7 +99,7 @@ def phase_c_ablation_to_dict(result: PhaseCAblationEvaluation) -> dict[str, obje
         "contract_version": result.contract_version,
         "comparison_fingerprint": result.comparison_fingerprint,
         "paired_rows": result.paired_rows,
-        "promotion_decision": result.promotion_decision,
+        "promotion_decision": "not_evaluated",
         "base": _arm(result.base),
         "candidates": [_arm(item) for item in result.candidates],
     }

@@ -22,13 +22,16 @@ def _rows() -> pd.DataFrame:
             "start_target": [1, 0, 0, pd.NA, 0, pd.NA],
             "minutes_target": [90, 30, 0, 120, 0, 20],
             "points_target": [7, 1, 0, -1, 0, 2],
+            "composition_route": ["component_model"] * 5 + ["direct_control"],
+            "evidence_status": ["not_requested"] * 6,
             "appearance_probability": [0.8, 0.4, 0.2, 0.5, 0.0, pd.NA],
             "q_start_given_appearance": [0.75, 0.25, 0.5, pd.NA, 0.0, pd.NA],
             "start_probability": [0.6, 0.1, 0.1, pd.NA, 0.0, pd.NA],
             "expected_minutes_if_appearance": [80, 50, 50, 150, 0, pd.NA],
             "expected_minutes": [64, 20, 10, 75, 0, pd.NA],
             "expected_points_if_appearance": [6, 5, 2.5, 0, 0, pd.NA],
-            "expected_points": [4.8, 2, 0.5, 0, 0, pd.NA],
+            "fallback_expected_points": [pd.NA] * 5 + [3],
+            "expected_points": [4.8, 2, 0.5, 0, 0, 3],
         }
     )
 
@@ -50,7 +53,7 @@ def test_scores_component_metrics_without_merging_conditional_populations() -> N
     assert result.overall.minutes.mean_absolute_error == pytest.approx(22.75)
     assert result.overall.minutes.root_mean_squared_error == pytest.approx(math.sqrt(725.25))
     assert result.overall.minutes_if_appearance.observations == 3
-    assert result.overall.points.observations == 4
+    assert result.overall.points.observations == 5
     assert result.overall.points_if_appearance.observations == 3
 
 
@@ -83,6 +86,39 @@ def test_reduced_form_predictions_must_be_structurally_composed(column: str, val
 
     with pytest.raises(EvaluationValidationError, match="must equal"):
         evaluate_component_oof(rows)
+
+
+def test_negative_raw_conditional_points_are_clipped_only_at_public_boundary() -> None:
+    rows = _rows()
+    rows.loc[0, "expected_points_if_appearance"] = -1.0
+    rows.loc[0, "expected_points"] = 0.0
+
+    result = evaluate_component_oof(rows)
+
+    assert result.overall.points_if_appearance.observations == 3
+
+
+def test_direct_control_fallback_does_not_invent_component_predictions() -> None:
+    rows = _rows()
+    rows.loc[0, "composition_route"] = "direct_control"
+    rows.loc[
+        0,
+        [
+            "appearance_probability",
+            "q_start_given_appearance",
+            "start_probability",
+            "expected_minutes_if_appearance",
+            "expected_minutes",
+            "expected_points_if_appearance",
+        ],
+    ] = pd.NA
+    rows.loc[0, "fallback_expected_points"] = 4.5
+    rows.loc[0, "expected_points"] = 4.5
+
+    result = evaluate_component_oof(rows)
+
+    assert result.overall.appearance.observations == 3
+    assert result.overall.points.observations == 5
 
 
 def test_start_probability_and_conditional_probability_are_jointly_available() -> None:
@@ -138,6 +174,15 @@ def test_locked_holdout_is_rejected() -> None:
     rows["season"] = "2025-26"
 
     with pytest.raises(EvaluationValidationError, match="locked 2025-26"):
+        evaluate_component_oof(rows)
+
+
+@pytest.mark.parametrize("season", ["2025-26 ", " 2025-26"])
+def test_noncanonical_season_cannot_bypass_the_holdout_guard(season: str) -> None:
+    rows = _rows()
+    rows["season"] = season
+
+    with pytest.raises(EvaluationValidationError, match="canonical"):
         evaluate_component_oof(rows)
 
 
