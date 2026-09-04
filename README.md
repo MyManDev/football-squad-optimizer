@@ -8,9 +8,9 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 - **Phase A — Engineering complete; prospective evidence accumulating.**
 - **Phase B — Complete.** The deadline-safe evidence layer is built and its first real
   handoff is produced and verified.
-- **Phase C — Component-base evaluation complete; prospective evidence validation open.**
-  The component base is measured on 147 development folds and the in-season handoff can
-  consume verified Top-100 evidence under a frozen, bounded rule.
+- **Phase C — Component base operational; prospective evidence validation open.**
+  The measured component base is the default in-season handoff model. The previous
+  in-season blend remains an explicit rollback and a structured fallback for old captures.
 - **Phases D–H — Planned.** Later phases do not become product claims until their own
   calibration and evaluation gates pass.
 
@@ -80,7 +80,7 @@ Exit criteria:
 
 ## Phase C — Probabilistic player model
 
-**Status: component-base evaluation complete; prospective evidence validation open.**
+**Status: component base operational; prospective evidence validation open.**
 
 Goal: replace a single undifferentiated point estimate with explicit, testable components.
 
@@ -95,10 +95,17 @@ Goal: replace a single undifferentiated point estimate with explicit, testable c
 - Evaluate points and final squad decisions on chronological walk-forward folds.
 - Ablate ownership, elite, transfer and availability evidence separately before combining them.
 
-The first operational slice is intentionally narrower than the final component model. It uses
-the previous-gameweek Top-100 XI count as a bounded five-per-cent uplift to the existing
-in-season expected-points handoff, while live availability remains a separate, single
-post-processing step. The exact rule, rollback and limitations are frozen in
+The default in-season handoff now fits the frozen component-base estimators on the declared
+2021-22 through 2024-25 development seasons. It builds live rolling features from at most five
+fully settled gameweeks captured before the target deadline, then composes expected points as
+appearance probability times points conditional on appearance. Players without complete live
+history use the existing in-season estimate row by row. Old captures without the required live
+payloads fall back to the legacy model with a recorded reason; `--control-only` is the explicit
+rollback. See [`docs/phase_c_operational_component.md`](docs/phase_c_operational_component.md).
+
+The earlier Top-100 five-per-cent uplift remains reproducible only as an explicit legacy
+candidate. It is not combined with the component base and is no longer the default; its frozen
+definition remains in
 [`docs/phase_c_operational_elite_policy.md`](docs/phase_c_operational_elite_policy.md).
 
 Recorded component-base result:
@@ -108,8 +115,10 @@ Recorded component-base result:
 - Mean realized squad score **63.1633**, against **58.5442** for the historical Ridge control.
 - Paired component-minus-control difference **+4.6190 points per gameweek**; season means are
   positive in all four development seasons.
-- This is descriptive, not a promotion: no candidate-specific gate was frozen before the run,
-  and some solves were feasible without proof of optimality. The operational control is retained.
+- This is descriptive rather than a confirmatory promotion: no candidate-specific gate was
+  frozen before the run, and some solves were feasible without proof of optimality. The owner
+  nevertheless selected the component base as the operational default, with explicit rollback
+  and diagnostics, to accumulate prospective evidence rather than leave it in shadow indefinitely.
 - Full record: [`docs/phase_c_component_evaluation.md`](docs/phase_c_component_evaluation.md).
 
 No probability from this phase is member-facing. Publication requires the later scenario and
