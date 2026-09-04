@@ -134,3 +134,49 @@ from is not evidence.
 No binding measurement is run in this pre-registration or in the foundation PR it describes. The
 locked 2025-26 holdout is not read, listed or hashed. No model is fitted or tuned, and the live
 recommendation path is unchanged.
+
+## 9. Amendment — component scenario lineage
+
+Frozen **before** the production change it governs, and before any measurement: no binding
+number has been produced from this foundation yet, so the structure below is still being chosen
+without having seen an output. This amendment registers no numeric threshold, no scale, no
+promotion gate and no change to live behaviour.
+
+It exists because the first foundation commit drew every scenario cell independently from the
+whole pooled residual history, and then recorded the first player's fold as the whole scenario's
+`source_fold_ids` entry. The sampling rule was defensible; the provenance claim written beside
+it was not. The following decisions fix the lineage rather than the numbers.
+
+1. **One source fold per scenario.** As in Scenario V1, a historical source fold is chosen once
+   per scenario, deterministically, from the eligible history folds under
+   `ScenarioConfig.deterministic_seed`. It is not chosen per player and not chosen per cell.
+2. **Both residuals from one row of that fold.** For every player in that scenario, the minutes
+   and points residual pair is taken together from the same historical row *of the fold chosen
+   for that scenario*. The pairing rule of §4 is unchanged; what narrows is where the row may
+   come from.
+3. **`ScenarioSet.source_fold_ids` is therefore true.** Each entry names the fold that scenario
+   actually drew from. Recording the first player's fold as the whole scenario's source is
+   **forbidden**: a provenance field that is only accidentally right is worse than an absent
+   one, because it invites a reader to trust it.
+4. **The chosen fold is a block-bootstrap boundary and nothing more.** This foundation adds no
+   explicit V1 common or team shock on top of it. Drawing one fold per scenario carries whatever
+   joint structure that historical week happened to contain; it does not claim to model
+   correlation, and it does not double count the point residual (§5). A finer correlation
+   structure is a later, measured step.
+5. **Direct-control rows fail closed in the sampler.** §5 already refuses to invent a value for
+   them. This makes the refusal explicit at the point of sampling: while no exact-key fallback
+   artifact is bound, a `direct_control` row is rejected with a named error rather than passed
+   through. In particular a missing component value on such a row is **not** turned into zero
+   and sampled from; zero is a prediction, and no prediction exists for those rows.
+6. **Component result identity covers both matrices.** A component draw carries a digest bound
+   to the points matrix *and* to the sampled minutes matrix, alongside the component contract
+   version, the Phase C table SHA, the roster SHA, the model and feature contract versions, and
+   the target season and gameweek. Minutes are not a by-product: the V2 decision scorer takes
+   autosub decisions from them, so two draws with identical points and different minutes are
+   different results and must not share an identity.
+7. **`evidence_status` is validated against the declared Phase C set, not a wider one.** That
+   set is `squadopt.prediction.components.COMPONENT_EVIDENCE_STATUSES`, which today declares
+   exactly `not_requested`. The three-state distinction in §5 is about the public availability
+   status in `application/views.py`, a different contract; nothing here collapses it, and no new
+   status is coined for the scenario input. Should the Phase C contract declare more statuses,
+   this validation follows it rather than being widened independently.
