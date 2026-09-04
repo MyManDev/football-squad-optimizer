@@ -13,7 +13,12 @@ import pandas as pd
 import pytest
 
 from squadopt.prediction.integration import PredictionProvenance, prepare_optimizer_projection
-from squadopt.scenarios import ScenarioConfig, ScenarioTarget, ScenarioValidationError
+from squadopt.scenarios import (
+    ScenarioConfig,
+    ScenarioConfigurationError,
+    ScenarioTarget,
+    ScenarioValidationError,
+)
 from squadopt.scenarios.components import (
     COMPONENT_SCENARIO_CONTRACT_VERSION,
     ComponentScenarioDraw,
@@ -57,7 +62,9 @@ def _input_frame(**overrides: object) -> pd.DataFrame:
             "expected_minutes_if_appearance": [45.0, 45.0, 45.0],
             "raw_expected_points_if_appearance": [4.0, 4.0, 4.0],
             "composition_route": ["component_model"] * 3,
-            "evidence_status": ["available"] * 3,
+            # The only status the Phase C contract declares today; the input contract follows
+            # that tuple rather than widening it here.
+            "evidence_status": ["not_requested"] * 3,
         }
     )
     for column, value in overrides.items():
@@ -85,7 +92,8 @@ def _snapshot() -> object:
     points = pd.DataFrame({"player_id": list(PLAYERS), "expected_points": [4.0, 4.0, 4.0]})
     provenance = PredictionProvenance(
         model_name="synthetic-component-model",
-        model_version="1.0.0",
+        # Must equal the component provenance's: the sampler cross-checks the two.
+        model_version="synthetic-component-1.0.0",
         feature_contract_version="synthetic-features-v1",
         training_cutoff=f"{SEASON}:GW08",
         training_data_fingerprint="b" * 64,
@@ -116,6 +124,47 @@ def _oof(folds: tuple[str, ...] = ("2026-27-gw07", "2026-27-gw08"), **overrides:
     for column, value in overrides.items():
         frame[column] = value
     return frame
+
+
+def _disjoint_oof() -> pd.DataFrame:
+    """Two folds whose residuals cannot be mistaken for each other.
+
+    ``gw07`` yields minutes residuals ``{10, 20, 30}`` and ``gw08`` yields ``{110, 120, 130}``.
+    Because the two sets are disjoint, the fold a sampled cell came from is readable straight
+    off the minutes matrix -- which is what makes the fold-block rule observable at all.
+    """
+
+    records: list[dict[str, object]] = []
+    for offset, fold in ((0.0, "2026-27-gw07"), (100.0, "2026-27-gw08")):
+        for index, player in enumerate(PLAYERS):
+            minutes_residual = offset + 10.0 * (index + 1)
+            records.append(
+                {
+                    "fold_id": fold,
+                    "player_id": player,
+                    "composition_route": "component_model",
+                    "appearance_target": 1,
+                    "expected_minutes_if_appearance": 45.0,
+                    "raw_expected_points_if_appearance": 4.0,
+                    "minutes_target": 45.0 + minutes_residual,
+                    "points_target": 4.0 + minutes_residual / 10.0,
+                }
+            )
+    return pd.DataFrame(records)
+
+
+FOLD_RESIDUALS = {
+    "2026-27-gw07": {10.0, 20.0, 30.0},
+    "2026-27-gw08": {110.0, 120.0, 130.0},
+}
+
+
+def _fold_block_draw():
+    """A draw over ``_disjoint_oof``, with a ceiling too wide to clip any residual away."""
+
+    frame = _input_frame(appearance_probability=1.0)
+    frame["fixture_count"] = 3  # ceiling 270, and the largest draw is 45 + 130
+    return _sample(inputs=_inputs(frame), oof=_disjoint_oof())
 
 
 def _sample(*, config: ScenarioConfig | None = None, **kwargs: object):
@@ -403,3 +452,172 @@ def test_the_v1_entry_point_is_still_present_and_independent() -> None:
     assert callable(generate_scenarios)
     assert generate_scenarios.__module__ == "squadopt.scenarios.generator"
     assert sample_component_scenarios.__module__ == "squadopt.scenarios.components"
+
+
+# --- 16. the input contract's declared vocabularies -------------------------
+
+
+def test_an_unknown_composition_route_is_refused() -> None:
+    """The route vocabulary is Phase C's, and this boundary does not extend it."""
+
+    with pytest.raises(ScenarioValidationError, match="composition_route must be one of"):
+        ComponentScenarioInputs(
+            table=_input_frame(composition_route="blended_control"), provenance=_provenance()
+        )
+
+
+def test_an_undeclared_evidence_status_is_refused() -> None:
+    """``available`` reads like a status, but Phase C does not declare it for this table.
+
+    Accepting it would mean this module had coined a status of its own, and a status nothing
+    else writes is a claim nothing else can check.
+    """
+
+    with pytest.raises(ScenarioValidationError, match="A status is not coined here"):
+        ComponentScenarioInputs(
+            table=_input_frame(evidence_status="available"), provenance=_provenance()
+        )
+
+
+def test_a_silently_coerced_scalar_is_refused_rather_than_rounded() -> None:
+    """Two scalars that were coerced instead of checked.
+
+    ``min_history_folds`` went through ``max(1, int(...))``, so ``True`` meant one fold and
+    ``2.9`` meant two. ``player_id`` was cast, so ``101.5`` became player 101 -- one player's
+    residual history attached to another player's row.
+    """
+
+    for folds in (True, 2.9, -1, 0):
+        with pytest.raises(ScenarioConfigurationError, match="min_history_folds"):
+            paired_conditional_residuals(_oof(), target=TARGET, min_history_folds=folds)  # type: ignore[arg-type]
+
+    for identifiers in ([101.5, 102.0, 103.0], [True, False, True]):
+        frame = _input_frame()
+        frame["player_id"] = identifiers
+        with pytest.raises(ScenarioValidationError, match="refused rather than truncated"):
+            ComponentScenarioInputs(table=frame, provenance=_provenance())
+
+
+# --- 17. the sampler's provenance preconditions -----------------------------
+
+
+def test_a_direct_control_row_is_refused_by_the_sampler_rather_than_sampled_as_zero() -> None:
+    """Fail closed, because the only thing available here is to invent a zero.
+
+    The row is legal input: it carries no component value, which is exactly what a
+    direct-control row must look like, so it survives the input contract. What it has no
+    business doing is reaching the sampler, where a missing conditional mean would have to be
+    read as zero -- a confident prediction of nothing, for a player nothing is predicted for.
+    The exact-key control fallback lives in another artifact and is not bound here.
+    """
+
+    frame = _input_frame()
+    frame["expected_minutes_if_appearance"] = frame["expected_minutes_if_appearance"].astype(float)
+    frame.loc[0, "composition_route"] = "direct_control"
+    frame.loc[
+        0,
+        [
+            "appearance_probability",
+            "expected_minutes_if_appearance",
+            "raw_expected_points_if_appearance",
+        ],
+    ] = float("nan")
+
+    inputs = ComponentScenarioInputs(table=frame, provenance=_provenance())
+    assert component_input_summary(inputs)["direct_control_rows"] == 1  # it did survive input
+
+    with pytest.raises(ScenarioValidationError, match="no exact-key control fallback"):
+        _sample(inputs=inputs)
+
+
+def test_provenance_naming_another_decision_week_is_refused() -> None:
+    """A set whose provenance names a different week cannot be traced to its Phase C rows."""
+
+    with pytest.raises(ScenarioValidationError, match="name season"):
+        _sample(inputs=_inputs(season="2024-25"))
+
+    with pytest.raises(ScenarioValidationError, match="name gameweek"):
+        _sample(inputs=_inputs(target_gameweek=TARGET.gameweek + 1))
+
+
+def test_a_roster_field_disagreeing_with_the_projection_is_refused() -> None:
+    """The caller joins team and position on, and a stale join must not pass silently.
+
+    Both fields decide something downstream -- position drives autosubs, team drives the team
+    limit -- so disagreeing with the projection they are sampled against is not cosmetic.
+    """
+
+    for column, values in (("team_id", [9, 1, 2]), ("position", ["DEF", "FWD", "DEF"])):
+        frame = _input_frame()
+        frame[column] = values
+        with pytest.raises(ScenarioValidationError, match=f"disagree on {column}"):
+            _sample(inputs=_inputs(frame))
+
+
+# --- 18. the fold block ------------------------------------------------------
+
+
+def test_each_scenario_names_the_fold_it_actually_drew_from() -> None:
+    """``source_fold_ids`` is a fact about the scenario, not a label from its first player.
+
+    The first foundation commit drew every cell from the whole pool and then recorded player
+    zero's fold as the whole scenario's source. That entry was only ever accidentally right.
+    """
+
+    draw = _fold_block_draw()
+    residuals = draw.sampled_minutes.to_numpy() - 45.0
+
+    assert set(draw.scenarios.source_fold_ids) == set(FOLD_RESIDUALS)  # both folds get used
+    for index, fold in enumerate(draw.scenarios.source_fold_ids):
+        assert set(residuals[index].tolist()) <= FOLD_RESIDUALS[fold]
+
+
+def test_no_cell_in_a_scenario_draws_from_another_fold() -> None:
+    """The block itself, read without reference to the recorded label.
+
+    A pooled draw mixes the two folds inside a single scenario row almost every time across
+    two hundred scenarios, so this fails loudly if the block boundary is dropped -- even if
+    ``source_fold_ids`` were somehow still labelled correctly.
+    """
+
+    draw = _fold_block_draw()
+    residuals = draw.sampled_minutes.to_numpy() - 45.0
+
+    for row in residuals:
+        drawn = set(row.tolist())
+        assert any(drawn <= allowed for allowed in FOLD_RESIDUALS.values())
+
+
+# --- 19. the component identity ---------------------------------------------
+
+
+def test_the_component_fingerprint_is_deterministic_and_not_a_constant() -> None:
+    draw = _sample()
+    moved_seed = _sample(config=ScenarioConfig(scenario_count=200, deterministic_seed=8))
+
+    assert draw.component_fingerprint == _sample().component_fingerprint
+    assert len(draw.component_fingerprint) == 64
+    assert moved_seed.component_fingerprint != draw.component_fingerprint
+
+
+def test_a_changed_minutes_matrix_changes_the_component_fingerprint() -> None:
+    """Identical points, one moved minute: a different result, so a different identity.
+
+    The autosub decision is taken from the minutes, so a digest bound only to the points
+    matrix would let two genuinely different draws pass as the same one. The same
+    ``ScenarioSet`` is reused here, so the points matrix is byte identical by construction and
+    the minutes are the only thing that moved.
+    """
+
+    draw = _sample(inputs=_inputs(_input_frame(appearance_probability=1.0)))
+    moved = draw.sampled_minutes.copy(deep=True)
+    assert moved.iloc[0, 0] > 0.0
+    moved.iloc[0, 0] = 0.0
+
+    with pytest.raises(ScenarioValidationError, match="component_fingerprint does not match"):
+        ComponentScenarioDraw(
+            scenarios=draw.scenarios,
+            inputs=draw.inputs,
+            sampled_minutes=moved,
+            component_fingerprint=draw.component_fingerprint,
+        )

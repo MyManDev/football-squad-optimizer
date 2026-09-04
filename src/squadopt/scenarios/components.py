@@ -26,19 +26,29 @@ double counts is the failure this avoids.
 """
 
 import hashlib
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
+from numbers import Integral
 from typing import Final
 
 import numpy as np
 import pandas as pd
 
+from squadopt.prediction.components import (
+    COMPONENT_EVIDENCE_STATUSES,
+    COMPONENT_MODEL_ROUTE,
+    COMPONENT_PREDICTION_ROUTES,
+    DIRECT_CONTROL_ROUTE,
+)
 from squadopt.prediction.integration import PredictionSnapshot
 from squadopt.scenarios.models import (
     ScenarioConfig,
     ScenarioSet,
     ScenarioTarget,
     ScenarioValidationError,
+    _digest,
+    _integer,
     _scenario_fingerprint,
 )
 
@@ -60,6 +70,14 @@ COMPONENT_INPUT_COLUMNS: Final = (
     "evidence_status",
 )
 
+# The three numbers that *are* the component prediction. A direct-control row must leave all
+# three missing; a component-model row must carry all three.
+_COMPONENT_VALUE_COLUMNS: Final = (
+    "appearance_probability",
+    "expected_minutes_if_appearance",
+    "raw_expected_points_if_appearance",
+)
+
 # Columns the paired residual pool is derived from, in the OOF table's own names.
 RESIDUAL_SOURCE_COLUMNS: Final = (
     "fold_id",
@@ -72,10 +90,10 @@ RESIDUAL_SOURCE_COLUMNS: Final = (
     "raw_expected_points_if_appearance",
 )
 
-# The route whose rows carry no component prediction, so no conditional residual exists for
-# them and none is invented.
-DIRECT_CONTROL_ROUTE: Final = "direct_control"
-COMPONENT_MODEL_ROUTE: Final = "component_model"
+# The routes and evidence statuses are the Phase C contract's own
+# (``squadopt.prediction.components``), imported rather than re-declared here: a second copy of
+# a declared vocabulary is a second contract that can drift from the first. ``direct_control``
+# rows carry no component prediction, so no conditional residual exists for them.
 
 # Declared locally: the constant also lives in ``backtest.learned``, which sits above this
 # layer, so importing it would invert the dependency the layer contract enforces.
@@ -140,6 +158,11 @@ class ComponentScenarioInputs:
     contract_version: str = COMPONENT_SCENARIO_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
+        if self.contract_version != COMPONENT_SCENARIO_CONTRACT_VERSION:
+            raise ScenarioValidationError(
+                "contract_version does not match this component scenario implementation; "
+                f"expected {COMPONENT_SCENARIO_CONTRACT_VERSION!r}, got {self.contract_version!r}."
+            )
         frame = _validated_component_table(self.table)
         object.__setattr__(self, "table", frame)
 
@@ -160,12 +183,47 @@ def _validated_component_table(table: object) -> pd.DataFrame:
         raise ScenarioValidationError("Component scenario inputs must carry at least one row.")
 
     frame = table.loc[:, list(COMPONENT_INPUT_COLUMNS)].copy(deep=True).reset_index(drop=True)
+
+    # Integral and not bool, following the identifier rule the projection contract already
+    # applies. A float identifier is refused rather than truncated: 101.5 silently becoming
+    # player 101 would attach one player's residual history to another's row.
+    non_integral = [
+        value
+        for value in frame["player_id"].tolist()
+        if isinstance(value, bool) or not isinstance(value, Integral)
+    ]
+    if non_integral:
+        raise ScenarioValidationError(
+            "player_id must be an integer that is not a bool; a non-integral identifier is "
+            f"refused rather than truncated. Invalid examples: {non_integral[:10]!r}."
+        )
+    frame["player_id"] = frame["player_id"].astype("int64")
+
     if bool(frame["player_id"].duplicated().any()):
         duplicated = sorted(
             {int(v) for v in frame.loc[frame["player_id"].duplicated(), "player_id"]}
         )
         raise ScenarioValidationError(
             f"Component scenario inputs list players more than once: {duplicated[:10]!r}."
+        )
+
+    route = frame["composition_route"].astype("string")
+    unknown_routes = sorted(
+        {str(value) for value in route[~route.isin(COMPONENT_PREDICTION_ROUTES)]}
+    )
+    if unknown_routes:
+        raise ScenarioValidationError(
+            f"composition_route must be one of {list(COMPONENT_PREDICTION_ROUTES)!r}; "
+            f"got {unknown_routes!r}."
+        )
+    status = frame["evidence_status"].astype("string")
+    unknown_status = sorted(
+        {str(value) for value in status[~status.isin(COMPONENT_EVIDENCE_STATUSES)]}
+    )
+    if unknown_status:
+        raise ScenarioValidationError(
+            f"evidence_status must be one of {list(COMPONENT_EVIDENCE_STATUSES)!r}; "
+            f"got {unknown_status!r}. A status is not coined here."
         )
 
     fixtures = frame["fixture_count"].to_numpy()
@@ -177,28 +235,35 @@ def _validated_component_table(table: object) -> pd.DataFrame:
         )
     frame["fixture_count"] = fixtures.astype("int64")
 
+    # Every numeric component value is coerced once, here, so the rest of the module reads
+    # float64 with NaN for "missing" instead of three different pandas null flavours.
+    for column in _COMPONENT_VALUE_COLUMNS:
+        frame[column] = pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype="float64")
+
+    component_rows = (route == COMPONENT_MODEL_ROUTE).to_numpy()
+    control_rows = (route == DIRECT_CONTROL_ROUTE).to_numpy()
+
+    # The probability bound is checked on component-model rows only, because a direct-control
+    # row is required below to carry no probability at all. Checking finiteness on every row
+    # would make the two rules contradict each other.
     probability = frame["appearance_probability"].to_numpy(dtype="float64")
-    if (
-        not np.all(np.isfinite(probability))
-        or bool(np.any(probability < 0.0))
-        or bool(np.any(probability > 1.0))
-    ):
+    invalid_probability = component_rows & (
+        ~np.isfinite(probability) | (probability < 0.0) | (probability > 1.0)
+    )
+    if bool(np.any(invalid_probability)):
         raise ScenarioValidationError("appearance_probability must be finite and within [0, 1].")
 
-    component_rows = frame["composition_route"].astype("string") == COMPONENT_MODEL_ROUTE
-    conditional = ("expected_minutes_if_appearance", "raw_expected_points_if_appearance")
-    for column in conditional:
-        values = pd.to_numeric(frame[column], errors="coerce").to_numpy(dtype="float64")
-        if bool(np.any(~np.isfinite(values) & component_rows.to_numpy())):
+    for column in ("expected_minutes_if_appearance", "raw_expected_points_if_appearance"):
+        values = frame[column].to_numpy(dtype="float64")
+        if bool(np.any(~np.isfinite(values) & component_rows)):
             raise ScenarioValidationError(
                 f"{column} must be finite on every {COMPONENT_MODEL_ROUTE} row; a missing "
                 "component value is not filled with zero."
             )
-        frame[column] = values
 
     minutes = frame["expected_minutes_if_appearance"].to_numpy(dtype="float64")
     ceiling = frame["fixture_count"].to_numpy(dtype="float64") * MINUTES_PER_FIXTURE
-    out_of_range = component_rows.to_numpy() & ((minutes < 0.0) | (minutes > ceiling))
+    out_of_range = component_rows & ((minutes < 0.0) | (minutes > ceiling))
     if bool(np.any(out_of_range)):
         raise ScenarioValidationError(
             "expected_minutes_if_appearance must lie in [0, 90 * fixture_count]."
@@ -207,10 +272,14 @@ def _validated_component_table(table: object) -> pd.DataFrame:
     # raw_expected_points_if_appearance is deliberately unbounded below: an FPL score can be
     # negative, and a lower bound here would be a claim about the game's rules, not the data.
 
-    control_rows = frame["composition_route"].astype("string") == DIRECT_CONTROL_ROUTE
-    invented = control_rows.to_numpy() & np.isfinite(
-        frame["expected_minutes_if_appearance"].to_numpy(dtype="float64")
-    )
+    # A direct-control row must leave *every* component value missing, not just the minutes.
+    # This is the Phase C rule (`squadopt.prediction.components`) applied at this boundary
+    # rather than a second one invented here, including its zero-fixture exemption: a blank
+    # gameweek is normalized to zeros upstream, so zeros there are not an invented prediction.
+    present = np.zeros(len(frame), dtype=bool)
+    for column in _COMPONENT_VALUE_COLUMNS:
+        present |= np.isfinite(frame[column].to_numpy(dtype="float64"))
+    invented = control_rows & present & (frame["fixture_count"].to_numpy() > 0)
     if bool(np.any(invented)):
         raise ScenarioValidationError(
             f"{DIRECT_CONTROL_ROUTE} rows carry no component prediction; a component value on "
@@ -241,10 +310,70 @@ class PairedResidualPool:
     def __len__(self) -> int:
         return len(self.residuals)
 
+    def fold_blocks(self) -> tuple[tuple[int, int], ...]:
+        """Return each fold's ``(start, size)`` row range, in ``history_fold_ids`` order.
+
+        ``residuals`` is sorted by ``fold_id`` then ``player_id``, so every fold occupies one
+        contiguous range and drawing within a fold is a start plus an offset. The boundaries
+        are searched for rather than assumed: a pool that was somehow not contiguous is
+        refused here instead of yielding a scenario whose cells silently span two folds.
+        """
+
+        folds = self.residuals["fold_id"].astype("string").to_numpy(dtype=object)
+        wanted = np.array(self.history_fold_ids, dtype=object)
+        starts = np.searchsorted(folds, wanted, side="left")
+        ends = np.searchsorted(folds, wanted, side="right")
+        blocks = tuple(
+            (int(start), int(end) - int(start)) for start, end in zip(starts, ends, strict=True)
+        )
+        if any(size < 1 for _, size in blocks) or sum(size for _, size in blocks) != len(
+            self.residuals
+        ):
+            raise ScenarioValidationError(
+                f"The residual pool for {self.target_fold_id} is not one contiguous block per "
+                "fold, so a per-scenario fold draw cannot be bounded to a single fold."
+            )
+        return blocks
+
+
+def _component_fingerprint(
+    scenarios: ScenarioSet,
+    inputs: "ComponentScenarioInputs",
+    sampled_minutes: pd.DataFrame,
+) -> str:
+    """Digest the V1 identity, the minutes matrix and the component provenance together.
+
+    Small and private on purpose. It follows ``_scenario_fingerprint``'s shape -- canonical
+    JSON metadata, then the raw little-endian float64 bytes of the matrix -- rather than
+    introducing a general fingerprint mechanism this phase has no second use for.
+
+    The minutes bytes are inside the digest because the autosub decision is taken from the
+    minutes: two draws with a byte-identical points matrix and different minutes are different
+    results, and must not be able to share an identity.
+    """
+
+    provenance = inputs.provenance
+    metadata = {
+        "component_contract_version": inputs.contract_version,
+        "scenario_fingerprint": scenarios.scenario_fingerprint,
+        "phase_c_table_sha": provenance.phase_c_table_sha,
+        "roster_sha": provenance.roster_sha,
+        "model_version": provenance.model_version,
+        "feature_contract_version": provenance.feature_contract_version,
+        "target_season": scenarios.target.season,
+        "target_gameweek": scenarios.target.gameweek,
+        "fixture_counts": [int(value) for value in inputs.table["fixture_count"]],
+    }
+    digest = hashlib.sha256(
+        json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    )
+    digest.update(sampled_minutes.to_numpy(dtype="<f8", copy=True).tobytes(order="C"))
+    return digest.hexdigest()
+
 
 @dataclass(frozen=True, slots=True)
 class ComponentScenarioDraw:
-    """A V1 ``ScenarioSet`` plus the per-cell minutes that produced it.
+    """A V1 ``ScenarioSet``, the per-cell minutes that produced it, and one identity for both.
 
     Minutes ride *beside* the set rather than inside it. ``ScenarioSet.diagnostics`` is
     JSON-compatible metadata by contract and rightly refuses a matrix, and this is not a
@@ -252,10 +381,76 @@ class ComponentScenarioDraw:
     ``scenario_points`` stays the public decision matrix. The minutes are here because the
     V2 decision scorer needs them for autosubs, and because without them the minutes-points
     pairing cannot be observed from the output at all.
+
+    ``inputs`` rides along because the two checks that belong here need it: the ``[0, 90 *
+    fixture_count]`` bound needs the per-player fixture counts, and the digest needs the
+    component provenance. Both are already validated and copied on that object, so carrying it
+    restates nothing.
+
+    ``component_fingerprint`` is recomputed and compared on construction, so a matrix and an
+    identity cannot be paired by assertion. ``ScenarioSet``'s own V1 fingerprint behaviour is
+    untouched.
     """
 
     scenarios: ScenarioSet
+    inputs: "ComponentScenarioInputs"
     sampled_minutes: pd.DataFrame
+    component_fingerprint: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.scenarios, ScenarioSet):
+            raise ScenarioValidationError("scenarios must be a ScenarioSet.")
+        if not isinstance(self.inputs, ComponentScenarioInputs):
+            raise ScenarioValidationError("inputs must be ComponentScenarioInputs.")
+        if not isinstance(self.sampled_minutes, pd.DataFrame):
+            raise ScenarioValidationError("sampled_minutes must be a pandas DataFrame.")
+
+        points = self.scenarios.scenario_points
+        # Copied before anything is checked, so a later edit to the caller's frame cannot
+        # change what the bound and the fingerprint were verified against.
+        minutes = self.sampled_minutes.copy(deep=True)
+        if minutes.shape != points.shape:
+            raise ScenarioValidationError(
+                "sampled_minutes shape must equal the scenario points matrix."
+            )
+        if tuple(minutes.index.tolist()) != self.scenarios.scenario_ids:
+            raise ScenarioValidationError("sampled_minutes index must equal scenario_ids.")
+        if tuple(minutes.columns.tolist()) != tuple(points.columns.tolist()):
+            raise ScenarioValidationError(
+                "sampled_minutes columns must exactly align with the scenario points columns."
+            )
+        # Compared as text so a numpy identifier and a Python one are not a false mismatch.
+        # This binds the columns to the *input rows* rather than only to the points columns,
+        # because the ceiling below is per player and is read off those rows.
+        if tuple(str(value) for value in minutes.columns) != tuple(
+            str(value) for value in self.inputs.table["player_id"]
+        ):
+            raise ScenarioValidationError(
+                "sampled_minutes columns must align with the component input player order; the "
+                "minutes ceiling is read per player from those rows."
+            )
+        try:
+            minutes = minutes.astype("float64")
+        except (TypeError, ValueError) as error:
+            raise ScenarioValidationError("sampled_minutes must be numeric.") from error
+
+        values = minutes.to_numpy(dtype="float64")
+        if not bool(np.isfinite(values).all()):
+            raise ScenarioValidationError("sampled_minutes must be finite.")
+        ceiling = self.inputs.table["fixture_count"].to_numpy(dtype="float64") * MINUTES_PER_FIXTURE
+        if bool(np.any((values < 0.0) | (values > ceiling[None, :]))):
+            raise ScenarioValidationError(
+                "sampled_minutes must lie in [0, 90 * fixture_count]; a minute outside the "
+                "calendar is not a playable outcome."
+            )
+
+        fingerprint = _digest(self.component_fingerprint, "component_fingerprint")
+        if fingerprint != _component_fingerprint(self.scenarios, self.inputs, minutes):
+            raise ScenarioValidationError(
+                "component_fingerprint does not match the scenario matrices and provenance."
+            )
+        object.__setattr__(self, "sampled_minutes", minutes)
+        object.__setattr__(self, "component_fingerprint", fingerprint)
 
 
 def paired_conditional_residuals(
@@ -326,11 +521,14 @@ def paired_conditional_residuals(
         .sort_values(["fold_id", "player_id"], kind="stable")
         .reset_index(drop=True)
     )
+    # Reuses the scenario config's own integer rule, so a bool, a float or a negative is a
+    # named refusal rather than a silent ``max(1, int(...))`` coercion.
+    required = _integer(min_history_folds, "min_history_folds", 1)
     history = tuple(sorted({str(value) for value in residuals["fold_id"]}))
-    if len(history) < max(1, int(min_history_folds)):
+    if len(history) < required:
         raise ScenarioValidationError(
             f"{len(history)} history fold(s) precede {target.fold_id}; at least "
-            f"{min_history_folds} are required. Refused rather than sampled from too little."
+            f"{required} are required. Refused rather than sampled from too little."
         )
     return PairedResidualPool(
         target_fold_id=target.fold_id,
@@ -349,12 +547,18 @@ def sample_component_scenarios(
     """Draw appearance, then a paired conditional residual, into a V1-shaped ``ScenarioSet``.
 
     ``scenario_points`` stays the public decision matrix, in the projection's own player
-    order. Sampled minutes ride in ``diagnostics`` because they are an internal by-product:
-    promoting them to a second public matrix would create a parallel result hierarchy for the
-    optimizer to disagree with.
+    order. The per-cell minutes are returned beside it as
+    ``ComponentScenarioDraw.sampled_minutes``, not inside ``ScenarioSet.diagnostics``: that
+    field is JSON-compatible metadata by contract and cannot hold a matrix.
+
+    One source fold is chosen per scenario, and every cell of that scenario draws its paired
+    residual from a row of that fold alone. That is what makes ``source_fold_ids`` a fact
+    about the scenario rather than a label taken from whichever player happened to be first.
     """
 
     settings = config if config is not None else ScenarioConfig()
+    if not isinstance(inputs, ComponentScenarioInputs):
+        raise ScenarioValidationError("inputs must be ComponentScenarioInputs.")
     if not isinstance(projections, PredictionSnapshot):
         raise ScenarioValidationError("projections must be a PredictionSnapshot.")
     if residuals.target_fold_id != target.fold_id:
@@ -366,11 +570,66 @@ def sample_component_scenarios(
             f"{LOCKED_HOLDOUT_SEASON} is the locked holdout and is not sampled."
         )
 
+    # The inputs' own decision week has to be the one being sampled. A set whose provenance
+    # names a different week cannot be traced back to the Phase C rows it claims to come from.
+    if inputs.provenance.season != target.season:
+        raise ScenarioValidationError(
+            f"The component inputs name season {inputs.provenance.season!r}, but the target is "
+            f"{target.season!r}."
+        )
+    if inputs.provenance.target_gameweek != target.gameweek:
+        raise ScenarioValidationError(
+            f"The component inputs name gameweek {inputs.provenance.target_gameweek}, but the "
+            f"target is gameweek {target.gameweek}."
+        )
+
+    # Direct-control rows fail closed. No exact-key control fallback is bound in this
+    # foundation, and the only alternative available here -- reading a missing component value
+    # as zero -- would publish a prediction of nothing for a player nothing is predicted for.
+    control = int(
+        (inputs.table["composition_route"].astype("string") == DIRECT_CONTROL_ROUTE).sum()
+    )
+    if control:
+        raise ScenarioValidationError(
+            f"{control} {DIRECT_CONTROL_ROUTE} row(s) cannot be sampled: they carry no component "
+            "prediction, and no exact-key control fallback is bound in this foundation. Refused "
+            "rather than sampled as zero."
+        )
+
     projected_ids = tuple(int(value) for value in projections.table["player_id"])
     if inputs.player_ids != projected_ids:
         raise ScenarioValidationError(
             "Component inputs and projections must list the same players in the same order; "
             "the scenario columns carry that order."
+        )
+    # The roster fields the caller joined onto the Phase C table must be the projection's own.
+    # Compared as text so a numpy identifier and a Python one are not a false mismatch.
+    for column in ("team_id", "position"):
+        if [str(value) for value in inputs.table[column]] != [
+            str(value) for value in projections.table[column]
+        ]:
+            raise ScenarioValidationError(
+                f"Component inputs and projections disagree on {column}; the component table's "
+                "roster fields must be the projection's own, not a stale join."
+            )
+    # Provenance the two artifacts both carry must agree. ``PredictionProvenance`` has no
+    # dataset or target contract field, so ``dataset_contract_version`` and
+    # ``target_contract_version`` are recorded but not cross-checked -- inventing a field to
+    # compare them against would fabricate the agreement rather than verify it.
+    if inputs.provenance.model_version != projections.provenance.model_version:
+        raise ScenarioValidationError(
+            f"model_version disagrees: the component inputs say "
+            f"{inputs.provenance.model_version!r}, the projections say "
+            f"{projections.provenance.model_version!r}."
+        )
+    if (
+        inputs.provenance.feature_contract_version
+        != projections.provenance.feature_contract_version
+    ):
+        raise ScenarioValidationError(
+            f"feature_contract_version disagrees: the component inputs say "
+            f"{inputs.provenance.feature_contract_version!r}, the projections say "
+            f"{projections.provenance.feature_contract_version!r}."
         )
 
     count = int(settings.scenario_count)
@@ -378,23 +637,34 @@ def sample_component_scenarios(
     generator = np.random.default_rng(_draw_seed(inputs, target, settings))
 
     probability = inputs.table["appearance_probability"].to_numpy(dtype="float64")
-    mean_minutes = np.nan_to_num(
-        inputs.table["expected_minutes_if_appearance"].to_numpy(dtype="float64")
-    )
-    mean_points = np.nan_to_num(
-        inputs.table["raw_expected_points_if_appearance"].to_numpy(dtype="float64")
-    )
+    # No ``nan_to_num`` here. Every surviving row is a component-model row whose conditional
+    # means the input contract already proved finite, so there is nothing to fill -- and
+    # filling would be the bug: zero is a prediction, not the absence of one.
+    mean_minutes = inputs.table["expected_minutes_if_appearance"].to_numpy(dtype="float64")
+    mean_points = inputs.table["raw_expected_points_if_appearance"].to_numpy(dtype="float64")
     ceiling = inputs.table["fixture_count"].to_numpy(dtype="float64") * MINUTES_PER_FIXTURE
 
     appeared = generator.random((count, players)) < probability[None, :]
     # A blank gameweek has nowhere to play, whatever the probability says.
     appeared &= ceiling[None, :] > 0.0
 
+    # One source fold per scenario, then one row *within that fold* per player. Drawing each
+    # cell from the whole pool while the set names a single source fold would make
+    # ``source_fold_ids`` true only by accident; here the block is the constraint, so the
+    # field is a fact. The chosen fold is a block-bootstrap boundary and nothing more: no
+    # common or team shock is layered on top of it, and no team or position fallback
+    # hierarchy is introduced.
+    history = residuals.history_fold_ids
+    blocks = residuals.fold_blocks()
+    starts = np.array([start for start, _ in blocks], dtype="int64")
+    sizes = np.array([size for _, size in blocks], dtype="int64")
+    chosen = generator.integers(0, len(history), size=count)
+    offsets = generator.integers(0, sizes[chosen][:, None], size=(count, players))
+    drawn = starts[chosen][:, None] + offsets
+
     minutes_pool = residuals.residuals["minutes_residual"].to_numpy(dtype="float64")
     points_pool = residuals.residuals["points_residual"].to_numpy(dtype="float64")
     # One index per cell, used for *both* residuals: this is what keeps the pair together.
-    drawn = generator.integers(0, len(minutes_pool), size=(count, players))
-
     minutes = np.clip(mean_minutes[None, :] + minutes_pool[drawn], 0.0, ceiling[None, :])
     # Points are not clipped: a negative FPL score is a real outcome, not an error.
     points = mean_points[None, :] + points_pool[drawn]
@@ -409,19 +679,19 @@ def sample_component_scenarios(
         columns=list(projections.table["player_id"]),
         dtype="float64",
     )
-    # The per-cell minutes ride in diagnostics rather than in a second public matrix. They
-    # are here for two reasons: the V2 decision scorer needs them for autosubs, and without
-    # them the minutes-points pairing is unobservable from the output -- a test could only
-    # check the points marginal, which a marginal draw would also satisfy.
+    # The per-cell minutes ride beside the set, not inside its diagnostics: that field is
+    # JSON-compatible metadata by contract. They are published for two reasons -- the V2
+    # decision scorer needs them for autosubs, and without them the minutes-points pairing is
+    # unobservable from the output, so a test could only check the points marginal, which a
+    # marginal draw would also satisfy.
     sampled_minutes = pd.DataFrame(
         minutes,
         index=pd.Index(scenario_ids, name="scenario_id"),
         columns=list(projections.table["player_id"]),
         dtype="float64",
     )
-    source_fold_ids = tuple(
-        str(value) for value in residuals.residuals["fold_id"].to_numpy()[drawn[:, 0]]
-    )
+    # The fold each scenario actually drew from, not the fold of whichever player came first.
+    source_fold_ids = tuple(history[int(index)] for index in chosen)
     fingerprint = _scenario_fingerprint(
         projections, target, settings, scenario_ids, source_fold_ids, matrix
     )
@@ -445,7 +715,12 @@ def sample_component_scenarios(
             "model_version": inputs.provenance.model_version,
         },
     )
-    return ComponentScenarioDraw(scenarios=scenario_set, sampled_minutes=sampled_minutes)
+    return ComponentScenarioDraw(
+        scenarios=scenario_set,
+        inputs=inputs,
+        sampled_minutes=sampled_minutes,
+        component_fingerprint=_component_fingerprint(scenario_set, inputs, sampled_minutes),
+    )
 
 
 def _draw_seed(
