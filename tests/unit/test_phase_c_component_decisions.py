@@ -79,7 +79,18 @@ def _handoff() -> PhaseCComponentHandoff:
             "position": _players()["position"],
         }
     )
-    return PhaseCComponentHandoff(rows, roster, "a" * 64, "b" * 64, "c" * 40)
+    return PhaseCComponentHandoff(
+        rows,
+        roster,
+        "a" * 64,
+        "b" * 64,
+        "d" * 64,
+        "c" * 40,
+        "phase-c-component-control-v1",
+        "phase_c_component_form_window_v1",
+        "phase_c_component_targets_v1",
+        "phase_c_component_dataset_v1",
+    )
 
 
 def _control() -> EvaluationFold:

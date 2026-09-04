@@ -60,6 +60,7 @@ def test_scores_component_metrics_without_merging_conditional_populations() -> N
     assert result.overall.minutes_if_appearance.observations == 3
     assert result.overall.points.observations == 4
     assert result.overall.points_if_appearance.observations == 3
+    assert result.overall.points_if_appearance.mean_absolute_error == pytest.approx(2.0)
 
 
 def test_reports_fixed_appearance_bins_and_descriptive_slices() -> None:
