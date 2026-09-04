@@ -7,6 +7,7 @@ from squadopt.evaluation import (
     ComponentMetricSet,
     ErrorMetrics,
     EvaluationResult,
+    PhaseCComponentEvaluation,
     PhaseCDecisionComparison,
 )
 from squadopt.experiments.config import ExperimentExecutionError
@@ -113,6 +114,22 @@ def phase_c_ablation_to_dict(result: PhaseCAblationEvaluation) -> dict[str, obje
     }
 
 
+def phase_c_component_evaluation_to_dict(
+    result: PhaseCComponentEvaluation,
+) -> dict[str, object]:
+    """Serialize the frozen player-level component diagnostics."""
+
+    if not isinstance(result, PhaseCComponentEvaluation):
+        raise ExperimentExecutionError("result must be a PhaseCComponentEvaluation.")
+    return {
+        "contract_version": result.contract_version,
+        "overall": _metric_set(result.overall),
+        "by_season": _slices(result.by_season),
+        "by_position": _slices(result.by_position),
+        "by_fixture_group": _slices(result.by_fixture_group),
+    }
+
+
 def _decision_summary(result: EvaluationResult) -> dict[str, object]:
     summary = result.summary
     return {
@@ -197,5 +214,6 @@ def phase_c_decision_comparison_to_dict(
 __all__ = [
     "PHASE_C_DECISION_REPORT_VERSION",
     "phase_c_ablation_to_dict",
+    "phase_c_component_evaluation_to_dict",
     "phase_c_decision_comparison_to_dict",
 ]

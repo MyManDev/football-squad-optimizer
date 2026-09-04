@@ -4,13 +4,17 @@ import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 
+from squadopt.evaluation import evaluate_component_oof
 from squadopt.experiments import ExperimentExecutionError
 from squadopt.experiments.phase_c_ablation import (
     PhaseCArmDeclaration,
     evaluate_phase_c_ablations,
     phase_c_evaluation_rows_sha256,
 )
-from squadopt.experiments.phase_c_reporting import phase_c_ablation_to_dict
+from squadopt.experiments.phase_c_reporting import (
+    phase_c_ablation_to_dict,
+    phase_c_component_evaluation_to_dict,
+)
 
 
 def _component_rows() -> pd.DataFrame:
@@ -205,6 +209,16 @@ def test_report_is_descriptive_and_contains_missingness() -> None:
     overall = record["base"]["metrics"]["overall"]
     assert overall["missing_points_prediction_rows"] == 0
     assert len(overall["appearance"]["reliability_bins"]) == 10
+
+
+def test_component_metrics_are_serialized_without_a_promotion_claim() -> None:
+    result = evaluate_component_oof(_component_rows())
+
+    record = phase_c_component_evaluation_to_dict(result)
+
+    assert record["contract_version"] == "phase_c_component_metrics_v1"
+    assert record["overall"]["population_rows"] == 4  # type: ignore[index]
+    assert "promotion_decision" not in record
 
 
 def test_inputs_are_not_mutated() -> None:
