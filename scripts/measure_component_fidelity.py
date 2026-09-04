@@ -472,7 +472,11 @@ def main() -> int:
     roster = pd.read_csv(arguments.roster, dtype={"team_id": "string", "position": "string"})
 
     document = measure_fidelity(oof, roster, manifest)
-    document["created_utc"] = datetime.now(UTC).isoformat(timespec="seconds")
+    # ``generated_at_utc`` rather than a synonym: it is the one field the repository's own
+    # ``replay_identity`` strips, so an identical re-run at the same commit is recognised as a
+    # replay instead of colliding on the clock alone. A field this writer cannot see would
+    # make create-once behave as create-only.
+    document["generated_at_utc"] = datetime.now(UTC).isoformat(timespec="seconds")
     document["provenance"] = {
         "repository_commit": revision,
         "working_tree_dirty": dirty,
