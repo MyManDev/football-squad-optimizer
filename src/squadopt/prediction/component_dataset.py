@@ -33,16 +33,24 @@ from squadopt.data.schema import (
     KEY_COLUMNS,
     OUTCOME_COLUMNS,
 )
-from squadopt.features.component_targets import COMPONENT_TARGET_COLUMNS
+from squadopt.features.builder import build_feature_dataset
+from squadopt.features.component_targets import COMPONENT_TARGET_COLUMNS, build_component_targets
 from squadopt.features.config import (
     APPEARANCE_SOURCE_COLUMN,
     FeatureConfig,
     feature_column_names,
     rolling_feature_name,
 )
+from squadopt.features.fixtures import attach_fixture_features
 from squadopt.prediction.config import PredictionConfigurationError
 
 DATASET_CONTRACT_VERSION: Final = "phase_c_component_dataset_v1"
+COMPONENT_TRAINING_SEASONS: Final = (
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25",
+)
 
 # Declared locally on purpose. The frozen mapping's own version string lives in
 # ``backtest.policy_evaluation``, which sits above this layer, so importing it would
@@ -56,6 +64,11 @@ FEATURE_CONTRACT_VERSION: Final = "phase_c_component_form_window_v1"
 # and a minutes average cannot separate the two. Both halves come from the same shifted
 # primitive as everything else.
 COMPONENT_FEATURE_CONFIG: Final = FeatureConfig(appearance_windows=(3, 5))
+COMPONENT_HISTORY_WINDOW: Final = max(
+    *COMPONENT_FEATURE_CONFIG.minutes_windows,
+    *COMPONENT_FEATURE_CONFIG.points_windows,
+    *COMPONENT_FEATURE_CONFIG.appearance_windows,
+)
 
 # Pre-match columns used directly. `price_tenths` is in `PRE_MATCH_COLUMNS`; the two
 # fixture counts are `features.fixtures.CALENDAR_ONLY_COLUMNS`, which is the subset whose
@@ -129,6 +142,60 @@ def excluded_ratio_features(config: FeatureConfig | None = None) -> tuple[str, .
     settings = COMPONENT_FEATURE_CONFIG if config is None else config
     used = set(component_feature_columns(settings))
     return tuple(name for name in feature_column_names(settings) if name not in used)
+
+
+def build_component_modelling_frame(
+    panel: pd.DataFrame,
+    fixtures: pd.DataFrame,
+    team_codes: pd.DataFrame,
+    *,
+    seasons: Sequence[str],
+    config: FeatureConfig | None = None,
+) -> pd.DataFrame:
+    """Build the source-neutral training frame used by the Phase C estimators."""
+
+    settings = COMPONENT_FEATURE_CONFIG if config is None else config
+    ordered_seasons = tuple(str(season) for season in seasons)
+    if not ordered_seasons:
+        raise PredictionConfigurationError("seasons must name at least one training season.")
+    features = build_feature_dataset(panel, config=settings)
+    attached = [
+        attach_fixture_features(
+            features.loc[features["season"].astype("string") == season],
+            fixtures.loc[fixtures["season"].astype("string") == season],
+            team_codes.loc[team_codes["season"].astype("string") == season],
+            unproven_difficulty="omit",
+        )
+        for season in ordered_seasons
+    ]
+    targets = build_component_targets(panel)
+    return build_component_frame(pd.concat(attached, ignore_index=True), targets, config=settings)
+
+
+def build_component_scoring_frame(
+    panel: pd.DataFrame,
+    fixtures: pd.DataFrame,
+    team_codes: pd.DataFrame,
+    *,
+    season: str,
+    gameweek: int,
+    config: FeatureConfig | None = None,
+) -> pd.DataFrame:
+    """Build one deadline's component features from prior outcomes and its calendar."""
+
+    settings = COMPONENT_FEATURE_CONFIG if config is None else config
+    features = build_feature_dataset(panel, config=settings)
+    scoring = rows_at(features, season=season, gameweek=gameweek)
+    if scoring.empty:
+        raise PredictionConfigurationError(
+            f"No scoring rows exist for {season} gameweek {gameweek}."
+        )
+    return attach_fixture_features(
+        scoring,
+        fixtures,
+        team_codes,
+        unproven_difficulty="omit",
+    )
 
 
 def _season_rank(season_order: Sequence[str]) -> dict[str, int]:

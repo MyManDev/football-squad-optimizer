@@ -46,6 +46,10 @@ BOOTSTRAP_PAYLOAD: Final = "bootstrap-static.json"
 FIXTURES_PAYLOAD: Final = "fixtures.json"
 
 
+class IncompleteLiveHistoryError(DataSourceError):
+    """A prior gameweek is present but not yet a final component-model outcome."""
+
+
 def _positive(value: int, label: str) -> int:
     """An identifier the source only ever publishes as a positive integer."""
 
@@ -1058,6 +1062,122 @@ def fpl_live_event_points(
         fixtures_finished=finished,
         fixtures_total=total,
         source_snapshot_id=source_snapshot_id,
+    )
+
+
+def build_live_player_history(
+    bootstrap: bytes,
+    fixtures: bytes,
+    event_payloads: Mapping[int, bytes],
+    *,
+    season: str,
+    target_gameweek: int,
+    source_snapshot_id: str | None = None,
+) -> tuple[pd.DataFrame, tuple[int, ...]]:
+    """Build canonical prior-outcome rows plus an empty target row for live scoring.
+
+    Only players present in every supplied historical live payload receive history. If a
+    player is absent from one payload, their whole history is omitted and the prediction
+    layer must use its explicit fallback for that player; treating a missing row as zero
+    minutes would manufacture an appearance outcome. The target rows carry zeros solely
+    as placeholders: shifted feature builders cannot read a target row's own outcome.
+    """
+
+    target = _positive(target_gameweek, "target_gameweek")
+    declared_season = _require_season(season)
+    weeks = tuple(sorted(event_payloads))
+    if not weeks:
+        raise DataSourceError("Live component history requires at least one completed gameweek.")
+    if any(
+        isinstance(week, bool) or not isinstance(week, int) or not 1 <= week < target
+        for week in weeks
+    ):
+        raise InvalidValueError(
+            f"Live component history weeks must be positive and earlier than GW{target}: "
+            f"{list(weeks)!r}."
+        )
+
+    roster = player_snapshot(bootstrap)
+    roster_by_code = {int(record["player_id"]): record for record in roster.to_dict("records")}
+    element_to_code = player_codes(bootstrap)
+    live_by_week: dict[int, LiveEventPoints] = {}
+    complete_codes = set(int(value) for value in roster["player_id"].tolist())
+    for week in weeks:
+        live = fpl_live_event_points(
+            event_payloads[week],
+            fixtures,
+            gameweek=week,
+            source_snapshot_id=source_snapshot_id,
+        )
+        if not live.bonus_confirmed:
+            raise IncompleteLiveHistoryError(
+                f"Gameweek {week} is not fully settled in capture {source_snapshot_id!r}; "
+                "component history cannot treat provisional points as outcomes."
+            )
+        unknown = sorted(set(live.points_by_player) - set(element_to_code))
+        if unknown:
+            raise DataSourceError(
+                f"Gameweek {week} live points name element ids absent from bootstrap: "
+                f"{format_examples(unknown)}."
+            )
+        available = {
+            element_to_code[element]
+            for element in live.points_by_player
+            if element_to_code[element] in roster_by_code
+        }
+        complete_codes &= available
+        live_by_week[week] = live
+
+    roster_codes = set(int(value) for value in roster["player_id"].tolist())
+    incomplete = tuple(sorted(roster_codes - complete_codes))
+    rows: list[dict[str, object]] = []
+    code_to_element = {code: element for element, code in element_to_code.items()}
+    for week in weeks:
+        live = live_by_week[week]
+        for code in sorted(complete_codes):
+            player = roster_by_code[code]
+            element = code_to_element[code]
+            rows.append(
+                {
+                    "season": declared_season,
+                    "gameweek": week,
+                    "player_id": code,
+                    "name": player["name"],
+                    "team_id": player["team_id"],
+                    "position": player["position"],
+                    "price_tenths": int(player["price_tenths"]),
+                    "minutes": int(live.minutes_by_player[element]),
+                    "total_points": int(live.points_by_player[element]),
+                }
+            )
+    for player in roster.to_dict("records"):
+        rows.append(
+            {
+                "season": declared_season,
+                "gameweek": target,
+                "player_id": int(player["player_id"]),
+                "name": player["name"],
+                "team_id": player["team_id"],
+                "position": player["position"],
+                "price_tenths": int(player["price_tenths"]),
+                "minutes": 0,
+                "total_points": 0,
+            }
+        )
+    frame = pd.DataFrame(rows)
+    frame["season"] = frame["season"].astype("string")
+    frame["gameweek"] = frame["gameweek"].astype("int64")
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["name"] = frame["name"].astype("string")
+    frame["team_id"] = frame["team_id"].astype("string")
+    frame["position"] = frame["position"].astype("string")
+    for column in ("price_tenths", "minutes", "total_points"):
+        frame[column] = frame[column].astype("int64")
+    return (
+        frame.sort_values(["season", "gameweek", "player_id"], kind="stable").reset_index(
+            drop=True
+        ),
+        incomplete,
     )
 
 
