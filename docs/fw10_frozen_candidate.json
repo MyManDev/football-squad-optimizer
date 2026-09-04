@@ -1,0 +1,15 @@
+{
+  "candidate": {
+    "bench_weight": 0.0,
+    "candidate_id": "fw10-bw0",
+    "form_window": 10
+  },
+  "configuration_fingerprint": "1072c1829995473eb89a8a74c8cf61bb80151d410c0f3e5c8ebada2fa1c4e98d",
+  "control": {
+    "bench_weight": 0.1,
+    "candidate_id": "fw05-bw0p1",
+    "form_window": 5
+  },
+  "experiment_contract_version": "screening_doe_v1",
+  "screening_fingerprint": "d07f292f799a0e44acd725fd9260c2184e29fbd2ef3030a656f986b3e3cb9388"
+}

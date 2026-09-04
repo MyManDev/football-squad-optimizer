@@ -1,0 +1,491 @@
+{
+  "contract_version": "mode_plan_selection_v1",
+  "created_utc": "2026-08-20T06:31:20+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "horizon": 3,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "origin": 20,
+  "pool_players": 81,
+  "projection_note": "Each window week repeats the origin's projection; the control produces one week and the calendar-aware GW2+ projection is the data side's deliverable.",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "a64b8e66501c24587cb0776ab294be52d59de757",
+    "working_tree_dirty": true
+  },
+  "rival_edge_points_per_week": 7.19,
+  "scenario_count": 200,
+  "season": "2024-25",
+  "selection": {
+    "candidates": [
+      {
+        "chips_played": {},
+        "label": "no_chips",
+        "solver_status": "OPTIMAL",
+        "total_projected_score": 306.0,
+        "total_transfer_hit_points": 0.0
+      },
+      {
+        "chips_played": {
+          "21": "bboost",
+          "22": "3xc"
+        },
+        "label": "planner_choice",
+        "solver_status": "OPTIMAL",
+        "total_projected_score": 315.2,
+        "total_transfer_hit_points": 0.0
+      },
+      {
+        "chips_played": {
+          "20": "bboost"
+        },
+        "label": "bboost_gw20",
+        "solver_status": "OPTIMAL",
+        "total_projected_score": 301.4,
+        "total_transfer_hit_points": 0.0
+      },
+      {
+        "chips_played": {
+          "21": "bboost"
+        },
+        "label": "bboost_gw21",
+        "solver_status": "OPTIMAL",
+        "total_projected_score": 301.4,
+        "total_transfer_hit_points": 0.0
+      },
+      {
+        "chips_played": {
+          "22": "bboost"
+        },
+        "label": "bboost_gw22",
+        "solver_status": "OPTIMAL",
+        "total_projected_score": 301.4,
+        "total_transfer_hit_points": 0.0
+      },
+      {
+        "chips_played": {
+          "20": "3xc"
+        },
+        "label": "3xc_gw20",
+        "solver_status": "OPTIMAL",
+        "total_projected_score": 319.8,
+        "total_transfer_hit_points": 0.0
+      },
+      {
+        "chips_played": {
+          "21": "3xc"
+        },
+        "label": "3xc_gw21",
+        "solver_status": "OPTIMAL",
+        "total_projected_score": 319.8,
+        "total_transfer_hit_points": 0.0
+      },
+      {
+        "chips_played": {
+          "22": "3xc"
+        },
+        "label": "3xc_gw22",
+        "solver_status": "OPTIMAL",
+        "total_projected_score": 319.8,
+        "total_transfer_hit_points": 0.0
+      }
+    ],
+    "contract_version": "mode_plan_selection_v1",
+    "diagnostics": {
+      "candidates": [
+        "no_chips",
+        "planner_choice",
+        "bboost_gw20",
+        "bboost_gw21",
+        "bboost_gw22",
+        "3xc_gw20",
+        "3xc_gw21",
+        "3xc_gw22"
+      ],
+      "chips_note": "A chip consumed inside the window is unavailable after it; candidates record their consumption so the recommendation is read next to its cost.",
+      "horizon": 3,
+      "rival_edge_points_per_week": 7.19,
+      "rival_held_fixed": true,
+      "rival_label": "ownership-template",
+      "scenario_count": 200,
+      "window_id": "2024-25-gw20-gw22"
+    },
+    "recommended": {
+      "agresif": "bboost_gw21",
+      "asiri_agresif": "planner_choice",
+      "garantici": "bboost_gw21",
+      "saf_puan": "planner_choice"
+    },
+    "verdicts": [
+      {
+        "candidate": "no_chips",
+        "chips_consumed": [],
+        "expected_rival_gap": null,
+        "expected_window_score": 304.1217389252464,
+        "mode": "saf_puan",
+        "probability_behind": null,
+        "probability_success": null
+      },
+      {
+        "candidate": "planner_choice",
+        "chips_consumed": [
+          "3xc",
+          "bboost"
+        ],
+        "expected_rival_gap": null,
+        "expected_window_score": 341.5915236096978,
+        "mode": "saf_puan",
+        "probability_behind": null,
+        "probability_success": null
+      },
+      {
+        "candidate": "bboost_gw20",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": null,
+        "expected_window_score": 326.8240165932591,
+        "mode": "saf_puan",
+        "probability_behind": null,
+        "probability_success": null
+      },
+      {
+        "candidate": "bboost_gw21",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": null,
+        "expected_window_score": 327.496273341548,
+        "mode": "saf_puan",
+        "probability_behind": null,
+        "probability_success": null
+      },
+      {
+        "candidate": "bboost_gw22",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": null,
+        "expected_window_score": 326.50404118671014,
+        "mode": "saf_puan",
+        "probability_behind": null,
+        "probability_success": null
+      },
+      {
+        "candidate": "3xc_gw20",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": null,
+        "expected_window_score": 318.16752156293103,
+        "mode": "saf_puan",
+        "probability_behind": null,
+        "probability_success": null
+      },
+      {
+        "candidate": "3xc_gw21",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": null,
+        "expected_window_score": 317.9601710620693,
+        "mode": "saf_puan",
+        "probability_behind": null,
+        "probability_success": null
+      },
+      {
+        "candidate": "3xc_gw22",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": null,
+        "expected_window_score": 318.21698919339616,
+        "mode": "saf_puan",
+        "probability_behind": null,
+        "probability_success": null
+      },
+      {
+        "candidate": "no_chips",
+        "chips_consumed": [],
+        "expected_rival_gap": 31.157742908881545,
+        "expected_window_score": 304.1217389252464,
+        "mode": "garantici",
+        "probability_behind": 0.085,
+        "probability_success": 0.915
+      },
+      {
+        "candidate": "planner_choice",
+        "chips_consumed": [
+          "3xc",
+          "bboost"
+        ],
+        "expected_rival_gap": 68.62752759333286,
+        "expected_window_score": 341.5915236096978,
+        "mode": "garantici",
+        "probability_behind": 0.0,
+        "probability_success": 1.0
+      },
+      {
+        "candidate": "bboost_gw20",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 53.86002057689422,
+        "expected_window_score": 326.8240165932591,
+        "mode": "garantici",
+        "probability_behind": 0.015,
+        "probability_success": 0.985
+      },
+      {
+        "candidate": "bboost_gw21",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 54.532277325183095,
+        "expected_window_score": 327.496273341548,
+        "mode": "garantici",
+        "probability_behind": 0.0,
+        "probability_success": 1.0
+      },
+      {
+        "candidate": "bboost_gw22",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 53.540045170345294,
+        "expected_window_score": 326.50404118671014,
+        "mode": "garantici",
+        "probability_behind": 0.005,
+        "probability_success": 0.995
+      },
+      {
+        "candidate": "3xc_gw20",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 45.203525546566176,
+        "expected_window_score": 318.16752156293103,
+        "mode": "garantici",
+        "probability_behind": 0.025,
+        "probability_success": 0.975
+      },
+      {
+        "candidate": "3xc_gw21",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 44.99617504570446,
+        "expected_window_score": 317.9601710620693,
+        "mode": "garantici",
+        "probability_behind": 0.025,
+        "probability_success": 0.975
+      },
+      {
+        "candidate": "3xc_gw22",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 45.252993177031314,
+        "expected_window_score": 318.21698919339616,
+        "mode": "garantici",
+        "probability_behind": 0.02,
+        "probability_success": 0.98
+      },
+      {
+        "candidate": "no_chips",
+        "chips_consumed": [],
+        "expected_rival_gap": 31.157742908881545,
+        "expected_window_score": 304.1217389252464,
+        "mode": "agresif",
+        "probability_behind": 0.085,
+        "probability_success": 0.915
+      },
+      {
+        "candidate": "planner_choice",
+        "chips_consumed": [
+          "3xc",
+          "bboost"
+        ],
+        "expected_rival_gap": 68.62752759333286,
+        "expected_window_score": 341.5915236096978,
+        "mode": "agresif",
+        "probability_behind": 0.0,
+        "probability_success": 1.0
+      },
+      {
+        "candidate": "bboost_gw20",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 53.86002057689422,
+        "expected_window_score": 326.8240165932591,
+        "mode": "agresif",
+        "probability_behind": 0.015,
+        "probability_success": 0.985
+      },
+      {
+        "candidate": "bboost_gw21",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 54.532277325183095,
+        "expected_window_score": 327.496273341548,
+        "mode": "agresif",
+        "probability_behind": 0.0,
+        "probability_success": 1.0
+      },
+      {
+        "candidate": "bboost_gw22",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 53.540045170345294,
+        "expected_window_score": 326.50404118671014,
+        "mode": "agresif",
+        "probability_behind": 0.005,
+        "probability_success": 0.995
+      },
+      {
+        "candidate": "3xc_gw20",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 45.203525546566176,
+        "expected_window_score": 318.16752156293103,
+        "mode": "agresif",
+        "probability_behind": 0.025,
+        "probability_success": 0.975
+      },
+      {
+        "candidate": "3xc_gw21",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 44.99617504570446,
+        "expected_window_score": 317.9601710620693,
+        "mode": "agresif",
+        "probability_behind": 0.025,
+        "probability_success": 0.975
+      },
+      {
+        "candidate": "3xc_gw22",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 45.252993177031314,
+        "expected_window_score": 318.21698919339616,
+        "mode": "agresif",
+        "probability_behind": 0.02,
+        "probability_success": 0.98
+      },
+      {
+        "candidate": "no_chips",
+        "chips_consumed": [],
+        "expected_rival_gap": 31.157742908881545,
+        "expected_window_score": 304.1217389252464,
+        "mode": "asiri_agresif",
+        "probability_behind": 0.085,
+        "probability_success": 0.855
+      },
+      {
+        "candidate": "planner_choice",
+        "chips_consumed": [
+          "3xc",
+          "bboost"
+        ],
+        "expected_rival_gap": 68.62752759333286,
+        "expected_window_score": 341.5915236096978,
+        "mode": "asiri_agresif",
+        "probability_behind": 0.0,
+        "probability_success": 1.0
+      },
+      {
+        "candidate": "bboost_gw20",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 53.86002057689422,
+        "expected_window_score": 326.8240165932591,
+        "mode": "asiri_agresif",
+        "probability_behind": 0.015,
+        "probability_success": 0.975
+      },
+      {
+        "candidate": "bboost_gw21",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 54.532277325183095,
+        "expected_window_score": 327.496273341548,
+        "mode": "asiri_agresif",
+        "probability_behind": 0.0,
+        "probability_success": 0.985
+      },
+      {
+        "candidate": "bboost_gw22",
+        "chips_consumed": [
+          "bboost"
+        ],
+        "expected_rival_gap": 53.540045170345294,
+        "expected_window_score": 326.50404118671014,
+        "mode": "asiri_agresif",
+        "probability_behind": 0.005,
+        "probability_success": 0.985
+      },
+      {
+        "candidate": "3xc_gw20",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 45.203525546566176,
+        "expected_window_score": 318.16752156293103,
+        "mode": "asiri_agresif",
+        "probability_behind": 0.025,
+        "probability_success": 0.96
+      },
+      {
+        "candidate": "3xc_gw21",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 44.99617504570446,
+        "expected_window_score": 317.9601710620693,
+        "mode": "asiri_agresif",
+        "probability_behind": 0.025,
+        "probability_success": 0.97
+      },
+      {
+        "candidate": "3xc_gw22",
+        "chips_consumed": [
+          "3xc"
+        ],
+        "expected_rival_gap": 45.252993177031314,
+        "expected_window_score": 318.21698919339616,
+        "mode": "asiri_agresif",
+        "probability_behind": 0.02,
+        "probability_success": 0.97
+      }
+    ]
+  },
+  "wall_clock_seconds": 78.46822330000577
+}

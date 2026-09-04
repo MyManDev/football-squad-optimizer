@@ -1,0 +1,89 @@
+{
+  "anchor": {
+    "bench_weight": 0.0,
+    "form_window": 6
+  },
+  "automatic_promotion": false,
+  "contract_version": "risk_frontier_v1",
+  "created_utc": "2026-08-16T07:11:23+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "evaluated_fold_count": 37,
+  "evaluated_seasons": [
+    "2024-25"
+  ],
+  "frontier": [
+    {
+      "lower_quantile_gain_vs_risk_neutral": 0.0,
+      "lower_quantile_score": 31.0,
+      "mean_premium_vs_risk_neutral": 0.0,
+      "mean_realized_squad_points": 55.054054054054056,
+      "probability_below_threshold": 0.21621621621621623,
+      "realized_stddev": 17.509759357393662,
+      "risk_aversion": 0.0,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 29.25
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -10.0,
+      "lower_quantile_score": 21.0,
+      "mean_premium_vs_risk_neutral": 15.756756756756758,
+      "mean_realized_squad_points": 39.2972972972973,
+      "probability_below_threshold": 0.5675675675675675,
+      "realized_stddev": 15.69276794158287,
+      "risk_aversion": 0.2,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 18.0
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -8.0,
+      "lower_quantile_score": 23.0,
+      "mean_premium_vs_risk_neutral": 15.86486486486487,
+      "mean_realized_squad_points": 39.189189189189186,
+      "probability_below_threshold": 0.5945945945945946,
+      "realized_stddev": 15.835024194312988,
+      "risk_aversion": 0.4,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 19.5
+    }
+  ],
+  "locked_holdout_accessed": false,
+  "lower_quantile": 0.1,
+  "objective_configuration_fingerprint": "0561e33fc3cb0f0e507a85ca96b50623383bb43cc8ecbabe2c55e332052916f9",
+  "points_threshold": 40.0,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "04587adf69db0a057ff6ce0212d182977f6c7ac3",
+    "working_tree_dirty": true
+  },
+  "recommendation_only": true,
+  "reproducibility_note": "Per-fold scenario solves stop at a wall-clock cap, not a deterministic work budget; the frontier is recommendation-quality measurement, not a formal reproducible benchmark.",
+  "residual_input": {
+    "candidate_label": "deterministic_baseline_control",
+    "path": "artifacts/codex-worktrees/control-residual-export/artifacts/residuals/control_residuals.csv",
+    "preflight_passed": true,
+    "rows": 101447,
+    "table_sha256": "1ed41f94f245b06d012293a895cdee755a5b1803cb19bcc3795e4a414767a22f"
+  },
+  "scenario_count": 100,
+  "worst_fraction": 0.1
+}

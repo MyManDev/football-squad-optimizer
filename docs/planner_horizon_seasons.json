@@ -1,0 +1,2449 @@
+{
+  "contract_version": "planner_horizon_seasons_v1",
+  "created_utc": "2026-08-16T16:43:56+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "horizons": [
+    2,
+    3,
+    4
+  ],
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "projection_rule": "naive_calendar_scaling_v1",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "dde732f6a217d43217aeae5158af24bdf9fbe69e",
+    "working_tree_dirty": true
+  },
+  "seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "skipped_windows": [
+    {
+      "reason": "a gameweek of the longest window is not a decision point in this season",
+      "season": "2022-23",
+      "start_gameweek": 5
+    }
+  ],
+  "start_gameweeks": [
+    5,
+    10,
+    15,
+    20,
+    25,
+    30
+  ],
+  "transfer_config": {
+    "horizon_discount_factor": 1.0,
+    "transfer_hit_cost_points": 4.0
+  },
+  "variants": [
+    {
+      "advantage_standard_error": 1.7060174685096856,
+      "advantage_stdev": 8.181772354800914,
+      "calendar_structured_windows": {
+        "mean_hit_disadvantage_points": -4.0,
+        "mean_planning_advantage_points": -2.0,
+        "mean_selection_advantage_points": -6.0,
+        "windows": 5
+      },
+      "horizon_length": 2,
+      "max_advantage": 22.0,
+      "mean_advantage_by_season": {
+        "2021-22": -5.666666666666667,
+        "2022-23": -3.0,
+        "2023-24": 1.1666666666666667,
+        "2024-25": 4.833333333333333
+      },
+      "mean_advantage_per_gameweek": -0.2826086956521739,
+      "mean_hit_disadvantage_points": -0.8695652173913043,
+      "mean_myopic_hit_points_per_window": 1.7391304347826086,
+      "mean_planning_advantage_points": -0.5652173913043478,
+      "mean_selection_advantage_points": -1.434782608695652,
+      "median_planning_advantage_points": -3.0,
+      "min_advantage": -14.0,
+      "plain_windows": {
+        "mean_hit_disadvantage_points": 0.0,
+        "mean_planning_advantage_points": -0.16666666666666666,
+        "mean_selection_advantage_points": -0.16666666666666666,
+        "windows": 18
+      },
+      "positive_window_share": 0.30434782608695654,
+      "total_planner_hit_points": 20.0,
+      "total_planner_transfers": 17,
+      "windows": 23
+    },
+    {
+      "advantage_standard_error": 3.1550960967872586,
+      "advantage_stdev": 15.131309320053253,
+      "calendar_structured_windows": {
+        "mean_hit_disadvantage_points": -3.3333333333333335,
+        "mean_planning_advantage_points": 0.5,
+        "mean_selection_advantage_points": -2.8333333333333335,
+        "windows": 12
+      },
+      "horizon_length": 3,
+      "max_advantage": 31.0,
+      "mean_advantage_by_season": {
+        "2021-22": -3.5,
+        "2022-23": 6.2,
+        "2023-24": 1.0,
+        "2024-25": 1.1666666666666667
+      },
+      "mean_advantage_per_gameweek": 0.33333333333333337,
+      "mean_hit_disadvantage_points": -1.7391304347826086,
+      "mean_myopic_hit_points_per_window": 2.4347826086956523,
+      "mean_planning_advantage_points": 1.0,
+      "mean_selection_advantage_points": -0.7391304347826086,
+      "median_planning_advantage_points": 2.0,
+      "min_advantage": -32.0,
+      "plain_windows": {
+        "mean_hit_disadvantage_points": 0.0,
+        "mean_planning_advantage_points": 1.5454545454545454,
+        "mean_selection_advantage_points": 1.5454545454545454,
+        "windows": 11
+      },
+      "positive_window_share": 0.5652173913043478,
+      "total_planner_hit_points": 16.0,
+      "total_planner_transfers": 39,
+      "windows": 23
+    },
+    {
+      "advantage_standard_error": 3.4308201402698506,
+      "advantage_stdev": 16.453635379522314,
+      "calendar_structured_windows": {
+        "mean_hit_disadvantage_points": -2.4615384615384617,
+        "mean_planning_advantage_points": -1.2307692307692308,
+        "mean_selection_advantage_points": -3.6923076923076925,
+        "windows": 13
+      },
+      "horizon_length": 4,
+      "max_advantage": 28.0,
+      "mean_advantage_by_season": {
+        "2021-22": -4.166666666666667,
+        "2022-23": -11.6,
+        "2023-24": -1.1666666666666667,
+        "2024-25": -3.6666666666666665
+      },
+      "mean_advantage_per_gameweek": -1.2173913043478262,
+      "mean_hit_disadvantage_points": -1.565217391304348,
+      "mean_myopic_hit_points_per_window": 3.8260869565217392,
+      "mean_planning_advantage_points": -4.869565217391305,
+      "mean_selection_advantage_points": -6.434782608695652,
+      "median_planning_advantage_points": -8.0,
+      "min_advantage": -36.0,
+      "plain_windows": {
+        "mean_hit_disadvantage_points": -0.4,
+        "mean_planning_advantage_points": -9.6,
+        "mean_selection_advantage_points": -10.0,
+        "windows": 10
+      },
+      "positive_window_share": 0.30434782608695654,
+      "total_planner_hit_points": 52.0,
+      "total_planner_transfers": 73,
+      "windows": 23
+    }
+  ],
+  "windows": [
+    {
+      "advantage_per_gameweek": -1.5,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        5,
+        6
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 92.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 89.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": -3.0,
+      "season": "2021-22",
+      "selection_advantage_points": -3.0,
+      "start_gameweek": 5
+    },
+    {
+      "advantage_per_gameweek": -3.0,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 90.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 84.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": -6.0,
+      "season": "2021-22",
+      "selection_advantage_points": -6.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": -2.0,
+      "blank_gameweek_teams": [
+        0,
+        2
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 105.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 101.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": -4.0,
+      "season": "2021-22",
+      "selection_advantage_points": -4.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": -7.0,
+      "blank_gameweek_teams": [
+        6,
+        2
+      ],
+      "double_gameweek_teams": [
+        0,
+        2
+      ],
+      "gameweeks": [
+        20,
+        21
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 121.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 107.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        2
+      ],
+      "planning_advantage_points": -14.0,
+      "season": "2021-22",
+      "selection_advantage_points": -14.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": -0.5,
+      "blank_gameweek_teams": [
+        2,
+        0
+      ],
+      "double_gameweek_teams": [
+        2,
+        8
+      ],
+      "gameweeks": [
+        25,
+        26
+      ],
+      "hit_disadvantage_points": -12.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 117.0,
+      "myopic_transfer_hit_points": 20.0,
+      "planned_realized_points": 104.0,
+      "planned_transfer_hit_points": 8.0,
+      "planner_transfers_by_week": [
+        2,
+        2
+      ],
+      "planning_advantage_points": -1.0,
+      "season": "2021-22",
+      "selection_advantage_points": -13.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": -3.0,
+      "blank_gameweek_teams": [
+        12,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        2
+      ],
+      "gameweeks": [
+        30,
+        31
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 99.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 93.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": -6.0,
+      "season": "2021-22",
+      "selection_advantage_points": -6.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": 0.0,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        5,
+        6,
+        7
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 124.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 124.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        1,
+        0
+      ],
+      "planning_advantage_points": 0.0,
+      "season": "2021-22",
+      "selection_advantage_points": 0.0,
+      "start_gameweek": 5
+    },
+    {
+      "advantage_per_gameweek": 0.6666666666666666,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11,
+        12
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 132.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 134.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": 2.0,
+      "season": "2021-22",
+      "selection_advantage_points": 2.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": 0.3333333333333333,
+      "blank_gameweek_teams": [
+        0,
+        2,
+        6
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16,
+        17
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 164.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 165.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        3
+      ],
+      "planning_advantage_points": 1.0,
+      "season": "2021-22",
+      "selection_advantage_points": 1.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": -10.666666666666666,
+      "blank_gameweek_teams": [
+        6,
+        2,
+        2
+      ],
+      "double_gameweek_teams": [
+        0,
+        2,
+        4
+      ],
+      "gameweeks": [
+        20,
+        21,
+        22
+      ],
+      "hit_disadvantage_points": 4.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 172.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 144.0,
+      "planned_transfer_hit_points": 4.0,
+      "planner_transfers_by_week": [
+        0,
+        1,
+        3
+      ],
+      "planning_advantage_points": -32.0,
+      "season": "2021-22",
+      "selection_advantage_points": -28.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": 10.333333333333334,
+      "blank_gameweek_teams": [
+        2,
+        0,
+        3
+      ],
+      "double_gameweek_teams": [
+        2,
+        8,
+        1
+      ],
+      "gameweeks": [
+        25,
+        26,
+        27
+      ],
+      "hit_disadvantage_points": -28.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 152.0,
+      "myopic_transfer_hit_points": 28.0,
+      "planned_realized_points": 155.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        2,
+        1
+      ],
+      "planning_advantage_points": 31.0,
+      "season": "2021-22",
+      "selection_advantage_points": 3.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": -7.666666666666667,
+      "blank_gameweek_teams": [
+        12,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        2,
+        0
+      ],
+      "gameweeks": [
+        30,
+        31,
+        32
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 169.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 146.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": -23.0,
+      "season": "2021-22",
+      "selection_advantage_points": -23.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": -9.0,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "hit_disadvantage_points": -4.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 191.0,
+      "myopic_transfer_hit_points": 4.0,
+      "planned_realized_points": 151.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        1,
+        2,
+        1
+      ],
+      "planning_advantage_points": -36.0,
+      "season": "2021-22",
+      "selection_advantage_points": -40.0,
+      "start_gameweek": 5
+    },
+    {
+      "advantage_per_gameweek": 4.75,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        2
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 166.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 185.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0,
+        3
+      ],
+      "planning_advantage_points": 19.0,
+      "season": "2021-22",
+      "selection_advantage_points": 19.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": 0.5,
+      "blank_gameweek_teams": [
+        0,
+        2,
+        6,
+        12
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16,
+        17,
+        18
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 222.0,
+      "myopic_transfer_hit_points": 4.0,
+      "planned_realized_points": 224.0,
+      "planned_transfer_hit_points": 4.0,
+      "planner_transfers_by_week": [
+        0,
+        2,
+        2,
+        1
+      ],
+      "planning_advantage_points": 2.0,
+      "season": "2021-22",
+      "selection_advantage_points": 2.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": -4.25,
+      "blank_gameweek_teams": [
+        6,
+        2,
+        2,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        2,
+        4,
+        2
+      ],
+      "gameweeks": [
+        20,
+        21,
+        22,
+        23
+      ],
+      "hit_disadvantage_points": 12.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 199.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 194.0,
+      "planned_transfer_hit_points": 12.0,
+      "planner_transfers_by_week": [
+        0,
+        1,
+        4,
+        2
+      ],
+      "planning_advantage_points": -17.0,
+      "season": "2021-22",
+      "selection_advantage_points": -5.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": 7.0,
+      "blank_gameweek_teams": [
+        2,
+        0,
+        3,
+        0
+      ],
+      "double_gameweek_teams": [
+        2,
+        8,
+        1,
+        8
+      ],
+      "gameweeks": [
+        25,
+        26,
+        27,
+        28
+      ],
+      "hit_disadvantage_points": -20.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 219.0,
+      "myopic_transfer_hit_points": 32.0,
+      "planned_realized_points": 227.0,
+      "planned_transfer_hit_points": 12.0,
+      "planner_transfers_by_week": [
+        1,
+        3,
+        2,
+        1
+      ],
+      "planning_advantage_points": 28.0,
+      "season": "2021-22",
+      "selection_advantage_points": 8.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": -5.25,
+      "blank_gameweek_teams": [
+        12,
+        0,
+        0,
+        3
+      ],
+      "double_gameweek_teams": [
+        0,
+        2,
+        0,
+        7
+      ],
+      "gameweeks": [
+        30,
+        31,
+        32,
+        33
+      ],
+      "hit_disadvantage_points": -4.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 223.0,
+      "myopic_transfer_hit_points": 4.0,
+      "planned_realized_points": 198.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0,
+        4
+      ],
+      "planning_advantage_points": -21.0,
+      "season": "2021-22",
+      "selection_advantage_points": -25.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": -2.0,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 101.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 97.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": -4.0,
+      "season": "2022-23",
+      "selection_advantage_points": -4.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": 0.0,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 97.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 97.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": 0.0,
+      "season": "2022-23",
+      "selection_advantage_points": 0.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": -1.5,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        4,
+        0
+      ],
+      "gameweeks": [
+        20,
+        21
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 133.0,
+      "myopic_transfer_hit_points": 8.0,
+      "planned_realized_points": 130.0,
+      "planned_transfer_hit_points": 8.0,
+      "planner_transfers_by_week": [
+        3,
+        1
+      ],
+      "planning_advantage_points": -3.0,
+      "season": "2022-23",
+      "selection_advantage_points": -3.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": -2.0,
+      "blank_gameweek_teams": [
+        4,
+        0
+      ],
+      "double_gameweek_teams": [
+        4,
+        0
+      ],
+      "gameweeks": [
+        25,
+        26
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 102.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 98.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        1,
+        1
+      ],
+      "planning_advantage_points": -4.0,
+      "season": "2022-23",
+      "selection_advantage_points": -4.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": -2.0,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        30,
+        31
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 131.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 127.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": -4.0,
+      "season": "2022-23",
+      "selection_advantage_points": -4.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": 1.6666666666666667,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        2
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11,
+        12
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 132.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 137.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        3
+      ],
+      "planning_advantage_points": 5.0,
+      "season": "2022-23",
+      "selection_advantage_points": 5.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": 3.0,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16,
+        17
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 159.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 168.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": 9.0,
+      "season": "2022-23",
+      "selection_advantage_points": 9.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": -2.0,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        4,
+        0,
+        2
+      ],
+      "gameweeks": [
+        20,
+        21,
+        22
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 207.0,
+      "myopic_transfer_hit_points": 8.0,
+      "planned_realized_points": 201.0,
+      "planned_transfer_hit_points": 8.0,
+      "planner_transfers_by_week": [
+        3,
+        0,
+        2
+      ],
+      "planning_advantage_points": -6.0,
+      "season": "2022-23",
+      "selection_advantage_points": -6.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": 4.333333333333333,
+      "blank_gameweek_teams": [
+        4,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        4,
+        0,
+        4
+      ],
+      "gameweeks": [
+        25,
+        26,
+        27
+      ],
+      "hit_disadvantage_points": -4.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 142.0,
+      "myopic_transfer_hit_points": 4.0,
+      "planned_realized_points": 151.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        1,
+        0,
+        2
+      ],
+      "planning_advantage_points": 13.0,
+      "season": "2022-23",
+      "selection_advantage_points": 9.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": 3.3333333333333335,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        4
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        30,
+        31,
+        32
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 178.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 188.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        3
+      ],
+      "planning_advantage_points": 10.0,
+      "season": "2022-23",
+      "selection_advantage_points": 10.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": -2.0,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        2,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 199.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 191.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        2,
+        2
+      ],
+      "planning_advantage_points": -8.0,
+      "season": "2022-23",
+      "selection_advantage_points": -8.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": -2.5,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16,
+        17,
+        18
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 218.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 208.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": -10.0,
+      "season": "2022-23",
+      "selection_advantage_points": -10.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": -7.25,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        4,
+        0,
+        2,
+        2
+      ],
+      "gameweeks": [
+        20,
+        21,
+        22,
+        23
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 289.0,
+      "myopic_transfer_hit_points": 12.0,
+      "planned_realized_points": 260.0,
+      "planned_transfer_hit_points": 12.0,
+      "planner_transfers_by_week": [
+        3,
+        0,
+        1,
+        3
+      ],
+      "planning_advantage_points": -29.0,
+      "season": "2022-23",
+      "selection_advantage_points": -29.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": -2.75,
+      "blank_gameweek_teams": [
+        4,
+        0,
+        0,
+        6
+      ],
+      "double_gameweek_teams": [
+        4,
+        0,
+        4,
+        0
+      ],
+      "gameweeks": [
+        25,
+        26,
+        27,
+        28
+      ],
+      "hit_disadvantage_points": -8.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 206.0,
+      "myopic_transfer_hit_points": 8.0,
+      "planned_realized_points": 187.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        1,
+        0,
+        2,
+        1
+      ],
+      "planning_advantage_points": -11.0,
+      "season": "2022-23",
+      "selection_advantage_points": -19.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": 0.0,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        4,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        30,
+        31,
+        32,
+        33
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 229.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 229.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        3,
+        1
+      ],
+      "planning_advantage_points": 0.0,
+      "season": "2022-23",
+      "selection_advantage_points": 0.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": -5.5,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        5,
+        6
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 91.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 80.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": -11.0,
+      "season": "2023-24",
+      "selection_advantage_points": -11.0,
+      "start_gameweek": 5
+    },
+    {
+      "advantage_per_gameweek": 3.0,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 87.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 93.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": 6.0,
+      "season": "2023-24",
+      "selection_advantage_points": 6.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": -2.5,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 81.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 76.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": -5.0,
+      "season": "2023-24",
+      "selection_advantage_points": -5.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": 5.5,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        20,
+        21
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 57.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 68.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": 11.0,
+      "season": "2023-24",
+      "selection_advantage_points": 11.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": 7.5,
+      "blank_gameweek_teams": [
+        0,
+        4
+      ],
+      "double_gameweek_teams": [
+        4,
+        0
+      ],
+      "gameweeks": [
+        25,
+        26
+      ],
+      "hit_disadvantage_points": -8.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 119.0,
+      "myopic_transfer_hit_points": 12.0,
+      "planned_realized_points": 126.0,
+      "planned_transfer_hit_points": 4.0,
+      "planner_transfers_by_week": [
+        2,
+        1
+      ],
+      "planning_advantage_points": 15.0,
+      "season": "2023-24",
+      "selection_advantage_points": 7.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": -4.5,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        30,
+        31
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 108.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 99.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": -9.0,
+      "season": "2023-24",
+      "selection_advantage_points": -9.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": -3.0,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        2
+      ],
+      "gameweeks": [
+        5,
+        6,
+        7
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 160.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 151.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        2
+      ],
+      "planning_advantage_points": -9.0,
+      "season": "2023-24",
+      "selection_advantage_points": -9.0,
+      "start_gameweek": 5
+    },
+    {
+      "advantage_per_gameweek": -0.3333333333333333,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11,
+        12
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 135.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 134.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": -1.0,
+      "season": "2023-24",
+      "selection_advantage_points": -1.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": -4.333333333333333,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        2
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16,
+        17
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 149.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 136.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        2
+      ],
+      "planning_advantage_points": -13.0,
+      "season": "2023-24",
+      "selection_advantage_points": -13.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": -1.6666666666666667,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        20,
+        21,
+        22
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 112.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 107.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": -5.0,
+      "season": "2023-24",
+      "selection_advantage_points": -5.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": 2.3333333333333335,
+      "blank_gameweek_teams": [
+        0,
+        4,
+        0
+      ],
+      "double_gameweek_teams": [
+        4,
+        0,
+        0
+      ],
+      "gameweeks": [
+        25,
+        26,
+        27
+      ],
+      "hit_disadvantage_points": -8.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 192.0,
+      "myopic_transfer_hit_points": 12.0,
+      "planned_realized_points": 191.0,
+      "planned_transfer_hit_points": 4.0,
+      "planner_transfers_by_week": [
+        1,
+        2,
+        1
+      ],
+      "planning_advantage_points": 7.0,
+      "season": "2023-24",
+      "selection_advantage_points": -1.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": 9.0,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        30,
+        31,
+        32
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 147.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 174.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": 27.0,
+      "season": "2023-24",
+      "selection_advantage_points": 27.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": -2.25,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        2,
+        0
+      ],
+      "gameweeks": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 206.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 197.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        2,
+        2
+      ],
+      "planning_advantage_points": -9.0,
+      "season": "2023-24",
+      "selection_advantage_points": -9.0,
+      "start_gameweek": 5
+    },
+    {
+      "advantage_per_gameweek": -0.5,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 182.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 180.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": -2.0,
+      "season": "2023-24",
+      "selection_advantage_points": -2.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": -3.0,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        2,
+        2
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16,
+        17,
+        18
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 186.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 174.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        2,
+        2
+      ],
+      "planning_advantage_points": -12.0,
+      "season": "2023-24",
+      "selection_advantage_points": -12.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": -2.5,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        20,
+        21,
+        22,
+        23
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 144.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 134.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": -10.0,
+      "season": "2023-24",
+      "selection_advantage_points": -10.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": 5.25,
+      "blank_gameweek_teams": [
+        0,
+        4,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        4,
+        0,
+        0,
+        2
+      ],
+      "gameweeks": [
+        25,
+        26,
+        27,
+        28
+      ],
+      "hit_disadvantage_points": -12.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 223.0,
+      "myopic_transfer_hit_points": 16.0,
+      "planned_realized_points": 232.0,
+      "planned_transfer_hit_points": 4.0,
+      "planner_transfers_by_week": [
+        1,
+        2,
+        1,
+        1
+      ],
+      "planning_advantage_points": 21.0,
+      "season": "2023-24",
+      "selection_advantage_points": 9.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": 1.25,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        30,
+        31,
+        32,
+        33
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 230.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 235.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": 5.0,
+      "season": "2023-24",
+      "selection_advantage_points": 5.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": 2.5,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        5,
+        6
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 108.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 113.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": 5.0,
+      "season": "2024-25",
+      "selection_advantage_points": 5.0,
+      "start_gameweek": 5
+    },
+    {
+      "advantage_per_gameweek": -0.5,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 94.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 93.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": -1.0,
+      "season": "2024-25",
+      "selection_advantage_points": -1.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": 2.0,
+      "blank_gameweek_teams": [
+        2,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 108.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 112.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": 4.0,
+      "season": "2024-25",
+      "selection_advantage_points": 4.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": 2.5,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        20,
+        21
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 125.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 130.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": 5.0,
+      "season": "2024-25",
+      "selection_advantage_points": 5.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": -3.0,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        2,
+        0
+      ],
+      "gameweeks": [
+        25,
+        26
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 151.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 145.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        1,
+        1
+      ],
+      "planning_advantage_points": -6.0,
+      "season": "2024-25",
+      "selection_advantage_points": -6.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": 11.0,
+      "blank_gameweek_teams": [
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0
+      ],
+      "gameweeks": [
+        30,
+        31
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 2,
+      "myopic_realized_points": 61.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 83.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0
+      ],
+      "planning_advantage_points": 22.0,
+      "season": "2024-25",
+      "selection_advantage_points": 22.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": 1.3333333333333333,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        5,
+        6,
+        7
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 155.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 159.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        1,
+        1
+      ],
+      "planning_advantage_points": 4.0,
+      "season": "2024-25",
+      "selection_advantage_points": 4.0,
+      "start_gameweek": 5
+    },
+    {
+      "advantage_per_gameweek": -6.666666666666667,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11,
+        12
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 177.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 157.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": -20.0,
+      "season": "2024-25",
+      "selection_advantage_points": -20.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": 3.3333333333333335,
+      "blank_gameweek_teams": [
+        2,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16,
+        17
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 157.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 167.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": 10.0,
+      "season": "2024-25",
+      "selection_advantage_points": 10.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": 2.3333333333333335,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        20,
+        21,
+        22
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 153.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 160.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": 7.0,
+      "season": "2024-25",
+      "selection_advantage_points": 7.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": -5.333333333333333,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        2,
+        0,
+        0
+      ],
+      "gameweeks": [
+        25,
+        26,
+        27
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 203.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 187.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        1,
+        1,
+        0
+      ],
+      "planning_advantage_points": -16.0,
+      "season": "2024-25",
+      "selection_advantage_points": -16.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": 7.333333333333333,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        2
+      ],
+      "gameweeks": [
+        30,
+        31,
+        32
+      ],
+      "hit_disadvantage_points": -4.0,
+      "horizon_length": 3,
+      "myopic_realized_points": 117.0,
+      "myopic_transfer_hit_points": 4.0,
+      "planned_realized_points": 135.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        2
+      ],
+      "planning_advantage_points": 22.0,
+      "season": "2024-25",
+      "selection_advantage_points": 18.0,
+      "start_gameweek": 30
+    },
+    {
+      "advantage_per_gameweek": -1.25,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 197.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 192.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        2,
+        1,
+        0
+      ],
+      "planning_advantage_points": -5.0,
+      "season": "2024-25",
+      "selection_advantage_points": -5.0,
+      "start_gameweek": 5
+    },
+    {
+      "advantage_per_gameweek": -1.75,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        10,
+        11,
+        12,
+        13
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 240.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 233.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": -7.0,
+      "season": "2024-25",
+      "selection_advantage_points": -7.0,
+      "start_gameweek": 10
+    },
+    {
+      "advantage_per_gameweek": -2.5,
+      "blank_gameweek_teams": [
+        2,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        15,
+        16,
+        17,
+        18
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 221.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 211.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": -10.0,
+      "season": "2024-25",
+      "selection_advantage_points": -10.0,
+      "start_gameweek": 15
+    },
+    {
+      "advantage_per_gameweek": 2.5,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        20,
+        21,
+        22,
+        23
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 204.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 214.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": 10.0,
+      "season": "2024-25",
+      "selection_advantage_points": 10.0,
+      "start_gameweek": 20
+    },
+    {
+      "advantage_per_gameweek": -7.75,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        2,
+        0,
+        0,
+        0
+      ],
+      "gameweeks": [
+        25,
+        26,
+        27,
+        28
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 264.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_realized_points": 233.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers_by_week": [
+        1,
+        1,
+        0,
+        0
+      ],
+      "planning_advantage_points": -31.0,
+      "season": "2024-25",
+      "selection_advantage_points": -31.0,
+      "start_gameweek": 25
+    },
+    {
+      "advantage_per_gameweek": 5.25,
+      "blank_gameweek_teams": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "double_gameweek_teams": [
+        0,
+        0,
+        2,
+        4
+      ],
+      "gameweeks": [
+        30,
+        31,
+        32,
+        33
+      ],
+      "hit_disadvantage_points": 0.0,
+      "horizon_length": 4,
+      "myopic_realized_points": 172.0,
+      "myopic_transfer_hit_points": 8.0,
+      "planned_realized_points": 193.0,
+      "planned_transfer_hit_points": 8.0,
+      "planner_transfers_by_week": [
+        0,
+        2,
+        2,
+        2
+      ],
+      "planning_advantage_points": 21.0,
+      "season": "2024-25",
+      "selection_advantage_points": 21.0,
+      "start_gameweek": 30
+    }
+  ]
+}

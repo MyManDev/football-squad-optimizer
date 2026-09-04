@@ -1,0 +1,712 @@
+{
+  "candidates": [
+    {
+      "candidate": "M1_price_by_position",
+      "coefficients": {
+        "DEF": {
+          "price_m": 0.1952707856598016
+        },
+        "FWD": {
+          "price_m": 0.22552318424292161
+        },
+        "GK": {
+          "price_m": 0.12863293864370295
+        },
+        "MID": {
+          "price_m": 0.1575382688016287
+        }
+      },
+      "features": [
+        "price_m"
+      ],
+      "improves_every_season": true,
+      "multiplier": null,
+      "pooled_error_improvement": 0.3325185816234169,
+      "pooled_error_interval": [
+        0.3075435358617912,
+        0.3555546712291445
+      ],
+      "pooled_rows": 656,
+      "ranks_better_every_season": false,
+      "seasons": [
+        {
+          "bias": 0.08602717874627883,
+          "candidate": "M1_price_by_position",
+          "control_bias": 0.535593176702514,
+          "control_mean_absolute_error": 1.3910431347741015,
+          "control_rank_correlation": 0.515231149821445,
+          "control_rank_correlation_players_only": 0.16872602623859345,
+          "mean_absolute_error": 1.1297404545802288,
+          "rank_correlation": 0.515231149821445,
+          "rank_correlation_players_only": 0.16872602623859345,
+          "rows": 202,
+          "season": "2022-23"
+        },
+        {
+          "bias": 0.3958073217605138,
+          "candidate": "M1_price_by_position",
+          "control_bias": 0.8443551086809694,
+          "control_mean_absolute_error": 1.2912039185054238,
+          "control_rank_correlation": 0.4713405494434665,
+          "control_rank_correlation_players_only": 0.21959951165082814,
+          "mean_absolute_error": 0.968938675372904,
+          "rank_correlation": 0.4713405494434665,
+          "rank_correlation_players_only": 0.21959951165082814,
+          "rows": 253,
+          "season": "2023-24"
+        },
+        {
+          "bias": 0.3212320238201571,
+          "candidate": "M1_price_by_position",
+          "control_bias": 0.8992666681451582,
+          "control_mean_absolute_error": 1.2271443673164637,
+          "control_rank_correlation": 0.5109622397691078,
+          "control_rank_correlation_players_only": 0.2933255120753991,
+          "mean_absolute_error": 0.8101496328225744,
+          "rank_correlation": 0.5109622397691078,
+          "rank_correlation_players_only": 0.2933255120753991,
+          "rows": 201,
+          "season": "2024-25"
+        }
+      ]
+    },
+    {
+      "candidate": "M2_ownership",
+      "coefficients": {
+        "DEF": {
+          "ownership_share": 5.253886144939237,
+          "price_m": 0.17802370719582103
+        },
+        "FWD": {
+          "ownership_share": 8.683915755143378,
+          "price_m": 0.15497001295353588
+        },
+        "GK": {
+          "ownership_share": 5.883014072811119,
+          "price_m": 0.09872602925942131
+        },
+        "MID": {
+          "ownership_share": 10.627371335077099,
+          "price_m": 0.14393915693680467
+        }
+      },
+      "features": [
+        "price_m",
+        "ownership_share"
+      ],
+      "improves_every_season": true,
+      "multiplier": null,
+      "pooled_error_improvement": 0.36290038201123115,
+      "pooled_error_interval": [
+        0.3319003021250337,
+        0.39276372634676116
+      ],
+      "pooled_rows": 656,
+      "ranks_better_every_season": false,
+      "seasons": [
+        {
+          "bias": 0.08896578320158591,
+          "candidate": "M2_ownership",
+          "control_bias": 0.535593176702514,
+          "control_mean_absolute_error": 1.3910431347741015,
+          "control_rank_correlation": 0.515231149821445,
+          "control_rank_correlation_players_only": 0.16872602623859345,
+          "mean_absolute_error": 1.1322330595785874,
+          "rank_correlation": 0.4832106637722018,
+          "rank_correlation_players_only": 0.1382926950464194,
+          "rows": 202,
+          "season": "2022-23"
+        },
+        {
+          "bias": 0.3098369083784957,
+          "candidate": "M2_ownership",
+          "control_bias": 0.8443551086809694,
+          "control_mean_absolute_error": 1.2912039185054238,
+          "control_rank_correlation": 0.4713405494434665,
+          "control_rank_correlation_players_only": 0.21959951165082814,
+          "mean_absolute_error": 0.9196222392105977,
+          "rank_correlation": 0.3639475633149494,
+          "rank_correlation_players_only": 0.042759852721418856,
+          "rows": 253,
+          "season": "2023-24"
+        },
+        {
+          "bias": 0.26089759184144956,
+          "candidate": "M2_ownership",
+          "control_bias": 0.8992666681451582,
+          "control_mean_absolute_error": 1.2271443673164637,
+          "control_rank_correlation": 0.5109622397691078,
+          "control_rank_correlation_players_only": 0.2933255120753991,
+          "mean_absolute_error": 0.7705630213051063,
+          "rank_correlation": 0.4326506334014216,
+          "rank_correlation_players_only": 0.18659195766199646,
+          "rows": 201,
+          "season": "2024-25"
+        }
+      ]
+    },
+    {
+      "candidate": "M3_source_expectation",
+      "coefficients": {
+        "DEF": {
+          "ownership_share": 4.276325112419131,
+          "price_m": 0.08356486465584811,
+          "source_expected_points": 0.36667419588407846
+        },
+        "FWD": {
+          "ownership_share": 5.964940706062798,
+          "price_m": 0.016356050005824064,
+          "source_expected_points": 0.9258554429363217
+        },
+        "GK": {
+          "ownership_share": 5.593128794221488,
+          "price_m": 0.0028499545447523787,
+          "source_expected_points": 0.38402507501894334
+        },
+        "MID": {
+          "ownership_share": 10.344101504378509,
+          "price_m": 0.085594286730589,
+          "source_expected_points": 0.30950709326669745
+        }
+      },
+      "features": [
+        "price_m",
+        "ownership_share",
+        "source_expected_points"
+      ],
+      "improves_every_season": true,
+      "multiplier": null,
+      "pooled_error_improvement": 0.4009897877325988,
+      "pooled_error_interval": [
+        0.3653550409604403,
+        0.43529770662283596
+      ],
+      "pooled_rows": 656,
+      "ranks_better_every_season": false,
+      "seasons": [
+        {
+          "bias": 0.10719192547856234,
+          "candidate": "M3_source_expectation",
+          "control_bias": 0.535593176702514,
+          "control_mean_absolute_error": 1.3910431347741015,
+          "control_rank_correlation": 0.515231149821445,
+          "control_rank_correlation_players_only": 0.16872602623859345,
+          "mean_absolute_error": 1.1220028760513479,
+          "rank_correlation": 0.36307181292849644,
+          "rank_correlation_players_only": 0.11643171607685687,
+          "rows": 202,
+          "season": "2022-23"
+        },
+        {
+          "bias": 0.24458508649547295,
+          "candidate": "M3_source_expectation",
+          "control_bias": 0.8443551086809694,
+          "control_mean_absolute_error": 1.2912039185054238,
+          "control_rank_correlation": 0.4713405494434665,
+          "control_rank_correlation_players_only": 0.21959951165082814,
+          "mean_absolute_error": 0.8570555428681336,
+          "rank_correlation": 0.3197385059336476,
+          "rank_correlation_players_only": 0.12308459667192076,
+          "rows": 253,
+          "season": "2023-24"
+        },
+        {
+          "bias": 0.23137671551657374,
+          "candidate": "M3_source_expectation",
+          "control_bias": 0.8992666681451582,
+          "control_mean_absolute_error": 1.2271443673164637,
+          "control_rank_correlation": 0.5109622397691078,
+          "control_rank_correlation_players_only": 0.2933255120753991,
+          "mean_absolute_error": 0.7352855143097264,
+          "rank_correlation": 0.3523294705463931,
+          "rank_correlation_players_only": 0.12292836459563065,
+          "rows": 201,
+          "season": "2024-25"
+        }
+      ]
+    },
+    {
+      "candidate": "M4a_published_difficulty",
+      "coefficients": {
+        "DEF": {
+          "ownership_share": 4.276325112419131,
+          "price_m": 0.08356486465584811,
+          "source_expected_points": 0.36667419588407846
+        },
+        "FWD": {
+          "ownership_share": 5.964940706062798,
+          "price_m": 0.016356050005824064,
+          "source_expected_points": 0.9258554429363217
+        },
+        "GK": {
+          "ownership_share": 5.593128794221488,
+          "price_m": 0.0028499545447523787,
+          "source_expected_points": 0.38402507501894334
+        },
+        "MID": {
+          "ownership_share": 10.344101504378509,
+          "price_m": 0.085594286730589,
+          "source_expected_points": 0.30950709326669745
+        },
+        "_multiplier": {
+          "feature": 0.0,
+          "gamma": -0.14132686823963492,
+          "mean_ease": 0.5074294205052006
+        }
+      },
+      "features": [
+        "price_m",
+        "ownership_share",
+        "source_expected_points"
+      ],
+      "improves_every_season": true,
+      "multiplier": "published_ease",
+      "pooled_error_improvement": 0.3943140730882009,
+      "pooled_error_interval": [
+        0.3571375447918802,
+        0.42911769063128574
+      ],
+      "pooled_rows": 656,
+      "ranks_better_every_season": false,
+      "seasons": [
+        {
+          "bias": 0.12122661275479085,
+          "candidate": "M4a_published_difficulty",
+          "control_bias": 0.535593176702514,
+          "control_mean_absolute_error": 1.3910431347741015,
+          "control_rank_correlation": 0.515231149821445,
+          "control_rank_correlation_players_only": 0.16872602623859345,
+          "mean_absolute_error": 1.1439442873412002,
+          "rank_correlation": 0.3050985810081772,
+          "rank_correlation_players_only": -0.08985957706863563,
+          "rows": 202,
+          "season": "2022-23"
+        },
+        {
+          "bias": 0.24684957148748488,
+          "candidate": "M4a_published_difficulty",
+          "control_bias": 0.8443551086809694,
+          "control_mean_absolute_error": 1.2912039185054238,
+          "control_rank_correlation": 0.4713405494434665,
+          "control_rank_correlation_players_only": 0.21959951165082814,
+          "mean_absolute_error": 0.8611336397737451,
+          "rank_correlation": 0.3019396022857603,
+          "rank_correlation_players_only": 0.22149063431061516,
+          "rows": 253,
+          "season": "2023-24"
+        },
+        {
+          "bias": 0.2333313363189283,
+          "candidate": "M4a_published_difficulty",
+          "control_bias": 0.8992666681451582,
+          "control_mean_absolute_error": 1.2271443673164637,
+          "control_rank_correlation": 0.5109622397691078,
+          "control_rank_correlation_players_only": 0.2933255120753991,
+          "mean_absolute_error": 0.7298892218174632,
+          "rank_correlation": 0.3836663718339045,
+          "rank_correlation_players_only": 0.13291757617635527,
+          "rows": 201,
+          "season": "2024-25"
+        }
+      ]
+    },
+    {
+      "candidate": "M4b_carried_team_strength",
+      "coefficients": {
+        "DEF": {
+          "ownership_share": 4.276325112419131,
+          "price_m": 0.08356486465584811,
+          "source_expected_points": 0.36667419588407846
+        },
+        "FWD": {
+          "ownership_share": 5.964940706062798,
+          "price_m": 0.016356050005824064,
+          "source_expected_points": 0.9258554429363217
+        },
+        "GK": {
+          "ownership_share": 5.593128794221488,
+          "price_m": 0.0028499545447523787,
+          "source_expected_points": 0.38402507501894334
+        },
+        "MID": {
+          "ownership_share": 10.344101504378509,
+          "price_m": 0.085594286730589,
+          "source_expected_points": 0.30950709326669745
+        },
+        "_multiplier": {
+          "feature": 0.0,
+          "gamma": 0.5170952529047335,
+          "mean_ease": 0.4114603573335874
+        }
+      },
+      "features": [
+        "price_m",
+        "ownership_share",
+        "source_expected_points"
+      ],
+      "improves_every_season": true,
+      "multiplier": "carried_ease",
+      "pooled_error_improvement": 0.3887132807716335,
+      "pooled_error_interval": [
+        0.3489235374784146,
+        0.4267912675850262
+      ],
+      "pooled_rows": 656,
+      "ranks_better_every_season": false,
+      "seasons": [
+        {
+          "bias": 0.16003501563529154,
+          "candidate": "M4b_carried_team_strength",
+          "control_bias": 0.535593176702514,
+          "control_mean_absolute_error": 1.3910431347741015,
+          "control_rank_correlation": 0.515231149821445,
+          "control_rank_correlation_players_only": 0.16872602623859345,
+          "mean_absolute_error": 1.15854509876345,
+          "rank_correlation": 0.23989210637522193,
+          "rank_correlation_players_only": 0.1151674113117938,
+          "rows": 202,
+          "season": "2022-23"
+        },
+        {
+          "bias": 0.2535675190635252,
+          "candidate": "M4b_carried_team_strength",
+          "control_bias": 0.8443551086809694,
+          "control_mean_absolute_error": 1.2912039185054238,
+          "control_rank_correlation": 0.4713405494434665,
+          "control_rank_correlation_players_only": 0.21959951165082814,
+          "mean_absolute_error": 0.8644216577950518,
+          "rank_correlation": 0.2838883201518143,
+          "rank_correlation_players_only": 0.12426202112193599,
+          "rows": 253,
+          "season": "2023-24"
+        },
+        {
+          "bias": 0.2138139938616833,
+          "candidate": "M4b_carried_team_strength",
+          "control_bias": 0.8992666681451582,
+          "control_mean_absolute_error": 1.2271443673164637,
+          "control_rank_correlation": 0.5109622397691078,
+          "control_rank_correlation_players_only": 0.2933255120753991,
+          "mean_absolute_error": 0.7293563227775787,
+          "rank_correlation": 0.36761589156490093,
+          "rank_correlation_players_only": 0.13912169323933818,
+          "rows": 201,
+          "season": "2024-25"
+        }
+      ]
+    }
+  ],
+  "config": {
+    "bootstrap_resamples": 2000,
+    "deterministic_seed": 0,
+    "evaluated_seasons": [
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "minimum_training_rows": 60,
+    "mover_shrink_grid": [
+      1.0,
+      0.9,
+      0.8,
+      0.7,
+      0.6,
+      0.5,
+      0.4,
+      0.25,
+      0.0
+    ],
+    "seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ]
+  },
+  "contract_version": "opening_newcomer_study_v1",
+  "control": {
+    "bias": 0.7007358866511844,
+    "coefficient": 0.29940564635958394,
+    "mean_absolute_error": 1.3643182954155204,
+    "mean_predicted_points": 1.3872347424864244,
+    "mean_realized_points": 0.6864988558352403,
+    "rows": 874.0
+  },
+  "created_utc": "2026-08-19T10:53:16+00:00",
+  "decisions": {
+    "M1_price_by_position": [
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 49.0,
+        "changed_starters": 0,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 49.0,
+        "season": "2022-23"
+      },
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 68.0,
+        "changed_starters": 0,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 68.0,
+        "season": "2023-24"
+      },
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 62.0,
+        "changed_starters": 0,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 62.0,
+        "season": "2024-25"
+      }
+    ],
+    "M2_ownership": [
+      {
+        "candidate_newcomers_selected": 2,
+        "candidate_realized_points": 61.0,
+        "changed_starters": 4,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 49.0,
+        "season": "2022-23"
+      },
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 68.0,
+        "changed_starters": 0,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 68.0,
+        "season": "2023-24"
+      },
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 62.0,
+        "changed_starters": 0,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 62.0,
+        "season": "2024-25"
+      }
+    ],
+    "M3_source_expectation": [
+      {
+        "candidate_newcomers_selected": 2,
+        "candidate_realized_points": 61.0,
+        "changed_starters": 4,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 49.0,
+        "season": "2022-23"
+      },
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 68.0,
+        "changed_starters": 0,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 68.0,
+        "season": "2023-24"
+      },
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 69.0,
+        "changed_starters": 3,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 62.0,
+        "season": "2024-25"
+      }
+    ],
+    "M4a_published_difficulty": [
+      {
+        "candidate_newcomers_selected": 2,
+        "candidate_realized_points": 57.0,
+        "changed_starters": 4,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 49.0,
+        "season": "2022-23"
+      },
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 68.0,
+        "changed_starters": 0,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 68.0,
+        "season": "2023-24"
+      },
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 62.0,
+        "changed_starters": 0,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 62.0,
+        "season": "2024-25"
+      }
+    ],
+    "M4b_carried_team_strength": [
+      {
+        "candidate_newcomers_selected": 3,
+        "candidate_realized_points": 57.0,
+        "changed_starters": 5,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 49.0,
+        "season": "2022-23"
+      },
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 68.0,
+        "changed_starters": 0,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 68.0,
+        "season": "2023-24"
+      },
+      {
+        "candidate_newcomers_selected": 0,
+        "candidate_realized_points": 62.0,
+        "changed_starters": 0,
+        "control_newcomers_selected": 0,
+        "control_realized_points": 62.0,
+        "season": "2024-25"
+      }
+    ]
+  },
+  "diagnostics": {
+    "availability_modelled": false,
+    "availability_note": "The archive stores no per-gameweek availability, so no availability weight is fitted here; the live path applies its own availability contract and ownership carries most of the same information.",
+    "evaluated_seasons": [
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "locked_holdout_accessed": false,
+    "seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ]
+  },
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "movers": {
+    "best_shrink": 0.0,
+    "best_shrink_error": 1.4253396041529738,
+    "mover_bias": -0.5116773062402413,
+    "mover_mean_absolute_error": 1.6156497847635594,
+    "per_season_bias": {
+      "2021-22": -1.3260931689466262,
+      "2022-23": -0.6519316383516822,
+      "2023-24": 0.23903162292581734,
+      "2024-25": -0.6354112628664972
+    },
+    "rows": 115,
+    "shrink_improves_every_season": false,
+    "stayer_bias": -0.3322151627511464,
+    "stayer_mean_absolute_error": 1.7944312769703654,
+    "unshrunk_error": 1.577233046984337
+  },
+  "population": {
+    "2021-22": {
+      "movers": 18.0,
+      "newcomer_share": 0.3935018050541516,
+      "newcomers": 218.0,
+      "newcomers_without_minutes": 0.6697247706422018,
+      "rows": 554.0
+    },
+    "2022-23": {
+      "movers": 27.0,
+      "newcomer_share": 0.3525305410122164,
+      "newcomers": 202.0,
+      "newcomers_without_minutes": 0.6435643564356436,
+      "rows": 573.0
+    },
+    "2023-24": {
+      "movers": 31.0,
+      "newcomer_share": 0.3844984802431611,
+      "newcomers": 253.0,
+      "newcomers_without_minutes": 0.7233201581027668,
+      "rows": 658.0
+    },
+    "2024-25": {
+      "movers": 39.0,
+      "newcomer_share": 0.3262987012987013,
+      "newcomers": 201.0,
+      "newcomers_without_minutes": 0.7213930348258707,
+      "rows": 616.0
+    }
+  },
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 0,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "b5e5a8d4fc3984ba637e4d6ef80b7ad98427a925",
+    "working_tree_dirty": true
+  },
+  "verdict": {
+    "per_candidate": [
+      {
+        "accuracy_passes": true,
+        "candidate": "M1_price_by_position",
+        "decision_losses": 0,
+        "decision_passes": true,
+        "mean_decision_difference": 0.0,
+        "ordering_passes": false,
+        "passes": false
+      },
+      {
+        "accuracy_passes": true,
+        "candidate": "M2_ownership",
+        "decision_losses": 0,
+        "decision_passes": true,
+        "mean_decision_difference": 4.0,
+        "ordering_passes": false,
+        "passes": false
+      },
+      {
+        "accuracy_passes": true,
+        "candidate": "M3_source_expectation",
+        "decision_losses": 0,
+        "decision_passes": true,
+        "mean_decision_difference": 6.333333333333333,
+        "ordering_passes": false,
+        "passes": false
+      },
+      {
+        "accuracy_passes": true,
+        "candidate": "M4a_published_difficulty",
+        "decision_losses": 0,
+        "decision_passes": true,
+        "mean_decision_difference": 2.6666666666666665,
+        "ordering_passes": false,
+        "passes": false
+      },
+      {
+        "accuracy_passes": true,
+        "candidate": "M4b_carried_team_strength",
+        "decision_losses": 0,
+        "decision_passes": true,
+        "mean_decision_difference": 2.6666666666666665,
+        "ordering_passes": false,
+        "passes": false
+      }
+    ],
+    "promotion_proposed": false,
+    "recommended_candidate": null
+  }
+}

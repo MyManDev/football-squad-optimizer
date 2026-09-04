@@ -1,0 +1,117 @@
+{
+  "contract_version": "planner_control_screen_v1",
+  "created_utc": "2026-08-16T06:01:56+00:00",
+  "design": "one_factor_at_a_time_around_defaults",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "projection_rule": "naive_calendar_scaling_v1",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "7db1f7493f4bba7a85be1575e24b9356a0e26b2e",
+    "working_tree_dirty": false
+  },
+  "season": "2024-25",
+  "start_gameweeks": [
+    5,
+    10,
+    15,
+    20,
+    25,
+    30
+  ],
+  "variants": [
+    {
+      "horizon_discount_factor": 1.0,
+      "horizon_length": 3,
+      "max_advantage": 22.0,
+      "mean_planning_advantage_points": 1.1666666666666667,
+      "min_advantage": -20.0,
+      "total_planner_hit_points": 0.0,
+      "total_planner_transfers": 6,
+      "transfer_hit_cost_points": 4.0,
+      "variant": "baseline_h3",
+      "windows": 6
+    },
+    {
+      "horizon_discount_factor": 1.0,
+      "horizon_length": 2,
+      "max_advantage": 22.0,
+      "mean_planning_advantage_points": 4.833333333333333,
+      "min_advantage": -6.0,
+      "total_planner_hit_points": 0.0,
+      "total_planner_transfers": 2,
+      "transfer_hit_cost_points": 4.0,
+      "variant": "horizon_2",
+      "windows": 6
+    },
+    {
+      "horizon_discount_factor": 1.0,
+      "horizon_length": 4,
+      "max_advantage": 21.0,
+      "mean_planning_advantage_points": -3.6666666666666665,
+      "min_advantage": -31.0,
+      "total_planner_hit_points": 8.0,
+      "total_planner_transfers": 11,
+      "transfer_hit_cost_points": 4.0,
+      "variant": "horizon_4",
+      "windows": 6
+    },
+    {
+      "horizon_discount_factor": 1.0,
+      "horizon_length": 3,
+      "max_advantage": 24.0,
+      "mean_planning_advantage_points": 5.333333333333333,
+      "min_advantage": -9.0,
+      "total_planner_hit_points": 0.0,
+      "total_planner_transfers": 23,
+      "transfer_hit_cost_points": 0.0,
+      "variant": "hit_free",
+      "windows": 6
+    },
+    {
+      "horizon_discount_factor": 1.0,
+      "horizon_length": 3,
+      "max_advantage": 22.0,
+      "mean_planning_advantage_points": 1.1666666666666667,
+      "min_advantage": -20.0,
+      "total_planner_hit_points": 0.0,
+      "total_planner_transfers": 6,
+      "transfer_hit_cost_points": 8.0,
+      "variant": "hit_8",
+      "windows": 6
+    },
+    {
+      "horizon_discount_factor": 0.9,
+      "horizon_length": 3,
+      "max_advantage": 22.0,
+      "mean_planning_advantage_points": 1.1666666666666667,
+      "min_advantage": -20.0,
+      "total_planner_hit_points": 0.0,
+      "total_planner_transfers": 5,
+      "transfer_hit_cost_points": 4.0,
+      "variant": "discount_09",
+      "windows": 6
+    }
+  ]
+}

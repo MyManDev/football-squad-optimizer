@@ -1,0 +1,79 @@
+"""Public prepared-fold evaluation interface."""
+
+from squadopt.evaluation.appearance import (
+    APPEARANCE_DIAGNOSTICS_VERSION,
+    APPEARANCE_LOG_LOSS_EPSILON,
+    APPEARANCE_RELIABILITY_BIN_COUNT,
+    AppearanceDiagnostics,
+    AppearanceReliabilityBin,
+    evaluate_appearance_snapshot,
+)
+from squadopt.evaluation.benchmarks import (
+    OWNERSHIP_TEMPLATE_V2,
+    OwnershipTemplateResult,
+    audit_unconstrained_template_v1,
+    build_constrained_ownership_template,
+)
+from squadopt.evaluation.cohorts import (
+    TOP_MANAGER_COHORT_SIZE,
+    TOP_MANAGER_COHORT_VERSION,
+    TOP_MANAGER_MINIMUM_COVERAGE_COUNT,
+    AsOfTop100Cohort,
+    RankedManager,
+    Top100BenchmarkResult,
+    aggregate_top_100_scores,
+    select_as_of_top_100,
+)
+from squadopt.evaluation.evaluator import evaluate_prepared_folds
+from squadopt.evaluation.models import (
+    EvaluationConfig,
+    EvaluationError,
+    EvaluationFold,
+    EvaluationResult,
+    EvaluationSummary,
+    EvaluationValidationError,
+    FoldEvaluationResult,
+    FrozenSquadDecision,
+    RealizedSquadScore,
+    ScoringPolicy,
+)
+from squadopt.evaluation.scoring import (
+    complete_optimization_decision,
+    score_frozen_squad_decision,
+    score_realized_squad_points,
+)
+
+__all__ = [
+    "APPEARANCE_DIAGNOSTICS_VERSION",
+    "APPEARANCE_LOG_LOSS_EPSILON",
+    "APPEARANCE_RELIABILITY_BIN_COUNT",
+    "OWNERSHIP_TEMPLATE_V2",
+    "TOP_MANAGER_COHORT_SIZE",
+    "TOP_MANAGER_COHORT_VERSION",
+    "TOP_MANAGER_MINIMUM_COVERAGE_COUNT",
+    "AppearanceDiagnostics",
+    "AppearanceReliabilityBin",
+    "AsOfTop100Cohort",
+    "EvaluationConfig",
+    "EvaluationError",
+    "EvaluationFold",
+    "EvaluationResult",
+    "EvaluationSummary",
+    "EvaluationValidationError",
+    "FoldEvaluationResult",
+    "FrozenSquadDecision",
+    "OwnershipTemplateResult",
+    "RankedManager",
+    "RealizedSquadScore",
+    "ScoringPolicy",
+    "Top100BenchmarkResult",
+    "aggregate_top_100_scores",
+    "audit_unconstrained_template_v1",
+    "build_constrained_ownership_template",
+    "complete_optimization_decision",
+    "evaluate_appearance_snapshot",
+    "evaluate_prepared_folds",
+    "score_frozen_squad_decision",
+    "score_realized_squad_points",
+    "select_as_of_top_100",
+]

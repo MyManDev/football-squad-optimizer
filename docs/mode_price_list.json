@@ -1,0 +1,277 @@
+{
+  "contract_version": "mode_price_list_v1",
+  "created_utc": "2026-08-19T21:14:15+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "grid": {
+    "agresif": {
+      "0.0": {
+        "ahead": 0.3783783783783784,
+        "ahead_by_more_than_five": 0.13513513513513514,
+        "behind": 0.4594594594594595,
+        "folds": 37,
+        "level": 0.16216216216216217,
+        "mean_claimed": 0.3529729729729729,
+        "mean_realized_cost": 1.7567567567567568,
+        "proven_share": 0.8108108108108109
+      },
+      "2.0": {
+        "ahead": 0.40540540540540543,
+        "ahead_by_more_than_five": 0.16216216216216217,
+        "behind": 0.5135135135135135,
+        "folds": 37,
+        "level": 0.08108108108108109,
+        "mean_claimed": 0.4405405405405405,
+        "mean_realized_cost": 2.4864864864864864,
+        "proven_share": 0.2972972972972973
+      },
+      "4.0": {
+        "ahead": 0.35135135135135137,
+        "ahead_by_more_than_five": 0.21621621621621623,
+        "behind": 0.4864864864864865,
+        "folds": 37,
+        "level": 0.16216216216216217,
+        "mean_claimed": 0.41837837837837843,
+        "mean_realized_cost": 1.1081081081081081,
+        "proven_share": 0.02702702702702703
+      },
+      "None": {
+        "ahead": 0.3783783783783784,
+        "ahead_by_more_than_five": 0.16216216216216217,
+        "behind": 0.40540540540540543,
+        "folds": 37,
+        "level": 0.21621621621621623,
+        "mean_claimed": 0.43081081081081085,
+        "mean_realized_cost": 0.10810810810810811,
+        "proven_share": 0.0
+      }
+    },
+    "asiri_agresif": {
+      "0.0": {
+        "ahead": 0.3783783783783784,
+        "ahead_by_more_than_five": 0.1891891891891892,
+        "behind": 0.40540540540540543,
+        "folds": 37,
+        "level": 0.21621621621621623,
+        "mean_claimed": 0.17405405405405405,
+        "mean_realized_cost": 1.5135135135135136,
+        "proven_share": 0.7567567567567568
+      },
+      "2.0": {
+        "ahead": 0.43243243243243246,
+        "ahead_by_more_than_five": 0.1891891891891892,
+        "behind": 0.5405405405405406,
+        "folds": 37,
+        "level": 0.02702702702702703,
+        "mean_claimed": 0.20648648648648651,
+        "mean_realized_cost": 3.1621621621621623,
+        "proven_share": 0.2702702702702703
+      },
+      "4.0": {
+        "ahead": 0.4594594594594595,
+        "ahead_by_more_than_five": 0.21621621621621623,
+        "behind": 0.4864864864864865,
+        "folds": 37,
+        "level": 0.05405405405405406,
+        "mean_claimed": 0.22000000000000003,
+        "mean_realized_cost": 1.972972972972973,
+        "proven_share": 0.05405405405405406
+      },
+      "None": {
+        "ahead": 0.3783783783783784,
+        "ahead_by_more_than_five": 0.1891891891891892,
+        "behind": 0.4864864864864865,
+        "folds": 37,
+        "level": 0.13513513513513514,
+        "mean_claimed": 0.2,
+        "mean_realized_cost": 0.8918918918918919,
+        "proven_share": 0.0
+      }
+    },
+    "garantici": {
+      "0.0": {
+        "ahead": 0.21621621621621623,
+        "ahead_by_more_than_five": 0.05405405405405406,
+        "behind": 0.2702702702702703,
+        "folds": 37,
+        "level": 0.5135135135135135,
+        "mean_claimed": 0.7216216216216216,
+        "mean_realized_cost": 1.6486486486486487,
+        "proven_share": 0.8648648648648649
+      },
+      "2.0": {
+        "ahead": 0.0,
+        "ahead_by_more_than_five": 0.0,
+        "behind": 0.0,
+        "folds": 37,
+        "level": 1.0,
+        "mean_claimed": 1.0,
+        "mean_realized_cost": -0.0,
+        "proven_share": 1.0
+      },
+      "4.0": {
+        "ahead": 0.0,
+        "ahead_by_more_than_five": 0.0,
+        "behind": 0.0,
+        "folds": 37,
+        "level": 1.0,
+        "mean_claimed": 1.0,
+        "mean_realized_cost": -0.0,
+        "proven_share": 1.0
+      },
+      "None": {
+        "ahead": 0.0,
+        "ahead_by_more_than_five": 0.0,
+        "behind": 0.0,
+        "folds": 37,
+        "level": 1.0,
+        "mean_claimed": 1.0,
+        "mean_realized_cost": -0.0,
+        "proven_share": 1.0
+      }
+    }
+  },
+  "honesty_pairs": [
+    {
+      "budget": 0.0,
+      "claimed": 0.7216216216216216,
+      "mode": "garantici",
+      "realized_event_frequency": 0.7297297297297297,
+      "within_ten_points": true
+    },
+    {
+      "budget": 2.0,
+      "claimed": 1.0,
+      "mode": "garantici",
+      "realized_event_frequency": 1.0,
+      "within_ten_points": true
+    },
+    {
+      "budget": 4.0,
+      "claimed": 1.0,
+      "mode": "garantici",
+      "realized_event_frequency": 1.0,
+      "within_ten_points": true
+    },
+    {
+      "budget": null,
+      "claimed": 1.0,
+      "mode": "garantici",
+      "realized_event_frequency": 1.0,
+      "within_ten_points": true
+    },
+    {
+      "budget": 0.0,
+      "claimed": 0.3529729729729729,
+      "mode": "agresif",
+      "realized_event_frequency": 0.3783783783783784,
+      "within_ten_points": true
+    },
+    {
+      "budget": 2.0,
+      "claimed": 0.4405405405405405,
+      "mode": "agresif",
+      "realized_event_frequency": 0.40540540540540543,
+      "within_ten_points": true
+    },
+    {
+      "budget": 4.0,
+      "claimed": 0.41837837837837843,
+      "mode": "agresif",
+      "realized_event_frequency": 0.35135135135135137,
+      "within_ten_points": true
+    },
+    {
+      "budget": null,
+      "claimed": 0.43081081081081085,
+      "mode": "agresif",
+      "realized_event_frequency": 0.3783783783783784,
+      "within_ten_points": true
+    },
+    {
+      "budget": 0.0,
+      "claimed": 0.17405405405405405,
+      "mode": "asiri_agresif",
+      "realized_event_frequency": 0.1891891891891892,
+      "within_ten_points": true
+    },
+    {
+      "budget": 2.0,
+      "claimed": 0.20648648648648651,
+      "mode": "asiri_agresif",
+      "realized_event_frequency": 0.1891891891891892,
+      "within_ten_points": true
+    },
+    {
+      "budget": 4.0,
+      "claimed": 0.22000000000000003,
+      "mode": "asiri_agresif",
+      "realized_event_frequency": 0.21621621621621623,
+      "within_ten_points": true
+    },
+    {
+      "budget": null,
+      "claimed": 0.2,
+      "mode": "asiri_agresif",
+      "realized_event_frequency": 0.1891891891891892,
+      "within_ten_points": true
+    }
+  ],
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "pooled": {
+    "agresif": {
+      "ahead_by_more_than_five": 0.16891891891891894,
+      "behind": 0.4662162162162163
+    },
+    "asiri_agresif": {
+      "ahead_by_more_than_five": 0.19594594594594594,
+      "behind": 0.4797297297297297
+    },
+    "garantici": {
+      "ahead_by_more_than_five": 0.013513513513513514,
+      "behind": 0.06756756756756757
+    }
+  },
+  "prereg": "docs/mode_price_list_prereg.md",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 0,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "5bc4f589ef46261ae45803e61702920c11136c7a",
+    "working_tree_dirty": true
+  },
+  "separation_garantici_vs_agresif_budget0": {
+    "excludes_zero": true,
+    "folds": 37,
+    "interval_90": [
+      -0.2972972972972973,
+      -0.08108108108108109
+    ],
+    "mean_difference": -0.1891891891891892
+  },
+  "verdict": {
+    "direction_asiri_passes": true,
+    "direction_garantici_passes": true,
+    "honesty_passes": true,
+    "passes": true,
+    "separation_passes": true
+  }
+}

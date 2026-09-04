@@ -1,0 +1,16 @@
+{
+  "contract_version": "entry_registry_v1",
+  "entries": [
+    {
+      "entry_id": 1000001,
+      "label": "Example Team One",
+      "registered_at_utc": "2026-08-25T09:00:00Z"
+    },
+    {
+      "entry_id": 1000002,
+      "label": "Example Team Two",
+      "registered_at_utc": "2026-08-25T09:00:00Z"
+    }
+  ],
+  "seeded_from_league": 9999999
+}

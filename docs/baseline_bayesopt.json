@@ -1,0 +1,313 @@
+{
+  "automatic_promotion": false,
+  "best_mean_realized_squad_points": 56.50340136054422,
+  "candidate_records": {
+    "bench_weight=0-form_window=10": {
+      "bench_weight": 0.0,
+      "form_window": 10,
+      "mean_realized_squad_points": 56.50340136054422,
+      "median_solver_runtime_seconds": 0.7679245000181254,
+      "realized_squad_points_stddev": 18.11729513444459,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0-form_window=3": {
+      "bench_weight": 0.0,
+      "form_window": 3,
+      "mean_realized_squad_points": 51.21768707482993,
+      "median_solver_runtime_seconds": 0.7427163999818731,
+      "realized_squad_points_stddev": 16.26879530797613,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0-form_window=4": {
+      "bench_weight": 0.0,
+      "form_window": 4,
+      "mean_realized_squad_points": 54.006802721088434,
+      "median_solver_runtime_seconds": 0.6503862999961711,
+      "realized_squad_points_stddev": 16.193765743676824,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0-form_window=5": {
+      "bench_weight": 0.0,
+      "form_window": 5,
+      "mean_realized_squad_points": 54.2108843537415,
+      "median_solver_runtime_seconds": 0.6787638000096194,
+      "realized_squad_points_stddev": 16.546463663337136,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0-form_window=6": {
+      "bench_weight": 0.0,
+      "form_window": 6,
+      "mean_realized_squad_points": 54.795918367346935,
+      "median_solver_runtime_seconds": 0.8131654000026174,
+      "realized_squad_points_stddev": 16.414254123849663,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0-form_window=7": {
+      "bench_weight": 0.0,
+      "form_window": 7,
+      "mean_realized_squad_points": 55.46938775510204,
+      "median_solver_runtime_seconds": 0.8437611999979708,
+      "realized_squad_points_stddev": 17.530655801265254,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0-form_window=9": {
+      "bench_weight": 0.0,
+      "form_window": 9,
+      "mean_realized_squad_points": 55.48979591836735,
+      "median_solver_runtime_seconds": 0.8531559999973979,
+      "realized_squad_points_stddev": 18.124049999757915,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0.05-form_window=10": {
+      "bench_weight": 0.05,
+      "form_window": 10,
+      "mean_realized_squad_points": 56.12925170068027,
+      "median_solver_runtime_seconds": 0.9068204000068363,
+      "realized_squad_points_stddev": 17.515113826784518,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0.05-form_window=7": {
+      "bench_weight": 0.05,
+      "form_window": 7,
+      "mean_realized_squad_points": 54.925170068027214,
+      "median_solver_runtime_seconds": 0.9708920000120997,
+      "realized_squad_points_stddev": 16.84506768295057,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0.1-form_window=10": {
+      "bench_weight": 0.1,
+      "form_window": 10,
+      "mean_realized_squad_points": 55.97959183673469,
+      "median_solver_runtime_seconds": 0.8999127999995835,
+      "realized_squad_points_stddev": 17.439289985763537,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0.15-form_window=5": {
+      "bench_weight": 0.15,
+      "form_window": 5,
+      "mean_realized_squad_points": 53.82312925170068,
+      "median_solver_runtime_seconds": 0.8526313999900594,
+      "realized_squad_points_stddev": 16.005824059173772,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0.15-form_window=8": {
+      "bench_weight": 0.15,
+      "form_window": 8,
+      "mean_realized_squad_points": 54.795918367346935,
+      "median_solver_runtime_seconds": 0.9861395000189077,
+      "realized_squad_points_stddev": 17.147990808909707,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0.2-form_window=10": {
+      "bench_weight": 0.2,
+      "form_window": 10,
+      "mean_realized_squad_points": 55.80952380952381,
+      "median_solver_runtime_seconds": 0.8492392000043765,
+      "realized_squad_points_stddev": 17.35320681741771,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0.25-form_window=9": {
+      "bench_weight": 0.25,
+      "form_window": 9,
+      "mean_realized_squad_points": 55.074829931972786,
+      "median_solver_runtime_seconds": 1.013125299999956,
+      "realized_squad_points_stddev": 17.948182571618165,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0.3-form_window=10": {
+      "bench_weight": 0.3,
+      "form_window": 10,
+      "mean_realized_squad_points": 55.55102040816327,
+      "median_solver_runtime_seconds": 0.9435954999935348,
+      "realized_squad_points_stddev": 17.349227540086005,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    },
+    "bench_weight=0.3-form_window=3": {
+      "bench_weight": 0.3,
+      "form_window": 3,
+      "mean_realized_squad_points": 50.70748299319728,
+      "median_solver_runtime_seconds": 0.7858084000181407,
+      "realized_squad_points_stddev": 15.750698455241343,
+      "risk_aversion": 0.0,
+      "scored_folds": 147
+    }
+  },
+  "created_utc": "2026-08-15T05:31:45+00:00",
+  "development_fold_count": 147,
+  "development_seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "evaluation_count": 16,
+  "locked_holdout_accessed": false,
+  "objective_configuration_fingerprint": "2d4a2199413ecc669cbc657396a5bda6257403751e664a5855e314accc2303af",
+  "pinned_risk_aversion": 0.0,
+  "policy_objective_contract_version": "baseline_policy_objective_v1",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "a9c808436e92d67591c8103ddb17cad389e444fe",
+    "working_tree_dirty": false
+  },
+  "recommendation_only": true,
+  "recommended_candidate": {
+    "bench_weight": 0.0,
+    "form_window": 10
+  },
+  "recommended_candidate_id": "bench_weight=0-form_window=10",
+  "run_fingerprint": "b0d7deb6210f9b567fdcfc4de73b8320665385594e49a126d9ece779e816524d",
+  "search_configuration_fingerprint": "ef689440dcb5dece105ae2b704338cd5fbaea534e7148acc062f5d21b0e5f49c",
+  "search_space_size": 56,
+  "stopped_reason": "evaluation_budget_exhausted",
+  "trace": [
+    {
+      "candidate_id": "bench_weight=0.25-form_window=9",
+      "expected_improvement": null,
+      "iteration": 0,
+      "mean_realized_squad_points": 55.074829931972786,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=3",
+      "expected_improvement": null,
+      "iteration": 1,
+      "mean_realized_squad_points": 51.21768707482993,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0.3-form_window=3",
+      "expected_improvement": null,
+      "iteration": 2,
+      "mean_realized_squad_points": 50.70748299319728,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=10",
+      "expected_improvement": null,
+      "iteration": 3,
+      "mean_realized_squad_points": 56.50340136054422,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0.15-form_window=5",
+      "expected_improvement": null,
+      "iteration": 4,
+      "mean_realized_squad_points": 53.82312925170068,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0.05-form_window=7",
+      "expected_improvement": null,
+      "iteration": 5,
+      "mean_realized_squad_points": 54.925170068027214,
+      "phase": "initial_design"
+    },
+    {
+      "candidate_id": "bench_weight=0.1-form_window=10",
+      "expected_improvement": 0.20648141402547654,
+      "iteration": 6,
+      "mean_realized_squad_points": 55.97959183673469,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0.05-form_window=10",
+      "expected_improvement": 0.00010645960870936887,
+      "iteration": 7,
+      "mean_realized_squad_points": 56.12925170068027,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=9",
+      "expected_improvement": 0.00012629853104245648,
+      "iteration": 8,
+      "mean_realized_squad_points": 55.48979591836735,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0.3-form_window=10",
+      "expected_improvement": 8.034920872635577e-06,
+      "iteration": 9,
+      "mean_realized_squad_points": 55.55102040816327,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0.2-form_window=10",
+      "expected_improvement": 4.5946591956018793e-07,
+      "iteration": 10,
+      "mean_realized_squad_points": 55.80952380952381,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0.15-form_window=8",
+      "expected_improvement": 1.2223808779470753e-13,
+      "iteration": 11,
+      "mean_realized_squad_points": 54.795918367346935,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=4",
+      "expected_improvement": 1.471105713066053e-156,
+      "iteration": 12,
+      "mean_realized_squad_points": 54.006802721088434,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=6",
+      "expected_improvement": 8.311297749570426e-11,
+      "iteration": 13,
+      "mean_realized_squad_points": 54.795918367346935,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=5",
+      "expected_improvement": 0.0,
+      "iteration": 14,
+      "mean_realized_squad_points": 54.2108843537415,
+      "phase": "expected_improvement"
+    },
+    {
+      "candidate_id": "bench_weight=0-form_window=7",
+      "expected_improvement": 3.470435138539064e-191,
+      "iteration": 15,
+      "mean_realized_squad_points": 55.46938775510204,
+      "phase": "expected_improvement"
+    }
+  ]
+}

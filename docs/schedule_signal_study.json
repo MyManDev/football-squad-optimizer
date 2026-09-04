@@ -1,0 +1,1088 @@
+{
+  "comparisons": [
+    {
+      "error_improvement": 0.11372522240692111,
+      "error_interval": [
+        0.07791556328733787,
+        0.15068031103768317
+      ],
+      "interval_excludes_zero": true,
+      "ordering_not_worse": true,
+      "per_season_error_improvement": {
+        "2022-23": 0.19393062529442487,
+        "2023-24": 0.13930735559139262,
+        "2024-25": 0.011242019489506911
+      },
+      "per_season_rank_improvement": {
+        "2022-23": 0.054126906118523055,
+        "2023-24": 0.035252950707540864,
+        "2024-25": 0.012688847994380636
+      },
+      "rank_improvement": 0.03402290160681487,
+      "reference": "A_flat",
+      "rows": 4403,
+      "rule": "B_calendar",
+      "sign_consistent": true
+    },
+    {
+      "error_improvement": 0.026140287886267752,
+      "error_interval": [
+        0.006992734138444492,
+        0.04413761460750787
+      ],
+      "interval_excludes_zero": true,
+      "ordering_not_worse": true,
+      "per_season_error_improvement": {
+        "2022-23": -0.03553831141428853,
+        "2023-24": 0.0380068991212226,
+        "2024-25": 0.07431655600305498
+      },
+      "per_season_rank_improvement": {
+        "2022-23": -0.0015967321441225368,
+        "2023-24": 0.002823903517095938,
+        "2024-25": 0.011901785588381508
+      },
+      "rank_improvement": 0.004376318987118322,
+      "reference": "B_calendar",
+      "rows": 4403,
+      "rule": "C_published_difficulty",
+      "sign_consistent": false
+    },
+    {
+      "error_improvement": -0.005855433231189709,
+      "error_interval": [
+        -0.028056690542237386,
+        0.014406100768580255
+      ],
+      "interval_excludes_zero": false,
+      "ordering_not_worse": true,
+      "per_season_error_improvement": {
+        "2022-23": -0.10010195918410475,
+        "2023-24": 0.033155854902782264,
+        "2024-25": 0.0474797058854976
+      },
+      "per_season_rank_improvement": {
+        "2022-23": 0.005333868706343059,
+        "2023-24": 0.003670647791290893,
+        "2024-25": 0.013374080160844515
+      },
+      "rank_improvement": 0.007459532219492804,
+      "reference": "B_calendar",
+      "rows": 4403,
+      "rule": "D_carried_strength",
+      "sign_consistent": false
+    }
+  ],
+  "config": {
+    "bootstrap_resamples": 2000,
+    "deterministic_seed": 0,
+    "evaluated_seasons": [
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "form_window": 5,
+    "minimum_prior_minutes": 180,
+    "minimum_training_rows": 200,
+    "origin_gameweeks": [
+      6,
+      11,
+      16,
+      21,
+      26,
+      31
+    ],
+    "seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "transfer_cost_points": 4.0,
+    "window_length": 5
+  },
+  "contract_version": "schedule_signal_study_v1",
+  "created_utc": "2026-08-19T12:27:22+00:00",
+  "decisions": [
+    {
+      "changed_starters": 4,
+      "origin_gameweek": 6,
+      "reference": "A_flat",
+      "reference_realized_points": 221.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 235.0,
+      "season": "2022-23",
+      "transfer_net_gain": 3.0,
+      "transfer_realized_gain": 7.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 11,
+      "reference": "A_flat",
+      "reference_realized_points": 257.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 265.0,
+      "season": "2022-23",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 5,
+      "origin_gameweek": 16,
+      "reference": "A_flat",
+      "reference_realized_points": 191.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 243.0,
+      "season": "2022-23",
+      "transfer_net_gain": 3.0,
+      "transfer_realized_gain": 7.0
+    },
+    {
+      "changed_starters": 3,
+      "origin_gameweek": 21,
+      "reference": "A_flat",
+      "reference_realized_points": 271.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 327.0,
+      "season": "2022-23",
+      "transfer_net_gain": 10.0,
+      "transfer_realized_gain": 14.0
+    },
+    {
+      "changed_starters": 4,
+      "origin_gameweek": 26,
+      "reference": "A_flat",
+      "reference_realized_points": 236.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 256.0,
+      "season": "2022-23",
+      "transfer_net_gain": -19.0,
+      "transfer_realized_gain": -15.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 31,
+      "reference": "A_flat",
+      "reference_realized_points": 235.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 277.0,
+      "season": "2022-23",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 6,
+      "reference": "A_flat",
+      "reference_realized_points": 302.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 302.0,
+      "season": "2023-24",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 11,
+      "reference": "A_flat",
+      "reference_realized_points": 223.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 223.0,
+      "season": "2023-24",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 16,
+      "reference": "A_flat",
+      "reference_realized_points": 233.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 233.0,
+      "season": "2023-24",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 21,
+      "reference": "A_flat",
+      "reference_realized_points": 172.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 185.0,
+      "season": "2023-24",
+      "transfer_net_gain": 9.0,
+      "transfer_realized_gain": 13.0
+    },
+    {
+      "changed_starters": 4,
+      "origin_gameweek": 26,
+      "reference": "A_flat",
+      "reference_realized_points": 164.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 179.0,
+      "season": "2023-24",
+      "transfer_net_gain": -4.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 2,
+      "origin_gameweek": 31,
+      "reference": "A_flat",
+      "reference_realized_points": 325.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 332.0,
+      "season": "2023-24",
+      "transfer_net_gain": -8.0,
+      "transfer_realized_gain": -4.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 6,
+      "reference": "A_flat",
+      "reference_realized_points": 201.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 201.0,
+      "season": "2024-25",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 11,
+      "reference": "A_flat",
+      "reference_realized_points": 293.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 293.0,
+      "season": "2024-25",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 16,
+      "reference": "A_flat",
+      "reference_realized_points": 302.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 302.0,
+      "season": "2024-25",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 3,
+      "origin_gameweek": 21,
+      "reference": "A_flat",
+      "reference_realized_points": 291.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 329.0,
+      "season": "2024-25",
+      "transfer_net_gain": 2.0,
+      "transfer_realized_gain": 6.0
+    },
+    {
+      "changed_starters": 2,
+      "origin_gameweek": 26,
+      "reference": "A_flat",
+      "reference_realized_points": 204.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 188.0,
+      "season": "2024-25",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 4.0
+    },
+    {
+      "changed_starters": 2,
+      "origin_gameweek": 31,
+      "reference": "A_flat",
+      "reference_realized_points": 179.0,
+      "rule": "B_calendar",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 195.0,
+      "season": "2024-25",
+      "transfer_net_gain": 4.0,
+      "transfer_realized_gain": 8.0
+    },
+    {
+      "changed_starters": 3,
+      "origin_gameweek": 6,
+      "reference": "B_calendar",
+      "reference_realized_points": 235.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 244.0,
+      "season": "2022-23",
+      "transfer_net_gain": 18.0,
+      "transfer_realized_gain": 22.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 11,
+      "reference": "B_calendar",
+      "reference_realized_points": 265.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 261.0,
+      "season": "2022-23",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 16,
+      "reference": "B_calendar",
+      "reference_realized_points": 243.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 243.0,
+      "season": "2022-23",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 21,
+      "reference": "B_calendar",
+      "reference_realized_points": 327.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 327.0,
+      "season": "2022-23",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 3,
+      "origin_gameweek": 26,
+      "reference": "B_calendar",
+      "reference_realized_points": 256.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 228.0,
+      "season": "2022-23",
+      "transfer_net_gain": -12.0,
+      "transfer_realized_gain": -8.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 31,
+      "reference": "B_calendar",
+      "reference_realized_points": 277.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 264.0,
+      "season": "2022-23",
+      "transfer_net_gain": -17.0,
+      "transfer_realized_gain": -13.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 6,
+      "reference": "B_calendar",
+      "reference_realized_points": 302.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 293.0,
+      "season": "2023-24",
+      "transfer_net_gain": -13.0,
+      "transfer_realized_gain": -9.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 11,
+      "reference": "B_calendar",
+      "reference_realized_points": 223.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 223.0,
+      "season": "2023-24",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 16,
+      "reference": "B_calendar",
+      "reference_realized_points": 233.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 247.0,
+      "season": "2023-24",
+      "transfer_net_gain": 10.0,
+      "transfer_realized_gain": 14.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 21,
+      "reference": "B_calendar",
+      "reference_realized_points": 185.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 167.0,
+      "season": "2023-24",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 2,
+      "origin_gameweek": 26,
+      "reference": "B_calendar",
+      "reference_realized_points": 179.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 158.0,
+      "season": "2023-24",
+      "transfer_net_gain": -33.0,
+      "transfer_realized_gain": -29.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 31,
+      "reference": "B_calendar",
+      "reference_realized_points": 332.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 355.0,
+      "season": "2023-24",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 6,
+      "reference": "B_calendar",
+      "reference_realized_points": 201.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 215.0,
+      "season": "2024-25",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 4,
+      "origin_gameweek": 11,
+      "reference": "B_calendar",
+      "reference_realized_points": 293.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 282.0,
+      "season": "2024-25",
+      "transfer_net_gain": -3.0,
+      "transfer_realized_gain": 1.0
+    },
+    {
+      "changed_starters": 4,
+      "origin_gameweek": 16,
+      "reference": "B_calendar",
+      "reference_realized_points": 302.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 309.0,
+      "season": "2024-25",
+      "transfer_net_gain": -33.0,
+      "transfer_realized_gain": -29.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 21,
+      "reference": "B_calendar",
+      "reference_realized_points": 329.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 329.0,
+      "season": "2024-25",
+      "transfer_net_gain": 3.0,
+      "transfer_realized_gain": 7.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 26,
+      "reference": "B_calendar",
+      "reference_realized_points": 188.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 188.0,
+      "season": "2024-25",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 2,
+      "origin_gameweek": 31,
+      "reference": "B_calendar",
+      "reference_realized_points": 195.0,
+      "rule": "C_published_difficulty",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 186.0,
+      "season": "2024-25",
+      "transfer_net_gain": -5.0,
+      "transfer_realized_gain": -1.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 6,
+      "reference": "B_calendar",
+      "reference_realized_points": 235.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 235.0,
+      "season": "2022-23",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 11,
+      "reference": "B_calendar",
+      "reference_realized_points": 265.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 257.0,
+      "season": "2022-23",
+      "transfer_net_gain": -8.0,
+      "transfer_realized_gain": -4.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 16,
+      "reference": "B_calendar",
+      "reference_realized_points": 243.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 250.0,
+      "season": "2022-23",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 21,
+      "reference": "B_calendar",
+      "reference_realized_points": 327.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 327.0,
+      "season": "2022-23",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 3,
+      "origin_gameweek": 26,
+      "reference": "B_calendar",
+      "reference_realized_points": 256.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 219.0,
+      "season": "2022-23",
+      "transfer_net_gain": -12.0,
+      "transfer_realized_gain": -8.0
+    },
+    {
+      "changed_starters": 3,
+      "origin_gameweek": 31,
+      "reference": "B_calendar",
+      "reference_realized_points": 277.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 252.0,
+      "season": "2022-23",
+      "transfer_net_gain": -10.0,
+      "transfer_realized_gain": -6.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 6,
+      "reference": "B_calendar",
+      "reference_realized_points": 302.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 315.0,
+      "season": "2023-24",
+      "transfer_net_gain": 9.0,
+      "transfer_realized_gain": 13.0
+    },
+    {
+      "changed_starters": 2,
+      "origin_gameweek": 11,
+      "reference": "B_calendar",
+      "reference_realized_points": 223.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 230.0,
+      "season": "2023-24",
+      "transfer_net_gain": 15.0,
+      "transfer_realized_gain": 19.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 16,
+      "reference": "B_calendar",
+      "reference_realized_points": 233.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 236.0,
+      "season": "2023-24",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 21,
+      "reference": "B_calendar",
+      "reference_realized_points": 185.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 185.0,
+      "season": "2023-24",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 26,
+      "reference": "B_calendar",
+      "reference_realized_points": 179.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 179.0,
+      "season": "2023-24",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 31,
+      "reference": "B_calendar",
+      "reference_realized_points": 332.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 352.0,
+      "season": "2023-24",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 2,
+      "origin_gameweek": 6,
+      "reference": "B_calendar",
+      "reference_realized_points": 201.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 209.0,
+      "season": "2024-25",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 3,
+      "origin_gameweek": 11,
+      "reference": "B_calendar",
+      "reference_realized_points": 293.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 289.0,
+      "season": "2024-25",
+      "transfer_net_gain": 15.0,
+      "transfer_realized_gain": 19.0
+    },
+    {
+      "changed_starters": 4,
+      "origin_gameweek": 16,
+      "reference": "B_calendar",
+      "reference_realized_points": 302.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": true,
+      "rule_realized_points": 322.0,
+      "season": "2024-25",
+      "transfer_net_gain": -33.0,
+      "transfer_realized_gain": -29.0
+    },
+    {
+      "changed_starters": 1,
+      "origin_gameweek": 21,
+      "reference": "B_calendar",
+      "reference_realized_points": 329.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 329.0,
+      "season": "2024-25",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 0,
+      "origin_gameweek": 26,
+      "reference": "B_calendar",
+      "reference_realized_points": 188.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 188.0,
+      "season": "2024-25",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    },
+    {
+      "changed_starters": 2,
+      "origin_gameweek": 31,
+      "reference": "B_calendar",
+      "reference_realized_points": 195.0,
+      "rule": "D_carried_strength",
+      "rule_proposes_transfer": false,
+      "rule_realized_points": 179.0,
+      "season": "2024-25",
+      "transfer_net_gain": 0.0,
+      "transfer_realized_gain": 0.0
+    }
+  ],
+  "diagnostics": {
+    "evaluated_seasons": [
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "locked_holdout_accessed": false,
+    "origin_gameweeks": [
+      6,
+      11,
+      16,
+      21,
+      26,
+      31
+    ],
+    "seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "transfer_check_note": "The transfer check prices the two players swapped over the window; it does not re-pick the eleven or the captain week by week, so it measures the ordering the rule imposes rather than a full season of play.",
+    "window_length": 5
+  },
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "population": {
+    "2020-21": {
+      "blank_window_share": 0.0,
+      "double_week_share": 0.15090543259557343,
+      "mean_fixture_count": 5.066398390342052,
+      "mean_realized_points": 12.816230717639169,
+      "rows": 1491.0,
+      "windows": 6.0
+    },
+    "2021-22": {
+      "blank_window_share": 0.0,
+      "double_week_share": 0.17707618393960192,
+      "mean_fixture_count": 4.854495538778312,
+      "mean_realized_points": 12.024708304735759,
+      "rows": 1457.0,
+      "windows": 6.0
+    },
+    "2022-23": {
+      "blank_window_share": 0.0,
+      "double_week_share": 0.21586206896551724,
+      "mean_fixture_count": 4.949655172413793,
+      "mean_realized_points": 12.591724137931035,
+      "rows": 1450.0,
+      "windows": 6.0
+    },
+    "2023-24": {
+      "blank_window_share": 0.0,
+      "double_week_share": 0.10446735395189004,
+      "mean_fixture_count": 4.94639175257732,
+      "mean_realized_points": 11.983505154639175,
+      "rows": 1455.0,
+      "windows": 6.0
+    },
+    "2024-25": {
+      "blank_window_share": 0.0,
+      "double_week_share": 0.04072096128170895,
+      "mean_fixture_count": 4.998664886515354,
+      "mean_realized_points": 12.401869158878505,
+      "rows": 1498.0,
+      "windows": 6.0
+    }
+  },
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 0,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "b96cf40631861b5d9aa298dc3c23b2d2cdd3706a",
+    "working_tree_dirty": true
+  },
+  "rules": [
+    {
+      "coefficients": {
+        "DEF": {
+          "coefficient_0": 0.6816936776990039
+        },
+        "FWD": {
+          "coefficient_0": 0.7158897813758357
+        },
+        "GK": {
+          "coefficient_0": 0.8244244509129396
+        },
+        "MID": {
+          "coefficient_0": 0.7592238224256884
+        }
+      },
+      "pooled_mean_absolute_error": 7.0495890502792875,
+      "pooled_rank_correlation": 0.2773091906695439,
+      "pooled_rows": 4403,
+      "rule": "A_flat",
+      "seasons": [
+        {
+          "bias": -1.9675503659906202,
+          "mean_absolute_error": 7.25432014918205,
+          "rank_correlation": 0.27692040685530583,
+          "rows": 1450,
+          "rule": "A_flat",
+          "season": "2022-23"
+        },
+        {
+          "bias": -1.8351500807275418,
+          "mean_absolute_error": 6.965287889094962,
+          "rank_correlation": 0.25004804681006554,
+          "rows": 1455,
+          "rule": "A_flat",
+          "season": "2023-24"
+        },
+        {
+          "bias": -2.12735252243557,
+          "mean_absolute_error": 6.933299394814792,
+          "rank_correlation": 0.3049591183432604,
+          "rows": 1498,
+          "rule": "A_flat",
+          "season": "2024-25"
+        }
+      ]
+    },
+    {
+      "coefficients": {
+        "DEF": {
+          "coefficient_0": 0.6961262178049314
+        },
+        "FWD": {
+          "coefficient_0": 0.7403395485940026
+        },
+        "GK": {
+          "coefficient_0": 0.8317325150518713
+        },
+        "MID": {
+          "coefficient_0": 0.7736041602029224
+        }
+      },
+      "pooled_mean_absolute_error": 6.935863827872366,
+      "pooled_rank_correlation": 0.3113320922763588,
+      "pooled_rows": 4403,
+      "rule": "B_calendar",
+      "seasons": [
+        {
+          "bias": -2.0528966684661403,
+          "mean_absolute_error": 7.0603895238876255,
+          "rank_correlation": 0.3310473129738289,
+          "rows": 1450,
+          "rule": "B_calendar",
+          "season": "2022-23"
+        },
+        {
+          "bias": -1.8391939417303944,
+          "mean_absolute_error": 6.82598053350357,
+          "rank_correlation": 0.2853009975176064,
+          "rows": 1455,
+          "rule": "B_calendar",
+          "season": "2023-24"
+        },
+        {
+          "bias": -1.935532415338634,
+          "mean_absolute_error": 6.922057375325285,
+          "rank_correlation": 0.31764796633764103,
+          "rows": 1498,
+          "rule": "B_calendar",
+          "season": "2024-25"
+        }
+      ]
+    },
+    {
+      "coefficients": {
+        "DEF": {
+          "coefficient_0": 0.3318752658073487,
+          "coefficient_1": 0.688003379857087
+        },
+        "FWD": {
+          "coefficient_0": 0.7643402100963286,
+          "coefficient_1": -0.0444836062005639
+        },
+        "GK": {
+          "coefficient_0": 0.514637553169807,
+          "coefficient_1": 0.6012489325675028
+        },
+        "MID": {
+          "coefficient_0": 0.5755273159393631,
+          "coefficient_1": 0.3704555497043386
+        }
+      },
+      "pooled_mean_absolute_error": 6.909723539986098,
+      "pooled_rank_correlation": 0.3157084112634771,
+      "pooled_rows": 4403,
+      "rule": "C_published_difficulty",
+      "seasons": [
+        {
+          "bias": -1.8714505882697852,
+          "mean_absolute_error": 7.095927835301914,
+          "rank_correlation": 0.32945058082970635,
+          "rows": 1450,
+          "rule": "C_published_difficulty",
+          "season": "2022-23"
+        },
+        {
+          "bias": -1.8053416169001124,
+          "mean_absolute_error": 6.787973634382347,
+          "rank_correlation": 0.28812490103470234,
+          "rows": 1455,
+          "rule": "C_published_difficulty",
+          "season": "2023-24"
+        },
+        {
+          "bias": -2.198754305686393,
+          "mean_absolute_error": 6.84774081932223,
+          "rank_correlation": 0.32954975192602254,
+          "rows": 1498,
+          "rule": "C_published_difficulty",
+          "season": "2024-25"
+        }
+      ]
+    },
+    {
+      "coefficients": {
+        "DEF": {
+          "coefficient_0": 0.5086280455796156,
+          "coefficient_1": 0.33839070347510175
+        },
+        "FWD": {
+          "coefficient_0": 0.6413702438972487,
+          "coefficient_1": 0.1755066377922246
+        },
+        "GK": {
+          "coefficient_0": 0.5857293050949487,
+          "coefficient_1": 0.442717929479282
+        },
+        "MID": {
+          "coefficient_0": 0.7684371803371409,
+          "coefficient_1": 0.009154780929873076
+        }
+      },
+      "pooled_mean_absolute_error": 6.941719261103556,
+      "pooled_rank_correlation": 0.3187916244958516,
+      "pooled_rows": 4403,
+      "rule": "D_carried_strength",
+      "seasons": [
+        {
+          "bias": -1.475983906489794,
+          "mean_absolute_error": 7.16049148307173,
+          "rank_correlation": 0.33638118168017195,
+          "rows": 1450,
+          "rule": "D_carried_strength",
+          "season": "2022-23"
+        },
+        {
+          "bias": -2.140275570741924,
+          "mean_absolute_error": 6.7928246786007875,
+          "rank_correlation": 0.2889716453088973,
+          "rows": 1455,
+          "rule": "D_carried_strength",
+          "season": "2023-24"
+        },
+        {
+          "bias": -2.0585985488754353,
+          "mean_absolute_error": 6.874577669439787,
+          "rank_correlation": 0.33102204649848554,
+          "rows": 1498,
+          "rule": "D_carried_strength",
+          "season": "2024-25"
+        }
+      ]
+    }
+  ],
+  "verdict": {
+    "difficulty_carries_signal": false,
+    "difficulty_over_calendar": [
+      {
+        "decision_passes": false,
+        "interval_excludes_zero": true,
+        "mean_squad_difference": -2.5555555555555554,
+        "mean_transfer_net_gain": -8.5,
+        "ordering_not_worse": true,
+        "passes": false,
+        "reference": "B_calendar",
+        "rule": "C_published_difficulty",
+        "sign_consistent": false,
+        "transfers_proposed": 10
+      },
+      {
+        "decision_passes": false,
+        "interval_excludes_zero": false,
+        "mean_squad_difference": -0.6666666666666666,
+        "mean_transfer_net_gain": -3.4285714285714284,
+        "ordering_not_worse": true,
+        "passes": false,
+        "reference": "B_calendar",
+        "rule": "D_carried_strength",
+        "sign_consistent": false,
+        "transfers_proposed": 7
+      }
+    ],
+    "recommended_rule": null,
+    "schedule_over_flat": {
+      "decision_passes": true,
+      "interval_excludes_zero": true,
+      "mean_squad_difference": 14.722222222222221,
+      "mean_transfer_net_gain": 0.0,
+      "ordering_not_worse": true,
+      "passes": true,
+      "reference": "A_flat",
+      "rule": "B_calendar",
+      "sign_consistent": true,
+      "transfers_proposed": 10
+    }
+  }
+}

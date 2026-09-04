@@ -1,0 +1,618 @@
+{
+  "bayesopt_contract_version": "deterministic_policy_bo_v1",
+  "chip_mode": "hybrid",
+  "contract_version": "chip_bayesopt_v1",
+  "created_utc": "2026-08-18T09:37:33+00:00",
+  "elapsed_seconds": 2031.689783,
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "evaluation_budget": 20,
+  "evaluations": [
+    {
+      "candidate": {
+        "bboost_hold": 25,
+        "freehit_hold": 15,
+        "planning_hit_cost": 8,
+        "threexc_hold": 30,
+        "wildcard_hold": 16
+      },
+      "expected_improvement": null,
+      "iteration": 0,
+      "mean_net": 2021.5,
+      "objective_value": 1935.0983217755581,
+      "phase": "initial_design",
+      "predicted_mean": null,
+      "season_net": {
+        "2021-22": 2003.0,
+        "2022-23": 2106.0,
+        "2023-24": 1888.0,
+        "2024-25": 2089.0
+      },
+      "season_spread": 86.40167822444191
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 0,
+        "planning_hit_cost": 4,
+        "threexc_hold": 0,
+        "wildcard_hold": 0
+      },
+      "expected_improvement": null,
+      "iteration": 1,
+      "mean_net": 2028.0,
+      "objective_value": 1894.6789588999545,
+      "phase": "initial_design",
+      "predicted_mean": null,
+      "season_net": {
+        "2021-22": 2123.0,
+        "2022-23": 2090.0,
+        "2023-24": 1798.0,
+        "2024-25": 2101.0
+      },
+      "season_spread": 133.32104110004542
+    },
+    {
+      "candidate": {
+        "bboost_hold": 15,
+        "freehit_hold": 20,
+        "planning_hit_cost": 4,
+        "threexc_hold": 0,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": null,
+      "iteration": 2,
+      "mean_net": 1985.0,
+      "objective_value": 1854.3764952238687,
+      "phase": "initial_design",
+      "predicted_mean": null,
+      "season_net": {
+        "2021-22": 2137.0,
+        "2022-23": 2044.0,
+        "2023-24": 1781.0,
+        "2024-25": 1978.0
+      },
+      "season_spread": 130.6235047761313
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 0,
+        "planning_hit_cost": 8,
+        "threexc_hold": 5,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": null,
+      "iteration": 3,
+      "mean_net": 2029.75,
+      "objective_value": 1977.940855054344,
+      "phase": "initial_design",
+      "predicted_mean": null,
+      "season_net": {
+        "2021-22": 2038.0,
+        "2022-23": 2081.0,
+        "2023-24": 1944.0,
+        "2024-25": 2056.0
+      },
+      "season_spread": 51.80914494565607
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 20,
+        "planning_hit_cost": 4,
+        "threexc_hold": 30,
+        "wildcard_hold": 0
+      },
+      "expected_improvement": null,
+      "iteration": 4,
+      "mean_net": 2018.0,
+      "objective_value": 1882.2078794627612,
+      "phase": "initial_design",
+      "predicted_mean": null,
+      "season_net": {
+        "2021-22": 2148.0,
+        "2022-23": 2061.0,
+        "2023-24": 1790.0,
+        "2024-25": 2073.0
+      },
+      "season_spread": 135.79212053723884
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 20,
+        "planning_hit_cost": 8,
+        "threexc_hold": 0,
+        "wildcard_hold": 0
+      },
+      "expected_improvement": null,
+      "iteration": 5,
+      "mean_net": 2007.25,
+      "objective_value": 1911.8315138455864,
+      "phase": "initial_design",
+      "predicted_mean": null,
+      "season_net": {
+        "2021-22": 1920.0,
+        "2022-23": 2148.0,
+        "2023-24": 1919.0,
+        "2024-25": 2042.0
+      },
+      "season_spread": 95.4184861544135
+    },
+    {
+      "candidate": {
+        "bboost_hold": 30,
+        "freehit_hold": 0,
+        "planning_hit_cost": 4,
+        "threexc_hold": 30,
+        "wildcard_hold": 0
+      },
+      "expected_improvement": null,
+      "iteration": 6,
+      "mean_net": 1980.0,
+      "objective_value": 1846.8778756179124,
+      "phase": "initial_design",
+      "predicted_mean": null,
+      "season_net": {
+        "2021-22": 2121.0,
+        "2022-23": 2020.0,
+        "2023-24": 1761.0,
+        "2024-25": 2018.0
+      },
+      "season_spread": 133.1221243820876
+    },
+    {
+      "candidate": {
+        "bboost_hold": 30,
+        "freehit_hold": 0,
+        "planning_hit_cost": 8,
+        "threexc_hold": 0,
+        "wildcard_hold": 0
+      },
+      "expected_improvement": null,
+      "iteration": 7,
+      "mean_net": 1972.5,
+      "objective_value": 1891.3781780283505,
+      "phase": "initial_design",
+      "predicted_mean": null,
+      "season_net": {
+        "2021-22": 1954.0,
+        "2022-23": 2072.0,
+        "2023-24": 1852.0,
+        "2024-25": 2012.0
+      },
+      "season_spread": 81.12182197164952
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 0,
+        "planning_hit_cost": 8,
+        "threexc_hold": 20,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 4.301632667725091,
+      "iteration": 8,
+      "mean_net": 2034.5,
+      "objective_value": 1984.347731855877,
+      "phase": "expected_improvement",
+      "predicted_mean": 1967.6733482796926,
+      "season_net": {
+        "2021-22": 2057.0,
+        "2022-23": 2084.0,
+        "2023-24": 1951.0,
+        "2024-25": 2046.0
+      },
+      "season_spread": 50.15226814412286
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 5,
+        "planning_hit_cost": 8,
+        "threexc_hold": 15,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 3.249473096812495,
+      "iteration": 9,
+      "mean_net": 2023.5,
+      "objective_value": 1906.2726567732595,
+      "phase": "expected_improvement",
+      "predicted_mean": 1979.330455739773,
+      "season_net": {
+        "2021-22": 2038.0,
+        "2022-23": 2143.0,
+        "2023-24": 1831.0,
+        "2024-25": 2082.0
+      },
+      "season_spread": 117.2273432267404
+    },
+    {
+      "candidate": {
+        "bboost_hold": 5,
+        "freehit_hold": 0,
+        "planning_hit_cost": 8,
+        "threexc_hold": 30,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 9.25777120531358,
+      "iteration": 10,
+      "mean_net": 2026.0,
+      "objective_value": 1975.7158076529015,
+      "phase": "expected_improvement",
+      "predicted_mean": 1989.9873573068237,
+      "season_net": {
+        "2021-22": 2037.0,
+        "2022-23": 2078.0,
+        "2023-24": 1943.0,
+        "2024-25": 2046.0
+      },
+      "season_spread": 50.284192347098504
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 0,
+        "planning_hit_cost": 8,
+        "threexc_hold": 25,
+        "wildcard_hold": 16
+      },
+      "expected_improvement": 3.482106495467955,
+      "iteration": 11,
+      "mean_net": 2009.0,
+      "objective_value": 1946.1271123615275,
+      "phase": "expected_improvement",
+      "predicted_mean": 1975.4440272967108,
+      "season_net": {
+        "2021-22": 1998.0,
+        "2022-23": 2078.0,
+        "2023-24": 1912.0,
+        "2024-25": 2048.0
+      },
+      "season_spread": 62.8728876384726
+    },
+    {
+      "candidate": {
+        "bboost_hold": 15,
+        "freehit_hold": 0,
+        "planning_hit_cost": 8,
+        "threexc_hold": 20,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 2.894419019671252,
+      "iteration": 12,
+      "mean_net": 2033.5,
+      "objective_value": 1977.3506455958752,
+      "phase": "expected_improvement",
+      "predicted_mean": 1971.1959704482783,
+      "season_net": {
+        "2021-22": 2038.0,
+        "2022-23": 2098.0,
+        "2023-24": 1944.0,
+        "2024-25": 2054.0
+      },
+      "season_spread": 56.14935440412472
+    },
+    {
+      "candidate": {
+        "bboost_hold": 30,
+        "freehit_hold": 0,
+        "planning_hit_cost": 8,
+        "threexc_hold": 30,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 2.4873138825659424,
+      "iteration": 13,
+      "mean_net": 2021.5,
+      "objective_value": 1967.1423878375806,
+      "phase": "expected_improvement",
+      "predicted_mean": 1962.9620680584312,
+      "season_net": {
+        "2021-22": 2016.0,
+        "2022-23": 2080.0,
+        "2023-24": 1936.0,
+        "2024-25": 2054.0
+      },
+      "season_spread": 54.35761216241935
+    },
+    {
+      "candidate": {
+        "bboost_hold": 15,
+        "freehit_hold": 0,
+        "planning_hit_cost": 8,
+        "threexc_hold": 0,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 1.4406304387861208,
+      "iteration": 14,
+      "mean_net": 2028.75,
+      "objective_value": 1969.2841484547644,
+      "phase": "expected_improvement",
+      "predicted_mean": 1963.3272992991783,
+      "season_net": {
+        "2021-22": 2019.0,
+        "2022-23": 2095.0,
+        "2023-24": 1937.0,
+        "2024-25": 2064.0
+      },
+      "season_spread": 59.46585154523561
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 0,
+        "planning_hit_cost": 7,
+        "threexc_hold": 20,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 1.3214272437098113,
+      "iteration": 15,
+      "mean_net": 2053.75,
+      "objective_value": 1988.6025710407541,
+      "phase": "expected_improvement",
+      "predicted_mean": 1972.1684599546008,
+      "season_net": {
+        "2021-22": 2097.0,
+        "2022-23": 2122.0,
+        "2023-24": 1952.0,
+        "2024-25": 2044.0
+      },
+      "season_spread": 65.14742895924597
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 0,
+        "planning_hit_cost": 5,
+        "threexc_hold": 30,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 1.5792498760578315,
+      "iteration": 16,
+      "mean_net": 2002.0,
+      "objective_value": 1903.341498085568,
+      "phase": "expected_improvement",
+      "predicted_mean": 1963.1359818142028,
+      "season_net": {
+        "2021-22": 2059.0,
+        "2022-23": 2123.0,
+        "2023-24": 1862.0,
+        "2024-25": 1964.0
+      },
+      "season_spread": 98.6585019144321
+    },
+    {
+      "candidate": {
+        "bboost_hold": 5,
+        "freehit_hold": 0,
+        "planning_hit_cost": 7,
+        "threexc_hold": 15,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 2.2980303312929893,
+      "iteration": 17,
+      "mean_net": 2054.0,
+      "objective_value": 1983.9179052824475,
+      "phase": "expected_improvement",
+      "predicted_mean": 1987.778147749836,
+      "season_net": {
+        "2021-22": 2078.0,
+        "2022-23": 2136.0,
+        "2023-24": 1943.0,
+        "2024-25": 2059.0
+      },
+      "season_spread": 70.0820947175525
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 0,
+        "planning_hit_cost": 6,
+        "threexc_hold": 0,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 1.244128821169559,
+      "iteration": 18,
+      "mean_net": 2023.0,
+      "objective_value": 1948.3508205001556,
+      "phase": "expected_improvement",
+      "predicted_mean": 1966.866706881432,
+      "season_net": {
+        "2021-22": 2034.0,
+        "2022-23": 2112.0,
+        "2023-24": 1905.0,
+        "2024-25": 2041.0
+      },
+      "season_spread": 74.64917949984446
+    },
+    {
+      "candidate": {
+        "bboost_hold": 0,
+        "freehit_hold": 0,
+        "planning_hit_cost": 7,
+        "threexc_hold": 15,
+        "wildcard_hold": 24
+      },
+      "expected_improvement": 0.5151359867136082,
+      "iteration": 19,
+      "mean_net": 2049.75,
+      "objective_value": 1972.878760254566,
+      "phase": "expected_improvement",
+      "predicted_mean": 1986.7112874415482,
+      "season_net": {
+        "2021-22": 2078.0,
+        "2022-23": 2136.0,
+        "2023-24": 1926.0,
+        "2024-25": 2059.0
+      },
+      "season_spread": 76.87123974543405
+    }
+  ],
+  "factors": [
+    {
+      "lower": 0,
+      "name": "bboost_hold",
+      "step": 5,
+      "upper": 30
+    },
+    {
+      "lower": 0,
+      "name": "threexc_hold",
+      "step": 5,
+      "upper": 30
+    },
+    {
+      "lower": 0,
+      "name": "wildcard_hold",
+      "step": 4,
+      "upper": 24
+    },
+    {
+      "lower": 0,
+      "name": "freehit_hold",
+      "step": 5,
+      "upper": 20
+    },
+    {
+      "lower": 4,
+      "name": "planning_hit_cost",
+      "step": 1,
+      "upper": 8
+    }
+  ],
+  "initial_design_size": 8,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "objective": "mean season net over the development seasons minus 1 x the standard deviation across seasons (season-robust); raw nets recorded per evaluation",
+  "promotion": "none - a candidate for the next season chain and the gates",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 0,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "19661d4c810e581d7addb3e86889cf1eb269b416",
+    "working_tree_dirty": true
+  },
+  "recommended_candidate": {
+    "bboost_hold": 0,
+    "freehit_hold": 0,
+    "planning_hit_cost": 7,
+    "threexc_hold": 20,
+    "wildcard_hold": 24
+  },
+  "recommended_evaluation": {
+    "details": {
+      "2021-22": {
+        "chip_realized_gains": {
+          "3xc": 20.0,
+          "bboost": 14.0,
+          "freehit": 0.0,
+          "wildcard": 84.0
+        },
+        "chips_played": {
+          "19": "wildcard",
+          "21": "bboost",
+          "22": "freehit",
+          "25": "wildcard",
+          "36": "3xc"
+        },
+        "proven_share": 0.972972972972973,
+        "realized_points": 2157.0,
+        "transfer_hit_points": 60.0
+      },
+      "2022-23": {
+        "chip_realized_gains": {
+          "3xc": 6.0,
+          "bboost": 25.0,
+          "freehit": -15.0,
+          "wildcard": 92.0
+        },
+        "chips_played": {
+          "19": "freehit",
+          "20": "bboost",
+          "25": "wildcard",
+          "37": "3xc",
+          "8": "wildcard"
+        },
+        "proven_share": 1.0,
+        "realized_points": 2154.0,
+        "transfer_hit_points": 32.0
+      },
+      "2023-24": {
+        "chip_realized_gains": {
+          "3xc": 8.0,
+          "bboost": 9.0,
+          "freehit": 6.0,
+          "wildcard": 48.0
+        },
+        "chips_played": {
+          "25": "wildcard",
+          "28": "bboost",
+          "35": "3xc",
+          "7": "freehit"
+        },
+        "proven_share": 1.0,
+        "realized_points": 1972.0,
+        "transfer_hit_points": 20.0
+      },
+      "2024-25": {
+        "chip_realized_gains": {
+          "bboost": 15.0,
+          "freehit": 5.0,
+          "wildcard": 48.0
+        },
+        "chips_played": {
+          "24": "freehit",
+          "25": "bboost",
+          "29": "wildcard"
+        },
+        "proven_share": 1.0,
+        "realized_points": 2056.0,
+        "transfer_hit_points": 12.0
+      }
+    },
+    "mean_net": 2053.75,
+    "robust_score": 1988.6025710407541,
+    "season_net": {
+      "2021-22": 2097.0,
+      "2022-23": 2122.0,
+      "2023-24": 1952.0,
+      "2024-25": 2044.0
+    },
+    "season_spread": 65.14742895924597,
+    "values": {
+      "bboost_hold": 0.0,
+      "freehit_hold": 0.0,
+      "planning_hit_cost": 7.0,
+      "threexc_hold": 20.0,
+      "wildcard_hold": 24.0
+    }
+  },
+  "seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "solver_limits": {
+    "deterministic_time_limit": 8.0,
+    "wall_time_limit": 60.0
+  }
+}

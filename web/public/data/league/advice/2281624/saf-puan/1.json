@@ -1,0 +1,41 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-08-26T12:21:53Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 2,
+    "entry_id": 2281624,
+    "league_id": 352490,
+    "mode": "saf-puan",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20260826T083133Z-d45f1bea8b68",
+    "moves": [
+      {
+        "move_id": "gw02-1",
+        "player_out": {
+          "player_id": 500040,
+          "name": "Cristhian Mosquera",
+          "short_name": "Mosquera",
+          "position": "DEF",
+          "team": "Arsenal"
+        },
+        "player_in": {
+          "player_id": 607464,
+          "name": "Michael Kayode",
+          "short_name": "Kayode",
+          "position": "DEF",
+          "team": "Brentford"
+        },
+        "expected_points_delta": 3.3872627136003572,
+        "expected_points_cost": 0.0,
+        "reason_code": "window_value"
+      }
+    ],
+    "data_quality": "partial",
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ]
+  }
+}

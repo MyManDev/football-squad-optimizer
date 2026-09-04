@@ -1,0 +1,56 @@
+{
+  "archive_load_seconds": 7.712756199995056,
+  "artifact_type": "candidate_runtime",
+  "checklist_item": 15,
+  "created_utc": "2026-08-16T18:57:44+00:00",
+  "environment": {
+    "logical_cpu_count": 16,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
+    "python": "3.11.0"
+  },
+  "gate_evidence": false,
+  "machine": {
+    "platform": "Windows-10-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 141 Stepping 1, GenuineIntel",
+    "python": "3.11.0"
+  },
+  "measured_at_utc": "2026-08-16T18:57:44+00:00",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "fd0f8911ba5147f1f511760499a3755018b9b818",
+    "working_tree_dirty": true
+  },
+  "stopping_rule": "every one of the 147 development folds is projected; no early exit, no solver",
+  "timings": [
+    {
+      "folds": 147,
+      "regime": "learned",
+      "rows": 101447,
+      "seconds_per_fold": 4.0154912918370504,
+      "wall_seconds": 590.2772199000465
+    },
+    {
+      "folds": 147,
+      "regime": "control",
+      "rows": 101447,
+      "seconds_per_fold": 0.07979717619042387,
+      "wall_seconds": 11.73018489999231
+    }
+  ]
+}

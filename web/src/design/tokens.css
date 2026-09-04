@@ -1,0 +1,179 @@
+/* SquadOpt design tokens.
+
+   Colour comes from direction A "Matchday" — pitch night, one gold accent — and the data
+   craft from direction B "Ledger": typographic tables, hairline rules, restrained charts.
+   Dark is the design's home; the light variant keeps the same roles with a warm off-white
+   ground and a darkened gold that clears 4.5:1 on white.
+
+   Gold is spent once per screen (the captain badge, the active nav pill, the realized line).
+   Semantic colours are separate from it, and every colour is defined on bare :root first so a
+   viewer with no explicit choice still gets a complete palette. */
+
+:root {
+  --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-body: "Source Sans 3", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", Consolas, "SFMono-Regular", monospace;
+
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.125rem;
+  --step-2: 1.375rem;
+  --step-3: 1.75rem;
+  --step-4: 2.25rem;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-pill: 999px;
+
+  /* Dark: the design's home. */
+  --color-bg: #0e1f18;
+  --color-surface: #15291f;
+  --color-surface-2: #1b3327;
+  --color-line: #27453a;
+  --color-text: #eef4ef;
+  --color-text-muted: #9fb5a8;
+  --color-text-faint: #9fb5a8;
+  --color-accent: #f2c14e;
+  --color-accent-text: #17210f;
+  --color-pitch: #123c2b;
+  --color-pitch-line: #1f5a41;
+  --color-chip: #e9f2ec;
+  --color-chip-text: #0f2419;
+  --color-chip-muted: #4b6a5b;
+  --color-good: #6fcf97;
+  --color-warn: #f2c14e;
+  --color-bad: #ef7a6d;
+  --color-focus: #f2c14e;
+
+  --shadow-1: 0 1px 0 rgba(0, 0, 0, 0.35);
+  --measure: 62ch;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-bg: #f4f6f2;
+    --color-surface: #ffffff;
+    --color-surface-2: #e9efe9;
+    --color-line: #d3dcd4;
+    --color-text: #12241c;
+    --color-text-muted: #546b5e;
+    --color-text-faint: #546b5e;
+    --color-accent: #8a6a12;
+    --color-accent-text: #ffffff;
+    --color-pitch: #dfeadf;
+    --color-pitch-line: #c2d4c6;
+    --color-chip: #ffffff;
+    --color-chip-text: #12241c;
+    --color-chip-muted: #5f7568;
+    --color-good: #1f7a4d;
+    --color-warn: #8a6a12;
+    --color-bad: #b42318;
+    --color-focus: #12241c;
+    --shadow-1: 0 1px 0 rgba(18, 36, 28, 0.1);
+  }
+}
+
+:root[data-theme="light"] {
+  --color-bg: #f4f6f2;
+  --color-surface: #ffffff;
+  --color-surface-2: #e9efe9;
+  --color-line: #d3dcd4;
+  --color-text: #12241c;
+  --color-text-muted: #546b5e;
+  --color-text-faint: #546b5e;
+  --color-accent: #8a6a12;
+  --color-accent-text: #ffffff;
+  --color-pitch: #dfeadf;
+  --color-pitch-line: #c2d4c6;
+  --color-chip: #ffffff;
+  --color-chip-text: #12241c;
+  --color-chip-muted: #5f7568;
+  --color-good: #1f7a4d;
+  --color-warn: #8a6a12;
+  --color-bad: #b42318;
+  --color-focus: #12241c;
+  --shadow-1: 0 1px 0 rgba(18, 36, 28, 0.1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark light;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+a:hover {
+  text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+a.visually-hidden:focus-visible {
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 10;
+  width: auto;
+  height: auto;
+  padding: var(--space-2) var(--space-3);
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  border-radius: var(--radius-s);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

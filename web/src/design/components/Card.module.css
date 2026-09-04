@@ -1,0 +1,43 @@
+.card {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-m);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.surface {
+  background: var(--color-surface);
+}
+
+.muted {
+  background: var(--color-surface-2);
+}
+
+.pitch {
+  background: var(--color-pitch);
+  border-color: var(--color-pitch-line);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--step-1);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.aside {
+  font-size: var(--step--1);
+  color: var(--color-text-muted);
+  text-align: right;
+}

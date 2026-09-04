@@ -1,0 +1,253 @@
+{
+  "automatic_promotion": false,
+  "contract_version": "residual_signal_scan_v1",
+  "created_utc": "2026-08-17T11:01:43+00:00",
+  "diagnostics": {
+    "covariate_rows": 103848,
+    "residual_rows": 101447,
+    "seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ]
+  },
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 103848,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "756802b2db5ec8de856773a9ab3cb36d0f5b24aa",
+    "working_tree_dirty": false
+  },
+  "residual_input": {
+    "path": "C:/Users/ertug/Desktop/football-squad-optimizer/artifacts/residuals-verify/control_residuals.csv",
+    "rows": 101447,
+    "table_sha256": "1ed41f94f245b06d012293a895cdee755a5b1803cb19bcc3795e4a414767a22f"
+  },
+  "signals": [
+    {
+      "bins": [
+        {
+          "label": "Q1",
+          "mean_covariate": 6.929643944186928e-05,
+          "mean_realized_points": 1.6839741286381602,
+          "mean_residual": 0.015706970894717922,
+          "observations": 11132
+        },
+        {
+          "label": "Q2",
+          "mean_covariate": 0.04563815390832647,
+          "mean_realized_points": 1.6637001078748652,
+          "mean_residual": 0.07651174637420591,
+          "observations": 11124
+        },
+        {
+          "label": "Q3",
+          "mean_covariate": 0.17546096740859268,
+          "mean_realized_points": 2.078450754852624,
+          "mean_residual": -0.017926252096812853,
+          "observations": 11128
+        },
+        {
+          "label": "Q4",
+          "mean_covariate": 0.6779447576544693,
+          "mean_realized_points": 2.6336838321200684,
+          "mean_residual": -0.24108325095113992,
+          "observations": 11127
+        }
+      ],
+      "covariate": "xgi_per_90_last",
+      "description": "expected goal involvement per 90 over the previous window (xG data from 2022-23)",
+      "monotone_residual": false,
+      "realized_spread": 0.9699837242452032,
+      "residual_spread": 0.3175949973253458,
+      "rows": 44511,
+      "seasons_present": [
+        "2022-23",
+        "2023-24",
+        "2024-25"
+      ],
+      "surviving_ratio": 0.32742301688874587
+    },
+    {
+      "bins": [
+        {
+          "label": "Q1",
+          "mean_covariate": -0.3780544766791992,
+          "mean_realized_points": 1.874403007824408,
+          "mean_residual": 0.3277690275378518,
+          "observations": 19682
+        },
+        {
+          "label": "Q2",
+          "mean_covariate": -0.00044562826579354575,
+          "mean_realized_points": 0.37906752483685047,
+          "mean_residual": 0.08869689698220118,
+          "observations": 44591
+        },
+        {
+          "label": "Q3",
+          "mean_covariate": 1.121947617473775,
+          "mean_realized_points": 2.7207213680126454,
+          "mean_residual": -0.7391351726780667,
+          "observations": 13918
+        }
+      ],
+      "covariate": "luck_last",
+      "description": "returns minus expected goal involvement over the previous window; positive = ran hot",
+      "monotone_residual": true,
+      "realized_spread": 2.341653843175795,
+      "residual_spread": 1.0669042002159186,
+      "rows": 78191,
+      "seasons_present": [
+        "2022-23",
+        "2023-24",
+        "2024-25"
+      ],
+      "surviving_ratio": 0.4556199471263281
+    },
+    {
+      "bins": [
+        {
+          "label": "Q1",
+          "mean_covariate": 1571.6115525186715,
+          "mean_realized_points": 0.2395518830446528,
+          "mean_residual": 0.05744809047089359,
+          "observations": 25172
+        },
+        {
+          "label": "Q2",
+          "mean_covariate": 9846.06897099722,
+          "mean_realized_points": 0.6967024235200636,
+          "mean_residual": 0.07375910475433717,
+          "observations": 25170
+        },
+        {
+          "label": "Q3",
+          "mean_covariate": 51961.14266417703,
+          "mean_realized_points": 1.2447260736561916,
+          "mean_residual": 0.0494590335438931,
+          "observations": 25171
+        },
+        {
+          "label": "Q4",
+          "mean_covariate": 793618.6582972468,
+          "mean_realized_points": 2.6706924635493228,
+          "mean_residual": -0.17308873968720617,
+          "observations": 25171
+        }
+      ],
+      "covariate": "ownership_prev",
+      "description": "ownership count at the previous gameweek",
+      "monotone_residual": false,
+      "realized_spread": 2.43114058050467,
+      "residual_spread": 0.24684784444154334,
+      "rows": 100684,
+      "seasons_present": [
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25"
+      ],
+      "surviving_ratio": 0.10153581673598704
+    },
+    {
+      "bins": [
+        {
+          "label": "Q1",
+          "mean_covariate": -0.11295426501612069,
+          "mean_realized_points": 0.1375034828643076,
+          "mean_residual": -0.15438342881314693,
+          "observations": 50246
+        },
+        {
+          "label": "Q2",
+          "mean_covariate": 0.18221311475409835,
+          "mean_realized_points": 0.46885245901639344,
+          "mean_residual": -0.12850644289089713,
+          "observations": 2440
+        },
+        {
+          "label": "Q3",
+          "mean_covariate": 0.9120250486587121,
+          "mean_realized_points": 0.8161123804688161,
+          "mean_residual": -0.1948793146593074,
+          "observations": 23634
+        },
+        {
+          "label": "Q4",
+          "mean_covariate": 3.874473673737414,
+          "mean_realized_points": 3.783977394834242,
+          "mean_residual": 0.48220642771045197,
+          "observations": 25127
+        }
+      ],
+      "covariate": "source_xp",
+      "description": "the source's own published point expectation for the gameweek",
+      "monotone_residual": false,
+      "realized_spread": 3.646473911969934,
+      "residual_spread": 0.6770857423697594,
+      "rows": 101447,
+      "seasons_present": [
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25"
+      ],
+      "surviving_ratio": 0.18568232180330543
+    },
+    {
+      "bins": [
+        {
+          "label": "recently_moved",
+          "mean_covariate": 1.0,
+          "mean_realized_points": 1.4966329966329965,
+          "mean_residual": 0.6161054994388329,
+          "observations": 594
+        },
+        {
+          "label": "unchanged",
+          "mean_covariate": 0.0,
+          "mean_realized_points": 1.2050410002677163,
+          "mean_residual": -0.00918216577636144,
+          "observations": 100853
+        }
+      ],
+      "covariate": "recently_moved",
+      "description": "changed club within the previous window (in-season)",
+      "monotone_residual": true,
+      "realized_spread": 0.2915919963652802,
+      "residual_spread": 0.6252876652151943,
+      "rows": 101447,
+      "seasons_present": [
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25"
+      ],
+      "surviving_ratio": 2.144392414776331
+    }
+  ],
+  "window": 6
+}

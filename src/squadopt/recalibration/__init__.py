@@ -1,0 +1,65 @@
+"""Calendar-aware residual measurement before uncertainty recalibration."""
+
+from squadopt.recalibration.measurement import (
+    measure_calendar_recalibration,
+    validate_residual_regimes,
+)
+from squadopt.recalibration.models import (
+    CALENDAR_RECALIBRATION_ARTIFACT_TYPE,
+    CALENDAR_RECALIBRATION_CONTRACT_VERSION,
+    CALENDAR_RECALIBRATION_REPORT_SCHEMA_VERSION,
+    FIXTURE_GROUPS,
+    RESIDUAL_COLUMNS,
+    TIME_AWARE_RECALIBRATION_ARTIFACT_TYPE,
+    TIME_AWARE_RECALIBRATION_CONTRACT_VERSION,
+    TIME_AWARE_RECALIBRATION_REPORT_SCHEMA_VERSION,
+    CalendarRecalibrationResult,
+    FixtureIntervalComparison,
+    FixtureResidualComparison,
+    IntervalMetrics,
+    PlayerScaleComparison,
+    RecalibrationConfig,
+    RecalibrationValidationError,
+    ResidualMetrics,
+    ScenarioComponentComparison,
+    ScenarioComponentMetrics,
+    TimeAwareRecalibrationConfig,
+    TimeAwareRecalibrationResult,
+)
+from squadopt.recalibration.reporting import (
+    recalibration_to_dict,
+    recalibration_to_markdown,
+    time_aware_recalibration_to_dict,
+    time_aware_recalibration_to_markdown,
+)
+from squadopt.recalibration.study import run_time_aware_recalibration
+
+__all__ = [
+    "CALENDAR_RECALIBRATION_ARTIFACT_TYPE",
+    "CALENDAR_RECALIBRATION_CONTRACT_VERSION",
+    "CALENDAR_RECALIBRATION_REPORT_SCHEMA_VERSION",
+    "FIXTURE_GROUPS",
+    "RESIDUAL_COLUMNS",
+    "TIME_AWARE_RECALIBRATION_ARTIFACT_TYPE",
+    "TIME_AWARE_RECALIBRATION_CONTRACT_VERSION",
+    "TIME_AWARE_RECALIBRATION_REPORT_SCHEMA_VERSION",
+    "CalendarRecalibrationResult",
+    "FixtureIntervalComparison",
+    "FixtureResidualComparison",
+    "IntervalMetrics",
+    "PlayerScaleComparison",
+    "RecalibrationConfig",
+    "RecalibrationValidationError",
+    "ResidualMetrics",
+    "ScenarioComponentComparison",
+    "ScenarioComponentMetrics",
+    "TimeAwareRecalibrationConfig",
+    "TimeAwareRecalibrationResult",
+    "measure_calendar_recalibration",
+    "recalibration_to_dict",
+    "recalibration_to_markdown",
+    "run_time_aware_recalibration",
+    "time_aware_recalibration_to_dict",
+    "time_aware_recalibration_to_markdown",
+    "validate_residual_regimes",
+]

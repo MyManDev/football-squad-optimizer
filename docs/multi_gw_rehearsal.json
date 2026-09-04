@@ -1,0 +1,179 @@
+{
+  "candidate_pool_per_position": 20,
+  "cheap_pool_per_position": 8,
+  "contract_version": "multi_gw_rehearsal_v1",
+  "created_utc": "2026-08-15T11:31:46+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "form_window": 5,
+  "horizon_length": 3,
+  "limitations": [
+    "Projections over the horizon are naively calendar-scaled decision-time baselines; projection quality is deliberately out of scope.",
+    "Both strategies share one decision-time candidate pool; the myopic baseline re-projects weekly and so holds an informational edge.",
+    "Venue is not modeled (home_fixture_count is recorded as zero)."
+  ],
+  "locked_holdout_accessed": false,
+  "mean_planning_advantage_points": 1.1666666666666667,
+  "projection_rule": "naive_calendar_scaling_v1",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "925c481aba9038c192b72bab125036a96362db28",
+    "working_tree_dirty": false
+  },
+  "recommendation_only": true,
+  "season": "2024-25",
+  "window_count": 6,
+  "windows": [
+    {
+      "candidate_pool_size": 112,
+      "gameweeks": [
+        5,
+        6,
+        7
+      ],
+      "horizon_fingerprint": "c6412d7ceaa98c70d139af026c9508db59a5ab0b0aaa904c9a41d786799268d1",
+      "myopic_net_points": 155.0,
+      "myopic_realized_points": 155.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_net_points": 159.0,
+      "planned_realized_points": 159.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers": [
+        0,
+        1,
+        1
+      ],
+      "planning_advantage_points": 4.0,
+      "start_gameweek": 5
+    },
+    {
+      "candidate_pool_size": 112,
+      "gameweeks": [
+        10,
+        11,
+        12
+      ],
+      "horizon_fingerprint": "3823e53b11ed11a746ab19151954061b39daa13e14f14c48d1c3fae4f17904ca",
+      "myopic_net_points": 177.0,
+      "myopic_realized_points": 177.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_net_points": 157.0,
+      "planned_realized_points": 157.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": -20.0,
+      "start_gameweek": 10
+    },
+    {
+      "candidate_pool_size": 112,
+      "gameweeks": [
+        15,
+        16,
+        17
+      ],
+      "horizon_fingerprint": "a9cfb3ff4426ca8cad756f8d521dfeaca0a52052dd4fc568fddb9ef5766f8cac",
+      "myopic_net_points": 157.0,
+      "myopic_realized_points": 157.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_net_points": 167.0,
+      "planned_realized_points": 167.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": 10.0,
+      "start_gameweek": 15
+    },
+    {
+      "candidate_pool_size": 112,
+      "gameweeks": [
+        20,
+        21,
+        22
+      ],
+      "horizon_fingerprint": "84c31c08300849ba93beec5315125b3f31ff9ae77ea71e5f96a591754ffc7c24",
+      "myopic_net_points": 153.0,
+      "myopic_realized_points": 153.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_net_points": 160.0,
+      "planned_realized_points": 160.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers": [
+        0,
+        0,
+        0
+      ],
+      "planning_advantage_points": 7.0,
+      "start_gameweek": 20
+    },
+    {
+      "candidate_pool_size": 112,
+      "gameweeks": [
+        25,
+        26,
+        27
+      ],
+      "horizon_fingerprint": "29db286475a818eb832f03cabe4815f76e5087feb285de20a7d7d4ccdbc314c8",
+      "myopic_net_points": 203.0,
+      "myopic_realized_points": 203.0,
+      "myopic_transfer_hit_points": 0.0,
+      "planned_net_points": 187.0,
+      "planned_realized_points": 187.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers": [
+        1,
+        1,
+        0
+      ],
+      "planning_advantage_points": -16.0,
+      "start_gameweek": 25
+    },
+    {
+      "candidate_pool_size": 112,
+      "gameweeks": [
+        30,
+        31,
+        32
+      ],
+      "horizon_fingerprint": "2b84691519e6a081af5d991a334c3de013614f1b74809a7ae73e1354b38b0c41",
+      "myopic_net_points": 113.0,
+      "myopic_realized_points": 117.0,
+      "myopic_transfer_hit_points": 4.0,
+      "planned_net_points": 135.0,
+      "planned_realized_points": 135.0,
+      "planned_transfer_hit_points": 0.0,
+      "planner_transfers": [
+        0,
+        0,
+        2
+      ],
+      "planning_advantage_points": 22.0,
+      "start_gameweek": 30
+    }
+  ]
+}

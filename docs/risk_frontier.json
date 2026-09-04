@@ -1,0 +1,177 @@
+{
+  "anchor": {
+    "bench_weight": 0.0,
+    "form_window": 6
+  },
+  "automatic_promotion": false,
+  "contract_version": "risk_frontier_v1",
+  "created_utc": "2026-08-15T10:24:54+00:00",
+  "environment": {
+    "logical_cpu_count": 32,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 183 Stepping 1, GenuineIntel",
+    "python": "3.13.5"
+  },
+  "evaluated_fold_count": 37,
+  "evaluated_seasons": [
+    "2024-25"
+  ],
+  "frontier": [
+    {
+      "lower_quantile_gain_vs_risk_neutral": 0.0,
+      "lower_quantile_score": 37.0,
+      "mean_premium_vs_risk_neutral": 0.0,
+      "mean_realized_squad_points": 57.108108108108105,
+      "probability_below_threshold": 0.16216216216216217,
+      "realized_stddev": 16.60638721759628,
+      "risk_aversion": 0.0,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 33.5
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -10.0,
+      "lower_quantile_score": 27.0,
+      "mean_premium_vs_risk_neutral": 14.783783783783782,
+      "mean_realized_squad_points": 42.32432432432432,
+      "probability_below_threshold": 0.43243243243243246,
+      "realized_stddev": 14.887059597596206,
+      "risk_aversion": 0.1,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 19.25
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -12.0,
+      "lower_quantile_score": 25.0,
+      "mean_premium_vs_risk_neutral": 12.621621621621621,
+      "mean_realized_squad_points": 44.486486486486484,
+      "probability_below_threshold": 0.4594594594594595,
+      "realized_stddev": 15.531348632939945,
+      "risk_aversion": 0.2,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 23.5
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -12.0,
+      "lower_quantile_score": 25.0,
+      "mean_premium_vs_risk_neutral": 12.75675675675675,
+      "mean_realized_squad_points": 44.351351351351354,
+      "probability_below_threshold": 0.40540540540540543,
+      "realized_stddev": 15.951304642425683,
+      "risk_aversion": 0.3,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 19.5
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -13.0,
+      "lower_quantile_score": 24.0,
+      "mean_premium_vs_risk_neutral": 14.75675675675675,
+      "mean_realized_squad_points": 42.351351351351354,
+      "probability_below_threshold": 0.43243243243243246,
+      "realized_stddev": 15.297440549419981,
+      "risk_aversion": 0.4,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 21.25
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -19.0,
+      "lower_quantile_score": 18.0,
+      "mean_premium_vs_risk_neutral": 14.054054054054049,
+      "mean_realized_squad_points": 43.054054054054056,
+      "probability_below_threshold": 0.4594594594594595,
+      "realized_stddev": 15.556255274301728,
+      "risk_aversion": 0.5,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 17.5
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -13.0,
+      "lower_quantile_score": 24.0,
+      "mean_premium_vs_risk_neutral": 14.405405405405403,
+      "mean_realized_squad_points": 42.7027027027027,
+      "probability_below_threshold": 0.4594594594594595,
+      "realized_stddev": 16.080649551330175,
+      "risk_aversion": 0.6,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 20.25
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -12.0,
+      "lower_quantile_score": 25.0,
+      "mean_premium_vs_risk_neutral": 13.864864864864863,
+      "mean_realized_squad_points": 43.24324324324324,
+      "probability_below_threshold": 0.4864864864864865,
+      "realized_stddev": 16.591116811382555,
+      "risk_aversion": 0.7,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 19.25
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -14.0,
+      "lower_quantile_score": 23.0,
+      "mean_premium_vs_risk_neutral": 15.243243243243242,
+      "mean_realized_squad_points": 41.86486486486486,
+      "probability_below_threshold": 0.4594594594594595,
+      "realized_stddev": 14.59944864224037,
+      "risk_aversion": 0.8,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 19.75
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -16.0,
+      "lower_quantile_score": 21.0,
+      "mean_premium_vs_risk_neutral": 17.648648648648646,
+      "mean_realized_squad_points": 39.45945945945946,
+      "probability_below_threshold": 0.5405405405405406,
+      "realized_stddev": 13.58376334948614,
+      "risk_aversion": 0.9,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 19.5
+    },
+    {
+      "lower_quantile_gain_vs_risk_neutral": -28.0,
+      "lower_quantile_score": 9.0,
+      "mean_premium_vs_risk_neutral": 37.86486486486486,
+      "mean_realized_squad_points": 19.243243243243242,
+      "probability_below_threshold": 0.972972972972973,
+      "realized_stddev": 8.572127697669758,
+      "risk_aversion": 1.0,
+      "scored_folds": 37,
+      "worst_tail_mean_score": 8.25
+    }
+  ],
+  "locked_holdout_accessed": false,
+  "lower_quantile": 0.1,
+  "objective_configuration_fingerprint": "caa12d77757511768c0406ae5cd5b6b6711368589c1461af86319b94bc54ca03",
+  "points_threshold": 40.0,
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "72acc1fd13202deb94589b4d0dfe3ecf2d6c99b10232b6c02bdf351089b381e8",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 156075,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25",
+      "2025-26"
+    ],
+    "repository_commit": "727507139b3e99df2a1873ad2fce10766c3ab874",
+    "working_tree_dirty": false
+  },
+  "recommendation_only": true,
+  "reproducibility_note": "Per-fold scenario solves stop at a wall-clock cap, not a deterministic work budget; the frontier is recommendation-quality measurement, not a formal reproducible benchmark.",
+  "residual_input": {
+    "candidate_label": "deterministic_baseline_control",
+    "path": "artifacts/codex-worktrees/control-residual-export/artifacts/residuals/control_residuals.csv",
+    "preflight_passed": true,
+    "rows": 101447,
+    "table_sha256": "1ed41f94f245b06d012293a895cdee755a5b1803cb19bcc3795e4a414767a22f"
+  },
+  "scenario_count": 100,
+  "worst_fraction": 0.1
+}

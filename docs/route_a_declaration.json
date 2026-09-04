@@ -1,0 +1,93 @@
+{
+  "artifact_type": "candidate_declaration_freeze",
+  "benchmark_configuration_fingerprint": "01bd220fbcb23e467f9945f243528fe73cf53af7cb092cd5db049cc28bb4cbf6",
+  "candidate_id": "opponent_signal_rate_candidate_v1",
+  "control_unchanged_by_the_fw10_holdout": true,
+  "declaration": {
+    "candidate_id": "opponent_signal_rate_candidate_v1",
+    "change_summary": "The expected-points rate reads two more inputs: the fitted Dixon-Coles attacking and defensive signals for the player's own club at that gameweek, joined by (season, gameweek, club) from the walk-forward signal frame. Everything else the rate already read is unchanged, and the signal enters as data rather than through any shared feature contract.",
+    "changed_component": "expected_points_rate",
+    "contract_version": "candidate_change_declaration_v1",
+    "evaluation_objective": "single_gameweek_realized_squad_points_v1",
+    "feature_contract_version": "route_a_opponent_signal_rate_v1",
+    "frozen_components": [
+      "expected_minutes_stage",
+      "cold_start_ladder",
+      "availability_post_processing",
+      "two_stage_combination",
+      "feature_window_mapping",
+      "shrinkage_weights",
+      "opening_price_prior",
+      "development_fold_set",
+      "baseline_control",
+      "ridge_reference",
+      "optimization_contract",
+      "budget_and_formation_constraints",
+      "promotion_gates",
+      "evaluation_objective",
+      "learned_rate_training_contract",
+      "shared_feature_contract_constants"
+    ],
+    "model_name": "squadopt-learned-rate",
+    "model_version": "learned-rate-opponent-signal-v1",
+    "source_reference": "docs/route_a_declaration.md",
+    "training_contract_version": "expanding_window_minutes_weighted_ridge_rate_v1"
+  },
+  "declaration_fingerprint": "29deea10bf176b59b5a4c9107008e8870ebcb5d685077fc3aa6e1142a6db4036",
+  "development_seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "expected_coefficient_signs": {
+    "rating_attacking_signal": "positive",
+    "rating_defensive_signal": "positive"
+  },
+  "formal_run_completed": false,
+  "gated_quantity": "pooled_coefficient",
+  "issue": 88,
+  "locked_holdout_accessed": false,
+  "operational_control_at_declaration": "fw05-bw0p1",
+  "per_position_slopes_are": "recorded diagnostics, not gates",
+  "rate_controls": {
+    "min_training_rows": 500,
+    "ridge_alpha": 1.0,
+    "window": 6
+  },
+  "rate_inputs_added": [
+    "rating_attacking_signal",
+    "rating_defensive_signal"
+  ],
+  "rate_inputs_after": [
+    "points_per_90_last_6",
+    "appearance_rate_last_6",
+    "minutes_per_appearance_last_6",
+    "fixture_count",
+    "home_fixture_count",
+    "rating_attacking_signal",
+    "rating_defensive_signal"
+  ],
+  "rate_inputs_before": [
+    "points_per_90_last_6",
+    "appearance_rate_last_6",
+    "minutes_per_appearance_last_6",
+    "fixture_count",
+    "home_fixture_count"
+  ],
+  "shared_contract_constants_moved": [],
+  "signal_input": {
+    "admissible_because": "fitted walk-forward with as_of set to the target gameweek's first kickoff; not the archive's post-hoc fixture_difficulty (#152) and not the published 1-5 rating (#137)",
+    "contract_version": "opponent_signal_v1",
+    "frame_fingerprint": "8d977552f638a53c9be3cd7960a3009344cd04c9538bcdf416727f81e3342624",
+    "grain": "season/gameweek/club",
+    "joined_on": [
+      "season",
+      "gameweek",
+      "club"
+    ],
+    "produced_by": "scripts/build_opponent_signal.py",
+    "re_derived_in_the_run": true
+  },
+  "stop_condition": "Route A stops if either declared signal's pooled coefficient fails to be positive with its 90% interval excluding zero. The gate is on the pooled coefficient because that is the parameter the model estimates; per-position slopes are recorded as diagnostics and gate nothing. Both clauses are evaluated once, on the formal run, and neither the expected sign nor the interval level is revisited afterwards."
+}

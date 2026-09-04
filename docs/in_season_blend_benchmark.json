@@ -1,0 +1,429 @@
+{
+  "artifact_type": "in_season_blend_benchmark",
+  "comparable_to_screening_levels": false,
+  "configurations": [
+    {
+      "detail": "shifted rolling features, form_window=5",
+      "family": "archive_fed_control",
+      "feasibility_rate": 1.0,
+      "label": "control-fw05",
+      "mean_realized_squad_points": 53.7755,
+      "scored_folds": 147,
+      "solve_health": {
+        "deterministic_budget_exhausted": 0,
+        "first_undetermined_folds": [],
+        "folds": 147,
+        "folds_not_fully_determined": 0,
+        "primary_status": {
+          "OPTIMAL": 147
+        },
+        "tiebreak_attempted": 147,
+        "tiebreak_completed": 147
+      }
+    },
+    {
+      "detail": "shifted rolling features, form_window=10",
+      "family": "archive_fed_control",
+      "feasibility_rate": 1.0,
+      "label": "control-fw10",
+      "mean_realized_squad_points": 55.9796,
+      "scored_folds": 147,
+      "solve_health": {
+        "deterministic_budget_exhausted": 0,
+        "first_undetermined_folds": [],
+        "folds": 147,
+        "folds_not_fully_determined": 0,
+        "primary_status": {
+          "OPTIMAL": 147
+        },
+        "tiebreak_attempted": 147,
+        "tiebreak_completed": 147
+      }
+    },
+    {
+      "detail": "the opening control at every gameweek; the season so far ignored",
+      "family": "floor",
+      "feasibility_rate": 1.0,
+      "label": "carry-over-only",
+      "mean_realized_squad_points": 43.1905,
+      "scored_folds": 147,
+      "solve_health": {
+        "deterministic_budget_exhausted": 0,
+        "first_undetermined_folds": [
+          "2021-22-gw02",
+          "2021-22-gw20",
+          "2021-22-gw28",
+          "2021-22-gw29",
+          "2022-23-gw03"
+        ],
+        "folds": 147,
+        "folds_not_fully_determined": 77,
+        "primary_status": {
+          "FEASIBLE": 66,
+          "OPTIMAL": 81
+        },
+        "tiebreak_attempted": 81,
+        "tiebreak_completed": 70
+      }
+    },
+    {
+      "detail": "prior_minute_equivalent=90, prior_gameweek_equivalent=6",
+      "family": "in_season_blend",
+      "feasibility_rate": 1.0,
+      "label": "blend-m90-g6",
+      "mean_realized_squad_points": 56.4694,
+      "scored_folds": 147,
+      "solve_health": {
+        "deterministic_budget_exhausted": 0,
+        "first_undetermined_folds": [
+          "2021-22-gw37",
+          "2021-22-gw38"
+        ],
+        "folds": 147,
+        "folds_not_fully_determined": 2,
+        "primary_status": {
+          "OPTIMAL": 147
+        },
+        "tiebreak_attempted": 147,
+        "tiebreak_completed": 145
+      }
+    },
+    {
+      "detail": "prior_minute_equivalent=270, prior_gameweek_equivalent=6",
+      "family": "in_season_blend",
+      "feasibility_rate": 1.0,
+      "label": "blend-m270-g6-declared",
+      "mean_realized_squad_points": 56.966,
+      "scored_folds": 147,
+      "solve_health": {
+        "deterministic_budget_exhausted": 0,
+        "first_undetermined_folds": [
+          "2021-22-gw32",
+          "2021-22-gw33",
+          "2021-22-gw34",
+          "2021-22-gw37",
+          "2021-22-gw38"
+        ],
+        "folds": 147,
+        "folds_not_fully_determined": 9,
+        "primary_status": {
+          "OPTIMAL": 147
+        },
+        "tiebreak_attempted": 147,
+        "tiebreak_completed": 138
+      }
+    },
+    {
+      "detail": "prior_minute_equivalent=540, prior_gameweek_equivalent=6",
+      "family": "in_season_blend",
+      "feasibility_rate": 1.0,
+      "label": "blend-m540-g6",
+      "mean_realized_squad_points": 56.585,
+      "scored_folds": 147,
+      "solve_health": {
+        "deterministic_budget_exhausted": 0,
+        "first_undetermined_folds": [
+          "2021-22-gw05",
+          "2021-22-gw06",
+          "2021-22-gw15",
+          "2021-22-gw29",
+          "2021-22-gw31"
+        ],
+        "folds": 147,
+        "folds_not_fully_determined": 24,
+        "primary_status": {
+          "FEASIBLE": 2,
+          "OPTIMAL": 145
+        },
+        "tiebreak_attempted": 145,
+        "tiebreak_completed": 123
+      }
+    },
+    {
+      "detail": "prior_minute_equivalent=1080, prior_gameweek_equivalent=6",
+      "family": "in_season_blend",
+      "feasibility_rate": 1.0,
+      "label": "blend-m1080-g6",
+      "mean_realized_squad_points": 56.7143,
+      "scored_folds": 147,
+      "solve_health": {
+        "deterministic_budget_exhausted": 0,
+        "first_undetermined_folds": [
+          "2021-22-gw03",
+          "2021-22-gw04",
+          "2021-22-gw06",
+          "2021-22-gw07",
+          "2021-22-gw08"
+        ],
+        "folds": 147,
+        "folds_not_fully_determined": 70,
+        "primary_status": {
+          "FEASIBLE": 12,
+          "OPTIMAL": 135
+        },
+        "tiebreak_attempted": 135,
+        "tiebreak_completed": 77
+      }
+    },
+    {
+      "detail": "prior_minute_equivalent=270, prior_gameweek_equivalent=3",
+      "family": "in_season_blend",
+      "feasibility_rate": 1.0,
+      "label": "blend-m270-g3",
+      "mean_realized_squad_points": 56.8095,
+      "scored_folds": 147,
+      "solve_health": {
+        "deterministic_budget_exhausted": 0,
+        "first_undetermined_folds": [
+          "2021-22-gw32",
+          "2021-22-gw33",
+          "2021-22-gw34",
+          "2021-22-gw37",
+          "2023-24-gw16"
+        ],
+        "folds": 147,
+        "folds_not_fully_determined": 9,
+        "primary_status": {
+          "FEASIBLE": 1,
+          "OPTIMAL": 146
+        },
+        "tiebreak_attempted": 146,
+        "tiebreak_completed": 138
+      }
+    },
+    {
+      "detail": "prior_minute_equivalent=270, prior_gameweek_equivalent=12",
+      "family": "in_season_blend",
+      "feasibility_rate": 1.0,
+      "label": "blend-m270-g12",
+      "mean_realized_squad_points": 56.1293,
+      "scored_folds": 147,
+      "solve_health": {
+        "deterministic_budget_exhausted": 0,
+        "first_undetermined_folds": [
+          "2021-22-gw06",
+          "2021-22-gw33",
+          "2021-22-gw37",
+          "2021-22-gw38",
+          "2023-24-gw16"
+        ],
+        "folds": 147,
+        "folds_not_fully_determined": 11,
+        "primary_status": {
+          "OPTIMAL": 147
+        },
+        "tiebreak_attempted": 147,
+        "tiebreak_completed": 136
+      }
+    }
+  ],
+  "contract_version": "in_season_blend_benchmark_v1",
+  "declared_configuration": "blend-m270-g6-declared",
+  "development_seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "first_fold": "2021-22-gw02",
+  "folds": 147,
+  "gate_evidence": false,
+  "last_fold": "2024-25-gw38",
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "model_version_measured": "in-season-carry-over-v1",
+  "optimizer_held_fixed": true,
+  "paired_against_declared": {
+    "blend-m270-g6-declared vs blend-m1080-g6": {
+      "confidence_level": 0.9,
+      "folds_paired": 147,
+      "interval_lower": -0.7551,
+      "interval_upper": 1.9184,
+      "mean_difference": 0.2517,
+      "season_means": {
+        "2021-22": 0.027,
+        "2022-23": 2.7222,
+        "2023-24": -1.3514,
+        "2024-25": -0.3243
+      },
+      "seasons": 4,
+      "seasons_positive": 2
+    },
+    "blend-m270-g6-declared vs blend-m270-g12": {
+      "confidence_level": 0.9,
+      "folds_paired": 147,
+      "interval_lower": -0.3878,
+      "interval_upper": 1.8844,
+      "mean_difference": 0.8367,
+      "season_means": {
+        "2021-22": -0.8649,
+        "2022-23": 1.2778,
+        "2023-24": -0.0811,
+        "2024-25": 3.027
+      },
+      "seasons": 4,
+      "seasons_positive": 2
+    },
+    "blend-m270-g6-declared vs blend-m270-g3": {
+      "confidence_level": 0.9,
+      "folds_paired": 147,
+      "interval_lower": -0.8299,
+      "interval_upper": 1.0272,
+      "mean_difference": 0.1565,
+      "season_means": {
+        "2021-22": 1.3243,
+        "2022-23": -0.1389,
+        "2023-24": 0.3784,
+        "2024-25": -0.9459
+      },
+      "seasons": 4,
+      "seasons_positive": 2
+    },
+    "blend-m270-g6-declared vs blend-m540-g6": {
+      "confidence_level": 0.9,
+      "folds_paired": 147,
+      "interval_lower": -0.3946,
+      "interval_upper": 1.0884,
+      "mean_difference": 0.381,
+      "season_means": {
+        "2021-22": 0.5946,
+        "2022-23": 0.1389,
+        "2023-24": 0.6216,
+        "2024-25": 0.1622
+      },
+      "seasons": 4,
+      "seasons_positive": 4
+    },
+    "blend-m270-g6-declared vs blend-m90-g6": {
+      "confidence_level": 0.9,
+      "folds_paired": 147,
+      "interval_lower": -0.449,
+      "interval_upper": 1.1565,
+      "mean_difference": 0.4966,
+      "season_means": {
+        "2021-22": 0.1622,
+        "2022-23": -0.6667,
+        "2023-24": 1.5946,
+        "2024-25": 0.8649
+      },
+      "seasons": 4,
+      "seasons_positive": 3
+    },
+    "blend-m270-g6-declared vs carry-over-only": {
+      "confidence_level": 0.9,
+      "folds_paired": 147,
+      "interval_lower": 11.6803,
+      "interval_upper": 16.8639,
+      "mean_difference": 13.7755,
+      "season_means": {
+        "2021-22": 10.6216,
+        "2022-23": 19.4722,
+        "2023-24": 11.6216,
+        "2024-25": 13.5405
+      },
+      "seasons": 4,
+      "seasons_positive": 4
+    },
+    "blend-m270-g6-declared vs control-fw05": {
+      "confidence_level": 0.9,
+      "folds_paired": 147,
+      "interval_lower": 1.4014,
+      "interval_upper": 5.7143,
+      "mean_difference": 3.1905,
+      "season_means": {
+        "2021-22": 1.5676,
+        "2022-23": 4.0,
+        "2023-24": 1.3514,
+        "2024-25": 5.8649
+      },
+      "seasons": 4,
+      "seasons_positive": 4
+    },
+    "blend-m270-g6-declared vs control-fw10": {
+      "confidence_level": 0.9,
+      "folds_paired": 147,
+      "interval_lower": -0.7554,
+      "interval_upper": 3.6259,
+      "mean_difference": 0.9864,
+      "season_means": {
+        "2021-22": 1.5405,
+        "2022-23": 0.6667,
+        "2023-24": -1.5676,
+        "2024-25": 3.2973
+      },
+      "seasons": 4,
+      "seasons_positive": 3
+    }
+  },
+  "reproducibility": {
+    "compared_against": "docs/in_season_blend_benchmark.json (#193)",
+    "configurations_compared": 9,
+    "configurations_that_moved": 3,
+    "largest_absolute_move": 0.2177,
+    "rows": [
+      {
+        "delta": 0.0,
+        "earlier": 53.7755,
+        "folds_determined": 147,
+        "label": "control-fw05",
+        "now": 53.7755
+      },
+      {
+        "delta": 0.0,
+        "earlier": 55.9796,
+        "folds_determined": 147,
+        "label": "control-fw10",
+        "now": 55.9796
+      },
+      {
+        "delta": 0.0408,
+        "earlier": 43.1497,
+        "folds_determined": 70,
+        "label": "carry-over-only",
+        "now": 43.1905
+      },
+      {
+        "delta": 0.0,
+        "earlier": 56.4694,
+        "folds_determined": 145,
+        "label": "blend-m90-g6",
+        "now": 56.4694
+      },
+      {
+        "delta": 0.0,
+        "earlier": 56.966,
+        "folds_determined": 138,
+        "label": "blend-m270-g6-declared",
+        "now": 56.966
+      },
+      {
+        "delta": 0.0,
+        "earlier": 56.585,
+        "folds_determined": 123,
+        "label": "blend-m540-g6",
+        "now": 56.585
+      },
+      {
+        "delta": -0.2177,
+        "earlier": 56.932,
+        "folds_determined": 77,
+        "label": "blend-m1080-g6",
+        "now": 56.7143
+      },
+      {
+        "delta": 0.034,
+        "earlier": 56.7755,
+        "folds_determined": 138,
+        "label": "blend-m270-g3",
+        "now": 56.8095
+      },
+      {
+        "delta": 0.0,
+        "earlier": 56.1293,
+        "folds_determined": 136,
+        "label": "blend-m270-g12",
+        "now": 56.1293
+      }
+    ]
+  }
+}
