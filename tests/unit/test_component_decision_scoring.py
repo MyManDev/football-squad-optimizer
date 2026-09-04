@@ -16,10 +16,15 @@ from squadopt.scenarios import (
     ScenarioValidationError,
     score_component_scenario_decision,
 )
+from squadopt.scenarios.components import (
+    ComponentScenarioDraw,
+    ComponentScenarioInputs,
+    ComponentScenarioProvenance,
+    _component_fingerprint,
+)
 from squadopt.scenarios.models import _scenario_fingerprint
 
 TARGET = ScenarioTarget("2026-27", 3)
-COMPONENT_FINGERPRINT = "b" * 64
 
 
 def _optimization_result() -> OptimizationResult:
@@ -105,6 +110,9 @@ def _scenario_set(
         points.loc["scenario-000001", 12] = 3.0
     if 6 in points:
         points.loc["scenario-000001", 6] = 2.0
+    for player_id in (3, 13):
+        if player_id in points:
+            points.loc["scenario-000001", player_id] = 0.0
     fingerprint = _scenario_fingerprint(
         snapshot,
         TARGET,
@@ -136,18 +144,61 @@ def _appearances(scenarios: ScenarioSet) -> pd.DataFrame:
     return appearances
 
 
-def test_scores_each_scenario_with_official_autosubs_and_captain_fallback() -> None:
-    result = _optimization_result()
-    scenarios = _scenario_set(result)
-
-    scored = score_component_scenario_decision(
-        result,
-        scenarios,
-        _appearances(scenarios),
-        component_fingerprint=COMPONENT_FINGERPRINT,
+def _draw(
+    result: OptimizationResult,
+    *,
+    player_ids: tuple[int, ...] | None = None,
+) -> ComponentScenarioDraw:
+    scenarios = _scenario_set(result, player_ids=player_ids)
+    appearances = _appearances(scenarios)
+    selected = result.selected_squad.set_index("player_id")
+    ids = list(scenarios.scenario_points.columns)
+    inputs = ComponentScenarioInputs(
+        table=pd.DataFrame(
+            {
+                "player_id": ids,
+                "team_id": [selected.loc[player_id, "team_id"] for player_id in ids],
+                "position": [selected.loc[player_id, "position"] for player_id in ids],
+                "fixture_count": [1] * len(ids),
+                "appearance_probability": [1.0] * len(ids),
+                "expected_minutes_if_appearance": [60.0] * len(ids),
+                "raw_expected_points_if_appearance": [
+                    selected.loc[player_id, "expected_points"] for player_id in ids
+                ],
+                "composition_route": ["component_model"] * len(ids),
+                "evidence_status": ["not_requested"] * len(ids),
+            }
+        ),
+        provenance=ComponentScenarioProvenance(
+            phase_c_table_sha="a" * 64,
+            roster_sha="b" * 64,
+            model_version="synthetic-component-model",
+            feature_contract_version="synthetic-v1",
+            target_contract_version="synthetic-target-v1",
+            dataset_contract_version="synthetic-dataset-v1",
+            season=TARGET.season,
+            target_gameweek=TARGET.gameweek,
+            deterministic_seed=0,
+        ),
+    )
+    minutes = appearances.astype("float64") * 60.0
+    fingerprint = _component_fingerprint(scenarios, inputs, minutes, appearances)
+    return ComponentScenarioDraw(
+        scenarios=scenarios,
+        inputs=inputs,
+        sampled_minutes=minutes,
+        sampled_appearances=appearances,
+        component_fingerprint=fingerprint,
     )
 
-    assert scored.scenario_ids == scenarios.scenario_ids
+
+def test_scores_each_scenario_with_official_autosubs_and_captain_fallback() -> None:
+    result = _optimization_result()
+    draw = _draw(result)
+
+    scored = score_component_scenario_decision(result, draw)
+
+    assert scored.scenario_ids == draw.scenarios.scenario_ids
     assert scored.total_points == (12.0, 27.0)
     assert scored.scores[1].autosubs == ((13, 12), (3, 6))
     assert scored.scores[1].captain_bonus_player_id == 8
@@ -156,14 +207,9 @@ def test_scores_each_scenario_with_official_autosubs_and_captain_fallback() -> N
 
 def test_decision_completion_is_identical_across_scenarios() -> None:
     result = _optimization_result()
-    scenarios = _scenario_set(result)
+    draw = _draw(result)
 
-    scored = score_component_scenario_decision(
-        result,
-        scenarios,
-        _appearances(scenarios),
-        component_fingerprint=COMPONENT_FINGERPRINT,
-    )
+    scored = score_component_scenario_decision(result, draw)
 
     assert scored.frozen_decision.bench == (2, 12, 6, 7)
     assert scored.frozen_decision.vice_captain_id == 8
@@ -171,80 +217,46 @@ def test_decision_completion_is_identical_across_scenarios() -> None:
 
 def test_missing_selected_player_is_rejected() -> None:
     result = _optimization_result()
-    scenarios = _scenario_set(result, player_ids=tuple(range(1, 15)))
+    draw = _draw(result, player_ids=tuple(range(1, 15)))
 
     with pytest.raises(ScenarioValidationError, match="every selected squad player"):
-        score_component_scenario_decision(
-            result,
-            scenarios,
-            _appearances(scenarios),
-            component_fingerprint=COMPONENT_FINGERPRINT,
-        )
+        score_component_scenario_decision(result, draw)
 
 
-@pytest.mark.parametrize(
-    "invalid",
-    [
-        pd.DataFrame([[1] * 15, [0] * 15]),
-        pd.DataFrame([[True] * 15]),
-    ],
-    ids=["integer-states", "wrong-shape"],
-)
-def test_appearance_states_must_be_complete_aligned_booleans(invalid: pd.DataFrame) -> None:
+def test_draw_is_revalidated_when_consumed() -> None:
     result = _optimization_result()
-    scenarios = _scenario_set(result)
+    draw = _draw(result)
+    draw.sampled_appearances.iloc[0, 0] = False
 
-    with pytest.raises(ScenarioValidationError, match="sampled_appearances"):
-        score_component_scenario_decision(
-            result,
-            scenarios,
-            invalid,
-            component_fingerprint=COMPONENT_FINGERPRINT,
-        )
+    with pytest.raises(ScenarioValidationError, match="did not feature scored nothing"):
+        score_component_scenario_decision(result, draw)
 
 
-def test_component_fingerprint_is_required() -> None:
+def test_draw_type_is_required() -> None:
     result = _optimization_result()
-    scenarios = _scenario_set(result)
 
-    with pytest.raises(ScenarioValidationError, match="component_fingerprint"):
-        score_component_scenario_decision(
-            result,
-            scenarios,
-            _appearances(scenarios),
-            component_fingerprint="not-a-digest",
-        )
+    with pytest.raises(ScenarioValidationError, match="ComponentScenarioDraw"):
+        score_component_scenario_decision(result, object())  # type: ignore[arg-type]
 
 
 def test_scoring_does_not_mutate_caller_frames() -> None:
     result = _optimization_result()
-    scenarios = _scenario_set(result)
-    appearances = _appearances(scenarios)
+    draw = _draw(result)
     original_squad = result.selected_squad.copy(deep=True)
-    original_points = scenarios.scenario_points.copy(deep=True)
-    original_appearances = appearances.copy(deep=True)
+    original_points = draw.scenarios.scenario_points.copy(deep=True)
+    original_appearances = draw.sampled_appearances.copy(deep=True)
 
-    score_component_scenario_decision(
-        result,
-        scenarios,
-        appearances,
-        component_fingerprint=COMPONENT_FINGERPRINT,
-    )
+    score_component_scenario_decision(result, draw)
 
     assert_frame_equal(result.selected_squad, original_squad)
-    assert_frame_equal(scenarios.scenario_points, original_points)
-    assert_frame_equal(appearances, original_appearances)
+    assert_frame_equal(draw.scenarios.scenario_points, original_points)
+    assert_frame_equal(draw.sampled_appearances, original_appearances)
 
 
 def test_solution_free_decision_is_rejected_before_scenario_outcomes() -> None:
     result = _optimization_result()
-    scenarios = _scenario_set(result)
+    draw = _draw(result)
     invalid_result = replace(result, solver_status=SolverStatus.INFEASIBLE)
 
     with pytest.raises(EvaluationValidationError, match="OPTIMAL or FEASIBLE"):
-        score_component_scenario_decision(
-            invalid_result,
-            scenarios,
-            pd.DataFrame(),
-            component_fingerprint=COMPONENT_FINGERPRINT,
-        )
+        score_component_scenario_decision(invalid_result, draw)

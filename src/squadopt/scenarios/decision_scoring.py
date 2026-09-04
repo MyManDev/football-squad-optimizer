@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Final
 
 import pandas as pd
-from pandas.api.types import is_bool_dtype
 
 from squadopt.evaluation.models import FrozenSquadDecision, RealizedSquadScore
 from squadopt.evaluation.scoring import (
@@ -14,7 +13,8 @@ from squadopt.evaluation.scoring import (
     score_frozen_squad_decision,
 )
 from squadopt.optimization import OptimizationResult
-from squadopt.scenarios.models import ScenarioSet, ScenarioValidationError
+from squadopt.scenarios.components import ComponentScenarioDraw
+from squadopt.scenarios.models import ScenarioValidationError
 
 COMPONENT_DECISION_SCORING_CONTRACT_VERSION: Final = "component_decision_scoring_v1"
 
@@ -51,23 +51,26 @@ class ComponentDecisionScoringResult:
 
 def score_component_scenario_decision(
     optimization_result: OptimizationResult,
-    scenarios: ScenarioSet,
-    sampled_appearances: pd.DataFrame,
-    *,
-    component_fingerprint: str,
+    draw: ComponentScenarioDraw,
 ) -> ComponentDecisionScoringResult:
     """Score a decision without re-optimizing or consulting scenario outcomes to complete it.
 
-    ``sampled_appearances`` is required explicitly because continuous sampled minutes cannot
-    distinguish a non-appearance from an appeared draw clipped to zero minutes. The frame
-    must therefore contain the sampler's actual Bernoulli states, not values inferred from
-    its minutes matrix.
+    The complete draw is required so points, appearances and their component fingerprint
+    cannot be mixed across otherwise shape-compatible draws.
     """
 
     frozen_decision = complete_optimization_decision(optimization_result)
-    scenario_set = scenarios.validated_copy()
-    appearances = _validated_appearance_matrix(sampled_appearances, scenario_set)
-    fingerprint = _digest(component_fingerprint, "component_fingerprint")
+    if not isinstance(draw, ComponentScenarioDraw):
+        raise ScenarioValidationError("draw must be a ComponentScenarioDraw.")
+    validated_draw = ComponentScenarioDraw(
+        scenarios=draw.scenarios,
+        inputs=draw.inputs,
+        sampled_minutes=draw.sampled_minutes,
+        sampled_appearances=draw.sampled_appearances,
+        component_fingerprint=draw.component_fingerprint,
+    )
+    scenario_set = validated_draw.scenarios.validated_copy()
+    appearances = validated_draw.sampled_appearances
 
     squad_ids = tuple(frozen_decision.squad["player_id"].tolist())
     missing = [
@@ -101,35 +104,8 @@ def score_component_scenario_decision(
         scenario_ids=scenario_set.scenario_ids,
         scores=tuple(scores),
         scenario_fingerprint=scenario_set.scenario_fingerprint,
-        component_fingerprint=fingerprint,
+        component_fingerprint=validated_draw.component_fingerprint,
     )
-
-
-def _validated_appearance_matrix(
-    sampled_appearances: object,
-    scenarios: ScenarioSet,
-) -> pd.DataFrame:
-    if not isinstance(sampled_appearances, pd.DataFrame):
-        raise ScenarioValidationError("sampled_appearances must be a pandas DataFrame.")
-    appearances = sampled_appearances.copy(deep=True)
-    if appearances.shape != scenarios.scenario_points.shape:
-        raise ScenarioValidationError(
-            "sampled_appearances shape must match the scenario point matrix."
-        )
-    if tuple(appearances.index.tolist()) != scenarios.scenario_ids:
-        raise ScenarioValidationError("sampled_appearances index must equal scenario_ids.")
-    if tuple(appearances.columns.tolist()) != tuple(scenarios.scenario_points.columns.tolist()):
-        raise ScenarioValidationError(
-            "sampled_appearances columns must match scenario player order."
-        )
-    if bool(appearances.isna().any().any()) or any(
-        not is_bool_dtype(dtype) for dtype in appearances.dtypes
-    ):
-        raise ScenarioValidationError(
-            "sampled_appearances must contain complete boolean Bernoulli states; "
-            "minutes-derived or nullable values are refused."
-        )
-    return appearances.astype("bool")
 
 
 def _digest(value: object, name: str) -> str:
