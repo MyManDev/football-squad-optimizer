@@ -1,8 +1,8 @@
 # Phase C operational elite-evidence policy
 
-Status: owner-approved operational convention, frozen before the 2026-27 gameweek 3
-outcome. It is active evidence use, not a claim that the candidate is better calibrated or
-scores more points than the control.
+Status: frozen legacy candidate. It was the owner-approved gameweek 3 convention, but the
+component base is now the operational default. This rule remains reproducible and explicit; it
+is not combined with the component model.
 
 ## Purpose and boundary
 
@@ -52,10 +52,10 @@ the control value. Evidence rows for players outside the current roster are igno
 counts are recorded, so ordinary roster churn is visible without making a deadline run
 impossible.
 
-The library producer keeps an explicit control-only seam for rollback and replay. The command
-line makes Phase C active by default: both artifact paths are required unless
-`--control-only` is stated. Supplying only one path is an error. Invalid requested evidence
-never falls back silently.
+The producer selects this candidate only when both evidence artifact paths are supplied.
+Supplying only one path is an error. Invalid requested evidence never falls back silently. With
+neither path, the producer attempts the operational component base; `--control-only` explicitly
+selects the legacy in-season control.
 
 ## Identity and rollback
 

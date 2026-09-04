@@ -43,6 +43,10 @@ from squadopt.prediction.availability import (
     AvailabilityRuleConfig,
     apply_availability,
 )
+from squadopt.prediction.component_dataset import (
+    FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
+)
+from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 from squadopt.prediction.config import BaselineProjectionConfig
 from squadopt.prediction.elite_evidence import (
     ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION,
@@ -67,6 +71,7 @@ PROJECTION_HANDOFF_CONTRACT_VERSION: Final = "projection_handoff_v1"
 # decision, made in a reviewed change, and until then a mid-season decision is refused at
 # verification rather than made from an unpromoted model.
 IN_SEASON_CONTROL_MODEL_VERSIONS: Final[tuple[str, ...]] = (
+    COMPONENT_MODEL_VERSION,
     IN_SEASON_MODEL_VERSION,
     ELITE_EVIDENCE_MODEL_VERSION,
 )
@@ -138,6 +143,14 @@ class InSeasonProjection:
         if self.model_version == IN_SEASON_MODEL_VERSION and self.evidence_fingerprint is not None:
             raise DataSourceError(
                 "The legacy in-season control cannot claim an elite evidence fingerprint."
+            )
+        if self.model_version == COMPONENT_MODEL_VERSION and (
+            self.evidence_fingerprint is not None
+            or self.feature_contract_version != COMPONENT_FEATURE_CONTRACT_VERSION
+        ):
+            raise DataSourceError(
+                "The Phase C component model requires no external evidence fingerprint and "
+                f"the exact feature contract {COMPONENT_FEATURE_CONTRACT_VERSION!r}."
             )
         object.__setattr__(self, "expected_points", MappingProxyType(points))
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))

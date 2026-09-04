@@ -17,14 +17,14 @@ because a projection of another roster is not a projection of this one. So on a 
 the order is capture, then this script, then decide -- not a handoff prepared earlier in the
 week.
 
-The in-season history comes from that same capture, which is only safe because the counters
-in it have been shown to describe the current season once the season's first match has
-kicked off (``docs/capture_season_phase.md``). ``in_season_totals`` refuses a capture taken
-before that, so a handoff cannot quietly be built from last season's totals.
+The default component model reads only the prior event-live documents stored in that same
+capture. They carry gameweek-level minutes and points, and every one must be settled. The
+legacy rollback still reads the capture's cumulative in-season counters; ``in_season_totals``
+refuses a capture taken before those counters reset.
 
-And the model version must be a promoted in-season control. Pinning it is a reviewed
-decision made in ``live``; this script only reports the identity it is claiming, so a
-refusal downstream is legible rather than mysterious.
+The component version and its legacy rollback are pinned in ``live``. This script reports
+which route it selected, so a fallback or refusal downstream is legible rather than
+mysterious.
 
 Nothing is fetched. The capture is already on disk.
 """
@@ -35,18 +35,25 @@ import sys
 from pathlib import Path
 from typing import Final
 
+import pandas as pd
 from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT
 
 from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
+    IncompleteLiveHistoryError,
+    build_live_player_history,
+    fixture_snapshot,
     gameweek_deadlines,
     in_season_totals,
+    live_payload,
     next_open_deadline,
     player_snapshot,
+    team_codes,
+    team_names,
 )
-from squadopt.data.sources.vaastav import build_panel
+from squadopt.data.sources.vaastav import build_fixture_panel, build_panel, load_team_codes
 from squadopt.features.cross_season import carry_over_as_of
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.live import (
@@ -58,6 +65,23 @@ from squadopt.live import (
     read_projection_handoff,
     write_projection_handoff,
 )
+from squadopt.prediction.component_dataset import (
+    COMPONENT_FEATURE_CONFIG,
+    COMPONENT_HISTORY_WINDOW,
+    COMPONENT_TRAINING_SEASONS,
+    build_component_modelling_frame,
+    build_component_scoring_frame,
+    component_feature_columns,
+)
+from squadopt.prediction.component_dataset import (
+    FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
+)
+from squadopt.prediction.component_models import (
+    COMPONENT_MODEL_VERSION,
+    fit_component_models,
+    predict_components,
+)
+from squadopt.prediction.components import DIRECT_CONTROL_ROUTE, prepare_component_prediction
 from squadopt.prediction.elite_evidence import (
     ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION,
     ELITE_EVIDENCE_MODEL_VERSION,
@@ -69,6 +93,7 @@ from squadopt.prediction.in_season import (
     InSeasonBlendConfig,
     blend_in_season_projection,
 )
+from squadopt.prediction.integration import PredictionProvenance
 from squadopt.prediction.opening import build_opening_projection_from_snapshot
 
 DEFAULT_SNAPSHOT_ROOT: Final = Path("data/snapshots")
@@ -88,6 +113,137 @@ def _latest_snapshot_id(snapshot_root: Path) -> str:
     return directories[-1]
 
 
+def _frame_fingerprint(frame: pd.DataFrame) -> str:
+    ordered = frame.sort_values(["season", "gameweek", "player_id"], kind="stable")
+    return hashlib.sha256(
+        ordered.to_csv(index=False, lineterminator="\n").encode("utf-8")
+    ).hexdigest()
+
+
+def _team_bridge(bootstrap: bytes, season: str) -> pd.DataFrame:
+    names = team_names(bootstrap)
+    codes = team_codes(bootstrap)
+    if set(names) != set(codes):
+        raise SystemExit("Bootstrap team names and persistent codes do not share one id set.")
+    return pd.DataFrame(
+        {
+            "season": season,
+            "name": [names[identifier] for identifier in sorted(names)],
+            "code": [codes[identifier] for identifier in sorted(names)],
+        }
+    )
+
+
+def _component_table(
+    archive_root: Path,
+    *,
+    bootstrap: bytes,
+    fixtures: bytes,
+    event_payloads: dict[int, bytes],
+    season: str,
+    target: int,
+    source_snapshot_id: str,
+    captured_at_utc: str,
+    deadline_utc: str,
+    fallback: pd.DataFrame,
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    training_panel = build_panel(archive_root, seasons=COMPONENT_TRAINING_SEASONS)
+    training_fixtures = build_fixture_panel(archive_root, seasons=COMPONENT_TRAINING_SEASONS)
+    training_team_codes = pd.concat(
+        [
+            load_team_codes(archive_root, training_season).assign(season=training_season)
+            for training_season in COMPONENT_TRAINING_SEASONS
+        ],
+        ignore_index=True,
+    )
+    training = build_component_modelling_frame(
+        training_panel,
+        training_fixtures,
+        training_team_codes,
+        seasons=COMPONENT_TRAINING_SEASONS,
+        config=COMPONENT_FEATURE_CONFIG,
+    )
+    models = fit_component_models(training, feature_columns=component_feature_columns())
+    if models is None:
+        raise SystemExit(
+            "The declared Phase C training population is too thin to fit its component models."
+        )
+
+    current_panel, incomplete_players = build_live_player_history(
+        bootstrap,
+        fixtures,
+        event_payloads,
+        season=season,
+        target_gameweek=target,
+        source_snapshot_id=source_snapshot_id,
+    )
+    live_fixtures = fixture_snapshot(
+        fixtures,
+        bootstrap,
+        season=season,
+        snapshot_id=source_snapshot_id,
+        captured_at_utc=captured_at_utc,
+    )
+    scoring = build_component_scoring_frame(
+        current_panel,
+        live_fixtures,
+        _team_bridge(bootstrap, season),
+        season=season,
+        gameweek=target,
+        config=COMPONENT_FEATURE_CONFIG,
+    )
+    predicted = predict_components(
+        models,
+        scoring,
+        feature_columns=component_feature_columns(),
+    )
+    fallback_points = fallback.set_index("player_id")["expected_points"]
+    rows = pd.DataFrame(
+        {
+            "player_id": scoring["player_id"].astype("int64"),
+            "fixture_count": scoring["fixture_count"].astype("int64"),
+            "appearance_probability": predicted["appearance_probability"],
+            "expected_minutes_if_appearance": predicted["expected_minutes_if_appearance"],
+            "expected_points_if_appearance": predicted["expected_points_if_appearance"],
+            "fallback_expected_points": scoring["player_id"]
+            .map(fallback_points)
+            .where(predicted["composition_route"].eq(DIRECT_CONTROL_ROUTE)),
+            "composition_route": predicted["composition_route"],
+            "evidence_status": predicted["evidence_status"],
+        }
+    )
+    last = training.sort_values(["season", "gameweek", "player_id"], kind="stable").iloc[-1]
+    provenance = PredictionProvenance(
+        model_name=CONTROL_MODEL_NAME,
+        model_version=COMPONENT_MODEL_VERSION,
+        feature_contract_version=COMPONENT_FEATURE_CONTRACT_VERSION,
+        training_cutoff=f"{last['season']}:GW{int(last['gameweek']):02d}",
+        training_data_fingerprint=_frame_fingerprint(training),
+    )
+    snapshot = prepare_component_prediction(
+        rows,
+        provenance,
+        decision_timestamp_utc=captured_at_utc,
+        decision_context={
+            "source_snapshot_id": source_snapshot_id,
+            "season": season,
+            "gameweek": str(target),
+            "deadline_utc": deadline_utc,
+        },
+    )
+    diagnostics: dict[str, object] = {
+        **dict(snapshot.diagnostics),
+        "component_fingerprint": snapshot.component_fingerprint,
+        "component_training_seasons": list(COMPONENT_TRAINING_SEASONS),
+        "component_training_rows": len(training),
+        "component_training_appearance_rows": models.appearance_rows,
+        "component_training_conditional_rows": models.conditional_rows,
+        "component_history_gameweeks": sorted(event_payloads),
+        "component_history_incomplete_players": len(incomplete_players),
+    }
+    return snapshot.table.loc[:, ["player_id", "expected_points"]], diagnostics
+
+
 def build(
     snapshot_root: Path,
     archive_root: Path,
@@ -98,6 +254,7 @@ def build(
     config: InSeasonBlendConfig | None = None,
     evidence_table_path: Path | None = None,
     evidence_manifest_path: Path | None = None,
+    control_only: bool = False,
     dry_run: bool = False,
 ) -> tuple[InSeasonProjection, Path | None, dict[str, object]]:
     """Project one capture's open deadline and write the handoff for it."""
@@ -144,6 +301,7 @@ def build(
     model_version = IN_SEASON_MODEL_VERSION
     feature_contract_version = IN_SEASON_FEATURE_CONTRACT_VERSION
     diagnostics = dict(blend.diagnostics)
+    evidence_fingerprint: str | None = None
     if evidence_table_path is not None and evidence_manifest_path is not None:
         evidence = read_player_evidence_artifact(evidence_table_path, evidence_manifest_path)
         adjusted = apply_elite_evidence(
@@ -163,8 +321,51 @@ def build(
         evidence_fingerprint = hashlib.sha256(
             f"{evidence.attrs['table_sha256']}:{manifest_digest}".encode()
         ).hexdigest()
+        diagnostics["projection_selection"] = "legacy_elite_candidate"
+    elif control_only:
+        diagnostics["projection_selection"] = "explicit_legacy_control"
     else:
-        evidence_fingerprint = None
+        history_weeks = tuple(range(max(1, target - COMPONENT_HISTORY_WINDOW), target))
+        missing_history = [
+            week for week in history_weeks if live_payload(week) not in snapshot.payloads
+        ]
+        if missing_history:
+            diagnostics.update(
+                {
+                    "projection_selection": "legacy_control_fallback",
+                    "component_fallback_reason": "missing_live_history_payloads",
+                    "component_missing_gameweeks": missing_history,
+                }
+            )
+        else:
+            try:
+                projected_table, component_diagnostics = _component_table(
+                    archive_root,
+                    bootstrap=bootstrap,
+                    fixtures=fixtures,
+                    event_payloads={
+                        week: snapshot.payloads[live_payload(week)] for week in history_weeks
+                    },
+                    season=season,
+                    target=target,
+                    source_snapshot_id=identifier,
+                    captured_at_utc=captured_at,
+                    deadline_utc=target_deadline.deadline_utc,
+                    fallback=blend.table,
+                )
+            except IncompleteLiveHistoryError as error:
+                diagnostics.update(
+                    {
+                        "projection_selection": "legacy_control_fallback",
+                        "component_fallback_reason": "provisional_live_history",
+                        "component_fallback_detail": str(error),
+                    }
+                )
+            else:
+                model_version = COMPONENT_MODEL_VERSION
+                feature_contract_version = COMPONENT_FEATURE_CONTRACT_VERSION
+                diagnostics.update(component_diagnostics)
+                diagnostics["projection_selection"] = "phase_c_component_default"
 
     expected = {
         int(code): float(points)
@@ -223,7 +424,7 @@ def main() -> int:
     parser.add_argument(
         "--control-only",
         action="store_true",
-        help="explicitly produce the previous control without Phase C evidence",
+        help="explicitly roll back to the previous in-season control",
     )
     parser.add_argument(
         "--gameweek",
@@ -236,7 +437,7 @@ def main() -> int:
         "--evidence-table",
         type=Path,
         default=None,
-        help="verified player_evidence_v1 CSV; requires --evidence-manifest",
+        help="explicit legacy elite candidate input; requires --evidence-manifest",
     )
     parser.add_argument(
         "--evidence-manifest",
@@ -246,18 +447,10 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    evidence_requested = (
-        arguments.evidence_table is not None and arguments.evidence_manifest is not None
-    )
     if arguments.control_only and (
         arguments.evidence_table is not None or arguments.evidence_manifest is not None
     ):
         parser.error("--control-only cannot be combined with evidence artifact arguments")
-    if not arguments.control_only and not evidence_requested:
-        parser.error(
-            "the operational Phase C path requires --evidence-table and --evidence-manifest; "
-            "use --control-only for the explicit rollback"
-        )
 
     if not arguments.snapshot_root.is_dir():
         print(f"No snapshot directory at {arguments.snapshot_root}.")
@@ -277,6 +470,7 @@ def main() -> int:
         gameweek=arguments.gameweek,
         evidence_table_path=arguments.evidence_table,
         evidence_manifest_path=arguments.evidence_manifest,
+        control_only=arguments.control_only,
         dry_run=arguments.dry_run,
     )
 
@@ -309,6 +503,23 @@ def main() -> int:
             "elite_evidence_manifest_sha256",
         ):
             print(f"  {key:42} {report[key]}")
+    if report.get("projection_selection") == "phase_c_component_default":
+        print()
+        print("Phase C component model")
+        for key in (
+            "component_training_rows",
+            "component_training_appearance_rows",
+            "component_training_conditional_rows",
+            "component_history_gameweeks",
+            "component_history_incomplete_players",
+            "route:component_model",
+            "route:direct_control",
+            "component_fingerprint",
+        ):
+            print(f"  {key:42} {report[key]}")
+    elif report.get("projection_selection") == "legacy_control_fallback":
+        print()
+        print(f"Phase C fallback  {report['component_fallback_reason']}")
     print()
     print(f"Identity  {report['model_name']} / {report['model_version']}")
     if not report["version_is_promoted"]:
