@@ -34,6 +34,7 @@ from typing import Final
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_bool_dtype
 
 from squadopt.prediction.components import (
     COMPONENT_EVIDENCE_STATUSES,
@@ -340,16 +341,19 @@ def _component_fingerprint(
     scenarios: ScenarioSet,
     inputs: "ComponentScenarioInputs",
     sampled_minutes: pd.DataFrame,
+    sampled_appearances: pd.DataFrame,
 ) -> str:
-    """Digest the V1 identity, the minutes matrix and the component provenance together.
+    """Digest the V1 identity, both sampled matrices and the component provenance together.
 
     Small and private on purpose. It follows ``_scenario_fingerprint``'s shape -- canonical
-    JSON metadata, then the raw little-endian float64 bytes of the matrix -- rather than
-    introducing a general fingerprint mechanism this phase has no second use for.
+    JSON metadata, then the raw bytes of each matrix -- rather than introducing a general
+    fingerprint mechanism this phase has no second use for.
 
-    The minutes bytes are inside the digest because the autosub decision is taken from the
-    minutes: two draws with a byte-identical points matrix and different minutes are different
-    results, and must not be able to share an identity.
+    The minutes and the appearance bytes are both inside the digest because the autosub
+    decision is taken from them: two draws with a byte-identical points matrix but a different
+    minute or a different appearance are different results, and must not be able to share an
+    identity. Both shapes are pinned by the metadata, so appending one block after the other
+    is unambiguous.
     """
 
     provenance = inputs.provenance
@@ -368,6 +372,7 @@ def _component_fingerprint(
         json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
     )
     digest.update(sampled_minutes.to_numpy(dtype="<f8", copy=True).tobytes(order="C"))
+    digest.update(sampled_appearances.to_numpy(dtype=bool, copy=True).tobytes(order="C"))
     return digest.hexdigest()
 
 
@@ -387,6 +392,13 @@ class ComponentScenarioDraw:
     component provenance. Both are already validated and copied on that object, so carrying it
     restates nothing.
 
+    ``sampled_appearances`` is the sampler's own Bernoulli state, published rather than left
+    to be inferred. Because the conditional minute draw is clipped, ``sampled_minutes == 0``
+    cannot on its own separate a player who did not feature from one who did and whose minute
+    draw fell below zero -- and a decision scorer decides autosub on exactly that difference.
+    Reconstructing it from ``minutes > 0`` would make the scorer's answer depend on an
+    inference this object already knows the truth of.
+
     ``component_fingerprint`` is recomputed and compared on construction, so a matrix and an
     identity cannot be paired by assertion. ``ScenarioSet``'s own V1 fingerprint behaviour is
     untouched.
@@ -395,6 +407,7 @@ class ComponentScenarioDraw:
     scenarios: ScenarioSet
     inputs: "ComponentScenarioInputs"
     sampled_minutes: pd.DataFrame
+    sampled_appearances: pd.DataFrame
     component_fingerprint: str
 
     def __post_init__(self) -> None:
@@ -404,6 +417,8 @@ class ComponentScenarioDraw:
             raise ScenarioValidationError("inputs must be ComponentScenarioInputs.")
         if not isinstance(self.sampled_minutes, pd.DataFrame):
             raise ScenarioValidationError("sampled_minutes must be a pandas DataFrame.")
+        if not isinstance(self.sampled_appearances, pd.DataFrame):
+            raise ScenarioValidationError("sampled_appearances must be a pandas DataFrame.")
 
         points = self.scenarios.scenario_points
         # Copied before anything is checked, so a later edit to the caller's frame cannot
@@ -444,12 +459,58 @@ class ComponentScenarioDraw:
                 "calendar is not a playable outcome."
             )
 
+        # Copied before it is checked, for the same reason the minutes are.
+        appearances = self.sampled_appearances.copy(deep=True)
+        if appearances.shape != points.shape:
+            raise ScenarioValidationError(
+                "sampled_appearances shape must equal the scenario points matrix."
+            )
+        if tuple(appearances.index.tolist()) != self.scenarios.scenario_ids:
+            raise ScenarioValidationError("sampled_appearances index must equal scenario_ids.")
+        if tuple(appearances.columns.tolist()) != tuple(points.columns.tolist()):
+            raise ScenarioValidationError(
+                "sampled_appearances columns must exactly align with the scenario points columns."
+            )
+        # Deliberately the same rule the decision scorer applies to this frame, so a frame that
+        # satisfies the producer satisfies the consumer: complete, and boolean rather than a
+        # 0/1 integer or an object column that merely looks like one.
+        if bool(appearances.isna().any().any()) or any(
+            not is_bool_dtype(dtype) for dtype in appearances.dtypes
+        ):
+            raise ScenarioValidationError(
+                "sampled_appearances must contain complete boolean Bernoulli states; a missing, "
+                "numeric or minutes-derived value is refused."
+            )
+        appearances = appearances.astype("bool")
+
+        # The three ways the appearance state and the two outcome matrices could contradict
+        # each other. Each is a real disagreement, not a style rule: a consumer reading one
+        # matrix would draw a conclusion the other matrix denies.
+        appeared = appearances.to_numpy(dtype=bool)
+        point_values = points.to_numpy(dtype="float64")
+        if bool(np.any(appeared & (ceiling[None, :] <= 0.0))):
+            raise ScenarioValidationError(
+                "sampled_appearances marks an appearance in a blank gameweek; with no fixture "
+                "there is nowhere to play, whatever the probability says."
+            )
+        if bool(np.any(~appeared & ((values != 0.0) | (point_values != 0.0)))):
+            raise ScenarioValidationError(
+                "a non-appearance must score exactly zero minutes and exactly zero points; a "
+                "player who did not feature scored nothing rather than approximately nothing."
+            )
+        if bool(np.any(appeared & (values <= 0.0))):
+            raise ScenarioValidationError(
+                "sampled_appearances marks an appearance with no minutes; the published minutes "
+                "may not contradict the published appearance state."
+            )
+
         fingerprint = _digest(self.component_fingerprint, "component_fingerprint")
-        if fingerprint != _component_fingerprint(self.scenarios, self.inputs, minutes):
+        if fingerprint != _component_fingerprint(self.scenarios, self.inputs, minutes, appearances):
             raise ScenarioValidationError(
                 "component_fingerprint does not match the scenario matrices and provenance."
             )
         object.__setattr__(self, "sampled_minutes", minutes)
+        object.__setattr__(self, "sampled_appearances", appearances)
         object.__setattr__(self, "component_fingerprint", fingerprint)
 
 
@@ -547,9 +608,11 @@ def sample_component_scenarios(
     """Draw appearance, then a paired conditional residual, into a V1-shaped ``ScenarioSet``.
 
     ``scenario_points`` stays the public decision matrix, in the projection's own player
-    order. The per-cell minutes are returned beside it as
-    ``ComponentScenarioDraw.sampled_minutes``, not inside ``ScenarioSet.diagnostics``: that
-    field is JSON-compatible metadata by contract and cannot hold a matrix.
+    order. The per-cell minutes and the per-cell Bernoulli appearance state are returned beside
+    it as ``ComponentScenarioDraw.sampled_minutes`` and ``.sampled_appearances``, not inside
+    ``ScenarioSet.diagnostics``: that field is JSON-compatible metadata by contract and cannot
+    hold a matrix. The appearance state is published rather than inferred, because a clipped
+    minute cannot distinguish a non-appearance from an appearance drawn below zero.
 
     One source fold is chosen per scenario, and every cell of that scenario draws its paired
     residual from a row of that fold alone. That is what makes ``source_fold_ids`` a fact
@@ -664,8 +727,15 @@ def sample_component_scenarios(
 
     minutes_pool = residuals.residuals["minutes_residual"].to_numpy(dtype="float64")
     points_pool = residuals.residuals["points_residual"].to_numpy(dtype="float64")
+    # An appearance is floored at one minute rather than zero. Not a claim that match minutes
+    # are integral: it is what stops the published minutes from contradicting the published
+    # appearance, since a cell reading zero minutes *and* appeared would leave every consumer
+    # to reconcile the two. ``appeared`` already implies a non-zero ceiling, so the floor can
+    # never exceed it. The cost is disclosed rather than corrected: this shifts the conditional
+    # minutes mean slightly upward on exactly the cells the zero clip was already distorting.
+    floor = np.where(appeared, 1.0, 0.0)
     # One index per cell, used for *both* residuals: this is what keeps the pair together.
-    minutes = np.clip(mean_minutes[None, :] + minutes_pool[drawn], 0.0, ceiling[None, :])
+    minutes = np.clip(mean_minutes[None, :] + minutes_pool[drawn], floor, ceiling[None, :])
     # Points are not clipped: a negative FPL score is a real outcome, not an error.
     points = mean_points[None, :] + points_pool[drawn]
 
@@ -689,6 +759,15 @@ def sample_component_scenarios(
         index=pd.Index(scenario_ids, name="scenario_id"),
         columns=list(projections.table["player_id"]),
         dtype="float64",
+    )
+    # The Bernoulli state itself, published rather than left to be recovered from the minutes.
+    # A clipped continuous quantity cannot separate "did not feature" from "featured, and the
+    # minute draw fell below zero", and the autosub decision turns on precisely that.
+    sampled_appearances = pd.DataFrame(
+        appeared,
+        index=pd.Index(scenario_ids, name="scenario_id"),
+        columns=list(projections.table["player_id"]),
+        dtype="bool",
     )
     # The fold each scenario actually drew from, not the fold of whichever player came first.
     source_fold_ids = tuple(history[int(index)] for index in chosen)
@@ -719,7 +798,10 @@ def sample_component_scenarios(
         scenarios=scenario_set,
         inputs=inputs,
         sampled_minutes=sampled_minutes,
-        component_fingerprint=_component_fingerprint(scenario_set, inputs, sampled_minutes),
+        sampled_appearances=sampled_appearances,
+        component_fingerprint=_component_fingerprint(
+            scenario_set, inputs, sampled_minutes, sampled_appearances
+        ),
     )
 
 

@@ -186,12 +186,21 @@ def _sample(*, config: ScenarioConfig | None = None, **kwargs: object):
 # --- 1, 2. determinism -------------------------------------------------------
 
 
-def test_the_same_seed_and_input_produce_the_same_matrix_and_fingerprint() -> None:
+def test_the_same_seed_and_input_produce_the_same_matrices_and_fingerprints() -> None:
+    """All three published matrices, not just the points one.
+
+    The appearance state is drawn from the same generator, so a determinism claim that covered
+    only the points matrix would leave the other two free to drift.
+    """
+
     first = _sample()
     second = _sample()
 
     assert first.scenarios.scenario_fingerprint == second.scenarios.scenario_fingerprint
+    assert first.component_fingerprint == second.component_fingerprint
     pd.testing.assert_frame_equal(first.scenarios.scenario_points, second.scenarios.scenario_points)
+    pd.testing.assert_frame_equal(first.sampled_minutes, second.sampled_minutes)
+    pd.testing.assert_frame_equal(first.sampled_appearances, second.sampled_appearances)
 
 
 def test_a_different_seed_moves_the_draws() -> None:
@@ -292,14 +301,20 @@ def test_minutes_and_points_residuals_come_from_the_same_historical_row() -> Non
     assert points_residual == pytest.approx(minutes_residual / 10.0)
 
 
-def test_the_sampled_minutes_are_diagnostics_not_a_second_decision_matrix() -> None:
-    """Minutes are published for the scorer, but the points matrix stays the public one."""
+def test_every_published_matrix_lines_up_cell_for_cell_with_the_points_matrix() -> None:
+    """Minutes and appearances are published for the scorer; points stays the public matrix.
 
-    scenarios = _sample()
-    minutes = scenarios.sampled_minutes
+    The scorer indexes all three by the same scenario id and the same player column, so an
+    alignment that held for one and not another would be read as a silent reordering.
+    """
 
-    assert list(minutes.columns) == list(scenarios.scenarios.scenario_points.columns)
-    assert minutes.shape == scenarios.scenarios.scenario_points.shape
+    draw = _sample()
+    points = draw.scenarios.scenario_points
+
+    for published in (draw.sampled_minutes, draw.sampled_appearances):
+        assert list(published.columns) == list(points.columns)
+        assert list(published.index) == list(points.index)
+        assert published.shape == points.shape
 
 
 # --- 9, 10, 11. leakage and chronology --------------------------------------
@@ -611,13 +626,145 @@ def test_a_changed_minutes_matrix_changes_the_component_fingerprint() -> None:
 
     draw = _sample(inputs=_inputs(_input_frame(appearance_probability=1.0)))
     moved = draw.sampled_minutes.copy(deep=True)
-    assert moved.iloc[0, 0] > 0.0
-    moved.iloc[0, 0] = 0.0
+    # Moved to another *positive* value on purpose. Moving it to zero would trip the
+    # appearance/minutes agreement check first, which is a different rule than the one under
+    # test here: this test is about the digest, not about the cross-matrix invariants.
+    assert moved.iloc[0, 0] > 1.0
+    moved.iloc[0, 0] = moved.iloc[0, 0] - 1.0
 
     with pytest.raises(ScenarioValidationError, match="component_fingerprint does not match"):
         ComponentScenarioDraw(
             scenarios=draw.scenarios,
             inputs=draw.inputs,
             sampled_minutes=moved,
+            sampled_appearances=draw.sampled_appearances,
             component_fingerprint=draw.component_fingerprint,
         )
+
+
+# --- 20. the appearance state, published rather than inferred ---------------
+
+
+def test_a_non_appearance_is_visible_as_such_and_scores_exactly_nothing() -> None:
+    """The state the scorer must not have to guess.
+
+    Zero minutes alone is ambiguous, which is the whole reason this matrix exists. Here the
+    ambiguity is removed from the other side: nobody appeared, and the matrix says so.
+    """
+
+    draw = _sample(inputs=_inputs(_input_frame(appearance_probability=0.0)))
+
+    assert not draw.sampled_appearances.to_numpy().any()
+    assert (draw.sampled_minutes.to_numpy() == 0.0).all()
+    assert (draw.scenarios.scenario_points.to_numpy() == 0.0).all()
+
+
+def test_an_appearance_drawn_below_zero_minutes_stays_an_appearance() -> None:
+    """The case that made zero minutes ambiguous in the first place.
+
+    The pool's minutes residual is -30 against a conditional mean of 5, so the unclipped draw
+    is -25 for every cell. Previously that clipped to zero and became indistinguishable from a
+    player who never featured. Now the appearance survives and the minutes are floored at one.
+
+    The floor is not a claim about integral match minutes; it is what keeps the two published
+    matrices from contradicting each other.
+    """
+
+    history = _oof()
+    history["minutes_target"] = 15.0  # residual -30 against the pool's own mean of 45
+    history["points_target"] = 1.0  # residual -3, so the point outcome stays realizable
+
+    frame = _input_frame(appearance_probability=1.0)
+    frame["expected_minutes_if_appearance"] = 5.0
+
+    draw = _sample(inputs=_inputs(frame), oof=history)
+
+    assert draw.sampled_appearances.to_numpy().all()
+    assert (draw.sampled_minutes.to_numpy() == 1.0).all()
+    # And the points are untouched by the minutes floor.
+    assert draw.scenarios.scenario_points.to_numpy() == pytest.approx(1.0)
+
+
+def test_the_appearance_state_and_positive_minutes_agree_exactly() -> None:
+    """The identity the floor buys, pinned because it is easy to lose and load-bearing.
+
+    Together, the floor and the cross-matrix invariants make ``sampled_appearances`` exactly
+    ``sampled_minutes > 0``. That is the point: after the floor, zero minutes means one thing
+    only. It also means the appearance frame is informationally *redundant* with the minutes --
+    it is published so a consumer need not know or trust this identity, and so that the
+    equivalence is a guarantee of the contract rather than a coincidence of the arithmetic.
+
+    Should the floor ever be relaxed, this test is the one that should fail first.
+    """
+
+    frame = _input_frame(appearance_probability=0.5)
+    frame["expected_minutes_if_appearance"] = 3.0  # low enough that the floor bites often
+
+    history = _oof()
+    history["minutes_target"] = 15.0  # residual -30, so the unclipped draw is negative
+    history["points_target"] = 1.0
+
+    draw = _sample(inputs=_inputs(frame), oof=history)
+    appearances = draw.sampled_appearances.to_numpy()
+    minutes = draw.sampled_minutes.to_numpy()
+
+    assert 0.0 < appearances.mean() < 1.0  # a mixture, so neither branch is untested
+    assert (minutes == 1.0).any()  # the floor really did engage
+    assert (appearances == (minutes > 0.0)).all()
+
+
+def test_a_blank_gameweek_never_appears_however_certain_the_probability() -> None:
+    """No fixture is nowhere to play, so certainty of appearing cannot override it."""
+
+    frame = _input_frame(appearance_probability=1.0)
+    frame["fixture_count"] = 0
+    frame["expected_minutes_if_appearance"] = 0.0
+
+    draw = _sample(inputs=_inputs(frame))
+
+    assert not draw.sampled_appearances.to_numpy().any()
+
+
+def test_a_corrupted_appearance_frame_is_refused() -> None:
+    """Five ways the appearance frame could be wrong, each named rather than absorbed.
+
+    Worth noting what the first case shows: the cross-matrix invariants make an *inconsistent*
+    appearance frame unrepresentable, so a flipped cell is caught by the disagreement it causes
+    rather than having to be detected by the digest. That is the stronger guarantee -- the
+    digest still covers the appearance bytes, but nothing has to rely on that to notice this.
+    """
+
+    draw = _sample(inputs=_inputs(_input_frame(appearance_probability=1.0)))
+    good = draw.sampled_appearances
+
+    def rebuild(appearances: pd.DataFrame) -> ComponentScenarioDraw:
+        return ComponentScenarioDraw(
+            scenarios=draw.scenarios,
+            inputs=draw.inputs,
+            sampled_minutes=draw.sampled_minutes,
+            sampled_appearances=appearances,
+            component_fingerprint=draw.component_fingerprint,
+        )
+
+    flipped = good.copy(deep=True)
+    flipped.iloc[0, 0] = False
+    with pytest.raises(ScenarioValidationError, match="did not feature scored nothing"):
+        rebuild(flipped)
+
+    with pytest.raises(ScenarioValidationError, match="complete boolean Bernoulli states"):
+        rebuild(good.astype("int64"))  # 0/1 integers are not the Bernoulli state
+
+    incomplete = good.astype("boolean")
+    incomplete.iloc[0, 0] = pd.NA
+    with pytest.raises(ScenarioValidationError, match="complete boolean Bernoulli states"):
+        rebuild(incomplete)
+
+    with pytest.raises(ScenarioValidationError, match="sampled_appearances columns"):
+        rebuild(good.loc[:, list(good.columns)[::-1]])
+
+    relabelled = good.copy(deep=True)
+    relabelled.index = pd.Index(
+        [f"not-a-scenario-{index}" for index in range(len(good))], name="scenario_id"
+    )
+    with pytest.raises(ScenarioValidationError, match="sampled_appearances index"):
+        rebuild(relabelled)
