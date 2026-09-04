@@ -180,3 +180,69 @@ it was not. The following decisions fix the lineage rather than the numbers.
    status in `application/views.py`, a different contract; nothing here collapses it, and no new
    status is coined for the scenario input. Should the Phase C contract declare more statuses,
    this validation follows it rather than being widened independently.
+
+## 10. Amendment — observable appearance state
+
+Frozen **before** the production change it governs. This amendment **modifies the frozen minutes
+formula of §3**, which is permissible only under the condition that still holds: no binding
+measurement has been produced from this module, none is produced by the change this amendment
+describes, and the locked 2025-26 holdout remains unread. Were a measurement already on record,
+the formula would be closed and this would have to be a new pre-registration instead.
+
+It exists because the real appearance state was being discarded. The sampler drew
+`A_i ~ Bernoulli(p_i)` internally and published only the minutes, and because the conditional
+minute draw was clipped at zero, `sampled_minutes == 0` collapsed two different outcomes:
+
+- the player did not feature, and
+- the player featured, but `mu_minutes_i + epsilon_minutes_i <= 0`, so the clip produced zero.
+
+A decision scorer must not have to guess which of those it is looking at. Autosub is decided on
+whether a player featured, and inferring that from a continuous, clipped quantity would make the
+scorer's answer depend on an inference the sampler already knows the truth of.
+
+1. **The draw carries the real Bernoulli state.** `ComponentScenarioDraw` publishes
+   `sampled_appearances: pandas.DataFrame`. It is the sampler's own `A_i` matrix, not a quantity
+   recovered from the minutes.
+2. **Its shape is the result's shape.** Boolean, complete — no missing value — and sharing the
+   scenario index and the player column order of both the points and the minutes matrices. A
+   frame that cannot be lined up cell for cell with the other two is refused.
+3. **A blank gameweek never appears.** `fixture_count == 0` implies appearance `False`,
+   whatever the probability says. This restates §6.4 rather than adding to it.
+4. **Non-appearance stays an exact zero.** Appearance `False` implies `sampled_minutes` and
+   `scenario_points` are exactly `0`, as §3 already froze.
+5. **An appearance played some minute.** Appearance `True` with `fixture_count > 0` implies
+   `sampled_minutes > 0`. Concretely, §3's
+
+   ```text
+   M_i = clip(mu_minutes_i + epsilon_minutes_i, 0, 90 * fixture_count_i)
+   ```
+
+   becomes, for an appearance,
+
+   ```text
+   M_i = clip(mu_minutes_i + epsilon_minutes_i, 1, 90 * fixture_count_i)
+   ```
+
+   **This is not a claim that match minutes are integral, and not a model of short
+   appearances.** It is the bound that stops the published minutes from contradicting the
+   published appearance state. The alternative — leaving the zero clip and allowing a cell where
+   appearance is `True` and minutes are `0` — keeps the two matrices in disagreement and puts the
+   burden of reconciling them on every consumer.
+
+   **Disclosed cost.** A lower bound at one minute shifts the conditional minutes mean slightly
+   upward relative to the zero clip, exactly on the cells the zero clip was already distorting.
+   One bias is replaced by a slightly different one; neither is measured here, and no correction,
+   centering or scale is introduced for either.
+6. **Points keep their sign.** Point outcomes may remain negative and are never clipped at zero.
+   Nothing in this amendment touches the point draw.
+7. **The identity covers all three matrices.** `component_fingerprint` binds the points matrix,
+   the minutes matrix, the appearance matrix and the whole of the existing provenance. An
+   appearance cell that changes changes the digest exactly as a points or minutes cell does,
+   because a draw whose appearance pattern differs is a different result.
+8. **Nothing numeric is chosen.** No location shift, no dispersion scale, no calibration or
+   promotion gate is registered here. In particular the scenario mean is not asserted to
+   reproduce the Phase C point mean: with `E[Y_i] = p_i * (mu_points_i + E[epsilon_points])`, a
+   residual pool or fold block whose mean residual is non-zero will not reproduce it, and
+   clipping moves the conditional minutes mean too. Measuring and, if warranted, correcting that
+   is separate work under its own pre-registration and gate.
+9. **No binding measurement is run after this change.**
