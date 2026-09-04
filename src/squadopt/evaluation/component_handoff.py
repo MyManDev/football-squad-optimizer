@@ -66,7 +66,12 @@ class PhaseCComponentHandoff:
     roster: pd.DataFrame
     table_sha256: str
     roster_sha256: str
+    manifest_sha256: str
     repository_commit: str
+    model_version: str
+    feature_contract_version: str
+    target_contract_version: str
+    dataset_contract_version: str
 
 
 def _manifest(path: Path) -> dict[str, object]:
@@ -89,6 +94,13 @@ def _sha256(path: Path, field: object, label: str) -> str:
             f"Phase C {label} checksum {digest} does not match its manifest."
         )
     return digest
+
+
+def _file_sha256(path: Path, label: str) -> str:
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as error:
+        raise EvaluationValidationError(f"Cannot read Phase C {label} {path}: {error}") from error
 
 
 def _schema(
@@ -202,6 +214,7 @@ def read_phase_c_component_handoff(
 
     table_path, roster_path, manifest_path = map(Path, (table_path, roster_path, manifest_path))
     document = _manifest(manifest_path)
+    manifest_digest = _file_sha256(manifest_path, "manifest")
     required = {
         "contract_version",
         "model_version",
@@ -310,7 +323,12 @@ def read_phase_c_component_handoff(
         roster=roster.copy(deep=True),
         table_sha256=table_digest,
         roster_sha256=roster_digest,
+        manifest_sha256=manifest_digest,
         repository_commit=repository_commit,
+        model_version=str(document["model_version"]),
+        feature_contract_version=str(document["feature_contract_version"]),
+        target_contract_version=str(document["target_contract_version"]),
+        dataset_contract_version=str(document["dataset_contract_version"]),
     )
 
 

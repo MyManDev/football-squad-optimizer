@@ -534,7 +534,7 @@ def _score(frame: pd.DataFrame) -> ComponentMetricSet:
         ),
         points=_error_metrics(non_blank, "control_expected_points", "realized_points"),
         points_if_appearance=_error_metrics(
-            appeared, "raw_expected_points_if_appearance", "points_target"
+            appeared, "expected_points_if_appearance", "points_target"
         ),
     )
 

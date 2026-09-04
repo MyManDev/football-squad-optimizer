@@ -8,9 +8,9 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 - **Phase A — Engineering complete; prospective evidence accumulating.**
 - **Phase B — Complete.** The deadline-safe evidence layer is built and its first real
   handoff is produced and verified.
-- **Phase C — Operational v1 active; evaluation continues.** The in-season handoff can
-  consume the verified Top-100 evidence artifact under a frozen, bounded rule. Richer
-  component fitting and prospective accuracy gates remain in progress.
+- **Phase C — Component-base evaluation complete; prospective evidence validation open.**
+  The component base is measured on 147 development folds and the in-season handoff can
+  consume verified Top-100 evidence under a frozen, bounded rule.
 - **Phases D–H — Planned.** Later phases do not become product claims until their own
   calibration and evaluation gates pass.
 
@@ -80,7 +80,7 @@ Exit criteria:
 
 ## Phase C — Probabilistic player model
 
-**Status: operational v1 available; component evaluation in progress.**
+**Status: component-base evaluation complete; prospective evidence validation open.**
 
 Goal: replace a single undifferentiated point estimate with explicit, testable components.
 
@@ -101,6 +101,17 @@ in-season expected-points handoff, while live availability remains a separate, s
 post-processing step. The exact rule, rollback and limitations are frozen in
 [`docs/phase_c_operational_elite_policy.md`](docs/phase_c_operational_elite_policy.md).
 
+Recorded component-base result:
+
+- **101,447** out-of-fold player rows and **147/147** comparable development decisions.
+- Appearance Brier score **0.10734** and unconditional points MAE **1.09027**.
+- Mean realized squad score **63.1633**, against **58.5442** for the historical Ridge control.
+- Paired component-minus-control difference **+4.6190 points per gameweek**; season means are
+  positive in all four development seasons.
+- This is descriptive, not a promotion: no candidate-specific gate was frozen before the run,
+  and some solves were feasible without proof of optimality. The operational control is retained.
+- Full record: [`docs/phase_c_component_evaluation.md`](docs/phase_c_component_evaluation.md).
+
 No probability from this phase is member-facing. Publication requires the later scenario and
 calibration gates.
 
@@ -110,6 +121,10 @@ Exit criteria:
 - Each evidence family has a separate incremental-value measurement.
 - The candidate improves decision-level outcomes under pre-registered gates or the control is
   retained.
+
+Exit state: the evaluation surface and historical component-base measurement are complete.
+Phase C remains open because evidence-family incremental-value measurements are prospective;
+deadline-valid elite, transfer and availability histories cannot be fabricated or backfilled.
 
 ## Phase D — Monte Carlo V2
 

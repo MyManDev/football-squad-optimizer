@@ -20,10 +20,13 @@ import json
 import sys
 import warnings
 from collections import Counter
+from collections.abc import Mapping
 from datetime import UTC, datetime
+from importlib.metadata import version
 from pathlib import Path
 from typing import Final, cast
 
+import pandas as pd
 from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT, REPOSITORY_ROOT, artifact_metadata
 
 from squadopt.backtest import (
@@ -109,6 +112,18 @@ def _recorded_warnings(caught: list[warnings.WarningMessage]) -> list[str]:
     ]
 
 
+def _load_development_panel(archive_root: Path) -> pd.DataFrame:
+    panel = build_panel(archive_root, seasons=HISTORY_SEASONS)
+    observed = {str(value) for value in panel["season"].dropna().unique()}
+    expected = set(HISTORY_SEASONS)
+    if observed != expected:
+        raise DataError(
+            "Phase C panel seasons differ from the explicit development history: "
+            f"expected {sorted(expected)!r}, observed {sorted(observed)!r}."
+        )
+    return panel
+
+
 def _measure(arguments: argparse.Namespace) -> dict[str, object]:
     handoff = read_phase_c_component_handoff(arguments.table, arguments.roster, arguments.manifest)
     producer = _producer_environment(
@@ -116,7 +131,7 @@ def _measure(arguments: argparse.Namespace) -> dict[str, object]:
         table_sha256=handoff.table_sha256,
         repository_commit=handoff.repository_commit,
     )
-    panel = build_panel(arguments.archive_root, seasons=HISTORY_SEASONS)
+    panel = _load_development_panel(arguments.archive_root)
     controls = build_walk_forward_folds(
         panel,
         seasons=DECISION_SEASONS,
@@ -132,7 +147,12 @@ def _measure(arguments: argparse.Namespace) -> dict[str, object]:
         "source": {
             "table_sha256": handoff.table_sha256,
             "roster_sha256": handoff.roster_sha256,
+            "manifest_sha256": handoff.manifest_sha256,
             "producer_repository_commit": handoff.repository_commit,
+            "model_version": handoff.model_version,
+            "feature_contract_version": handoff.feature_contract_version,
+            "target_contract_version": handoff.target_contract_version,
+            "dataset_contract_version": handoff.dataset_contract_version,
             "producer_environment": producer,
         },
         "player_metrics": phase_c_component_evaluation_to_dict(player_metrics),
@@ -176,9 +196,17 @@ def main() -> int:
         created_utc=started.isoformat(timespec="seconds"),
         history_seasons=HISTORY_SEASONS,
     )
+    evaluation_environment = dict(cast(Mapping[str, object], metadata["environment"]))
+    evaluation_environment.update(
+        {
+            "numpy": version("numpy"),
+            "scipy": version("scipy"),
+            "scikit_learn": version("scikit-learn"),
+        }
+    )
     document: dict[str, object] = {
         "contract_version": REPORT_VERSION,
-        "created_utc": metadata["created_utc"],
+        "generated_at_utc": metadata["created_utc"],
         "descriptive_only": True,
         "promotion_decision": "not_evaluated",
         "operational_control_changed": False,
@@ -190,7 +218,7 @@ def main() -> int:
             "warnings": _recorded_warnings(caught),
         },
         "provenance": metadata["provenance"],
-        "evaluation_environment": metadata["environment"],
+        "evaluation_environment": evaluation_environment,
         **measured,
     }
     try:

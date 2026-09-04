@@ -126,10 +126,13 @@ def _write_document(path: Path, value: dict[str, object]) -> None:
 
 
 def test_reads_exact_handoff_and_supplies_position_to_the_scorer(tmp_path: Path) -> None:
-    handoff = read_phase_c_component_handoff(*_artifacts(tmp_path))
+    artifacts = _artifacts(tmp_path)
+    handoff = read_phase_c_component_handoff(*artifacts)
 
     assert handoff.rows["position"].tolist() == ["MID"]
     assert handoff.roster["price_tenths"].tolist() == [65]
+    assert handoff.manifest_sha256 == hashlib.sha256(artifacts[2].read_bytes()).hexdigest()
+    assert handoff.model_version == "phase-c-component-control-v1"
     assert evaluate_component_oof(handoff.rows).overall.appearance.observations == 1
 
 
