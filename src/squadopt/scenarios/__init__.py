@@ -1,5 +1,14 @@
 """Joint point scenarios and fixed-decision distribution summaries."""
 
+from squadopt.scenarios.decision_scoring import (
+    COMPONENT_DECISION_LOWER_QUANTILE,
+    COMPONENT_DECISION_READOUT_CONTRACT_VERSION,
+    COMPONENT_DECISION_SCORING_CONTRACT_VERSION,
+    ComponentDecisionDistributionReadout,
+    ComponentDecisionScoringResult,
+    score_component_scenario_decision,
+    summarize_component_decision_distribution,
+)
 from squadopt.scenarios.evaluation import (
     RivalSquad,
     ScenarioComparisonResult,
@@ -53,6 +62,9 @@ from squadopt.scenarios.rivals import (
 
 __all__ = [
     "CLAIM_SCENARIO_MODES",
+    "COMPONENT_DECISION_LOWER_QUANTILE",
+    "COMPONENT_DECISION_READOUT_CONTRACT_VERSION",
+    "COMPONENT_DECISION_SCORING_CONTRACT_VERSION",
     "RANK_OBJECTIVE_CONTRACT_VERSION",
     "RESIDUAL_HISTORY_COLUMNS",
     "SCENARIO_CONTRACT_VERSION",
@@ -60,6 +72,8 @@ __all__ = [
     "SCENARIO_OPTIMIZATION_CONTRACT_VERSION",
     "SCENARIO_PATH_CONTRACT_VERSION",
     "TEMPLATE_RIVAL_CONTRACT_VERSION",
+    "ComponentDecisionDistributionReadout",
+    "ComponentDecisionScoringResult",
     "GoalMenuEntry",
     "RankObjectiveConfig",
     "RankOptimizationResult",
@@ -87,6 +101,8 @@ __all__ = [
     "optimize_scenario_aware_squad",
     "scenario_result_to_dict",
     "scenario_result_to_markdown",
+    "score_component_scenario_decision",
+    "summarize_component_decision_distribution",
     "template_rival_diagnostics",
     "template_rival_from_ownership",
     "validate_residual_history",
