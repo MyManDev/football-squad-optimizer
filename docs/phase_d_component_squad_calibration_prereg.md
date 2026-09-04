@@ -31,8 +31,8 @@ The scenario configuration is the existing `ScenarioConfig` default, stated expl
 `player_location_shrinkage=None`, and `double_gameweek_scale=1.0`.
 
 No location shift, dispersion scale, residual recentering, winsorization, reweighting or
-bootstrap correction is applied. If sampler fidelity fails, this run abstains; these values
-are not changed to rescue it.
+bootstrap correction is applied. If sampler fidelity cannot be verified, this run abstains;
+these values are not changed to rescue it.
 
 ## Outcome-independent population
 
@@ -83,8 +83,15 @@ they cannot overturn the pooled result. No interval or parameter search is autho
 Before the single binding run, the sampler-fidelity diagnostic must be committed and reviewed.
 It must measure, without tuning, appearance frequency, unconditional points and minutes means,
 their conditional counterparts, residual-pool means and the one-minute floor engagement. A
-missing or failed fidelity result causes abstention. It does not authorize a shift or scale in
-this protocol.
+missing or structurally invalid fidelity result causes abstention. It does not authorize a
+shift or scale in this protocol.
+
+The fidelity study is diagnostic-only and registers no numeric pass/fail threshold. Here,
+"verified" therefore means its committed artifact loads under its own contract, names the
+expected Phase C table and roster digests, records the frozen scenario configuration, excludes
+the locked holdout and contains no non-finite or structurally contradictory reading. It does
+not mean that a post-hoc numeric tolerance was met. The measured differences remain descriptive
+and cannot be used to tune or rescue S1/S2.
 
 ## Acceptance checks before any binding run
 
@@ -95,4 +102,3 @@ this protocol.
 - Inputs are not mutated.
 - No 2025-26 path is read, listed or hashed.
 - No member-facing payload or operational recommendation path changes.
-

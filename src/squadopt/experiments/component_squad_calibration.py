@@ -81,7 +81,7 @@ def evaluate_component_squad_calibration(
     folds: Sequence[ComponentCalibrationFold],
     *,
     expected_fold_ids: Sequence[str],
-    sampler_fidelity_accepted: bool,
+    sampler_fidelity_verified: bool,
 ) -> ComponentSquadCalibrationResult:
     """Evaluate S1/S2, or abstain before reading them when evidence is incomplete.
 
@@ -90,8 +90,8 @@ def evaluate_component_squad_calibration(
     exact 137-fold Phase D population.
     """
 
-    if not isinstance(sampler_fidelity_accepted, bool):
-        raise ComponentSquadCalibrationError("sampler_fidelity_accepted must be a bool.")
+    if not isinstance(sampler_fidelity_verified, bool):
+        raise ComponentSquadCalibrationError("sampler_fidelity_verified must be a bool.")
     observed = tuple(folds)
     if any(not isinstance(fold, ComponentCalibrationFold) for fold in observed):
         raise ComponentSquadCalibrationError("folds must contain ComponentCalibrationFold values.")
@@ -105,11 +105,11 @@ def evaluate_component_squad_calibration(
 
     ordered = tuple(sorted(observed, key=lambda fold: fold.fold_id))
     observed_ids = tuple(fold.fold_id for fold in ordered)
-    if not sampler_fidelity_accepted:
+    if not sampler_fidelity_verified:
         return _abstained(
             observed_ids,
             len(expected),
-            "sampler_fidelity_not_accepted",
+            "sampler_fidelity_not_verified",
         )
     if set(observed_ids) != set(expected):
         missing = sorted(set(expected) - set(observed_ids))

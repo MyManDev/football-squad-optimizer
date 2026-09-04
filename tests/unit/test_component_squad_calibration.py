@@ -57,7 +57,7 @@ def test_aggregates_the_hand_calculated_s1_and_s2_readings() -> None:
     result = evaluate_component_squad_calibration(
         folds,
         expected_fold_ids=_fold_ids(),
-        sampler_fidelity_accepted=True,
+        sampler_fidelity_verified=True,
     )
 
     assert result.status == "calibrated_internal"
@@ -80,7 +80,7 @@ def test_gate_bounds_are_inclusive(pit: float, lower_tail_count: int) -> None:
     result = evaluate_component_squad_calibration(
         folds,
         expected_fold_ids=_fold_ids(100),
-        sampler_fidelity_accepted=True,
+        sampler_fidelity_verified=True,
     )
 
     assert result.status == "calibrated_internal"
@@ -92,7 +92,7 @@ def test_a_measured_gate_failure_is_recorded_without_moving_the_bounds() -> None
     result = evaluate_component_squad_calibration(
         folds,
         expected_fold_ids=_fold_ids(),
-        sampler_fidelity_accepted=True,
+        sampler_fidelity_verified=True,
     )
 
     assert result.status == "failed"
@@ -104,20 +104,20 @@ def test_missing_sampler_fidelity_abstains_without_publishing_gate_values() -> N
     result = evaluate_component_squad_calibration(
         _folds(),
         expected_fold_ids=_fold_ids(),
-        sampler_fidelity_accepted=False,
+        sampler_fidelity_verified=False,
     )
 
     assert result.status == "abstained"
     assert result.mean_probability_integral_transform is None
     assert result.realized_below_lower_quantile_rate is None
-    assert result.abstention_reason == "sampler_fidelity_not_accepted"
+    assert result.abstention_reason == "sampler_fidelity_not_verified"
 
 
 def test_a_population_mismatch_abstains_instead_of_changing_the_denominator() -> None:
     result = evaluate_component_squad_calibration(
         _folds()[:-1],
         expected_fold_ids=_fold_ids(),
-        sampler_fidelity_accepted=True,
+        sampler_fidelity_verified=True,
     )
 
     assert result.status == "abstained"
@@ -140,7 +140,7 @@ def test_an_incomplete_observation_abstains_instead_of_becoming_zero() -> None:
     result = evaluate_component_squad_calibration(
         folds,
         expected_fold_ids=_fold_ids(),
-        sampler_fidelity_accepted=True,
+        sampler_fidelity_verified=True,
     )
 
     assert result.status == "abstained"
@@ -155,7 +155,7 @@ def test_duplicate_fold_identifiers_are_rejected() -> None:
         evaluate_component_squad_calibration(
             folds,
             expected_fold_ids=_fold_ids(),
-            sampler_fidelity_accepted=True,
+            sampler_fidelity_verified=True,
         )
 
 
@@ -176,7 +176,7 @@ def test_a_readout_that_contradicts_the_frozen_protocol_is_rejected(
         evaluate_component_squad_calibration(
             folds,
             expected_fold_ids=_fold_ids(),
-            sampler_fidelity_accepted=True,
+            sampler_fidelity_verified=True,
         )
 
 
@@ -191,5 +191,5 @@ def test_invalid_pit_values_are_rejected(pit: float) -> None:
         evaluate_component_squad_calibration(
             folds,
             expected_fold_ids=_fold_ids(),
-            sampler_fidelity_accepted=True,
+            sampler_fidelity_verified=True,
         )
