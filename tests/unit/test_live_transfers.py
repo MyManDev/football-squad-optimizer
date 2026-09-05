@@ -33,6 +33,10 @@ from squadopt.live import (
     write_projection_handoff,
 )
 from squadopt.live import recommendation as live_recommendation
+from squadopt.prediction.component_dataset import (
+    FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
+)
+from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 from squadopt.prediction.elite_evidence import (
     ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION,
     ELITE_EVIDENCE_MODEL_VERSION,
@@ -266,7 +270,11 @@ def _handoff(
         feature_contract_version=(
             ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION
             if feature_contract_version is None and version == ELITE_EVIDENCE_MODEL_VERSION
-            else feature_contract_version or "synthetic-in-season-features-v0"
+            else (
+                COMPONENT_FEATURE_CONTRACT_VERSION
+                if feature_contract_version is None and version == COMPONENT_MODEL_VERSION
+                else feature_contract_version or "synthetic-in-season-features-v0"
+            )
         ),
         expected_points=expected,
         evidence_fingerprint=evidence_fingerprint,
@@ -374,6 +382,26 @@ def test_the_elite_model_requires_its_evidence_identity(world: dict[str, Any]) -
 
     with pytest.raises(DataSourceError, match="legacy in-season control"):
         _handoff(world, evidence_fingerprint="a" * 64)
+
+
+def test_the_component_model_requires_its_exact_identity_without_external_evidence(
+    world: dict[str, Any],
+) -> None:
+    projection = read_projection_handoff(_handoff(world, version=COMPONENT_MODEL_VERSION))
+    assert projection.model_version == COMPONENT_MODEL_VERSION
+
+    with pytest.raises(DataSourceError, match="requires no external evidence fingerprint"):
+        _handoff(
+            world,
+            version=COMPONENT_MODEL_VERSION,
+            evidence_fingerprint="a" * 64,
+        )
+    with pytest.raises(DataSourceError, match="exact feature contract"):
+        _handoff(
+            world,
+            version=COMPONENT_MODEL_VERSION,
+            feature_contract_version="wrong-features-v1",
+        )
 
 
 def test_a_handoff_for_another_capture_or_gameweek_is_refused(

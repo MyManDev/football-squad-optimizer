@@ -23,10 +23,12 @@ from squadopt.data.sources.fpl_live import (
     entry_endpoint_paths,
     gameweek_deadlines,
     league_standings_endpoint_path,
+    live_endpoint_path,
     next_open_deadline,
     player_snapshot,
 )
 from squadopt.data.sources.vaastav import build_panel
+from squadopt.prediction.component_dataset import COMPONENT_HISTORY_WINDOW
 
 BASE_URL = "https://fantasy.premierleague.com/api"
 ENDPOINTS: dict[str, str] = {
@@ -147,6 +149,17 @@ def registered_endpoints(
     return {name: f"{BASE_URL}/{path}" for name, path in sorted(paths.items())}
 
 
+def component_history_endpoints(bootstrap: bytes, *, as_of_utc: str) -> Mapping[str, str]:
+    """Return the bounded, already-played live endpoints needed by Phase C features."""
+
+    target = next_open_deadline(gameweek_deadlines(bootstrap), as_of_utc=as_of_utc).gameweek
+    first = max(1, target - COMPONENT_HISTORY_WINDOW)
+    paths: dict[str, str] = {}
+    for gameweek in range(first, target):
+        paths.update(live_endpoint_path(gameweek))
+    return {name: f"{BASE_URL}/{path}" for name, path in sorted(paths.items())}
+
+
 def registered_entry_ids(path: Path) -> tuple[int, ...]:
     """Read the registry, reporting a bad one in the data error contract.
 
@@ -178,7 +191,9 @@ def capture(
 ) -> SnapshotMetadata | None:
     """Fetch, describe and optionally persist one immutable snapshot.
 
-    The two season endpoints are always read. Passing ``entry_registry`` adds the three
+    The two season endpoints and up to five already-played live-score documents are always
+    read. The bounded history supplies the exact shifted minutes and points used by the
+    operational Phase C component model. Passing ``entry_registry`` adds the three
     documents each registered entry publishes, and ``league_id`` adds the league standings
     page, so a capture can record who was in the league when a recommendation was made.
 
@@ -195,9 +210,20 @@ def capture(
     for name, content in sorted(payloads.items()):
         print(f"  read     {name}  ({len(content):,} bytes)")
 
+    resolution_at = _utc_now()
+    history = component_history_endpoints(
+        payloads[BOOTSTRAP_PAYLOAD],
+        as_of_utc=resolution_at,
+    )
+    if history:
+        print(f"Reading {len(history)} component-history endpoint(s)")
+        for name, url in history.items():
+            payloads[name] = fetch(url)
+            print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
+
     extra = registered_endpoints(
         payloads[BOOTSTRAP_PAYLOAD],
-        as_of_utc=_utc_now(),
+        as_of_utc=resolution_at,
         entry_registry=entry_registry,
         league_id=league_id,
     )

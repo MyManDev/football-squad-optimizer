@@ -185,6 +185,29 @@ def test_an_empty_registry_reads_nothing_extra(tmp_path: Path) -> None:
     assert endpoints == {}
 
 
+def test_component_history_is_bounded_to_the_five_weeks_before_the_target() -> None:
+    events = [
+        {
+            "id": gameweek,
+            "deadline_time": f"2026-09-{gameweek + 1:02d}T17:30:00Z",
+            "finished": gameweek < 7,
+        }
+        for gameweek in range(1, 9)
+    ]
+    bootstrap = json.dumps({"events": events}).encode("utf-8")
+
+    endpoints = fpl_capture.component_history_endpoints(bootstrap, as_of_utc="2026-09-08T12:00:00Z")
+
+    assert tuple(endpoints) == tuple(f"event-gw{week:02d}-live.json" for week in range(2, 7))
+
+
+def test_component_history_reads_nothing_before_the_opening_deadline() -> None:
+    assert (
+        fpl_capture.component_history_endpoints(_bootstrap(), as_of_utc="2026-08-20T09:00:00Z")
+        == {}
+    )
+
+
 # --- capture end to end ---------------------------------------------------------------
 
 
@@ -212,6 +235,7 @@ def test_the_extra_payloads_land_in_the_snapshot_and_survive_the_checksum(
     assert set(snapshot.payloads) == {
         BOOTSTRAP_PAYLOAD,
         FIXTURES_PAYLOAD,
+        "event-gw01-live.json",
         "league-352490-standings.json",
         "entry-11.json",
         "entry-11-history.json",
@@ -222,7 +246,7 @@ def test_the_extra_payloads_land_in_the_snapshot_and_survive_the_checksum(
     )
 
 
-def test_a_capture_without_a_registry_is_the_two_endpoints_it_always_was(
+def test_a_capture_without_a_registry_adds_only_the_bounded_component_history(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The injected capture operation calls this with one argument; it must not grow one."""
@@ -238,7 +262,11 @@ def test_a_capture_without_a_registry_is_the_two_endpoints_it_always_was(
     written = fpl_capture.capture(tmp_path / "snapshots")
     assert written is not None
     snapshot = read_snapshot(tmp_path / "snapshots", written.snapshot_id)
-    assert set(snapshot.payloads) == {BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD}
+    assert set(snapshot.payloads) == {
+        BOOTSTRAP_PAYLOAD,
+        FIXTURES_PAYLOAD,
+        "event-gw01-live.json",
+    }
 
 
 def test_a_dry_run_with_entries_writes_nothing(
