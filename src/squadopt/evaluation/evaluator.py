@@ -142,7 +142,7 @@ def evaluate_prepared_folds(
         if optimization_result.has_solution:
             realized_score = score_realized_squad_points(
                 optimization_result,
-                validated_realized,
+                fold.realized_points,
                 policy=config.scoring_policy,
             )
 
