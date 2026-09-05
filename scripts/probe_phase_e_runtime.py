@@ -44,6 +44,7 @@ from scripts._experiment_cli import (
     artifact_metadata,
     write_json,
 )
+from scripts._phase_e_inputs import PhaseDBindingEvidence, load_phase_d_binding
 from scripts.run_component_squad_calibration import (
     BINDING_FOLD_COUNT,
     DECISION_SEASONS,
@@ -165,6 +166,7 @@ class DecisionPoint:
     draw_factory: DrawFactory | None = None
     draw_unavailable_reason: str | None = None
     covered_player_ids: frozenset[int] | None = None
+    source: Record | None = None
 
     def __post_init__(self) -> None:
         if self.kind not in ("live", "fold"):
@@ -485,6 +487,7 @@ def probe_decision_point(
         "draw_unavailable_reason": point.draw_unavailable_reason,
         "runs": runs,
         "warnings": warnings,
+        **({"source": point.source} if point.source is not None else {}),
     }
 
 
@@ -809,7 +812,14 @@ def fold_decision_points(
     return points, len(panel)
 
 
-def live_point_from_capture(snapshot_root: Path, spec: str) -> DecisionPoint:
+def live_point_from_capture(
+    snapshot_root: Path,
+    spec: str,
+    *,
+    component_handoff: PhaseCComponentHandoff | None = None,
+    archive_root: Path = DEFAULT_ARCHIVE_ROOT,
+    binding_evidence: PhaseDBindingEvidence | None = None,
+) -> DecisionPoint:
     """``SEASON:GAMEWEEK:SNAPSHOT_ID:HANDOFF_PATH``: the decide phase's own projection."""
 
     parts = spec.split(":", 3)
@@ -821,6 +831,20 @@ def live_point_from_capture(snapshot_root: Path, spec: str) -> DecisionPoint:
     snapshot = read_snapshot(snapshot_root, snapshot_id)
     inputs = read_inputs(snapshot, season=season, gameweek=int(gameweek))
     handoff = read_projection_handoff(Path(handoff_path))
+    if component_handoff is not None:
+        from scripts._phase_e_live import live_component_decision
+
+        if (handoff.season, handoff.gameweek) != (season, int(gameweek)):
+            raise ProbeError("The requested live decision differs from the projection handoff.")
+        if binding_evidence is None:
+            raise ProbeError("Live components require Phase D binding evidence.")
+        return live_component_decision(
+            snapshot,
+            handoff,
+            component_handoff,
+            archive_root,
+            binding_evidence=binding_evidence,
+        )
     table = project(inputs, in_season=handoff).table
     return DecisionPoint(
         label=f"{season}-gw{int(gameweek):02d}",
@@ -866,6 +890,12 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
         "--all-binding-folds", action="store_true", help="probe the 137-fold population"
     )
     parser.add_argument("--snapshot-root", type=Path, default=DEFAULT_SNAPSHOT_ROOT)
+    parser.add_argument("--binding", type=Path, help="calibrated Phase D evidence for live draws")
+    parser.add_argument(
+        "--live-components",
+        action="store_true",
+        help="rebuild GW2/GW3 draws from original captures and the frozen Phase C handoff",
+    )
     parser.add_argument(
         "--live-decision",
         action="append",
@@ -936,10 +966,37 @@ def main(argv: Sequence[str] | None = None) -> int:
         points: list[DecisionPoint] = []
         panel_rows = 0
         expected_fold_ids: tuple[str, ...] | None = None
+        live_handoff = None
+        live_evidence = None
+        if arguments.live_components:
+            if not arguments.live_decision or not all(
+                (arguments.table, arguments.roster, arguments.manifest)
+            ):
+                raise ProbeError(
+                    "--live-components requires --live-decision and --table/--roster/--manifest."
+                )
+            if arguments.binding is None:
+                raise ProbeError("--live-components requires --binding.")
+            live_evidence = load_phase_d_binding(arguments.binding)
+            if live_evidence.status != "calibrated_internal":
+                raise ProbeError(
+                    "Live component draws require calibrated_internal Phase D evidence."
+                )
+            live_handoff = read_phase_c_component_handoff(
+                arguments.table, arguments.roster, arguments.manifest
+            )
         for spec in arguments.live_pool:
             points.append(live_point_from_csv(spec))
         for spec in arguments.live_decision:
-            points.append(live_point_from_capture(arguments.snapshot_root, spec))
+            points.append(
+                live_point_from_capture(
+                    arguments.snapshot_root,
+                    spec,
+                    component_handoff=live_handoff,
+                    archive_root=arguments.archive_root,
+                    binding_evidence=live_evidence,
+                )
+            )
         if arguments.fold or arguments.all_binding_folds:
             handoff = read_phase_c_component_handoff(
                 arguments.table, arguments.roster, arguments.manifest
