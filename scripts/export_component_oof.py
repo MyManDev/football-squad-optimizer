@@ -44,19 +44,17 @@ from squadopt.data.sources.vaastav import (
     build_panel,
     load_team_codes,
 )
-from squadopt.features import build_feature_dataset
 from squadopt.features.component_targets import (
     START_TARGET_STATUS,
     START_TARGET_SUPPORTED_SEASONS,
     TARGET_CONTRACT_VERSION,
-    build_component_targets,
 )
-from squadopt.features.fixtures import attach_fixture_features
 from squadopt.prediction.component_dataset import (
     COMPONENT_FEATURE_CONFIG,
+    COMPONENT_TRAINING_SEASONS,
     DATASET_CONTRACT_VERSION,
     FEATURE_CONTRACT_VERSION,
-    build_component_frame,
+    build_component_modelling_frame,
     component_feature_columns,
     excluded_ratio_features,
     rows_at,
@@ -74,7 +72,7 @@ OOF_CONTRACT_VERSION = "phase_c_component_oof_v1"
 
 # The chronological development seasons. 2025-26 is the locked holdout and 2020-21 sits
 # before the window every recorded development measurement uses, so neither is a default.
-DEFAULT_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25")
+DEFAULT_SEASONS = COMPONENT_TRAINING_SEASONS
 LOCKED_HOLDOUT_SEASON = "2025-26"
 
 OOF_COLUMNS = (
@@ -168,24 +166,13 @@ def _modelling_frame(archive_root: Path, seasons: tuple[str, ...]) -> tuple[pd.D
         [load_team_codes(archive_root, season).assign(season=season) for season in seasons],
         ignore_index=True,
     )
-    features = build_feature_dataset(panel, config=COMPONENT_FEATURE_CONFIG)
-
-    # Attached per season, as the production backtest does: the fixture table and the team
-    # bridge are both per-season objects. "omit" because the archive publishes no capture
-    # instant, so its difficulty is not a pre-match value -- and the two omitted columns
-    # are not in this feature set anyway.
-    attached = [
-        attach_fixture_features(
-            features.loc[features["season"].astype("string") == season],
-            fixtures.loc[fixtures["season"].astype("string") == season],
-            team_codes.loc[team_codes["season"].astype("string") == season],
-            unproven_difficulty="omit",
-        )
-        for season in seasons
-    ]
-    with_fixtures = pd.concat(attached, ignore_index=True)
-    targets = build_component_targets(panel)
-    return panel, build_component_frame(with_fixtures, targets)
+    return panel, build_component_modelling_frame(
+        panel,
+        fixtures,
+        team_codes,
+        seasons=seasons,
+        config=COMPONENT_FEATURE_CONFIG,
+    )
 
 
 def _training_key_digest(training: pd.DataFrame) -> str:
