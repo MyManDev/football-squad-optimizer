@@ -8,10 +8,14 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 - **Phase A — Engineering complete; prospective evidence accumulating.**
 - **Phase B — Complete.** The deadline-safe evidence layer is built and its first real
   handoff is produced and verified.
-- **Phase C — Component base operational; prospective evidence validation open.**
-  The measured component base is the default in-season handoff model. The previous
-  in-season blend remains an explicit rollback and a structured fallback for old captures.
-- **Phases D–H — Planned.** Later phases do not become product claims until their own
+- **Phase C — Engineering ready; merge and deployment pending.** The component model,
+  decision-level evaluation and live-default integration are prepared in PRs #348, #350 and
+  #351. They remain outside `develop` and production until the deadline freeze ends and the
+  stacked release is revalidated.
+- **Phase D — Foundation under review; decision scoring in progress.** PR #349 introduces the
+  pre-registered appearance-plus-paired-residual sampler without changing Scenario V1 or live
+  behaviour. Contract hardening, official scenario scoring, correlation and calibration remain.
+- **Phases E–H — Planned.** Later phases do not become product claims until their own
   calibration and evaluation gates pass.
 
 ## Phase A — Measurement correctness
@@ -80,7 +84,7 @@ Exit criteria:
 
 ## Phase C — Probabilistic player model
 
-**Status: component base operational; prospective evidence validation open.**
+**Status: engineering ready; merge and deployment pending the deadline freeze.**
 
 Goal: replace a single undifferentiated point estimate with explicit, testable components.
 
@@ -124,6 +128,14 @@ Recorded component-base result:
 No probability from this phase is member-facing. Publication requires the later scenario and
 calibration gates.
 
+Delivery state:
+
+- PR #348 provides the versioned component targets, models and reproducible out-of-fold handoff.
+- PR #350 provides the chronological component and decision-level evaluation record.
+- PR #351 makes the component projection the live default with an explicit legacy fallback.
+- The three-PR stack is not yet on `develop` or in production. It must be merged in order and
+  exercised through the live replay and deployment runbooks after the freeze.
+
 Exit criteria:
 
 - Component models are leakage-safe, versioned and reproducible.
@@ -137,7 +149,7 @@ deadline-valid elite, transfer and availability histories cannot be fabricated o
 
 ## Phase D — Monte Carlo V2
 
-**Status: planned.**
+**Status: foundation under review; decision-level integration in progress.**
 
 Goal: generate realistic joint player and squad outcomes from the Phase C model.
 
@@ -149,6 +161,15 @@ Goal: generate realistic joint player and squad outcomes from the Phase C model.
 - Apply autosubs, bench order and vice-captain recovery inside every scenario.
 - Re-run squad-level location and lower-tail calibration.
 
+Current delivery state:
+
+- PR #349 pre-registers and implements the first component-aware sampler: a Bernoulli
+  appearance mixture followed by paired conditional minutes and points residuals.
+- The foundation does not yet provide official per-scenario autosubs, vice-captain recovery,
+  honest fallback for direct-control rows, calibrated common/team shocks or a live promotion.
+- The next delivery reuses the Phase A official scorer to evaluate one frozen squad decision
+  inside every component scenario; it does not create a second game-rules implementation.
+
 Exit criteria:
 
 - Scenario means reproduce the point model.
@@ -157,7 +178,7 @@ Exit criteria:
 
 ## Phase E — Stochastic single-gameweek optimizer
 
-**Status: planned.**
+**Status: pre-registered; engine not yet written.**
 
 Goal: choose one legal squad decision using calibrated uncertainty rather than only mean points.
 
@@ -167,6 +188,24 @@ Goal: choose one legal squad decision using calibrated uncertainty rather than o
 - Price captain risk explicitly.
 - Support rival-gap utility without mixing rival identity into the player model.
 - Give Saf Puan, Garantici and aggressive modes measured mathematical meanings.
+
+Current delivery state:
+
+- `docs/phase_e_candidate_selection_prereg.md` freezes the first Phase E design before any
+  production code: a candidate-based selector, not a scenario-aware optimizer. The
+  deterministic CP-SAT model proposes the top-K decisions over the full pool (identity:
+  squad, starting eleven and captain, exact no-good constraints, every candidate proven optimal),
+  every candidate is scored on one shared Phase D component draw with the official scorer,
+  and a fixed integer mean/CVaR utility (rho 0.25, alpha 0.10, 1000 scenarios) selects, with
+  named fallbacks to the Phase C control. E2 measures repeatability and seed sensitivity;
+  E3 uses season-aware moving-block uncertainty for historical shadow evaluation.
+- Legacy boundary: `optimize_scenario_aware_squad` and its config and result types are
+  legacy. They are not on the live path, are not a fallback, receive no new features, and
+  are scheduled for removal after E5 behind an audit of the recorded artifacts that depend
+  on them.
+- Not yet delivered: the candidate generator, the selector, the E2 runtime probe, the E3
+  shadow evaluation and the live shadow seam. The rival-gap utility and the mode meanings in
+  the goals above are later Phase E work with their own preregistrations.
 
 Exit criteria:
 
