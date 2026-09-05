@@ -7,6 +7,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from math import ceil, isfinite
+from numbers import Integral
 from statistics import fmean
 from typing import Final
 
@@ -48,6 +49,11 @@ _FOLD_ID = re.compile(r"^(2021-22|2022-23|2023-24|2024-25)-gw(0[1-9]|[12][0-9]|3
 
 class PhaseEShadowError(ValueError):
     """Raised when shadow evidence cannot support the preregistered comparison."""
+
+
+def _plain_identifier(value: object) -> object:
+    """Optimizer frames may carry NumPy integers; artifact identities use JSON scalars."""
+    return int(value) if isinstance(value, Integral) else value
 
 
 @dataclass(frozen=True, slots=True)
@@ -170,9 +176,9 @@ def score_phase_e_shadow_fold(
                 score,
                 difference,
                 utility,
-                diagnostic.squad_ids,
-                diagnostic.starting_ids,
-                diagnostic.captain_id,
+                tuple(_plain_identifier(value) for value in diagnostic.squad_ids),
+                tuple(_plain_identifier(value) for value in diagnostic.starting_ids),
+                _plain_identifier(diagnostic.captain_id),
             )
         )
     by_rank = {item.rank: item for item in readings}
@@ -188,7 +194,7 @@ def score_phase_e_shadow_fold(
         selected_points=by_rank[rank].realized_points,
         squad_changed=set(selected.squad_ids) != set(control.squad_ids),
         eleven_changed=set(selected.starting_ids) != set(control.starting_ids),
-        captain_changed=selected.captain_id != control.captain_id,
+        captain_changed=bool(selected.captain_id != control.captain_id),
         formation_changed=(
             frozen[rank].starting_xi["position"].value_counts().to_dict()
             != frozen[0].starting_xi["position"].value_counts().to_dict()

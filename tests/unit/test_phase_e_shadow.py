@@ -1,10 +1,12 @@
 """Paired shadow gates, whole-fold uncertainty and official realized scoring."""
 
 import hashlib
+import json
 import random
-from dataclasses import replace
+from dataclasses import asdict, replace
 from statistics import fmean
 
+import numpy as np
 import pandas as pd
 import pytest
 from tests.unit.test_phase_e_selection import _candidates, _full_draw, _select
@@ -251,3 +253,22 @@ def test_bootstrap_signal_keeps_both_candidates_of_each_sampled_fold(
     monkeypatch.setattr(module, "spearmanr", check_pairs)
     _evaluate(records)
     assert calls == 2001
+
+
+def test_shadow_artifact_uses_plain_json_scalars_for_numpy_optimizer_identifiers() -> None:
+    candidates = []
+    for candidate in _candidates():
+        captain = candidate.captain.copy()
+        captain["player_id"] = np.int64(captain["player_id"])
+        candidates.append(replace(candidate, captain=captain))
+    draw = _full_draw()
+    selection = _select(tuple(candidates), draw)
+    outcomes = pd.DataFrame(
+        {"player_id": range(1, 16), "total_points": range(1, 16), "minutes": 90}
+    )
+    record = score_phase_e_shadow_fold(
+        "2023-24-gw10", candidates, selection, outcomes, candidate_set_complete=True
+    )
+    json.dumps(asdict(record), allow_nan=False)
+    assert type(record.captain_changed) is bool
+    assert all(type(candidate.captain_id) is int for candidate in record.candidates)
