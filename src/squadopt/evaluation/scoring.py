@@ -20,7 +20,6 @@ from squadopt.optimization import OptimizationResult
 from squadopt.optimization.config import POSITIONS, Position
 
 REALIZED_POINTS_COLUMNS: tuple[str, str] = ("player_id", "total_points")
-REALIZED_OUTCOME_COLUMNS: tuple[str, str, str] = ("player_id", "total_points", "minutes")
 MAX_ERROR_EXAMPLES = 10
 OPTIMIZER_COMPLETION_POLICY = "optimizer_projection_order_v1"
 FPL_SQUAD_POSITION_LIMITS: dict[str, int] = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}

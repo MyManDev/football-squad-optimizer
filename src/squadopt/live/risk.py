@@ -167,7 +167,6 @@ CALENDAR_BLIND_LIMIT: Final = (
     "optimistic by roughly the measured undercoverage (0.85 against nominal 0.90; "
     "docs/fixture_group_conformal_note.md)."
 )
-LIVE_RISK_STATED_LIMITS: Final = (CALENDAR_BLIND_LIMIT,)
 
 
 @dataclass(frozen=True, slots=True)
