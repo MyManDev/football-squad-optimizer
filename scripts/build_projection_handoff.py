@@ -146,6 +146,7 @@ def _component_table(
     captured_at_utc: str,
     deadline_utc: str,
     fallback: pd.DataFrame,
+    include_components: bool = False,
 ) -> tuple[pd.DataFrame, dict[str, object]]:
     training_panel = build_panel(archive_root, seasons=COMPONENT_TRAINING_SEASONS)
     training_fixtures = build_fixture_panel(archive_root, seasons=COMPONENT_TRAINING_SEASONS)
@@ -241,7 +242,15 @@ def _component_table(
         "component_history_gameweeks": sorted(event_payloads),
         "component_history_incomplete_players": len(incomplete_players),
     }
-    return snapshot.table.loc[:, ["player_id", "expected_points"]], diagnostics
+    table = snapshot.table.loc[:, ["player_id", "expected_points"]]
+    if include_components:
+        diagnostics["component_training_cutoff"] = provenance.training_cutoff
+        diagnostics["component_training_data_fingerprint"] = provenance.training_data_fingerprint
+        # The sampler needs the raw conditional point mean, including negative values.
+        raw = rows.drop(columns="expected_points_if_appearance").copy()
+        raw["raw_expected_points_if_appearance"] = predicted["raw_expected_points_if_appearance"]
+        table = raw.merge(table, on="player_id", validate="one_to_one")
+    return table, diagnostics
 
 
 def build(
