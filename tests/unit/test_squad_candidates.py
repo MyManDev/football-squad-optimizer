@@ -336,3 +336,25 @@ def test_excluding_a_decision_returns_the_next_best_and_refuses_foreign_ones(
             small_config,
             excluded_decisions=(replace(control, captain=None),),
         )
+
+
+def test_a_repeated_starter_row_is_refused_by_the_seam(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """An eleven that lists one starter twice would count that variable twice in the cut."""
+
+    control = optimize_squad(known_optimum_players, small_config)
+    assert control.captain is not None
+    captain_id = control.captain["player_id"]
+    eleven = control.starting_xi
+    other = eleven.loc[eleven["player_id"] != captain_id].iloc[0]["player_id"]
+    doubled = pd.concat(
+        [eleven.loc[eleven["player_id"] != other], eleven.loc[eleven["player_id"] == captain_id]],
+        ignore_index=True,
+    )
+    assert len(doubled) == small_config.starting_size, "cardinality alone does not catch it"
+    malformed = replace(control, starting_xi=doubled)
+
+    with pytest.raises(InvalidConfigurationError, match="complete decision"):
+        optimize_squad(known_optimum_players, small_config, excluded_decisions=(malformed,))

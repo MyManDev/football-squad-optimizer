@@ -334,6 +334,7 @@ def _add_decision_exclusions(
             len(squad_ids) != config.squad_size
             or len(set(squad_ids)) != len(squad_ids)
             or len(starter_ids) != config.starting_size
+            or len(set(starter_ids)) != len(starter_ids)
             or not set(starter_ids) <= set(squad_ids)
             or captain_id not in starter_ids
         ):
