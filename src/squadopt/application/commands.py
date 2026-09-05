@@ -6,6 +6,7 @@ callers supply typed requests, domain failures are raised before an invalid reco
 published, and successful calls return typed descriptions of the files they wrote.
 """
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -319,6 +320,7 @@ def decide(
     *,
     panel_builder: PanelBuilder = build_panel,
     verifier: DecisionVerifier = verify_decision,
+    phase_e_shadow: Callable[[CapturedSnapshot, Projection], dict[str, object]] | None = None,
 ) -> DecideResult:
     """Calculate, verify, and immutably record one gameweek decision."""
 
@@ -383,6 +385,28 @@ def decide(
     )
     if failures:
         raise DecisionVerificationError(failures)
+
+    if phase_e_shadow is not None:
+        # The experiment receives its own pool; it cannot change the published control.
+        shadow_projection = Projection(
+            table=projection.table.copy(deep=True),
+            unavailable_players=projection.unavailable_players,
+            diagnostics=dict(projection.diagnostics),
+            unprojected_players=projection.unprojected_players,
+        )
+        try:
+            diagnostic = phase_e_shadow(snapshot, shadow_projection)
+            if not isinstance(diagnostic, dict):
+                raise ValueError("Shadow diagnostics must be a JSON object.")
+            metadata["phase_e_shadow"] = json.loads(json.dumps(diagnostic, allow_nan=False))
+        except Exception as error:
+            # An optional shadow failure must never prevent a verified control publication.
+            metadata["phase_e_shadow"] = {
+                "status": "ERROR",
+                "internal_only": True,
+                "published_decision_changed": False,
+                "error": f"{type(error).__name__}: {error}",
+            }
 
     report = render(recommendation) + "\n" + render_rules(rules)
     directory = record_decision(

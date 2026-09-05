@@ -332,9 +332,11 @@ def test_evidence_paths_are_an_explicit_pair(world: dict[str, Any], tmp_path: Pa
         )
 
 
+@pytest.mark.parametrize("development_only", [False, True])
 def test_the_command_uses_the_component_path_without_evidence_arguments(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    development_only: bool,
 ) -> None:
     class Called(Exception):
         pass
@@ -343,6 +345,7 @@ def test_the_command_uses_the_component_path_without_evidence_arguments(
         assert kwargs["control_only"] is False
         assert kwargs["evidence_table_path"] is None
         assert kwargs["evidence_manifest_path"] is None
+        assert kwargs["development_only"] is development_only
         raise Called
 
     monkeypatch.setattr(producer, "build", fake_build)
@@ -354,7 +357,8 @@ def test_the_command_uses_the_component_path_without_evidence_arguments(
             str(tmp_path),
             "--archive-root",
             str(tmp_path),
-        ],
+        ]
+        + (["--development-only"] if development_only else []),
     )
 
     with pytest.raises(Called):
@@ -419,6 +423,51 @@ def test_the_latest_capture_is_used_when_none_is_named(world: dict[str, Any]) ->
     projection, _, _ = _build(world)
 
     assert projection.source_snapshot_id == world["after"]
+
+
+@pytest.mark.parametrize("development_only", [False, True])
+def test_development_only_restricts_the_outer_fallback_archive(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch, development_only: bool
+) -> None:
+    reads: list[dict[str, object]] = []
+
+    def panel(root: Path, **kwargs: object) -> pd.DataFrame:
+        assert root == world["archive_root"]
+        reads.append(kwargs)
+        return _panel().assign(season="2024-25")
+
+    monkeypatch.setattr(producer, "build_panel", panel)
+    projection, _, report = _build(
+        world, snapshot_id=world["after"], development_only=development_only, dry_run=True
+    )
+
+    assert reads == (
+        [{"seasons": producer.COMPONENT_TRAINING_SEASONS}] if development_only else [{}]
+    )
+    if development_only:
+        assert projection.diagnostics["fallback_training_seasons"] == list(
+            producer.COMPONENT_TRAINING_SEASONS
+        )
+    else:
+        assert "fallback_training_seasons" not in report
+
+
+@pytest.mark.parametrize("season,target", [("2026-27", 1), ("2025-26", 2)])
+def test_development_only_refuses_nonprospective_targets_before_archive_reads(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch, season: str, target: int
+) -> None:
+    monkeypatch.setattr(producer, "infer_season", lambda _snapshot: season)
+    monkeypatch.setattr(
+        producer, "build_panel", lambda *_args, **_kwargs: pytest.fail("archive read")
+    )
+    with pytest.raises(SystemExit, match="2026-27 in-season"):
+        _build(
+            world,
+            snapshot_id=world["after"],
+            gameweek=target,
+            development_only=True,
+            dry_run=True,
+        )
 
 
 def test_the_report_says_whether_the_version_is_promoted(world: dict[str, Any]) -> None:
