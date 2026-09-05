@@ -49,8 +49,8 @@ def live_component_decision(
         raise probe.ProbeError(
             "The preregistered live draw requires calibrated Phase D binding evidence."
         )
-    if projection.season != "2026-27" or projection.gameweek not in (2, 3):
-        raise probe.ProbeError("Live component E2 inputs support only 2026-27 GW2 and GW3.")
+    if projection.season != "2026-27" or not 2 <= projection.gameweek <= 38:
+        raise probe.ProbeError("Live component inputs support only in-season 2026-27 decisions.")
     if infer_season(capture) != projection.season:
         raise probe.ProbeError("The capture season differs from the frozen projection.")
     if (

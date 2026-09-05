@@ -1,5 +1,7 @@
 """Public application command contracts, independent of CLI parsing and exit codes."""
 
+import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +19,10 @@ from squadopt.application import (
     run_season_tick,
     settle,
 )
+from squadopt.application.build import recommendation_view_from_ledger
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
+from squadopt.live import load_ledger
 
 
 @pytest.fixture(name="world")
@@ -80,6 +84,52 @@ def test_decide_returns_a_typed_result_and_every_published_output(world: dict[st
         "projections.csv",
         "report.txt",
     }
+
+
+@pytest.mark.parametrize("failure", ["none", "exception", "invalid_json", "nonfinite"])
+def test_optional_shadow_cannot_change_or_block_the_verified_publication(
+    world: dict[str, Any], failure: str
+) -> None:
+    request = _decide_request(world)
+    baseline = decide(request, panel_builder=lambda root: gameweek_world._panel())
+    calls = []
+
+    def shadow(snapshot, projection):
+        calls.append(snapshot.metadata.snapshot_id)
+        projection.table.loc[:, "expected_points"] = 999.0
+        if failure == "exception":
+            raise ValueError("synthetic shadow failure")
+        if failure == "invalid_json":
+            return {"bad": {1, 2}}
+        if failure == "nonfinite":
+            return {"bad": float("nan")}
+        return {"status": "NOT_READY", "internal_only": True, "published_decision_changed": False}
+
+    measured = decide(
+        replace(request, ledger_root=world["ledger_root"].parent / "shadow-ledger"),
+        panel_builder=lambda root: gameweek_world._panel(),
+        phase_e_shadow=shadow,
+    )
+    assert calls == [world["decide_id"]]
+    for name in ("projections.csv", "report.txt"):
+        assert (baseline.decision_directory / name).read_bytes() == (
+            measured.decision_directory / name
+        ).read_bytes()
+    control = json.loads(
+        (baseline.decision_directory / "decision.json").read_text(encoding="utf-8")
+    )
+    outcome = json.loads(
+        (measured.decision_directory / "decision.json").read_text(encoding="utf-8")
+    )
+    diagnostic = outcome["metadata"].pop("phase_e_shadow")
+    assert diagnostic["status"] == ("NOT_READY" if failure == "none" else "ERROR")
+    assert outcome == control
+    assert measured.report == baseline.report
+    control_entry = load_ledger(request.ledger_root, baseline.season)[0]
+    shadow_entry = load_ledger(world["ledger_root"].parent / "shadow-ledger", measured.season)[0]
+    assert recommendation_view_from_ledger(control_entry) == recommendation_view_from_ledger(
+        shadow_entry
+    )
 
 
 def test_verification_failure_is_typed_and_publishes_nothing(world: dict[str, Any]) -> None:
