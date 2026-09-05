@@ -1,14 +1,19 @@
 # Backend HTTP Boundary
 
 The versioned HTTP surface above the application/runtime contracts. The transport-neutral
-contract landed first; `squadopt.api` now implements its initial read-only FastAPI surface.
+contract landed first; `squadopt.api` implements published-view reads and optional on-demand
+advice routes. The default ASGI app serves the published views; advice needs injected stores,
+submission services and a worker composition before it can compute anything.
 
 Companion contracts:
 
 - [`backend_api_v1`](../contracts/backend_api_v1.schema.json) defines normalized commands and
   service, run, and error responses.
-- [`ui_view_v1`](../contracts/ui_view_v1.schema.json) remains the response contract for every
-  read endpoint used by the React application.
+- [`ui_view_v1`](../contracts/ui_view_v1.schema.json) remains the published season/gameweek
+  view contract. League-member advice uses `provisional_league_ui_v1` documents and the
+  separate advice-job resource.
+- [`backend_jobs_v1`](../contracts/backend_jobs_v1.schema.json) defines the queued advice
+  lifecycle; it is separate from the terminal operator-run response described below.
 - [platform and runtime boundary](platform_runtime.md) defines execution and provenance.
 - [ADR 0005](decisions/0005-persistence-boundaries.md) defines the future storage split.
 
@@ -40,7 +45,7 @@ validator are in the optional `api` installation extra, so research-only users d
 a web stack. Transport models continue to use the framework-neutral platform contracts rather
 than a duplicate set of Pydantic response classes.
 
-## Running the read-only adapter
+## Running the default published-view adapter
 
 Install the optional dependencies and start the ASGI app from the repository root:
 
@@ -56,8 +61,10 @@ the configured root, rejects non-finite JSON, and validates the exact route-spec
 `ui_view_v1` payload before returning it. Read responses use `Cache-Control: no-cache`.
 
 The Cloudflare Pages deployment remains a static React deployment and does not run this Python
-process. Hosting the API, adding CORS for a separate frontend origin, or moving reads to a
-database requires a later deployment decision; none is silently added here.
+process. [ADR 0006](decisions/0006-backend-hosting.md) records the separate API/worker hosting
+decision and durable shared-store requirements. That decision is not evidence that a deployment
+is running. `create_app(allowed_origins=...)` implements explicit CORS allowlisting; an empty
+tuple enables no cross-origin access and a wildcard is rejected.
 
 ## Version and media type
 
@@ -73,7 +80,7 @@ route version. Adding an optional endpoint without changing existing documents d
 
 ## Read side
 
-The first FastAPI implementation is read-only. It serves the same `ViewEnvelope` documents
+The published-view read side serves the same `ViewEnvelope` documents
 that `python -m scripts.build_site` writes today; it does not wrap them in a second API envelope.
 
 | Method and route | `ui_view_v1` payload | Meaning |
@@ -95,9 +102,51 @@ The initial frontend may continue using committed `/data` JSON while these endpo
 Pages migrate one at a time; static JSON and HTTP must validate against the same `ui_view_v1`
 schema during that transition.
 
-## Command side
+## Implemented advice commands and jobs
 
-Command routes arrive only after the read side works through the application boundary:
+| Method and route | Meaning |
+| --- | --- |
+| `GET /api/v1/leagues/{league_id}` | Published league connection state |
+| `GET /api/v1/leagues/{league_id}/entries/{entry_id}/advice` | Cache lookup for strategy, window and optional rival; never starts a solve |
+| `POST /api/v1/leagues/{league_id}/entries/{entry_id}/advice` | Cached answer (`200`) or accepted job (`202`) |
+| `GET /api/v1/advice-jobs/{job_id}` | Public job state: queued, running, completed or failed |
+| `GET /ready` | Injected readiness checks, or static data-root readiness in the default app |
+| `GET /metrics` | Advice metrics when configured; otherwise `404` |
+
+Advice routes return `503 ADVICE_BACKEND_DISABLED` when their required injected service is
+absent. A missing current capture context is a readiness failure; a valid context with no
+cached answer is a cache miss. These are different states.
+
+The POST body contains `strategy`, `window` and optional `rival_entry_id`. An explicit
+`Idempotency-Key` is supported; the advice submission service also handles its absence.
+Reusing an explicit key with a different request conflicts. Equivalent open work is deduplicated,
+and configured request buckets can reject excess submissions. The in-memory limiter is per API
+process; replicas do not share it automatically.
+
+`run_advice_worker_once` claims a job, calls an injected compute function, writes the immutable
+cache entry and records completion or failure. The real compute function must invoke the public
+application advice service with the captured picks, projection and rules. The worker primitive
+and API tests do not by themselves provide a production worker loop, a capture-context provider
+or a deployed shared store. The default `app = create_app()` does not assemble those services.
+
+The API accepts window values 1, 3 and 5 at the transport boundary. That is not a claim that the
+current engine computes all three: `advise_entry` currently computes window 1 and refuses the
+others. Strategy registration also differs from executable support; only wired constraints
+can produce a plan. The current public advice envelope contains expected-point trade-offs,
+not member-facing probability claims.
+
+The frontend's general pages still use `StaticDataClient`. The member advice client optionally
+uses `VITE_ADVICE_API_ORIGIN` and can fall back to the published static answer. Completing the
+UI integration requires rendering the returned advice payload, retaining the compute controls
+when a static document is absent, and aligning available strategy choices with the backend.
+Enabling an origin alone does not complete that flow.
+
+## Planned operator HTTP commands
+
+The routes below describe the operator-command design; they are not implemented HTTP routes
+in the current `create_app`. The corresponding application/runtime operations remain callable
+through their existing entry points. The remainder of this section describes the planned
+operator request and terminal-run contracts, not the implemented advice-job resource above.
 
 | Method and route | Operation |
 | --- | --- |
