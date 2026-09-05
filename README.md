@@ -8,15 +8,23 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 - **Phase A — Engineering complete; prospective evidence accumulating.**
 - **Phase B — Complete.** The deadline-safe evidence layer is built and its first real
   handoff is produced and verified.
-- **Phase C — Engineering ready; merge and deployment pending.** The component model,
-  decision-level evaluation and live-default integration are prepared in PRs #348, #350 and
-  #351. They remain outside `develop` and production until the deadline freeze ends and the
-  stacked release is revalidated.
-- **Phase D — Foundation under review; decision scoring in progress.** PR #349 introduces the
-  pre-registered appearance-plus-paired-residual sampler without changing Scenario V1 or live
-  behaviour. Contract hardening, official scenario scoring, correlation and calibration remain.
-- **Phases E–H — Planned.** Later phases do not become product claims until their own
-  calibration and evaluation gates pass.
+- **Phase C — Engineering merged; prospective evidence still required.** The component model,
+  decision-level evaluation and default handoff integration landed on `develop` through
+  #348, #350 and #351. This integration does not establish a production deployment.
+- **Phase D — Sampler, scoring, readout and binding runner merged.** The preregistered
+  component scenario path and single-run calibration command are implemented. Calibration
+  claims require the separate binding evidence; merging the code does not establish them.
+- **Phase E — Initial candidate-selection engineering merged; promotion gated.** Candidate
+  generation, selection, E2/E3 measurement commands and the explicit live shadow seam landed
+  through #358–#366. The production selector pin remains empty and normal decisions do not
+  enable the shadow hook. Measurement results are separate from this engineering milestone.
+- **Phases F–H — Planned.** Multi-gameweek and later product claims require their own
+  implementation and evaluation gates.
+
+The backend and frontend are at different integration stages. Published pages use static
+views; optional advice HTTP/job primitives exist, but production worker assembly and the
+complete interactive UI flow still need integration. See the
+[backend boundary](docs/architecture/backend.md).
 
 ## Phase A — Measurement correctness
 
@@ -84,7 +92,7 @@ Exit criteria:
 
 ## Phase C — Probabilistic player model
 
-**Status: engineering ready; merge and deployment pending the deadline freeze.**
+**Status: engineering merged to develop; prospective evidence accumulating.**
 
 Goal: replace a single undifferentiated point estimate with explicit, testable components.
 
@@ -133,8 +141,9 @@ Delivery state:
 - PR #348 provides the versioned component targets, models and reproducible out-of-fold handoff.
 - PR #350 provides the chronological component and decision-level evaluation record.
 - PR #351 makes the component projection the live default with an explicit legacy fallback.
-- The three-PR stack is not yet on `develop` or in production. It must be merged in order and
-  exercised through the live replay and deployment runbooks after the freeze.
+- All three PRs are merged to `develop`, with Python 3.11, Python 3.13 and web CI passing
+  on their integration heads. Deployment remains a separate operation; the source-code
+  default alone does not refresh a published capture, handoff or website.
 
 Exit criteria:
 
@@ -149,7 +158,7 @@ deadline-valid elite, transfer and availability histories cannot be fabricated o
 
 ## Phase D — Monte Carlo V2
 
-**Status: foundation under review; decision-level integration in progress.**
+**Status: engineering merged; calibration and promotion require binding evidence.**
 
 Goal: generate realistic joint player and squad outcomes from the Phase C model.
 
@@ -163,12 +172,16 @@ Goal: generate realistic joint player and squad outcomes from the Phase C model.
 
 Current delivery state:
 
-- PR #349 pre-registers and implements the first component-aware sampler: a Bernoulli
+- PR #349 pre-registers and implements the component-aware sampler: a Bernoulli
   appearance mixture followed by paired conditional minutes and points residuals.
-- The foundation does not yet provide official per-scenario autosubs, vice-captain recovery,
-  honest fallback for direct-control rows, calibrated common/team shocks or a live promotion.
-- The next delivery reuses the Phase A official scorer to evaluate one frozen squad decision
-  inside every component scenario; it does not create a second game-rules implementation.
+- #355, #353 and #354 add contract hardening, official per-scenario decision scoring and
+  unadjusted distribution readouts. Autosubs and vice-captain recovery reuse the Phase A
+  official scorer. Unsupported component inputs fail closed.
+- #356 freezes the 137-fold squad-calibration population and S1/S2 gates. Runner #368
+  enforces the frozen inputs and writes a create-once binding report from a clean revision.
+- Sampling uses one historical source fold per scenario. This boundary does not establish
+  a calibrated explicit team/fixture shock model. A finer dependence model and any live
+  promotion require separate evidence.
 
 Exit criteria:
 
@@ -178,7 +191,7 @@ Exit criteria:
 
 ## Phase E — Stochastic single-gameweek optimizer
 
-**Status: pre-registered; engine not yet written.**
+**Status: initial candidate-selection implementation merged; live/default use gated.**
 
 Goal: choose one legal squad decision using calibrated uncertainty rather than only mean points.
 
@@ -203,9 +216,20 @@ Current delivery state:
   legacy. They are not on the live path, are not a fallback, receive no new features, and
   are scheduled for removal after E5 behind an audit of the recorded artifacts that depend
   on them.
-- Not yet delivered: the candidate generator, the selector, the E2 runtime probe, the E3
-  shadow evaluation and the live shadow seam. The rival-gap utility and the mode meanings in
-  the goals above are later Phase E work with their own preregistrations.
+- Delivered in #358–#366: the top-K candidate generator, fixed integer utility selector,
+  outcome-free E2 runtime probe, E3 historical shadow evaluation, binding command checks,
+  capture-bound live component producer and an explicit application shadow seam.
+- The development-K amendment retains all 137 historical folds and the original three live
+  pools. Historical measurements determine K; the old live pools remain generation/diversity
+  diagnostics. K=4 failure disables the selector even if a larger K passes. Missing old
+  capture payloads are never backfilled.
+- E4 requires calibrated Phase D evidence, eligible E3 evidence and a valid new prospective
+  capture. The ordinary decision command does not install the shadow hook, and the production
+  selector pin remains empty. The explicit seam evaluates full-pool squad decisions; it does
+  not establish a transfer-policy improvement or implement the public strategy modes.
+- Rival-gap utility, the mode meanings above and E5 default promotion remain later work with
+  their own preregistrations. The existing E2/E3 instruments do not satisfy these broader
+  exit criteria by their mere presence.
 
 Exit criteria:
 
