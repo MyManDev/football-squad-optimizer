@@ -170,10 +170,11 @@ Current delivery state:
 - `docs/phase_e_candidate_selection_prereg.md` freezes the first Phase E design before any
   production code: a candidate-based selector, not a scenario-aware optimizer. The
   deterministic CP-SAT model proposes the top-K decisions over the full pool (identity:
-  starting eleven and captain, exact no-good constraints, every candidate proven optimal),
+  squad, starting eleven and captain, exact no-good constraints, every candidate proven optimal),
   every candidate is scored on one shared Phase D component draw with the official scorer,
   and a fixed integer mean/CVaR utility (rho 0.25, alpha 0.10, 1000 scenarios) selects, with
-  a scenario-bootstrap separability check and named fallbacks to the Phase C control.
+  named fallbacks to the Phase C control. E2 measures repeatability and seed sensitivity;
+  E3 uses season-aware moving-block uncertainty for historical shadow evaluation.
 - Legacy boundary: `optimize_scenario_aware_squad` and its config and result types are
   legacy. They are not on the live path, are not a fallback, receive no new features, and
   are scheduled for removal after E5 behind an audit of the recorded artifacts that depend

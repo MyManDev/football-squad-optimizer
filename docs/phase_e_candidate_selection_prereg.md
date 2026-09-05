@@ -42,7 +42,6 @@ audit that lists which recorded experiment artifacts become non-reproducible.
 | Tail fraction α | 0.10 |
 | Scenario count N | 1000, so the tail holds K_tail = ⌈αN⌉ = 100 scenarios |
 | Weight scale W, risk weight R | W = 1000, R = ρW = 250 |
-| Separability bootstrap | B = 200 scenario resamples, `numpy.random.default_rng(0)`, 90% percentile interval |
 | Candidate counts probed in E2 | K ∈ {4, 8, 16} |
 | Operational budget | 120 seconds of wall clock per decision, candidate generation plus scoring, on the machine named in the E2 artifact |
 
@@ -51,32 +50,29 @@ own preregistration.
 
 ## Candidate set
 
-**Identity.** A decision is identified by its starting eleven and its captain. The full
-fifteen-player squad, the bench order and the vice-captain are completions: the squad is
-whatever the deterministic model chooses under its own objective, and the bench order and
-vice-captain follow `optimizer_projection_order_v1` unchanged. Two decisions with the same
-eleven and captain are the same candidate.
-
-Why not the full (squad, eleven, captain) triple: an unrecorded design probe on the GW3
-2026-27 pool (651 players, no outcomes read) showed that excluding exact triples returns six
-objective-tied bench swaps before the eleven changes once; excluding (eleven, captain) pairs
-returned eight distinct elevens with objective gaps of −0.09 to −0.21 points at 0.33 to 0.50
-seconds per solve. The risk trade-off Phase E is meant to see lives in the eleven and the
-captain, so that is where the identity lives.
+**Identity.** A complete decision is identified by its fifteen-player squad, starting eleven
+and captain: `(squad, starting XI, captain)`. Squad and XI identities use sorted player ids.
+Bench order and vice-captain are derived once by `optimizer_projection_order_v1` unchanged;
+they are not additional search variables. Two decisions are the same candidate only when all
+three signature fields match. A bench-player swap with the same XI and captain is a distinct
+candidate because it can change official autosub points. Such candidates remain in the top-K
+set even when their deterministic objectives tie; E2 measures the resulting diversity.
 
 **Generation.** Candidate 0 is the control: the `optimize_squad` result, byte-identical to what
 the live path publishes today, tie-break included. Candidate k is the solution of the same
 model with one no-good constraint per earlier candidate j < k:
 
 ```text
-sum(starter[i] for i in eleven_j) + captain[captain_j] <= 11
+sum(squad[i] for i in squad_j)
+    + sum(starter[i] for i in eleven_j) + captain[captain_j] <= 26
 ```
 
-A decision equals candidate j exactly when that sum is 12, so the constraint excludes the pair
-and nothing else. Each candidate solve uses the control's own procedure: primary solve, then
-the lexicographic tie-break with the primary's solution as a hint. The pool is the complete
-validated projection pool; `required_player_ids` stays available as a constraint seam and is
-not used by Phase E itself.
+A legal decision selects exactly 15 squad players, 11 starters and one captain. The sum is
+27 exactly when all three signature fields match candidate j, so the constraint excludes that
+complete decision and nothing else. Each candidate solve uses the control's own procedure:
+primary solve, then the lexicographic tie-break with the primary's solution as a hint. The pool
+is the complete validated projection pool; `required_player_ids` stays available as a constraint
+seam and is not used by Phase E itself.
 
 **Completeness.** Every candidate's primary status must be `OPTIMAL`. A candidate whose
 primary status is `FEASIBLE` or `UNKNOWN` makes the set incomplete and Phase E falls back. A
@@ -86,9 +82,10 @@ existing error behaviour is kept and Phase E produces no result at all.
 
 **Bounded loss.** Because candidates are ordered by the deterministic objective, no candidate's
 objective lies below the control's by more than δ_K, the gap of the K-th candidate. Whatever
-Phase E selects therefore costs at most δ_K expected points under the projection the control
-itself trusts. δ_K is recorded on every decision and its distribution is an E2 field. This is
-the property that makes the legacy optimizer's measured losses structurally impossible here.
+Phase E selects therefore loses at most δ_K in that deterministic objective, including its
+bench weight. For an exhausted set smaller than K, use the last available candidate's gap.
+δ_K is recorded on every decision and its distribution is an E2 field. This is an objective
+bound, not a guarantee about realized official points or downside outcomes.
 
 **K.** E2 probes K ∈ {4, 8, 16}. The frozen K is the largest value for which, on every E2 pool:
 (a) all candidates are `OPTIMAL`; (b) generation plus scoring stays inside the 120-second
@@ -127,16 +124,14 @@ reproducible. The arithmetic is Python integer arithmetic; no CP-SAT integer bou
 
 - **Selection rule.** The selected decision is the covered candidate with the largest U_int.
 - **Ties.** Equal U_int is resolved toward the lower candidate rank; the control wins a tie.
-- **Reported floats.** Mean and CVaR are reported per candidate as the same integer sums
-  divided by the scale, so a reported number can be recomputed from the selection inputs.
+- **Reported floats.** Mean is `sum_k y_{d,k} / (1000 * N)` and CVaR is
+  `sum_{k in tail(d)} y_{d,k} / (1000 * K_tail)`, so both can be recomputed from the selection
+  inputs.
 
-**Separability.** When the argmax d* is not the control, the draw must prefer d* by more than
-its own Monte Carlo noise. Scenario identifiers are resampled with replacement B = 200 times
-under `numpy.random.default_rng(0)`; on each resample U_int is recomputed for d* and the control
-and their difference recorded. If the 5th percentile of those differences is not strictly
-positive, the result is `FALLBACK_NOT_SEPARABLE` and the control is returned. The bootstrap is
-over scenarios only: it says the draw, not sampling noise, prefers d*. It claims nothing about
-realized outcomes.
+The first engine uses the fixed seed, common random numbers and integer utility directly.
+E2 records repeatability and seed sensitivity; E3 evaluates realized outcomes in shadow. A
+per-decision separability test is deferred unless E2 demonstrates material Monte Carlo
+instability and a later preregistration authorizes it.
 
 ## Calibration pin
 
@@ -163,14 +158,13 @@ One frozen result per decision. Nothing in it is member-facing.
 | `candidate_count_scored` | proven candidates covered by the draw |
 | `scenario_fingerprint`, `component_fingerprint` | copied from the draw; `None` only when no draw was consulted |
 | `utility_contract_version` | names this document's constants |
-| `diagnostics` | the candidate table: rank, objective, deterministic gap, eleven overlap with the control, same captain, covered, mean, CVaR, `U_int`, and the separability interval for the argmax |
+| `diagnostics` | the candidate table: rank, complete decision signature, objective, deterministic gap, squad and eleven overlap with the control, same captain, covered, mean, CVaR, and `U_int` |
 
 Statuses:
 
 - `SELECTED`: a covered candidate was chosen; rank 0 when the control itself wins.
-- `FALLBACK_NOT_SEPARABLE`: the argmax was not the control and the scenario bootstrap did not
-  separate them.
-- `FALLBACK_INCOMPLETE_CANDIDATES`: a candidate solve was not `OPTIMAL`.
+- `FALLBACK_INCOMPLETE_CANDIDATES`: a candidate primary solve was `FEASIBLE` or `UNKNOWN`;
+  `INFEASIBLE` after earlier candidates proves exhaustion, as specified above.
 - `FALLBACK_SCENARIO_COVERAGE`: the control was uncovered or fewer than two candidates were.
 - `FALLBACK_PHASE_D_NOT_CALIBRATED`: the draw's provenance is not on the pin.
 
@@ -185,7 +179,8 @@ far (GW1 from the opening capture, GW2 and GW3 from their handoffs) and the 137-
 of the Phase D calibration for coverage. For each K in {4, 8, 16} it records:
 
 - candidate generation time, per-candidate solver status and tie-break completion;
-- the number of distinct elevens and distinct captains among the candidates, and δ_K;
+- the number of distinct complete signatures, squads, elevens and captains, the number of
+  candidates differing from the control only in bench membership, and δ_K;
 - the size of the candidates' player union relative to the pool;
 - coverage: candidates eliminated and decisions with an uncovered control;
 - scoring time per candidate and in total;
@@ -200,8 +195,9 @@ repository commit.
 
 **Population.** The 137 folds fixed by `docs/phase_d_component_squad_calibration_prereg.md`,
 ending at `2024-25-gw38`, with the same eligibility. The E3 runner requires the binding Phase D
-verdict artifact to exist. If that verdict is `failed` or `abstained`, E3 still runs and writes
-its fields, but its verdict is `technical_only` and no gate below binds anything.
+verdict artifact to exist; a missing artifact stops the runner before evaluation. If that
+verdict is `failed` or `abstained`, E3 still runs and writes its fields, but its verdict is
+`technical_only` and no gate below binds anything.
 
 **Per fold.** Generate the candidates from the fold's Phase C decision roster, draw the fold's
 scenarios once, select, and score the control and every covered candidate against the fold's
@@ -210,28 +206,52 @@ Phase D calibration uses. Let D_f be the realized score of the selected decision
 realized score of the control; D_f is exactly zero on a fallback fold and that zero is kept,
 because it is what the operator would have experienced.
 
+**Uncertainty.** Gate A reuses
+`squadopt.experiments.statistics.season_aware_moving_block_interval` with
+`PromotionPolicy(bootstrap_resamples=2000, moving_block_length=4, confidence_level=0.90,
+deterministic_seed=0)` and the fixed `candidate_id="phase_e_vs_phase_c"`. Supply all 137
+`(season, D_f)` pairs in season/gameweek order, including fallback zeros. The helper samples
+overlapping blocks of four eligible folds within each season, truncating each resampled
+season to its original length; blocks never cross seasons. Missing gameweeks remain absent,
+as in the existing helper's eligible-fold contract. Its RNG is `random.Random`, seeded by 0
+plus the integer represented by the first eight hexadecimal digits of SHA-256 of the
+candidate id, not NumPy's RNG. The interval uses the helper's linearly interpolated 5th and
+95th percentiles. Only the resampling fields of `PromotionPolicy` apply; Phase E's −1.0-point
+threshold below remains its own gate.
+
+Use the same season/block sampling policy and fixed seed for S, sampling fold indices with
+all candidate rows of a sampled fold kept together, then recomputing Spearman correlation.
+Candidate rows are never resampled independently. The disagreement-only mean is descriptive:
+resample the full chronological fold population first and then retain disagreement folds in
+each resample, without compressing the original time series before sampling. If an interval
+cannot be computed (no disagreements or undefined correlations), report it as unavailable;
+an unavailable S interval does not establish signal. No new resampling framework is required.
+
 **Gates**, all fixed here:
 
-- **A, harm excluded.** The 90% fold-bootstrap interval of mean(D_f) over all 137 folds
-  (B = 2000 resamples, `numpy.random.default_rng(0)`) has a lower bound above −1.0 points per
-  gameweek.
+- **A, harm excluded.** The 90% season-aware moving-block interval of mean(D_f) over all 137
+  folds, under the uncertainty policy above, has a lower bound above −1.0 points per gameweek.
 - **R, reliability.** The frozen K produces a complete candidate set on at least 95% of folds,
   no fold raises, and every non-selected fold carries a named status.
-- **U, usefulness.** The selection differs from the control on at least 20% of folds.
+- **U, usefulness.** The selected complete `(squad, starting XI, captain)` signature differs
+  from the control on at least 20% of folds, including bench-only changes.
 - **S, signal.** Over every (fold, covered candidate other than the control) pair, the Spearman
   correlation between the predicted utility difference to the control, in points, and the
   realized paired difference to the control has a positive point estimate and a 90%
-  fold-cluster bootstrap interval that excludes zero.
+  season-aware moving-block interval that excludes zero, with fold candidate rows kept
+  together as specified above.
 
 **Reported, not gated:** mean(D_f) on all folds and on disagreement folds only, each with its
 interval; season-level means; the mean of the worst 10% of folds by D_f; the realized lower
-10% tail of the selected decisions against the control's across folds; counts of eleven,
-captain and formation changes; status counts; solve and scoring time.
+10% tail of the selected decisions against the control's across folds; counts of squad,
+bench-only, eleven, captain and formation changes under the complete signature; status counts;
+solve and scoring time.
 
-**Verdicts.** `harmful` when A fails. `inert` when A passes and U fails. `shadow_eligible` when
-A and R pass and the Phase D verdict is `passed`; S is reported beside it as `signal: true` or
-`signal: false` and does not change the verdict. `technical_only` when the Phase D verdict is
-absent, `failed` or `abstained`.
+**Verdicts, in order.** A Phase D verdict of `failed` or `abstained` gives `technical_only`.
+With Phase D `passed`, a failed A gives `harmful`; otherwise a failed R gives `technical_only`
+with the reliability failure recorded; otherwise a failed U gives `inert`. Only a Phase D
+`passed` verdict with A, R and U all passing gives `shadow_eligible`. S is reported as
+`signal: true` or `signal: false` and does not change the verdict.
 
 `shadow_eligible` permits exactly one thing: E4, a shadow arm in the live decide phase that
 computes the Phase E result and records it in the ledger diagnostics while the published
@@ -243,13 +263,14 @@ that pools these 137 folds with settled prospective gameweeks.
 Realized weekly points of regular starters in the four development seasons have a standard
 deviation of 4.3 to 4.7, and the realized difference between two such starters in the same
 gameweek has a standard deviation of about 6.2. Those are variance estimates only; no candidate
-was evaluated to obtain them. At 137 folds the standard error of a one-swap paired mean is about
-0.53 points, so a 90% interval excludes zero only for effects above roughly 0.87 points per
-gameweek, while the candidates' deterministic gaps are 0.2 points or less. A superiority claim
-is therefore not expected to be provable on this population and is not a gate. Gate A is the
-only decision-level gate; gate S uses the K × 137 candidate pairs because that is where the
-population has power. Computation does not change this: the noise is in the single realized
-gameweek per fold, not in the Monte Carlo estimate.
+was evaluated to obtain them. Treating 137 folds as independent would give a standard error
+of about 0.53 points and a 90% detection scale of roughly 0.87 points per gameweek. These are
+only rough reference calculations: adjacent gameweeks are dependent, and the binding interval
+uses the season-aware moving-block policy above. Complete-decision objective gaps are measured
+by E2; no gap from an XI/captain-only probe is assumed for this candidate set. Superiority is
+not a gate. Gate S uses all covered non-control candidate pairs, but those pairs share outcomes
+within a fold and do not multiply the independent sample size. More Monte Carlo draws do not
+create more realized gameweeks.
 
 ## Non-publication and the locked holdout
 
