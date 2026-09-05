@@ -496,8 +496,13 @@ def test_control_only_is_an_explicit_rollback_even_with_component_history(
     assert report["projection_selection"] == "explicit_legacy_control"
 
 
+@pytest.mark.parametrize("include_components", [False, True])
+@pytest.mark.parametrize("conditional_points", [5, -5])
 def test_component_wiring_fits_composes_and_records_row_level_fallbacks(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    include_components: bool,
+    conditional_points: int,
 ) -> None:
     feature_columns = component_feature_columns()
     training_rows = []
@@ -510,7 +515,7 @@ def test_component_wiring_fits_composes_and_records_row_level_fallbacks(
                 "player_id": index + 1,
                 "appearance_target": int(appeared),
                 "minutes_target": 70 if appeared else pd.NA,
-                "points_target": 5 if appeared else pd.NA,
+                "points_target": conditional_points if appeared else pd.NA,
                 **{column: float(index % 7 + 1) for column in feature_columns},
             }
         )
@@ -529,8 +534,12 @@ def test_component_wiring_fits_composes_and_records_row_level_fallbacks(
     )
     scoring["fixture_count"] = [1, 1]
 
-    monkeypatch.setattr(producer, "build_panel", lambda *_args, **_kwargs: pd.DataFrame())
-    monkeypatch.setattr(producer, "build_fixture_panel", lambda *_args, **_kwargs: pd.DataFrame())
+    def development_only(*_args, seasons):
+        assert seasons == producer.COMPONENT_TRAINING_SEASONS
+        return pd.DataFrame()
+
+    monkeypatch.setattr(producer, "build_panel", development_only)
+    monkeypatch.setattr(producer, "build_fixture_panel", development_only)
     monkeypatch.setattr(producer, "load_team_codes", lambda *_args: pd.DataFrame())
     monkeypatch.setattr(
         producer,
@@ -561,6 +570,7 @@ def test_component_wiring_fits_composes_and_records_row_level_fallbacks(
         captured_at_utc=GW2_CAPTURED_AT,
         deadline_utc=EVENTS[1]["deadline_time"],
         fallback=pd.DataFrame({"player_id": [1001, 1002], "expected_points": [3.0, 4.0]}),
+        include_components=include_components,
     )
 
     by_player = table.set_index("player_id")
@@ -569,3 +579,11 @@ def test_component_wiring_fits_composes_and_records_row_level_fallbacks(
     assert diagnostics["route:component_model"] == 1
     assert diagnostics["route:direct_control"] == 1
     assert diagnostics["component_history_incomplete_players"] == 1
+    if include_components:
+        assert by_player.loc[1001, "raw_expected_points_if_appearance"] == pytest.approx(
+            conditional_points
+        )
+        assert pd.isna(by_player.loc[1002, "raw_expected_points_if_appearance"])
+        assert diagnostics["component_training_data_fingerprint"]
+    else:
+        assert list(table.columns) == ["player_id", "expected_points"]
