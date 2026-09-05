@@ -347,10 +347,6 @@ class ChipAvailability:
         object.__setattr__(self, "available", MappingProxyType(available))
         object.__setattr__(self, "forced", MappingProxyType(forced))
 
-    @property
-    def is_empty(self) -> bool:
-        return not self.available
-
     def gameweeks_for(self, name: str) -> frozenset[int]:
         return self.available.get(name, frozenset())
 

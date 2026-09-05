@@ -48,14 +48,6 @@ MINUTES_FROM_CARRY_OVER: Final = "cross_season_carry_over"
 MINUTES_UNKNOWN: Final = "no_record"
 MINUTES_BLANK_GAMEWEEK: Final = "blank_gameweek"
 
-MINUTES_SOURCES: Final = (
-    MINUTES_FROM_HISTORY,
-    MINUTES_FROM_NO_APPEARANCE,
-    MINUTES_FROM_CARRY_OVER,
-    MINUTES_UNKNOWN,
-    MINUTES_BLANK_GAMEWEEK,
-)
-
 # How many fixtures a club is assumed to play when the calendar is not supplied.
 # One, because a gameweek normally holds one fixture per club and assuming otherwise
 # would silently scale every projection.
