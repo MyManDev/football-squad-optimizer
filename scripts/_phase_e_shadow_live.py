@@ -60,6 +60,22 @@ def load_shadow_eligibility(
             )
         folds = []
         for record in document["folds"]:
+            if (
+                any(
+                    type(record[name]) is not bool
+                    for name in (
+                        "candidate_set_complete",
+                        "squad_changed",
+                        "eleven_changed",
+                        "captain_changed",
+                        "formation_changed",
+                    )
+                )
+                or type(record["selected_rank"]) is not int
+            ):
+                raise PhaseEShadowError(
+                    "E3 fold flags and ranks must retain their measured JSON types."
+                )
             candidates = tuple(
                 PhaseEShadowCandidate(
                     **{

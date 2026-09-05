@@ -82,6 +82,7 @@ def test_e3_eligibility_recomputes_the_entire_verdict(tmp_path: Path) -> None:
         "harmful",
         "old_amendment",
         "prereg_document",
+        "string_boolean",
     ],
 )
 def test_unproven_or_mismatched_e3_cannot_authorize_live_shadow(
@@ -104,6 +105,8 @@ def test_unproven_or_mismatched_e3_cannot_authorize_live_shadow(
         document["preregistration_version"] = "old"
     elif problem == "prereg_document":
         document.pop("prereg_document")
+    elif problem == "string_boolean":
+        document["folds"][0]["candidate_set_complete"] = "false"
     else:
         for fold in document["folds"]:
             fold["selected_points"] = 0.0
