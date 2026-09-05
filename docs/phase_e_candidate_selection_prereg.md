@@ -135,13 +135,20 @@ instability and a later preregistration authorizes it.
 
 ## Calibration pin
 
-Phase E may only act on a draw whose provenance is on a pin of calibrated component and
-sampler versions. The pin is a tuple constant declared beside `IN_SEASON_CONTROL_MODEL_VERSIONS`
-in the application layer, empty until the binding Phase D component-squad calibration records
-`passed`. A `failed` or `abstained` Phase D verdict leaves the pin empty. A draw whose
-provenance is not on the pin yields `FALLBACK_PHASE_D_NOT_CALIBRATED`. The versions the pin
-names are the Phase C component contract (`component_prediction_v1` today) and the sampler
-contract (`component_scenario_foundation_v1` today); Phase D owns their exact spelling.
+Phase E may only act on a draw whose provenance is on a pin of calibrated model and sampler
+versions. `PHASE_E_CALIBRATED_VERSIONS` in `squadopt.application.phase_e` stays empty until the
+binding Phase D artifact records `verdict.status == "calibrated_internal"`. This is the
+binding runner's actual success label; `failed` or `abstained` leaves the pin empty. The
+application supplies the pin explicitly to the selector; the scenarios layer does not import
+the application, and no live path is enabled by declaring the constant.
+
+The pin matches `(draw.inputs.provenance.model_version, draw.inputs.contract_version)`, today
+`("phase_c_control_components_v1", "component_scenario_foundation_v1")`. The prediction table
+schema `component_prediction_v1` is not a model version and is not carried by the draw. The
+draw's model, feature and target provenance must agree with its projection, and its sampler
+config must match the frozen defaults. Seeds 0 to 4 are accepted only for the declared E2
+sensitivity diagnostic; the binding run and eventual operational caller use seed 0. A missing
+pin or mismatch yields `FALLBACK_PHASE_D_NOT_CALIBRATED`.
 
 ## Result contract
 
@@ -248,9 +255,9 @@ bench-only, eleven, captain and formation changes under the complete signature; 
 solve and scoring time.
 
 **Verdicts, in order.** A Phase D verdict of `failed` or `abstained` gives `technical_only`.
-With Phase D `passed`, a failed A gives `harmful`; otherwise a failed R gives `technical_only`
+With Phase D `calibrated_internal`, a failed A gives `harmful`; otherwise a failed R gives `technical_only`
 with the reliability failure recorded; otherwise a failed U gives `inert`. Only a Phase D
-`passed` verdict with A, R and U all passing gives `shadow_eligible`. S is reported as
+`calibrated_internal` verdict with A, R and U all passing gives `shadow_eligible`. S is reported as
 `signal: true` or `signal: false` and does not change the verdict.
 
 `shadow_eligible` permits exactly one thing: E4, a shadow arm in the live decide phase that
@@ -296,7 +303,7 @@ engine's tests.
 - Engine: candidate generator in `optimization`, selector and result contract in `scenarios`,
   and later the live shadow seam.
 - Phase D boundary: the binding calibration verdict and the pin, an importable loader for the
-  137 folds (pool, draw, realized points) and, only after a `passed` verdict, the live draw
+  137 folds (pool, draw, realized points) and, only after a `calibrated_internal` verdict, the live draw
   builder.
 - Evidence: this document, the adversarial contract tests, the E2 and E3 runners and
   artifacts, and the legacy removal audit.
