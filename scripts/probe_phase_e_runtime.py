@@ -867,7 +867,7 @@ def live_point_from_csv(spec: str) -> DecisionPoint:
     label, separator, path = spec.partition("=")
     if not separator or not label.strip() or not path.strip():
         raise ProbeError(f"--live-pool needs LABEL=PATH, got {spec!r}.")
-    frame = pd.read_csv(path)
+    frame = pd.read_csv(path, float_precision="round_trip")
     missing = [name for name in POOL_COLUMNS if name not in frame.columns]
     if missing:
         raise ProbeError(f"{path}: pool is missing {missing!r}.")

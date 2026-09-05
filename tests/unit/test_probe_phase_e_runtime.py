@@ -456,6 +456,20 @@ def test_fold_projection_blanks_the_decision_outcomes_and_fills_direct_control_r
         probe.fold_projection_roster(rows, roster, "2024-25-gw38", control.head(2))
 
 
+def test_recorded_live_pool_preserves_projection_float_bits(tmp_path: Path) -> None:
+    pool = make_baseline_players()
+    # The default CSV parser rounds this shortest decimal spelling down by one ULP.
+    pool.loc[pool.index[0], "expected_points"] = 0.30000000000000004
+    path = tmp_path / "projections.csv"
+    pool.to_csv(path, index=False)
+
+    point = probe.live_point_from_csv(f"2026-27-gw01={path}")
+
+    assert [float(value).hex() for value in point.pool["expected_points"]] == [
+        float(value).hex() for value in pool["expected_points"]
+    ]
+
+
 def test_the_cli_writes_an_honest_artifact_for_a_recorded_pool(tmp_path: Path) -> None:
     pool_path = tmp_path / "gw01_projections.csv"
     make_baseline_players().assign(has_prior_record=True).to_csv(pool_path, index=False)
