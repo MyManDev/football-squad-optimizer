@@ -103,8 +103,9 @@ from squadopt.scenarios.selection import (
     PHASE_E_WEIGHT_SCALE,
 )
 
-PROBE_CONTRACT_VERSION: Final = "phase_e_runtime_probe_v1"
+PROBE_CONTRACT_VERSION: Final = "phase_e_runtime_probe_v2"
 PREREGISTRATION: Final = "docs/phase_e_candidate_selection_prereg.md"
+PREREGISTRATION_VERSION: Final = "phase_e_development_k_amendment_v1"
 SENSITIVITY_SEEDS: Final = (1, 2, 3, 4)
 BUDGET_SECONDS: Final = 120.0
 E2_LIVE_LABELS: Final = ("2026-27-gw01", "2026-27-gw02", "2026-27-gw03")
@@ -511,19 +512,21 @@ def candidate_count_rule(
     expected_live_labels: Sequence[str] = E2_LIVE_LABELS,
     expected_fold_ids: Sequence[str] | None = None,
 ) -> Record:
-    """Apply the frozen rule: the largest K proven, repeatable and within budget on every pool.
+    """Freeze historical K on 137 folds; retain three original live pools as diagnostics.
 
-    K is frozen only when the E2 pool set is exactly the three 2026-27 live decision points
-    and the binding folds, each label once, with exactly one run for every K in {4, 8, 16}
-    on every pool, every run evaluable on all three conditions, and K = 4 passing. A failed
-    K = 4 disables Phase E whatever a larger K does. Anything less reports what it saw and
-    freezes nothing.
+    Every pool needs all three K records. Only historical folds enter the scoring budget
+    and repeatability gate. This rule establishes no prospective live readiness.
     """
 
     live_labels = [str(point["label"]) for point in decision_points if point["kind"] == "live"]
     fold_labels = [str(point["label"]) for point in decision_points if point["kind"] == "fold"]
-    identities_complete = _unique_matches(live_labels, expected_live_labels) and _unique_matches(
-        fold_labels, expected_fold_ids
+    identities_complete = (
+        _unique_matches(live_labels, expected_live_labels)
+        and len(expected_live_labels) == 3
+        and expected_fold_ids is not None
+        and len(expected_fold_ids) == E2_FOLD_COUNT
+        and _unique_matches(fold_labels, expected_fold_ids)
+        and len(decision_points) == len(live_labels) + len(fold_labels)
     )
     counts_complete = sorted(set(candidate_counts)) == sorted(PHASE_E_CANDIDATE_COUNTS) and all(
         sorted(run["candidate_count"] for run in point["runs"]) == sorted(PHASE_E_CANDIDATE_COUNTS)
@@ -536,6 +539,7 @@ def candidate_count_rule(
         runs = [
             run
             for point in decision_points
+            if point["kind"] == "fold"
             for run in point["runs"]
             if run["candidate_count"] == count
         ]
@@ -543,8 +547,8 @@ def candidate_count_rule(
         repeatable = bool(runs) and all(
             bool(run.get("generation_repeat_identical"))
             and (
-                not isinstance(run.get("scoring"), dict)
-                or (
+                isinstance(run.get("scoring"), dict)
+                and (
                     bool(run["scoring"].get("draw_repeat_identical"))
                     and bool(run["scoring"].get("selection_repeat_identical"))
                 )
@@ -587,7 +591,7 @@ def candidate_count_rule(
     elif not evaluable:
         frozen = None
         reason = (
-            "E2 pool set complete but not evaluable on every pool (scoring or budget "
+            "E2 pool set complete but not evaluable on every historical fold (scoring or budget "
             "unavailable somewhere); nothing is frozen"
         )
     elif smallest_passes is not True:
@@ -595,8 +599,11 @@ def candidate_count_rule(
         reason = f"K={smallest} failed the rule on the E2 pool set; Phase E is not enabled"
     else:
         frozen = k_on_probed
-        reason = "largest K proven, repeatable and within budget on every E2 pool"
+        reason = "largest K proven, repeatable and within budget on every historical E2 fold"
     return {
+        "preregistration_version": PREREGISTRATION_VERSION,
+        "gating_population": "binding_development_folds_only",
+        "live_readiness_established": False,
         "candidate_counts": sorted(set(candidate_counts)),
         "required_candidate_counts": list(PHASE_E_CANDIDATE_COUNTS),
         "per_candidate_count": per_count,
@@ -860,7 +867,7 @@ def live_point_from_csv(spec: str) -> DecisionPoint:
     label, separator, path = spec.partition("=")
     if not separator or not label.strip() or not path.strip():
         raise ProbeError(f"--live-pool needs LABEL=PATH, got {spec!r}.")
-    frame = pd.read_csv(path)
+    frame = pd.read_csv(path, float_precision="round_trip")
     missing = [name for name in POOL_COLUMNS if name not in frame.columns]
     if missing:
         raise ProbeError(f"{path}: pool is missing {missing!r}.")
@@ -967,6 +974,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         panel_rows = 0
         expected_fold_ids: tuple[str, ...] | None = None
         live_handoff = None
+        source = None
         live_evidence = None
         if arguments.live_components:
             if not arguments.live_decision or not all(
@@ -985,6 +993,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             live_handoff = read_phase_c_component_handoff(
                 arguments.table, arguments.roster, arguments.manifest
             )
+            source = {
+                "table_sha256": live_handoff.table_sha256,
+                "roster_sha256": live_handoff.roster_sha256,
+                "manifest_sha256": live_handoff.manifest_sha256,
+            }
         for spec in arguments.live_pool:
             points.append(live_point_from_csv(spec))
         for spec in arguments.live_decision:
@@ -1001,6 +1014,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             handoff = read_phase_c_component_handoff(
                 arguments.table, arguments.roster, arguments.manifest
             )
+            source = {
+                "table_sha256": handoff.table_sha256,
+                "roster_sha256": handoff.roster_sha256,
+                "manifest_sha256": handoff.manifest_sha256,
+            }
             expected_fold_ids = binding_fold_ids(handoff)
             fold_ids = (
                 list(expected_fold_ids) if arguments.all_binding_folds else list(arguments.fold)
@@ -1026,6 +1044,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         document: Record = {
             "contract_version": PROBE_CONTRACT_VERSION,
             "preregistration": PREREGISTRATION,
+            "preregistration_version": PREREGISTRATION_VERSION,
+            "source": source,
             "generated_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
             "diagnostic_only": True,
             "promotes_anything": False,

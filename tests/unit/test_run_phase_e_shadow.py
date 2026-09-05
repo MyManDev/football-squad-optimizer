@@ -70,6 +70,12 @@ def _probe(evidence):
     return {
         "contract_version": runner.probe.PROBE_CONTRACT_VERSION,
         "preregistration": runner.probe.PREREGISTRATION,
+        "preregistration_version": runner.probe.PREREGISTRATION_VERSION,
+        "source": {
+            "table_sha256": runner.binding.PHASE_C_TABLE_SHA256,
+            "roster_sha256": runner.binding.PHASE_C_ROSTER_SHA256,
+            "manifest_sha256": runner.binding.PHASE_C_MANIFEST_SHA256,
+        },
         "diagnostic_only": True,
         "promotes_anything": False,
         "reads_realized_outcomes": False,
@@ -120,6 +126,9 @@ def test_accepts_only_the_largest_k_from_the_complete_measured_probe(tmp_path: P
         "duplicate_rank",
         "dirty",
         "outcomes",
+        "old_schema",
+        "missing_amendment",
+        "wrong_source",
     ],
 )
 def test_refuses_incomplete_or_inconsistent_e2_evidence(tmp_path: Path, mutation: str) -> None:
@@ -153,6 +162,12 @@ def test_refuses_incomplete_or_inconsistent_e2_evidence(tmp_path: Path, mutation
         first["candidates"][1]["rank"] = 0
     elif mutation == "dirty":
         document["provenance"]["working_tree_dirty"] = True
+    elif mutation == "old_schema":
+        document["contract_version"] = "phase_e_runtime_probe_v1"
+    elif mutation == "missing_amendment":
+        document.pop("preregistration_version")
+    elif mutation == "wrong_source":
+        document["source"]["table_sha256"] = "0" * 64
     else:
         document["reads_realized_outcomes"] = True
     with pytest.raises(runner.PhaseEShadowError):
@@ -176,7 +191,7 @@ def test_proven_exhaustion_can_complete_a_set_smaller_than_requested_k(tmp_path:
 def test_k4_failure_cannot_be_overridden_by_a_larger_success(tmp_path: Path) -> None:
     evidence = _evidence(tmp_path)
     document = _probe(evidence)
-    first = document["decision_points"][0]["runs"][0]
+    first = document["decision_points"][3]["runs"][0]
     first.update(generation_seconds=121.0, budget_seconds=123.0, within_budget=False)
     rule = runner.probe.candidate_count_rule(
         document["decision_points"], (4, 8, 16), expected_fold_ids=evidence.fold_ids
@@ -185,6 +200,72 @@ def test_k4_failure_cannot_be_overridden_by_a_larger_success(tmp_path: Path) -> 
     assert rule["frozen_k"] is None
     with pytest.raises(runner.PhaseEShadowError, match="K=4 failed"):
         runner.load_phase_e_runtime(_write_probe(tmp_path, document), evidence)
+
+
+def _unscore_live(document: dict) -> None:
+    for point in document["decision_points"][:3]:
+        point.update(
+            draw_available=False, draw_unavailable_reason="original capture missing history"
+        )
+        for run in point["runs"]:
+            run.update(
+                scoring=None,
+                scoring_unavailable_reason="original capture missing history",
+                budget_seconds=None,
+                within_budget=None,
+            )
+
+
+def test_accepts_unscored_original_live_diagnostics_without_claiming_live_readiness(
+    tmp_path: Path,
+) -> None:
+    evidence = _evidence(tmp_path)
+    document = _probe(evidence)
+    _unscore_live(document)
+    result = runner.load_phase_e_runtime(_write_probe(tmp_path, document), evidence)
+    assert result.candidate_count == 16
+    assert document["candidate_count_rule"]["live_readiness_established"] is False
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["zero_budget", "success_budget", "missing_reason", "missing_generation", "missing_fold_draw"],
+)
+def test_unavailable_live_scoring_cannot_be_presented_as_a_measured_success(
+    tmp_path: Path, mutation: str
+) -> None:
+    evidence = _evidence(tmp_path)
+    document = _probe(evidence)
+    _unscore_live(document)
+    run = document["decision_points"][0]["runs"][0]
+    if mutation == "zero_budget":
+        run["budget_seconds"] = 0
+    elif mutation == "success_budget":
+        run["within_budget"] = True
+    elif mutation == "missing_reason":
+        run["scoring_unavailable_reason"] = None
+    elif mutation == "missing_generation":
+        run["generation_seconds"] = None
+    else:
+        document["decision_points"][3]["draw_available"] = False
+    with pytest.raises(runner.PhaseEShadowError):
+        runner.load_phase_e_runtime(_write_probe(tmp_path, document), evidence)
+
+
+def test_unsolved_live_control_is_retained_as_diagnostic_failure(tmp_path: Path) -> None:
+    evidence = _evidence(tmp_path)
+    document = _probe(evidence)
+    _unscore_live(document)
+    run = document["decision_points"][0]["runs"][0]
+    run.update(
+        candidates=[],
+        candidates_found=0,
+        complete=False,
+        all_optimal=False,
+        termination_status="UNKNOWN",
+    )
+    result = runner.load_phase_e_runtime(_write_probe(tmp_path, document), evidence)
+    assert result.candidate_count == 16
 
 
 def _argv(tmp_path: Path) -> list[str]:

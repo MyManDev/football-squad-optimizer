@@ -264,9 +264,15 @@ def build(
     evidence_table_path: Path | None = None,
     evidence_manifest_path: Path | None = None,
     control_only: bool = False,
+    development_only: bool = False,
     dry_run: bool = False,
 ) -> tuple[InSeasonProjection, Path | None, dict[str, object]]:
-    """Project one capture's open deadline and write the handoff for it."""
+    """Project one capture's open deadline and write the handoff for it.
+
+    ``development_only`` restricts all historical inputs to the frozen component training
+    seasons for prospective 2026-27 in-season preparation. In particular, the legacy
+    fallback cannot use the withheld season's carry-over in this mode.
+    """
 
     identifier = _latest_snapshot_id(snapshot_root) if snapshot_id is None else snapshot_id
     snapshot = read_snapshot(snapshot_root, identifier)
@@ -287,12 +293,18 @@ def build(
             raise SystemExit(f"Capture {identifier} publishes no gameweek {gameweek} deadline.")
         target_deadline = matches[0]
     target = target_deadline.gameweek
+    if development_only and (season != "2026-27" or target <= 1):
+        raise SystemExit("--development-only requires a 2026-27 in-season capture target.")
     # Every gameweek before the target has been played, so that is the in-season sample.
     played = target - 1
 
     roster = player_snapshot(bootstrap)
     history = in_season_totals(bootstrap, fixtures, captured_at_utc=captured_at)
-    panel = build_panel(archive_root)
+    panel = (
+        build_panel(archive_root, seasons=COMPONENT_TRAINING_SEASONS)
+        if development_only
+        else build_panel(archive_root)
+    )
     carried = carry_over_as_of(panel, target_season=season)
     # The opening control's own output, used only where a player has neither an in-season
     # record nor a carried one, so both paths price such a player identically by
@@ -310,6 +322,8 @@ def build(
     model_version = IN_SEASON_MODEL_VERSION
     feature_contract_version = IN_SEASON_FEATURE_CONTRACT_VERSION
     diagnostics = dict(blend.diagnostics)
+    if development_only:
+        diagnostics["fallback_training_seasons"] = list(COMPONENT_TRAINING_SEASONS)
     evidence_fingerprint: str | None = None
     if evidence_table_path is not None and evidence_manifest_path is not None:
         evidence = read_player_evidence_artifact(evidence_table_path, evidence_manifest_path)
@@ -443,6 +457,14 @@ def main() -> int:
     )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     parser.add_argument(
+        "--development-only",
+        action="store_true",
+        help=(
+            "restrict historical reads to the frozen Phase C training seasons; "
+            "requires a 2026-27 in-season target and excludes withheld-season carry-over"
+        ),
+    )
+    parser.add_argument(
         "--evidence-table",
         type=Path,
         default=None,
@@ -480,6 +502,7 @@ def main() -> int:
         evidence_table_path=arguments.evidence_table,
         evidence_manifest_path=arguments.evidence_manifest,
         control_only=arguments.control_only,
+        development_only=arguments.development_only,
         dry_run=arguments.dry_run,
     )
 
