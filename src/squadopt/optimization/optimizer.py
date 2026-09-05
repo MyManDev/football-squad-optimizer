@@ -297,6 +297,61 @@ def _add_tiebreak_objective(
     model.minimize(cp_model.LinearExpr.sum(tiebreak_terms))
 
 
+def _add_decision_exclusions(
+    artifacts: _ModelArtifacts,
+    players: pd.DataFrame,
+    config: OptimizationConfig,
+    excluded_decisions: Sequence[OptimizationResult],
+) -> None:
+    """Cut each complete decision out of the feasible set, and nothing else.
+
+    A legal decision selects exactly ``squad_size`` squad players, ``starting_size``
+    starters and one captain, so an excluded decision's own indicator sum reaches
+    ``squad_size + starting_size + 1`` only when squad, eleven and captain all match.
+    Bounding that sum one lower removes that one complete decision; a decision that
+    differs only on the bench is a different decision and stays feasible.
+    """
+
+    if isinstance(excluded_decisions, (str, bytes)) or not isinstance(excluded_decisions, Sequence):
+        raise InvalidConfigurationError("excluded_decisions must be a sequence of results.")
+    index_by_id = {
+        player_id: index for index, player_id in enumerate(players["player_id"].tolist())
+    }
+    bound = config.squad_size + config.starting_size
+    for position, decision in enumerate(excluded_decisions):
+        if (
+            not isinstance(decision, OptimizationResult)
+            or not decision.has_solution
+            or decision.captain is None
+        ):
+            raise InvalidConfigurationError(
+                f"excluded_decisions[{position}] must be a solved result with a captain."
+            )
+        squad_ids = decision.selected_squad["player_id"].tolist()
+        starter_ids = decision.starting_xi["player_id"].tolist()
+        captain_id = decision.captain["player_id"]
+        if (
+            len(squad_ids) != config.squad_size
+            or len(set(squad_ids)) != len(squad_ids)
+            or len(starter_ids) != config.starting_size
+            or not set(starter_ids) <= set(squad_ids)
+            or captain_id not in starter_ids
+        ):
+            raise InvalidConfigurationError(
+                f"excluded_decisions[{position}] is not a complete decision under this "
+                "configuration."
+            )
+        unknown = sorted({str(value) for value in squad_ids if value not in index_by_id})
+        if unknown:
+            raise InvalidConfigurationError(
+                f"excluded_decisions[{position}] names players outside the pool: {unknown[:10]!r}."
+            )
+        terms = [artifacts.squad_vars[index_by_id[player_id]] for player_id in squad_ids]
+        terms.extend(artifacts.starter_vars[index_by_id[player_id]] for player_id in starter_ids)
+        terms.append(artifacts.captain_vars[index_by_id[captain_id]])
+        artifacts.model.add(cp_model.LinearExpr.sum(terms) <= bound)
+
+
 def _selected_indices(
     solver: cp_model.CpSolver,
     variables: list[cp_model.IntVar],
@@ -428,6 +483,7 @@ def _optimize_squad_with_objective_points(
     objective_points: Mapping[object, object] | None,
     objective_contract: str,
     required_player_ids: tuple[int, ...] = (),
+    excluded_decisions: Sequence[OptimizationResult] = (),
 ) -> OptimizationResult:
     """Solve the shared squad model with a validated private objective override."""
 
@@ -456,6 +512,8 @@ def _optimize_squad_with_objective_points(
         for index, player_id in enumerate(ordered_players["player_id"].tolist()):
             if int(player_id) in required:
                 artifacts.model.add(artifacts.squad_vars[index] == 1)
+    if excluded_decisions:
+        _add_decision_exclusions(artifacts, ordered_players, config, excluded_decisions)
     started_at = perf_counter()
     deadline = started_at + config.solver_time_limit_seconds
 
@@ -649,14 +707,20 @@ def optimize_squad(
     config: OptimizationConfig,
     *,
     required_player_ids: tuple[int, ...] = (),
+    excluded_decisions: Sequence[OptimizationResult] = (),
 ) -> OptimizationResult:
     """Select a squad, starting XI, bench, and captain for one gameweek.
 
     ``required_player_ids`` forces those players into the selected squad (not
     necessarily the eleven): the constraint a candidate like "highest projection with
     the crowd's core held" needs. Unknown ids are refused; an infeasible requirement
-    is reported by the solver as any other infeasibility. Empty (the default) is the
-    historical model, bit for bit.
+    is reported by the solver as any other infeasibility.
+
+    ``excluded_decisions`` removes each given complete decision (its squad, starting
+    eleven and captain together) from the feasible set, which is how the next-best
+    decision after a known optimum is asked for. Only that exact decision is cut, so
+    the answer is the best remaining decision under the unchanged objective and
+    tie-break. Both empty (the default) is the historical model, bit for bit.
     """
 
     return _optimize_squad_with_objective_points(
@@ -665,4 +729,5 @@ def optimize_squad(
         objective_points=None,
         objective_contract="expected_points_v1",
         required_player_ids=required_player_ids,
+        excluded_decisions=excluded_decisions,
     )
