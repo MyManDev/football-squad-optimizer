@@ -13,6 +13,7 @@ from squadopt import (
     EvaluationValidationError,
     OptimizationConfig,
     OptimizationResult,
+    ScoringPolicy,
     SolverStatus,
     evaluate_prepared_folds,
     optimize_squad,
@@ -76,6 +77,20 @@ def test_evaluates_one_prepared_fold(
     assert result.summary.median_solver_runtime_seconds is not None
     assert result.summary.p95_solver_runtime_seconds is not None
     assert result.summary.turnover_observations == 0
+
+
+def test_official_v2_scoring_preserves_realized_minutes(
+    baseline_players: pd.DataFrame,
+) -> None:
+    outcomes = _outcomes(baseline_players)
+    outcomes["minutes"] = 90
+
+    result = evaluate_prepared_folds(
+        [EvaluationFold("official-v2", baseline_players, outcomes)],
+        EvaluationConfig(scoring_policy=ScoringPolicy.OFFICIAL_AUTOSUB_CAPTAIN_V2),
+    )
+
+    assert result.folds[0].realized_squad_points == 12.0
 
 
 def test_fold_order_and_turnover_are_deterministic(
