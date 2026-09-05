@@ -16,6 +16,7 @@ import pandas as pd
 import pytest
 from scripts import probe_phase_e_runtime as probe
 from tests.fixtures.synthetic_players import make_baseline_players
+from tests.unit.test_run_component_squad_calibration import _handoff
 
 from squadopt.optimization import (
     OptimizationConfig,
@@ -289,11 +290,32 @@ def _full_set(**overrides: list[dict[str, object]]) -> list[dict[str, object]]:
     points = [
         _point(label, "live", overrides.get(label.replace("-", "_"), default)) for label in LIVE
     ]
-    points += [_point(f"f{index}", "fold", overrides.get(f"f{index}", default)) for index in (1, 2)]
+    points += [_point(fold, "fold", overrides.get(fold, default)) for fold in FOLDS]
     return points
 
 
-FOLDS = ("f1", "f2")
+FOLDS = tuple(f"f{index}" for index in range(1, 138))
+
+
+def test_original_live_diagnostics_do_not_gate_historical_k() -> None:
+    points = _full_set()
+    for point in points[:3]:
+        point["runs"] = [_run(count, optimal=False, scored=False) for count in (4, 8, 16)]
+    rule = probe.candidate_count_rule(points, (4, 8, 16), expected_fold_ids=FOLDS)
+    assert rule["frozen_k"] == 16
+    assert rule["per_candidate_count"]["4"]["pools"] == 137
+    assert rule["gating_population"] == "binding_development_folds_only"
+    assert rule["live_readiness_established"] is False
+
+    points[3]["runs"] = [_run(count, scored=False) for count in (4, 8, 16)]
+    rule = probe.candidate_count_rule(points, (4, 8, 16), expected_fold_ids=FOLDS)
+    assert rule["frozen_k"] is None
+
+
+def test_subset_population_cannot_be_declared_the_complete_binding_population() -> None:
+    points = _full_set()[:-1]
+    rule = probe.candidate_count_rule(points, (4, 8, 16), expected_fold_ids=FOLDS[:-1])
+    assert rule["frozen_k"] is None
 
 
 def test_the_rule_freezes_only_on_the_exact_pool_set_with_every_count() -> None:
@@ -457,6 +479,8 @@ def test_the_cli_writes_an_honest_artifact_for_a_recorded_pool(tmp_path: Path) -
     document = json.loads(output.read_text(encoding="utf-8"))
     assert document["contract_version"] == probe.PROBE_CONTRACT_VERSION
     assert document["preregistration"] == probe.PREREGISTRATION
+    assert document["preregistration_version"] == probe.PREREGISTRATION_VERSION
+    assert document["source"] is None
     assert document["diagnostic_only"] is True and document["promotes_anything"] is False
     assert document["reads_realized_outcomes"] is False
     assert document["outcome_policy"] == probe.OUTCOME_POLICY
@@ -473,6 +497,37 @@ def test_the_cli_writes_an_honest_artifact_for_a_recorded_pool(tmp_path: Path) -
     assert run["candidates_found"] == 4 and run["all_optimal"] is True
     assert {"provenance", "environment"} <= set(document)
     assert "2025-26" not in document["provenance"]["history_seasons"]
+
+
+def test_cli_records_the_actual_handoff_digests_without_rehashing_other_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    handoff = _handoff()
+    monkeypatch.setattr(probe, "read_phase_c_component_handoff", lambda *args: handoff)
+    monkeypatch.setattr(probe, "fold_decision_points", lambda *args: ([], 0))
+    output = tmp_path / "probe.json"
+    assert (
+        probe.main(
+            [
+                "--all-binding-folds",
+                "--table",
+                "synthetic.csv",
+                "--roster",
+                "synthetic-roster.csv",
+                "--manifest",
+                "synthetic.json",
+                "--json-output",
+                str(output),
+            ]
+        )
+        == 0
+    )
+    document = json.loads(output.read_text(encoding="utf-8"))
+    assert document["source"] == {
+        "table_sha256": handoff.table_sha256,
+        "roster_sha256": handoff.roster_sha256,
+        "manifest_sha256": handoff.manifest_sha256,
+    }
 
 
 def test_the_cli_refuses_counts_outside_the_selector_contract(

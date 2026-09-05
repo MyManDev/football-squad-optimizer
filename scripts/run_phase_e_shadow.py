@@ -75,6 +75,7 @@ def load_phase_e_runtime(
     if (
         document.get("contract_version") != probe.PROBE_CONTRACT_VERSION
         or document.get("preregistration") != probe.PREREGISTRATION
+        or document.get("preregistration_version") != probe.PREREGISTRATION_VERSION
         or document.get("diagnostic_only") is not True
         or document.get("promotes_anything") is not False
         or document.get("reads_realized_outcomes") is not False
@@ -85,6 +86,12 @@ def load_phase_e_runtime(
         raise PhaseEShadowError(
             "E2 must use the frozen, outcome-free probe contract and constants."
         )
+    if document.get("source") != {
+        "table_sha256": binding.PHASE_C_TABLE_SHA256,
+        "roster_sha256": binding.PHASE_C_ROSTER_SHA256,
+        "manifest_sha256": binding.PHASE_C_MANIFEST_SHA256,
+    }:
+        raise PhaseEShadowError("E2 source must match the binding run's frozen Phase C inputs.")
     provenance = _object(document.get("provenance"), "E2 provenance")
     if provenance.get("working_tree_dirty") is not False or not provenance.get("repository_commit"):
         raise PhaseEShadowError("E2 must name a clean producer repository revision.")
@@ -95,13 +102,16 @@ def load_phase_e_runtime(
         point = _object(value, "E2 decision point")
         if point.get("kind") not in ("live", "fold") or not isinstance(point.get("label"), str):
             raise PhaseEShadowError("E2 decision points need recognized kinds and labels.")
-        if (
+        historical = point["kind"] == "fold"
+        if historical and (
             point.get("draw_available") is not True
             or point.get("draw_unavailable_reason") is not None
         ):
             raise PhaseEShadowError(
-                "Every E2 pool needs measured scenario scoring before K can freeze."
+                "Every historical E2 fold needs measured scenario scoring before K can freeze."
             )
+        if not isinstance(point.get("draw_available"), bool):
+            raise PhaseEShadowError("E2 draw availability must be a measured boolean.")
         runs = point.get("runs")
         if not isinstance(runs, list) or len(runs) != 3:
             raise PhaseEShadowError(
@@ -114,31 +124,60 @@ def load_phase_e_runtime(
                 or run["candidate_count"] not in PHASE_E_CANDIDATE_COUNTS
             ):
                 raise PhaseEShadowError("E2 run candidate counts must be 4, 8 or 16.")
-            for key in ("complete", "all_optimal", "generation_repeat_identical", "within_budget"):
+            for key in ("complete", "all_optimal", "generation_repeat_identical"):
                 if not isinstance(run.get(key), bool):
                     raise PhaseEShadowError(f"E2 {key} must be a measured boolean.")
-            scoring = _object(run.get("scoring"), "E2 scoring")
-            draw = _object(scoring.get("draw"), "E2 draw")
-            if draw.get("scenario_count") != 1000 or draw.get("deterministic_seed") != 0:
-                raise PhaseEShadowError("E2 draws must use N=1000 and seed 0.")
-            for key in ("draw_repeat_identical", "selection_repeat_identical"):
-                if not isinstance(scoring.get(key), bool):
-                    raise PhaseEShadowError(f"E2 {key} must be a measured boolean.")
-            total = _seconds(run.get("generation_seconds"), "generation_seconds") + _seconds(
-                scoring.get("scoring_seconds_total"), "scoring_seconds_total"
-            )
+            generation = _seconds(run.get("generation_seconds"), "generation_seconds")
             _seconds(run.get("generation_seconds_repeat"), "generation_seconds_repeat")
-            if not math.isclose(
-                total, _seconds(run.get("budget_seconds"), "budget_seconds"), abs_tol=1e-9
-            ):
-                raise PhaseEShadowError(
-                    "E2 budget must equal measured generation plus scoring time."
+            if not historical and run.get("scoring") is None:
+                if (
+                    not isinstance(run.get("scoring_unavailable_reason"), str)
+                    or not run["scoring_unavailable_reason"]
+                    or run.get("budget_seconds") is not None
+                    or run.get("within_budget") is not None
+                    or (not point["draw_available"] and not point.get("draw_unavailable_reason"))
+                ):
+                    raise PhaseEShadowError(
+                        "Unscored live diagnostics need a reason and unknown scoring budget."
+                    )
+            else:
+                if not point["draw_available"] or point.get("draw_unavailable_reason") is not None:
+                    raise PhaseEShadowError("E2 scoring contradicts draw availability.")
+                scoring = _object(run.get("scoring"), "E2 scoring")
+                draw = _object(scoring.get("draw"), "E2 draw")
+                if draw.get("scenario_count") != 1000 or draw.get("deterministic_seed") != 0:
+                    raise PhaseEShadowError("E2 draws must use N=1000 and seed 0.")
+                for key in ("draw_repeat_identical", "selection_repeat_identical"):
+                    if not isinstance(scoring.get(key), bool):
+                        raise PhaseEShadowError(f"E2 {key} must be a measured boolean.")
+                total = generation + _seconds(
+                    scoring.get("scoring_seconds_total"), "scoring_seconds_total"
                 )
-            if run["within_budget"] != (total <= probe.BUDGET_SECONDS):
-                raise PhaseEShadowError(
-                    "E2 within_budget contradicts the measured 120-second budget."
-                )
+                if not math.isclose(
+                    total, _seconds(run.get("budget_seconds"), "budget_seconds"), abs_tol=1e-9
+                ):
+                    raise PhaseEShadowError(
+                        "E2 budget must equal measured generation plus scoring time."
+                    )
+                if not isinstance(run.get("within_budget"), bool) or run["within_budget"] != (
+                    total <= probe.BUDGET_SECONDS
+                ):
+                    raise PhaseEShadowError(
+                        "E2 within_budget contradicts the measured 120-second budget."
+                    )
             candidates = run.get("candidates")
+            if not historical and candidates == []:
+                if (
+                    run["complete"]
+                    or run["all_optimal"]
+                    or run.get("candidates_found") != 0
+                    or run.get("termination_status") not in ("INFEASIBLE", "UNKNOWN")
+                    or run.get("scoring") is not None
+                ):
+                    raise PhaseEShadowError(
+                        "Unsolved live control needs consistent failure evidence."
+                    )
+                continue
             if (
                 not isinstance(candidates, list)
                 or not 0 < len(candidates) <= run["candidate_count"]
@@ -239,6 +278,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         document = {
             "contract_version": PHASE_E_SHADOW_CONTRACT,
             "prereg_document": probe.PREREGISTRATION,
+            "preregistration_version": probe.PREREGISTRATION_VERSION,
             "internal_only": True,
             "operational_control_changed": False,
             "member_facing_probability_published": False,
