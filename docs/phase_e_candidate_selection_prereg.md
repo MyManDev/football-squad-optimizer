@@ -98,6 +98,13 @@ Every candidate of one decision is scored on **one** `ComponentScenarioDraw` dra
 full projected pool. No candidate gets its own draw. The draw's `scenario_fingerprint` and
 `component_fingerprint` travel into the Phase E result unchanged.
 
+For mixed-route pools, the shared draw contains every projected player with a component-model
+prediction. The Phase D sampler cannot simulate `direct_control` rows because those rows have
+no component prediction. Such players remain in the complete optimizer pool, and any candidate
+containing one is subject to the coverage rule below. This is not candidate-dependent draw
+construction: all component-eligible players are drawn once, and no missing prediction is
+filled with zero or a synthetic fallback.
+
 Coverage is decided by the scorer's own rule: a candidate with any squad player absent from
 the draw's `scenario_points` is eliminated and counted. If the control is uncovered, or fewer
 than two candidates are covered, Phase E is disabled for that decision with
@@ -212,6 +219,10 @@ realized points and minutes with `score_frozen_squad_decision`, the same realize
 Phase D calibration uses. Let D_f be the realized score of the selected decision minus the
 realized score of the control; D_f is exactly zero on a fallback fold and that zero is kept,
 because it is what the operator would have experienced.
+
+With a failed or abstained Phase D verdict, the selector keeps its empty pin and falls back
+to the control. E3 still computes technical utility and realized readings for the covered
+candidates; those readings do not authorize a selection or change the `technical_only` verdict.
 
 **Uncertainty.** Gate A reuses
 `squadopt.experiments.statistics.season_aware_moving_block_interval` with
