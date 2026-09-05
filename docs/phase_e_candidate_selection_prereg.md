@@ -1,10 +1,44 @@
 # Phase E Candidate Selection Preregistration
 
-Status: frozen before any Phase E production code. This document authorizes no binding
+Status: original preregistration frozen before Phase E production code; the explicit
+`phase_e_development_k_amendment_v1` below was approved on 2026-09-05 before any binding
+E2 or E3 measurement. This document authorizes no binding
 measurement by itself. The E2 runtime probe and the E3 shadow evaluation each cite it, run
 under the constants fixed here, and add their own artifact and `docs/measurements_index.md`
 row. The E5 default decision is not decidable from this document and needs its own
 preregistration.
+
+## Pre-measurement amendment: development K and prospective live readiness
+
+The original E2 rule required scoring on all three captured live pools and the 137
+development folds. The original GW2/GW3 captures lack their settled prior-gameweek live
+payloads, and GW1 has no supported component-model history. These are input availability
+findings, not candidate performance measurements. Old captures are not retrofilled, missing
+scoring costs are not replaced with zero, and no opening component model is invented.
+
+Amendment `phase_e_development_k_amendment_v1` retains exactly those three original live
+labels and one generation run plus its repeat for each K in {4, 8, 16} as required
+generation/diversity diagnostics. Their scoring, where unavailable, remains explicitly
+unavailable, with `budget_seconds` and `within_budget` both null. Their generation or
+scoring success does not enter the historical K gate. Only the exact 137 binding development
+folds determine K, with all three K values measured and the original K=4 hard-disable rule.
+The E2 artifact is now `phase_e_runtime_probe_v2`, cites this amendment, and carries the exact
+Phase C table, roster and manifest SHA-256 digests. E3 rejects the previous artifact schema
+and mismatched source digests rather than interpreting old evidence under the new rule.
+
+Historical K establishes no live readiness. Before E4 executes, a new prospective capture
+must demonstrate the same frozen K's complete optimal candidate generation, full draw
+provenance, covered control and at least two covered candidates, repeatable draws and
+selection, and generation plus scoring within 120 seconds under the frozen sampler.
+This evidence is specific to the same capture, projection, model and complete player pool
+that E4 will use; a historical or different-capture success cannot stand in for it.
+The capture must contain the original bootstrap, fixtures and settled prior-gameweek live
+payloads available before its deadline. This prospective gate is separate from E3's
+`shadow_eligible` verdict and from the calibrated Phase D binding gate; all are necessary.
+
+No candidate-count options, sampler settings, utility weights, historical folds, A/R/U/S
+thresholds, calibration/default gates or holdout rules change. This amendment does not
+authorize measurements during the freeze, retrospective capture repair, or E5 promotion.
 
 ## Question
 
@@ -58,8 +92,10 @@ three signature fields match. A bench-player swap with the same XI and captain i
 candidate because it can change official autosub points. Such candidates remain in the top-K
 set even when their deterministic objectives tie; E2 measures the resulting diversity.
 
-**Generation.** Candidate 0 is the control: the `optimize_squad` result, byte-identical to what
-the live path publishes today, tie-break included. Candidate k is the solution of the same
+**Generation.** Candidate 0 is the deterministic full-pool Phase C `optimize_squad` reference,
+tie-break included. It is the control for this from-scratch squad comparison. The live
+in-season path publishes a transfer recommendation constrained by holdings and transfer hits;
+that recommendation is not candidate 0. Candidate k is the solution of the same
 model with one no-good constraint per earlier candidate j < k:
 
 ```text
@@ -87,7 +123,8 @@ bench weight. For an exhausted set smaller than K, use the last available candid
 δ_K is recorded on every decision and its distribution is an E2 field. This is an objective
 bound, not a guarantee about realized official points or downside outcomes.
 
-**K.** E2 probes K ∈ {4, 8, 16}. The frozen K is the largest value for which, on every E2 pool:
+**K.** E2 probes K ∈ {4, 8, 16}. The frozen K is the largest value for which, on every one of
+the 137 historical E2 folds:
 (a) all candidates are `OPTIMAL`; (b) generation plus scoring stays inside the 120-second
 budget; (c) two runs produce bit-for-bit identical candidate sets and selections. If K = 4 fails
 any of the three, Phase E is not enabled and the E2 artifact says so.
@@ -188,9 +225,12 @@ it.
 
 ## E2: outcome-free runtime and coverage probe
 
-E2 reads no realized outcome. Its pools are the three real 2026-27 decision points captured so
-far (GW1 from the opening capture, GW2 and GW3 from their handoffs) and the 137-fold population
-of the Phase D calibration for coverage. For each K in {4, 8, 16} it records:
+E2 reads no realized outcome. Its report contains the three original 2026-27 decision points
+(GW1 from the opening capture, GW2 and GW3 from their handoffs) as diagnostics and the exact
+137-fold Phase D population as the historical K gate. Every label appears exactly once and
+every pool has exactly one run for each K in {4, 8, 16}, with a generation repeat. Missing live
+scoring is named and is not a budget success; missing historical scoring prevents K freezing.
+For each K it records, wherever the required inputs exist:
 
 - candidate generation time, per-candidate solver status and tie-break completion;
 - the number of distinct complete signatures, squads, elevens and captains, the number of
@@ -202,8 +242,9 @@ of the Phase D calibration for coverage. For each K in {4, 8, 16} it records:
 - seed sensitivity: with the draw re-sampled under seeds 0 to 4, how often the selected rank
   changes, reported as a count and never used to pick a seed.
 
-The frozen K follows the rule in the candidate section. The artifact names the machine and the
-repository commit.
+The frozen K follows the amended rule in the candidate section. The artifact names the
+machine, repository commit, amendment version and frozen Phase C source digests. No live
+diagnostic in this report establishes the separate prospective E4 readiness gate.
 
 ## E3: shadow evaluation
 
@@ -271,9 +312,13 @@ with the reliability failure recorded; otherwise a failed U gives `inert`. Only 
 `calibrated_internal` verdict with A, R and U all passing gives `shadow_eligible`. S is reported as
 `signal: true` or `signal: false` and does not change the verdict.
 
-`shadow_eligible` permits exactly one thing: E4, a shadow arm in the live decide phase that
-computes the Phase E result and records it in the ledger diagnostics while the published
-decision stays the control. Making Phase E the default is E5 and needs a new preregistration
+`shadow_eligible`, together with calibrated Phase D evidence and the separate prospective
+live readiness gate, permits E4: a shadow arm in the live decide phase labelled
+`full_pool_squad_diagnostic`. It records Phase E against its deterministic from-scratch
+Phase C squad reference in internal ledger diagnostics while the published transfer
+recommendation remains byte-identical. The diagnostic is not a feasible transfer alternative
+and makes no improvement claim against the published plan. Holdings, hits, chips and transfer
+state do not enter this comparison. Making Phase E the default is E5 and needs a new preregistration
 that pools these 137 folds with settled prospective gameweeks.
 
 ## Power, stated before the run
