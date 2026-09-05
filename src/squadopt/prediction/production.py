@@ -53,18 +53,10 @@ RATE_FROM_HISTORY: Final = "in_season_history"
 RATE_FROM_CARRY_OVER: Final = "cross_season_carry_over"
 RATE_UNKNOWN: Final = "no_record"
 
-RATE_SOURCES: Final = (RATE_FROM_HISTORY, RATE_FROM_CARRY_OVER, RATE_UNKNOWN)
-
 # How the two halves were combined, or that they were not.
 POINTS_FROM_TWO_STAGE: Final = "minutes_times_rate"
 POINTS_FROM_PRICE_PRIOR: Final = "price_prior"
 POINTS_FROM_BLANK_GAMEWEEK: Final = "blank_gameweek"
-
-POINTS_SOURCES: Final = (
-    POINTS_FROM_TWO_STAGE,
-    POINTS_FROM_PRICE_PRIOR,
-    POINTS_FROM_BLANK_GAMEWEEK,
-)
 
 
 @dataclass(frozen=True, slots=True)

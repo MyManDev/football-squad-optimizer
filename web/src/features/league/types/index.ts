@@ -117,5 +117,3 @@ export interface EntryAdvice {
   data_quality: EntryDataQuality;
   missing_fields: string[];
 }
-
-export type LeagueLoaded<T> = LeagueViewEnvelope<T>;

@@ -19,7 +19,7 @@ rather than assumed.
 """
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Final
 
@@ -223,12 +223,6 @@ def validate_fixture_snapshot(frame: pd.DataFrame) -> pd.DataFrame:
     _require_utc_timestamps(validated)
 
     return validated.sort_values(list(FIXTURE_SORT_COLUMNS), kind="stable").reset_index(drop=True)
-
-
-def fixture_pair_columns() -> Sequence[str]:
-    """Columns identifying one match, both of whose sides must agree."""
-
-    return _FIXTURE_PAIR_COLUMNS
 
 
 def aggregate_team_gameweek(fixtures: pd.DataFrame) -> pd.DataFrame:
