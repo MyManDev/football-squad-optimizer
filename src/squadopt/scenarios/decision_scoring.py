@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
+from numbers import Real
 from typing import Final
 
+import numpy as np
 import pandas as pd
 
 from squadopt.evaluation.models import FrozenSquadDecision, RealizedSquadScore
@@ -17,6 +20,8 @@ from squadopt.scenarios.components import ComponentScenarioDraw
 from squadopt.scenarios.models import ScenarioValidationError
 
 COMPONENT_DECISION_SCORING_CONTRACT_VERSION: Final = "component_decision_scoring_v1"
+COMPONENT_DECISION_READOUT_CONTRACT_VERSION: Final = "component_decision_readout_v1"
+COMPONENT_DECISION_LOWER_QUANTILE: Final = 0.10
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +52,65 @@ class ComponentDecisionScoringResult:
         """Return official-rules scores in scenario order."""
 
         return tuple(score.total_points for score in self.scores)
+
+
+@dataclass(frozen=True, slots=True)
+class ComponentDecisionDistributionReadout:
+    """Canonical internal summary of one officially scored component draw."""
+
+    scenario_count: int
+    mean_score: float
+    score_standard_deviation: float
+    lower_quantile_probability: float
+    lower_quantile_score: float
+    realized_score: float | None
+    probability_integral_transform: float | None
+    realized_below_lower_quantile: bool | None
+    scenario_fingerprint: str
+    component_fingerprint: str
+    decision_scoring_contract_version: str
+    contract_version: str = COMPONENT_DECISION_READOUT_CONTRACT_VERSION
+
+
+def summarize_component_decision_distribution(
+    scored: ComponentDecisionScoringResult,
+    *,
+    realized_score: float | None = None,
+) -> ComponentDecisionDistributionReadout:
+    """Summarize scores without shifting, scaling, reweighting or publishing them."""
+
+    if not isinstance(scored, ComponentDecisionScoringResult):
+        raise ScenarioValidationError("scored must be a ComponentDecisionScoringResult.")
+    values = np.asarray(scored.total_points, dtype="float64")
+    if values.size < 1 or not bool(np.isfinite(values).all()):
+        raise ScenarioValidationError("Component decision scores must be finite and non-empty.")
+    lower = float(np.quantile(values, COMPONENT_DECISION_LOWER_QUANTILE, method="linear"))
+
+    observed: float | None = None
+    pit: float | None = None
+    below: bool | None = None
+    if realized_score is not None:
+        if isinstance(realized_score, bool) or not isinstance(realized_score, Real):
+            raise ScenarioValidationError("realized_score must be a finite number or None.")
+        observed = float(realized_score)
+        if not math.isfinite(observed):
+            raise ScenarioValidationError("realized_score must be a finite number or None.")
+        pit = float((values <= observed).mean())
+        below = observed < lower
+
+    return ComponentDecisionDistributionReadout(
+        scenario_count=len(values),
+        mean_score=float(values.mean()),
+        score_standard_deviation=float(values.std(ddof=0)),
+        lower_quantile_probability=COMPONENT_DECISION_LOWER_QUANTILE,
+        lower_quantile_score=lower,
+        realized_score=observed,
+        probability_integral_transform=pit,
+        realized_below_lower_quantile=below,
+        scenario_fingerprint=scored.scenario_fingerprint,
+        component_fingerprint=scored.component_fingerprint,
+        decision_scoring_contract_version=scored.contract_version,
+    )
 
 
 def score_component_scenario_decision(

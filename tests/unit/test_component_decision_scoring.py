@@ -15,6 +15,7 @@ from squadopt.scenarios import (
     ScenarioTarget,
     ScenarioValidationError,
     score_component_scenario_decision,
+    summarize_component_decision_distribution,
 )
 from squadopt.scenarios.components import (
     ComponentScenarioDraw,
@@ -203,6 +204,43 @@ def test_scores_each_scenario_with_official_autosubs_and_captain_fallback() -> N
     assert scored.scores[1].autosubs == ((13, 12), (3, 6))
     assert scored.scores[1].captain_bonus_player_id == 8
     assert scored.scores[1].captain_bonus_points == 7.0
+
+
+def test_summarizes_the_unadjusted_official_score_distribution() -> None:
+    result = _optimization_result()
+    scored = score_component_scenario_decision(result, _draw(result))
+
+    reading = summarize_component_decision_distribution(scored)
+
+    assert reading.scenario_count == 2
+    assert reading.mean_score == pytest.approx(19.5)
+    assert reading.score_standard_deviation == pytest.approx(7.5)
+    assert reading.lower_quantile_probability == 0.10
+    assert reading.lower_quantile_score == pytest.approx(13.5)
+    assert reading.realized_score is None
+    assert reading.probability_integral_transform is None
+    assert reading.realized_below_lower_quantile is None
+    assert reading.scenario_fingerprint == scored.scenario_fingerprint
+    assert reading.component_fingerprint == scored.component_fingerprint
+
+
+def test_pit_is_inclusive_and_the_lower_tail_is_strict() -> None:
+    result = _optimization_result()
+    scored = score_component_scenario_decision(result, _draw(result))
+
+    reading = summarize_component_decision_distribution(scored, realized_score=13.5)
+
+    assert reading.probability_integral_transform == 0.5
+    assert reading.realized_below_lower_quantile is False
+
+
+@pytest.mark.parametrize("invalid", [True, float("nan"), float("inf")])
+def test_rejects_an_invalid_realized_score(invalid: object) -> None:
+    result = _optimization_result()
+    scored = score_component_scenario_decision(result, _draw(result))
+
+    with pytest.raises(ScenarioValidationError, match="realized_score"):
+        summarize_component_decision_distribution(scored, realized_score=invalid)  # type: ignore[arg-type]
 
 
 def test_decision_completion_is_identical_across_scenarios() -> None:
