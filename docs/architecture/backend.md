@@ -66,6 +66,43 @@ decision and durable shared-store requirements. That decision is not evidence th
 is running. `create_app(allowed_origins=...)` implements explicit CORS allowlisting; an empty
 tuple enables no cross-origin access and a wildcard is rejected.
 
+## Composing the advice backend
+
+`squadopt.api:app` is the module-level default: it serves published views and answers 503 on
+every advice route, because `create_app()` defaults `advice_store` and `advice_submit` to
+`None`. That default is deliberate and stays — an api built without a store must not present
+an empty cache as a computed absence.
+
+The deployment's app is the other half. `squadopt.platform.backend_runtime` is the composition
+root: it reads the server's own environment, opens **one** store, and builds the queue, the
+cache, the read store, the submission service and the capture context that the api and the
+worker share. `squadopt.api.runtime` hands those to `create_app`. The split follows the layer
+contract rather than taste — `api` sits above `platform`, so platform may not import the
+FastAPI wiring, and whatever calls `create_app` has to live in `api`.
+
+```console
+uvicorn --factory squadopt.api.runtime:build_app --host 0.0.0.0 --port 8000
+```
+
+Configuration is entirely server-side; a request names a league, a member, a strategy and a
+window, never a path.
+
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `SQUADOPT_BACKEND_STORE_ROOT` | yes | the one shared ReadWrite mount; `jobs/` and `cache/` are derived from it |
+| `SQUADOPT_BACKEND_SITE_DATA_ROOT` | yes | what ops publishes; the league tree the read side answers `connected` from |
+| `SQUADOPT_BACKEND_SNAPSHOT_ROOT` | yes | captures; the most recent one is the current context |
+| `SQUADOPT_BACKEND_HANDOFF_ROOT` | yes | projection handoffs, addressed by the capture's own season and gameweek |
+| `SQUADOPT_BACKEND_ALLOWED_ORIGINS` | no | comma-separated CORS allowlist; a wildcard is refused |
+| `SQUADOPT_BACKEND_SEASON` | no | override; otherwise inferred from the capture |
+| `SQUADOPT_REPOSITORY_COMMIT` | in a container | part of every answer's identity; falls back to `git rev-parse` locally |
+
+The backend answers only from a capture that has a **projection handoff** — the same handoff
+the decision path reads. The opening gameweek's archive-panel route is deliberately not offered
+here: a projection whose identity nobody can name has no business entering a cache key. No
+capture, no handoff, or an unreadable one means no context, and no context means `/ready`
+reports `capture_context: false` rather than the service answering from whatever it can find.
+
 ## Version and media type
 
 Versioned routes live below `/api/v1`. JSON responses use `application/json`; UTF-8 is assumed.
