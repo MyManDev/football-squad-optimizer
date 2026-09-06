@@ -20,12 +20,11 @@ is the public post-deadline picture the league's own standings page already show
 """
 
 import argparse
-import json
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from squadopt.application.entries import EntryPicks, EntryRegistry
+from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import (
     MemberStanding,
     build_league_views,
@@ -36,7 +35,6 @@ from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.fpl_live import (
     EntryGameweekPoints,
     fpl_entry_history_points,
-    fpl_entry_picks,
     fpl_league_standings,
     scored_gameweeks,
 )
@@ -49,20 +47,7 @@ from squadopt.live import (
     read_season_rules,
 )
 from squadopt.live.recommendation import infer_season
-
-
-def _element_to_code(payloads: object) -> dict[int, int]:
-    """Map the capture's per-season element ids onto the codes everything else uses."""
-
-    document = json.loads(payloads["bootstrap-static.json"].decode("utf-8"))  # type: ignore[index]
-    elements = document.get("elements")
-    if not isinstance(elements, list):
-        raise DataError("The capture's bootstrap payload carries no elements list.")
-    return {
-        int(element["id"]): int(element["code"])
-        for element in elements
-        if isinstance(element, dict) and "id" in element and "code" in element
-    }
+from squadopt.platform.capture_context import CapturePicksProvider
 
 
 def member_points(
@@ -102,68 +87,6 @@ def last_scored_gameweek(bootstrap: bytes, *, before: int) -> int | None:
 SNAPSHOT_ROOT = Path("data/snapshots")
 ARCHIVE_ROOT = Path("data/raw/vaastav-fpl")
 REGISTRY_PATH = Path("data/entries/registry.json")
-
-
-class _CapturePicks:
-    """Serves each member's picks from the capture's own payloads.
-
-    One translation happens here and it is load-bearing: the entry endpoints name players
-    by **element** id, which is a per-season number, while everything downstream of a
-    capture — the projection, the prices, the ledger — names them by **code**, the
-    identifier that survives a transfer window. Handing element ids to a consumer that
-    means codes does not fail loudly; it silently fails to find any of the squad, which
-    is exactly how this surfaced (fifteen members, "no current price", zero rendered).
-    """
-
-    def __init__(self, snapshot: object, snapshot_id: str) -> None:
-        self._payloads = getattr(snapshot, "payloads", {})
-        self._snapshot_id = snapshot_id
-        self._code_by_element = _element_to_code(self._payloads)
-
-    def _code(self, element: int) -> int:
-        code = self._code_by_element.get(int(element))
-        if code is None:
-            raise DataError(
-                f"The capture's bootstrap does not name element {element}, so the squad "
-                "cannot be resolved to the ids the projection uses."
-            )
-        return code
-
-    def picks(self, entry_id: int, season: str, gameweek: int) -> EntryPicks:
-        picks_name = f"entry-{entry_id}-picks-gw{gameweek:02d}.json"
-        history_name = f"entry-{entry_id}-history.json"
-        for name in (picks_name, history_name):
-            if name not in self._payloads:
-                raise DataError(f"The capture holds no {name}; re-capture with --entries.")
-        record = fpl_entry_picks(
-            self._payloads[picks_name],
-            self._payloads[history_name],
-            entry_id=entry_id,
-            season=season,
-            gameweek=gameweek,
-            source_snapshot_id=self._snapshot_id,
-        )
-        # The data record and the application type are twins by design: same field names,
-        # no translation table, so a drift on either side is a type error rather than a
-        # silently wrong squad.
-        return EntryPicks(
-            entry_id=record.entry_id,
-            season=record.season,
-            gameweek=record.gameweek,
-            squad=tuple(self._code(player) for player in record.squad),
-            starting_xi=tuple(self._code(player) for player in record.starting_xi),
-            captain=self._code(record.captain),
-            vice_captain=self._code(record.vice_captain),
-            bank_tenths=record.bank_tenths,
-            free_transfers=record.free_transfers,
-            free_transfers_known=record.free_transfers_known,
-            chips_used=record.chips_used,
-            purchase_prices={
-                self._code(player): price for player, price in record.purchase_prices.items()
-            },
-            purchase_prices_known=record.purchase_prices_known,
-            source_snapshot_id=record.source_snapshot_id,
-        )
 
 
 def main() -> int:
@@ -269,7 +192,7 @@ def main() -> int:
             )
         out_dir = Path(arguments.out) / "data" / "league"
         report = build_league_views(
-            _CapturePicks(snapshot, snapshot_id),
+            CapturePicksProvider(snapshot, snapshot_id),
             registry.entries,
             inputs,
             projection,
