@@ -1,26 +1,41 @@
 """Tests for the Phase D binding-run orchestration guards."""
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 import pandas as pd
 import pytest
 from scripts.run_component_squad_calibration import (
     BINDING_FOLD_COUNT,
+    CANDIDATE_REPORT_VERSION,
+    DEFAULT_OUTPUT,
     DIRECT_CONTROL_ABSTENTIONS,
     HISTORY_BURN_IN_FOLDS,
     PHASE_C_MANIFEST_SHA256,
     PHASE_C_ROSTER_SHA256,
     PHASE_C_TABLE_SHA256,
+    REPORT_VERSION,
     BindingCalibrationError,
     _binding_population,
+    _candidate_from_arguments,
+    _candidate_record,
     _load_verified_fidelity,
+    _measure_fold,
+    _report_contract_version,
     _selected_component_inputs,
 )
 
 from squadopt.evaluation import EvaluationFold
 from squadopt.evaluation.component_handoff import PhaseCComponentHandoff
+from squadopt.optimization import OptimizationResult, SolverStatus
 from squadopt.prediction.components import COMPONENT_MODEL_ROUTE
+from squadopt.scenarios import ScenarioConfig
+from squadopt.scenarios.components import (
+    COMPONENT_SCENARIO_CONTRACT_VERSION,
+    CONDITIONAL_RESIDUAL_CONTRACT_VERSION,
+    ConditionalResidualConfig,
+)
 
 
 def _all_fold_ids() -> tuple[str, ...]:
@@ -212,3 +227,161 @@ def test_selected_component_inputs_align_the_same_fifteen_players() -> None:
     assert inputs.player_ids == tuple(ids)
     assert tuple(snapshot.table["player_id"]) == tuple(ids)
     assert tuple(inputs.table["team_id"]) == tuple(snapshot.table["team_id"])
+
+
+def _arguments(fraction: object, minimum_rows: object, output: Path) -> object:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        conditional_residual_fraction=fraction,
+        conditional_residual_minimum_rows=minimum_rows,
+        json_output=output,
+    )
+
+
+def test_candidate_mode_needs_both_controls_and_its_own_output_path(tmp_path: Path) -> None:
+    assert _candidate_from_arguments(_arguments(None, None, DEFAULT_OUTPUT)) is None
+    with pytest.raises(BindingCalibrationError):
+        _candidate_from_arguments(_arguments(0.15, None, tmp_path / "candidate.json"))
+    with pytest.raises(BindingCalibrationError):
+        _candidate_from_arguments(_arguments(0.15, 30, DEFAULT_OUTPUT))
+    candidate = _candidate_from_arguments(_arguments(0.15, 30, tmp_path / "candidate.json"))
+    assert candidate is not None
+    assert (candidate.fraction, candidate.minimum_rows) == (0.15, 30)
+
+
+def test_a_candidate_report_never_carries_the_binding_contract() -> None:
+    candidate = _candidate_from_arguments(_arguments(0.15, 30, Path("candidate.json")))
+    assert _report_contract_version(None) == REPORT_VERSION
+    assert _report_contract_version(candidate) == CANDIDATE_REPORT_VERSION
+    assert CANDIDATE_REPORT_VERSION != REPORT_VERSION
+
+
+def _squad_positions() -> dict[int, str]:
+    return {
+        1: "GK",
+        2: "GK",
+        3: "DEF",
+        4: "DEF",
+        5: "DEF",
+        6: "DEF",
+        7: "DEF",
+        8: "MID",
+        9: "MID",
+        10: "MID",
+        11: "MID",
+        12: "MID",
+        13: "FWD",
+        14: "FWD",
+        15: "FWD",
+    }
+
+
+def _component_rows(fold_ids: Sequence[str]) -> pd.DataFrame:
+    """Phase C rows for one squad across folds: history folds feed the residual pool."""
+
+    records: list[dict[str, object]] = []
+    for fold_index, fold_id in enumerate(fold_ids):
+        for player_id, position in _squad_positions().items():
+            expectation = 0.5 * player_id
+            records.append(
+                {
+                    "fold_id": fold_id,
+                    "player_id": player_id,
+                    "position": position,
+                    "fixture_count": 1,
+                    "appearance_probability": 0.9,
+                    "expected_minutes_if_appearance": 70.0,
+                    "raw_expected_points_if_appearance": expectation,
+                    "composition_route": COMPONENT_MODEL_ROUTE,
+                    "evidence_status": "not_requested",
+                    "appearance_target": 1,
+                    "minutes_target": 70.0 + ((player_id + fold_index) % 5) * 4.0,
+                    "points_target": expectation + ((player_id * 3 + fold_index) % 7) - 3.0,
+                }
+            )
+    return pd.DataFrame(records)
+
+
+def _frozen_decision() -> tuple[PhaseCComponentHandoff, EvaluationFold, OptimizationResult]:
+    fold_id = "2021-22-gw11"
+    history = tuple(f"2021-22-gw{gameweek:02d}" for gameweek in range(2, 11))
+    handoff = PhaseCComponentHandoff(
+        rows=_component_rows((*history, fold_id)),
+        roster=pd.DataFrame(),
+        table_sha256="a" * 64,
+        roster_sha256="b" * 64,
+        manifest_sha256="c" * 64,
+        repository_commit="d" * 40,
+        model_version="component-v1",
+        feature_contract_version="features-v1",
+        target_contract_version="targets-v1",
+        dataset_contract_version="dataset-v1",
+    )
+    positions = _squad_positions()
+    squad = pd.DataFrame(
+        {
+            "player_id": list(positions),
+            "name": [f"Player {player_id}" for player_id in positions],
+            "team_id": [f"T{(player_id - 1) // 3}" for player_id in positions],
+            "position": list(positions.values()),
+            "price_tenths": [50] * len(positions),
+            "expected_points": [0.45 * player_id for player_id in positions],
+        }
+    )
+    starters = (1, 3, 4, 5, 8, 9, 10, 11, 13, 14, 15)
+    result = OptimizationResult(
+        solver_status=SolverStatus.OPTIMAL,
+        selected_squad=squad,
+        starting_xi=squad.loc[squad["player_id"].isin(starters)].copy(),
+        bench=squad.loc[~squad["player_id"].isin(starters)].copy(),
+        captain=squad.loc[squad["player_id"] == 15].iloc[0].copy(),
+        total_cost_tenths=750,
+        projected_score=0.0,
+        objective_value=0.0,
+        diagnostics={},
+    )
+    prepared = EvaluationFold(
+        fold_id=fold_id,
+        projections=squad,
+        realized_points=pd.DataFrame(
+            {"player_id": list(positions), "total_points": [2.0] * len(positions)}
+        ),
+    )
+    return handoff, prepared, result
+
+
+def test_measure_fold_draws_on_the_sampler_the_run_asked_for() -> None:
+    """Regression: the sampler setting reached the draw as a prepared fold once, and was refused."""
+
+    handoff, prepared, result = _frozen_decision()
+    settings = ScenarioConfig(scenario_count=64)
+    selected = tuple(_squad_positions())
+
+    frozen_reading, frozen = _measure_fold(
+        handoff, prepared, result, 40.0, selected, settings, None
+    )
+    candidate_reading, candidate = _measure_fold(
+        handoff,
+        prepared,
+        result,
+        40.0,
+        selected,
+        settings,
+        ConditionalResidualConfig(fraction=0.25, minimum_rows=4),
+    )
+
+    assert frozen["sampler_contract_version"] == COMPONENT_SCENARIO_CONTRACT_VERSION
+    assert candidate["sampler_contract_version"] == CONDITIONAL_RESIDUAL_CONTRACT_VERSION
+    assert frozen["scenario_fingerprint"] != candidate["scenario_fingerprint"]
+    assert frozen_reading.fold_id == candidate_reading.fold_id == prepared.fold_id
+    assert frozen["realized_score"] == candidate["realized_score"] == 40.0
+
+
+def test_candidate_record_names_the_candidate_sampler_and_nothing_for_the_binding_one() -> None:
+    assert _candidate_record(None) is None
+    record = _candidate_record(ConditionalResidualConfig(fraction=0.15, minimum_rows=30))
+    assert record is not None
+    assert record["sampler_contract_version"] == CONDITIONAL_RESIDUAL_CONTRACT_VERSION
+    assert record["reference_contract_version"] == REPORT_VERSION
+    assert record["binding"] is False
