@@ -50,6 +50,7 @@ from squadopt.experiments import (
 )
 from squadopt.experiments.shadow_report import ShadowReportError, write_document_once
 from squadopt.features import CrossSeasonConfig
+from squadopt.optimization import OptimizationResult
 from squadopt.prediction import (
     PredictionProvenance,
     PredictionSnapshot,
@@ -389,8 +390,75 @@ def _binding_population(
     return eligible
 
 
+def _candidate_record(
+    candidate_sampler: ConditionalResidualConfig | None,
+) -> dict[str, object] | None:
+    """The provenance block a candidate report carries; None for the binding sampler."""
+
+    if candidate_sampler is None:
+        return None
+    return {
+        "sampler_contract_version": candidate_sampler.contract_version,
+        "conditional_residual_fraction": candidate_sampler.fraction,
+        "conditional_residual_minimum_rows": candidate_sampler.minimum_rows,
+        "reference_contract_version": REPORT_VERSION,
+        "development_data_only": True,
+        "binding": False,
+    }
+
+
+def _measure_fold(
+    handoff: PhaseCComponentHandoff,
+    prepared: EvaluationFold,
+    result: OptimizationResult,
+    realized_score: float,
+    selected_ids: Sequence[int],
+    settings: ScenarioConfig,
+    candidate_sampler: ConditionalResidualConfig | None,
+) -> tuple[ComponentCalibrationFold, dict[str, object]]:
+    """Simulate one frozen squad decision on the binding sampler, or on the candidate if given.
+
+    The sampler setting travels under its own name from the arguments to the draw, and the fold
+    record reports the contract version the draw itself declares, so the report can never name
+    a sampler the draw did not use.
+    """
+
+    fold_id = prepared.fold_id
+    inputs, snapshot = _selected_component_inputs(handoff, prepared, selected_ids)
+    if not bool(inputs.table["composition_route"].eq(COMPONENT_MODEL_ROUTE).all()):
+        raise BindingCalibrationError(f"{fold_id} contains a selected non-component row.")
+    target = _target(fold_id)
+    history = handoff.rows.loc[handoff.rows["fold_id"].astype("string") < fold_id]
+    residuals = paired_conditional_residuals(
+        history,
+        target=target,
+        min_history_folds=settings.min_history_folds,
+    )
+    draw = sample_component_scenarios(
+        inputs, snapshot, residuals, target, settings, conditional_residuals=candidate_sampler
+    )
+    scored = score_component_scenario_decision(result, draw)
+    readout = summarize_component_decision_distribution(scored, realized_score=realized_score)
+    record: dict[str, object] = {
+        "fold_id": fold_id,
+        "sampler_contract_version": str(
+            draw.scenarios.diagnostics["component_sampler_contract_version"]
+        ),
+        "solver_status": result.solver_status.value,
+        "realized_score": readout.realized_score,
+        "scenario_mean_score": readout.mean_score,
+        "scenario_standard_deviation": readout.score_standard_deviation,
+        "q10_score": readout.lower_quantile_score,
+        "probability_integral_transform": readout.probability_integral_transform,
+        "realized_below_q10": readout.realized_below_lower_quantile,
+        "scenario_fingerprint": readout.scenario_fingerprint,
+        "component_fingerprint": readout.component_fingerprint,
+    }
+    return ComponentCalibrationFold(fold_id=fold_id, readout=readout), record
+
+
 def _measure(arguments: argparse.Namespace) -> tuple[dict[str, object], int]:
-    candidate = _candidate_from_arguments(arguments)
+    candidate_sampler = _candidate_from_arguments(arguments)
     handoff = read_phase_c_component_handoff(arguments.table, arguments.roster, arguments.manifest)
     fidelity_sha256 = _load_verified_fidelity(arguments.fidelity, handoff)
     panel = _load_development_panel(arguments.archive_root)
@@ -438,44 +506,17 @@ def _measure(arguments: argparse.Namespace) -> tuple[dict[str, object], int]:
             or evaluated_fold.realized_squad_points is None
         ):
             continue
-        candidate = candidate_by_id[fold_id]
-        selected_ids = selected_by_id[fold_id]
-        inputs, snapshot = _selected_component_inputs(handoff, candidate, selected_ids)
-        if not bool(inputs.table["composition_route"].eq(COMPONENT_MODEL_ROUTE).all()):
-            raise BindingCalibrationError(f"{fold_id} contains a selected non-component row.")
-        target = _target(fold_id)
-        history = handoff.rows.loc[handoff.rows["fold_id"].astype("string") < fold_id]
-        residuals = paired_conditional_residuals(
-            history,
-            target=target,
-            min_history_folds=settings.min_history_folds,
+        reading, record = _measure_fold(
+            handoff,
+            candidate_by_id[fold_id],
+            evaluated_fold.optimization_result,
+            evaluated_fold.realized_squad_points,
+            selected_by_id[fold_id],
+            settings,
+            candidate_sampler,
         )
-        draw = sample_component_scenarios(
-            inputs, snapshot, residuals, target, settings, conditional_residuals=candidate
-        )
-        scored = score_component_scenario_decision(evaluated_fold.optimization_result, draw)
-        readout = summarize_component_decision_distribution(
-            scored,
-            realized_score=evaluated_fold.realized_squad_points,
-        )
-        readings.append(ComponentCalibrationFold(fold_id=fold_id, readout=readout))
-        fold_records.append(
-            {
-                "fold_id": fold_id,
-                "sampler_contract_version": str(
-                    draw.scenarios.diagnostics["component_sampler_contract_version"]
-                ),
-                "solver_status": evaluated_fold.optimization_result.solver_status.value,
-                "realized_score": readout.realized_score,
-                "scenario_mean_score": readout.mean_score,
-                "scenario_standard_deviation": readout.score_standard_deviation,
-                "q10_score": readout.lower_quantile_score,
-                "probability_integral_transform": readout.probability_integral_transform,
-                "realized_below_q10": readout.realized_below_lower_quantile,
-                "scenario_fingerprint": readout.scenario_fingerprint,
-                "component_fingerprint": readout.component_fingerprint,
-            }
-        )
+        readings.append(reading)
+        fold_records.append(record)
 
     verdict = evaluate_component_squad_calibration(
         readings,
@@ -496,18 +537,7 @@ def _measure(arguments: argparse.Namespace) -> tuple[dict[str, object], int]:
                 "fidelity_artifact_sha256": fidelity_sha256,
             },
             "config": asdict(settings),
-            "candidate": (
-                None
-                if candidate is None
-                else {
-                    "sampler_contract_version": candidate.contract_version,
-                    "conditional_residual_fraction": candidate.fraction,
-                    "conditional_residual_minimum_rows": candidate.minimum_rows,
-                    "reference_contract_version": REPORT_VERSION,
-                    "development_data_only": True,
-                    "binding": False,
-                }
-            ),
+            "candidate": _candidate_record(candidate_sampler),
             "population": {
                 "full_fold_count": len(all_ids),
                 "history_burn_in_fold_ids": list(HISTORY_BURN_IN_FOLDS),
