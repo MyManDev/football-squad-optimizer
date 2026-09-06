@@ -308,8 +308,7 @@ const en = {
   leagueMembers: {
     loading: "Loading league members…",
     computeTitle: "Compute this plan",
-    computeBodySelf:
-      "Compute the selected strategy and window from your own squad, against the rival you pick.",
+    computeBodySelf: "Compute a one-week pure-points plan from your own squad.",
     computeBodyOther:
       "You are viewing another member. The computation starts from this member's public squad.",
     computeRival: "Rival",
@@ -320,14 +319,17 @@ const en = {
     computeRunning: "Computing",
     computeWaiting: "The answer will appear here when the computation finishes.",
     computeWaitingWithFallback: "Showing the previously published plan below while this computes.",
-    computeDone: "Computed",
-    computeProvenance: (capture: string, at: string) => `Capture ${capture}, computed ${at}.`,
+    computeDone: "Plan available",
+    computePublished: "Published plan",
+    computeUnsupportedSelection:
+      "Compute currently supports only Pure Points / 1 week. Other modes and horizons can show published research plans, but cannot request a new calculation yet.",
+    computeProvenance: (capture: string, at: string) => `Capture ${capture}, result dated ${at}.`,
     computeStaticFallback: "The backend was unreachable; this is the published static answer.",
     computeUnavailable:
       "Only the published site is available right now; this combination was not published.",
     computeFailed:
       "The computation did not finish. The published plan, where one exists, still stands.",
-    adviceComputedBadge: "Computed now",
+    adviceComputedBadge: "Computation result",
     advicePublishedWhileComputing: "The published plan is shown while the computation runs.",
     adviceBaselineWhileComputing:
       "This is the published pure-points, one-week plan; the requested combination is still computing.",
@@ -841,8 +843,7 @@ const tr: MessageSchema<typeof en> = {
   },
   leagueMembers: {
     computeTitle: "Bu planı hesapla",
-    computeBodySelf:
-      "Seçili strateji ve pencereyi kendi kadrondan, seçtiğin rakibe karşı hesaplat.",
+    computeBodySelf: "Kendi kadrondan bir haftalık saf puan planı hesaplat.",
     computeBodyOther:
       "Başka bir üyeye bakıyorsun. Hesap bu üyenin herkese açık kadrosundan başlar.",
     computeRival: "Rakip",
@@ -853,12 +854,15 @@ const tr: MessageSchema<typeof en> = {
     computeRunning: "Hesaplanıyor",
     computeWaiting: "Hesap bitince cevap burada görünecek.",
     computeWaitingWithFallback: "Hesap sürerken aşağıda daha önce yayınlanmış plan gösteriliyor.",
-    computeDone: "Hesaplandı",
-    computeProvenance: (capture: string, at: string) => `Capture ${capture}, hesap ${at}.`,
+    computeDone: "Plan hazır",
+    computePublished: "Yayınlanmış plan",
+    computeUnsupportedSelection:
+      "Hesapla şu anda yalnız Saf Puan / 1 hafta için kullanılabilir. Diğer mod ve ufuklarda yayınlanmış araştırma planları görüntülenebilir; henüz yeni hesap istenemez.",
+    computeProvenance: (capture: string, at: string) => `Capture ${capture}, sonuç tarihi ${at}.`,
     computeStaticFallback: "Backend'e ulaşılamadı; bu, yayınlanmış statik cevap.",
     computeUnavailable: "Şu an yalnız yayınlanmış site var; bu kombinasyon yayınlanmamış.",
     computeFailed: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
-    adviceComputedBadge: "Şimdi hesaplandı",
+    adviceComputedBadge: "Hesap sonucu",
     advicePublishedWhileComputing: "Hesap sürerken yayınlanmış plan gösteriliyor.",
     adviceBaselineWhileComputing:
       "Bu, yayınlanmış saf puan / 1 hafta planı; istenen kombinasyon hâlâ hesaplanıyor.",

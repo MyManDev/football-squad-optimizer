@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import { LeagueDataMissing } from "../data";
+import { AdviceResponseError } from "./adviceResponse";
 import {
   createAdviceClient,
+  AdviceApiError,
   FallbackAdviceClient,
   HttpAdviceClient,
   StaticOnlyAdviceClient,
@@ -69,6 +71,7 @@ describe("HttpAdviceClient", () => {
   it("reads a cache hit and carries the rival in the query", async () => {
     const calls: string[] = [];
     const envelope = mockEntryAdviceEnvelope(101, "saf-puan", 1);
+    Object.assign(envelope.payload, { rival_entry_id: 202 });
     const client = new HttpAdviceClient("https://api.example/", async (url) => {
       calls.push(url);
       return jsonResponse(200, envelope);
@@ -85,7 +88,7 @@ describe("HttpAdviceClient", () => {
 
   it("404 means not computed; 202 means a job", async () => {
     const notComputed = new HttpAdviceClient("https://api.example", async () =>
-      jsonResponse(404, { code: "NOT_FOUND" }),
+      jsonResponse(404, { error: { code: "NOT_COMPUTED" } }),
     );
     expect((await notComputed.readAdvice(REQUEST)).kind).toBe("not-computed");
 
@@ -123,11 +126,76 @@ describe("FallbackAdviceClient", () => {
     if (hit.kind === "advice") expect(hit.source).toBe("api-cache");
 
     const empty = new HttpAdviceClient("https://api.example", async () =>
-      jsonResponse(404, { code: "NOT_FOUND" }),
+      jsonResponse(404, { error: { code: "NOT_COMPUTED" } }),
     );
     const emptyClient = new FallbackAdviceClient(empty, new StaticOnlyAdviceClient());
     const baseline = await emptyClient.readAdvice(REQUEST);
     expect(baseline.kind).toBe("advice");
     if (baseline.kind === "advice") expect(baseline.source).toBe("static");
+  });
+});
+
+describe("advice response identity", () => {
+  it.each([
+    { entry_id: 999 },
+    { league_id: 123 },
+    { mode: "garantici" },
+    { window: 3 },
+    { season: "2024-25" },
+    { gameweek: 99 },
+    { moves: null },
+  ])("refuses a successful response that does not answer the selection: %j", async (change) => {
+    const envelope = mockEntryAdviceEnvelope(101, "saf-puan", 1);
+    const request = {
+      ...REQUEST,
+      season: envelope.payload.season,
+      gameweek: envelope.payload.gameweek,
+    };
+    const wrong = { ...envelope, payload: { ...envelope.payload, ...change } };
+    const client = new HttpAdviceClient("https://api.example", async () =>
+      jsonResponse(200, wrong),
+    );
+    await expect(client.readAdvice(request)).rejects.toBeInstanceOf(AdviceResponseError);
+    await expect(client.requestAdvice(request)).rejects.toBeInstanceOf(AdviceResponseError);
+  });
+
+  it("does not treat a published rival-free answer as an explicit rival answer", async () => {
+    const client = new StaticOnlyAdviceClient();
+    await expect(client.readAdvice({ ...REQUEST, rivalEntryId: 202 })).rejects.toBeInstanceOf(
+      AdviceResponseError,
+    );
+  });
+
+  it("rejects an unknown contract", async () => {
+    const envelope = { ...mockEntryAdviceEnvelope(101, "saf-puan", 1), contract_version: "other" };
+    const client = new HttpAdviceClient("https://api.example", async () =>
+      jsonResponse(200, envelope),
+    );
+    await expect(client.requestAdvice(REQUEST)).rejects.toBeInstanceOf(AdviceResponseError);
+  });
+
+  it.each([400, 401, 403, 404, 409, 422, 429])(
+    "does not mask API rejection %i with a published answer",
+    async (status) => {
+      const primary = new HttpAdviceClient("https://api.example", async () =>
+        jsonResponse(status, { error: { code: "UNKNOWN_ENTRY" } }),
+      );
+      const client = new FallbackAdviceClient(primary, new StaticOnlyAdviceClient());
+      await expect(client.requestAdvice(REQUEST)).rejects.toBeInstanceOf(AdviceApiError);
+      await expect(client.readAdvice(REQUEST)).rejects.toBeInstanceOf(AdviceApiError);
+    },
+  );
+
+  it("rejects a queued response with no job identity", async () => {
+    const client = new HttpAdviceClient("https://api.example", async () => jsonResponse(202, {}));
+    await expect(client.requestAdvice(REQUEST)).rejects.toBeInstanceOf(AdviceResponseError);
+  });
+
+  it.each([
+    { job_id: "different-job", status: "completed" },
+    { job_id: "job-1", status: "unknown" },
+  ])("rejects a mismatched job response: %j", async (body) => {
+    const client = new HttpAdviceClient("https://api.example", async () => jsonResponse(200, body));
+    await expect(client.readJob("job-1")).rejects.toBeInstanceOf(AdviceResponseError);
   });
 });

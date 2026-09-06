@@ -11,7 +11,8 @@ import type {
   AdviceRequest,
   AdviceRequestResult,
 } from "./adviceClient";
-import { useAdviceJob, type ComputePhase } from "./useAdviceJob";
+import { sameAdviceRequest, useAdviceJob, type ComputePhase } from "./useAdviceJob";
+import { AdviceResponseError } from "./adviceResponse";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -74,6 +75,42 @@ function describePhase(state: ComputePhase): string {
 }
 
 describe("useAdviceJob", () => {
+  it("a different season or week is a different request even for the same member", () => {
+    const request = { ...REQUEST, season: "2026-27", gameweek: 3 };
+    expect(sameAdviceRequest(request, { ...request })).toBe(true);
+    expect(sameAdviceRequest(request, { ...request, gameweek: 4 })).toBe(false);
+    expect(sameAdviceRequest(request, { ...request, season: "2027-28" })).toBe(false);
+  });
+
+  it("does not show another member's result when a custom client misroutes a cache hit", async () => {
+    const client = new ScriptedClient();
+    client.requestAdvice = async () => ({
+      kind: "advice",
+      envelope: mockEntryAdviceEnvelope(999, "garantici", 1),
+      source: "api-cache",
+    });
+    render(<Harness client={client} />);
+    await act(async () => {
+      screen.getByRole("button", { name: "go" }).click();
+    });
+    expect(screen.getByTestId("phase").textContent).toBe("failed");
+  });
+
+  it("does not keep polling a malformed job response", async () => {
+    const client = new ScriptedClient();
+    client.readJob = async () => {
+      throw new AdviceResponseError("Wrong job identity");
+    };
+    render(<Harness client={client} />);
+    await act(async () => {
+      screen.getByRole("button", { name: "go" }).click();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100);
+    });
+    expect(screen.getByTestId("phase").textContent).toBe("failed");
+  });
+
   it("walks queued to running to completed, showing the published answer meanwhile", async () => {
     const client = new ScriptedClient();
     client.statuses = ["running", "completed"];

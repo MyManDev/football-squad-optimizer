@@ -12,21 +12,6 @@
   margin-bottom: 0.5rem;
 }
 
-.rivalLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.9rem;
-}
-
-.rivalSelect {
-  border: 1px solid var(--border, currentColor);
-  border-radius: 0.4rem;
-  background: transparent;
-  color: inherit;
-  padding: 0.3rem 0.5rem;
-}
-
 .compute {
   border: 1px solid var(--border, currentColor);
   border-radius: 0.5rem;
@@ -39,7 +24,7 @@
 
 .compute:disabled {
   opacity: 0.6;
-  cursor: wait;
+  cursor: not-allowed;
 }
 
 .state {

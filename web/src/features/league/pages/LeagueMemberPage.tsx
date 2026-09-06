@@ -10,7 +10,8 @@ import { points, signedPoints } from "../../../lib/format";
 import { DecisionControls } from "../../moves/components/DecisionControls";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { createAdviceClient, type AdviceClient, type AdviceSource } from "../advice/adviceClient";
-import { selectedAdviceRequest } from "../advice/adviceSelection";
+import { canComputeAdvice, selectedAdviceRequest } from "../advice/adviceSelection";
+import { checkedAdvice } from "../advice/adviceResponse";
 import { sameAdviceRequest, useAdviceJob } from "../advice/useAdviceJob";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { useDecisionSelection } from "../../moves/decisionSelection";
@@ -104,28 +105,47 @@ interface ShownAdvice {
   source?: AdviceSource;
 }
 
-export function LeagueMemberView({
-  squad,
-  advice,
-  adviceIssue,
-  members = [],
-  client,
-}: {
+interface LeagueMemberViewProps {
   squad: LeagueViewEnvelope<EntrySquad>;
   advice: LeagueViewEnvelope<EntryAdvice> | null;
   adviceIssue?: AdviceIssue;
   members?: EntryView[];
   client?: AdviceClient;
-}) {
+}
+
+export function LeagueMemberView(props: LeagueMemberViewProps) {
+  const { squad } = props;
+  const contextKey = [
+    squad.payload.league_id,
+    squad.payload.entry.entry_id,
+    squad.payload.season,
+    squad.payload.gameweek,
+    squad.payload.source_snapshot_id,
+    squad.generated_at_utc,
+  ].join(":");
+  // A new published squad invalidates both an old result and its in-flight request.
+  return <LeagueMemberContent key={contextKey} {...props} />;
+}
+
+function LeagueMemberContent({
+  squad,
+  advice,
+  adviceIssue,
+  members = [],
+  client,
+}: LeagueMemberViewProps) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = squad.payload;
   const [searchParams] = useSearchParams();
   const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
   const job = useAdviceJob(adviceClient);
-  const leagueId = advice?.payload.league_id ?? view.league_id;
+  const leagueId = view.league_id;
   const entryId = view.entry.entry_id;
-  const request = selectedAdviceRequest(searchParams, leagueId, entryId, members);
+  const request = selectedAdviceRequest(searchParams, leagueId, entryId, members, {
+    season: view.season,
+    gameweek: view.gameweek,
+  });
   const requestKey = [
     request.leagueId,
     request.entryId,
@@ -145,11 +165,24 @@ export function LeagueMemberView({
     job.state.phase !== "idle" && sameAdviceRequest(job.state.request, request) ? job.state : null;
   const computed = current?.phase === "done" ? current : null;
   const waiting = current?.phase === "waiting" ? current : null;
+  let published: LeagueViewEnvelope<EntryAdvice> | null = null;
+  if (advice) {
+    try {
+      published = checkedAdvice(advice, request);
+    } catch {
+      // A published file for another selection or week is not this request's answer.
+      published = null;
+    }
+  }
   let shown: ShownAdvice | null = null;
   if (computed) {
-    shown = { envelope: computed.envelope, origin: "computed", source: computed.source };
-  } else if (advice) {
-    shown = { envelope: advice, origin: waiting ? "published-while-computing" : "published" };
+    shown = {
+      envelope: computed.envelope,
+      origin: computed.source === "api-cache" ? "computed" : "published",
+      source: computed.source,
+    };
+  } else if (published) {
+    shown = { envelope: published, origin: waiting ? "published-while-computing" : "published" };
   } else if (waiting?.fallback) {
     shown = { envelope: waiting.fallback, origin: "baseline-while-computing" };
   }
@@ -239,18 +272,21 @@ export function LeagueMemberView({
         </h2>
         <TemplatePicker />
         <DecisionControls variant="entry" />
-        <AdviceRequestPanel leagueId={leagueId} entryId={entryId} members={members} job={job} />
+        <AdviceRequestPanel request={request} job={job} />
         {shown ? (
           <AdviceCard shown={shown} />
         ) : (
-          <MissingAdviceCard issue={adviceIssue ?? "not-computed"} />
+          <MissingAdviceCard
+            issue={advice && !published ? "not-computed" : (adviceIssue ?? "not-computed")}
+            canCompute={canComputeAdvice(request)}
+          />
         )}
       </section>
     </div>
   );
 }
 
-function MissingAdviceCard({ issue }: { issue: AdviceIssue }) {
+function MissingAdviceCard({ issue, canCompute }: { issue: AdviceIssue; canCompute: boolean }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   return (
@@ -263,7 +299,7 @@ function MissingAdviceCard({ issue }: { issue: AdviceIssue }) {
       <p className={styles.muted}>
         {issue === "not-computed" ? copy.adviceNotComputedBody : copy.entryNotAvailableBody}
       </p>
-      <p className={styles.muted}>{copy.adviceRequestHint}</p>
+      {canCompute ? <p className={styles.muted}>{copy.adviceRequestHint}</p> : null}
     </Card>
   );
 }
