@@ -114,7 +114,7 @@ export class HttpAdviceClient implements AdviceClient {
   private readonly origin: string;
   private readonly fetcher: FetchLike;
 
-  constructor(origin: string, fetcher: FetchLike = fetch) {
+  constructor(origin: string, fetcher: FetchLike = (input, init) => fetch(input, init)) {
     this.origin = origin.replace(/\/$/, "");
     this.fetcher = fetcher;
   }
