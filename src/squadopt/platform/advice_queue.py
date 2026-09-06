@@ -65,6 +65,22 @@ def sanitize_error_message(message: str, *, limit: int = 200) -> str:
     return trimmed or "unspecified failure"
 
 
+class AdviceComputeRefused(ValueError):
+    """The worker will not compute this job, and names a stable reason.
+
+    Distinct from a bug. A bug is unexpected and lands as ``ADVICE_FAILED`` with a
+    sanitized message; this is a decision the compute side reached deliberately — the
+    capture the job was accepted under is gone, its request cannot be read back, it has
+    been retried too often — and the operator (and the member's page) deserve to be told
+    which. The code travels with the exception so the worker step stays the only place
+    that writes a terminal record.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 class AdviceQueueError(ValueError):
     """A queue operation violates the store's contract."""
 
@@ -374,6 +390,19 @@ def run_advice_worker_once(
         return failed
     except BackendJobsContractError:
         raise
+    except AdviceComputeRefused as refusal:
+        failed = job.transition(
+            "failed",
+            at_utc=at_utc,
+            error=JobError(code=refusal.code, message=sanitize_error_message(str(refusal))),
+        )
+        queue.store(failed)
+        if metrics is not None:
+            metrics.solve_seconds(perf_counter() - started)
+            metrics.increment("advice_jobs_total", outcome="refused")
+        if log is not None:
+            log.event("advice_job_refused", job_id=job.job_id, code=refusal.code)
+        return failed
     except Exception as error:
         failed = job.transition(
             "failed",

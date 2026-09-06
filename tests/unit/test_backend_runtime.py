@@ -70,7 +70,8 @@ def _handoff(handoff_root: Path, snapshot_id: str, *, gameweek: int = 2) -> Path
     return write_projection_handoff(handoff_path_for(handoff_root, SEASON, gameweek), projection)
 
 
-def _publish_members(site_root: Path) -> None:
+def _publish_members(site_root: Path, *entry_ids: int) -> None:
+    members = (ENTRY_ID, *entry_ids)
     document = {
         "contract_version": "provisional_league_ui_v1",
         "payload": {
@@ -78,7 +79,7 @@ def _publish_members(site_root: Path) -> None:
             "league_name": "Test League",
             "season": SEASON,
             "gameweek": 2,
-            "members": [{"member_kind": "human", "entry_id": ENTRY_ID}],
+            "members": [{"member_kind": "human", "entry_id": one} for one in members],
         },
     }
     path = site_root / "league" / "members.json"

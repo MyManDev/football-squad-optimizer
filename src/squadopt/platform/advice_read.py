@@ -204,6 +204,18 @@ class AdviceReadStore:
         )
         return key, context
 
+    def strategy_uses_rival(self, strategy: str) -> bool:
+        """Whether a rival is part of this strategy's identity, or dropped before hashing.
+
+        The same fact ``advice_cache_key`` applies, exposed so a caller that has to record
+        a request *beside* the key normalizes it the same way. Two requests that reach one
+        key must describe one question.
+        """
+
+        if strategy not in self._strategies:
+            raise UnknownStrategyError(f"Strategy {strategy!r} is not computed here.")
+        return self._strategies[strategy]
+
     def cached(self, key: str) -> bytes | None:
         """The exact cached bytes under a resolved key, or None."""
 

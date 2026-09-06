@@ -40,6 +40,7 @@ from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.platform.advice_cache import FileAdviceCache
+from squadopt.platform.advice_job_spec import AdviceJobSpecStore, FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics, readiness_report
 from squadopt.platform.advice_queue import FileJobQueue
 from squadopt.platform.advice_read import AdviceReadStore, AdviceRequestContext, FileLeagueDirectory
@@ -168,6 +169,10 @@ class BackendConfig:
     @property
     def cache_root(self) -> Path:
         return self.store_root / "cache"
+
+    @property
+    def spec_root(self) -> Path:
+        return self.store_root / "specs"
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] | None = None) -> BackendConfig:
@@ -351,6 +356,7 @@ class AdviceBackend:
     reader: AdviceReadStore
     submit: AdviceSubmitService
     contexts: CaptureContextProvider
+    job_specs: AdviceJobSpecStore
     metrics: AdviceMetrics
     log: AdviceLog
 
@@ -396,6 +402,7 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
     metrics = AdviceMetrics()
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
+    specs = FileAdviceJobSpecStore(config.spec_root)
     contexts = CaptureContextProvider(
         config,
         repository_commit=_repository_commit(),
@@ -412,6 +419,7 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
         reader,
         queue,
         rate_limiter=FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds),
+        specs=specs,
     )
     return AdviceBackend(
         config=config,
@@ -420,6 +428,7 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
         reader=reader,
         submit=submit,
         contexts=contexts,
+        job_specs=specs,
         metrics=metrics,
         log=component_log,
     )
