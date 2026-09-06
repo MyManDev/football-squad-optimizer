@@ -7,7 +7,9 @@ presses a button for.
 """
 
 import json
+import time
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -306,7 +308,9 @@ def test_recomputing_one_job_produces_the_same_bytes(running: dict[str, Any]) ->
 
     # Equal bytes alone would not prove this: two computes a moment apart share a
     # whole-second clock reading, so the field is pinned to its *source* instead.
-    capture = backend.contexts.capture(running["snapshot_id"])
+    current = backend.contexts.current()
+    assert current is not None
+    capture = backend.contexts.capture(current)
     assert capture is not None
     assert json.loads(first)["generated_at_utc"] == capture.inputs.captured_at_utc
     assert capture.inputs.captured_at_utc != _now_stamp()
@@ -437,9 +441,8 @@ def test_an_ignored_rival_cannot_split_the_answer_or_the_spec(running: dict[str,
     write-once store holding a different description of the same key — a 500 for a
     request the contract says is the first one again.
 
-    They are two *jobs*, because the request fingerprint keeps the field the cache key
-    discards. That is the existing contract's granularity, not this store's: the second
-    job recomputes an identical answer and the cache accepts it as the no-op it is.
+    One job, not two: the open-job index is keyed on the answer's address, so a parameter
+    the strategy ignores cannot buy a second solve of the same plan.
     """
 
     backend = running["backend"]
@@ -459,6 +462,7 @@ def test_an_ignored_rival_cannot_split_the_answer_or_the_spec(running: dict[str,
     assert with_rival.status_code == 202, with_rival.text
 
     jobs = backend.queue.jobs()
+    assert len(jobs) == 1
     assert len({job.cache_key for job in jobs}) == 1
     spec = backend.job_specs.get(jobs[0].cache_key)
     assert spec is not None
@@ -474,3 +478,133 @@ def test_an_ignored_rival_cannot_split_the_answer_or_the_spec(running: dict[str,
     )
     assert processed == len(jobs)
     assert all(job.status == "completed" for job in backend.queue.jobs())
+
+
+def test_a_changed_commit_under_the_same_capture_is_refused(running: dict[str, Any]) -> None:
+    """A cache key is seven fields, not one.
+
+    The capture is untouched; the deployment redeployed. Computing here would file an
+    answer produced by new code under the old code's address — the same silent corruption
+    a replaced capture would cause, reached through a different field.
+    """
+
+    backend = running["backend"]
+    current = backend.contexts.current()
+    assert current is not None
+    stale = replace(current, repository_commit="9" * 40)
+    key = "1" * 64
+    backend.job_specs.put(key, _spec(context=stale))
+
+    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    with pytest.raises(AdviceComputeRefused) as refusal:
+        compute(_job(key))
+    assert refusal.value.code == "CONTEXT_UNAVAILABLE"
+    assert backend.cache.get(key) is None
+
+
+def test_a_changed_configuration_under_the_same_capture_is_refused(
+    running: dict[str, Any],
+) -> None:
+    backend = running["backend"]
+    current = backend.contexts.current()
+    assert current is not None
+    stale = replace(current, configuration_fingerprint="2" * 64)
+    key = "3" * 64
+    backend.job_specs.put(key, _spec(context=stale))
+
+    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    with pytest.raises(AdviceComputeRefused) as refusal:
+        compute(_job(key))
+    assert refusal.value.code == "CONTEXT_UNAVAILABLE"
+    assert backend.cache.get(key) is None
+
+
+def test_a_republished_handoff_replaces_the_context_without_a_new_capture(
+    running: dict[str, Any],
+) -> None:
+    """Ops corrects a projection for the capture already loaded. The process must notice.
+
+    Caching the context on the capture id alone made a corrected handoff invisible for the
+    life of the process: every later answer would still be filed — and computed — under a
+    projection that had been withdrawn.
+    """
+
+    backend = running["backend"]
+    first = backend.contexts.current()
+    assert first is not None
+
+    deployment_module._handoff(running["handoff_root"], running["snapshot_id"], expected_points=7.5)
+    second = backend.contexts.current()
+    assert second is not None
+    assert second.capture_snapshot_id == first.capture_snapshot_id
+    assert second.projection_handoff_fingerprint != first.projection_handoff_fingerprint
+
+    # And the withdrawn projection is no longer answerable.
+    assert backend.contexts.capture(first) is None
+    assert backend.contexts.capture(second) is not None
+
+
+def test_a_request_in_a_new_context_does_not_join_the_old_contexts_open_job(
+    running: dict[str, Any],
+) -> None:
+    """Dedup must be per answer, not per fingerprint.
+
+    The request fingerprint omits the handoff, the commit and the configuration, so keying
+    the open-job index on it handed the second caller a job whose result lands at an
+    address that caller never reads: a completed job, then a "not computed" reply.
+    """
+
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+
+    first = client.post(route, json=body)
+    assert first.status_code == 202, first.text
+    first_key = backend.queue.jobs()[0].cache_key
+
+    deployment_module._handoff(
+        running["handoff_root"], running["snapshot_id"], expected_points=8.25
+    )
+    second = client.post(route, json=body)
+    assert second.status_code == 202, second.text
+
+    assert second.json()["job_id"] != first.json()["job_id"]
+    keys = {job.cache_key for job in backend.queue.jobs()}
+    assert len(keys) == 2
+    assert first_key in keys
+
+
+def test_the_claim_stays_alive_while_a_long_computation_runs(
+    running: dict[str, Any],
+) -> None:
+    """A live worker's claim must not look abandoned to a second worker.
+
+    Driven with a short lease rather than a slow solve, so the test states the property
+    without waiting five minutes for it.
+    """
+
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW},
+    )
+    stolen: list[str] = []
+
+    def slow(job: AdviceJob) -> bytes:
+        # While this "solve" runs, a second worker's recovery sweep looks at the queue.
+        time.sleep(0.35)
+        recovered = backend.queue.recover(at_utc=_now_stamp(), lease_seconds=0.2)
+        stolen.extend(one.job_id for one in recovered)
+        return b'{"contract_version":"x"}'
+
+    processed = run_advice_worker_once(
+        backend.queue,
+        backend.cache,
+        slow,
+        at_utc=_now_stamp(),
+        heartbeat_seconds=0.05,
+    )
+    assert processed is not None and processed.status == "completed"
+    assert stolen == [], "a heartbeat-refreshed claim was recovered from under its owner"

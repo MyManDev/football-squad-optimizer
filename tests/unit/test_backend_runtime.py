@@ -55,8 +55,18 @@ def _capture(snapshot_root: Path) -> str:
     return written.snapshot_id
 
 
-def _handoff(handoff_root: Path, snapshot_id: str, *, gameweek: int = 2) -> Path:
+def _handoff(
+    handoff_root: Path,
+    snapshot_id: str,
+    *,
+    gameweek: int = 2,
+    expected_points: float | None = None,
+) -> Path:
+    """Write the capture's handoff; ``expected_points`` republishes a different one."""
+
     expected = {code: 2.0 + (code % 3) * 0.5 for code in range(1001, 1025)}
+    if expected_points is not None:
+        expected = dict.fromkeys(expected, expected_points)
     projection = InSeasonProjection(
         season=SEASON,
         gameweek=gameweek,

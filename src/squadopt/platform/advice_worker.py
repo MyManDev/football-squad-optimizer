@@ -20,10 +20,12 @@ member never loses a solve to a deployment. Abandoned work is walked back period
 rather than on every tick, and a job that has been retried past the limit is failed with a
 code instead of crash-looping forever.
 
-The claim's lease is 300 seconds and one member's plan solves in 3.0 to 29.6 s wall on a
-single thread under the deterministic budget, so a compute in progress cannot outlive its
-own claim; ``queue.heartbeat`` exists for work that could, and this loop deliberately does
-not pretend to need it.
+The claim is kept alive while the computation runs. One member's plan is not one solve —
+a rival strategy runs the control plan, the banded plan and the payload's own plan — so the
+wall time that matters is a multiple of the 3.0 to 29.6 s single-solve measurement the 300 s
+lease was compared against, and the margin is thinner than it looks. ``queue.heartbeat``
+already existed for exactly this; the loop now uses it rather than arguing that it will not
+be needed.
 """
 
 from __future__ import annotations
@@ -57,6 +59,7 @@ from squadopt.platform.backend_runtime import (
 from squadopt.platform.jobs_contract import AdviceJob
 
 __all__ = [
+    "DEFAULT_HEARTBEAT_SECONDS",
     "DEFAULT_IDLE_SECONDS",
     "DEFAULT_MAX_ATTEMPTS",
     "DEFAULT_RECOVER_EVERY_SECONDS",
@@ -68,6 +71,8 @@ __all__ = [
 DEFAULT_IDLE_SECONDS: Final = 2.0
 DEFAULT_POLL_SECONDS: Final = 0.25
 DEFAULT_RECOVER_EVERY_SECONDS: Final = 30.0
+# A third of the lease: two refreshes may be missed before a live claim looks stale.
+DEFAULT_HEARTBEAT_SECONDS: Final = DEFAULT_LEASE_SECONDS / 3.0
 DEFAULT_MAX_ATTEMPTS: Final = 3
 
 
@@ -101,14 +106,16 @@ def build_advice_compute(
                 "No request is recorded at this job's address, so what to compute "
                 "cannot be known. Ask again to file a fresh one.",
             )
-        capture = contexts.capture(spec.context.capture_snapshot_id)
+        capture = contexts.capture(spec.context)
         if capture is None:
-            # The alternative is the silent corruption this check exists to prevent:
-            # computing from today's capture and filing the answer under yesterday's key.
+            # The whole context, not just the capture: the key this answer will be filed
+            # under names the commit, the configuration and the handoff too, and computing
+            # under any other value of them is the silent corruption this check prevents.
             raise AdviceComputeRefused(
                 "CONTEXT_UNAVAILABLE",
-                f"Capture {spec.context.capture_snapshot_id} is no longer the one this "
-                "backend answers from; ask again to be answered from the current one.",
+                f"The context this job was accepted under (capture "
+                f"{spec.context.capture_snapshot_id}) is no longer the one this backend "
+                "answers from; ask again to be answered from the current one.",
             )
         advice = advise_entry(
             AdviseEntryRequest(
@@ -157,6 +164,7 @@ def run_advice_worker(
     poll_seconds: float = DEFAULT_POLL_SECONDS,
     recover_every_seconds: float = DEFAULT_RECOVER_EVERY_SECONDS,
     lease_seconds: float = DEFAULT_LEASE_SECONDS,
+    heartbeat_seconds: float | None = DEFAULT_HEARTBEAT_SECONDS,
     max_jobs: int | None = None,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
@@ -177,7 +185,13 @@ def run_advice_worker(
             if recovered and log is not None:
                 log.event("advice_jobs_recovered", count=len(recovered))
         job = run_advice_worker_once(
-            queue, cache, compute, at_utc=_stamp(now()), metrics=metrics, log=log
+            queue,
+            cache,
+            compute,
+            at_utc=_stamp(now()),
+            heartbeat_seconds=heartbeat_seconds,
+            metrics=metrics,
+            log=log,
         )
         if job is not None:
             processed += 1

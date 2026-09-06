@@ -52,6 +52,7 @@ __all__ = [
     "CaptureIdentity",
     "CapturePicksProvider",
     "capture_element_codes",
+    "handoff_fingerprint_for",
     "latest_snapshot_id",
     "load_capture_context",
     "load_capture_identity",
@@ -167,6 +168,23 @@ def latest_snapshot_id(snapshot_root: Path | str) -> str | None:
 
     identifiers = list_snapshot_ids(snapshot_root)
     return identifiers[-1] if identifiers else None
+
+
+def handoff_fingerprint_for(handoff_root: Path | str, season: str, gameweek: int) -> str | None:
+    """The fingerprint of the handoff a capture would be projected with, or ``None``.
+
+    Cheap on purpose: reading one small JSON is what lets a caller notice that ops
+    republished a corrected handoff for a capture it has already read, without paying for
+    the capture and its projection again. ``None`` when the file is absent or unreadable —
+    the caller treats "cannot be confirmed" as "changed", which fails toward unready rather
+    than toward serving a projection nobody can name.
+    """
+
+    path = handoff_path_for(Path(handoff_root), season, gameweek)
+    try:
+        return read_projection_handoff(path).fingerprint
+    except Exception:
+        return None
 
 
 def load_capture_identity(
