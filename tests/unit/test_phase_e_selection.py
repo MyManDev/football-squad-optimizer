@@ -12,7 +12,11 @@ from squadopt.application.phase_e import PHASE_E_CALIBRATED_VERSIONS
 from squadopt.evaluation import EvaluationValidationError
 from squadopt.optimization import OptimizationResult, SolverStatus
 from squadopt.scenarios import selection
-from squadopt.scenarios.components import ComponentScenarioDraw, _component_fingerprint
+from squadopt.scenarios.components import (
+    CONDITIONAL_RESIDUAL_CONTRACT_VERSION,
+    ComponentScenarioDraw,
+    _component_fingerprint,
+)
 from squadopt.scenarios.models import (
     ScenarioConfig,
     ScenarioSet,
@@ -329,3 +333,43 @@ def test_inconsistent_model_provenance_does_not_receive_calibration_by_assertion
     result = _select(_candidates(), mismatched)
     assert result.selection_status is PhaseESelectionStatus.FALLBACK_PHASE_D_NOT_CALIBRATED
     assert result.candidate_count_scored == 0
+
+
+def test_a_foundation_pin_does_not_admit_a_conditional_residual_draw() -> None:
+    """The pin names the sampler that was calibrated; another sampler needs its own pin."""
+
+    draw = _full_draw()
+    scenarios = replace(
+        draw.scenarios,
+        diagnostics={"component_sampler_contract_version": CONDITIONAL_RESIDUAL_CONTRACT_VERSION},
+    )
+    conditional = replace(
+        draw,
+        scenarios=scenarios,
+        component_fingerprint=_component_fingerprint(
+            scenarios, draw.inputs, draw.sampled_minutes, draw.sampled_appearances
+        ),
+    )
+    model = draw.inputs.provenance.model_version
+    foundation_pin = ((model, draw.inputs.contract_version),)
+
+    refused = select_phase_e_candidate(
+        _candidates(),
+        conditional,
+        candidate_count_requested=4,
+        candidate_set_complete=True,
+        calibrated_versions=foundation_pin,
+    )
+    admitted = select_phase_e_candidate(
+        _candidates(),
+        conditional,
+        candidate_count_requested=4,
+        candidate_set_complete=True,
+        calibrated_versions=((model, CONDITIONAL_RESIDUAL_CONTRACT_VERSION),),
+    )
+
+    assert refused.selection_status is PhaseESelectionStatus.FALLBACK_PHASE_D_NOT_CALIBRATED
+    assert refused.candidate_count_scored == 0
+    assert admitted.selection_status is not PhaseESelectionStatus.FALLBACK_PHASE_D_NOT_CALIBRATED
+    # The foundation draw itself is still what the foundation pin admits.
+    assert _select(_candidates(), draw).selection_status is PhaseESelectionStatus.SELECTED

@@ -201,7 +201,15 @@ def select_phase_e_candidate(
         scenario_fingerprint=validated.scenarios.scenario_fingerprint,
         component_fingerprint=validated.component_fingerprint,
     )
-    identity = (validated.inputs.provenance.model_version, validated.inputs.contract_version)
+    # The pin names the sampler that was calibrated, not only the input contract it read. A
+    # draw declares its sampler in its diagnostics; one without that key predates candidate
+    # samplers and is the foundation sampler, whose contract string is the inputs contract.
+    sampler_version = str(
+        validated.scenarios.diagnostics.get(
+            "component_sampler_contract_version", validated.inputs.contract_version
+        )
+    )
+    identity = (validated.inputs.provenance.model_version, sampler_version)
     provenance = validated.inputs.provenance
     projection_provenance = validated.scenarios.projections.provenance
     # Seeds 0..4 are permitted for the preregistered outcome-free sensitivity diagnostic.
