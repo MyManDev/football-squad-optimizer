@@ -77,9 +77,20 @@ disappears at the next restart. The image therefore neither creates the director
 the variable that names it: a forgotten volume fails at configuration, a mistyped path fails at
 the probe.
 
+That is a guard, not a proof. An existing directory can still be ephemeral, private to one
+container, or a bind mount of a scratch path — the check catches the common shape of the
+mistake and nothing more. **Neither the durable mount nor the container image has been
+verified.** No `docker build` has been run, and the probe has never been executed against an
+Azure Files NFS share. Both are open work, and neither should be reported as done.
+
 A pass is held for thirty seconds, not for ever. A store can stop working after it started, and
 a gate that cached its first success would keep reporting a mount that has since gone away. A
 failure is never cached, so a mount that arrives late brings the service up without a restart.
+Each probe cleans up after itself, so the periodic re-checks do not grow the store.
+
+The worker asks the same gate **before every round**, not only at startup: while it says no, no
+job is claimed and none is recovered, and the loop idles until the store answers again. Nothing
+interferes with a computation already running.
 
 **The probe gates work, not only the readiness page.** While it is failing the api answers
 `503 NOT_READY` to a POST instead of writing a job onto a store that cannot hold it, and the
@@ -107,7 +118,7 @@ mount and must never be reported as one.
 | --- | --- |
 | `capture_context` | no capture, no handoff for it, or the pair cannot be read |
 | `league_tree` | ops has published no `league/members.json` under the site data root |
-| `cache_store` | the store probe has not passed on this path — a root that does not exist counts, and that is what a forgotten volume looks like |
+| `cache_store` | the store probe has not passed on this path — a root that does not exist counts, which is the common shape of a forgotten volume, though not proof of one |
 
 An unready backend answers advice routes with a coded 503. It does not present an empty cache as
 a computed absence.

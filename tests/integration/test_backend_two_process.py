@@ -225,3 +225,42 @@ def test_the_worker_refuses_operational_arguments_that_would_hurt(argument: str)
     )
     assert finished.returncode == 2, finished.stdout
     assert "must be" in finished.stderr
+
+
+def test_repeated_probes_do_not_grow_the_store(tmp_path: Path) -> None:
+    """The probe is scaffolding, not a record; the gate runs it for the life of a process.
+
+    Every run takes a fresh identity, so a marker left behind was two files a minute per
+    process on the shared mount — and every later probe got slower, because the listing
+    check reads the whole directory.
+    """
+
+    store = tmp_path / "store"
+    store.mkdir()
+    now = [0.0]
+    gate = StoreProbeGate(store, recheck_seconds=30.0, clock=lambda: now[0])
+
+    counts: list[int] = []
+    seen: list[int] = []
+    for _ in range(4):
+        now[0] += 100.0  # past the TTL, so each round is a real probe
+        assert gate.passed()
+        seen.append(id(gate.result()))
+        counts.append(len(list((store / "probe").iterdir())))
+
+    # Four distinct results: the gate re-probed rather than replaying a cached pass, which
+    # is what makes the count below mean anything.
+    assert len(set(seen)) == 4, seen
+    assert counts == [0, 0, 0, 0], counts
+
+
+def test_a_probe_leaves_nothing_behind_even_when_it_fails(tmp_path: Path) -> None:
+    store = tmp_path / "store"
+    store.mkdir()
+    (store / "probe").mkdir()
+    # A directory where the marker file needs to go: exclusive create cannot win.
+    (store / "probe" / "stuck.marker").mkdir()
+
+    result = probe_store(store, process_id="stuck")
+    assert result.ok is False
+    assert list((store / "probe").iterdir()) == [store / "probe" / "stuck.marker"]

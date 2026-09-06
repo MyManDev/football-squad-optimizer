@@ -8,9 +8,16 @@ is the discipline around that one write:
   intent; the ``request_fingerprint`` is the normalized request (built by
   ``backend_api_v1``'s own ``league.advise`` command, so the API contract and the
   queue agree about what "the same request" means); the cache key is the answer's
-  address. Reusing one idempotency key for a *different* fingerprint is a conflict,
-  answered as one; a new key for the same fingerprint is a distinct attempt that
+  address. Reusing one idempotency key for a *different* request is a conflict,
+  answered as one; a new key for the same request is a distinct attempt that
   deduplicates onto the same open job.
+- **Every "which answer is this" decision goes through the cache key.** The
+  fingerprint deliberately omits the handoff, the repository commit and the
+  configuration, so it cannot tell two contexts apart — it names a request, not a
+  result. Deduplication, the job's id, its attempt count and idempotency replay are
+  therefore all addressed by ``cache_key``; the fingerprint is left to do the one
+  thing it is for, which is saying whether an idempotency key was reused for
+  something else.
 - **A hit is a hit.** If the cache already holds the answer, the POST returns it and
   no job exists — the queue is for work, not for bookkeeping about work already done.
 - **Rate limits are honest refusals.** Two buckets guard the POST — one per client
@@ -194,9 +201,17 @@ class AdviceSubmitService:
         if idempotency_key is not None:
             # Idempotency history survives terminal state: a key reused for a
             # different request is a conflict whether or not the first job finished.
+            #
+            # "Different" is decided by the **cache key** as well as the fingerprint. The
+            # fingerprint names the client's fields and the capture; it says nothing about
+            # the handoff, the repository commit or the configuration. So a key replayed
+            # after ops republished a handoff matched here, and the caller was handed the
+            # older job with a 202 — it would poll that job to completion and then be told
+            # its own answer had never been computed, because the completed answer lives at
+            # an address this request does not read.
             for job in history:
                 if job.idempotency_key == idempotency_key:
-                    if job.request_fingerprint != fingerprint:
+                    if job.request_fingerprint != fingerprint or job.cache_key != cache_key:
                         raise IdempotencyConflictError(
                             "This Idempotency-Key was already used for a different request."
                         )
@@ -209,9 +224,13 @@ class AdviceSubmitService:
                         return SubmitOutcome(kind="hit", payload=replay)
                     break
 
-        attempt_ordinal = sum(1 for job in history if job.request_fingerprint == fingerprint)
+        # Addressed by the answer, not by the request. Two valid contexts — a redeploy is
+        # enough — share a fingerprint, so counting and naming by it gave both the same
+        # job id: the second submission reserved its own index, reached ``submit``, and
+        # collided on a name that is create-once. One caller got 202 and the other a 500.
+        attempt_ordinal = sum(1 for job in history if job.cache_key == cache_key)
         record = AdviceJob(
-            job_id=f"advice-{fingerprint[:16]}-{attempt_ordinal + 1}",
+            job_id=f"advice-{cache_key[:16]}-{attempt_ordinal + 1}",
             status="queued",
             request_fingerprint=fingerprint,
             cache_key=cache_key,
