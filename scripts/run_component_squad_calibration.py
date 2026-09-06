@@ -48,6 +48,7 @@ from squadopt.evaluation import (
     EvaluationError,
     EvaluationFold,
     ScoringPolicy,
+    complete_optimization_decision,
     evaluate_prepared_folds,
     prepare_phase_c_component_folds,
     read_phase_c_component_handoff,
@@ -60,6 +61,7 @@ from squadopt.experiments import (
     evaluate_component_squad_calibration,
 )
 from squadopt.experiments.component_squad_calibration import (
+    BOUND_TOLERANCE,
     MIN_CALIBRATION_FOLDS,
     S1_PIT_BOUNDS,
     S2_LOWER_TAIL_BOUNDS,
@@ -160,7 +162,10 @@ def _parse_arguments() -> argparse.Namespace:
         default=None,
         help="candidate sampler: the smallest such window, whole fold when the fold is smaller",
     )
-    return parser.parse_args()
+    arguments = parser.parse_args()
+    if arguments.phase_c_contract == "v1" and arguments.fidelity is None:
+        parser.error("--fidelity is required under the v1 binding contract.")
+    return arguments
 
 
 def _candidate_from_arguments(arguments: argparse.Namespace) -> ConditionalResidualConfig | None:
@@ -338,10 +343,21 @@ def _development_observation(
 
     if not readings:
         return None
-    pits = [float(item.readout.probability_integral_transform or 0.0) for item in readings]
-    below = [bool(item.readout.realized_below_lower_quantile) for item in readings]
+    pits: list[float] = []
+    below: list[bool] = []
+    for item in readings:
+        pit = item.readout.probability_integral_transform
+        tail = item.readout.realized_below_lower_quantile
+        if pit is None or tail is None:
+            raise BindingCalibrationError(f"{item.fold_id} has an incomplete readout.")
+        pits.append(float(pit))
+        below.append(bool(tail))
     mean_pit = sum(pits) / len(pits)
     tail_rate = sum(below) / len(below)
+
+    def within(value: float, bounds: tuple[float, float]) -> bool:
+        return bounds[0] - BOUND_TOLERANCE <= value <= bounds[1] + BOUND_TOLERANCE
+
     return {
         "fold_count": len(readings),
         "mean_probability_integral_transform": mean_pit,
@@ -349,10 +365,8 @@ def _development_observation(
         "realized_below_lower_quantile_rate": tail_rate,
         "s1_bounds": list(S1_PIT_BOUNDS),
         "s2_bounds": list(S2_LOWER_TAIL_BOUNDS),
-        "mean_pit_within_s1_bounds": S1_PIT_BOUNDS[0] <= mean_pit <= S1_PIT_BOUNDS[1],
-        "tail_rate_within_s2_bounds": S2_LOWER_TAIL_BOUNDS[0]
-        <= tail_rate
-        <= S2_LOWER_TAIL_BOUNDS[1],
+        "mean_pit_within_s1_bounds": within(mean_pit, S1_PIT_BOUNDS),
+        "tail_rate_within_s2_bounds": within(tail_rate, S2_LOWER_TAIL_BOUNDS),
         "minimum_folds_for_a_verdict": MIN_CALIBRATION_FOLDS,
         "note": (
             "Development observation on the folds measured in this run. It is not a "
@@ -363,15 +377,21 @@ def _development_observation(
 
 
 def _decision_identity(result: OptimizationResult) -> dict[str, object]:
-    """The complete frozen decision, so a repeat under the fixed profile can be compared."""
+    """The complete frozen decision, so a repeat under the fixed profile can be compared.
+
+    Squad, eleven and captain come from the model's own signature; the bench order and the
+    vice-captain are the completion the official scorer walks, taken from the same function
+    the scorer uses rather than from the optimizer's frame layout.
+    """
 
     squad, starters, captain = decision_signature(result)
-    bench_order = [int(value) for value in result.bench["player_id"]]
+    completed = complete_optimization_decision(result)
     payload = {
         "squad": list(squad),
         "starting_xi": list(starters),
         "captain": int(captain),
-        "bench_order": bench_order,
+        "vice_captain": int(completed.vice_captain_id),  # type: ignore[call-overload]
+        "bench_order": [int(value) for value in completed.bench],  # type: ignore[call-overload]
     }
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -644,8 +664,14 @@ def _binding_population(
 
 def _candidate_record(
     candidate_sampler: ConditionalResidualConfig | None,
+    *,
+    reference: str = REPORT_VERSION,
 ) -> dict[str, object] | None:
-    """The provenance block a candidate report carries; None for the binding sampler."""
+    """The provenance block a candidate report carries; None for the binding sampler.
+
+    ``reference`` names the report contract whose population and gates the candidate is read
+    against: the binding contract on the v1 path, the development contract on the v2 path.
+    """
 
     if candidate_sampler is None:
         return None
@@ -653,7 +679,7 @@ def _candidate_record(
         "sampler_contract_version": candidate_sampler.contract_version,
         "conditional_residual_fraction": candidate_sampler.fraction,
         "conditional_residual_minimum_rows": candidate_sampler.minimum_rows,
-        "reference_contract_version": REPORT_VERSION,
+        "reference_contract_version": reference,
         "development_data_only": True,
         "binding": False,
     }
@@ -863,7 +889,7 @@ def _measure_development(
             },
             "config": asdict(settings),
             "solver_profile": _solver_profile(),
-            "candidate": _candidate_record(candidate_sampler),
+            "candidate": _candidate_record(candidate_sampler, reference=DEVELOPMENT_REPORT_VERSION),
             "sampler_contract_version": (
                 candidate_sampler.contract_version
                 if candidate_sampler is not None
@@ -1004,7 +1030,13 @@ def _recorded_warnings(caught: list[warnings.WarningMessage]) -> list[str]:
 def main() -> int:
     arguments = _parse_arguments()
     started = datetime.now(UTC)
-    development_mode = str(arguments.phase_c_contract) == "development_v2"
+    try:
+        development = _development_from_arguments(arguments)
+        candidate_sampler = _candidate_from_arguments(arguments)
+    except BindingCalibrationError as error:
+        print(f"Refused: {error}")
+        return 1
+    development_mode = development is not None
     history_seasons = DEVELOPMENT_HISTORY_SEASONS if development_mode else HISTORY_SEASONS
     metadata = artifact_metadata(
         panel_rows=0,
@@ -1035,6 +1067,11 @@ def main() -> int:
             return 1
 
     completed = datetime.now(UTC)
+    if development_mode:
+        # The seasons the run actually loaded, so the provenance cannot claim more than the
+        # handoff carried.
+        population = cast(Mapping[str, object], measured["population"])
+        history_seasons = tuple(cast(list[str], population["history_seasons"]))
     metadata = artifact_metadata(
         panel_rows=panel_rows,
         created_utc=started.isoformat(timespec="seconds"),
@@ -1048,24 +1085,18 @@ def main() -> int:
             "scikit_learn": version("scikit-learn"),
         }
     )
-    candidate = cast(Mapping[str, object] | None, measured.get("candidate"))
-    if development_mode:
-        contract_version = DEVELOPMENT_REPORT_VERSION
-    elif candidate is None:
-        contract_version = REPORT_VERSION
-    else:
-        contract_version = CANDIDATE_REPORT_VERSION
     document: dict[str, object] = {
-        "contract_version": contract_version,
-        "binding": candidate is None and not development_mode,
+        "contract_version": _report_contract_version(candidate_sampler, development),
+        "binding": candidate_sampler is None and not development_mode,
         "development_only": development_mode,
         "evaluation_contract_version": COMPONENT_SQUAD_CALIBRATION_CONTRACT_VERSION,
         "generated_at_utc": metadata["created_utc"],
         "internal_only": True,
         "member_facing_probability_published": False,
         "operational_control_changed": False,
-        # 2025-26 is read as development data under the v2 contract; never an unseen test.
-        "locked_holdout_accessed": development_mode,
+        # True only when the development run actually loaded 2025-26, as development data
+        # under the v2 contract; never an unseen test.
+        "locked_holdout_accessed": development_mode and LOCKED_HOLDOUT_SEASON in history_seasons,
         "prereg_document": "docs/phase_d_component_squad_calibration_prereg.md",
         **(
             {"development_method": "docs/phase_d_v2_development_method.md"}

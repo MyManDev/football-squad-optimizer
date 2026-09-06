@@ -46,10 +46,14 @@ artifact and its frozen 137-fold population.
 
 ## Readings and status
 
-Per-fold readings are the existing PIT, q10 and lower-tail indicator from the official
-scorer. The inherited gates are reported beside the readings as a development observation
-(mean PIT against `[0.43, 0.57]`, lower-tail rate against `[0.04, 0.16]`). No sampler-fidelity
-artifact exists for the v2 handoff, so the protocol's verdict abstains
-(`sampler_fidelity_not_verified`) on a full run and is not computed at all on a pilot with
-fewer than the minimum folds. Nothing in the sampler, the scenario configuration, the solver
-profile or the gates is changed to alter that reading.
+The development reading is taken with the registered candidate sampler,
+`ConditionalResidualConfig(fraction=0.15, minimum_rows=30)`
+(`component_scenario_conditional_residual_v1`), passed on the command line exactly as the
+Phase D candidate measurement passed it; the report's `candidate` block records it and names
+the development contract as its reference. Per-fold readings are the existing PIT, q10 and
+lower-tail indicator from the official scorer. The inherited gates are reported beside the
+readings as a development observation (mean PIT against `[0.43, 0.57]`, lower-tail rate
+against `[0.04, 0.16]`). No sampler-fidelity artifact exists for the v2 handoff, so the
+protocol's verdict abstains (`sampler_fidelity_not_verified`) on a full run and is not
+computed at all on a pilot with fewer than the minimum folds. Nothing in the sampler, the
+scenario configuration, the solver profile or the gates is changed to alter that reading.
