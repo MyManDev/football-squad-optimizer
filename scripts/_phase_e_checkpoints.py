@@ -102,13 +102,20 @@ class CheckpointStore:
     def path(self, label: str) -> Path:
         return self.checkpoint_directory / f"{label}.json"
 
-    def refuse_foreign_work(self) -> None:
-        """Stop before any computation if the directory carries another identity's work."""
+    def refuse_foreign_work(self, pool_digests: Mapping[str, str] | None = None) -> None:
+        """Stop before any computation if the directory carries another identity's work.
+
+        ``pool_digests`` maps each label this run will probe to the digest of the pool it will
+        probe; a checkpoint written for another pool under the same label is foreign work.
+        """
 
         if not self.checkpoint_directory.exists():
             return
         for path in sorted(self.checkpoint_directory.glob("*.json")):
-            self._verify(path, read_json_retry(path))
+            document = self._verify(path, read_json_retry(path))
+            label = str(document.get("label"))
+            if pool_digests is not None and label in pool_digests:
+                self._verify_pool(path, document, pool_digests[label])
 
     def _verify(self, path: Path, document: object) -> Record:
         if (
@@ -117,20 +124,39 @@ class CheckpointStore:
             or document.get("run_identity") != dict(self.identity)
         ):
             raise CheckpointError(
-                f"{path} belongs to a different probe run identity (sampler, settings, source or "
-                "commit); it is neither reused nor overwritten."
+                f"{path} belongs to a different probe run identity (sampler, settings, source, "
+                "execution or commit); it is neither reused nor overwritten."
             )
         return document
 
-    def load(self, label: str) -> Record | None:
+    @staticmethod
+    def _verify_pool(path: Path, document: Record, pool_sha256: str) -> None:
+        if document.get("pool_sha256") != pool_sha256:
+            raise CheckpointError(
+                f"{path} was measured on a different pool than the one this run prepared for "
+                "its label; it is neither reused nor overwritten."
+            )
+
+    def load(self, label: str, *, pool_sha256: str | None = None) -> Record | None:
         """The verified checkpoint of ``label``, or None when it was never written."""
 
         path = self.path(label)
         if not path.exists():
             return None
-        return self._verify(path, read_json_retry(path))
+        document = self._verify(path, read_json_retry(path))
+        if pool_sha256 is not None:
+            self._verify_pool(path, document, pool_sha256)
+        return document
 
-    def save(self, label: str, *, kind: str, completed_counts: list[int], record: Record) -> None:
+    def save(
+        self,
+        label: str,
+        *,
+        kind: str,
+        completed_counts: list[int],
+        record: Record,
+        pool_sha256: str | None = None,
+    ) -> None:
         write_json_atomic(
             self.path(label),
             {
@@ -138,6 +164,7 @@ class CheckpointStore:
                 "run_identity": dict(self.identity),
                 "label": label,
                 "kind": kind,
+                "pool_sha256": pool_sha256,
                 "completed_counts": list(completed_counts),
                 "record": record,
                 "updated_at_utc": utc_now(),

@@ -518,7 +518,11 @@ def test_cli_records_the_actual_handoff_digests_without_rehashing_other_inputs(
 ) -> None:
     handoff = _handoff()
     monkeypatch.setattr(probe, "read_phase_c_component_handoff", lambda *args: handoff)
-    monkeypatch.setattr(probe, "prepare_fold_projections", lambda *args: ({}, 0))
+    monkeypatch.setattr(
+        probe,
+        "prepare_fold_projections",
+        lambda handoff, fold_ids, root: ({fold: make_baseline_players() for fold in fold_ids}, 0),
+    )
     monkeypatch.setattr(
         probe,
         "_probe_label",

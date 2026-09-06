@@ -354,3 +354,79 @@ def test_worker_processes_probe_pools_exactly_like_one_process(tmp_path: Path) -
     status = json.loads((tmp_path / "parallel" / "status.json").read_text(encoding="utf-8"))
     assert status["status"] == "completed" and status["workers"] == 2
     assert sorted(status["completed_labels"]) == sorted(pools)
+
+
+def test_pool_digest_ignores_row_order_and_reads_every_value() -> None:
+    pool = make_baseline_players()
+    shuffled = pool.iloc[::-1].reset_index(drop=True)
+    assert probe.pool_digest(pool) == probe.pool_digest(shuffled)
+    nudged = pool.copy()
+    nudged.loc[nudged.index[3], "expected_points"] += 1e-9
+    assert probe.pool_digest(nudged) != probe.pool_digest(pool)
+    repriced = pool.copy()
+    repriced.loc[repriced.index[0], "price_tenths"] += 1
+    assert probe.pool_digest(repriced) != probe.pool_digest(pool)
+
+
+def test_a_changed_pool_under_the_same_label_is_refused_on_resume(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pool = _pool_csv(tmp_path, "gw01")
+    directory = tmp_path / "run"
+    checkpoint_path = directory / "checkpoints" / "2026-27-gw01.json"
+    assert probe.main(_arguments(pool, tmp_path / "first.json", directory)) == 0
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    assert checkpoint["pool_sha256"] == probe.pool_digest(make_baseline_players())
+    before = checkpoint_path.read_bytes()
+
+    changed = make_baseline_players()
+    changed.loc[changed.index[0], "expected_points"] += 0.5
+    changed.to_csv(pool, index=False)
+
+    assert probe.main(_arguments(pool, tmp_path / "second.json", directory, "--resume")) == 1
+    assert "different pool" in capsys.readouterr().err
+    assert checkpoint_path.read_bytes() == before
+    assert not (tmp_path / "second.json").exists()
+
+
+def test_execution_settings_are_part_of_the_run_identity(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pool = _pool_csv(tmp_path, "gw01")
+    directory = tmp_path / "run"
+    assert probe.main(_arguments(pool, tmp_path / "first.json", directory)) == 0
+    checkpoint = json.loads(
+        (directory / "checkpoints" / "2026-27-gw01.json").read_text(encoding="utf-8")
+    )
+    identity = checkpoint["run_identity"]
+    assert identity["execution"]["workers"] == 1
+    assert set(identity["execution"]["blas_threads"]) == set(probe.BLAS_THREAD_VARIABLES)
+    assert set(identity["archive"]) == {"archive_commit", "archive_manifest_sha256"}
+
+    # Another worker count is another identity: refused before any process is started.
+    assert (
+        probe.main(
+            _arguments(pool, tmp_path / "second.json", directory, "--resume", "--workers", "2")
+        )
+        == 1
+    )
+    assert "different probe run identity" in capsys.readouterr().err
+    assert not (tmp_path / "second.json").exists()
+
+
+def test_a_checkpoint_for_another_pool_is_refused_by_the_store(tmp_path: Path) -> None:
+    identity = {"contract_version": "x"}
+    store = checkpoints.CheckpointStore(tmp_path / "run", identity)
+    store.save(
+        "2026-27-gw01",
+        kind="live",
+        completed_counts=[4],
+        record={"label": "2026-27-gw01", "runs": [], "warnings": []},
+        pool_sha256="a" * 64,
+    )
+    assert store.load("2026-27-gw01", pool_sha256="a" * 64) is not None
+    with pytest.raises(checkpoints.CheckpointError, match="different pool"):
+        store.load("2026-27-gw01", pool_sha256="b" * 64)
+    with pytest.raises(checkpoints.CheckpointError, match="different pool"):
+        store.refuse_foreign_work({"2026-27-gw01": "b" * 64})
+    store.refuse_foreign_work({"2026-27-gw01": "a" * 64, "other": "c" * 64})

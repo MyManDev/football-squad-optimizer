@@ -28,10 +28,12 @@ That override is labelled on every record, is not the production pin and claims 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import multiprocessing
 import os
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -230,6 +232,28 @@ def probe_contract_version(conditional_residuals: ConditionalResidualConfig | No
         if conditional_residuals is None
         else DEVELOPMENT_PROBE_CONTRACT_VERSION
     )
+
+
+def pool_digest(pool: pd.DataFrame) -> str:
+    """A digest of the decision pool a probe measures: the same players, prices and points.
+
+    Row order does not matter; every value does, with expected points compared bit for bit.
+    """
+
+    frame = pool.loc[:, list(POOL_COLUMNS)].sort_values("player_id", kind="stable")
+    rows = [
+        {
+            "player_id": str(row["player_id"]),
+            "name": str(row["name"]),
+            "team_id": str(row["team_id"]),
+            "position": str(row["position"]),
+            "price_tenths": int(row["price_tenths"]),
+            "expected_points": float(row["expected_points"]).hex(),
+        }
+        for _, row in frame.iterrows()
+    ]
+    payload = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def draw_sampler_version(draw: ComponentScenarioDraw) -> str:
@@ -1157,19 +1181,29 @@ def _build_point(state: Record, label: str) -> DecisionPoint:
 
 
 def _probe_label(label: str) -> Record:
-    """Probe one pool count by count, checkpointing after each count under the run identity."""
+    """Probe one pool count by count, checkpointing after each count under the run identity.
+
+    The pool is rebuilt here and digested before any checkpoint is read: a checkpoint is
+    reused only for the very pool this run prepared for its label.
+    """
 
     state = _WORKER
     store: CheckpointStore | None = state["store"]
     counts: list[int] = list(state["candidate_counts"])
-    existing = store.load(label) if store is not None else None
+    point = _build_point(state, label)
+    digest = pool_digest(point.pool)
+    expected_digest = state["pool_digests"].get(label)
+    if expected_digest is not None and digest != expected_digest:
+        raise CheckpointError(
+            f"{label}: the pool built in the worker differs from the one the coordinator prepared."
+        )
+    existing = store.load(label, pool_sha256=digest) if store is not None else None
     completed: list[int] = list(existing["completed_counts"]) if existing else []
     runs: list[Record] = list(existing["record"]["runs"]) if existing else []
     warnings: list[str] = list(existing["record"]["warnings"]) if existing else []
     record: Record | None = existing["record"] if existing else None
     if record is not None and all(count in completed for count in counts):
         return record
-    point = _build_point(state, label)
     order = {count: index for index, count in enumerate(counts)}
     for count in counts:
         if count in completed:
@@ -1189,7 +1223,13 @@ def _probe_label(label: str) -> Record:
             "warnings": warnings,
         }
         if store is not None:
-            store.save(label, kind=point.kind, completed_counts=completed, record=record)
+            store.save(
+                label,
+                kind=point.kind,
+                completed_counts=completed,
+                record=record,
+                pool_sha256=digest,
+            )
     assert record is not None
     return record
 
@@ -1240,9 +1280,6 @@ def _dispatch(
                 failures[label] = f"{type(error).__name__}: {error}"
             finish(label)
     else:
-        # One BLAS thread per process: concurrency is the number of pools, not threads.
-        for name in BLAS_THREAD_VARIABLES:
-            os.environ.setdefault(name, "1")
         with ProcessPoolExecutor(
             max_workers=workers,
             mp_context=multiprocessing.get_context("spawn"),
@@ -1267,8 +1304,14 @@ def _run_identity(
     arguments: argparse.Namespace,
     conditional_residuals: ConditionalResidualConfig | None,
     source: Record | None,
-    repository_commit: object,
+    provenance: Mapping[str, object],
 ) -> Record:
+    """Everything a checkpoint must share with the run that reuses it.
+
+    The execution settings are part of it because the recorded timings, and therefore the
+    budget rule, depend on how many pools ran at once and on how many threads each had.
+    """
+
     return {
         "contract_version": probe_contract_version(conditional_residuals),
         "sampler": sampler_record(conditional_residuals),
@@ -1277,9 +1320,17 @@ def _run_identity(
         "budget_seconds": BUDGET_SECONDS,
         "scoring_requested": not arguments.skip_scoring,
         "source": source,
-        "repository_commit": repository_commit,
+        "archive": {
+            "archive_commit": provenance.get("archive_commit"),
+            "archive_manifest_sha256": provenance.get("archive_manifest_sha256"),
+        },
+        "repository_commit": provenance.get("repository_commit"),
         "optimization_config": jsonable(OptimizationConfig()),
         "scenario_config": jsonable(ScenarioConfig()),
+        "execution": {
+            "workers": int(arguments.workers),
+            "blas_threads": {name: os.environ.get(name) for name in BLAS_THREAD_VARIABLES},
+        },
     }
 
 
@@ -1360,18 +1411,25 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         preparation_seconds = perf_counter() - preparation_started
 
+        if arguments.workers > 1:
+            # One BLAS thread per process: concurrency is the number of pools, not threads.
+            for name in BLAS_THREAD_VARIABLES:
+                os.environ.setdefault(name, "1")
         metadata = artifact_metadata(panel_rows=panel_rows, history_seasons=HISTORY_SEASONS)
         provenance = metadata["provenance"]
         assert isinstance(provenance, dict)
-        identity = _run_identity(
-            arguments, conditional_residuals, source, provenance["repository_commit"]
-        )
+        identity = _run_identity(arguments, conditional_residuals, source, provenance)
+        pool_digests: dict[str, str] = {
+            label: pool_digest(live_point_from_csv(f"{label}={path}").pool)
+            for label, path in live_specs.items()
+        }
+        pool_digests.update({label: pool_digest(fold_projections[label]) for label in fold_ids})
         store: CheckpointStore | None = None
         resumed_labels: list[str] = []
         labels = [*live_specs, *fold_ids]
         if arguments.checkpoint_dir is not None:
             store = CheckpointStore(arguments.checkpoint_dir, identity)
-            store.refuse_foreign_work()
+            store.refuse_foreign_work(pool_digests)
             present = [label for label in labels if store.path(label).exists()]
             if present and not arguments.resume:
                 raise ProbeError(
@@ -1379,7 +1437,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "this run identity; give --resume to continue that run."
                 )
             for label in present:
-                checkpoint = store.load(label)
+                checkpoint = store.load(label, pool_sha256=pool_digests[label])
                 if checkpoint is not None and sorted(checkpoint["completed_counts"]) == sorted(
                     set(arguments.candidate_counts)
                 ):
@@ -1388,6 +1446,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "handoff": handoff,
             "fold_projections": fold_projections,
             "live_specs": live_specs,
+            "pool_digests": pool_digests,
             "conditional_residuals": conditional_residuals,
             "candidate_counts": list(arguments.candidate_counts),
             "sensitivity_seeds": list(arguments.sensitivity_seeds),
