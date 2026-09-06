@@ -15,16 +15,17 @@ correctness one, which is ADR 0005's trigger firing silently.
 
 One check is not a syscall at all: the store root must **already exist**. Every other
 primitive here passes just as happily on a container's own ephemeral disk, so a forgotten
-volume would produce a green probe on storage that disappears at the next restart. Refusing
-to create the root is what separates "the mount is attached" from "this process can write
-somewhere".
+volume would otherwise produce a green probe on storage that disappears at the next restart.
+Since the image no longer creates that path, requiring it catches the common shape of that
+mistake. It does not prove a mount: an existing directory can still be ephemeral, private to
+one container, or a bind mount of a scratch path.
 
-**What this cannot prove, and does not claim.** Persistence across a replacement, and
-visibility between two containers, are properties of the deployment, not of one process.
-What the probe establishes is that *this* process's writes land and are immediately visible
-in the shared directory through the same listing every other mounter reads — which is the
-part a process can honestly test. Each process leaves a marker naming itself; whether the
-other container sees it is answered by looking, from there, at the store. A green probe on
+**What this cannot prove, and does not claim.** Durability, persistence across a replacement,
+and visibility between two containers are properties of the deployment, not of one process.
+What the probe establishes is narrower and worth stating exactly: on this path, right now,
+this process's own writes obey exclusive create, refuse to be overwritten by a link, carry a
+refreshable mtime, and appear in the directory listing. Whether a second container sees them
+is answered by running something from that container, not by anything here. A green probe on
 a laptop's local disk is evidence about that laptop and nothing else.
 """
 
@@ -68,10 +69,11 @@ def probe_store(root: Path | str, *, process_id: str | None = None) -> StoreProb
     checks: dict[str, bool] = {}
     detail: dict[str, str] = {}
     failure: str | None = None
-    # The store root must already exist: it is a mount, and a process that creates it is
-    # a process that has quietly accepted a directory nobody mounted. This is the only
-    # check that separates "the volume is attached" from "the container has a writable
-    # filesystem", because every later syscall passes just as happily on ephemeral disk.
+    # The store root must already exist. This is a cheap guard, not a proof: an existing
+    # directory can still be ephemeral, private to one container, or a bind mount of a
+    # scratch path. What it catches is the common shape of the mistake — the image no
+    # longer creates this path, so a run that forgot its volume finds nothing here, where
+    # every later syscall would have passed happily on the container's own disk.
     if not store.is_dir():
         failure = (
             f"{store} is not an existing directory. The store is a mount, not something "
@@ -97,15 +99,24 @@ def probe_store(root: Path | str, *, process_id: str | None = None) -> StoreProb
     checks["mounted_root"] = True
 
     marker = directory / f"{identity}.marker"
-    _check(checks, detail, "exclusive_create", lambda: _exclusive_create(marker))
-    _check(
-        checks,
-        detail,
-        "hard_link_no_overwrite",
-        lambda: _hard_link_no_overwrite(directory, identity),
-    )
-    _check(checks, detail, "heartbeat_mtime", lambda: _heartbeat_mtime(marker))
-    _check(checks, detail, "shared_listing", lambda: _shared_listing(directory, marker))
+    try:
+        _check(checks, detail, "exclusive_create", lambda: _exclusive_create(marker))
+        _check(
+            checks,
+            detail,
+            "hard_link_no_overwrite",
+            lambda: _hard_link_no_overwrite(directory, identity),
+        )
+        _check(checks, detail, "heartbeat_mtime", lambda: _heartbeat_mtime(marker))
+        _check(checks, detail, "shared_listing", lambda: _shared_listing(directory, marker))
+    finally:
+        # The marker is scaffolding for this run, not a record of it. Each probe takes a
+        # fresh identity, so leaving them behind grew the store by two files a minute per
+        # process — and slowed every later probe, because the listing check reads the whole
+        # directory. Removing it here bounds the store to one file per probe in flight and
+        # needs no cleanup service.
+        with contextlib.suppress(OSError):
+            marker.unlink(missing_ok=True)
     return StoreProbeResult(ok=all(checks.values()), checks=checks, detail=detail)
 
 

@@ -165,6 +165,7 @@ def run_advice_worker(
     recover_every_seconds: float = DEFAULT_RECOVER_EVERY_SECONDS,
     lease_seconds: float = DEFAULT_LEASE_SECONDS,
     heartbeat_seconds: float | None = DEFAULT_HEARTBEAT_SECONDS,
+    store_ready: Callable[[], bool] | None = None,
     max_jobs: int | None = None,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
@@ -173,11 +174,32 @@ def run_advice_worker(
 
     ``should_stop`` is injected rather than read from a signal handler here, so a test
     drives the loop deterministically and the process entry point owns the signals.
+
+    ``store_ready`` is asked before **each** round rather than once at startup. A store
+    that was healthy when the process began can stop working later, and a worker that kept
+    recovering and claiming against it would walk live jobs back to queued and take work it
+    cannot finish. An unready store means no new work: the loop idles and keeps asking, so
+    a passing mount brings it back without a restart. Nothing here manages a computation
+    already in progress — a round is entered or it is not.
     """
 
     processed = 0
     recovered_at = 0.0
+    waiting_on_store = False
     while not should_stop():
+        if store_ready is not None and not store_ready():
+            if not waiting_on_store and log is not None:
+                # Once per outage, not once per round: an unreachable store would
+                # otherwise write a log line every couple of seconds for as long as it
+                # stays unreachable.
+                log.event("advice_worker_waiting_on_store")
+            waiting_on_store = True
+            _wait(sleep, should_stop, idle_seconds, poll_seconds)
+            continue
+        if waiting_on_store:
+            waiting_on_store = False
+            if log is not None:
+                log.event("advice_worker_store_recovered")
         elapsed = time.monotonic()
         if elapsed - recovered_at >= recover_every_seconds:
             recovered_at = elapsed
@@ -287,6 +309,8 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
             running.contexts, running.job_specs, max_attempts=arguments.max_attempts
         ),
         should_stop=flag,
+        # The same TTL'd gate the api submits behind, asked again before every round.
+        store_ready=running.probe.passed,
         idle_seconds=arguments.idle_seconds,
         max_jobs=arguments.max_jobs,
         metrics=running.metrics,
