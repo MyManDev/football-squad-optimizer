@@ -13,6 +13,7 @@ commands compose over one store rather than over shared memory.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -25,7 +26,7 @@ from fastapi.testclient import TestClient
 
 from squadopt.api.runtime import app_for_backend
 from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
-from squadopt.platform.backend_runtime import BackendConfig, build_backend
+from squadopt.platform.backend_runtime import BackendConfig, StoreProbeGate, build_backend
 from squadopt.platform.store_probe import probe_store
 
 LEAGUE_ID = deployment_module.LEAGUE_ID
@@ -59,8 +60,10 @@ def _deployed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]
     snapshot_id = worker_module._capture_with_entries(snapshot_root)
     deployment_module._handoff(handoff_root, snapshot_id)
     deployment_module._publish_members(site_root)
+    store_root = tmp_path / "store"
+    store_root.mkdir()  # the mount exists before the process does
     config = BackendConfig(
-        store_root=tmp_path / "store",
+        store_root=store_root,
         site_data_root=site_root,
         snapshot_root=snapshot_root,
         handoff_root=handoff_root,
@@ -71,10 +74,12 @@ def _deployed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]
 def test_the_store_passes_the_primitives_the_adapters_were_built_on(tmp_path: Path) -> None:
     """ADR 0006's probe, on a real path. A failure here would keep a service unready."""
 
-    result = probe_store(tmp_path / "store")
+    store = tmp_path / "store"
+    store.mkdir()
+    result = probe_store(store)
     assert result.ok, result.detail
     assert set(result.checks) == {
-        "writable_root",
+        "mounted_root",
         "exclusive_create",
         "hard_link_no_overwrite",
         "heartbeat_mtime",
@@ -89,8 +94,77 @@ def test_a_probe_on_an_unwritable_root_reports_rather_than_raises(tmp_path: Path
     blocker.write_bytes(b"")
     result = probe_store(blocker)
     assert result.ok is False
-    assert "writable_root" in result.failures()
-    assert result.detail["writable_root"]
+    assert "mounted_root" in result.failures()
+    assert result.detail["mounted_root"]
+
+
+def test_a_store_root_that_does_not_exist_is_a_forgotten_volume(tmp_path: Path) -> None:
+    """The one check that separates an attached mount from a writable container.
+
+    Creating the root would have made this pass: every other primitive here works
+    perfectly well on the ephemeral disk a `docker run` without `--volume` provides, and
+    the deployment would look healthy until a restart took the queue with it.
+    """
+
+    result = probe_store(tmp_path / "never-mounted")
+    assert result.ok is False
+    assert result.failures() == (
+        "exclusive_create",
+        "hard_link_no_overwrite",
+        "heartbeat_mtime",
+        "mounted_root",
+        "shared_listing",
+    )
+    assert not (tmp_path / "never-mounted").exists(), "the probe created the mount point"
+
+
+def test_the_worker_exits_when_the_store_is_unavailable(tmp_path: Path) -> None:
+    """A worker that cannot reach its store must die loudly, not claim nothing forever.
+
+    Run as a subprocess under a timeout on purpose. The worker's normal life *is* an
+    endless loop, so a regression here would not fail this test — it would hang it, and
+    take the suite with it. Out of process, the same regression is a timeout with a name.
+    """
+
+    config = BackendConfig(
+        store_root=tmp_path / "never-mounted",
+        site_data_root=tmp_path / "site",
+        snapshot_root=tmp_path / "snapshots",
+        handoff_root=tmp_path / "handoffs",
+    )
+    finished = subprocess.run(
+        [sys.executable, "-m", "squadopt.platform.advice_worker"],
+        env=_environment(config),
+        capture_output=True,
+        text=True,
+        timeout=90,
+        check=False,
+    )
+    assert finished.returncode == 1, finished.stdout
+
+
+def test_a_failed_store_stops_the_api_accepting_work(
+    deployed: dict[str, Any], tmp_path: Path
+) -> None:
+    """503, not a queue write onto storage nothing will read again."""
+
+    config = deployed["config"]
+    # A gate that holds nothing, so the store's failure is observed rather than waited out.
+    backend = build_backend(config, probe=StoreProbeGate(config.store_root, recheck_seconds=0.0))
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+    assert client.post(route, json=body).status_code == 202
+
+    # The mount goes away after the probe had already passed.
+    shutil.rmtree(config.store_root)
+    ready, checks = backend.readiness()
+    assert ready is False
+    assert checks["cache_store"] is False
+
+    refused = client.post(route, json=body)
+    assert refused.status_code == 503, refused.text
+    assert refused.json()["error"]["code"] == "NOT_READY"
 
 
 def test_a_separate_worker_process_computes_what_the_api_accepted(

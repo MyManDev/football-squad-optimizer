@@ -32,7 +32,8 @@ import os
 import re
 import subprocess
 import threading
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -70,6 +71,9 @@ _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 DEFAULT_RATE_LIMIT = 30
 DEFAULT_RATE_WINDOW_SECONDS = 60.0
+# Long enough that a readiness poll is not a syscall storm, short enough that a store
+# which stops working is noticed in the same minute it does.
+DEFAULT_PROBE_RECHECK_SECONDS = 30.0
 
 
 class BackendConfigError(ValueError):
@@ -368,34 +372,51 @@ class CaptureContextProvider:
 
 
 class StoreProbeGate:
-    """ADR 0006's startup capability probe, run once and remembered while it passes.
+    """ADR 0006's capability probe, held for a short while rather than for ever.
 
-    Re-run only while failing, so a mount that arrives late brings the service up without a
-    restart, and a mount that has already proven its primitives is not re-exercised on every
-    readiness poll. There is deliberately no local-disk fallback: a failed probe keeps the
-    service unready, which is a loud problem rather than a quiet correctness one.
+    A pass is remembered so a proven mount is not re-exercised on every readiness poll,
+    but only for ``recheck_seconds``: a store can stop working after it started, and a
+    gate that cached its first success would keep reporting a mount that has since gone
+    away. A failure is never cached, so a mount that arrives late brings the service up
+    without a restart.
+
+    There is deliberately no local-disk fallback. A failed probe keeps the service
+    unready, which is a loud problem rather than a quiet correctness one.
     """
 
-    def __init__(self, root: Path, *, log: AdviceLog | None = None) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        recheck_seconds: float = DEFAULT_PROBE_RECHECK_SECONDS,
+        clock: Callable[[], float] = time.monotonic,
+        log: AdviceLog | None = None,
+    ) -> None:
         self._root = root
+        self._recheck = recheck_seconds
+        self._clock = clock
         self._log = log
         self._passed: StoreProbeResult | None = None
+        self._passed_at = 0.0
 
     def result(self) -> StoreProbeResult:
         held = self._passed
-        if held is not None:
+        if held is not None and self._clock() - self._passed_at < self._recheck:
             return held
         outcome = probe_store(self._root)
         if outcome.ok:
             self._passed = outcome
+            self._passed_at = self._clock()
             if self._log is not None:
                 self._log.event("advice_store_probe_passed", root=str(self._root))
-        elif self._log is not None:
-            self._log.event(
-                "advice_store_probe_failed",
-                root=str(self._root),
-                failed=",".join(outcome.failures()),
-            )
+        else:
+            self._passed = None
+            if self._log is not None:
+                self._log.event(
+                    "advice_store_probe_failed",
+                    root=str(self._root),
+                    failed=",".join(outcome.failures()),
+                )
         return outcome
 
     def passed(self) -> bool:
@@ -432,15 +453,25 @@ class AdviceBackend:
         )
 
 
-def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> AdviceBackend:
-    """Open one store and wire every collaborator that reads or writes it."""
+def build_backend(
+    config: BackendConfig,
+    *,
+    log: AdviceLog | None = None,
+    probe: StoreProbeGate | None = None,
+) -> AdviceBackend:
+    """Open one store and wire every collaborator that reads or writes it.
+
+    ``probe`` is injectable for the same reason ``log`` is: the gate holds a pass for a
+    staleness budget, and a caller that wants to observe a store failing after it passed
+    supplies a gate that rechecks immediately rather than fabricating a clock.
+    """
 
     component_log = log if log is not None else AdviceLog("backend")
     metrics = AdviceMetrics()
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
     specs = FileAdviceJobSpecStore(config.spec_root)
-    probe = StoreProbeGate(config.store_root, log=component_log)
+    gate = probe if probe is not None else StoreProbeGate(config.store_root, log=component_log)
     contexts = CaptureContextProvider(
         config,
         repository_commit=_repository_commit(),
@@ -458,6 +489,9 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
         queue,
         rate_limiter=FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds),
         specs=specs,
+        # Accepting work the store cannot hold is a promise the deployment cannot keep:
+        # the job write would fail, or succeed onto storage nobody will read again.
+        store_ready=gate.passed,
     )
     return AdviceBackend(
         config=config,
@@ -467,7 +501,7 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
         submit=submit,
         contexts=contexts,
         job_specs=specs,
-        probe=probe,
+        probe=gate,
         metrics=metrics,
         log=component_log,
     )

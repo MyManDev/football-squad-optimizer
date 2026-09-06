@@ -13,6 +13,12 @@ that a directory exists. A failure keeps the service unready. There is deliberat
 local-disk fallback: falling back would trade a loud startup failure for a quiet
 correctness one, which is ADR 0005's trigger firing silently.
 
+One check is not a syscall at all: the store root must **already exist**. Every other
+primitive here passes just as happily on a container's own ephemeral disk, so a forgotten
+volume would produce a green probe on storage that disappears at the next restart. Refusing
+to create the root is what separates "the mount is attached" from "this process can write
+somewhere".
+
 **What this cannot prove, and does not claim.** Persistence across a replacement, and
 visibility between two containers, are properties of the deployment, not of one process.
 What the probe establishes is that *this* process's writes land and are immediately visible
@@ -57,24 +63,38 @@ def probe_store(root: Path | str, *, process_id: str | None = None) -> StoreProb
     """
 
     identity = process_id or f"{os.getpid()}-{time.time_ns():x}"
-    directory = Path(root) / _PROBE_DIRECTORY
+    store = Path(root)
+    directory = store / _PROBE_DIRECTORY
     checks: dict[str, bool] = {}
     detail: dict[str, str] = {}
-    try:
-        directory.mkdir(parents=True, exist_ok=True)
-    except OSError as error:
+    failure: str | None = None
+    # The store root must already exist: it is a mount, and a process that creates it is
+    # a process that has quietly accepted a directory nobody mounted. This is the only
+    # check that separates "the volume is attached" from "the container has a writable
+    # filesystem", because every later syscall passes just as happily on ephemeral disk.
+    if not store.is_dir():
+        failure = (
+            f"{store} is not an existing directory. The store is a mount, not something "
+            "to create: a missing one means the volume was not attached."
+        )
+    else:
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            failure = str(error)
+    if failure is not None:
         return StoreProbeResult(
             ok=False,
             checks={
-                "writable_root": False,
+                "mounted_root": False,
                 "exclusive_create": False,
                 "hard_link_no_overwrite": False,
                 "heartbeat_mtime": False,
                 "shared_listing": False,
             },
-            detail={"writable_root": str(error)},
+            detail={"mounted_root": failure},
         )
-    checks["writable_root"] = True
+    checks["mounted_root"] = True
 
     marker = directory / f"{identity}.marker"
     _check(checks, detail, "exclusive_create", lambda: _exclusive_create(marker))

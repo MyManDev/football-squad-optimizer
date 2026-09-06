@@ -31,14 +31,15 @@ COPY src ./src
 RUN python -m pip install --no-cache-dir ".[api]"
 
 # The store is a mount, never image state: ADR 0006 rules out container-local storage
-# because it is ephemeral across restart and replica replacement. The directory exists so a
-# misconfigured deployment fails its startup probe loudly instead of writing into the layer.
-RUN useradd --system --create-home --uid 10001 squadopt \
-    && mkdir -p /mnt/squadopt-store \
-    && chown squadopt:squadopt /mnt/squadopt-store
+# because it is ephemeral across restart and replica replacement.
+#
+# So the image neither creates the directory nor defaults the variable that names it. Both
+# were here and both were wrong: with them, a `docker run` that forgot its volume got a
+# writable directory on the container's own disk, passed every capability check, and served
+# happily until the next restart took the queue with it. Without them a forgotten volume
+# fails at configuration, and a mistyped path fails at the probe.
+RUN useradd --system --create-home --uid 10001 squadopt
 USER squadopt
-
-ENV SQUADOPT_BACKEND_STORE_ROOT=/mnt/squadopt-store
 
 EXPOSE 8000
 

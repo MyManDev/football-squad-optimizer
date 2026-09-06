@@ -27,7 +27,7 @@ from typing import Final, Protocol
 
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
 from squadopt.platform.advice_queue import JobQueue
-from squadopt.platform.advice_read import AdviceReadStore
+from squadopt.platform.advice_read import AdviceBackendNotReadyError, AdviceReadStore
 from squadopt.platform.api_contract import ApiCommandRequest
 from squadopt.platform.jobs_contract import AdviceJob
 
@@ -98,11 +98,13 @@ class AdviceSubmitService:
         *,
         rate_limiter: RateLimiter | None = None,
         specs: AdviceJobSpecStore | None = None,
+        store_ready: Callable[[], bool] | None = None,
     ) -> None:
         self._reader = reader
         self._queue = queue
         self._limiter = rate_limiter
         self._specs = specs
+        self._store_ready = store_ready
 
     def job(self, job_id: str) -> AdviceJob | None:
         return self._queue.load(job_id)
@@ -148,6 +150,13 @@ class AdviceSubmitService:
         open job exists per normalized request, however many keys or clients ask.
         """
 
+        if self._store_ready is not None and not self._store_ready():
+            # Refuse before validating: a queue write onto a store that has failed its
+            # capability checks either errors, or lands on storage nothing will read
+            # again. Both are worse than telling the caller the backend is not ready.
+            raise AdviceBackendNotReadyError(
+                "The advice store is not available; the backend cannot accept work."
+            )
         cache_key, context = self._reader.resolve_key(
             league_id=league_id,
             entry_id=entry_id,

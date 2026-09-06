@@ -106,8 +106,10 @@ def _deployment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, An
     snapshot_id = _capture(snapshot_root)
     _handoff(handoff_root, snapshot_id)
     _publish_members(site_root)
+    store_root = tmp_path / "store"
+    store_root.mkdir()  # the mount exists before the process does; the backend never creates it
     config = BackendConfig(
-        store_root=tmp_path / "store",
+        store_root=store_root,
         site_data_root=site_root,
         snapshot_root=snapshot_root,
         handoff_root=handoff_root,
@@ -206,9 +208,11 @@ def test_a_deployment_without_a_capture_is_unready_rather_than_broken(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "b" * 40)
+    store_root = tmp_path / "store"
+    store_root.mkdir()
     backend = build_backend(
         BackendConfig(
-            store_root=tmp_path / "store",
+            store_root=store_root,
             site_data_root=tmp_path / "site",
             snapshot_root=tmp_path / "snapshots",
             handoff_root=tmp_path / "handoffs",
