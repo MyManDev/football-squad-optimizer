@@ -177,6 +177,13 @@ def prepare_phase_c_component_folds(
 
     if not isinstance(handoff, PhaseCComponentHandoff):
         raise EvaluationValidationError("handoff must be a PhaseCComponentHandoff.")
+    # The explicit development reader can return 2025-26 rows or a weighted arm. Neither is
+    # admissible here: a decision comparison reads the frozen v1 handoff and nothing else.
+    if handoff.development_contract is not None:
+        raise EvaluationValidationError(
+            "Phase C development artifacts are not admissible decision-comparison evidence; "
+            f"{handoff.development_contract!r} is development-only."
+        )
     controls = _folds(control_folds)
     handoff_order = handoff.rows["fold_id"].drop_duplicates().tolist()
     if [item.fold_id for item in controls] != handoff_order:

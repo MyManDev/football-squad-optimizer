@@ -5,9 +5,14 @@ and its arm on every row and fold record, the per-fold weights must follow the d
 rule, and the refusals must fire before any archive is read.
 """
 
+import json
+from collections.abc import Sequence
+from pathlib import Path
+
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
+from scripts.compare_component_oof_development import main as compare_main
 from scripts.export_component_oof import (
     DEVELOPMENT_OOF_CONTRACT_VERSION,
     DEVELOPMENT_SEASONS_V2,
@@ -20,6 +25,7 @@ from scripts.export_component_oof import (
 from squadopt.backtest.splits import DecisionPoint
 from squadopt.data.errors import DataError
 from squadopt.evaluation import DEVELOPMENT_OOF_CONTRACT_VERSION as READER_DEVELOPMENT_CONTRACT
+from squadopt.evaluation import EvaluationValidationError, read_phase_c_component_handoff
 from squadopt.features.component_targets import build_component_targets
 from squadopt.prediction.component_dataset import (
     COMPONENT_DEVELOPMENT_SEASONS_V2,
@@ -39,7 +45,65 @@ FEATURES = component_feature_columns()
 SMALL = ComponentModelConfig(minimum_training_rows=10)
 OLD = "2023-24"
 NEW = "2024-25"
+LOCKED = "2025-26"
 ORDER = (OLD, NEW)
+THREE = (OLD, NEW, LOCKED)
+# The v1 manifest schema, pinned: the v2 scope must not add a key to it.
+V1_MANIFEST_KEYS = (
+    "archive_commit",
+    "chronology_check",
+    "component_model_rows",
+    "contract_version",
+    "dataset_contract_version",
+    "decision_timestamp_policy",
+    "deterministic_seed",
+    "development_seasons",
+    "direct_control_rows",
+    "excluded_ratio_features",
+    "feature_columns",
+    "feature_contract_version",
+    "fold_count",
+    "fold_ids",
+    "folds",
+    "folds_refused_for_thin_history",
+    "generated_at_utc",
+    "locked_holdout_read",
+    "locked_holdout_season",
+    "missing_data_policy",
+    "model_version",
+    "negative_raw_conditional_points",
+    "promotes_anything",
+    "public_points_bound",
+    "public_points_bound_note",
+    "repository_commit",
+    "reproduce",
+    "roster_column_dtypes",
+    "roster_columns",
+    "roster_contract_version",
+    "roster_file",
+    "roster_ownership_policy",
+    "roster_row_count",
+    "roster_sha256",
+    "row_count",
+    "scored_fold_count",
+    "start_target_status",
+    "start_target_supported_seasons",
+    "table_column_dtypes",
+    "table_columns",
+    "table_file",
+    "table_sha256",
+    "target_contract_version",
+    "training_rows_seen",
+    "working_tree_dirty",
+)
+V2_MANIFEST_KEYS = (
+    *V1_MANIFEST_KEYS,
+    "development_note",
+    "development_only",
+    "development_scope",
+    "rule_era",
+    "weighting",
+)
 DEFENSIVE_ACTION_COLUMNS = (
     "defensive_contribution",
     "clearances_blocks_interceptions",
@@ -72,8 +136,12 @@ def _panel(season: str, gameweeks: int, players: int) -> pd.DataFrame:
     )
 
 
-def _frame(gameweeks: int, players: int) -> pd.DataFrame:
-    panel = pd.concat([_panel(season, gameweeks, players) for season in ORDER], ignore_index=True)
+def _panels(gameweeks: int, players: int, seasons: Sequence[str] = ORDER) -> pd.DataFrame:
+    return pd.concat([_panel(season, gameweeks, players) for season in seasons], ignore_index=True)
+
+
+def _frame(gameweeks: int, players: int, seasons: Sequence[str] = ORDER) -> pd.DataFrame:
+    panel = _panels(gameweeks, players, seasons)
     features = panel.loc[:, ["season", "gameweek", "player_id", "price_tenths"]].copy(deep=True)
     for offset, column in enumerate(FEATURES, start=1):
         if column == "price_tenths":
@@ -89,10 +157,10 @@ def _frame(gameweeks: int, players: int) -> pd.DataFrame:
     return build_component_frame(features, build_component_targets(panel))
 
 
-def _decisions(gameweeks: range) -> tuple[DecisionPoint, ...]:
+def _decisions(gameweeks: range, seasons: Sequence[str] = ORDER) -> tuple[DecisionPoint, ...]:
     return tuple(
         DecisionPoint(season=season, gameweek=gameweek)
-        for season in ORDER
+        for season in seasons
         for gameweek in gameweeks
     )
 
@@ -351,3 +419,160 @@ def test_no_defensive_action_column_is_a_feature_and_the_target_adds_nothing() -
         == joined.loc[appeared, "total_points"].tolist()
     )
     assert joined.loc[~appeared, "points_target"].isna().all()
+
+
+def test_a_three_season_v2_walk_weights_every_fold_from_its_own_season() -> None:
+    """The 2025-26 folds see 0.25 / 0.5 / 1, and every training fold ranks before the fold."""
+
+    _, walk = build_oof_table(
+        _frame(6, 12, THREE),
+        _decisions(range(3, 7), THREE),
+        season_order=THREE,
+        config=SMALL,
+        weighting="season_half_life",
+        contract_version=DEVELOPMENT_OOF_CONTRACT_VERSION,
+    )
+    expected = {
+        OLD: {OLD: 1.0},
+        NEW: {OLD: 0.5, NEW: 1.0},
+        LOCKED: {OLD: 0.25, NEW: 0.5, LOCKED: 1.0},
+    }
+    ranks = {season: rank for rank, season in enumerate(THREE)}
+
+    assert {record.season for record in walk.folds} == set(THREE)
+    for record in walk.folds:
+        assert record.training_weight_by_season == expected[record.season]
+        decision = (ranks[record.season], record.target_gameweek)
+        assert record.training_fold_ids
+        assert all(
+            (ranks[fold[:7]], int(fold[-2:])) < decision for fold in record.training_fold_ids
+        )
+
+
+def _run_export(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *arguments: str
+) -> tuple[Path, Path, Path]:
+    """Run ``main`` end to end on a synthetic three-season frame, returning the artifacts."""
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    panel = _panels(6, 12, THREE)
+    frame = _frame(6, 12, THREE)
+    monkeypatch.setattr(
+        "scripts.export_component_oof._modelling_frame",
+        lambda archive_root, seasons: (panel, frame),
+    )
+    monkeypatch.setattr(
+        "scripts.export_component_oof.season_ranks",
+        lambda panel: {season: rank for rank, season in enumerate(THREE)},
+    )
+    monkeypatch.setattr(
+        "scripts.export_component_oof.walk_forward_decision_points",
+        lambda panel, *, seasons: _decisions(range(3, 7), tuple(seasons)),
+    )
+    monkeypatch.setattr("scripts.export_component_oof._git_revision", lambda: ("0" * 40, False))
+    output = tmp_path / "out"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "export_component_oof",
+            "--archive-root",
+            str(tmp_path),
+            "--output-dir",
+            str(output),
+            "--minimum-training-rows",
+            "10",
+            *arguments,
+        ],
+    )
+    assert main() == 0
+    written = sorted(output.glob("*.manifest.json"))
+    assert len(written) == 1
+    manifest = written[0]
+    name = manifest.name[: -len(".manifest.json")]
+    return output / f"{name}.csv", output / f"{name}.roster.csv", manifest
+
+
+def test_main_writes_v2_artifacts_the_development_reader_and_the_comparison_accept(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seasons = ",".join(THREE)
+    equal = _run_export(
+        tmp_path / "equal",
+        monkeypatch,
+        "--development-scope",
+        "v2",
+        "--season-weighting",
+        "equal",
+        "--seasons",
+        seasons,
+    )
+    weighted = _run_export(
+        tmp_path / "weighted",
+        monkeypatch,
+        "--development-scope",
+        "v2",
+        "--season-weighting",
+        "season_half_life",
+        "--seasons",
+        seasons,
+    )
+
+    for paths, label, model_version in (
+        (equal, EQUAL_WEIGHTING, COMPONENT_MODEL_VERSION),
+        (weighted, SEASON_HALF_LIFE_WEIGHTING, SEASON_WEIGHTED_MODEL_VERSION),
+    ):
+        table_path, _, manifest_path = paths
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert sorted(manifest) == sorted(V2_MANIFEST_KEYS)
+        assert manifest["development_only"] is True
+        assert manifest["locked_holdout_read"] is True
+        assert manifest["weighting"]["label"] == label
+        assert manifest["weighting"]["model_version"] == model_version
+        assert manifest["rule_era"]["defensive_contribution_seasons"] == [LOCKED]
+        assert all("training_weight_by_season" in record for record in manifest["folds"])
+        assert table_path.name.endswith(
+            f"_{'equal' if label == EQUAL_WEIGHTING else 'season_half_life'}.csv"
+        )
+
+        handoff = read_phase_c_component_handoff(
+            *paths, development_contract=DEVELOPMENT_OOF_CONTRACT_VERSION
+        )
+        assert handoff.weighting == label
+        assert handoff.model_version == model_version
+        assert set(handoff.rows["season"]) == set(THREE)
+        with pytest.raises(EvaluationValidationError):
+            read_phase_c_component_handoff(*paths)
+
+    # The comparison reads exactly what the export wrote; both live in one directory.
+    artifact_dir = tmp_path / "pair"
+    artifact_dir.mkdir()
+    for paths in (equal, weighted):
+        for path in paths:
+            (artifact_dir / path.name).write_bytes(path.read_bytes())
+    assert compare_main(["--artifact-dir", str(artifact_dir)]) == 0
+    report = json.loads(
+        (artifact_dir / "comparison" / "comparison.json").read_text(encoding="utf-8")
+    )
+    assert report["primary_season"]["season"] == LOCKED
+    assert report["control_era_season"]["season"] == NEW
+    assert report["verdict"]["verdict"] in {"candidate_preferred", "no_selection"}
+
+
+def test_main_under_the_v1_scope_writes_the_pinned_manifest_schema(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    paths = _run_export(tmp_path, monkeypatch, "--seasons", f"{OLD},{NEW}")
+    table_path, _, manifest_path = paths
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert table_path.name == f"{OOF_CONTRACT_VERSION}.csv"
+    assert sorted(manifest) == sorted(V1_MANIFEST_KEYS)
+    assert manifest["contract_version"] == OOF_CONTRACT_VERSION
+    assert manifest["model_version"] == COMPONENT_MODEL_VERSION
+    assert manifest["locked_holdout_read"] is False
+    assert (
+        "then python -m scripts.export_component_oof, at the repository_commit"
+        in (manifest["reproduce"])
+    )
+    assert all("weighting" not in record for record in manifest["folds"])
+    assert read_phase_c_component_handoff(*paths).development_contract is None

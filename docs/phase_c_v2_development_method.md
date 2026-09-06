@@ -22,7 +22,9 @@ protocols that consume them.
   is the only way to read a v2 artifact. The default reader refuses it, and the development
   reader refuses v1 artifacts, undeclared holdout reads and artifacts without a weighting
   declaration. `evaluate_component_oof(..., development_seasons=("2025-26",))` is the
-  matching explicit allowance on the scorer.
+  matching explicit allowance on the scorer. The Phase C decision comparison
+  (`prepare_phase_c_component_folds`) refuses a handoff read under the development
+  contract, so a v2 artifact cannot enter the Phase D evidence path.
 
 ## The two arms
 
@@ -58,7 +60,9 @@ reader, refuses arms that are not one paired measurement (same commit, same rows
 targets, same coverage), scores each with the existing `evaluate_component_oof`, and
 applies the rule below.
 
-- **Primary evaluation:** 2025-26 folds. The metric is the existing overall points MAE of
+- **Primary evaluation:** 2025-26 folds. The primary and previous-era seasons are constants
+  of the comparison script, not command-line options, so the rule cannot be re-pointed after
+  the numbers are seen. The metric is the existing overall points MAE of
   `control_expected_points` against realized gameweek points, per fold. The paired
   statistic is control MAE minus candidate MAE per fold, summarized with the existing
   `season_aware_moving_block_interval` under `PromotionPolicy(confidence_level=0.90,

@@ -37,9 +37,16 @@ from squadopt.evaluation import (
 from squadopt.experiments.config import PromotionPolicy
 from squadopt.experiments.phase_c_reporting import phase_c_component_evaluation_to_dict
 from squadopt.experiments.statistics import season_aware_moving_block_interval
-from squadopt.prediction.component_models import EQUAL_WEIGHTING, SEASON_HALF_LIFE_WEIGHTING
+from squadopt.prediction.component_models import (
+    COMPONENT_MODEL_VERSION,
+    EQUAL_WEIGHTING,
+    SEASON_HALF_LIFE_WEIGHTING,
+    SEASON_WEIGHTED_MODEL_VERSION,
+)
 
 COMPARISON_CONTRACT_VERSION = "phase_c_v2_development_comparison_v1"
+# The two seasons the rule was written for. Constants, not options: a primary season that
+# could be chosen after the numbers are seen would not be a fixed rule.
 PRIMARY_SEASON = "2025-26"
 CONTROL_ERA_SEASON = "2024-25"
 DEVELOPMENT_SEASONS = (PRIMARY_SEASON,)
@@ -108,8 +115,6 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
         "--candidate", default=f"{DEVELOPMENT_OOF_CONTRACT_VERSION}_season_half_life"
     )
     parser.add_argument("--output-dir", type=Path, default=None)
-    parser.add_argument("--primary-season", default=PRIMARY_SEASON)
-    parser.add_argument("--control-era-season", default=CONTROL_ERA_SEASON)
     return parser.parse_args(argv)
 
 
@@ -132,6 +137,16 @@ def check_paired(control: PhaseCComponentHandoff, candidate: PhaseCComponentHand
             "The declared comparison is the equal-weight control against the season-half-life "
             f"candidate; got control {control.weighting!r} and candidate "
             f"{candidate.weighting!r}."
+        )
+    # A label alone is a claim; the model version is what the fit actually recorded.
+    if (
+        control.model_version != COMPONENT_MODEL_VERSION
+        or candidate.model_version != SEASON_WEIGHTED_MODEL_VERSION
+    ):
+        raise EvaluationValidationError(
+            "Arm labels and model versions disagree: the control must carry "
+            f"{COMPONENT_MODEL_VERSION!r} and the candidate {SEASON_WEIGHTED_MODEL_VERSION!r}, "
+            f"got {control.model_version!r} and {candidate.model_version!r}."
         )
     if control.repository_commit != candidate.repository_commit:
         raise EvaluationValidationError("Both arms must come from the same commit.")
@@ -156,15 +171,14 @@ def check_paired(control: PhaseCComponentHandoff, candidate: PhaseCComponentHand
 def _scored_points(rows: pd.DataFrame) -> pd.DataFrame:
     """The rows the component points metric scores, with its realized target.
 
-    Mirrors ``evaluate_component_oof``: non-blank rows with a prediction and a known
-    appearance outcome, where a player who did not appear realized zero points.
+    Mirrors ``evaluate_component_oof`` exactly: non-blank rows with a prediction, where a
+    player who did not appear -- or whose appearance is unknown -- realized zero points.
     """
 
     appearance = pd.to_numeric(rows["appearance_target"], errors="raise").astype("Float64")
-    known = appearance.notna()
     appeared = appearance.eq(1.0).fillna(False).astype(bool)
     points = pd.to_numeric(rows["points_target"], errors="raise").astype("Float64")
-    realized = points.where(appeared, 0.0).mask(~known)
+    realized = points.where(appeared, 0.0)
     prediction = pd.to_numeric(rows["control_expected_points"], errors="raise").astype("Float64")
     fixtures = pd.to_numeric(rows["fixture_count"], errors="raise").astype("int64")
     scored = pd.DataFrame(
@@ -330,8 +344,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     output_dir: Path = (
         artifact_dir / "comparison" if arguments.output_dir is None else arguments.output_dir
     )
-    primary_season = str(arguments.primary_season)
-    control_era_season = str(arguments.control_era_season)
+    primary_season = PRIMARY_SEASON
+    control_era_season = CONTROL_ERA_SEASON
     try:
         control = load_arm(artifact_dir, str(arguments.control))
         candidate = load_arm(artifact_dir, str(arguments.candidate))

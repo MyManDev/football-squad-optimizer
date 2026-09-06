@@ -193,7 +193,13 @@ def test_the_weights_reach_the_scaler_and_every_estimator_on_the_right_rows() ->
     """The fit must equal a by-hand weighted fit: normalized per subset, scaler included."""
 
     frame = _two_seasons()
-    training = rows_strictly_before(frame, season_order=(OLD, NEW), season=NEW, gameweek=6)
+    training = rows_strictly_before(frame, season_order=(OLD, NEW), season=NEW, gameweek=6).copy(
+        deep=True
+    )
+    # One appeared row loses its points target: it stays in the appearance subset and
+    # leaves the conditional one, and the conditional normalization must follow it out.
+    first_appeared = training.index[training["appearance_target"].eq(1)][0]
+    training.loc[first_appeared, "points_target"] = pd.NA
     rule = SeasonAgeWeighting(target_season=NEW)
 
     fitted = fit_component_models(training, feature_columns=FEATURES, config=SMALL, weighting=rule)
@@ -212,7 +218,13 @@ def test_the_weights_reach_the_scaler_and_every_estimator_on_the_right_rows() ->
         standardscaler__sample_weight=usable_weights,
         logisticregression__sample_weight=usable_weights,
     )
-    appeared = appearance_target.eq(1)
+    appeared = (
+        appearance_target.eq(1)
+        & training["minutes_target"].notna()
+        & training["points_target"].notna()
+    )
+    assert fitted.appearance_rows == len(training)
+    assert fitted.conditional_rows == int(appeared.sum()) == int(appearance_target.sum()) - 1
     conditional_raw = raw.loc[appeared]
     conditional_weights = (conditional_raw / conditional_raw.mean()).to_numpy()
     reference_points = make_pipeline(StandardScaler(), Ridge(alpha=1.0, solver="cholesky")).fit(

@@ -29,6 +29,7 @@ from squadopt.evaluation import (
     ROSTER_ARTIFACT_COLUMNS,
     EvaluationValidationError,
     evaluate_component_oof,
+    prepare_phase_c_component_folds,
     read_phase_c_component_handoff,
 )
 from squadopt.prediction.component_models import (
@@ -585,3 +586,58 @@ def test_decide_applies_each_clause_of_the_rule() -> None:
         decide(good_primary, season(PREVIOUS, 2.0, 2.4, -0.9, 0.0))["verdict"]
         == "candidate_preferred"
     )
+
+
+def test_a_mislabelled_arm_is_refused_by_its_model_version(tmp_path: Path) -> None:
+    """A weighting label is a claim; the recorded model version has to agree with it."""
+
+    _write_arm(
+        tmp_path,
+        "control",
+        _development_table(lambda *_: 2.0, model_version=SEASON_WEIGHTED_MODEL_VERSION),
+        seasons=(PREVIOUS, LOCKED),
+        weighting_label=EQUAL_WEIGHTING,
+    )
+    _write_arm(
+        tmp_path,
+        "candidate",
+        _development_table(lambda *_: 1.0, model_version=SEASON_WEIGHTED_MODEL_VERSION),
+        seasons=(PREVIOUS, LOCKED),
+        weighting_label=SEASON_HALF_LIFE_WEIGHTING,
+    )
+
+    with pytest.raises(EvaluationValidationError, match="model version"):
+        check_paired(load_arm(tmp_path, "control"), load_arm(tmp_path, "candidate"))
+
+
+def test_fold_points_mae_equals_the_component_metric_on_the_same_rows() -> None:
+    """One fold, one season: the per-fold MAE must equal the metric, corner cases included."""
+
+    rows = _oof_rows(PREVIOUS)
+    rows = rows.loc[rows["target_gameweek"].eq(2)].reset_index(drop=True)
+    rows["appearance_target"] = rows["appearance_target"].astype("Int64")
+    # A non-appearance realizes zero; an unknown appearance realizes zero in the metric too.
+    rows.loc[0, ["appearance_target", "minutes_target", "points_target"]] = [0, pd.NA, pd.NA]
+    rows.loc[1, ["appearance_target", "minutes_target", "points_target"]] = [pd.NA, pd.NA, pd.NA]
+
+    metric = evaluate_component_oof(rows).by_season[PREVIOUS].points
+    per_fold = fold_points_mae(rows)
+
+    assert metric.observations == 3
+    assert per_fold.to_dict() == pytest.approx({f"{PREVIOUS}-gw02": metric.mean_absolute_error})
+
+
+def test_the_decision_comparison_refuses_a_development_handoff(tmp_path: Path) -> None:
+    paths = _write_arm(
+        tmp_path,
+        "control",
+        _development_table(lambda *_: 1.0),
+        seasons=(PREVIOUS, LOCKED),
+        weighting_label=EQUAL_WEIGHTING,
+    )
+    handoff = read_phase_c_component_handoff(
+        *paths, development_contract=DEVELOPMENT_OOF_CONTRACT_VERSION
+    )
+
+    with pytest.raises(EvaluationValidationError, match="development"):
+        prepare_phase_c_component_folds(handoff, [])
