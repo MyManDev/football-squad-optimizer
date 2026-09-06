@@ -22,8 +22,9 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
   implementation and evaluation gates.
 
 The backend and frontend are at different integration stages. Published pages use static
-views; optional advice HTTP/job primitives exist, but production worker assembly and the
-complete interactive UI flow still need integration. See the
+views; the member page can request and display advice through the optional HTTP/job client,
+with computation restricted to the supported pure-points, one-week choice. Production worker
+and capture-context assembly still need integration. See the
 [backend boundary](docs/architecture/backend.md).
 
 ## Phase A — Measurement correctness

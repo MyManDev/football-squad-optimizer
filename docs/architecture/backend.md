@@ -136,10 +136,16 @@ can produce a plan. The current public advice envelope contains expected-point t
 not member-facing probability claims.
 
 The frontend's general pages still use `StaticDataClient`. The member advice client optionally
-uses `VITE_ADVICE_API_ORIGIN` and can fall back to the published static answer. Completing the
-UI integration requires rendering the returned advice payload, retaining the compute controls
-when a static document is absent, and aligning available strategy choices with the backend.
-Enabling an origin alone does not complete that flow.
+uses `VITE_ADVICE_API_ORIGIN` and can fall back to the published static answer. The member page
+renders returned advice and retains compute controls when published advice is absent. Of the
+existing UI mode/window choices, only `saf-puan` with window 1 can request a computation; the
+other choices may display published research plans. They are not aliases for the application's
+`ortak-koru` and `fark-yarat` strategies.
+
+Advice responses must match the selected league, member, mode, window and displayed season/week.
+A refreshed squad invalidates earlier jobs and results. Static answers are labelled published
+plans, and request rejections are not turned into successful static computations. Enabling an
+origin still requires the real worker and capture-context assembly described above.
 
 ## Planned operator HTTP commands
 
