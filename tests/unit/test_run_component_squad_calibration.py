@@ -7,14 +7,19 @@ import pandas as pd
 import pytest
 from scripts.run_component_squad_calibration import (
     BINDING_FOLD_COUNT,
+    CANDIDATE_REPORT_VERSION,
+    DEFAULT_OUTPUT,
     DIRECT_CONTROL_ABSTENTIONS,
     HISTORY_BURN_IN_FOLDS,
     PHASE_C_MANIFEST_SHA256,
     PHASE_C_ROSTER_SHA256,
     PHASE_C_TABLE_SHA256,
+    REPORT_VERSION,
     BindingCalibrationError,
     _binding_population,
+    _candidate_from_arguments,
     _load_verified_fidelity,
+    _report_contract_version,
     _selected_component_inputs,
 )
 
@@ -212,3 +217,31 @@ def test_selected_component_inputs_align_the_same_fifteen_players() -> None:
     assert inputs.player_ids == tuple(ids)
     assert tuple(snapshot.table["player_id"]) == tuple(ids)
     assert tuple(inputs.table["team_id"]) == tuple(snapshot.table["team_id"])
+
+
+def _arguments(fraction: object, minimum_rows: object, output: Path) -> object:
+    from types import SimpleNamespace
+
+    return SimpleNamespace(
+        conditional_residual_fraction=fraction,
+        conditional_residual_minimum_rows=minimum_rows,
+        json_output=output,
+    )
+
+
+def test_candidate_mode_needs_both_controls_and_its_own_output_path(tmp_path: Path) -> None:
+    assert _candidate_from_arguments(_arguments(None, None, DEFAULT_OUTPUT)) is None
+    with pytest.raises(BindingCalibrationError):
+        _candidate_from_arguments(_arguments(0.15, None, tmp_path / "candidate.json"))
+    with pytest.raises(BindingCalibrationError):
+        _candidate_from_arguments(_arguments(0.15, 30, DEFAULT_OUTPUT))
+    candidate = _candidate_from_arguments(_arguments(0.15, 30, tmp_path / "candidate.json"))
+    assert candidate is not None
+    assert (candidate.fraction, candidate.minimum_rows) == (0.15, 30)
+
+
+def test_a_candidate_report_never_carries_the_binding_contract() -> None:
+    candidate = _candidate_from_arguments(_arguments(0.15, 30, Path("candidate.json")))
+    assert _report_contract_version(None) == REPORT_VERSION
+    assert _report_contract_version(candidate) == CANDIDATE_REPORT_VERSION
+    assert CANDIDATE_REPORT_VERSION != REPORT_VERSION

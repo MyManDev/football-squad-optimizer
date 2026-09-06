@@ -27,6 +27,7 @@ double counts is the failure this avoids.
 
 import hashlib
 import json
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from numbers import Integral
@@ -54,6 +55,15 @@ from squadopt.scenarios.models import (
 )
 
 COMPONENT_SCENARIO_CONTRACT_VERSION: Final = "component_scenario_foundation_v1"
+CONDITIONAL_RESIDUAL_CONTRACT_VERSION: Final = "component_scenario_conditional_residual_v1"
+# ScenarioConfig fields the component sampler does not read; recorded on every draw so a
+# reader of the config block cannot take them for applied settings.
+UNUSED_SCENARIO_CONFIG_FIELDS: Final = (
+    "min_player_observations",
+    "player_scale_shrinkage",
+    "player_location_shrinkage",
+    "double_gameweek_scale",
+)
 
 # The per-player fields a component scenario row must carry. Names follow the Phase C
 # out-of-fold export (`scripts/export_component_oof.py`) rather than being coined here, so a
@@ -514,6 +524,53 @@ class ComponentScenarioDraw:
         object.__setattr__(self, "component_fingerprint", fingerprint)
 
 
+@dataclass(frozen=True, slots=True)
+class ConditionalResidualConfig:
+    """Opt-in: draw each player's paired residual from history rows of similar expectation.
+
+    Inside the scenario's source fold the rows are ordered by their own conditional
+    expectation (``raw_expected_points_if_appearance``) and a player draws uniformly from the
+    ``size`` rows nearest in rank to their expectation, where ``size = max(minimum_rows,
+    ceil(fraction * rows_in_fold))``. A fold with no more rows than ``size`` is used whole, and
+    that fallback is counted in the draw's diagnostics rather than hidden.
+
+    Everything else is the foundation sampler: the appearance draw, the one-fold-per-scenario
+    block, the minutes-points pairing, the seed stream and its order. Only *which row within
+    the fold* a cell may take changes, so a draw with and without this config shares its
+    appearances and source folds seed for seed.
+    """
+
+    fraction: float = 0.15
+    minimum_rows: int = 30
+    contract_version: str = CONDITIONAL_RESIDUAL_CONTRACT_VERSION
+
+    def __post_init__(self) -> None:
+        if self.contract_version != CONDITIONAL_RESIDUAL_CONTRACT_VERSION:
+            raise ScenarioValidationError(
+                "contract_version does not match the conditional residual implementation."
+            )
+        if (
+            isinstance(self.fraction, bool)
+            or not isinstance(self.fraction, int | float)
+            or not math.isfinite(float(self.fraction))
+            or not 0.0 < float(self.fraction) <= 1.0
+        ):
+            raise ScenarioValidationError("fraction must be a finite number in (0, 1].")
+        object.__setattr__(self, "fraction", float(self.fraction))
+        if (
+            isinstance(self.minimum_rows, bool)
+            or not isinstance(self.minimum_rows, Integral)
+            or int(self.minimum_rows) < 2
+        ):
+            raise ScenarioValidationError("minimum_rows must be an integer of at least 2.")
+        object.__setattr__(self, "minimum_rows", int(self.minimum_rows))
+
+    def window_rows(self, fold_rows: int) -> int:
+        """Rows a player may draw from in a fold of ``fold_rows``; the whole fold when small."""
+
+        return min(fold_rows, max(self.minimum_rows, math.ceil(self.fraction * fold_rows)))
+
+
 def paired_conditional_residuals(
     out_of_fold: pd.DataFrame,
     *,
@@ -577,8 +634,23 @@ def paired_conditional_residuals(
     )
     # Canonical order, so a caller's row order cannot change the pool or anything drawn from it.
     residuals = (
-        kept.loc[:, ["fold_id", "player_id", "minutes_residual", "points_residual"]]
-        .astype({"fold_id": "string", "player_id": "int64"})
+        kept.loc[
+            :,
+            [
+                "fold_id",
+                "player_id",
+                "minutes_residual",
+                "points_residual",
+                "raw_expected_points_if_appearance",
+            ],
+        ]
+        .astype(
+            {
+                "fold_id": "string",
+                "player_id": "int64",
+                "raw_expected_points_if_appearance": "float64",
+            }
+        )
         .sort_values(["fold_id", "player_id"], kind="stable")
         .reset_index(drop=True)
     )
@@ -604,8 +676,13 @@ def sample_component_scenarios(
     residuals: PairedResidualPool,
     target: ScenarioTarget,
     config: ScenarioConfig | None = None,
+    *,
+    conditional_residuals: ConditionalResidualConfig | None = None,
 ) -> ComponentScenarioDraw:
     """Draw appearance, then a paired conditional residual, into a V1-shaped ``ScenarioSet``.
+
+    ``conditional_residuals`` is the opt-in candidate of ``ConditionalResidualConfig``; left as
+    ``None`` (the default) this is the frozen foundation sampler, bit for bit.
 
     ``scenario_points`` stays the public decision matrix, in the projection's own player
     order. The per-cell minutes and the per-cell Bernoulli appearance state are returned beside
@@ -622,6 +699,12 @@ def sample_component_scenarios(
     settings = config if config is not None else ScenarioConfig()
     if not isinstance(inputs, ComponentScenarioInputs):
         raise ScenarioValidationError("inputs must be ComponentScenarioInputs.")
+    if conditional_residuals is not None and not isinstance(
+        conditional_residuals, ConditionalResidualConfig
+    ):
+        raise ScenarioValidationError(
+            "conditional_residuals must be a ConditionalResidualConfig or None."
+        )
     if not isinstance(projections, PredictionSnapshot):
         raise ScenarioValidationError("projections must be a PredictionSnapshot.")
     if residuals.target_fold_id != target.fold_id:
@@ -722,8 +805,17 @@ def sample_component_scenarios(
     starts = np.array([start for start, _ in blocks], dtype="int64")
     sizes = np.array([size for _, size in blocks], dtype="int64")
     chosen = generator.integers(0, len(history), size=count)
-    offsets = generator.integers(0, sizes[chosen][:, None], size=(count, players))
-    drawn = starts[chosen][:, None] + offsets
+    if conditional_residuals is None:
+        offsets = generator.integers(0, sizes[chosen][:, None], size=(count, players))
+        drawn = starts[chosen][:, None] + offsets
+        selection_diagnostics: dict[str, object] = {
+            "component_sampler_contract_version": COMPONENT_SCENARIO_CONTRACT_VERSION,
+            "residual_selection": "fold_uniform",
+        }
+    else:
+        drawn, selection_diagnostics = _conditional_rows(
+            generator, residuals, blocks, chosen, mean_points, conditional_residuals
+        )
 
     minutes_pool = residuals.residuals["minutes_residual"].to_numpy(dtype="float64")
     points_pool = residuals.residuals["points_residual"].to_numpy(dtype="float64")
@@ -789,6 +881,13 @@ def sample_component_scenarios(
             "residual_pool_rows": len(residuals),
             "residual_history_folds": len(residuals.history_fold_ids),
             "point_decomposition_applied": False,
+            **selection_diagnostics,
+            "effective_settings": {
+                "scenario_count": settings.scenario_count,
+                "deterministic_seed": settings.deterministic_seed,
+                "min_history_folds": "applied by paired_conditional_residuals, not here",
+                "unused_scenario_config_fields": list(UNUSED_SCENARIO_CONFIG_FIELDS),
+            },
             "phase_c_table_sha": inputs.provenance.phase_c_table_sha,
             "roster_sha": inputs.provenance.roster_sha,
             "model_version": inputs.provenance.model_version,
@@ -803,6 +902,59 @@ def sample_component_scenarios(
             scenario_set, inputs, sampled_minutes, sampled_appearances
         ),
     )
+
+
+def _conditional_rows(
+    generator: np.random.Generator,
+    residuals: PairedResidualPool,
+    blocks: tuple[tuple[int, int], ...],
+    chosen: np.ndarray,
+    expectations: np.ndarray,
+    config: ConditionalResidualConfig,
+) -> tuple[np.ndarray, dict[str, object]]:
+    """Row per cell from the source fold, restricted to the player's expectation window.
+
+    Each fold block is ordered once by the history rows' own conditional expectation. For a
+    player, the window is the ``window_rows`` rows around their rank position in that order,
+    clipped so it stays inside the fold; the draw is uniform within the window. The generator
+    is consumed exactly once here, after the fold choice, so the appearance and fold streams
+    stay those of the foundation sampler.
+    """
+
+    pool = residuals.residuals["raw_expected_points_if_appearance"].to_numpy(dtype="float64")
+    ordered_rows: list[np.ndarray] = []
+    sorted_values: list[np.ndarray] = []
+    windows: list[int] = []
+    fallback_folds = 0
+    for start, size in blocks:
+        order = np.argsort(pool[start : start + size], kind="stable")
+        ordered_rows.append(start + order)
+        sorted_values.append(pool[start + order])
+        window = config.window_rows(size)
+        windows.append(window)
+        fallback_folds += int(window >= size)
+    flat_rows = np.concatenate(ordered_rows)
+    starts = np.array([start for start, _ in blocks], dtype="int64")
+    sizes = np.array([size for _, size in blocks], dtype="int64")
+    window_sizes = np.array(windows, dtype="int64")
+    # Rank of every player's expectation inside every fold's ordering: (folds, players).
+    ranks = np.stack(
+        [np.searchsorted(values, expectations, side="left") for values in sorted_values]
+    )
+    window_start = np.clip(ranks - (window_sizes // 2)[:, None], 0, (sizes - window_sizes)[:, None])
+    count, players = chosen.shape[0], expectations.shape[0]
+    offsets = generator.integers(0, window_sizes[chosen][:, None], size=(count, players))
+    positions = window_start[chosen] + offsets
+    drawn = flat_rows[starts[chosen][:, None] + positions]
+    return drawn, {
+        "component_sampler_contract_version": config.contract_version,
+        "residual_selection": "conditional_neighbourhood",
+        "conditional_residual_fraction": config.fraction,
+        "conditional_residual_minimum_rows": config.minimum_rows,
+        "conditional_residual_window_rows_mean": float(window_sizes.mean()),
+        "conditional_residual_fallback_folds": fallback_folds,
+        "conditional_residual_history_folds": len(blocks),
+    }
 
 
 def _draw_seed(
