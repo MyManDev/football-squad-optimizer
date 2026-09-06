@@ -19,6 +19,7 @@ export function selectedAdviceRequest(
   leagueId: number,
   entryId: number,
   members: EntryView[],
+  context?: { season: string; gameweek: number },
 ): AdviceRequest {
   const strategy: PlayMode = isPlayMode(searchParams.get("mode"))
     ? (searchParams.get("mode") as PlayMode)
@@ -27,9 +28,15 @@ export function selectedAdviceRequest(
   const window: WindowSize = rawWindow === 3 ? 3 : rawWindow === 5 ? 5 : 1;
   const rawRival = Number(searchParams.get("rival"));
   const rivalEntryId =
+    strategy !== "saf-puan" &&
     Number.isInteger(rawRival) &&
     rivalCandidates(members, entryId).some((member) => member.entry_id === rawRival)
       ? rawRival
       : null;
-  return { leagueId, entryId, strategy, window, rivalEntryId };
+  return { leagueId, entryId, strategy, window, rivalEntryId, ...context };
+}
+
+/** Only this published UI combination is connected to the application compute path. */
+export function canComputeAdvice(request: AdviceRequest): boolean {
+  return request.strategy === "saf-puan" && request.window === 1;
 }

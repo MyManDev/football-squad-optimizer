@@ -14,6 +14,7 @@
 import type { PlayMode, WindowSize } from "../../moves/modePrices";
 import { LeagueDataError, LeagueDataMissing, loadEntryAdvice } from "../data";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
+import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
 
 export interface AdviceRequest {
   leagueId: number;
@@ -21,6 +22,9 @@ export interface AdviceRequest {
   strategy: PlayMode;
   window: WindowSize;
   rivalEntryId?: number | null;
+  /** Display context only; the server resolves its own immutable computation inputs. */
+  season?: string;
+  gameweek?: number;
 }
 
 /** Where an answer came from; the page shows capture identity, not a "cached" badge. */
@@ -65,7 +69,10 @@ export class StaticOnlyAdviceClient implements AdviceClient {
 
   async readAdvice(request: AdviceRequest): Promise<AdviceReadResult> {
     try {
-      const envelope = await this.loader(request.entryId, request.strategy, request.window);
+      const envelope = checkedAdvice(
+        await this.loader(request.entryId, request.strategy, request.window),
+        request,
+      );
       return { kind: "advice", envelope, source: "static" };
     } catch (error) {
       if (error instanceof LeagueDataMissing) return { kind: "not-computed" };
@@ -89,6 +96,19 @@ interface FetchLike {
   (input: string, init?: RequestInit): Promise<Response>;
 }
 
+export class AdviceApiError extends LeagueDataError {
+  readonly status: number;
+
+  constructor(status: number) {
+    super(`Advice API answered ${status}.`);
+    this.status = status;
+  }
+}
+
+function isRequestRejection(error: unknown): boolean {
+  return error instanceof AdviceApiError && error.status >= 400 && error.status < 500;
+}
+
 /** Talks to the advice backend; understands 200 (hit), 202 (job), and 404 (not computed). */
 export class HttpAdviceClient implements AdviceClient {
   private readonly origin: string;
@@ -110,9 +130,12 @@ export class HttpAdviceClient implements AdviceClient {
 
   async readAdvice(request: AdviceRequest): Promise<AdviceReadResult> {
     const response = await this.fetcher(this.adviceUrl(request), { cache: "no-cache" });
-    if (response.status === 404) return { kind: "not-computed" };
-    if (!response.ok) throw new LeagueDataError(`Advice API answered ${response.status}.`);
-    const envelope = (await response.json()) as LeagueViewEnvelope<EntryAdvice>;
+    if (response.status === 404) {
+      const body = (await response.json()) as { error?: { code?: string } };
+      if (body?.error?.code === "NOT_COMPUTED") return { kind: "not-computed" };
+    }
+    if (!response.ok) throw new AdviceApiError(response.status);
+    const envelope = checkedAdvice(await response.json(), request);
     return { kind: "advice", envelope, source: "api-cache" };
   }
 
@@ -128,10 +151,13 @@ export class HttpAdviceClient implements AdviceClient {
     });
     if (response.status === 202) {
       const body = (await response.json()) as { job_id: string };
+      if (typeof body?.job_id !== "string" || !body.job_id.trim()) {
+        throw new AdviceResponseError("Accepted advice request has no job identity.");
+      }
       return { kind: "job", jobId: body.job_id };
     }
-    if (!response.ok) throw new LeagueDataError(`Advice API answered ${response.status}.`);
-    const envelope = (await response.json()) as LeagueViewEnvelope<EntryAdvice>;
+    if (!response.ok) throw new AdviceApiError(response.status);
+    const envelope = checkedAdvice(await response.json(), request);
     return { kind: "advice", envelope, source: "api-cache" };
   }
 
@@ -140,8 +166,14 @@ export class HttpAdviceClient implements AdviceClient {
       `${this.origin}/api/v1/advice-jobs/${encodeURIComponent(jobId)}`,
       { cache: "no-cache" },
     );
-    if (!response.ok) throw new LeagueDataError(`Advice API answered ${response.status}.`);
+    if (!response.ok) throw new AdviceApiError(response.status);
     const body = (await response.json()) as { job_id: string; status: AdviceJobStatus["status"] };
+    if (
+      body?.job_id !== jobId ||
+      !["queued", "running", "completed", "failed"].includes(body?.status)
+    ) {
+      throw new AdviceResponseError("Advice job response has an invalid identity or status.");
+    }
     return { jobId: body.job_id, status: body.status };
   }
 }
@@ -165,7 +197,8 @@ export class FallbackAdviceClient implements AdviceClient {
     let primaryResult: AdviceReadResult | null = null;
     try {
       primaryResult = await this.primary.readAdvice(request);
-    } catch {
+    } catch (error) {
+      if (isRequestRejection(error)) throw error;
       primaryResult = null;
     }
     if (primaryResult && primaryResult.kind === "advice") return primaryResult;
@@ -181,7 +214,8 @@ export class FallbackAdviceClient implements AdviceClient {
   async requestAdvice(request: AdviceRequest): Promise<AdviceRequestResult> {
     try {
       return await this.primary.requestAdvice(request);
-    } catch {
+    } catch (error) {
+      if (isRequestRejection(error)) throw error;
       const read = await this.fallback.readAdvice(request);
       return read.kind === "advice"
         ? { ...read, source: "static-fallback" }

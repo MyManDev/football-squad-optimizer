@@ -247,3 +247,99 @@ def test_the_rival_changes_labels_not_the_baseline(world: dict[str, Any]) -> Non
         _request(), provider=accompanied, inputs=inputs, projection=projection, rules=rules
     )
     assert baseline_alone == baseline_accompanied
+
+
+@pytest.mark.parametrize(
+    ("strategy", "entry_id"),
+    [("saf-puan", 101), ("fark-yarat", 101), ("fark-yarat", 202)],
+)
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"entry_id": 303}, "Picks entry_id"),
+        ({"season": "2024-25"}, "Picks season"),
+        ({"gameweek": 2}, "Picks gameweek"),
+        ({"source_snapshot_id": "another-capture"}, "another capture"),
+    ],
+)
+def test_mismatched_member_or_rival_picks_are_refused_before_solving(
+    world: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    strategy: str,
+    entry_id: int,
+    changes: dict[str, object],
+    message: str,
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    picks = {
+        101: _member_picks(world, 101, _legal_squad(world)),
+        202: _member_picks(world, 202, _rival_squad(world)),
+    }
+    picks[entry_id] = dataclasses.replace(picks[entry_id], **changes)
+
+    def unexpected_solve(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("Mismatched picks must be rejected before either planner is called.")
+
+    monkeypatch.setattr(advice_service, "plan_transfers", unexpected_solve)
+    monkeypatch.setattr(advice_service, "plan_transfers_with_overlap", unexpected_solve)
+    request = _request(strategy=strategy, rival_entry_id=202 if strategy != "saf-puan" else None)
+
+    with pytest.raises(EntryError, match=message):
+        advise_entry(
+            request,
+            provider=_Provider(picks),
+            inputs=inputs,
+            projection=projection,
+            rules=rules,
+        )
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"season": "2024-25"}, "rules belong to another season"),
+        ({"source_snapshot_id": "another-capture"}, "rules belong to another capture"),
+    ],
+)
+def test_mismatched_rules_are_refused_before_solving(
+    world: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    changes: dict[str, object],
+    message: str,
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+
+    def unexpected_solve(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("Mismatched rules must be rejected before the planner is called.")
+
+    monkeypatch.setattr(advice_service, "plan_transfers", unexpected_solve)
+
+    with pytest.raises(EntryError, match=message):
+        advise_entry(
+            _request(),
+            provider=provider,
+            inputs=inputs,
+            projection=projection,
+            rules=dataclasses.replace(rules, **changes),
+        )
+
+
+def test_picks_without_capture_metadata_keep_their_existing_payload(
+    world: dict[str, Any],
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    picks = dataclasses.replace(
+        _member_picks(world, 101, _legal_squad(world)), source_snapshot_id=None
+    )
+
+    payload = advise_entry(
+        _request(),
+        provider=_Provider({101: picks}),
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+    assert payload["entry_id"] == 101
+    assert payload["source_snapshot_id"] is None

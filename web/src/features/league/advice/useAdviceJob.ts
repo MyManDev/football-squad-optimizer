@@ -15,7 +15,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { AdviceClient, AdviceRequest, AdviceSource } from "./adviceClient";
-import { StaticOnlyAdviceClient } from "./adviceClient";
+import { AdviceApiError, StaticOnlyAdviceClient } from "./adviceClient";
+import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 
 const POLL_INTERVAL_MS = 2000;
@@ -53,6 +54,8 @@ export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): bo
     left.entryId === right.entryId &&
     left.strategy === right.strategy &&
     left.window === right.window &&
+    left.season === right.season &&
+    left.gameweek === right.gameweek &&
     (left.rivalEntryId ?? null) === (right.rivalEntryId ?? null)
   );
 }
@@ -82,6 +85,7 @@ export function useAdviceJob(client: AdviceClient): AdviceJob {
         let outcome;
         try {
           outcome = await client.requestAdvice(request);
+          if (outcome.kind === "advice") checkedAdvice(outcome.envelope, request);
         } catch {
           if (alive()) setState({ phase: "failed", request });
           return;
@@ -103,6 +107,7 @@ export function useAdviceJob(client: AdviceClient): AdviceJob {
             ...request,
             strategy: "saf-puan",
             window: 1,
+            rivalEntryId: null,
           });
           if (published.kind === "advice") fallback = published.envelope;
         } catch {
@@ -117,7 +122,14 @@ export function useAdviceJob(client: AdviceClient): AdviceJob {
           let job;
           try {
             job = await client.readJob(outcome.jobId);
-          } catch {
+          } catch (error) {
+            if (
+              error instanceof AdviceResponseError ||
+              (error instanceof AdviceApiError && error.status >= 400 && error.status < 500)
+            ) {
+              if (alive()) setState({ phase: "failed", request });
+              return;
+            }
             continue; // one flaky poll is not a failed computation
           }
           if (!alive()) return;
@@ -125,6 +137,7 @@ export function useAdviceJob(client: AdviceClient): AdviceJob {
             let read;
             try {
               read = await client.readAdvice(request);
+              if (read.kind === "advice") checkedAdvice(read.envelope, request);
             } catch {
               // Completed but the answer cannot be read: an honest failure, not a wait
               // that never ends. A stale read from a superseded request changes nothing.

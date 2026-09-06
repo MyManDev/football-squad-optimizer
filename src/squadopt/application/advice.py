@@ -223,6 +223,10 @@ def advise_entry(
             f"Request gameweek {request.gameweek} is not the capture's "
             f"{int(inputs.deadline.gameweek)}."
         )
+    if rules.season != inputs.season:
+        raise EntryError("The advice rules belong to another season.")
+    if rules.source_snapshot_id != inputs.snapshot_id:
+        raise EntryError("The advice rules belong to another capture.")
     if request.window != COMPUTED_WINDOW:
         raise EntryError(f"Window {request.window} is not computed; only {COMPUTED_WINDOW} is.")
     if request.strategy == COMPUTED_MODE:
@@ -231,7 +235,7 @@ def advise_entry(
                 f"{COMPUTED_MODE!r} is rival-free; to name a rival, ask for a rival "
                 "strategy from the catalogue."
             )
-        picks = provider.picks(request.entry_id, request.season, request.gameweek - 1)
+        picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
         return build_advice_payload(
             picks,
             inputs,
@@ -265,6 +269,30 @@ def advise_entry(
     )
 
 
+def _requested_picks(
+    request: AdviseEntryRequest,
+    entry_id: int,
+    *,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+) -> EntryPicks:
+    """Reject a collaborator's mismatched member or capture before any solve."""
+
+    picks = provider.picks(entry_id, request.season, request.gameweek - 1)
+    for name, expected, actual in (
+        ("entry_id", entry_id, picks.entry_id),
+        ("season", request.season, picks.season),
+        ("gameweek", request.gameweek - 1, picks.gameweek),
+    ):
+        if actual != expected:
+            raise EntryError(
+                f"Picks {name} {actual!r} does not match requested {name} {expected!r}."
+            )
+    if picks.source_snapshot_id is not None and picks.source_snapshot_id != inputs.snapshot_id:
+        raise EntryError(f"Picks for entry {entry_id} belong to another capture.")
+    return picks
+
+
 def _advise_against_rival(
     request: AdviseEntryRequest,
     *,
@@ -287,8 +315,8 @@ def _advise_against_rival(
     the overlap count, captain agreement; no spread, no probability, ever.
     """
 
-    picks = provider.picks(request.entry_id, request.season, request.gameweek - 1)
-    rival_picks = provider.picks(rival_entry_id, request.season, request.gameweek - 1)
+    picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
+    rival_picks = _requested_picks(request, rival_entry_id, provider=provider, inputs=inputs)
     rival_eleven = frozenset(int(value) for value in rival_picks.starting_xi)
     rival_captain = int(rival_picks.captain)
     if rival_captain not in rival_eleven:
