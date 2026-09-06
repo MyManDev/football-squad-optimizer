@@ -25,6 +25,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final, Protocol
 
+from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
 from squadopt.platform.advice_queue import JobQueue
 from squadopt.platform.advice_read import AdviceReadStore
 from squadopt.platform.api_contract import ApiCommandRequest
@@ -96,10 +97,12 @@ class AdviceSubmitService:
         queue: JobQueue,
         *,
         rate_limiter: RateLimiter | None = None,
+        specs: AdviceJobSpecStore | None = None,
     ) -> None:
         self._reader = reader
         self._queue = queue
         self._limiter = rate_limiter
+        self._specs = specs
 
     def job(self, job_id: str) -> AdviceJob | None:
         return self._queue.load(job_id)
@@ -207,6 +210,24 @@ class AdviceSubmitService:
             updated_at_utc=at_utc,
             idempotency_key=command.idempotency_key,
         )
+        if self._specs is not None:
+            # Before the job exists, never after: a worker may claim the instant the
+            # record lands, and a claimed job whose request cannot be read is a job
+            # nobody can answer. The rival is normalized exactly as the cache key
+            # normalizes it, so requests that share an address share a meaning.
+            self._specs.put(
+                cache_key,
+                AdviceJobSpec(
+                    league_id=int(league_id),
+                    entry_id=int(entry_id),
+                    strategy=strategy,
+                    window=int(window),
+                    context=context,
+                    rival_entry_id=(
+                        rival_entry_id if self._reader.strategy_uses_rival(strategy) else None
+                    ),
+                ),
+            )
         # At-most-one open job is the queue's atomic guarantee, not a scan's promise:
         # two api processes racing here converge on one winner.
         winner, _created = self._queue.submit_unique(record)

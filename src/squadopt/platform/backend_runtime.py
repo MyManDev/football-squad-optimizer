@@ -40,6 +40,7 @@ from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.platform.advice_cache import FileAdviceCache
+from squadopt.platform.advice_job_spec import AdviceJobSpecStore, FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics, readiness_report
 from squadopt.platform.advice_queue import FileJobQueue
 from squadopt.platform.advice_read import AdviceReadStore, AdviceRequestContext, FileLeagueDirectory
@@ -47,6 +48,7 @@ from squadopt.platform.advice_submit import AdviceSubmitService, FixedWindowRate
 from squadopt.platform.capture_context import (
     AdviceCaptureContext,
     CaptureIdentity,
+    handoff_fingerprint_for,
     latest_snapshot_id,
     load_capture_context,
     load_capture_identity,
@@ -169,6 +171,10 @@ class BackendConfig:
     def cache_root(self) -> Path:
         return self.store_root / "cache"
 
+    @property
+    def spec_root(self) -> Path:
+        return self.store_root / "specs"
+
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] | None = None) -> BackendConfig:
         """Read the configuration, naming every variable that is missing at once."""
@@ -242,12 +248,19 @@ def _positive_float(source: Mapping[str, str], variable: str, default: float) ->
 
 
 class CaptureContextProvider:
-    """The current capture, re-resolved cheaply and re-read only when it changes.
+    """The current context, re-resolved cheaply and re-read only when it changes.
 
     ``current()`` runs inside a request, so it must be quick and it must never raise: a
     capture that cannot be read is a backend that is not ready, not a five-hundred on a
-    member's page. The reason is kept for the operator, logged once per capture rather
+    member's page. The reason is kept for the operator, logged once per context rather
     than once per request.
+
+    "Changed" means more than a new capture. A cache key is seven fields, and ops can
+    republish a **corrected handoff for the capture already loaded** — same capture id,
+    different projection. Keying the cache on the capture id alone made that correction
+    invisible for the life of the process, so the handoff's fingerprint is re-read on
+    every resolve. It is one small JSON; the expensive halves (the capture and its
+    projection) stay cached behind it.
 
     Both processes use this class, which is what makes "the worker computes under the
     context the api validated" a property of the code rather than of a convention.
@@ -280,7 +293,16 @@ class CaptureContextProvider:
         with self._lock:
             held = self._identity
             if held is not None and held.context.capture_snapshot_id == snapshot_id:
-                return held
+                published = handoff_fingerprint_for(
+                    self._config.handoff_root, held.context.season, held.context.gameweek
+                )
+                if published == held.context.projection_handoff_fingerprint:
+                    return held
+                # A handoff that cannot be confirmed counts as changed: falling through
+                # rebuilds, and a rebuild that fails reports unready rather than serving
+                # answers under a projection identity nobody can name any more.
+                self._identity = None
+                self._context = None
             try:
                 identity = load_capture_identity(
                     snapshot_root=self._config.snapshot_root,
@@ -312,25 +334,27 @@ class CaptureContextProvider:
         identity = self.identity()
         return None if identity is None else identity.context
 
-    def capture(self, snapshot_id: str) -> AdviceCaptureContext | None:
-        """The projected bundle for one named capture, or ``None`` if it is not current.
+    def capture(self, context: AdviceRequestContext) -> AdviceCaptureContext | None:
+        """The projected bundle for one **whole** context, or ``None`` if it is not current.
 
-        Named rather than implicit: a worker holds a job that was accepted under a
-        particular capture and must be told whether *that* capture is still the one this
-        process can answer from. Answering "here is the current bundle" to a question
-        about an older capture is the silent-corruption path this exists to close.
+        The argument is the entire ``AdviceRequestContext`` rather than a capture id, and
+        the comparison is equality over all seven fields, because all seven are in the
+        cache key. Matching on the capture alone left three ways to compute an answer with
+        inputs the key does not describe: a redeployed commit, a changed configuration, and
+        a republished handoff. Answering "here is the current bundle" to a question about
+        any other context is the silent-corruption path this exists to close.
         """
 
         identity = self.identity()
-        if identity is None or identity.context.capture_snapshot_id != snapshot_id:
+        if identity is None or identity.context != context:
             return None
         with self._lock:
             held = self._context
-            if held is not None and held.context.capture_snapshot_id == snapshot_id:
+            if held is not None and held.context == context:
                 return held
-            context = load_capture_context(identity)
-            self._context = context
-            return context
+            bundle = load_capture_context(identity)
+            self._context = bundle
+            return bundle
 
     def _report(self, event: str, **fields: object) -> None:
         marker = f"{event}:{fields.get('snapshot_id', '')}:{fields.get('reason', '')}"
@@ -351,6 +375,7 @@ class AdviceBackend:
     reader: AdviceReadStore
     submit: AdviceSubmitService
     contexts: CaptureContextProvider
+    job_specs: AdviceJobSpecStore
     metrics: AdviceMetrics
     log: AdviceLog
 
@@ -396,6 +421,7 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
     metrics = AdviceMetrics()
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
+    specs = FileAdviceJobSpecStore(config.spec_root)
     contexts = CaptureContextProvider(
         config,
         repository_commit=_repository_commit(),
@@ -412,6 +438,7 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
         reader,
         queue,
         rate_limiter=FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds),
+        specs=specs,
     )
     return AdviceBackend(
         config=config,
@@ -420,6 +447,7 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
         reader=reader,
         submit=submit,
         contexts=contexts,
+        job_specs=specs,
         metrics=metrics,
         log=component_log,
     )
