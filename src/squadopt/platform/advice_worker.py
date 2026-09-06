@@ -264,6 +264,16 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
         parser.error("--max-attempts must be at least one.")
 
     running = backend if backend is not None else backend_from_environment()
+    probe = running.probe.result()
+    if not probe.ok:
+        # Loudly, and at once. A worker that cannot reach its store would otherwise spend
+        # its life claiming nothing while the deployment looks healthy.
+        running.log.event(
+            "advice_worker_store_unavailable",
+            root=str(running.config.store_root),
+            failed=",".join(probe.failures()),
+        )
+        return 1
     flag = _ShutdownFlag()
     for name in ("SIGTERM", "SIGINT"):
         handled = getattr(signal, name, None)

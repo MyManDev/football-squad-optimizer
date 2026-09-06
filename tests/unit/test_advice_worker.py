@@ -86,9 +86,11 @@ def _running(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     snapshot_id = _capture_with_entries(snapshot_root)
     deployment_module._handoff(handoff_root, snapshot_id)
     deployment_module._publish_members(site_root, RIVAL_ID)
+    store_root = tmp_path / "store"
+    store_root.mkdir()
     backend = build_backend(
         BackendConfig(
-            store_root=tmp_path / "store",
+            store_root=store_root,
             site_data_root=site_root,
             snapshot_root=snapshot_root,
             handoff_root=handoff_root,
@@ -187,9 +189,11 @@ def test_one_address_may_only_ever_mean_one_question(tmp_path: Path) -> None:
 
 
 def test_a_missing_spec_is_a_named_refusal_not_a_crash(tmp_path: Path) -> None:
+    store_root = tmp_path / "store"
+    store_root.mkdir()
     backend = build_backend(
         BackendConfig(
-            store_root=tmp_path / "store",
+            store_root=store_root,
             site_data_root=tmp_path / "site",
             snapshot_root=tmp_path / "snapshots",
             handoff_root=tmp_path / "handoffs",
@@ -202,9 +206,11 @@ def test_a_missing_spec_is_a_named_refusal_not_a_crash(tmp_path: Path) -> None:
 
 
 def test_a_job_retried_past_the_limit_is_failed_rather_than_repeated(tmp_path: Path) -> None:
+    store_root = tmp_path / "store"
+    store_root.mkdir()
     backend = build_backend(
         BackendConfig(
-            store_root=tmp_path / "store",
+            store_root=store_root,
             site_data_root=tmp_path / "site",
             snapshot_root=tmp_path / "snapshots",
             handoff_root=tmp_path / "handoffs",
@@ -365,8 +371,13 @@ def test_the_loop_stops_when_asked_and_finishes_the_job_in_hand(
         computed.append(job.job_id)
         return b'{"contract_version":"x"}'
 
+    give_up = _stop_after(4)
+
     def should_stop() -> bool:
-        return bool(stopped)
+        # Bounded as well as intentional: if the POST above ever fails to queue anything,
+        # "stop once a job has been computed" never becomes true and this hangs the suite
+        # instead of failing it.
+        return bool(stopped) or give_up()
 
     processed = run_advice_worker(
         backend.queue,

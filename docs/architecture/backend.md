@@ -140,6 +140,9 @@ claim, say — indistinguishable from a determinism defect.
 python -m squadopt.platform.advice_worker
 ```
 
+Deployment configuration, the startup store probe, a local two-process run and the rollback
+step are in the [advice backend runbook](../backend_runbook.md).
+
 One computation at a time per worker: CP-SAT runs a single search worker by design and a
 replica scales by replication (ADR 0006). An empty queue waits rather than spins. SIGTERM and
 SIGINT are honoured *after* the job in hand finishes, so a container stop costs nobody their
