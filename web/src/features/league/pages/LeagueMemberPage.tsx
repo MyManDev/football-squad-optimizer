@@ -1,5 +1,6 @@
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router";
+import { Link, useParams, useSearchParams } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
@@ -8,6 +9,9 @@ import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { DecisionControls } from "../../moves/components/DecisionControls";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
+import { createAdviceClient, type AdviceClient, type AdviceSource } from "../advice/adviceClient";
+import { selectedAdviceRequest } from "../advice/adviceSelection";
+import { sameAdviceRequest, useAdviceJob } from "../advice/useAdviceJob";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { useDecisionSelection } from "../../moves/decisionSelection";
 import { Pitch } from "../../squad/components/Pitch";
@@ -16,6 +20,9 @@ import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { LeagueDataMissing, loadEntryAdvice, loadEntrySquad, loadLeagueMembers } from "../data";
 import type { AdviceMove, EntryAdvice, EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
 import styles from "./LeagueMemberPage.module.css";
+
+/** Why no published advice is on hand for the selection: never published, or not loadable. */
+export type AdviceIssue = "not-computed" | "unavailable";
 
 export function LeagueMemberPage() {
   const { messages } = useLanguage();
@@ -48,20 +55,20 @@ export function LeagueMemberPage() {
   if (squad.isError) {
     return <EmptyState title={copy.entryNotAvailable}>{copy.entryNotAvailableBody}</EmptyState>;
   }
-  if (advice.isError) {
-    // Only this pair is solved per member; asking for another is a normal outcome, and
-    // saying "not available" for it would read as a fault the reader should report.
-    const uncomputed = advice.error instanceof LeagueDataMissing;
-    return (
-      <EmptyState title={uncomputed ? copy.adviceNotComputed : copy.entryNotAvailable}>
-        {uncomputed ? copy.adviceNotComputedBody : copy.entryNotAvailableBody}
-      </EmptyState>
-    );
-  }
+  // Published advice that is missing or unloadable does not close the page: the member
+  // context is valid, so the squad and the compute control stay, and the advice card says
+  // what is missing. Only this pair is solved per member, so an unpublished combination
+  // is a normal outcome rather than a fault the reader should report.
+  const adviceIssue: AdviceIssue | undefined = advice.isError
+    ? advice.error instanceof LeagueDataMissing
+      ? "not-computed"
+      : "unavailable"
+    : undefined;
   return (
     <LeagueMemberView
       squad={squad.data}
-      advice={advice.data}
+      advice={advice.isError ? null : advice.data}
+      adviceIssue={adviceIssue}
       members={membersQuery.data?.payload.members ?? []}
     />
   );
@@ -90,18 +97,63 @@ function SystemLeagueMemberPage() {
   );
 }
 
+/** What the advice card shows and where it came from. */
+interface ShownAdvice {
+  envelope: LeagueViewEnvelope<EntryAdvice>;
+  origin: "computed" | "published" | "published-while-computing" | "baseline-while-computing";
+  source?: AdviceSource;
+}
+
 export function LeagueMemberView({
   squad,
   advice,
+  adviceIssue,
   members = [],
+  client,
 }: {
   squad: LeagueViewEnvelope<EntrySquad>;
-  advice: LeagueViewEnvelope<EntryAdvice>;
+  advice: LeagueViewEnvelope<EntryAdvice> | null;
+  adviceIssue?: AdviceIssue;
   members?: EntryView[];
+  client?: AdviceClient;
 }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = squad.payload;
+  const [searchParams] = useSearchParams();
+  const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
+  const job = useAdviceJob(adviceClient);
+  const leagueId = advice?.payload.league_id ?? view.league_id;
+  const entryId = view.entry.entry_id;
+  const request = selectedAdviceRequest(searchParams, leagueId, entryId, members);
+  const requestKey = [
+    request.leagueId,
+    request.entryId,
+    request.strategy,
+    request.window,
+    request.rivalEntryId ?? "",
+  ].join(":");
+
+  // A new selection starts clean: an earlier request's answer, wait or failure must not
+  // read as this member's, strategy's, window's or rival's.
+  const { reset } = job;
+  useEffect(() => {
+    reset();
+  }, [requestKey, reset]);
+
+  const current =
+    job.state.phase !== "idle" && sameAdviceRequest(job.state.request, request) ? job.state : null;
+  const computed = current?.phase === "done" ? current : null;
+  const waiting = current?.phase === "waiting" ? current : null;
+  let shown: ShownAdvice | null = null;
+  if (computed) {
+    shown = { envelope: computed.envelope, origin: "computed", source: computed.source };
+  } else if (advice) {
+    shown = { envelope: advice, origin: waiting ? "published-while-computing" : "published" };
+  } else if (waiting?.fallback) {
+    shown = { envelope: waiting.fallback, origin: "baseline-while-computing" };
+  }
+
   return (
     <div className={styles.page}>
       <header className={styles.head}>
@@ -187,23 +239,56 @@ export function LeagueMemberView({
         </h2>
         <TemplatePicker />
         <DecisionControls variant="entry" />
-        <AdviceRequestPanel
-          leagueId={advice.payload.league_id}
-          entryId={view.entry.entry_id ?? 0}
-          members={members}
-        />
-        <AdviceCard envelope={advice} />
+        <AdviceRequestPanel leagueId={leagueId} entryId={entryId} members={members} job={job} />
+        {shown ? (
+          <AdviceCard shown={shown} />
+        ) : (
+          <MissingAdviceCard issue={adviceIssue ?? "not-computed"} />
+        )}
       </section>
     </div>
   );
 }
 
-function AdviceCard({ envelope }: { envelope: LeagueViewEnvelope<EntryAdvice> }) {
+function MissingAdviceCard({ issue }: { issue: AdviceIssue }) {
+  const { messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  return (
+    <Card title={copy.advice}>
+      <p className={styles.honesty}>
+        <strong>
+          {issue === "not-computed" ? copy.adviceNotComputed : copy.entryNotAvailable}
+        </strong>
+      </p>
+      <p className={styles.muted}>
+        {issue === "not-computed" ? copy.adviceNotComputedBody : copy.entryNotAvailableBody}
+      </p>
+      <p className={styles.muted}>{copy.adviceRequestHint}</p>
+    </Card>
+  );
+}
+
+function AdviceCard({ shown }: { shown: ShownAdvice }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
+  const { envelope, origin } = shown;
   const view = envelope.payload;
   return (
-    <Card title={copy.advice} aside={<ExampleDataBadge sourceKind={envelope.source_kind} />}>
+    <Card
+      title={copy.advice}
+      aside={
+        <>
+          {origin === "computed" ? <Badge tone="good">{copy.adviceComputedBadge}</Badge> : null}{" "}
+          <ExampleDataBadge sourceKind={envelope.source_kind} />
+        </>
+      }
+    >
+      {origin === "published-while-computing" ? (
+        <p className={styles.honesty}>{copy.advicePublishedWhileComputing}</p>
+      ) : null}
+      {origin === "baseline-while-computing" ? (
+        <p className={styles.honesty}>{copy.adviceBaselineWhileComputing}</p>
+      ) : null}
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
       {view.solver_status === "FEASIBLE" ? (

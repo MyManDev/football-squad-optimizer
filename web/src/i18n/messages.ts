@@ -327,6 +327,11 @@ const en = {
       "Only the published site is available right now; this combination was not published.",
     computeFailed:
       "The computation did not finish. The published plan, where one exists, still stands.",
+    adviceComputedBadge: "Computed now",
+    advicePublishedWhileComputing: "The published plan is shown while the computation runs.",
+    adviceBaselineWhileComputing:
+      "This is the published pure-points, one-week plan; the requested combination is still computing.",
+    adviceRequestHint: "You can ask for it with Compute above.",
     viewerTitle: "Which one is you?",
     viewerBody:
       "Pick your own row to get advice from your squad. This is a claim, not a login: anyone can pick anyone, and that is fine because everything shown here is already public after the deadline.",
@@ -853,6 +858,11 @@ const tr: MessageSchema<typeof en> = {
     computeStaticFallback: "Backend'e ulaşılamadı; bu, yayınlanmış statik cevap.",
     computeUnavailable: "Şu an yalnız yayınlanmış site var; bu kombinasyon yayınlanmamış.",
     computeFailed: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
+    adviceComputedBadge: "Şimdi hesaplandı",
+    advicePublishedWhileComputing: "Hesap sürerken yayınlanmış plan gösteriliyor.",
+    adviceBaselineWhileComputing:
+      "Bu, yayınlanmış saf puan / 1 hafta planı; istenen kombinasyon hâlâ hesaplanıyor.",
+    adviceRequestHint: "Yukarıdaki Hesapla ile isteyebilirsin.",
     viewerTitle: "Hangisi sensin?",
     viewerBody:
       "Kendi satırını seç ki tavsiye kendi kadrondan hesaplansın. Bu bir beyandır, giriş değil: herkes herkesi seçebilir ve bu sorun değil, çünkü burada gösterilen her şey son tarihten sonra zaten herkese açık.",
