@@ -7,53 +7,41 @@
  * sentence the member can act on — queued, running with the published answer
  * showing, done with the capture identity beside it, honestly unavailable when only
  * the static site is there.
+ *
+ * The job itself belongs to the page: the panel asks for a computation and reports its
+ * state, and the page hands the finished answer to the advice card beside it.
  */
 
-import { useMemo } from "react";
 import { useSearchParams } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { isPlayMode, type PlayMode, type WindowSize } from "../../moves/modePrices";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import type { EntryView } from "../types";
-import { createAdviceClient, type AdviceClient } from "./adviceClient";
-import { useAdviceJob } from "./useAdviceJob";
+import { rivalCandidates, selectedAdviceRequest } from "./adviceSelection";
+import type { AdviceJob } from "./useAdviceJob";
 import styles from "./AdviceRequestPanel.module.css";
 
 export function AdviceRequestPanel({
   leagueId,
   entryId,
   members,
-  client,
+  job,
 }: {
   leagueId: number;
   entryId: number;
   members: EntryView[];
-  client?: AdviceClient;
+  job: AdviceJob;
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { viewer } = useViewerEntry();
   const [searchParams, setSearchParams] = useSearchParams();
-  const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
-  const { state, compute } = useAdviceJob(adviceClient);
+  const { state, compute } = job;
 
-  const strategy: PlayMode = isPlayMode(searchParams.get("mode"))
-    ? (searchParams.get("mode") as PlayMode)
-    : "saf-puan";
-  const rawWindow = Number(searchParams.get("window"));
-  const windowSize: WindowSize = rawWindow === 3 ? 3 : rawWindow === 5 ? 5 : 1;
-  const rawRival = Number(searchParams.get("rival"));
-  const rivalCandidates = members.filter(
-    (member) => member.member_kind === "human" && member.entry_id !== entryId,
-  );
-  const rival =
-    Number.isInteger(rawRival) && rivalCandidates.some((member) => member.entry_id === rawRival)
-      ? rawRival
-      : null;
-
+  const request = selectedAdviceRequest(searchParams, leagueId, entryId, members);
+  const candidates = rivalCandidates(members, entryId);
   const isSelf = viewer !== null && viewer.entryId === entryId;
 
   function setRival(value: string): void {
@@ -71,11 +59,11 @@ export function AdviceRequestPanel({
           {copy.computeRival}
           <select
             className={styles.rivalSelect}
-            value={rival === null ? "" : String(rival)}
+            value={request.rivalEntryId === null ? "" : String(request.rivalEntryId)}
             onChange={(event) => setRival(event.target.value)}
           >
             <option value="">{copy.computeRivalNearest}</option>
-            {rivalCandidates.map((member) => (
+            {candidates.map((member) => (
               <option key={member.entry_id ?? 0} value={String(member.entry_id)}>
                 {member.manager_name ?? `#${member.entry_id}`}
               </option>
@@ -86,15 +74,7 @@ export function AdviceRequestPanel({
           type="button"
           className={styles.compute}
           disabled={state.phase === "requesting" || state.phase === "waiting"}
-          onClick={() =>
-            compute({
-              leagueId,
-              entryId,
-              strategy,
-              window: windowSize,
-              rivalEntryId: rival,
-            })
-          }
+          onClick={() => compute(request)}
         >
           {copy.computeButton}
         </button>

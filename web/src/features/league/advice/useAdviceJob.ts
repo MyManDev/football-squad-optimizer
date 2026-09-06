@@ -7,6 +7,9 @@
  * "beklerken önceden yayınlanmış cevap gösterilir". Every terminal state is explicit,
  * and "the backend cannot help" degrades to whatever the static tree can show,
  * never to an error page.
+ *
+ * Every phase after idle carries the request it answers, so a page can tell a result
+ * that belongs to the selection on screen from one left behind by an earlier selection.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,22 +23,41 @@ const MAX_POLLS = 150; // five minutes of patience, then an honest failure
 
 export type ComputePhase =
   | { phase: "idle" }
-  | { phase: "requesting" }
+  | { phase: "requesting"; request: AdviceRequest }
   | {
       phase: "waiting";
+      request: AdviceRequest;
       jobId: string;
       status: "queued" | "running";
       fallback: LeagueViewEnvelope<EntryAdvice> | null;
     }
-  | { phase: "done"; envelope: LeagueViewEnvelope<EntryAdvice>; source: AdviceSource }
-  | { phase: "unavailable" }
-  | { phase: "failed" };
+  | {
+      phase: "done";
+      request: AdviceRequest;
+      envelope: LeagueViewEnvelope<EntryAdvice>;
+      source: AdviceSource;
+    }
+  | { phase: "unavailable"; request: AdviceRequest }
+  | { phase: "failed"; request: AdviceRequest };
 
-export function useAdviceJob(client: AdviceClient): {
+export interface AdviceJob {
   state: ComputePhase;
   compute: (request: AdviceRequest) => void;
   reset: () => void;
-} {
+}
+
+/** Whether two requests ask the same question: same member, strategy, window and rival. */
+export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): boolean {
+  return (
+    left.leagueId === right.leagueId &&
+    left.entryId === right.entryId &&
+    left.strategy === right.strategy &&
+    left.window === right.window &&
+    (left.rivalEntryId ?? null) === (right.rivalEntryId ?? null)
+  );
+}
+
+export function useAdviceJob(client: AdviceClient): AdviceJob {
   const [state, setState] = useState<ComputePhase>({ phase: "idle" });
   const generation = useRef(0);
 
@@ -54,23 +76,23 @@ export function useAdviceJob(client: AdviceClient): {
     (request: AdviceRequest) => {
       const run = ++generation.current;
       const alive = () => generation.current === run;
-      setState({ phase: "requesting" });
+      setState({ phase: "requesting", request });
 
       void (async () => {
         let outcome;
         try {
           outcome = await client.requestAdvice(request);
         } catch {
-          if (alive()) setState({ phase: "failed" });
+          if (alive()) setState({ phase: "failed", request });
           return;
         }
         if (!alive()) return;
         if (outcome.kind === "advice") {
-          setState({ phase: "done", envelope: outcome.envelope, source: outcome.source });
+          setState({ phase: "done", request, envelope: outcome.envelope, source: outcome.source });
           return;
         }
         if (outcome.kind === "unavailable") {
-          setState({ phase: "unavailable" });
+          setState({ phase: "unavailable", request });
           return;
         }
 
@@ -87,7 +109,7 @@ export function useAdviceJob(client: AdviceClient): {
           fallback = null; // the wait is just quieter
         }
         if (!alive()) return;
-        setState({ phase: "waiting", jobId: outcome.jobId, status: "queued", fallback });
+        setState({ phase: "waiting", request, jobId: outcome.jobId, status: "queued", fallback });
 
         for (let attempt = 0; attempt < MAX_POLLS; attempt += 1) {
           await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
@@ -103,24 +125,25 @@ export function useAdviceJob(client: AdviceClient): {
             const read = await client.readAdvice(request);
             if (!alive()) return;
             if (read.kind === "advice") {
-              setState({ phase: "done", envelope: read.envelope, source: read.source });
+              setState({ phase: "done", request, envelope: read.envelope, source: read.source });
             } else {
-              setState({ phase: "failed" }); // completed but unreadable: say so
+              setState({ phase: "failed", request }); // completed but unreadable: say so
             }
             return;
           }
           if (job.status === "failed") {
-            setState({ phase: "failed" });
+            setState({ phase: "failed", request });
             return;
           }
           setState({
             phase: "waiting",
+            request,
             jobId: outcome.jobId,
             status: job.status,
             fallback,
           });
         }
-        if (alive()) setState({ phase: "failed" });
+        if (alive()) setState({ phase: "failed", request });
       })();
     },
     [client],
