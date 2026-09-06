@@ -122,7 +122,15 @@ export function useAdviceJob(client: AdviceClient): AdviceJob {
           }
           if (!alive()) return;
           if (job.status === "completed") {
-            const read = await client.readAdvice(request);
+            let read;
+            try {
+              read = await client.readAdvice(request);
+            } catch {
+              // Completed but the answer cannot be read: an honest failure, not a wait
+              // that never ends. A stale read from a superseded request changes nothing.
+              if (alive()) setState({ phase: "failed", request });
+              return;
+            }
             if (!alive()) return;
             if (read.kind === "advice") {
               setState({ phase: "done", request, envelope: read.envelope, source: read.source });
