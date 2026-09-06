@@ -28,6 +28,12 @@ per-candidate diagnostic table. Nothing here re-optimizes, reads an outcome or i
 - The start state: every candidate must begin from the same held squad, bank and free
   transfers, and its post-transfer squad must equal the held squad minus its transfers out
   plus its transfers in. Anything else is an error, not a silent exclusion.
+- The week: a candidate carries the gameweek of the planner week it was taken from, the
+  adapter refuses a plan whose first week is not the deadline being decided, and the
+  evaluation refuses a candidate whose gameweek is not the start state's.
+- The identity: two candidates are the same decision only when squad, eleven, captain and
+  chip all agree. The same squad reached under a wildcard and under paid transfers are two
+  decisions with two hit costs and are compared as such.
 - The transfer rules: paid transfers are the transfers beyond the free ones, zero under a
   wildcard or free hit, and the hit must equal paid transfers times the planner's hit cost.
   The planner's objective (which already contains the hit) is never used to rank.

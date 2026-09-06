@@ -46,6 +46,8 @@ class TransferWeekLike(Protocol):
     """The first-week fields of a planner result this module reads; no planner import."""
 
     @property
+    def gameweek(self) -> int: ...
+    @property
     def selected_squad(self) -> pd.DataFrame: ...
     @property
     def starting_xi(self) -> pd.DataFrame: ...
@@ -162,6 +164,7 @@ class TransferDecisionCandidate:
     """
 
     label: str
+    gameweek: int
     decision: OptimizationResult
     transfers_in: tuple[object, ...]
     transfers_out: tuple[object, ...]
@@ -183,7 +186,13 @@ class TransferDecisionCandidate:
             raise ScenarioValidationError("decision must be an OptimizationResult.")
         if self.chip is not None and self.chip not in KNOWN_CHIPS:
             raise ScenarioValidationError(f"Unknown chip {self.chip!r} on a transfer candidate.")
-        for name in ("free_transfers_before", "paid_transfer_count"):
+        for name in (
+            "gameweek",
+            "free_transfers_before",
+            "paid_transfer_count",
+            "bank_before_tenths",
+            "bank_after_tenths",
+        ):
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, Integral) or value < 0:
                 raise ScenarioValidationError(f"{name} must be a non-negative integer.")
@@ -211,15 +220,34 @@ class TransferDecisionCandidate:
             _plain(captain),
         )
 
+    def identity(self) -> tuple[tuple[object, ...], tuple[object, ...], object, str | None]:
+        """What makes two candidates the same decision: the complete signature and the chip.
+
+        The same squad, eleven and captain reached under a wildcard and under paid transfers
+        are two decisions with two hit costs; the transfers themselves follow from the squad
+        and the start state, so they add nothing to the identity.
+        """
+
+        squad, starters, captain = self.signature()
+        return squad, starters, captain, self.chip
+
 
 def transfer_candidate_from_plan(
-    plan: TransferPlanLike, *, label: str
+    plan: TransferPlanLike, *, label: str, gameweek: int | None = None
 ) -> TransferDecisionCandidate:
-    """Adapt the first week of a planner result; later weeks are not decisions of this deadline."""
+    """Adapt the first week of a planner result; later weeks are not decisions of this deadline.
+
+    ``gameweek`` names the deadline the caller is deciding; a plan whose first week is another
+    gameweek is refused here rather than evaluated against the wrong start state.
+    """
 
     if not plan.weeks:
         raise ScenarioValidationError("A transfer plan needs at least one planned week.")
     week = plan.weeks[0]
+    if gameweek is not None and int(week.gameweek) != int(gameweek):
+        raise ScenarioValidationError(
+            f"{label}: the plan's first week is gameweek {int(week.gameweek)}, not {int(gameweek)}."
+        )
     decision = OptimizationResult(
         solver_status=plan.solver_status,
         selected_squad=week.selected_squad,
@@ -233,6 +261,7 @@ def transfer_candidate_from_plan(
     )
     return TransferDecisionCandidate(
         label=label,
+        gameweek=int(week.gameweek),
         decision=decision,
         transfers_in=_frame_ids(week.transfers_in),
         transfers_out=_frame_ids(week.transfers_out),
@@ -312,6 +341,11 @@ def _validate_candidate(
 ) -> None:
     if not candidate.decision.has_solution or candidate.decision.captain is None:
         raise ScenarioValidationError(f"{candidate.label}: a candidate needs a solved decision.")
+    if int(candidate.gameweek) != int(start_state.gameweek):
+        raise ScenarioValidationError(
+            f"{candidate.label}: the plan is for gameweek {int(candidate.gameweek)}, not the "
+            f"start state's gameweek {int(start_state.gameweek)}."
+        )
     start = set(start_state.squad_player_ids)
     ins, outs = set(candidate.transfers_in), set(candidate.transfers_out)
     if len(candidate.transfers_in) != len(candidate.transfers_out):
@@ -420,16 +454,19 @@ def evaluate_transfer_candidates(
     if len(horizons) > 1:
         raise ScenarioValidationError("All candidates must come from one projection horizon.")
     signatures: list[DecisionSignature] = []
+    identities: set[tuple[tuple[object, ...], tuple[object, ...], object, str | None]] = set()
     for candidate in frozen:
         _validate_candidate(
             candidate, start_state, transfer_hit_cost_points=transfer_hit_cost_points
         )
-        signature = candidate.signature()
-        if signature in signatures:
+        identity = candidate.identity()
+        if identity in identities:
             raise ScenarioValidationError(
-                "Transfer candidates must be distinct complete decisions."
+                "Transfer candidates must be distinct complete decisions (squad, eleven, "
+                "captain and chip)."
             )
-        signatures.append(signature)
+        identities.add(identity)
+        signatures.append(candidate.signature())
 
     control_signature = signatures[0]
     diagnostics = tuple(

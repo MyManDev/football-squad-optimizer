@@ -31,6 +31,7 @@ from squadopt.scenarios.components import (
     COMPONENT_SCENARIO_CONTRACT_VERSION,
     CONDITIONAL_RESIDUAL_CONTRACT_VERSION,
     ComponentScenarioDraw,
+    _component_fingerprint,
 )
 
 HELD = (*range(1, 14), 16, 17)
@@ -60,10 +61,12 @@ def _candidate(
     free: int = 1,
     bank: int = 25,
     horizon: str | None = "horizon-a",
+    gameweek: int = START.gameweek,
 ) -> TransferDecisionCandidate:
     paid = 0 if chip in ("wildcard", "freehit") else max(0, len(ins) - free)
     return TransferDecisionCandidate(
         label=label,
+        gameweek=gameweek,
         decision=decision,
         transfers_in=ins,
         transfers_out=outs,
@@ -91,7 +94,9 @@ def _raw_mean(decision: OptimizationResult, draw: ComponentScenarioDraw) -> floa
 def test_candidates_share_one_draw_and_pay_the_hit_exactly_once() -> None:
     draw = _full_draw()
     control = _candidate("control", _optimization_result())
-    challenger = _candidate("captain-8", _with_captain(_optimization_result(), 8))
+    # Captain 14 scores 1 in both scenarios, so the challenger forgoes the vice-captain's 7 the
+    # control collects when captain 13 is absent: (27 - 21) / 2 = 3.0 points of mean, same tail.
+    challenger = _candidate("captain-14", _with_captain(_optimization_result(), 14))
 
     selection = evaluate_transfer_candidates(
         (control, challenger), draw, start_state=START, calibrated_versions=_pin(draw)
@@ -114,10 +119,12 @@ def test_candidates_share_one_draw_and_pay_the_hit_exactly_once() -> None:
     scores = score_component_scenario_decision(control.decision, draw)
     net = integer_mean_cvar([float(score.total_points) - HIT for score in scores.scores])
     assert first.utility_int == net.utility_int and first.cvar == pytest.approx(net.cvar)
-    winner = max(selection.diagnostics, key=lambda item: item.utility_int or 0)
-    assert selection.selected_rank == winner.rank
-    assert selection.selected is (control, challenger)[winner.rank]
-    assert "highest net utility" in selection.reason
+    assert second.mean == pytest.approx(first.mean - 3.0)
+    assert second.cvar == pytest.approx(first.cvar)
+    assert first.utility_int is not None and second.utility_int is not None
+    assert first.utility_int > second.utility_int
+    assert selection.selected_rank == 0 and selection.selected is control
+    assert "control has the highest net utility" in selection.reason
     record = selection_record(selection)
     json.dumps(record, allow_nan=False)
     assert record["status"] == "SELECTED" and len(record["candidates"]) == 2
@@ -232,7 +239,7 @@ def test_unsupported_chips_keep_the_control_or_drop_the_candidate_with_a_reason(
         (control, triple, third), draw, start_state=START, calibrated_versions=_pin(draw)
     )
     assert with_third.status is TransferSelectionStatus.SELECTED
-    assert with_third.candidate_count_scored == 2 and with_third.selected_rank in (0, 2)
+    assert with_third.candidate_count_scored == 2 and with_third.selected_rank == 0
 
 
 def test_a_missing_or_unpinned_draw_keeps_the_control_with_its_reason() -> None:
@@ -297,6 +304,7 @@ def test_an_uncovered_control_or_a_single_covered_candidate_keeps_the_control() 
 def test_the_adapter_reads_only_the_first_week_of_a_plan() -> None:
     result = _optimization_result()
     week = SimpleNamespace(
+        gameweek=TARGET.gameweek,
         selected_squad=result.selected_squad,
         starting_xi=result.starting_xi,
         bench=result.bench,
@@ -321,6 +329,7 @@ def test_the_adapter_reads_only_the_first_week_of_a_plan() -> None:
 
     candidate = transfer_candidate_from_plan(plan, label="planner")
 
+    assert candidate.gameweek == TARGET.gameweek
     assert candidate.transfers_in == (14, 15) and candidate.transfers_out == (16, 17)
     assert candidate.transfer_count == 2 and candidate.paid_transfer_count == 1
     assert candidate.transfer_hit_points == 4.0 and candidate.chip is None
@@ -339,3 +348,200 @@ def test_the_adapter_reads_only_the_first_week_of_a_plan() -> None:
     assert selection.status is TransferSelectionStatus.SELECTED
     with pytest.raises(ScenarioValidationError, match="planned week"):
         transfer_candidate_from_plan(SimpleNamespace(**{**vars(plan), "weeks": ()}), label="empty")
+
+
+def test_a_plan_for_another_week_is_never_evaluated_against_this_start_state() -> None:
+    draw = _full_draw()
+    control = _candidate("control", _optimization_result())
+    next_week = _candidate(
+        "next-week", _with_captain(_optimization_result(), 8), gameweek=START.gameweek + 1
+    )
+    with pytest.raises(ScenarioValidationError, match="gameweek"):
+        evaluate_transfer_candidates(
+            (control, next_week), draw, start_state=START, calibrated_versions=_pin(draw)
+        )
+    with pytest.raises(ScenarioValidationError, match="gameweek"):
+        evaluate_transfer_candidates(
+            (control,), None, start_state=replace(START, gameweek=START.gameweek + 1)
+        )
+
+    result = _optimization_result()
+    week = SimpleNamespace(
+        gameweek=START.gameweek + 1,
+        selected_squad=result.selected_squad,
+        starting_xi=result.starting_xi,
+        bench=result.bench,
+        captain=result.captain,
+        transfers_in=pd.DataFrame({"player_id": [14, 15]}),
+        transfers_out=pd.DataFrame({"player_id": [16, 17]}),
+        bank_before_tenths=25,
+        bank_after_tenths=25,
+        free_transfers_before=1,
+        paid_transfer_count=1,
+        transfer_hit_points=4.0,
+        projected_score=50.0,
+        chip=None,
+    )
+    plan = SimpleNamespace(
+        solver_status=SolverStatus.OPTIMAL,
+        weeks=(week,),
+        horizon_fingerprint="horizon-a",
+        objective_value=46.0,
+    )
+    with pytest.raises(ScenarioValidationError, match="first week is gameweek"):
+        transfer_candidate_from_plan(plan, label="planner", gameweek=START.gameweek)
+    adapted = transfer_candidate_from_plan(plan, label="planner")
+    assert adapted.gameweek == START.gameweek + 1
+    with pytest.raises(ScenarioValidationError, match="gameweek"):
+        evaluate_transfer_candidates((adapted,), None, start_state=START)
+
+
+def test_the_same_decision_under_another_chip_is_a_distinct_candidate() -> None:
+    draw = _full_draw()
+    control = _candidate("control", _optimization_result())
+    wildcard = _candidate("wildcard", _optimization_result(), chip="wildcard")
+    assert control.signature() == wildcard.signature()
+    assert control.identity() != wildcard.identity()
+
+    selection = evaluate_transfer_candidates(
+        (control, wildcard), draw, start_state=START, calibrated_versions=_pin(draw)
+    )
+
+    assert selection.status is TransferSelectionStatus.SELECTED
+    first, second = selection.diagnostics
+    assert first.transfer_hit_points == HIT and second.transfer_hit_points == 0.0
+    assert second.mean == pytest.approx(first.mean + HIT)
+    assert selection.selected_rank == 1 and selection.selected is wildcard
+    assert "wildcard has the highest net utility" in selection.reason
+
+    same_chip = _candidate("same", _optimization_result())
+    with pytest.raises(ScenarioValidationError, match="distinct"):
+        evaluate_transfer_candidates((control, same_chip), draw, start_state=START)
+
+
+def test_an_exact_tie_on_the_shared_draw_keeps_the_control() -> None:
+    draw = _full_draw()
+    control = _candidate("control", _optimization_result())
+    # Captain 8 doubles the same 7 the control's vice-captain doubles: identical scores.
+    tie = _candidate("captain-8", _with_captain(_optimization_result(), 8))
+
+    selection = evaluate_transfer_candidates(
+        (control, tie), draw, start_state=START, calibrated_versions=_pin(draw)
+    )
+
+    first, second = selection.diagnostics
+    assert first.utility_int == second.utility_int
+    assert first.mean == pytest.approx(second.mean)
+    assert selection.status is TransferSelectionStatus.SELECTED
+    assert selection.selected_rank == 0 and selection.selected is control
+
+
+def test_a_draw_for_another_deadline_is_refused_even_when_candidates_agree_with_the_start() -> None:
+    draw = _full_draw()
+    later = replace(START, gameweek=START.gameweek + 1)
+    control = _candidate("control", _optimization_result(), gameweek=later.gameweek)
+    other = _candidate(
+        "captain-14", _with_captain(_optimization_result(), 14), gameweek=later.gameweek
+    )
+
+    with pytest.raises(ScenarioValidationError, match="simulates"):
+        evaluate_transfer_candidates(
+            (control, other), draw, start_state=later, calibrated_versions=_pin(draw)
+        )
+
+
+def test_hit_arithmetic_follows_free_transfers_and_the_seasons_hit_cost() -> None:
+    draw = _full_draw()
+    two_free = replace(START, free_transfers=2)
+    banked = _candidate("banked", _optimization_result(), free=2)
+    assert banked.paid_transfer_count == 0 and banked.transfer_hit_points == 0.0
+    other = _candidate("captain-14", _with_captain(_optimization_result(), 14), free=2)
+
+    selection = evaluate_transfer_candidates(
+        (banked, other), draw, start_state=two_free, calibrated_versions=_pin(draw)
+    )
+
+    assert selection.status is TransferSelectionStatus.SELECTED
+    assert selection.diagnostics[0].transfer_hit_points == 0.0
+    assert selection.diagnostics[0].mean == pytest.approx(_raw_mean(banked.decision, draw))
+    overcharged = replace(banked, paid_transfer_count=1, transfer_hit_points=HIT)
+    with pytest.raises(ScenarioValidationError, match="hit points"):
+        evaluate_transfer_candidates((overcharged,), None, start_state=two_free)
+
+    three_start = TransferStartState(
+        season=START.season,
+        gameweek=START.gameweek,
+        squad_player_ids=(*range(1, 13), 16, 17, 18),
+        bank_tenths=25,
+        free_transfers=1,
+    )
+    triple = _candidate("three", _optimization_result(), ins=(13, 14, 15), outs=(16, 17, 18))
+    assert triple.paid_transfer_count == 2 and triple.transfer_hit_points == 2 * HIT
+    unpinned = evaluate_transfer_candidates((triple,), None, start_state=three_start)
+    assert unpinned.status is TransferSelectionStatus.FALLBACK_PHASE_D_NOT_CALIBRATED
+    with pytest.raises(ScenarioValidationError, match=r"5\.0 points per hit"):
+        evaluate_transfer_candidates(
+            (triple,), None, start_state=three_start, transfer_hit_cost_points=5.0
+        )
+    priced = replace(triple, transfer_hit_points=10.0)
+    assert (
+        evaluate_transfer_candidates(
+            (priced,), None, start_state=three_start, transfer_hit_cost_points=5.0
+        ).status
+        is TransferSelectionStatus.FALLBACK_PHASE_D_NOT_CALIBRATED
+    )
+
+    held = TransferStartState(
+        season=START.season,
+        gameweek=START.gameweek,
+        squad_player_ids=tuple(range(1, 16)),
+        bank_tenths=25,
+        free_transfers=1,
+    )
+    roll = _candidate("roll", _optimization_result(), ins=(), outs=())
+    assert roll.transfer_count == 0 and roll.transfer_hit_points == 0.0
+    rolled = evaluate_transfer_candidates(
+        (roll,), draw, start_state=held, calibrated_versions=_pin(draw)
+    )
+    assert rolled.status is TransferSelectionStatus.FALLBACK_SCENARIO_COVERAGE
+    assert rolled.diagnostics[0].covered is True and "fewer than two" in rolled.reason
+
+
+def test_bank_fields_must_be_non_negative_integers() -> None:
+    candidate = _candidate("control", _optimization_result())
+    for name, value in (
+        ("bank_before_tenths", True),
+        ("bank_after_tenths", -40),
+        ("bank_after_tenths", None),
+        ("bank_before_tenths", 2.5),
+    ):
+        with pytest.raises(ScenarioValidationError, match=name):
+            replace(candidate, **{name: value})
+
+
+def test_a_draw_whose_inputs_disagree_with_its_projections_is_not_calibrated() -> None:
+    draw = _full_draw()
+    inputs = replace(
+        draw.inputs, provenance=replace(draw.inputs.provenance, model_version="other-model")
+    )
+    foreign = ComponentScenarioDraw(
+        scenarios=draw.scenarios,
+        inputs=inputs,
+        sampled_minutes=draw.sampled_minutes,
+        sampled_appearances=draw.sampled_appearances,
+        component_fingerprint=_component_fingerprint(
+            draw.scenarios, inputs, draw.sampled_minutes, draw.sampled_appearances
+        ),
+    )
+    control = _candidate("control", _optimization_result())
+    other = _candidate("captain-14", _with_captain(_optimization_result(), 14))
+
+    selection = evaluate_transfer_candidates(
+        (control, other),
+        foreign,
+        start_state=START,
+        calibrated_versions=(("other-model", COMPONENT_SCENARIO_CONTRACT_VERSION),),
+    )
+
+    assert selection.status is TransferSelectionStatus.FALLBACK_PHASE_D_NOT_CALIBRATED
+    assert selection.candidate_count_scored == 0
