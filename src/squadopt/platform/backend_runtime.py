@@ -53,11 +53,13 @@ from squadopt.platform.capture_context import (
     load_capture_context,
     load_capture_identity,
 )
+from squadopt.platform.store_probe import StoreProbeResult, probe_store
 
 __all__ = [
     "BackendConfig",
     "BackendConfigError",
     "CaptureContextProvider",
+    "StoreProbeGate",
     "backend_from_environment",
     "build_backend",
     "computable_strategies",
@@ -365,6 +367,41 @@ class CaptureContextProvider:
             self._log.event(event, **fields)
 
 
+class StoreProbeGate:
+    """ADR 0006's startup capability probe, run once and remembered while it passes.
+
+    Re-run only while failing, so a mount that arrives late brings the service up without a
+    restart, and a mount that has already proven its primitives is not re-exercised on every
+    readiness poll. There is deliberately no local-disk fallback: a failed probe keeps the
+    service unready, which is a loud problem rather than a quiet correctness one.
+    """
+
+    def __init__(self, root: Path, *, log: AdviceLog | None = None) -> None:
+        self._root = root
+        self._log = log
+        self._passed: StoreProbeResult | None = None
+
+    def result(self) -> StoreProbeResult:
+        held = self._passed
+        if held is not None:
+            return held
+        outcome = probe_store(self._root)
+        if outcome.ok:
+            self._passed = outcome
+            if self._log is not None:
+                self._log.event("advice_store_probe_passed", root=str(self._root))
+        elif self._log is not None:
+            self._log.event(
+                "advice_store_probe_failed",
+                root=str(self._root),
+                failed=",".join(outcome.failures()),
+            )
+        return outcome
+
+    def passed(self) -> bool:
+        return self.result().ok
+
+
 @dataclass(frozen=True, slots=True)
 class AdviceBackend:
     """The wired backend: the objects both processes share, built once."""
@@ -376,6 +413,7 @@ class AdviceBackend:
     submit: AdviceSubmitService
     contexts: CaptureContextProvider
     job_specs: AdviceJobSpecStore
+    probe: StoreProbeGate
     metrics: AdviceMetrics
     log: AdviceLog
 
@@ -390,28 +428,8 @@ class AdviceBackend:
         return readiness_report(
             context_loaded=self.contexts.current() is not None,
             league_tree_readable=(self.config.site_data_root / "league" / "members.json").is_file(),
-            cache_writable=_store_writable(self.config.cache_root),
+            cache_writable=self.probe.passed(),
         )
-
-
-def _store_writable(root: Path) -> bool:
-    """Whether the cache root can be created and written; never raises."""
-
-    probe = root / ".writable-probe"
-    try:
-        root.mkdir(parents=True, exist_ok=True)
-        descriptor = os.open(probe, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        # Another process is probing right now; the store is plainly writable.
-        return True
-    except OSError:
-        return False
-    os.close(descriptor)
-    try:
-        probe.unlink()
-    except OSError:
-        return False
-    return True
 
 
 def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> AdviceBackend:
@@ -422,6 +440,7 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
     specs = FileAdviceJobSpecStore(config.spec_root)
+    probe = StoreProbeGate(config.store_root, log=component_log)
     contexts = CaptureContextProvider(
         config,
         repository_commit=_repository_commit(),
@@ -448,6 +467,7 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
         submit=submit,
         contexts=contexts,
         job_specs=specs,
+        probe=probe,
         metrics=metrics,
         log=component_log,
     )
