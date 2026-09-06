@@ -6,6 +6,7 @@ population from the handoff under the preregistered rule, admit a 2025-26 decisi
 through a development handoff, and carry the decision identity a repeat can be compared to.
 """
 
+import json
 from collections.abc import Sequence
 from pathlib import Path
 from types import SimpleNamespace
@@ -21,23 +22,29 @@ from scripts.run_component_squad_calibration import (
     REPORT_VERSION,
     BindingCalibrationError,
     DevelopmentInputs,
+    _candidate_record,
     _decision_identity,
     _development_from_arguments,
     _development_observation,
     _development_population,
+    _measure_development,
     _measure_fold,
     _read_handoff,
     _report_contract_version,
+    _selected_component_inputs,
     _solver_profile,
+    main,
 )
 
 from squadopt.evaluation import (
     DEVELOPMENT_OOF_CONTRACT_VERSION,
     EvaluationFold,
     EvaluationValidationError,
+    complete_optimization_decision,
     prepare_phase_c_component_folds,
 )
 from squadopt.evaluation.component_handoff import PhaseCComponentHandoff
+from squadopt.experiments import ComponentCalibrationFold
 from squadopt.optimization import OptimizationResult, SolverStatus
 from squadopt.prediction.component_models import (
     COMPONENT_MODEL_VERSION,
@@ -46,11 +53,13 @@ from squadopt.prediction.component_models import (
     SEASON_WEIGHTED_MODEL_VERSION,
 )
 from squadopt.prediction.components import COMPONENT_MODEL_ROUTE, DIRECT_CONTROL_ROUTE
-from squadopt.scenarios import ScenarioConfig
+from squadopt.scenarios import ScenarioConfig, ScenarioTarget
 from squadopt.scenarios.components import (
     CONDITIONAL_RESIDUAL_CONTRACT_VERSION,
     ComponentScenarioProvenance,
     ConditionalResidualConfig,
+    paired_conditional_residuals,
+    sample_component_scenarios,
 )
 from squadopt.scenarios.models import ScenarioValidationError
 
@@ -471,10 +480,14 @@ def test_the_decision_identity_is_complete_and_order_independent() -> None:
     _, result = _frozen_decision("2021-22-gw11")
     identity = _decision_identity(result)
 
+    completed = complete_optimization_decision(result)
     assert identity["squad"] == list(range(1, 16))
     assert identity["starting_xi"] == [1, 3, 4, 5, 8, 9, 10, 11, 13, 14, 15]
     assert identity["captain"] == 15
-    assert identity["bench_order"] == [2, 6, 7, 12]
+    # The completion the official scorer walks, not the optimizer's frame layout.
+    assert identity["bench_order"] == [int(value) for value in completed.bench]
+    assert identity["vice_captain"] == int(completed.vice_captain_id)  # type: ignore[call-overload]
+    assert identity["vice_captain"] != identity["captain"]
     assert len(str(identity["sha256"])) == 64
 
     shuffled = OptimizationResult(
@@ -506,3 +519,379 @@ def test_the_development_report_has_its_own_contract_and_the_fixed_solver_profil
     assert profile["solver_deterministic_time_limit"] is None
     assert profile["deterministic_seed"] == 0
     assert profile["num_search_workers"] == 1
+
+
+def test_the_candidate_block_names_the_report_it_belongs_to() -> None:
+    sampler = ConditionalResidualConfig(fraction=0.15, minimum_rows=30)
+    binding = _candidate_record(sampler)
+    development = _candidate_record(sampler, reference=DEVELOPMENT_REPORT_VERSION)
+
+    assert binding is not None and development is not None
+    assert binding["reference_contract_version"] == REPORT_VERSION
+    assert development["reference_contract_version"] == DEVELOPMENT_REPORT_VERSION
+    assert development["binding"] is False
+
+
+def test_an_incomplete_readout_is_refused_by_the_observation() -> None:
+    fold_id = "2021-22-gw11"
+    history = tuple(f"2021-22-gw{gameweek:02d}" for gameweek in range(2, 11))
+    prepared, result = _frozen_decision(fold_id)
+    handoff = _handoff(_component_rows((*history, fold_id)), development=True)
+    reading, _ = _measure_fold(
+        handoff,
+        prepared,
+        result,
+        40.0,
+        tuple(_squad_positions()),
+        ScenarioConfig(scenario_count=64),
+        None,
+    )
+    incomplete = SimpleNamespace(
+        fold_id=fold_id,
+        readout=SimpleNamespace(
+            probability_integral_transform=None, realized_below_lower_quantile=None
+        ),
+    )
+
+    with pytest.raises(BindingCalibrationError, match="incomplete readout"):
+        _development_observation([reading, incomplete])  # type: ignore[list-item]
+
+
+def test_a_frozen_draw_carries_no_development_key_and_a_development_draw_does() -> None:
+    fold_id = "2021-22-gw11"
+    history = tuple(f"2021-22-gw{gameweek:02d}" for gameweek in range(2, 11))
+    rows = _component_rows((*history, fold_id))
+    prepared, _ = _frozen_decision(fold_id)
+    selected = tuple(_squad_positions())
+    target = ScenarioTarget(season="2021-22", gameweek=11)
+    settings = ScenarioConfig(scenario_count=16)
+
+    draws = {}
+    for label, development in (("frozen", False), ("development", True)):
+        handoff = _handoff(rows, development=development)
+        inputs, snapshot = _selected_component_inputs(handoff, prepared, selected)
+        pool = paired_conditional_residuals(
+            handoff.rows.loc[handoff.rows["fold_id"] < fold_id],
+            target=target,
+            min_history_folds=settings.min_history_folds,
+        )
+        draws[label] = sample_component_scenarios(inputs, snapshot, pool, target, settings)
+
+    assert "development_contract" not in draws["frozen"].scenarios.diagnostics
+    assert (
+        draws["development"].scenarios.diagnostics["development_contract"]
+        == DEVELOPMENT_OOF_CONTRACT_VERSION
+    )
+    # The points matrices agree: only the identity differs, never the draw itself.
+    assert draws["frozen"].scenarios.scenario_fingerprint == (
+        draws["development"].scenarios.scenario_fingerprint
+    )
+    assert draws["frozen"].component_fingerprint != draws["development"].component_fingerprint
+
+
+def test_the_residual_pool_for_a_2025_26_fold_uses_only_earlier_folds() -> None:
+    earlier = (
+        *_history_before("x", "2024-25"),
+        f"{LOCKED}-gw02",
+        f"{LOCKED}-gw03",
+        f"{LOCKED}-gw04",
+    )
+    later = (f"{LOCKED}-gw05", f"{LOCKED}-gw06")
+    rows = _component_rows((*earlier, *later))
+    target = ScenarioTarget(season=LOCKED, gameweek=5)
+
+    pool = paired_conditional_residuals(
+        rows.loc[rows["fold_id"] < target.fold_id], target=target, min_history_folds=8
+    )
+
+    assert pool.history_fold_ids == tuple(sorted(earlier))
+    with pytest.raises(ScenarioValidationError, match=r"own residual history|must precede"):
+        paired_conditional_residuals(rows, target=target, min_history_folds=8)
+    later_only = rows.loc[rows["fold_id"] != target.fold_id]
+    with pytest.raises(ScenarioValidationError, match="must precede"):
+        paired_conditional_residuals(later_only, target=target, min_history_folds=8)
+
+
+def test_v1_argument_parsing_still_refuses_a_missing_fidelity_artifact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sys.argv",
+        ["run", "--table", "t.csv", "--manifest", "m.json", "--roster", "r.csv"],
+    )
+    with pytest.raises(SystemExit) as raised:
+        runner._parse_arguments()
+    assert raised.value.code == 2
+
+
+# --- the development measurement itself ------------------------------------------------------
+
+
+def _prepared_folds(fold_ids: Sequence[str]) -> tuple[EvaluationFold, ...]:
+    prepared, _ = _frozen_decision(fold_ids[0])
+    return tuple(
+        EvaluationFold(
+            fold_id=fold_id,
+            projections=prepared.projections,
+            realized_points=prepared.realized_points,
+        )
+        for fold_id in fold_ids
+    )
+
+
+def _unsolved() -> OptimizationResult:
+    empty = pd.DataFrame(
+        {
+            "player_id": pd.Series([], dtype="int64"),
+            "name": pd.Series([], dtype="string"),
+            "team_id": pd.Series([], dtype="string"),
+            "position": pd.Series([], dtype="string"),
+            "price_tenths": pd.Series([], dtype="int64"),
+            "expected_points": pd.Series([], dtype="float64"),
+        }
+    )
+    return OptimizationResult(
+        solver_status=SolverStatus.UNKNOWN,
+        selected_squad=empty,
+        starting_xi=empty,
+        bench=empty,
+        captain=None,
+        total_cost_tenths=None,
+        projected_score=None,
+        objective_value=None,
+        diagnostics={},
+    )
+
+
+def _patch_measurement(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    unsolved: Sequence[str] = (),
+    unscored: Sequence[str] = (),
+    readings: dict[str, object] | None = None,
+) -> list[str]:
+    """Stand in for the panel, the controls and the scorer; record which folds were solved."""
+
+    _, solved_result = _frozen_decision("2021-22-gw11")
+    solved: list[str] = []
+
+    def fake_panel(archive_root: Path, seasons: Sequence[str] = ()) -> pd.DataFrame:
+        return pd.DataFrame({"season": list(seasons)})
+
+    def fake_controls(panel: pd.DataFrame, **kwargs: object) -> tuple[str, ...]:
+        return ("controls",)
+
+    def fake_prepare(
+        handoff: PhaseCComponentHandoff, controls: object, *, development_contract: str | None
+    ) -> tuple[EvaluationFold, ...]:
+        assert development_contract == DEVELOPMENT_OOF_CONTRACT_VERSION
+        return _prepared_folds(tuple(handoff.rows["fold_id"].drop_duplicates()))
+
+    def fake_evaluate(candidates: Sequence[EvaluationFold], config: object) -> SimpleNamespace:
+        folds = []
+        for fold in candidates:
+            solved.append(fold.fold_id)
+            folds.append(
+                SimpleNamespace(
+                    fold_id=fold.fold_id,
+                    optimization_result=_unsolved() if fold.fold_id in unsolved else solved_result,
+                    realized_squad_points=None if fold.fold_id in unscored else 40.0,
+                )
+            )
+        return SimpleNamespace(folds=folds)
+
+    def fake_measure_fold(
+        handoff: PhaseCComponentHandoff,
+        prepared: EvaluationFold,
+        result: OptimizationResult,
+        realized: float,
+        selected: Sequence[int],
+        settings: ScenarioConfig,
+        sampler: object,
+        *,
+        development: bool = False,
+    ) -> tuple[object, dict[str, object]]:
+        assert development is True
+        if readings is not None:
+            return readings[prepared.fold_id], {"fold_id": prepared.fold_id}
+        reading = SimpleNamespace(
+            fold_id=prepared.fold_id,
+            readout=SimpleNamespace(
+                probability_integral_transform=0.5, realized_below_lower_quantile=False
+            ),
+        )
+        return reading, {"fold_id": prepared.fold_id}
+
+    monkeypatch.setattr(runner, "_load_development_panel", fake_panel)
+    monkeypatch.setattr(runner, "build_walk_forward_folds", fake_controls)
+    monkeypatch.setattr(runner, "prepare_phase_c_component_folds", fake_prepare)
+    monkeypatch.setattr(runner, "evaluate_prepared_folds", fake_evaluate)
+    monkeypatch.setattr(runner, "_measure_fold", fake_measure_fold)
+    return solved
+
+
+def test_a_pilot_solves_only_the_requested_folds_and_lists_every_abstention(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows, fold_ids = _v1_shaped_rows((LOCKED,))
+    direct = "2024-25-gw02"
+    picked = rows["fold_id"].eq(direct) & rows["player_id"].eq(1)
+    rows.loc[picked, "composition_route"] = DIRECT_CONTROL_ROUTE
+    handoff = _handoff(rows, development=True)
+    solved = _patch_measurement(
+        monkeypatch, unsolved=(f"{LOCKED}-gw02",), unscored=("2023-24-gw03",)
+    )
+    requested = ("2023-24-gw02", "2023-24-gw03", direct, f"{LOCKED}-gw02")
+    sampler = ConditionalResidualConfig(fraction=0.15, minimum_rows=30)
+
+    measured, panel_rows = _measure_development(
+        SimpleNamespace(archive_root=Path(".")),
+        handoff,
+        sampler,
+        DevelopmentInputs(TABLE, ROSTER, MANIFEST, requested),
+    )
+
+    population = measured["population"]
+    assert solved == list(requested)
+    assert population["evaluated_fold_ids"] == list(requested)
+    assert population["history_burn_in_fold_ids"] == list(HISTORY_BURN_IN_FOLDS)
+    assert population["history_eligible_fold_count"] == len(fold_ids) - len(HISTORY_BURN_IN_FOLDS)
+    assert population["direct_control_abstention_fold_ids"] == [direct]
+    assert population["unsolved_fold_ids"] == [f"{LOCKED}-gw02"]
+    assert population["unscored_fold_ids"] == ["2023-24-gw03"]
+    assert population["measured_fold_ids"] == ["2023-24-gw02"]
+    assert population["history_seasons"] == [
+        "2020-21",
+        "2021-22",
+        "2022-23",
+        "2023-24",
+        "2024-25",
+        LOCKED,
+    ]
+    assert measured["verdict"] is None
+    assert "pilot" in str(measured["verdict_note"])
+    assert measured["source"]["phase_c_contract"] == DEVELOPMENT_OOF_CONTRACT_VERSION
+    assert measured["source"]["pinned_by_arguments"] is True
+    assert measured["candidate"]["reference_contract_version"] == DEVELOPMENT_REPORT_VERSION
+    assert measured["development_observation"]["fold_count"] == 1
+    assert panel_rows == 6
+
+
+def test_a_pilot_refuses_unknown_and_burn_in_folds(monkeypatch: pytest.MonkeyPatch) -> None:
+    rows, _ = _v1_shaped_rows((LOCKED,))
+    handoff = _handoff(rows, development=True)
+    _patch_measurement(monkeypatch)
+
+    with pytest.raises(BindingCalibrationError, match="outside the handoff"):
+        _measure_development(
+            SimpleNamespace(archive_root=Path(".")),
+            handoff,
+            None,
+            DevelopmentInputs(TABLE, ROSTER, MANIFEST, ("2027-28-gw02",)),
+        )
+    with pytest.raises(BindingCalibrationError, match="burn-in"):
+        _measure_development(
+            SimpleNamespace(archive_root=Path(".")),
+            handoff,
+            None,
+            DevelopmentInputs(TABLE, ROSTER, MANIFEST, ("2021-22-gw05",)),
+        )
+
+
+def test_a_full_development_run_abstains_by_protocol_at_the_minimum_fold_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows, _ = _v1_shaped_rows((LOCKED,))
+    handoff = _handoff(rows, development=True)
+    fold_id = "2021-22-gw11"
+    history = tuple(f"2021-22-gw{gameweek:02d}" for gameweek in range(2, 11))
+    prepared, result = _frozen_decision(fold_id)
+    base, _ = _measure_fold(
+        _handoff(_component_rows((*history, fold_id)), development=True),
+        prepared,
+        result,
+        40.0,
+        tuple(_squad_positions()),
+        ScenarioConfig(scenario_count=64),
+        None,
+    )
+    requested = tuple(f"2023-24-gw{gameweek:02d}" for gameweek in range(2, 32))
+    readings = {
+        item: ComponentCalibrationFold(fold_id=item, readout=base.readout) for item in requested
+    }
+    _patch_measurement(monkeypatch, readings=readings)
+
+    measured, _ = _measure_development(
+        SimpleNamespace(archive_root=Path(".")),
+        handoff,
+        None,
+        DevelopmentInputs(TABLE, ROSTER, MANIFEST, requested),
+    )
+
+    verdict = measured["verdict"]
+    assert verdict is not None
+    assert verdict["status"] == "abstained"
+    assert verdict["abstention_reason"] == "sampler_fidelity_not_verified"
+    assert verdict["fold_count"] == 30
+    assert "abstains by protocol" in str(measured["verdict_note"])
+    assert measured["development_observation"]["fold_count"] == 30
+
+
+def test_the_development_document_is_flagged_not_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "development.json"
+    arguments = SimpleNamespace(
+        phase_c_contract="development_v2",
+        fidelity=None,
+        expected_table_sha256=TABLE,
+        expected_roster_sha256=ROSTER,
+        expected_manifest_sha256=MANIFEST,
+        folds=None,
+        json_output=output,
+        conditional_residual_fraction=0.15,
+        conditional_residual_minimum_rows=30,
+        table=Path("t.csv"),
+        roster=Path("r.csv"),
+        manifest=Path("m.json"),
+        archive_root=Path("."),
+    )
+    measured = {
+        "source": {"phase_c_contract": DEVELOPMENT_OOF_CONTRACT_VERSION},
+        "config": {},
+        "solver_profile": {},
+        "candidate": {"binding": False},
+        "sampler_contract_version": CONDITIONAL_RESIDUAL_CONTRACT_VERSION,
+        "population": {
+            "history_seasons": ["2020-21", "2021-22", "2022-23", "2023-24", "2024-25", LOCKED],
+            "measured_fold_ids": ["2023-24-gw02"],
+        },
+        "folds": [],
+        "development_observation": None,
+        "verdict": None,
+        "verdict_note": "pilot",
+    }
+
+    def fake_metadata(**kwargs: object) -> dict[str, object]:
+        return {
+            "created_utc": "2026-09-06T00:00:00+00:00",
+            "provenance": {
+                "working_tree_dirty": False,
+                "repository_commit": "0" * 40,
+                "history_seasons": list(kwargs.get("history_seasons", ())),  # type: ignore[arg-type]
+            },
+            "environment": {},
+        }
+
+    monkeypatch.setattr(runner, "_parse_arguments", lambda: arguments)
+    monkeypatch.setattr(runner, "artifact_metadata", fake_metadata)
+    monkeypatch.setattr(runner, "_measure", lambda received: (measured, 10))
+
+    assert main() == 0
+    document = json.loads(output.read_text(encoding="utf-8"))
+    assert document["contract_version"] == DEVELOPMENT_REPORT_VERSION
+    assert document["binding"] is False
+    assert document["development_only"] is True
+    assert document["locked_holdout_accessed"] is True
+    assert document["development_method"] == "docs/phase_d_v2_development_method.md"
+    assert document["provenance"]["history_seasons"][-1] == LOCKED
