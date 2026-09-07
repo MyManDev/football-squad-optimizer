@@ -88,6 +88,11 @@ _PUBLISHED_ENVELOPE = frozenset(
         "difference_makers",
         "solver_status",
         "optimality_gap",
+        "captain",
+        "vice_captain",
+        "starting_xi",
+        "bench",
+        "chip",
     }
 )
 

@@ -38,11 +38,14 @@ from squadopt.live import (
 )
 from squadopt.live.transfers import TransferDecision
 from squadopt.optimization import SolverStatus
-from squadopt.planning import FirstWeekOverlap
+from squadopt.planning import FirstWeekOverlap, PlanningWeekResult
 
 #: The one combination computed today: the deterministic planner's own answer.
 COMPUTED_MODE = "saf-puan"
 COMPUTED_WINDOW = 1
+
+#: Pitch order for the published eleven and the outfield bench.
+_POSITION_ORDER: tuple[str, ...] = ("GK", "DEF", "MID", "FWD")
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +90,68 @@ def _advice_player(row: "pd.Series[Any]") -> dict[str, object]:
     }
 
 
+def _lineup_player(row: "pd.Series[Any]") -> dict[str, object]:
+    return {**_advice_player(row), "expected_points": float(str(row["expected_points"]))}
+
+
+def _ranking(row: "pd.Series[Any]") -> tuple[float, int]:
+    return (-float(str(row["expected_points"])), int(str(row["player_id"])))
+
+
+def lineup_fields(week: PlanningWeekResult) -> dict[str, object]:
+    """The complete decision a member acts on, read from the plan's first week.
+
+    Transfers alone are not a gameweek: the member still has to name a captain, a
+    vice-captain, an eleven and a bench order, and decide whether a chip is played.
+    The planner decides the eleven, the captain and the chip; the vice-captain and the
+    bench order follow the same completion rule the official scorer applies to an
+    optimizer decision (highest expected points first, ties by player id, the bench
+    goalkeeper first) so what is shown is what would be scored. ``expected_own_points``
+    is the eleven plus the captain's double — expected points, nothing else.
+    """
+
+    eleven = [row for _, row in week.starting_xi.iterrows()]
+    bench = [row for _, row in week.bench.iterrows()]
+    captain_id = int(str(week.captain["player_id"]))
+    starters = {int(str(row["player_id"])): row for row in eleven}
+    if captain_id not in starters:
+        raise EntryError("The plan's captain is not in its starting eleven.")
+    vice_candidates = sorted(
+        (row for row in eleven if int(str(row["player_id"])) != captain_id), key=_ranking
+    )
+    if not vice_candidates:
+        raise EntryError("The plan's eleven has no vice-captain candidate.")
+    goalkeepers = [row for row in bench if str(row["position"]) == "GK"]
+    outfield = sorted((row for row in bench if str(row["position"]) != "GK"), key=_ranking)
+    if len(goalkeepers) != 1:
+        raise EntryError("The plan's bench must hold exactly one goalkeeper.")
+    ordered_eleven = sorted(
+        eleven, key=lambda row: (_POSITION_ORDER.index(str(row["position"])), _ranking(row))
+    )
+    expected_own = sum(float(str(row["expected_points"])) for row in eleven) + float(
+        str(starters[captain_id]["expected_points"])
+    )
+    return {
+        "expected_own_points": expected_own,
+        "captain": _lineup_player(starters[captain_id]),
+        "vice_captain": _lineup_player(vice_candidates[0]),
+        "starting_xi": [_lineup_player(row) for row in ordered_eleven],
+        "bench": [_lineup_player(row) for row in (*goalkeepers, *outfield)],
+        "chip": week.chip,
+    }
+
+
+#: What a payload carries when the decision it renders came without its plan week.
+_NO_LINEUP: dict[str, object] = {
+    "expected_own_points": None,
+    "captain": None,
+    "vice_captain": None,
+    "starting_xi": None,
+    "bench": None,
+    "chip": None,
+}
+
+
 def build_advice_payload(
     picks: EntryPicks,
     inputs: RecommendationInputs,
@@ -100,6 +165,7 @@ def build_advice_payload(
     rival_label: str | None = None,
     solver_status: str | None = None,
     optimality_gap: float | None = None,
+    week: PlanningWeekResult | None = None,
     phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
 ) -> dict[str, object]:
     """One member's advice payload — from their squad and the shared projection only.
@@ -111,6 +177,11 @@ def build_advice_payload(
     of that plan (``solver_status``, ``optimality_gap``), read from the menu entry it
     chose. A competitive mode without a supplied decision is refused rather than
     silently re-labelled as the baseline.
+
+    The payload carries the whole decision, not only the transfers: captain,
+    vice-captain, the eleven, the bench order and the chip, read from the plan's first
+    week (``lineup_fields``). A supplied decision without its ``week`` publishes those
+    fields as null rather than inventing a lineup.
 
     A plan the solver found but could not prove optimal is published with
     ``solver_status: "FEASIBLE"`` and the measured bound gap, not discarded: the plan
@@ -148,9 +219,11 @@ def build_advice_payload(
         solver_status = plan.solver_status.name
         raw_gap = plan.diagnostics.get("absolute_optimality_gap")
         optimality_gap = float(str(raw_gap)) if raw_gap is not None else None
+        week = plan.weeks[0]
     else:
         transfers = decision
         by_id = pool_by_id
+    lineup = lineup_fields(week) if week is not None else dict(_NO_LINEUP)
     reason_code = "window_value" if mode == COMPUTED_MODE else "mode_tradeoff"
     moves: list[dict[str, object]] = []
     if transfers is not None:
@@ -207,6 +280,10 @@ def build_advice_payload(
         # plan with the measured bound gap beside it. Absent proof is stated, not hidden.
         "solver_status": solver_status,
         "optimality_gap": optimality_gap,
+        # The rest of the decision: who wears the armband, who stands in for him, the
+        # eleven in pitch order, the bench in the order the game's autosubs walk it,
+        # and the chip — all in expected points, none of it a probability.
+        **lineup,
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
     }
@@ -394,6 +471,7 @@ def _advise_against_rival(
         rival_label=f"entry-{rival_entry_id}",
         solver_status=plan.solver_status.name,
         optimality_gap=float(str(raw_gap)) if raw_gap is not None else None,
+        week=plan.weeks[0],
     )
     week = plan.weeks[0]
     squad_ids = {int(str(value)) for value in week.selected_squad["player_id"]}
@@ -422,4 +500,5 @@ __all__: tuple[str, ...] = (
     "AdviseEntryRequest",
     "advise_entry",
     "build_advice_payload",
+    "lineup_fields",
 )

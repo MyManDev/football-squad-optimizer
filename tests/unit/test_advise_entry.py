@@ -124,6 +124,91 @@ def test_uncomputed_combinations_are_refused_not_faked(world: dict[str, Any]) ->
         call(_request(season="2025-26"))
 
 
+def test_the_payload_carries_the_whole_decision(world: dict[str, Any]) -> None:
+    """Transfers alone are not a gameweek: captain, vice-captain, eleven, bench order and
+    chip travel with the moves, all in expected points, completed by the scorer's rule."""
+
+    from squadopt.planning import CHIP_NAMES
+
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    payload = advise_entry(
+        _request(), provider=provider, inputs=inputs, projection=projection, rules=rules
+    )
+    eleven = payload["starting_xi"]
+    bench = payload["bench"]
+    captain = payload["captain"]
+    vice = payload["vice_captain"]
+    assert isinstance(eleven, list) and len(eleven) == 11
+    assert isinstance(bench, list) and len(bench) == 4
+    assert isinstance(captain, dict) and isinstance(vice, dict)
+    eleven_ids = [player["player_id"] for player in eleven]
+    bench_ids = [player["player_id"] for player in bench]
+    assert len(set(eleven_ids) | set(bench_ids)) == 15
+    assert captain["player_id"] in eleven_ids
+    assert vice["player_id"] in eleven_ids and vice["player_id"] != captain["player_id"]
+    # The vice-captain is the eleven's next-highest expected points; the bench is the
+    # goalkeeper first, then outfield by descending expected points — the scorer's rule.
+    others = [p for p in eleven if p["player_id"] != captain["player_id"]]
+    assert vice["expected_points"] == max(p["expected_points"] for p in others)
+    assert bench[0]["position"] == "GK"
+    outfield = [p["expected_points"] for p in bench[1:]]
+    assert outfield == sorted(outfield, reverse=True)
+    positions = [p["position"] for p in eleven]
+    assert positions == sorted(positions, key=("GK", "DEF", "MID", "FWD").index)
+    assert payload["chip"] is None or payload["chip"] in CHIP_NAMES
+    assert payload["expected_own_points"] == pytest.approx(
+        sum(p["expected_points"] for p in eleven) + captain["expected_points"]
+    )
+
+
+def test_a_rival_strategy_carries_the_decision_and_agrees_with_its_own_captain_label(
+    world: dict[str, Any],
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    rival = _rival_squad(world)
+    provider = _Provider(
+        {
+            101: _member_picks(world, 101, _legal_squad(world)),
+            202: _member_picks(world, 202, rival),
+        }
+    )
+    payload = advise_entry(
+        _request(strategy="fark-yarat", rival_entry_id=202),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+    captain = payload["captain"]
+    assert isinstance(captain, dict) and len(payload["starting_xi"]) == 11
+    rival_captain = provider.picks(202, "2026-27", 1).captain
+    assert payload["captain_agreement"] == (captain["player_id"] == rival_captain)
+    assert isinstance(payload["expected_own_points"], float)
+
+
+def test_a_decision_without_its_week_publishes_no_lineup(world: dict[str, Any]) -> None:
+    """A menu entry handed over without its plan week gets null lineup fields, never an
+    invented eleven."""
+
+    from squadopt.application.advice import build_advice_payload
+    from squadopt.application.entries import held_squad_from_picks
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad(world))
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    held = held_squad_from_picks(picks, current_prices=prices)
+    _plan, decision, _config = advice_service.plan_transfers(inputs, projection, held, rules)
+    payload = build_advice_payload(
+        picks, inputs, projection, rules, league_id=352490, mode="garantici", decision=decision
+    )
+    for name in ("expected_own_points", "captain", "vice_captain", "starting_xi", "bench", "chip"):
+        assert payload[name] is None
+
+
 def _rival_squad(world: dict[str, Any]) -> list[int]:
     # Only the first eleven (the public XI) matters to the band. It is arranged to
     # share exactly six players with the member's fifteen, so the differential band

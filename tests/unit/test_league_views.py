@@ -595,7 +595,7 @@ def test_the_baseline_advice_is_byte_identical_with_and_without_paths(
 # thing here that would notice. The planner itself has the GW1 opening pin
 # (test_live_recommendation.py); this is the same gate for the in-season member path,
 # which that pin never exercised: a held squad, sell prices, and a transfer decision.
-IN_SEASON_MEMBER_ADVICE_SHA256 = "81cbc617f4d451b3b366c189ffc7fecf0cbbb7b47a6b6878b7283dd880e5a305"
+IN_SEASON_MEMBER_ADVICE_SHA256 = "77d790cdc04c6ae924eb34c891af6f0312ff5117ba2b53c9b703805f4a985863"
 # (player_out, player_in, expected_points_delta, expected_points_cost) per move.
 IN_SEASON_MEMBER_MOVES = (
     (1005, 1009, 2.5, 4.0),

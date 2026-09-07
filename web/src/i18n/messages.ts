@@ -446,6 +446,23 @@ const en = {
     planCost: (points: string) =>
       `This mode's plan gives up ~${points} expected points against the pure-points pick.`,
     planRival: (name: string) => `priced against ${name}'s squad`,
+    lineupTitle: "Your gameweek",
+    lineupRule:
+      "Captain, vice-captain, eleven and bench order follow the same projection as the moves; the bench is listed in the order the game's automatic substitutions walk it.",
+    expectedOwnPoints: (points: string) =>
+      `${points} expected points for the eleven with the captain doubled`,
+    captainLabel: "Captain",
+    viceCaptainLabel: "Vice-captain",
+    startingXiLabel: "Starting eleven",
+    benchOrderLabel: "Bench order",
+    chipLabel: "Chip",
+    chipNone: "No chip this gameweek",
+    chipNames: {
+      bboost: "Bench Boost",
+      "3xc": "Triple Captain",
+      wildcard: "Wildcard",
+      freehit: "Free Hit",
+    } as Record<string, string>,
     linkTitle: "Classic league 352490",
     linkBody:
       "The member surface is prepared mock-first; every row will link to that entry's public post-deadline squad and suggested moves.",
@@ -1000,6 +1017,22 @@ const tr: MessageSchema<typeof en> = {
     planCost: (pointsValue) =>
       `Bu modun planı, saf puan seçimine göre ~${pointsValue} beklenen puandan vazgeçiyor.`,
     planRival: (name) => `${name} kadrosuna göre fiyatlandı`,
+    lineupTitle: "Bu haftaki kadron",
+    lineupRule:
+      "Kaptan, yedek kaptan, ilk on bir ve yedek sırası hamlelerle aynı projeksiyondan gelir; yedekler oyunun otomatik değişikliklerinin izlediği sırayla listelenir.",
+    expectedOwnPoints: (pointsValue) => `${pointsValue} beklenen puan (ilk on bir, kaptan iki kat)`,
+    captainLabel: "Kaptan",
+    viceCaptainLabel: "Yedek kaptan",
+    startingXiLabel: "İlk on bir",
+    benchOrderLabel: "Yedek sırası",
+    chipLabel: "Çip",
+    chipNone: "Bu hafta çip yok",
+    chipNames: {
+      bboost: "Bench Boost",
+      "3xc": "Triple Captain",
+      wildcard: "Wildcard",
+      freehit: "Free Hit",
+    },
     linkTitle: "Klasik lig 352490",
     linkBody:
       "Üye yüzeyi mock-first hazırlandı; her satır üyenin son tarih sonrası public kadrosuna ve önerilen hamlelerine bağlanacak.",

@@ -44,9 +44,10 @@ class StrategyConfigurationError(ValueError):
 
 
 #: Everything a strategy may publish. The honesty envelope, closed: expected points,
-#: expected gap, set arithmetic, the price tag, and the solver's own account. No
-#: probability, no quantile, no spread — the stop-rule that closed those lines is a
-#: measurement, and this list is where it is enforced structurally.
+#: expected gap, set arithmetic, the price tag, the solver's own account, and the
+#: decision itself — captain, vice-captain, eleven, bench order, chip. No probability,
+#: no quantile, no spread — the stop-rule that closed those lines is a measurement,
+#: and this list is where it is enforced structurally.
 PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
     {
         "moves",
@@ -58,6 +59,11 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         "difference_makers",
         "solver_status",
         "optimality_gap",
+        "captain",
+        "vice_captain",
+        "starting_xi",
+        "bench",
+        "chip",
     }
 )
 
@@ -232,7 +238,18 @@ def _continuous_knob(name: str, lower: float, upper: float, step: float) -> Baye
 
 
 _BASELINE_PUBLISHES: Final = frozenset(
-    {"moves", "expected_own_points", "expected_points_cost", "solver_status", "optimality_gap"}
+    {
+        "moves",
+        "expected_own_points",
+        "expected_points_cost",
+        "solver_status",
+        "optimality_gap",
+        "captain",
+        "vice_captain",
+        "starting_xi",
+        "bench",
+        "chip",
+    }
 )
 _RIVAL_PUBLISHES: Final = _BASELINE_PUBLISHES | frozenset(
     {"expected_gap_vs_rival", "overlap_count", "captain_agreement", "difference_makers"}

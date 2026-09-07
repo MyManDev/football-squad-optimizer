@@ -48,7 +48,16 @@ async function read<T>(relative: string): Promise<LeagueViewEnvelope<T>> {
   return assertEnvelope(parsed);
 }
 
+/**
+ * The example league is a development and test convenience. The guard is written so the
+ * production build can prove the import unreachable: without it the fixture module was
+ * emitted as a chunk no production page ever loads, and it still counted against the
+ * bundle budget.
+ */
 async function mockModule() {
+  if (!import.meta.env.DEV && import.meta.env.MODE !== "test") {
+    throw new Error("Example league data is not bundled in production.");
+  }
   return import("../../fixtures/league");
 }
 

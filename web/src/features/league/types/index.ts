@@ -78,7 +78,12 @@ export interface AdvicePlayer {
   short_name: string;
   position: PlayerView["position"];
   team: string;
+  /** Present on lineup players: the projection's expected points for the gameweek. */
+  expected_points?: number;
 }
+
+/** The chips the producer's planner models; the payload names the one it plays, if any. */
+export type AdviceChip = "bboost" | "3xc" | "wildcard" | "freehit";
 
 export interface AdviceMove {
   move_id: string;
@@ -114,6 +119,19 @@ export interface EntryAdvice {
   solver_status?: string | null;
   /** The measured bound gap beside a FEASIBLE plan; 0 under proof. */
   optimality_gap?: number | null;
+  /**
+   * The rest of the decision, published since the producer carried the plan's first
+   * week: the eleven plus the captain's double in expected points, the armband, the
+   * eleven in pitch order, the bench in the order the game's autosubs walk it, and the
+   * chip. Null on a decision handed over without its plan week; absent on documents
+   * published before the producer carried them.
+   */
+  expected_own_points?: number | null;
+  captain?: AdvicePlayer | null;
+  vice_captain?: AdvicePlayer | null;
+  starting_xi?: AdvicePlayer[] | null;
+  bench?: AdvicePlayer[] | null;
+  chip?: AdviceChip | null;
   data_quality: EntryDataQuality;
   missing_fields: string[];
 }
