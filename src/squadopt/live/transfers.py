@@ -19,7 +19,7 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Final
+from typing import Final, TypedDict
 
 import pandas as pd
 
@@ -173,8 +173,99 @@ class TransferDecision:
         }
 
 
-def _transfer_config(rules: SeasonRules) -> TransferPlanningConfig:
-    return TransferPlanningConfig(max_free_transfers=rules.transfers.max_free_transfers)
+class _MemberPlanningPolicy(TypedDict):
+    """The planner controls the member path fixes; the values are MEMBER_PLANNING_POLICY."""
+
+    transfer_hit_cost_points: float
+    banked_transfer_value_points: float
+    horizon_discount_factor: float
+    chip_holding_value_points: Mapping[str, float]
+
+
+MEMBER_PLANNING_POLICY_ID: Final = "member_planning_policy_v1"
+_MEMBER_PLANNING_POLICY_VALUES: Final[_MemberPlanningPolicy] = {
+    "transfer_hit_cost_points": 4.0,
+    "banked_transfer_value_points": 0.0,
+    "horizon_discount_factor": 1.0,
+    "chip_holding_value_points": MappingProxyType({}),
+}
+MEMBER_PLANNING_POLICY: Final[Mapping[str, object]] = MappingProxyType(
+    _MEMBER_PLANNING_POLICY_VALUES
+)
+"""The member path's planning policy, ``member_planning_policy_v1``: the rule values.
+
+Every mid-season member decision plans one week ahead under these four controls; the
+rest of ``TransferPlanningConfig`` is the season's rules (the free-transfer cap, a
+transfer cap when a caller sets one) and the planner's contract. The values are the
+game's own: a hit costs the 4 points the sheet charges, a banked free transfer is worth
+nothing past the week, a single week is not discounted, and no chip carries a holding
+value because the member path offers no chip unless the operator names one
+(``_chip_availability``), which leaves holding values inert here. All four are the
+dataclass defaults, so ``configuration_fingerprint`` is the one every recorded pin was
+made under.
+
+Provenance — what each measurement said about moving them, in date order:
+
+* ``docs/planner_doe.json`` (2026-08-15, #71): one factor at a time around the defaults
+  on the windowed rehearsal; the hit cost moved the advantage only below 4, and the
+  discount was dead. That removed both as search axes.
+* ``docs/transfer_discipline.json`` (2026-08-17): planning hit cost {4, 6, 8} x transfer
+  cap x banked-transfer value on the lookahead-1 season chain over the four development
+  seasons, chips under the reservation rule. At the rule cell (no cap, banked value 0)
+  hit cost 6 was -29 a season against 4 (weekly -0.79, 90% block bootstrap
+  [-1.99, +0.25]) and hit cost 8 was -27 (weekly -0.73, [-1.96, +0.69]); the season
+  signs disagree (2021-22 -236/-246, 2022-23 +69/+84, 2023-24 +30/+96,
+  2024-25 +21/-41). A banked-transfer value was negative wherever its interval left
+  zero. The note's reading: keep the rule for the weekly control.
+* ``docs/chip_bayesopt.json`` (2026-08-18): the Bayesian search over chip holding
+  values and the planning hit cost recommended hit cost 7 (with ``3xc=20,
+  wildcard=24``): mean net 2053.8 against the hybrid reference 2035.0, ahead in all
+  four seasons, most of it a smaller season spread rather than a mean shift. No
+  promotion; the two follow-up searches agreed only on a hit cost of 7-8.
+* ``docs/season_chain_tuned.json`` (2026-08-18): that candidate walked as the chain's
+  ``tuned`` mode against ``hybrid``: +0.51 a week, 90% block bootstrap [-1.14, +2.13],
+  positive-week share 0.43 -- the interval holds zero. The chips were the effect; the
+  tuning was not.
+* ``docs/member_policy_hit_cost_grid.json`` (2026-09-07): the hit cost measured where
+  this policy lives -- {4, 5, 6, 7, 8} on the lookahead-1 chain with chips off, five
+  seasons including 2025-26 as declared development data, 184 paired gameweeks. Against
+  4: 5 is +1.24 a week [+0.34, +2.18], 6 is +1.08 [-0.13, +2.02], 7 is +2.11
+  [+0.83, +3.44], 8 is +2.44 [+1.04, +3.94]; paid transfers fall from 193 to 37 across
+  the five seasons. The rule declared before that run -- beat 4 in pooled mean, an
+  interval clear of zero, worse in at most one season -- **fires for 5, 7 and 8**. The
+  value here is still 4: moving it re-prices every member's advice and so belongs in the
+  pull request that re-pins the two hashes below, with an owner's decision behind it.
+  The finding disagrees with ``transfer_discipline``, which reserved chips where this
+  run turns them off, so it is a reading in the member path's own configuration rather
+  than a reversal of that artifact on its terms.
+
+Revisit rule. These values change only in a pull request that cites a measurement on
+the lookahead-1 season chain with 2025-26 included as a season, and that re-pins
+``IN_SEASON_MEMBER_ADVICE_SHA256`` (``tests/unit/test_league_views.py``) and the site's
+pinned fixture under ``web/public/data`` in the same commit, because a changed policy
+changes what every member is told. The reading is re-examined at gameweek 19 from the live scorecard
+(``docs/weekly_scorecard.md``): the season's own hits and what they returned are the
+evidence the development seasons cannot give.
+
+A planning hit cost above 4 would be a caution margin on projected gains, not a rule
+change: the ledger and the settle step charge the game's 4 regardless.
+"""
+
+
+def _transfer_config(
+    rules: SeasonRules, *, transfer_cap: int | None = None
+) -> TransferPlanningConfig:
+    """The member planning policy under this season's rules.
+
+    ``transfer_cap`` bounds the week's transfers (a wildcard week is exempt, as in the
+    planner); ``None`` leaves the count to the objective and the policy's hit cost.
+    """
+
+    return TransferPlanningConfig(
+        max_free_transfers=rules.transfers.max_free_transfers,
+        max_transfers_per_gameweek=transfer_cap,
+        **_MEMBER_PLANNING_POLICY_VALUES,
+    )
 
 
 def _chip_availability(
@@ -282,13 +373,8 @@ def _prepare_planning(
             "expected_points": table["expected_points"].astype("float64"),
         }
     )
-    transfer_config = (
-        _transfer_config(rules)
-        if transfer_cap is None
-        else TransferPlanningConfig(
-            max_free_transfers=rules.transfers.max_free_transfers,
-            max_transfers_per_gameweek=int(transfer_cap),
-        )
+    transfer_config = _transfer_config(
+        rules, transfer_cap=None if transfer_cap is None else int(transfer_cap)
     )
     state = InitialSquadState(
         held.squad_player_ids,

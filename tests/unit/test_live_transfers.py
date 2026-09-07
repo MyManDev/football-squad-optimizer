@@ -11,6 +11,7 @@ window, a tampered handoff.
 
 import json
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import pandas as pd
@@ -18,6 +19,7 @@ import pytest
 import scripts.run_gameweek_ops as ops
 
 import squadopt.application.commands as command_services
+import squadopt.live.transfers as live_transfers
 from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
@@ -33,6 +35,13 @@ from squadopt.live import (
     write_projection_handoff,
 )
 from squadopt.live import recommendation as live_recommendation
+from squadopt.live.rules import read_season_rules
+from squadopt.live.transfers import (
+    MEMBER_PLANNING_POLICY,
+    MEMBER_PLANNING_POLICY_ID,
+    _transfer_config,
+)
+from squadopt.planning import TransferPlanningConfig
 from squadopt.prediction.component_dataset import (
     FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
 )
@@ -299,6 +308,67 @@ def _decide_gw2(
         str(handoff),
         *extra,
     )
+
+
+# --- the planning policy ------------------------------------------------------------
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+# The artifacts MEMBER_PLANNING_POLICY's docstring cites as its provenance.
+POLICY_PROVENANCE_ARTIFACTS = (
+    "planner_doe.json",
+    "transfer_discipline.json",
+    "chip_bayesopt.json",
+    "season_chain_tuned.json",
+    "member_policy_hit_cost_grid.json",
+)
+
+
+def test_the_member_planning_policy_is_the_rule_and_its_provenance_exists(
+    world: dict[str, Any],
+) -> None:
+    """The member path plans under ``member_planning_policy_v1``: the planner's defaults.
+
+    Every recorded pin -- the in-season member advice bytes above all -- was made under
+    ``TransferPlanningConfig``'s defaults, so the policy's fingerprint must be theirs,
+    with and without a transfer cap; and each artifact the policy's docstring cites as
+    provenance must exist where it says.
+    """
+
+    snapshot = read_snapshot(world["snapshot_root"], world["gw1_id"])
+    rules = read_season_rules(snapshot, season=SEASON)
+
+    assert MEMBER_PLANNING_POLICY_ID == "member_planning_policy_v1"
+    assert isinstance(MEMBER_PLANNING_POLICY, MappingProxyType)
+    assert dict(MEMBER_PLANNING_POLICY) == {
+        "transfer_hit_cost_points": 4.0,
+        "banked_transfer_value_points": 0.0,
+        "horizon_discount_factor": 1.0,
+        "chip_holding_value_points": {},
+    }
+
+    config = _transfer_config(rules)
+    defaults = TransferPlanningConfig(max_free_transfers=rules.transfers.max_free_transfers)
+    assert config.configuration_fingerprint == defaults.configuration_fingerprint
+    assert config.transfer_hit_cost_points == MEMBER_PLANNING_POLICY["transfer_hit_cost_points"]
+    assert (
+        config.banked_transfer_value_points
+        == MEMBER_PLANNING_POLICY["banked_transfer_value_points"]
+    )
+    assert config.horizon_discount_factor == MEMBER_PLANNING_POLICY["horizon_discount_factor"]
+    assert dict(config.chip_holding_value_points) == {}
+    capped = _transfer_config(rules, transfer_cap=1)
+    assert (
+        capped.configuration_fingerprint
+        == TransferPlanningConfig(
+            max_free_transfers=rules.transfers.max_free_transfers, max_transfers_per_gameweek=1
+        ).configuration_fingerprint
+    )
+
+    source = Path(live_transfers.__file__).read_text(encoding="utf-8")
+    for name in POLICY_PROVENANCE_ARTIFACTS:
+        assert f"docs/{name}" in source, name
+        assert (REPOSITORY_ROOT / "docs" / name).is_file(), name
 
 
 # --- the held squad -----------------------------------------------------------------
