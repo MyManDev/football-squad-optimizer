@@ -506,6 +506,19 @@ function rivalFields(
     captain_agreement: mode === "ortak-koru",
     control_solver_status: "OPTIMAL",
     control_optimality_gap: 0,
+    transfer_cap: 1,
+    overlap_target: mode === "ortak-koru" ? 9 : 5,
+    overlap_applied: mode === "ortak-koru" ? 7 : 5,
+    plan_kind: "within_free_transfers",
+    alternative_plan:
+      mode === "ortak-koru"
+        ? {
+            kind: "with_hits",
+            overlap_applied: 9,
+            transfer_hit_points: 8,
+            expected_points_cost: 6.4,
+          }
+        : null,
   };
 }
 

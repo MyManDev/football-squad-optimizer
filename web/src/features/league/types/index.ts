@@ -161,6 +161,22 @@ export interface EntryAdvice {
   control_solver_status?: string | null;
   control_optimality_gap?: number | null;
   /**
+   * The transfer rule the strategy played under: the free transfers it could spend
+   * without hits, the overlap it asked for, the overlap it applied, and which of the
+   * two candidates won — within the free transfers, or the target with hits. The
+   * other candidate travels as the alternative with its own price.
+   */
+  transfer_cap?: number;
+  overlap_target?: number;
+  overlap_applied?: number;
+  plan_kind?: "within_free_transfers" | "with_hits";
+  alternative_plan?: {
+    kind: "within_free_transfers" | "with_hits";
+    overlap_applied: number;
+    transfer_hit_points: number | null;
+    expected_points_cost: number;
+  } | null;
+  /**
    * The rest of the decision, published since the producer carried the plan's first
    * week: the eleven plus the captain's double in expected points, the armband, the
    * eleven in pitch order, the bench in the order the game's autosubs walk it, and the

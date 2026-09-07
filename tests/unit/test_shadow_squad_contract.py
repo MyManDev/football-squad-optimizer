@@ -95,6 +95,11 @@ _PUBLISHED_ENVELOPE = frozenset(
         "chip",
         "control_solver_status",
         "control_optimality_gap",
+        "transfer_cap",
+        "overlap_target",
+        "overlap_applied",
+        "plan_kind",
+        "alternative_plan",
     }
 )
 

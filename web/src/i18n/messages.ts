@@ -373,12 +373,12 @@ const en = {
       "ortak-koru": {
         name: "Keep the shared core",
         description:
-          "Hold at least nine of the rival's eleven; spend what is left on expected points. Paid transfers are charged in the price.",
+          "Hold as many of the rival's eleven as the free transfers reach, up to nine; a hit is spent only where it pays for itself.",
       },
       "fark-yarat": {
         name: "Create a gap",
         description:
-          "Hold at most five of the rival's eleven; the players you do not share decide the gap.",
+          "Hold as few of the rival's eleven as the free transfers allow, down to five; the players you do not share decide the gap.",
       },
     } as Record<"saf-puan" | "ortak-koru" | "fark-yarat", { name: string; description: string }>,
     rivalLegend: "Rival",
@@ -395,6 +395,14 @@ const en = {
     overlapLine: (count: number) => `${count} of the rival's eleven in your fifteen`,
     gapLine: (points: string) => `expected gap vs rival ${points}`,
     captainShared: "same captain",
+    planWithinFree: (cap: number, target: number, applied: number) =>
+      `Played within ${cap} free transfer${cap === 1 ? "" : "s"}, no hits: the strategy asked for ${target} of the rival's eleven and ${applied} was reachable.`,
+    planWithHits: (cap: number, target: number) =>
+      `Reaching ${target} of the rival's eleven needed more than the ${cap} free transfer${cap === 1 ? "" : "s"}; the hits are charged in the price and still came out ahead.`,
+    alternativeWithHits: (applied: number, hits: string, cost: string) =>
+      `Not taken: reaching ${applied} with hits would have cost ${hits} hit points, ${cost} expected points against pure points.`,
+    alternativeWithinFree: (applied: number, cost: string) =>
+      `Not taken: staying within the free transfers reached ${applied} at ${cost} expected points against pure points.`,
     templatesTitle: "Game templates",
     templatesBody:
       "A template is a named strategy-and-window pair. Applying one sets the same shareable selection the controls read; your own templates live in this browser.",
@@ -978,12 +986,12 @@ const tr: MessageSchema<typeof en> = {
       "ortak-koru": {
         name: "Ortak çekirdeği koru",
         description:
-          "Rakibin on birinden en az dokuzunu tut; kalanı beklenen puana harca. Ücretli transferler fiyata dahil.",
+          "Rakibin on birinden ücretsiz transferlerin ulaştığı kadarını tut, en çok dokuz; hit yalnız kendini ödüyorsa harcanır.",
       },
       "fark-yarat": {
         name: "Fark yarat",
         description:
-          "Rakibin on birinden en fazla beşini tut; paylaşmadığın oyuncular farkı belirler.",
+          "Rakibin on birinden ücretsiz transferlerin izin verdiği kadar azını tut, en az beş; paylaşmadığın oyuncular farkı belirler.",
       },
     },
     rivalLegend: "Rakip",
@@ -1000,6 +1008,14 @@ const tr: MessageSchema<typeof en> = {
     overlapLine: (count: number) => `rakibin on birinden ${count} tanesi senin on beşinde`,
     gapLine: (pointsValue: string) => `rakibe karşı beklenen fark ${pointsValue}`,
     captainShared: "aynı kaptan",
+    planWithinFree: (cap: number, target: number, applied: number) =>
+      `${cap} ücretsiz transfer içinde, hit yok: strateji rakibin on birinden ${target} istedi, ${applied} ulaşılabilirdi.`,
+    planWithHits: (cap: number, target: number) =>
+      `Rakibin on birinden ${target} tanesine ulaşmak ${cap} ücretsiz transferden fazlasını istedi; hit'ler fiyata dahil ve yine de önde çıktı.`,
+    alternativeWithHits: (applied: number, hits: string, cost: string) =>
+      `Tercih edilmedi: hit'lerle ${applied} tanesine ulaşmak ${hits} hit puanı, saf puana göre ${cost} beklenen puan mal olurdu.`,
+    alternativeWithinFree: (applied: number, cost: string) =>
+      `Tercih edilmedi: ücretsiz transferlerde kalmak ${applied} tanesine ulaşırdı, saf puana göre ${cost} beklenen puana.`,
     templatesTitle: "Oyun şablonları",
     templatesBody:
       "Şablon, adlandırılmış bir strateji-pencere çiftidir. Uygulamak, kontrollerin okuduğu paylaşılabilir seçimi kurar; kendi şablonların bu tarayıcıda durur.",

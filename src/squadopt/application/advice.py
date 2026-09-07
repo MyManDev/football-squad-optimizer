@@ -36,7 +36,7 @@ from squadopt.live import (
     plan_transfers,
     plan_transfers_with_overlap,
 )
-from squadopt.live.transfers import TransferDecision
+from squadopt.live.transfers import HeldSquad, TransferDecision
 from squadopt.planning import (
     FirstWeekOverlap,
     PlanningWeekResult,
@@ -448,6 +448,46 @@ def advise_entry(
     )
 
 
+def _solve_within_free_transfers(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    held: HeldSquad,
+    rules: SeasonRules,
+    *,
+    rival_eleven: frozenset[int],
+    floor: int | None,
+    ceiling: int | None,
+    transfer_cap: int,
+) -> tuple[TransferPlanResult, TransferDecision, int] | None:
+    """The banded plan under the transfer cap, at the strictest level the cap reaches.
+
+    A floor is relaxed downward (nine, eight, …, one); a ceiling upward (five, six, …,
+    eleven). Each level is one solve; an unsatisfiable level is the planner's own
+    refusal, not a guess. Returns the plan, its decision and the level applied, or
+    ``None`` when no level is reachable.
+    """
+
+    levels: list[tuple[int | None, int | None]]
+    if floor is not None:
+        levels = [(level, None) for level in range(int(floor), 0, -1)]
+    elif ceiling is not None:
+        levels = [(None, level) for level in range(int(ceiling), len(rival_eleven) + 1)]
+    else:
+        return None
+    for minimum, maximum in levels:
+        band = FirstWeekOverlap(player_ids=rival_eleven, minimum=minimum, maximum=maximum)
+        try:
+            plan, decision, _config = plan_transfers_with_overlap(
+                inputs, projection, held, rules, band, transfer_cap=transfer_cap
+            )
+        except DataSourceError:
+            continue
+        applied = minimum if minimum is not None else maximum
+        assert applied is not None
+        return plan, decision, applied
+    return None
+
+
 def _requested_picks(
     request: AdviseEntryRequest,
     entry_id: int,
@@ -489,14 +529,24 @@ def _advise_against_rival(
     The member's own squad is still the only starting point — the rival contributes a
     constraint (their public eleven) and the comparison labels, nothing else, so the
     invariance rule survives: what this member is told is computed from this member's
-    squad and the shared projection. The price tag is the control's expected points
-    minus the banded plan's, both net of the hits each plan pays and both from this
-    member's own solves. A control the solver found but could not prove is used as it
-    is and published beside the tag as ``control_solver_status`` with its measured
-    gap, so a bound on the price travels with an unproven one; only a control with no
-    solution refuses. Everything added to the payload here is in the strategy's
-    declared ``publishes`` set — the mean gap, the overlap count, captain agreement;
-    no spread, no probability, ever.
+    squad and the shared projection.
+
+    A rival strategy spends the free transfers and nothing more: one free transfer a
+    week, banked up to the rules' limit, and every extra transfer costs four points,
+    which no one-week band is worth. So the band is solved under a cap of the free
+    transfers the member holds, and a target the free transfers cannot reach is
+    relaxed one step at a time — a floor of nine that one transfer cannot reach
+    becomes the highest floor it can — and the payload names both the target and the
+    band actually applied. The eleven, the captain and the bench are then chosen
+    from the resulting fifteen.
+
+    The price tag is the control's expected points minus the banded plan's, both net
+    of the hits each plan pays and both from this member's own solves. A control the
+    solver found but could not prove is used as it is and published beside the tag as
+    ``control_solver_status`` with its measured gap; only a control with no solution
+    refuses. Everything added to the payload here is in the strategy's declared
+    ``publishes`` set — the mean gap, the overlap count, captain agreement; no spread,
+    no probability, ever.
     """
 
     picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
@@ -526,14 +576,46 @@ def _advise_against_rival(
         for _, row in inputs.players.iterrows()
     }
     held = held_squad_from_picks(picks, current_prices=prices)
+    transfer_cap = max(1, min(int(held.free_transfers), int(rules.transfers.max_free_transfers)))
+    target = floor if floor is not None else ceiling
+    assert target is not None
+    # Two candidates, one decision rule. Within the free transfers: the strictest band
+    # level they reach, no hits. With hits: the declared target, every extra transfer
+    # charged four points in the objective. The one with the higher net expected points
+    # is the advice — a hit is spent only where it pays for itself — and the other is
+    # published beside it as the alternative, so the member sees what it would have cost.
+    within_free = _solve_within_free_transfers(
+        inputs,
+        projection,
+        held,
+        rules,
+        rival_eleven=rival_eleven,
+        floor=floor,
+        ceiling=ceiling,
+        transfer_cap=transfer_cap,
+    )
     band = FirstWeekOverlap(player_ids=rival_eleven, minimum=floor, maximum=ceiling)
     try:
-        plan, decision, _config = plan_transfers_with_overlap(inputs, projection, held, rules, band)
-    except DataSourceError as error:
+        with_hits: tuple[TransferPlanResult, TransferDecision, int] | None = (
+            *plan_transfers_with_overlap(inputs, projection, held, rules, band)[:2],
+            target,
+        )
+    except DataSourceError:
+        with_hits = None
+    if within_free is None and with_hits is None:
         raise EntryError(
             f"The {request.strategy!r} band cannot be satisfied from this squad against "
             f"entry {rival_entry_id}: no provable plan exists."
-        ) from error
+        )
+    if within_free is not None and (
+        with_hits is None
+        or net_expected_points(within_free[0]) >= net_expected_points(with_hits[0])
+    ):
+        chosen, other, chosen_kind = within_free, with_hits, "within_free_transfers"
+    else:
+        assert with_hits is not None
+        chosen, other, chosen_kind = with_hits, within_free, "with_hits"
+    plan, decision, applied = chosen
     raw_gap = plan.diagnostics.get("absolute_optimality_gap")
     raw_control_gap = control_plan.diagnostics.get("absolute_optimality_gap")
     # Net of hits on both sides: a band that forces paid transfers costs those hits.
@@ -568,6 +650,25 @@ def _advise_against_rival(
     my_hits = float(hits) if hits is not None and math.isfinite(hits) else 0.0
     payload["rival_entry_id"] = rival_entry_id
     payload["overlap_count"] = len(squad_ids & rival_eleven)
+    # What the strategy asked for, what the free transfers could reach, and the cap
+    # itself: a target a member cannot afford without hits is stated, never bought.
+    payload["transfer_cap"] = transfer_cap
+    payload["overlap_target"] = target
+    payload["overlap_applied"] = applied
+    payload["plan_kind"] = chosen_kind
+    other_hits = other[0].total_transfer_hit_points if other is not None else None
+    payload["alternative_plan"] = (
+        None
+        if other is None
+        else {
+            "kind": (
+                "with_hits" if chosen_kind == "within_free_transfers" else "within_free_transfers"
+            ),
+            "overlap_applied": other[2],
+            "transfer_hit_points": float(other_hits) if other_hits is not None else None,
+            "expected_points_cost": control_net - net_expected_points(other[0]),
+        }
+    )
     # A mean and only a mean: shared players cancel exactly in the fixed-decision
     # comparison, so this is projection arithmetic over the differentials, net of the
     # hits this plan pays (the rival's future transfers are unknown and not guessed).

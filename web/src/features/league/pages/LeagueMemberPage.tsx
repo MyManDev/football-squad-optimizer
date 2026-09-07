@@ -420,6 +420,27 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
           {view.captain_agreement ? ` · ${copy.captainShared}` : ""}
         </p>
       ) : null}
+      {view.plan_kind && view.transfer_cap != null && view.overlap_target != null ? (
+        <p className={styles.muted}>
+          {view.plan_kind === "within_free_transfers"
+            ? copy.planWithinFree(view.transfer_cap, view.overlap_target, view.overlap_applied ?? 0)
+            : copy.planWithHits(view.transfer_cap, view.overlap_target)}
+          {view.alternative_plan
+            ? ` ${
+                view.alternative_plan.kind === "with_hits"
+                  ? copy.alternativeWithHits(
+                      view.alternative_plan.overlap_applied,
+                      points(view.alternative_plan.transfer_hit_points ?? 0, 0, locale),
+                      points(view.alternative_plan.expected_points_cost, 1, locale),
+                    )
+                  : copy.alternativeWithinFree(
+                      view.alternative_plan.overlap_applied,
+                      points(view.alternative_plan.expected_points_cost, 1, locale),
+                    )
+              }`
+            : ""}
+        </p>
+      ) : null}
       {view.moves.length === 0 ? (
         <p className={styles.muted}>
           {view.data_quality === "complete" ? copy.noMove : copy.noAdviceMissingData}
