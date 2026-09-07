@@ -696,10 +696,21 @@ def _extract_plan(
         if chip == "3xc":
             projected_score += float(captain["expected_points"])
         projected_bench = float(bench["expected_points"].sum())
-        hit_points = paid_count * transfer_config.transfer_hit_cost_points
+        # Two different hit numbers, and the difference is the whole point. The
+        # objective priced this week's paid transfers at ``transfer_hit_cost_points``
+        # (that is what ``hit_cost_scaled`` was built from), so the contribution — which
+        # must reconstruct ``objective_value`` — is charged at that price. What the game
+        # takes off the sheet is ``hit_points_charged``, and that is the only one
+        # reported: the week's ``transfer_hit_points`` and the plan's total. When a
+        # caller sets a planning cost above the charge, the margin filters marginal
+        # transfers inside the solve and never appears in a number anyone is shown.
+        objective_hit_points = paid_count * transfer_config.transfer_hit_cost_points
+        hit_points = paid_count * transfer_config.hit_points_charged
         discount = transfer_config.horizon_discount_factor**week_index
         bench_weight = 1.0 if chip == "bboost" else optimization_config.bench_weight
-        contribution = discount * (projected_score + bench_weight * projected_bench - hit_points)
+        contribution = discount * (
+            projected_score + bench_weight * projected_bench - objective_hit_points
+        )
         gameweek = int(players.iloc[0]["gameweek"])
         if chip is not None:
             chips_played[gameweek] = chip
@@ -940,6 +951,7 @@ def optimize_transfer_plan(
         "discount_weights": artifacts.discount_weights,
         "horizon_discount_factor": settings.horizon_discount_factor,
         "transfer_hit_cost_points": settings.transfer_hit_cost_points,
+        "hit_points_charged": settings.hit_points_charged,
         "hit_cost_scaled": artifacts.hit_cost_scaled,
         "max_free_transfers": settings.max_free_transfers,
         "free_transfer_accrual": settings.free_transfer_accrual,

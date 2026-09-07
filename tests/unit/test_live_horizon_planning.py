@@ -104,6 +104,37 @@ def test_live_horizon_plans_every_requested_gameweek(tmp_path: Path, length: int
     assert config.max_transfers_per_gameweek == (None if length == 1 else 1)
 
 
+@pytest.mark.parametrize("length", [1, 3, 5])
+def test_the_horizon_path_plans_under_the_same_policy_as_the_one_week_path(
+    tmp_path: Path, length: int
+) -> None:
+    """One policy for both member paths, or a window prices a hit differently from a week.
+
+    ``plan_transfer_horizon`` used to spell its controls out, which coincided with the
+    dataclass defaults and so hid the bug: the moment ``MEMBER_PLANNING_POLICY`` moves off
+    those defaults, a member's three- or five-week window would plan at one hit cost and
+    their one-week advice at another. Both build from the policy now, and both report the
+    hits at the game's charge whatever the planner was told to pay.
+    """
+
+    gameweeks = tuple(range(2, 2 + length))
+    inputs, horizon, held, rules = _inputs(tmp_path, gameweeks)
+
+    plan, config = plan_transfer_horizon(inputs, horizon, held, rules)
+
+    expected = live_transfers._transfer_config(rules, transfer_cap=None if length == 1 else 1)
+    assert config.configuration_fingerprint == expected.configuration_fingerprint
+    assert (
+        config.transfer_hit_cost_points
+        == (live_transfers.MEMBER_PLANNING_POLICY["transfer_hit_cost_points"])
+    )
+    charged = live_transfers.MEMBER_PLANNING_POLICY["hit_points_charged"]
+    assert config.hit_points_charged == charged
+    for week in plan.weeks:
+        assert week.transfer_hit_points == week.paid_transfer_count * float(str(charged))
+    assert plan.total_transfer_hit_points == sum(week.transfer_hit_points for week in plan.weeks)
+
+
 def test_the_same_live_horizon_plans_identically_twice(tmp_path: Path) -> None:
     inputs, horizon, held, rules = _inputs(tmp_path, (2,))
 

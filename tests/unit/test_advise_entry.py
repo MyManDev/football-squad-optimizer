@@ -411,6 +411,54 @@ def test_the_price_tag_and_the_gap_are_net_of_hits(world: dict[str, Any]) -> Non
     )
 
 
+def test_a_member_is_shown_the_games_charge_never_the_planning_margin(
+    world: dict[str, Any],
+) -> None:
+    """The one number a member reads about a hit is the four points the game takes.
+
+    ``MEMBER_PLANNING_POLICY`` prices a paid transfer at 8 inside the solve — a caution
+    margin on a projection that overstates transfer gains — and at the game's 4 in every
+    number that leaves it. This member's plan pays one hit, so the two would differ if
+    the margin leaked: through the plan, the decision the ledger records, the advice
+    payload's ``expected_points_cost``, and ``net_expected_points``, which decides
+    between two solved plans and must therefore compare at what is actually docked.
+    """
+
+    from squadopt.application.advice import net_expected_points, solve_member_control
+    from squadopt.live.transfers import MEMBER_PLANNING_POLICY
+
+    margin = MEMBER_PLANNING_POLICY["transfer_hit_cost_points"]
+    charge = MEMBER_PLANNING_POLICY["hit_points_charged"]
+    assert isinstance(margin, float) and isinstance(charge, float) and margin > charge
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad(world))
+    control = solve_member_control(picks, inputs, projection, rules)
+    week = control.plan.weeks[0]
+
+    assert control.transfer_config.transfer_hit_cost_points == margin
+    assert control.transfer_config.hit_points_charged == charge
+    assert week.paid_transfer_count == 1, "the pin is vacuous unless a hit is paid"
+    assert week.transfer_hit_points == charge
+    assert control.plan.total_transfer_hit_points == charge
+    assert control.decision.transfer_hit_points == charge
+    assert control.decision.transfer_hit_cost_points == charge
+    assert net_expected_points(control.plan) == pytest.approx(
+        float(control.plan.total_projected_score or 0.0) - charge
+    )
+
+    payload = advise_entry(
+        _request(),
+        provider=_Provider({101: picks}),
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+    moves = payload["moves"]
+    assert isinstance(moves, list) and moves
+    assert {move["expected_points_cost"] for move in moves} == {charge}
+
+
 def _club_legal_squad(world: dict[str, Any]) -> list[int]:
     """A fifteen the game would accept as held: 2/5/5/3, at most three per club, nobody
     unavailable — so one free transfer is a real budget rather than an impossibility."""

@@ -10,6 +10,7 @@ window, a tampered handoff.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -327,21 +328,22 @@ POLICY_PROVENANCE_ARTIFACTS = (
 def test_the_member_planning_policy_is_the_rule_and_its_provenance_exists(
     world: dict[str, Any],
 ) -> None:
-    """The member path plans under ``member_planning_policy_v1``: the planner's defaults.
+    """The member path plans under ``member_planning_policy_v2``: the rule values.
 
-    Every recorded pin -- the in-season member advice bytes above all -- was made under
-    ``TransferPlanningConfig``'s defaults, so the policy's fingerprint must be theirs,
-    with and without a transfer cap; and each artifact the policy's docstring cites as
-    provenance must exist where it says.
+    The policy is the planner's defaults but for the hit cost, which carries the caution
+    margin ``member_policy_hit_cost_grid`` measured; the charge stays the game's 4. The
+    fingerprint must therefore differ from the defaults' in exactly that one control, and
+    each artifact the policy's docstring cites as provenance must exist where it says.
     """
 
     snapshot = read_snapshot(world["snapshot_root"], world["gw1_id"])
     rules = read_season_rules(snapshot, season=SEASON)
 
-    assert MEMBER_PLANNING_POLICY_ID == "member_planning_policy_v1"
+    assert MEMBER_PLANNING_POLICY_ID == "member_planning_policy_v2"
     assert isinstance(MEMBER_PLANNING_POLICY, MappingProxyType)
     assert dict(MEMBER_PLANNING_POLICY) == {
-        "transfer_hit_cost_points": 4.0,
+        "transfer_hit_cost_points": 8.0,
+        "hit_points_charged": 4.0,
         "banked_transfer_value_points": 0.0,
         "horizon_discount_factor": 1.0,
         "chip_holding_value_points": {},
@@ -349,8 +351,15 @@ def test_the_member_planning_policy_is_the_rule_and_its_provenance_exists(
 
     config = _transfer_config(rules)
     defaults = TransferPlanningConfig(max_free_transfers=rules.transfers.max_free_transfers)
-    assert config.configuration_fingerprint == defaults.configuration_fingerprint
+    assert config.configuration_fingerprint != defaults.configuration_fingerprint
+    assert (
+        config.configuration_fingerprint
+        == replace(defaults, transfer_hit_cost_points=8.0).configuration_fingerprint
+    )
     assert config.transfer_hit_cost_points == MEMBER_PLANNING_POLICY["transfer_hit_cost_points"]
+    assert config.hit_points_charged == MEMBER_PLANNING_POLICY["hit_points_charged"]
+    # The margin lives in the objective; the charge is the game's, and it did not move.
+    assert config.hit_points_charged == defaults.hit_points_charged == 4.0
     assert (
         config.banked_transfer_value_points
         == MEMBER_PLANNING_POLICY["banked_transfer_value_points"]
@@ -360,9 +369,7 @@ def test_the_member_planning_policy_is_the_rule_and_its_provenance_exists(
     capped = _transfer_config(rules, transfer_cap=1)
     assert (
         capped.configuration_fingerprint
-        == TransferPlanningConfig(
-            max_free_transfers=rules.transfers.max_free_transfers, max_transfers_per_gameweek=1
-        ).configuration_fingerprint
+        == replace(config, max_transfers_per_gameweek=1).configuration_fingerprint
     )
 
     source = Path(live_transfers.__file__).read_text(encoding="utf-8")
