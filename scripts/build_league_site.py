@@ -39,7 +39,7 @@ from squadopt.application.league_views import (
 )
 from squadopt.application.mode_selection import build_mode_paths
 from squadopt.data.errors import DataError
-from squadopt.data.snapshots import read_snapshot
+from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import (
     EntryGameweekPoints,
     fpl_entry_history_points,
@@ -92,9 +92,29 @@ def last_scored_gameweek(bootstrap: bytes, *, before: int) -> int | None:
     return max(scored) if scored else None
 
 
-SNAPSHOT_ROOT = Path("data/snapshots")
-ARCHIVE_ROOT = Path("data/raw/vaastav-fpl")
-REGISTRY_PATH = Path("data/entries/registry.json")
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
+ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
+REGISTRY_PATH = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
+
+#: Only a live capture can serve the league tree; Top-100 and elite-picks captures share
+#: the snapshot root and sort after it by name, so "the latest snapshot" must not be
+#: "the last directory".
+LIVE_SNAPSHOT_PREFIX = "fpl-live-"
+
+
+def resolve_live_snapshot_id(root: Path, requested: str | None) -> str:
+    """The capture to read: the one named, or the most recent *live* one held."""
+
+    identifiers = list_snapshot_ids(root)
+    if requested:
+        if requested not in identifiers:
+            raise DataError(f"No snapshot {requested!r} under {root}.")
+        return requested
+    live = [name for name in identifiers if name.startswith(LIVE_SNAPSHOT_PREFIX)]
+    if not live:
+        raise DataError(f"No {LIVE_SNAPSHOT_PREFIX}* snapshots under {root}; capture one first.")
+    return live[-1]
 
 
 # --- the process pool ----------------------------------------------------------------
@@ -161,7 +181,8 @@ def pool_mapper(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--league", type=int, required=True)
-    parser.add_argument("--snapshot-id", help="default: the most recent capture")
+    parser.add_argument("--snapshot-id", help="default: the most recent live capture")
+    parser.add_argument("--snapshot-root", type=Path, default=SNAPSHOT_ROOT)
     parser.add_argument("--out", default="web/public")
     parser.add_argument("--season")
     parser.add_argument("--archive-root", default=str(ARCHIVE_ROOT))
@@ -198,10 +219,9 @@ def main() -> int:
         parser.error("--workers must be at least 1")
 
     try:
-        from scripts.recommend_current_squad import resolve_snapshot_id
-
-        snapshot_id = resolve_snapshot_id(arguments.snapshot_id)
-        snapshot = read_snapshot(SNAPSHOT_ROOT, snapshot_id)
+        snapshot_root = Path(arguments.snapshot_root)
+        snapshot_id = resolve_live_snapshot_id(snapshot_root, arguments.snapshot_id)
+        snapshot = read_snapshot(snapshot_root, snapshot_id)
         season = arguments.season or infer_season(snapshot)
         inputs = read_inputs(snapshot, season=season, gameweek=None)
         registry = EntryRegistry.load(Path(arguments.registry))
@@ -284,7 +304,7 @@ def main() -> int:
                         mp_context=multiprocessing.get_context("spawn"),
                         initializer=_worker_init,
                         initargs=(
-                            str(SNAPSHOT_ROOT),
+                            str(snapshot_root),
                             snapshot_id,
                             season,
                             (
