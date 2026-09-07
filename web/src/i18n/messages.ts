@@ -416,15 +416,20 @@ const en = {
       `A declared rule marks one option from two numbers: your league points against ${rival} (${gap}) and the ${weeks} gameweeks still to play. The rule is written down, not measured — nothing has tested whether following it does better than ignoring it — so it labels an option and never chooses for you.`,
     rivalLegend: "Rival",
     rivalLabel: "The member you are playing against",
+    rivalChoose: "Choose a rival",
     rivalDefaultSuffix: "(nearest above in the standings)",
     rivalUnavailableSuffix: "(not computed)",
     rivalNone: "No other member's squad is published for this week.",
+    rivalNoDefault:
+      "This publish named no standings neighbour for you, so no rival is chosen on your behalf: pick one and the plan against them can be computed.",
     rivalNote: "The rival's public eleven is a constraint and a comparison, nothing more.",
     windowLegend: "Window",
     windowNotComputed:
       "Only the one-week plan is on hand for this choice: three- and five-week plans exist for pure points only, and only where this publish solved them; a rival strategy is one week at a time.",
     windowLimits:
       "A three- or five-week plan repeats the week-1 projection over the fixture calendar, one transfer a week, and is published with the limits it assumes; it is not a forecast of the later weeks.",
+    windowFellBack: (asked: number, shown: number) =>
+      `The ${asked}-week window was not published for this strategy, so this selection is the ${shown}-week plan.`,
     windowTitle: (weeks: number) => `The ${weeks}-week window`,
     windowRule:
       "The moves and the lineup above are the first week's. Each row below is one gameweek of the plan, in expected points under the limits stated here.",
@@ -464,6 +469,9 @@ const en = {
     adviceNotComputed: "This combination was not computed for this publish.",
     adviceNotComputedBody:
       "The site publishes the decisions it actually solved from your squad: pure points, and each strategy against each rival where a plan exists. A pair that has no plan says so in the rival list.",
+    adviceUnreadable: "This member's advice could not be read.",
+    adviceUnreadableBody:
+      "The squad above came from this build and the advice document did not answer, so this is a fault in reading the site rather than a combination nobody solved. Reloading, or reporting it, is the right move.",
     entryNotAvailable: "This member is not available yet.",
     entryNotAvailableBody:
       "The public post-deadline squad or its advice has not been published to this site build.",
@@ -481,6 +489,8 @@ const en = {
     team: "team",
     gameweekPoints: "GW points",
     gameweekPointsFor: (gameweek: number) => `GW${gameweek} points`,
+    gameweekBasisNote:
+      "The gameweek column is not on one basis. Each member's figure is their week before their own transfer hits, as the FPL standings report it; SquadOpt's is after ours. The members' hit points are not published to this site, so they are not taken off here.",
     noScoredWeek:
       "No gameweek has been finalised yet, so no scores are published: points are only final once the platform has added bonus and checked the week.",
     total: "total",
@@ -1077,15 +1087,20 @@ const tr: MessageSchema<typeof en> = {
       `Tanımlı bir kural, iki sayıya bakarak seçeneklerden birini işaretler: ${rival} karşısındaki lig puanın (${gap}) ve oynanacak ${weeks} hafta. Kural yazılı, ölçülmüş değil — uymanın uymamaktan daha iyi olduğu test edilmedi — yani bir seçeneği etiketler, senin yerine seçmez.`,
     rivalLegend: "Rakip",
     rivalLabel: "Karşısında oynadığın üye",
+    rivalChoose: "Bir rakip seç",
     rivalDefaultSuffix: "(sıralamada hemen üstün)",
     rivalUnavailableSuffix: "(hesaplanamadı)",
     rivalNone: "Bu hafta için başka bir üyenin kadrosu yayınlanmamış.",
+    rivalNoDefault:
+      "Bu yayın senin için sıralamada bir komşu belirlemedi, o yüzden yerine bir rakip seçilmiyor: birini seç, ona karşı plan hesaplanabilsin.",
     rivalNote: "Rakibin açık on biri bir kısıt ve bir karşılaştırmadır, başka bir şey değil.",
     windowLegend: "Pencere",
     windowNotComputed:
       "Bu seçim için yalnız bir haftalık plan var: üç ve beş haftalık planlar yalnız saf puan için ve yalnız bu yayının çözdüğü yerde var; rakip stratejisi hafta hafta oynanır.",
     windowLimits:
       "Üç ya da beş haftalık plan 1. hafta projeksiyonunu fikstür takvimi üzerinde tekrarlar, haftada bir transferle; varsaydığı sınırlarla yayınlanır ve sonraki haftaların tahmini değildir.",
+    windowFellBack: (asked, shown) =>
+      `${asked} haftalık pencere bu strateji için yayınlanmadı; bu seçim ${shown} haftalık plandır.`,
     windowTitle: (weeks) => `${weeks} haftalık pencere`,
     windowRule:
       "Yukarıdaki hamleler ve kadro ilk haftanın. Aşağıdaki her satır planın bir oyun haftası; beklenen puan, burada yazılı sınırlar altında.",
@@ -1139,6 +1154,9 @@ const tr: MessageSchema<typeof en> = {
     adviceNotComputed: "Bu kombinasyon bu yayın için hesaplanmadı.",
     adviceNotComputedBody:
       "Site, kadrondan gerçekten çözdüğü kararları yayınlar: saf puan ve plan bulunan her rakibe karşı her strateji. Planı olmayan bir çift rakip listesinde bunu söyler.",
+    adviceUnreadable: "Bu üyenin önerisi okunamadı.",
+    adviceUnreadableBody:
+      "Yukarıdaki kadro bu yayından geldi, öneri belgesi ise yanıt vermedi; yani bu, kimsenin çözmediği bir kombinasyon değil, siteyi okurken çıkan bir arıza. Sayfayı yenilemek ya da bildirmek doğru olan.",
     entryNotAvailable: "Bu üye henüz kullanılamıyor.",
     entryNotAvailableBody:
       "Son tarih sonrası public kadro veya öneri bu site paketine henüz yayımlanmadı.",
@@ -1156,6 +1174,8 @@ const tr: MessageSchema<typeof en> = {
     team: "takım",
     gameweekPoints: "OH puanı",
     gameweekPointsFor: (gameweek) => `OH${gameweek} puanı`,
+    gameweekBasisNote:
+      "Oyun haftası sütunu tek bir temele oturmuyor. Her üyenin sayısı, FPL sıralamasının verdiği gibi kendi transfer cezalarından önceki haftasıdır; SquadOpt'unki ise cezadan sonrasıdır. Üyelerin ceza puanları bu siteye yayınlanmıyor, o yüzden burada düşülmüyor.",
     noScoredWeek:
       "Henüz kesinleşmiş oyun haftası yok, o yüzden puan yayınlanmıyor: puanlar ancak platform bonusu ekleyip haftayı kontrol edince kesinleşir.",
     total: "toplam",

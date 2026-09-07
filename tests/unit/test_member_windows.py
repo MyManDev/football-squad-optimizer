@@ -8,6 +8,7 @@ gameweek six, the way the horizon planning tests do, and hold the GW1 replay squ
 
 import datetime
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +44,24 @@ from squadopt.planning import CHIP_NAMES
 
 ENTRY = 101
 LEAGUE = 352490
+
+#: The site keys its Turkish copy by these exact sentences, so the producer's constant and
+#: the web's copy of it are two ends of one contract with a silent failure mode: an unknown
+#: sentence falls through in English onto a Turkish page and every test stays green.
+WEB_FIXTURE = Path(__file__).resolve().parents[2] / "web" / "src" / "fixtures" / "league.ts"
+
+
+def _web_stated_limits() -> list[str]:
+    """The sentences the site holds, read out of its fixture rather than restated here."""
+
+    text = WEB_FIXTURE.read_text(encoding="utf-8")
+    block = re.search(
+        r"export const WINDOW_STATED_LIMITS: readonly string\[\] = \[(.*?)^\];",
+        text,
+        re.DOTALL | re.MULTILINE,
+    )
+    assert block is not None, f"{WEB_FIXTURE} no longer declares WINDOW_STATED_LIMITS"
+    return [json.loads(literal) for literal in re.findall(r'"(?:[^"\\]|\\.)*"', block.group(1))]
 
 
 @pytest.fixture(name="window_world")
@@ -296,3 +315,17 @@ def test_the_top100_sentence_is_published_only_when_the_projection_carries_it(
     assert window_stated_limits(projection) == [
         sentence for sentence in WINDOW_STATED_LIMITS if sentence != WINDOW_TOP100_LIMIT
     ]
+
+
+def test_the_site_holds_the_producers_window_limit_sentences_verbatim() -> None:
+    """The sentences the page is keyed by are the sentences the payload carries.
+
+    ``WINDOW_STATED_LIMITS`` is published into every window document; the site translates
+    each one by exact string lookup and falls through to the producer's English when it
+    does not know it. Nothing compared the two constants, so rewording one here shipped an
+    English sentence onto the Turkish page with pytest and vitest both green. This asserts
+    the equality rather than the wording, so it survives any rewrite of the sentences and
+    fails only when the two sides disagree.
+    """
+
+    assert _web_stated_limits() == list(WINDOW_STATED_LIMITS)

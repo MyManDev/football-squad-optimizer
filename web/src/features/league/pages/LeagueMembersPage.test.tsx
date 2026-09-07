@@ -150,6 +150,31 @@ describe("league member surfaces", () => {
     expect(systemCells.querySelector("td")!.textContent).toBe("—");
   });
 
+  it.each(["tr", "en"] as const)(
+    "says the gameweek column is not on one basis while our net row sits in it, in %s",
+    (language) => {
+      // Our number is net of our transfer hit; every member's is their week before their
+      // own hits, and the site publishes no hit for them, so the column cannot be netted.
+      const copy = MESSAGES[language];
+      renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
+
+      expect(screen.getByText(copy.leagueMembers.gameweekBasisNote)).toBeInTheDocument();
+    },
+  );
+
+  it("omits the basis note when no row of ours is in the column", () => {
+    renderPage(
+      <LeagueMembersView
+        envelope={membersWith({
+          members: mockLeagueMembersEnvelope.payload.members.filter(
+            (member) => member.member_kind !== "system",
+          ),
+        })}
+      />,
+    );
+    expect(screen.queryByText(MESSAGES.tr.leagueMembers.gameweekBasisNote)).not.toBeInTheDocument();
+  });
+
   it("does not double our row when the envelope already carries one", () => {
     renderPage(
       <LeagueMembersView

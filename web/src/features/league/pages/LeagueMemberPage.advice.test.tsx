@@ -250,11 +250,15 @@ describe("league member advice flow", () => {
     ["ortak-koru", 3],
     ["fark-yarat", 5],
   ] as const)(
-    "keeps %s/%i visible but does not submit a rival strategy over a longer window",
+    "answers %s carried in on a %i-week window at the week the producer published",
     async (mode, window) => {
+      // The index lists every rival strategy at one week only. A window carried over from
+      // pure points must not send the page after a file nobody wrote: it lands on the
+      // published week, and the plan that exists is the one shown.
       const requests: AdviceRequest[] = [];
+      const rival = mockEntryAdviceIndex(ENTRY).payload.default_rival_entry_id;
       renderView({
-        advice: mockEntryAdviceEnvelope(ENTRY, mode, window),
+        advice: mockEntryAdviceEnvelope(ENTRY, mode, 1, rival),
         initialEntry: `/league/members/${ENTRY}?mode=${mode}&window=${window}`,
         client: new FakeClient(async (request) => {
           requests.push(request);
@@ -263,16 +267,30 @@ describe("league member advice flow", () => {
       });
 
       expect(screen.getByDisplayValue(mode)).toBeChecked();
-      expect(screen.getByRole("radio", { name: new RegExp(`${window} hafta`) })).toBeChecked();
-      expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled();
-      expect(
-        screen.getByText(/Rakip stratejisi daha uzun pencerede hesaplanmaz/),
-      ).toBeInTheDocument();
-      expect(screen.queryByText("Yukarıdaki Hesapla ile isteyebilirsin.")).toBeNull();
+      expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
+      expect(screen.getByRole("radio", { name: new RegExp(`${window} hafta`) })).not.toBeChecked();
+      expect(screen.queryByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeNull();
+      expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
       await compute();
-      expect(requests).toEqual([]);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]).toMatchObject({ strategy: mode, window: 1, rivalEntryId: rival });
     },
   );
+
+  it("separates an advice document that could not be read from one nobody computed", () => {
+    // The squad above loaded, so "this member is not available yet" states a cause the
+    // page has not established: the fault is in reading the advice document.
+    renderView({
+      advice: null,
+      adviceIssue: "unavailable",
+      client: new FakeClient(async () => ({ kind: "unavailable" })),
+    });
+
+    expect(screen.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeInTheDocument();
+    expect(screen.getByText("Bu üyenin önerisi okunamadı.")).toBeInTheDocument();
+    expect(screen.queryByText("Bu üye henüz kullanılamıyor.")).toBeNull();
+    expect(screen.queryByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeNull();
+  });
 
   it.each([3, 5] as const)("submits pure points over a %i-week window", async (window) => {
     const requests: AdviceRequest[] = [];
@@ -353,12 +371,19 @@ describe("league member advice flow", () => {
   });
 
   it("explains unsupported selections in English without promising a calculation", () => {
+    // A rival strategy with nobody to play it against: the publish named no standings
+    // neighbour, so the control offers no rival as chosen and the button says why.
+    const base = mockEntryAdviceIndex(ENTRY).payload;
     renderView({
       advice: null,
-      initialEntry: `/league/members/${ENTRY}?mode=ortak-koru&window=3`,
+      index: { ...base, default_rival_entry_id: null },
+      initialEntry: `/league/members/${ENTRY}?mode=ortak-koru`,
       language: "en",
       client: new FakeClient(async () => ({ kind: "unavailable" })),
     });
+    expect(
+      screen.getByRole("combobox", { name: "The member you are playing against" }),
+    ).toHaveValue("");
     expect(screen.getByRole("button", { name: "Compute" })).toBeDisabled();
     expect(
       screen.getByText(/A rival strategy is not computed over a longer window/),
