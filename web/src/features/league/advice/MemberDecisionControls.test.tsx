@@ -1,7 +1,9 @@
 /**
  * The member's controls name only what the producer computed: the catalogue's
- * strategies, the league's rivals with the producer's default marked, one-week windows.
- * Everything else is shown disabled with its reason, never hidden.
+ * strategies, the league's rivals with the producer's default marked, and the windows
+ * the index lists — pure points at three and five weeks where this publish solved them,
+ * one week for a rival strategy. Everything else is shown disabled with its reason,
+ * never hidden.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -78,12 +80,47 @@ describe("member decision controls", () => {
     expect(option).toHaveValue(String(missing.rival_entry_id));
   });
 
-  it("keeps the longer windows visible but disabled, with the reason", () => {
+  it("enables the windows the index lists for pure points and states what they assume", () => {
     renderControls();
+    expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /3 hafta/ })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeEnabled();
+    expect(
+      screen.getByText(/1\. hafta projeksiyonunu fikstür takvimi üzerinde tekrarlar/),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: /3 hafta/ }));
+    expect(screen.getByTestId("selection").textContent).toBe("-/3/-");
+  });
+
+  it("keeps a rival strategy at one week, with the reason", () => {
+    renderControls(`/league/members/${ENTRY}?mode=ortak-koru`);
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /3 hafta/ })).toBeDisabled();
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeDisabled();
-    expect(screen.getByText(/çok haftalı projeksiyon bu yol için ölçülmedi/)).toBeInTheDocument();
+    expect(screen.getByText(/rakip stratejisi hafta hafta oynanır/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["no index", null],
+    [
+      "an index from before the windows existed",
+      { ...mockEntryAdviceIndex(ENTRY).payload, windows: undefined },
+    ],
+    [
+      "an index where a window did not solve",
+      { ...mockEntryAdviceIndex(ENTRY).payload, windows: { "saf-puan": [1, 3] } },
+    ],
+  ] as const)("offers only the windows a publish solved: %s", (_name, index) => {
+    renderControls(`/league/members/${ENTRY}`, index as EntryAdviceIndex | null, "en");
+    expect(screen.getByRole("radio", { name: /1 week/ })).toBeEnabled();
+    expect(screen.getByRole("radio", { name: /5 weeks/ })).toBeDisabled();
+    if (index?.windows?.["saf-puan"]?.includes(3)) {
+      expect(screen.getByRole("radio", { name: /3 weeks/ })).toBeEnabled();
+    } else {
+      expect(screen.getByRole("radio", { name: /3 weeks/ })).toBeDisabled();
+      expect(screen.getByText(/only where this publish solved them/)).toBeInTheDocument();
+    }
   });
 
   it("falls back to the league's members as rivals when no index was published", () => {

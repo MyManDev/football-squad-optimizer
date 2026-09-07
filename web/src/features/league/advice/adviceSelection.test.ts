@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
-import { canComputeAdvice, selectedAdviceRequest } from "./adviceSelection";
+import { mockEntryAdviceIndex, mockLeagueMembersEnvelope } from "../../../fixtures/league";
+import { availableWindows, canComputeAdvice, selectedAdviceRequest } from "./adviceSelection";
 
 const MEMBERS = mockLeagueMembersEnvelope.payload.members;
 const HUMANS = MEMBERS.filter((member) => member.member_kind === "human");
@@ -77,7 +77,7 @@ describe("advice selection", () => {
     expect(stranger.rivalEntryId).toBe(RIVAL);
   });
 
-  it("cannot compute a rival strategy without any rival, nor a longer window", () => {
+  it("cannot compute a rival strategy without any rival, nor over a longer window", () => {
     const alone = selectedAdviceRequest(new URLSearchParams("mode=ortak-koru"), 352490, ENTRY, []);
     expect(alone.rivalEntryId).toBeNull();
     expect(canComputeAdvice(alone)).toBe(false);
@@ -88,5 +88,29 @@ describe("advice selection", () => {
       MEMBERS,
     );
     expect(canComputeAdvice(long)).toBe(false);
+  });
+
+  it("computes pure points at three and five weeks", () => {
+    for (const window of [3, 5]) {
+      const request = selectedAdviceRequest(
+        new URLSearchParams(`window=${window}`),
+        352490,
+        ENTRY,
+        MEMBERS,
+      );
+      expect(request).toMatchObject({ strategy: "saf-puan", window, rivalEntryId: null });
+      expect(canComputeAdvice(request)).toBe(true);
+    }
+  });
+
+  it("offers the windows the index lists, and one week without an index", () => {
+    const index = mockEntryAdviceIndex(ENTRY).payload;
+    expect(availableWindows(index, "saf-puan")).toEqual([1, 3, 5]);
+    expect(availableWindows(index, "ortak-koru")).toEqual([1]);
+    expect(availableWindows(null, "saf-puan")).toEqual([1]);
+    expect(availableWindows({ ...index, windows: undefined }, "saf-puan")).toEqual([1]);
+    expect(availableWindows({ ...index, windows: { "saf-puan": [1, 3] } }, "saf-puan")).toEqual([
+      1, 3,
+    ]);
   });
 });

@@ -1,6 +1,7 @@
 import type { PlayerView } from "../data/schema";
 import type {
   AdviceMove,
+  AdvicePlanWeek,
   AdvicePlayer,
   AdviceStrategy,
   EntryAdvice,
@@ -376,6 +377,41 @@ function moveFor(mode: AdviceStrategy, window: WindowSize): AdviceMove[] {
   ];
 }
 
+/**
+ * The producer's limit sentences for a three- or five-week window, as its payload
+ * carries them (`WINDOW_STATED_LIMITS` in the application layer). The site's Turkish
+ * copy is keyed by these exact strings, and a test pins that every one is known there.
+ */
+export const WINDOW_STATED_LIMITS: readonly string[] = [
+  "The first week's projection is repeated over the later weeks, scaled by each club's fixture count from the captured calendar; the later weeks are not projected separately.",
+  "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
+  "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
+  "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.",
+  "Prices are held at the captured values; no price change is modelled.",
+  "A chip the plan plays inside the window is valued inside the window only; what it would be worth in a later week is not counted.",
+];
+
+/** One row per gameweek of a pure-points window: the first week's move, one paid
+ * transfer in the second week, a bench boost in the last. */
+function planWeeksFor(window: WindowSize): AdvicePlanWeek[] {
+  const first = moveFor("saf-puan", window);
+  return Array.from({ length: window }, (_, index) => {
+    const paid = index === 1;
+    return {
+      gameweek: GAMEWEEK + index,
+      transfers_in:
+        index === 0 ? first.map((move) => move.player_in!) : paid ? [advicePlayers.safe] : [],
+      transfers_out:
+        index === 0 ? first.map((move) => move.player_out!) : paid ? [advicePlayers.extreme] : [],
+      transfer_hit_points: paid ? 4 : 0,
+      chip: index === window - 1 ? "bboost" : null,
+      free_transfers_before: index === 0 ? 1 : 1,
+      free_transfers_after: paid ? 1 : index === 0 ? 1 : 2,
+      expected_points: Number((52.4 + index * 0.6).toFixed(1)),
+    };
+  });
+}
+
 function lineupFor(
   squad: EntrySquad | undefined,
 ): Pick<
@@ -482,6 +518,8 @@ export function mockEntryAdviceIndex(entryId: number): LeagueViewEnvelope<EntryA
     gameweek: GAMEWEEK,
     entry_id: entryId,
     window: 1,
+    // Pure points solved at every window in this publish; a rival strategy is one week.
+    windows: { "saf-puan": [1, 3, 5], "ortak-koru": [1], "fark-yarat": [1] },
     strategies: ["saf-puan", ...strategies],
     rival_entry_ids: rivals,
     default_rival_entry_id: mockDefaultRival(entryId),
@@ -545,6 +583,16 @@ export function mockEntryAdviceEnvelope(
     rival_label: mode === "saf-puan" ? null : "Harbor Rovers",
     ...lineupFor(squad),
     ...rivalFields(entryId, mode, rivalEntryId),
+    // A pure-points window carries the whole plan and its stated limits; the producer's
+    // multi-week solve is typically found rather than proven, so the example says so.
+    ...(mode === "saf-puan" && window !== 1 && quality === "complete"
+      ? {
+          solver_status: "FEASIBLE",
+          optimality_gap: 1.3,
+          plan_weeks: planWeeksFor(window),
+          stated_limits: [...WINDOW_STATED_LIMITS],
+        }
+      : {}),
     data_quality: quality,
     missing_fields: quality === "complete" ? [] : (squad?.missing_fields ?? ["entry"]),
   });

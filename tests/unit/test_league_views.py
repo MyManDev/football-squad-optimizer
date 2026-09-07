@@ -657,6 +657,55 @@ def test_the_recorded_in_season_member_plan_holds(world: dict[str, Any], tmp_pat
     assert hashlib.sha256(raw).hexdigest() == IN_SEASON_MEMBER_ADVICE_SHA256
 
 
+def test_a_window_the_calendar_cannot_reach_is_recorded_not_dropped(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """This world publishes three gameweeks, so no three- or five-week window exists
+    from its GW2 deadline: the index says which windows solved (one), records each
+    missing window with the horizon builder's own reason, and the one-week bytes are
+    the same as without any builder — the replay pin above still holds."""
+
+    import datetime
+
+    from squadopt.application.advice import member_horizon_builder
+
+    inputs, projection, rules = _world_context(world)
+    snapshot = read_snapshot(world["snapshot_root"], world["gw2_id"])
+    handoff = read_projection_handoff(world_module._handoff(world))
+    builder = member_horizon_builder(snapshot, season=SEASON, in_season=handoff)
+    squad = _legal_squad(world)
+    when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    for name, horizon_builder in (("plain", None), ("windows", builder)):
+        build_league_views(
+            _Provider({101: _member_picks(world, 101, squad)}),
+            (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+            inputs,
+            projection,
+            rules,
+            league_id=352490,
+            league_name="Test League",
+            out_dir=tmp_path / name,
+            now=when,
+            horizon_builder=horizon_builder,
+        )
+    baseline = Path("advice") / "101" / "saf-puan" / "1.json"
+    assert (tmp_path / "plain" / baseline).read_bytes() == (
+        tmp_path / "windows" / baseline
+    ).read_bytes()
+    assert not (tmp_path / "windows" / "advice" / "101" / "saf-puan" / "3.json").exists()
+    index = json.loads(
+        (tmp_path / "windows" / "advice" / "101" / "index.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert index["windows"] == {"saf-puan": [1], "ortak-koru": [1], "fark-yarat": [1]}
+    missing = [entry for entry in index["unavailable"] if entry.get("window") is not None]
+    assert [(entry["strategy"], entry["rival_entry_id"], entry["window"]) for entry in missing] == [
+        ("saf-puan", None, 3),
+        ("saf-puan", None, 5),
+    ]
+    for entry in missing:
+        assert "absent from the captured season" in entry["reason"]
+
+
 def test_without_a_rival_only_the_baseline_is_published(
     world: dict[str, Any], tmp_path: Path
 ) -> None:

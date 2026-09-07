@@ -249,6 +249,27 @@ def test_an_optimal_long_horizon_remains_research_shadow(tmp_path: Path) -> None
     assert document["publication_status"] == "shadow_only"
 
 
+def test_chips_are_offered_only_when_the_caller_names_them(tmp_path: Path) -> None:
+    """The bridge plays no chip by itself; a caller who names the availability gets a
+    plan that spends each offered chip at most once inside the horizon."""
+
+    from squadopt.live import chip_availability_for
+
+    inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
+    silent, _ = plan_transfer_horizon(inputs, horizon, held, rules)
+    assert dict(silent.chips_played) == {}
+    assert all(week.chip is None for week in silent.weeks)
+
+    offered = chip_availability_for(rules, (2, 3, 4), used=held.chips_used)
+    assert "bboost" in offered.available
+    plan, _ = plan_transfer_horizon(inputs, horizon, held, rules, chips=offered)
+    played = dict(plan.chips_played)
+    assert set(played) <= {2, 3, 4}
+    assert len(set(played.values())) == len(played)
+    for gameweek, name in played.items():
+        assert gameweek in offered.gameweeks_for(name)
+
+
 def test_planner_refuses_a_horizon_mutated_after_fingerprinting(tmp_path: Path) -> None:
     inputs, horizon, held, rules = _inputs(tmp_path, (2,))
     horizon.table.loc[horizon.table.index[0], "expected_points"] += 1.0
