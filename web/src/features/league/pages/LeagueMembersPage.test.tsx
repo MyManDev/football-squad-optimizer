@@ -8,14 +8,15 @@ import {
   mockLeagueMembersEnvelope,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { MESSAGES, type Language } from "../../../i18n/messages";
 import { LeagueMemberView } from "./LeagueMemberPage";
 import { LeagueMembersView } from "./LeagueMembersPage";
 
 afterEach(cleanup);
 
-function renderPage(node: React.ReactNode, path = "/league/members") {
+function renderPage(node: React.ReactNode, path = "/league/members", language: Language = "tr") {
   return render(
-    <LanguageProvider initialLanguage="tr">
+    <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[path]}>{node}</MemoryRouter>
     </LanguageProvider>,
   );
@@ -77,6 +78,43 @@ describe("league member points", () => {
 });
 
 describe("league member surfaces", () => {
+  it.each(["tr", "en"] as const)(
+    "explains the system score and preserves member differences in %s",
+    (language) => {
+      const copy = MESSAGES[language];
+      renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
+      expect(screen.getAllByText(copy.league.note)).toHaveLength(1);
+      cleanup();
+      const entryId = 35249001;
+      renderPage(
+        <LeagueMemberView
+          squad={mockEntrySquadEnvelopes[entryId]!}
+          advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
+        />,
+        `/league/members/${entryId}`,
+        language,
+      );
+      expect(screen.getAllByText(copy.league.note)).toHaveLength(1);
+      expect(
+        screen.getByRole("heading", { name: copy.leagueMembers.squadoptComparisonTitle }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(copy.leagueMembers.squadoptComparison("+9"))).toBeInTheDocument();
+    },
+  );
+
+  it("omits the system score explanation when no system row is shown", () => {
+    renderPage(
+      <LeagueMembersView
+        envelope={membersWith({
+          members: mockLeagueMembersEnvelope.payload.members.filter(
+            (member) => member.member_kind !== "system",
+          ),
+        })}
+      />,
+    );
+    expect(screen.queryByText(MESSAGES.tr.league.note)).not.toBeInTheDocument();
+  });
+
   it("appends our own row when the live envelope has none, and claims no rank for it", () => {
     const live = {
       ...mockLeagueMembersEnvelope,
