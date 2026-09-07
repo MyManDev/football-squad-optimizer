@@ -8,9 +8,16 @@ is the discipline around that one write:
   intent; the ``request_fingerprint`` is the normalized request (built by
   ``backend_api_v1``'s own ``league.advise`` command, so the API contract and the
   queue agree about what "the same request" means); the cache key is the answer's
-  address. Reusing one idempotency key for a *different* fingerprint is a conflict,
-  answered as one; a new key for the same fingerprint is a distinct attempt that
+  address. Reusing one idempotency key for a *different* request is a conflict,
+  answered as one; a new key for the same request is a distinct attempt that
   deduplicates onto the same open job.
+- **Every "which answer is this" decision goes through the cache key.** The
+  fingerprint deliberately omits the handoff, the repository commit and the
+  configuration, so it cannot tell two contexts apart — it names a request, not a
+  result. Deduplication, the job's id, its attempt count and idempotency replay are
+  therefore all addressed by ``cache_key``; the fingerprint is left to do the one
+  thing it is for, which is saying whether an idempotency key was reused for
+  something else.
 - **A hit is a hit.** If the cache already holds the answer, the POST returns it and
   no job exists — the queue is for work, not for bookkeeping about work already done.
 - **Rate limits are honest refusals.** Two buckets guard the POST — one per client
@@ -25,8 +32,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Final, Protocol
 
+from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
 from squadopt.platform.advice_queue import JobQueue
-from squadopt.platform.advice_read import AdviceReadStore
+from squadopt.platform.advice_read import AdviceBackendNotReadyError, AdviceReadStore
 from squadopt.platform.api_contract import ApiCommandRequest
 from squadopt.platform.jobs_contract import AdviceJob
 
@@ -96,10 +104,14 @@ class AdviceSubmitService:
         queue: JobQueue,
         *,
         rate_limiter: RateLimiter | None = None,
+        specs: AdviceJobSpecStore | None = None,
+        store_ready: Callable[[], bool] | None = None,
     ) -> None:
         self._reader = reader
         self._queue = queue
         self._limiter = rate_limiter
+        self._specs = specs
+        self._store_ready = store_ready
 
     def job(self, job_id: str) -> AdviceJob | None:
         return self._queue.load(job_id)
@@ -145,6 +157,13 @@ class AdviceSubmitService:
         open job exists per normalized request, however many keys or clients ask.
         """
 
+        if self._store_ready is not None and not self._store_ready():
+            # Refuse before validating: a queue write onto a store that has failed its
+            # capability checks either errors, or lands on storage nothing will read
+            # again. Both are worse than telling the caller the backend is not ready.
+            raise AdviceBackendNotReadyError(
+                "The advice store is not available; the backend cannot accept work."
+            )
         cache_key, context = self._reader.resolve_key(
             league_id=league_id,
             entry_id=entry_id,
@@ -182,9 +201,17 @@ class AdviceSubmitService:
         if idempotency_key is not None:
             # Idempotency history survives terminal state: a key reused for a
             # different request is a conflict whether or not the first job finished.
+            #
+            # "Different" is decided by the **cache key** as well as the fingerprint. The
+            # fingerprint names the client's fields and the capture; it says nothing about
+            # the handoff, the repository commit or the configuration. So a key replayed
+            # after ops republished a handoff matched here, and the caller was handed the
+            # older job with a 202 — it would poll that job to completion and then be told
+            # its own answer had never been computed, because the completed answer lives at
+            # an address this request does not read.
             for job in history:
                 if job.idempotency_key == idempotency_key:
-                    if job.request_fingerprint != fingerprint:
+                    if job.request_fingerprint != fingerprint or job.cache_key != cache_key:
                         raise IdempotencyConflictError(
                             "This Idempotency-Key was already used for a different request."
                         )
@@ -197,9 +224,13 @@ class AdviceSubmitService:
                         return SubmitOutcome(kind="hit", payload=replay)
                     break
 
-        attempt_ordinal = sum(1 for job in history if job.request_fingerprint == fingerprint)
+        # Addressed by the answer, not by the request. Two valid contexts — a redeploy is
+        # enough — share a fingerprint, so counting and naming by it gave both the same
+        # job id: the second submission reserved its own index, reached ``submit``, and
+        # collided on a name that is create-once. One caller got 202 and the other a 500.
+        attempt_ordinal = sum(1 for job in history if job.cache_key == cache_key)
         record = AdviceJob(
-            job_id=f"advice-{fingerprint[:16]}-{attempt_ordinal + 1}",
+            job_id=f"advice-{cache_key[:16]}-{attempt_ordinal + 1}",
             status="queued",
             request_fingerprint=fingerprint,
             cache_key=cache_key,
@@ -207,6 +238,24 @@ class AdviceSubmitService:
             updated_at_utc=at_utc,
             idempotency_key=command.idempotency_key,
         )
+        if self._specs is not None:
+            # Before the job exists, never after: a worker may claim the instant the
+            # record lands, and a claimed job whose request cannot be read is a job
+            # nobody can answer. The rival is normalized exactly as the cache key
+            # normalizes it, so requests that share an address share a meaning.
+            self._specs.put(
+                cache_key,
+                AdviceJobSpec(
+                    league_id=int(league_id),
+                    entry_id=int(entry_id),
+                    strategy=strategy,
+                    window=int(window),
+                    context=context,
+                    rival_entry_id=(
+                        rival_entry_id if self._reader.strategy_uses_rival(strategy) else None
+                    ),
+                ),
+            )
         # At-most-one open job is the queue's atomic guarantee, not a scan's promise:
         # two api processes racing here converge on one winner.
         winner, _created = self._queue.submit_unique(record)
