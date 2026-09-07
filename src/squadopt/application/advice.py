@@ -455,9 +455,10 @@ def build_advice_payload(
 #: the reader gets the limits with the answer. Every sentence names a mechanism the code
 #: applies; none of them is softened.
 WINDOW_STATED_LIMITS: tuple[str, ...] = (
-    "The first week's projection is repeated over the later weeks, scaled by each "
-    "club's fixture count from the captured calendar; the later weeks are not "
-    "projected separately.",
+    "The first week's projection is repeated over the later weeks, rescaled by each "
+    "club's fixture count in that week relative to its count in the first week, from "
+    "the captured calendar; a club with no fixture in the first week stays at zero all "
+    "the way through, and the later weeks are not projected separately.",
     "Availability is applied once, from the capture: injuries, rotation and "
     "suspensions after it are not seen.",
     "Every week inside the window, the first included, is capped at one transfer "

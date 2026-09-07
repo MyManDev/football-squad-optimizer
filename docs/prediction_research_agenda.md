@@ -108,8 +108,10 @@ ones — so it starts with a change to `REQUIRED_COLUMNS`, which is a shared bou
 calibration seam in [ownership](architecture/ownership.md).
 
 **Multi-horizon forecasting.** The horizon builder currently projects one information state and
-scales it by fixture count (`linear_fixture_count_scaling_v1`), and says plainly that it will
-grow overconfident by an amount nobody has measured. `horizon_decay` measures the drift.
+scales a later week by its fixture count relative to the decision week's
+(`first_week_control_relative_fixture_scaling_v3`), and says plainly that it will grow
+overconfident as the horizon lengthens. `horizon_decay` measures that drift, under the earlier
+`linear_fixture_count_scaling_v1` treatment.
 Modelling each horizon separately, and calibrating each separately, is what would let the
 planner's horizon length be chosen on evidence.
 
