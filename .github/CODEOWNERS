@@ -1,11 +1,10 @@
 # Review authority per zone — derived from docs/architecture/ownership.md (PR #111).
 # Ownership means who must approve a change, not exclusive access. Shared boundaries
 # need one approving review from each of the other two roles. Later rules win, so the
-# shared surfaces come last. GitHub handles: data / data mining = @SpeedyV5,
-# optimization / evaluation = @ErtugrulS32175, architecture / CI = @tunayaslan.
-# During the handover the architecture/CI zone lists both @tunayaslan and
-# @ErtugrulS32175 (the operational surface stays with optimization/evaluation until the
-# opening gameweek is captured, decided and settled).
+# shared surfaces come last. @SpeedyV5 leads data and backend implementation;
+# @ErtugrulS32175 leads optimization, core CI and application/web integration.
+# @tunayaslan retains architecture and backend review authority. Backend entries
+# list alternative reviewers, not the all-three approval rule for shared boundaries.
 
 # --- data / data mining
 /src/squadopt/data/                @SpeedyV5
@@ -25,7 +24,7 @@
 /src/squadopt/experiments/         @ErtugrulS32175
 /src/squadopt/live/                @ErtugrulS32175
 
-# --- architecture / CI (handover in progress)
+# --- core architecture / CI
 /.github/                          @tunayaslan @ErtugrulS32175
 /pyproject.toml                    @tunayaslan @ErtugrulS32175
 /constraints.txt                   @tunayaslan @ErtugrulS32175
@@ -34,10 +33,19 @@
 /src/squadopt/application/         @tunayaslan @ErtugrulS32175
 /scripts/_experiment_cli.py        @tunayaslan @ErtugrulS32175
 /docs/architecture/                @tunayaslan @ErtugrulS32175
+/web/                              @ErtugrulS32175
 
-# --- platform / backend
-/src/squadopt/platform/            @tunayaslan
-/src/squadopt/api/                 @tunayaslan
+# --- platform / backend: implementation and integration review
+/src/squadopt/platform/            @SpeedyV5 @tunayaslan @ErtugrulS32175
+/src/squadopt/api/                 @SpeedyV5 @tunayaslan @ErtugrulS32175
+/Dockerfile                        @SpeedyV5 @tunayaslan @ErtugrulS32175
+/.dockerignore                     @SpeedyV5 @tunayaslan @ErtugrulS32175
+/docs/backend_runbook.md            @SpeedyV5 @tunayaslan @ErtugrulS32175
+/scripts/build_site.py              @SpeedyV5 @tunayaslan @ErtugrulS32175
+# The operational handover is complete; other live/ files retain their owner above.
+/src/squadopt/live/ledger.py        @SpeedyV5 @tunayaslan @ErtugrulS32175
+/src/squadopt/live/tick.py          @SpeedyV5 @tunayaslan @ErtugrulS32175
+/src/squadopt/live/recommendation.py  @SpeedyV5 @tunayaslan @ErtugrulS32175
 
 # --- shared boundaries: all three roles
 /src/squadopt/contracts/           @SpeedyV5 @ErtugrulS32175 @tunayaslan
