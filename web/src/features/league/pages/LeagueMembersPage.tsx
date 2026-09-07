@@ -119,6 +119,7 @@ export function LeagueMembersView({
             <strong>
               {copy.viewerSelected(viewerRow.manager_name ?? `#${viewerRow.entry_id}`)}
             </strong>{" "}
+            <Link to={`/league/members/${viewerRow.entry_id}`}>{copy.viewerOpenMine}</Link>{" "}
             <button type="button" className={styles.viewerClear} onClick={clear}>
               {copy.viewerClear}
             </button>
