@@ -62,12 +62,16 @@ from squadopt.application.commands import DecideRequest, decide
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import gameweek_deadlines, next_open_deadline
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live import (
     CHIP_NAMES,
     LedgerError,
+    SeasonRules,
+    chip_availability_for,
     handoff_path_for,
     held_squad_from_ledger,
     load_ledger,
+    read_season_rules,
 )
 from squadopt.optimization import OptimizationConfig
 from squadopt.planning import CHIP_NAMES as PLANNER_CHIP_NAMES
@@ -181,24 +185,61 @@ def new_snapshot(before: Sequence[str], after: Sequence[str], prefix: str) -> st
     return added[0]
 
 
-def preflight_decide(ledger_root: Path, season: str, gameweek: int) -> None:
-    """Refuse a decision the ledger cannot start, before any capture is spent on it.
+#: The rule the mode is stamped by, printed before any capture is spent on a decision.
+MODE_RULE = (
+    "mode: live only when this run makes the capture and the clock is still before its "
+    "deadline; a reused --snapshot-id, or a run past the deadline, is recorded as replay."
+)
 
-    ``decide`` itself checks both conditions, but only after the Top-100 captures, the
-    live capture and the handoff have all been made; a refusal there wastes the week's
-    captures. The same two questions are asked here first: does the ledger already hold
-    this gameweek (a recorded decision is immutable), and can it supply the squad this
-    gameweek starts from (``held_squad_from_ledger`` wants exactly the previous week).
+
+def decision_mode_for(*, reused_capture: bool, deadline_utc: str, now_utc: str) -> str:
+    """The mode this run's decision is recorded in — never asserted, always derived.
+
+    Two independent reasons make a decision a replay rather than a live one, and the
+    ledger, the site and the scoreboard all repeat whichever is stamped here. A reused
+    capture is ``commands.decide``'s own rule (``replay`` whenever a snapshot is named
+    rather than taken). Past the capture's own deadline is the second: a catch-up run
+    from a pre-deadline capture is an honest record of what the model would have said,
+    but it was not said before the deadline, and calling it live would claim it was.
+    """
+
+    if reused_capture:
+        return "replay"
+    now = as_instant(normalize_utc_timestamp(now_utc, label="now_utc"))
+    deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
+    return "replay" if now >= deadline else "live"
+
+
+def preflight_decide(
+    ledger_root: Path,
+    season: str,
+    gameweek: int,
+    *,
+    chip: str | None = None,
+    rules: SeasonRules | None = None,
+) -> str | None:
+    """Check what the ledger can answer about a decision, before a capture is spent on it.
+
+    ``decide`` itself checks these, but only after the Top-100 captures, the live capture
+    and the handoff have all been made; a refusal there wastes the week's captures. Asked
+    here first: can the ledger supply the squad this gameweek starts from
+    (``held_squad_from_ledger`` wants exactly the previous week), and — when ``--chip``
+    names one — is that chip's window open this week and the chip still unspent, which is
+    exactly the question ``build_transfer_recommendation`` asks an hour later.
+
+    A gameweek the ledger already holds is not a refusal but a skip, returned as the
+    reason: a recorded decision is immutable, which is precisely why the rest of the week
+    (the tree, the site, the scoreboard) can safely be re-run after a partial failure.
     """
 
     recorded = sorted(entry.gameweek for entry in load_ledger(ledger_root, season))
     if gameweek in recorded:
-        raise WeekError(
-            f"The ledger already holds {season} GW{gameweek}; recorded decisions are "
-            "immutable, so --decide has nothing to do this week."
+        return (
+            f"the ledger already holds {season} GW{gameweek}; a recorded decision is "
+            "immutable, so this run rebuilds the rest of the week around it"
         )
     try:
-        held_squad_from_ledger(
+        held = held_squad_from_ledger(
             ledger_root,
             season,
             before_gameweek=gameweek,
@@ -208,11 +249,41 @@ def preflight_decide(ledger_root: Path, season: str, gameweek: int) -> None:
         raise WeekError(
             f"The ledger cannot supply the squad GW{gameweek} starts from: {error}"
         ) from error
+    if chip is not None:
+        if rules is None:
+            raise WeekError(
+                f"--chip {chip!r} cannot be checked before the capture: no snapshot on "
+                "disk carries the season rules its window is published in."
+            )
+        played = {name: list(weeks) for name, weeks in held.chips_used.items()}
+        offered = chip_availability_for(rules, (gameweek,), used=held.chips_used)
+        if gameweek not in offered.gameweeks_for(chip):
+            raise WeekError(
+                f"--chip {chip!r} cannot be played in GW{gameweek}: its window is not open "
+                f"there, or it was already played inside this window (chips played through "
+                f"GW{held.decided_gameweek}: {played or 'none'})."
+            )
+    return None
 
 
 def latest_live_snapshot(root: Path) -> str | None:
     live = [name for name in list_snapshot_ids(root) if name.startswith(LIVE_PREFIX)]
     return live[-1] if live else None
+
+
+def rules_before_capture(root: Path, snapshot_id: str | None, season: str) -> SeasonRules | None:
+    """The season rules the chip pre-flight reads, from a capture already on disk.
+
+    This week's capture does not exist yet when the pre-flight runs — that is the point
+    of running it first — so the chip windows come from the capture the caller reuses, or
+    failing that from the most recent live one held. Chip windows are the season's, not
+    the week's: the same ``game_config`` block every capture of the season carries.
+    """
+
+    identifier = snapshot_id or latest_live_snapshot(root)
+    if identifier is None:
+        return None
+    return read_season_rules(read_snapshot(root, identifier), season=season)
 
 
 def capture_deadline(root: Path, snapshot_id: str) -> tuple[int, str, str]:
@@ -276,16 +347,30 @@ def run_week(arguments: argparse.Namespace) -> int:
             f"No entry registry at {REGISTRY_PATH}; seed it first with "
             "`python -m scripts.seed_entry_registry --league <id>`."
         )
-    if "decide" in plan.steps:
-        # Before any capture: a ledger that cannot start this gameweek refuses now.
-        preflight_decide(LEDGER_ROOT, plan.season, plan.gameweek)
-        print(f"ledger can start gameweek {plan.gameweek}; --decide will record it")
+    decide_step = "decide" in plan.steps
+    if decide_step:
+        # Before any capture: a ledger that cannot start this gameweek refuses now, and a
+        # gameweek it already holds skips the step instead of refusing the whole run.
+        skip = preflight_decide(
+            LEDGER_ROOT,
+            plan.season,
+            plan.gameweek,
+            chip=arguments.chip,
+            rules=rules_before_capture(SNAPSHOT_ROOT, arguments.snapshot_id, plan.season),
+        )
+        if skip is None:
+            print(f"ledger can start gameweek {plan.gameweek}; --decide will record it")
+            print(f"  {MODE_RULE}")
+        else:
+            decide_step = False
+            print(f"decide skipped: {skip}")
 
     # 1. Top-100: cohort, picks, evidence export — before the live capture, so the
     # evidence predates the decision capture it will be applied to
     evidence_table: Path | None = None
     evidence_manifest: Path | None = None
     cohort: str | None = arguments.cohort_snapshot
+    elite_snapshot: str | None = arguments.elite_snapshot
     if "top100" in plan.steps:
         if not cohort:
             before = list_snapshot_ids(SNAPSHOT_ROOT)
@@ -303,7 +388,7 @@ def run_week(arguments: argparse.Namespace) -> int:
                 f"Cohort capture {cohort} is open for gameweek {cohort_target}, "
                 f"not {plan.gameweek}."
             )
-        elite = arguments.elite_snapshot
+        elite = elite_snapshot
         if not elite:
             before = list_snapshot_ids(SNAPSHOT_ROOT)
             _python(
@@ -316,6 +401,7 @@ def run_week(arguments: argparse.Namespace) -> int:
                 deadline_utc,
             )
             elite = new_snapshot(before, list_snapshot_ids(SNAPSHOT_ROOT), ELITE_PREFIX)
+        elite_snapshot = elite
         # The export never overwrites a different artifact at the same path, and a
         # rehearsal earlier in the week is a different artifact from Friday's; the picks
         # capture's own hash makes the name unique per capture, and an export already on
@@ -389,8 +475,14 @@ def run_week(arguments: argparse.Namespace) -> int:
     if not handoff.is_file():
         raise WeekError(f"The handoff {handoff} was not written.")
 
-    # 4. our own decision, in-process, stamped live: this capture, this handoff
-    if "decide" in plan.steps:
+    # 4. our own decision, in-process: this capture, this handoff, and the mode the two
+    # of them earn — never an asserted "live"
+    if decide_step:
+        mode = decision_mode_for(
+            reused_capture="capture" not in plan.steps,
+            deadline_utc=deadline_utc,
+            now_utc=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
         result = decide(
             DecideRequest(
                 snapshot_root=SNAPSHOT_ROOT,
@@ -401,7 +493,7 @@ def run_week(arguments: argparse.Namespace) -> int:
                 season=plan.season,
                 in_season_projection=handoff,
                 chip=arguments.chip,
-                mode="live",
+                mode=mode,
             )
         )
         print(result.report, flush=True)
@@ -434,8 +526,12 @@ def run_week(arguments: argparse.Namespace) -> int:
     )
     _python("scripts.build_site", "--season", plan.season, "--out", str(out))
 
-    # 7. scoreboard — after the site, because it reads the ledger the decision just wrote
+    # 7. scoreboard — after the site, because it reads the ledger the decision just wrote.
+    # The elite-picks capture travels with the cohort: without it the Top-100 mean can
+    # only be published gross of transfer costs, which is not the members' basis.
     cohort_arguments = ["--cohort-snapshot", cohort] if cohort else []
+    if cohort and elite_snapshot:
+        cohort_arguments += ["--elite-snapshot", elite_snapshot]
     _python(
         "scripts.build_scoreboard",
         "--league",
