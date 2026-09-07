@@ -9,7 +9,7 @@ from pandas.testing import assert_frame_equal
 from tests.unit.test_component_decision_scoring import _draw, _optimization_result
 
 from squadopt.application.phase_e import PHASE_E_CALIBRATED_VERSIONS
-from squadopt.evaluation import EvaluationValidationError
+from squadopt.evaluation import DEVELOPMENT_OOF_CONTRACT_VERSION, EvaluationValidationError
 from squadopt.optimization import OptimizationResult, SolverStatus
 from squadopt.scenarios import selection
 from squadopt.scenarios.components import (
@@ -373,3 +373,36 @@ def test_a_foundation_pin_does_not_admit_a_conditional_residual_draw() -> None:
     assert admitted.selection_status is not PhaseESelectionStatus.FALLBACK_PHASE_D_NOT_CALIBRATED
     # The foundation draw itself is still what the foundation pin admits.
     assert _select(_candidates(), draw).selection_status is PhaseESelectionStatus.SELECTED
+
+
+def test_a_development_draw_is_refused_by_the_pin_that_matches_its_own_identity() -> None:
+    """A development draw shares the frozen model version and sampler; only its contract differs."""
+
+    draw = _full_draw()
+    inputs = replace(
+        draw.inputs,
+        provenance=replace(
+            draw.inputs.provenance, development_contract=DEVELOPMENT_OOF_CONTRACT_VERSION
+        ),
+    )
+    development = replace(
+        draw,
+        inputs=inputs,
+        component_fingerprint=_component_fingerprint(
+            draw.scenarios, inputs, draw.sampled_minutes, draw.sampled_appearances
+        ),
+    )
+    candidates = _candidates()
+
+    refused = _select(candidates, development)
+    admitted = _select(candidates, draw)
+
+    assert refused.selection_status is PhaseESelectionStatus.FALLBACK_PHASE_D_NOT_CALIBRATED
+    assert refused.candidate_count_scored == 0
+    assert refused.selected_candidate_rank == 0
+    assert refused.selected_result is candidates[0]
+    # The refused draw is still identified in diagnostics.
+    assert refused.component_fingerprint == development.component_fingerprint
+    # The same pin, on the same identity, still admits the draw without the contract.
+    assert admitted.selection_status is PhaseESelectionStatus.SELECTED
+    assert admitted.candidate_count_scored == 2
