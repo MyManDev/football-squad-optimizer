@@ -34,10 +34,25 @@ The data side's standing research programme is
 
 The platform role and its boundary with the current application pilot are fixed in
 [platform and runtime boundary](platform_runtime.md). The platform consumes public application
-contracts; it does not duplicate the application or engine implementation. Until the new
-packages exist, the existing CODEOWNERS entries remain the mechanical review baseline. Each
-implementation PR adds its own path and review authority rather than claiming an empty zone in
-advance.
+contracts; it does not duplicate the application or engine implementation. CODEOWNERS records
+the review authority for the packages and operational entry points that now exist.
+
+### Current implementation and review assignment
+
+The backend work assignment is now reflected in CODEOWNERS rather than leaving its author
+outside the listed zone:
+
+| Work | Implementation lead | Review responsibility |
+| --- | --- | --- |
+| API, platform, workers, storage, image packaging and backend runbook | İbrahim (`@SpeedyV5`) | Ertuğrul (`@ErtugrulS32175`) handles integration sign-off; Tuna (`@tunayaslan`) retains backend review authority |
+| Operational `live/ledger.py`, `tick.py`, `recommendation.py` and `scripts/build_site.py` | İbrahim | The same backend reviewers; scientific or public-contract changes still need their existing owners |
+| Application and web integration, core CI and branch protection | Ertuğrul | Existing core-architecture reviewers; `web/` is assigned to Ertuğrul |
+
+İbrahim's data-side ownership and Tuna's architecture authority remain in place. The backend
+paths list alternative reviewers; listing three people there does not extend the all-three
+approval rule below to the whole backend. For İbrahim's backend PRs, Ertuğrul records the
+integration review. A CI change still needs core-architecture sign-off even when it accompanies
+a backend change. The operational assignment does not transfer measurement or model work.
 
 ## Core architecture and platform are different work
 
