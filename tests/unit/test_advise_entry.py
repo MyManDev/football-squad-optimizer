@@ -109,7 +109,12 @@ def test_uncomputed_combinations_are_refused_not_faked(world: dict[str, Any]) ->
     with pytest.raises(EntryError, match="needs a rival"):
         call(_request(strategy="fark-yarat"))
     with pytest.raises(EntryError, match="not computed"):
+        call(_request(window=2))
+    # A saf-puan window is computed, but only from the capture's horizon builder.
+    with pytest.raises(EntryError, match="horizon builder"):
         call(_request(window=3))
+    with pytest.raises(EntryError, match="window 1 only"):
+        call(_request(strategy="fark-yarat", rival_entry_id=202, window=5))
     with pytest.raises(EntryError, match="not in the catalogue"):
         call(_request(strategy="kaptan-taklidi"))
     with pytest.raises(EntryError, match="not wired"):

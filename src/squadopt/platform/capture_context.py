@@ -29,6 +29,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from squadopt.application.advice import HorizonBuilder, member_horizon_builder
 from squadopt.application.entries import EntryPicks
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
@@ -150,13 +151,15 @@ class CaptureIdentity:
 
 @dataclass(frozen=True, slots=True)
 class AdviceCaptureContext:
-    """One capture, read once, as the four collaborators ``advise_entry`` requires."""
+    """One capture, read once, as the collaborators ``advise_entry`` requires: the four
+    every request needs, and the horizon builder a multi-week window needs."""
 
     context: AdviceRequestContext
     inputs: RecommendationInputs
     projection: Projection
     rules: SeasonRules
     provider: CapturePicksProvider
+    horizon_builder: HorizonBuilder
 
 
 def latest_snapshot_id(snapshot_root: Path | str) -> str | None:
@@ -253,4 +256,9 @@ def load_capture_context(identity: CaptureIdentity) -> AdviceCaptureContext:
         projection=projection,
         rules=rules,
         provider=CapturePicksProvider(identity.snapshot, inputs.snapshot_id),
+        # The same capture and handoff, as the multi-week windows read them; built once
+        # per window for the life of this context and shared by every request.
+        horizon_builder=member_horizon_builder(
+            identity.snapshot, season=inputs.season, in_season=identity.handoff
+        ),
     )

@@ -324,7 +324,7 @@ const en = {
   leagueMembers: {
     loading: "Loading league members…",
     computeTitle: "Compute this plan",
-    computeBodySelf: "Compute this one-week plan from your own squad.",
+    computeBodySelf: "Compute this plan from your own squad.",
     computeBodyOther:
       "You are viewing another member. The computation starts from this member's public squad.",
     computeRivalNearest: "Nearest above in the standings",
@@ -337,7 +337,7 @@ const en = {
     computeDone: "Plan available",
     computePublished: "Published plan",
     computeUnsupportedSelection:
-      "Compute supports one-week plans: pure points, or a strategy with a rival chosen. Longer windows are not computed for members yet.",
+      "Compute supports pure points at one, three or five weeks, and a one-week strategy with a rival chosen. A rival strategy is not computed over a longer window.",
     computeProvenance: (capture: string, at: string) => `Capture ${capture}, result dated ${at}.`,
     computeStaticFallback: "The backend was unreachable; this is the published static answer.",
     computeUnavailable:
@@ -389,7 +389,20 @@ const en = {
     rivalNote: "The rival's public eleven is a constraint and a comparison, nothing more.",
     windowLegend: "Window",
     windowNotComputed:
-      "One week at a time: three- and five-week plans are not computed, because the multi-week projection has not been measured for this path.",
+      "Only the one-week plan is on hand for this choice: three- and five-week plans exist for pure points only, and only where this publish solved them; a rival strategy is one week at a time.",
+    windowLimits:
+      "A three- or five-week plan repeats the week-1 projection over the fixture calendar, one transfer a week, and is published with the limits it assumes; it is not a forecast of the later weeks.",
+    windowTitle: (weeks: number) => `The ${weeks}-week window`,
+    windowRule:
+      "The moves and the lineup above are the first week's. Each row below is one gameweek of the plan, in expected points under the limits stated here.",
+    windowLimitsLabel: "What this window assumes",
+    windowWeek: "Week",
+    windowWeekOf: (gameweek: number) => `GW${gameweek}`,
+    windowHits: "Hit points",
+    windowPoints: "Expected points",
+    // The producer's limit sentences travel in the payload; English shows them as
+    // written, so nothing is listed here and every sentence falls through unchanged.
+    statedLimits: {} as Record<string, string>,
     controlUnprovenBody: (gap: string) =>
       `The pure-points plan behind this price was not proven optimal (gap ≤ ${gap} pts): the tag is a reading with that bound, not a proof.`,
     overlapLine: (count: number) => `${count} of the rival's eleven in your fifteen`,
@@ -939,7 +952,7 @@ const tr: MessageSchema<typeof en> = {
   },
   leagueMembers: {
     computeTitle: "Bu planı hesapla",
-    computeBodySelf: "Bu bir haftalık planı kendi kadrondan hesaplat.",
+    computeBodySelf: "Bu planı kendi kadrondan hesaplat.",
     computeBodyOther:
       "Başka bir üyeye bakıyorsun. Hesap bu üyenin herkese açık kadrosundan başlar.",
     computeRivalNearest: "Sıralamada hemen üstündeki",
@@ -952,7 +965,7 @@ const tr: MessageSchema<typeof en> = {
     computeDone: "Plan hazır",
     computePublished: "Yayınlanmış plan",
     computeUnsupportedSelection:
-      "Hesapla bir haftalık planları destekler: saf puan ya da rakip seçilmiş bir strateji. Daha uzun pencereler üyeler için henüz hesaplanmıyor.",
+      "Hesapla saf puanı bir, üç ve beş haftada, rakip seçilmiş bir stratejiyi ise bir haftada destekler. Rakip stratejisi daha uzun pencerede hesaplanmaz.",
     computeProvenance: (capture: string, at: string) => `Capture ${capture}, sonuç tarihi ${at}.`,
     computeStaticFallback: "Backend'e ulaşılamadı; bu, yayınlanmış statik cevap.",
     computeUnavailable: "Şu an yalnız yayınlanmış site var; bu kombinasyon yayınlanmamış.",
@@ -1002,7 +1015,33 @@ const tr: MessageSchema<typeof en> = {
     rivalNote: "Rakibin açık on biri bir kısıt ve bir karşılaştırmadır, başka bir şey değil.",
     windowLegend: "Pencere",
     windowNotComputed:
-      "Haftalık: üç ve beş haftalık planlar hesaplanmıyor, çünkü çok haftalı projeksiyon bu yol için ölçülmedi.",
+      "Bu seçim için yalnız bir haftalık plan var: üç ve beş haftalık planlar yalnız saf puan için ve yalnız bu yayının çözdüğü yerde var; rakip stratejisi hafta hafta oynanır.",
+    windowLimits:
+      "Üç ya da beş haftalık plan 1. hafta projeksiyonunu fikstür takvimi üzerinde tekrarlar, haftada bir transferle; varsaydığı sınırlarla yayınlanır ve sonraki haftaların tahmini değildir.",
+    windowTitle: (weeks) => `${weeks} haftalık pencere`,
+    windowRule:
+      "Yukarıdaki hamleler ve kadro ilk haftanın. Aşağıdaki her satır planın bir oyun haftası; beklenen puan, burada yazılı sınırlar altında.",
+    windowLimitsLabel: "Bu pencerenin varsaydıkları",
+    windowWeek: "Hafta",
+    windowWeekOf: (gameweek) => `OH${gameweek}`,
+    windowHits: "Hit puanı",
+    windowPoints: "Beklenen puan",
+    // The producer's sentences, keyed exactly as its payload carries them; a sentence
+    // the site does not know falls through in the producer's own words.
+    statedLimits: {
+      "The first week's projection is repeated over the later weeks, scaled by each club's fixture count from the captured calendar; the later weeks are not projected separately.":
+        "İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır, her kulübün capture'daki takvimdeki maç sayısıyla ölçeklenir; sonraki haftalar ayrıca projekte edilmez.",
+      "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
+        "Oynayabilirlik bir kez, capture'dan uygulanır: sonrasındaki sakatlıklar, rotasyon ve cezalar görülmez.",
+      "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.":
+        "Pencere içindeki her hafta, ilki dahil, bir transferle sınırlıdır (wildcard haftası hariç); bir haftalık planda böyle bir sınır yoktur.",
+      "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.":
+        "Top-100 düzeltmesi ilk haftanın sayılarının içindedir ve tekrar onu sonraki her haftaya taşır.",
+      "Prices are held at the captured values; no price change is modelled.":
+        "Fiyatlar capture'daki değerlerde tutulur; fiyat değişimi modellenmez.",
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.":
+        "Pencere içinde çip önerilmez. Sonlu bir pencere, bir çipi elde tutmaya değer biçmez; ulaşabilse harcardı. Çip zamanlaması sezonluk bir karardır ve bu pencere onu fiyatlayamaz.",
+    },
     controlUnprovenBody: (gap: string) =>
       `Bu fiyatın arkasındaki saf puan planı en iyi diye kanıtlanamadı (fark ≤ ${gap} puan): etiket o sınırla bir okuma, kanıt değil.`,
     overlapLine: (count: number) => `rakibin on birinden ${count} tanesi senin on beşinde`,

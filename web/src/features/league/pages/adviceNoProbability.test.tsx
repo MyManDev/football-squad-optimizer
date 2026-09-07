@@ -38,7 +38,11 @@ function withAdvice(overrides: Partial<EntryAdvice>): LeagueViewEnvelope<EntryAd
 function renderState(language: Language, advice: LeagueViewEnvelope<EntryAdvice>): string {
   const { container, unmount } = render(
     <LanguageProvider initialLanguage={language}>
-      <MemoryRouter initialEntries={["/league/members/35249001?mode=" + advice.payload.mode]}>
+      <MemoryRouter
+        initialEntries={[
+          `/league/members/35249001?mode=${advice.payload.mode}&window=${advice.payload.window}`,
+        ]}
+      >
         <LeagueMemberView
           squad={mockEntrySquadEnvelopes[35249001]}
           advice={advice}
@@ -75,6 +79,10 @@ const STATES: Array<[string, LeagueViewEnvelope<EntryAdvice>]> = [
     withAdvice({ data_quality: "partial", missing_fields: ["free_transfers"], moves: [] }),
   ],
   ["legacy document without solver fields", withAdvice({})],
+  // The multi-week window: the per-week table, the stated limits and the found-not-proven
+  // badge, all in expected points and plain sentences.
+  ["three-week window", mockEntryAdviceEnvelope(35249001, "saf-puan", 3)],
+  ["five-week window", mockEntryAdviceEnvelope(35249001, "saf-puan", 5)],
 ];
 
 describe("no advice state shows a probability, in either language", () => {

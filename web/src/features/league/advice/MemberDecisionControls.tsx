@@ -5,9 +5,10 @@
  * (strategy, rival) and an index that says which exist — so every option here names
  * something that was actually solved from this member's squad, or says plainly that it
  * was not. The rival list is the league's other members; the standings neighbour the
- * producer chose is the default and is labelled as such. Windows beyond one week are
- * shown and disabled: the site does not compute them for members, and it says why
- * rather than hiding the choice.
+ * producer chose is the default and is labelled as such. Windows are enabled only where
+ * the index lists them — pure points at three and five weeks when this publish solved
+ * them — and the note says what a longer window assumes; a rival strategy stays at one
+ * week, and a window nobody computed is shown disabled rather than hidden.
  *
  * Selection lives in the URL (`mode`, `rival`, `window`), the same parameters the
  * templates set and the compute panel reads, so the whole state stays shareable.
@@ -28,7 +29,7 @@ import {
   type HumanEntryView,
   type MemberStrategy,
 } from "../types";
-import { rivalCandidates } from "./adviceSelection";
+import { availableWindows, rivalCandidates } from "./adviceSelection";
 import styles from "./MemberDecisionControls.module.css";
 
 export function MemberDecisionControls({
@@ -60,9 +61,10 @@ export function MemberDecisionControls({
     : (defaultRival ?? rivalIds[0] ?? null);
   const unavailable = new Set(
     (index?.unavailable ?? [])
-      .filter((entry) => entry.strategy === strategy)
+      .filter((entry) => entry.strategy === strategy && entry.rival_entry_id !== null)
       .map((entry) => entry.rival_entry_id),
   );
+  const windows = availableWindows(index, strategy);
 
   function update(changes: Record<string, string | null>): void {
     const next = new URLSearchParams(searchParams);
@@ -149,14 +151,16 @@ export function MemberDecisionControls({
                   name="window"
                   value={window}
                   checked={windowSize === window}
-                  disabled={window !== 1}
+                  disabled={!windows.includes(window)}
                   onChange={() => update({ window: String(window) })}
                 />
                 <span>{messages.decision.week(window)}</span>
               </label>
             ))}
           </div>
-          <p className={styles.note}>{copy.windowNotComputed}</p>
+          <p className={styles.note}>
+            {windows.length > 1 ? copy.windowLimits : copy.windowNotComputed}
+          </p>
         </fieldset>
       </div>
       <p className={styles.honesty}>{copy.honestyRule}</p>
