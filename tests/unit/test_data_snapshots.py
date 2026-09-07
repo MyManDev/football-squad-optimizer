@@ -343,3 +343,48 @@ def test_a_directory_without_metadata_is_not_listed_as_a_snapshot(tmp_path: Path
 
 def test_listing_an_absent_root_is_empty_rather_than_an_error(tmp_path: Path) -> None:
     assert list_snapshot_ids(tmp_path / "never-captured") == ()
+
+
+def test_lexical_order_is_capture_order_only_within_one_source(tmp_path: Path) -> None:
+    """The listing's ordering claim, and the exact case where it does not hold.
+
+    An identifier leads with its source, so a sort orders by collector name before it
+    orders by time. Several collectors default to the same root, which is how the last
+    entry of an unfiltered listing came to mean "whichever source sorts last" rather than
+    "the newest capture".
+    """
+
+    live = _write(tmp_path, captured_at="2026-08-21T17:00:00Z")
+    cohort = _write(tmp_path, source="fpl-top200", captured_at="2026-01-01T12:00:00Z")
+
+    # Older, and still last: the unfiltered listing is a listing, not a choice.
+    assert list_snapshot_ids(tmp_path) == (live, cohort)
+    assert list_snapshot_ids(tmp_path, source=SOURCE) == (live,)
+    assert list_snapshot_ids(tmp_path, source="fpl-top200") == (cohort,)
+
+
+def test_one_source_still_lists_in_capture_order(tmp_path: Path) -> None:
+    later = _write(tmp_path, captured_at="2026-08-21T17:00:00Z")
+    earlier = _write(tmp_path, captured_at="2026-08-21T16:00:00Z")
+    _write(tmp_path, source="fpl-top100", captured_at="2026-08-21T18:00:00Z")
+
+    assert list_snapshot_ids(tmp_path, source=SOURCE) == (earlier, later)
+
+
+def test_a_source_nothing_captured_lists_nothing(tmp_path: Path) -> None:
+    """Empty rather than falling back to another collector's capture."""
+
+    _write(tmp_path)
+
+    assert list_snapshot_ids(tmp_path, source="fpl-elite-picks") == ()
+
+
+def test_a_source_filter_is_held_to_the_same_shape_a_capture_is_written_with(
+    tmp_path: Path,
+) -> None:
+    """A filter that cannot name a real source would silently match nothing."""
+
+    _write(tmp_path)
+
+    with pytest.raises(DataSourceError):
+        list_snapshot_ids(tmp_path, source="Not A Source")
