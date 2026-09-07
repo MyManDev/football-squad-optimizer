@@ -961,6 +961,157 @@ def test_the_menu_does_not_move_the_baseline_bytes(world: dict[str, Any], tmp_pa
     assert not (tmp_path / "plain" / "advice" / "101" / "index.json").exists()
 
 
+def _standings_with_totals(totals: dict[int, int]) -> dict[int, MemberStanding]:
+    return {
+        entry_id: MemberStanding(
+            entry_id=entry_id,
+            team_name=f"Team {entry_id}",
+            manager_name=f"Manager {entry_id}",
+            rank=rank,
+            total_points=total,
+        )
+        for rank, (entry_id, total) in enumerate(totals.items(), start=1)
+    }
+
+
+def test_the_index_carries_the_declared_rules_pick_with_the_inputs_it_read(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The rule is a band on the gap, published with the gap and the weeks it read.
+
+    Three members, three bands: the leader is far enough clear to be told to mirror, the
+    chaser far enough behind to be told to differentiate, and the member level with their
+    neighbour is left on pure points. Nothing is asserted about the rule being right —
+    only that the index states which rule ran, on which two numbers.
+    """
+
+    import datetime
+
+    from squadopt.application.strategies.rule import STRATEGY_RULE_ID, suggest_strategy
+
+    inputs, projection, rules = _world_context(world)
+    provider, registrations = _three_member_league(world)
+    when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "rule",
+        standings=_standings_with_totals({101: 400, 202: 100, 303: 90}),
+        scored_gameweek=1,
+        now=when,
+    )
+    expected_rivals = {101: 202, 202: 101, 303: 202}
+    expected_slugs = {101: "ortak-koru", 202: "fark-yarat", 303: "saf-puan"}
+    totals = {101: 400, 202: 100, 303: 90}
+    for entry_id, rival_id in expected_rivals.items():
+        index = json.loads(
+            (tmp_path / "rule" / "advice" / str(entry_id) / "index.json").read_text(
+                encoding="utf-8"
+            )
+        )["payload"]
+        suggested = index["suggested_strategy"]
+        assert (
+            suggested
+            == suggest_strategy(
+                rival_entry_id=rival_id,
+                points_ahead_of_rival=totals[entry_id] - totals[rival_id],
+                gameweek=2,
+                scored_gameweek=1,
+            ).to_dict()
+        )
+        assert suggested["strategy"] == expected_slugs[entry_id]
+        assert suggested["rule_id"] == STRATEGY_RULE_ID
+        assert suggested["strategy"] in index["strategies"]
+        # The two inputs a reader needs to re-apply the rule, and the edge they met.
+        assert suggested["points_ahead_of_rival"] == totals[entry_id] - totals[rival_id]
+        assert suggested["gameweeks_remaining"] == 37
+        assert suggested["band_edge_points"] > 0
+
+
+def test_the_rules_pick_is_absent_when_the_totals_are_not_proven(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """No standings totals, no gap, no suggestion — an absent field, never a guessed one."""
+
+    import datetime
+
+    inputs, projection, rules = _world_context(world)
+    provider, registrations = _three_member_league(world)
+    when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "silent",
+        standings=_standings(101, 202, 303),
+        now=when,
+    )
+    for entry_id in (101, 202, 303):
+        index = json.loads(
+            (tmp_path / "silent" / "advice" / str(entry_id) / "index.json").read_text(
+                encoding="utf-8"
+            )
+        )["payload"]
+        assert index["suggested_strategy"] is None
+
+
+def test_the_rules_pick_does_not_move_a_single_advice_file(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The rule points at one of the member's files; it never enters one.
+
+    Every advice document is still computed from that member's own squad, so the whole
+    advice tree is byte-identical whether or not the standings prove a gap to read.
+    """
+
+    import datetime
+
+    inputs, projection, rules = _world_context(world)
+    provider, registrations = _three_member_league(world)
+    when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    for name, kwargs in (
+        ("without", {"standings": _standings(101, 202, 303)}),
+        (
+            "with",
+            {
+                "standings": _standings_with_totals({101: 400, 202: 100, 303: 90}),
+                "scored_gameweek": 1,
+            },
+        ),
+    ):
+        build_league_views(
+            provider,
+            registrations,
+            inputs,
+            projection,
+            rules,
+            league_id=352490,
+            league_name="Test League",
+            out_dir=tmp_path / name,
+            now=when,
+            **kwargs,  # type: ignore[arg-type]
+        )
+    advice_files = sorted(
+        path.relative_to(tmp_path / "without")
+        for path in (tmp_path / "without" / "advice").rglob("*.json")
+        if path.name != "index.json"
+    )
+    assert advice_files
+    for relative in advice_files:
+        assert (tmp_path / "without" / relative).read_bytes() == (
+            tmp_path / "with" / relative
+        ).read_bytes()
+
+
 def test_a_rival_that_cannot_be_priced_is_recorded_not_fatal(
     world: dict[str, Any], tmp_path: Path
 ) -> None:

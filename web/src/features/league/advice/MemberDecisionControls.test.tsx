@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { mockEntryAdviceIndex, mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdviceIndex } from "../types";
 import { MemberDecisionControls } from "./MemberDecisionControls";
 
@@ -131,17 +132,85 @@ describe("member decision controls", () => {
     expect(select).toHaveValue(String(humans[0]!.entry_id));
   });
 
-  it("never shows a probability or a chance, in either language", () => {
-    for (const language of ["tr", "en"] as const) {
+  it("labels the declared rule's pick without preselecting it", () => {
+    const base = mockEntryAdviceIndex(ENTRY).payload;
+    const index: EntryAdviceIndex = {
+      ...base,
+      suggested_strategy: {
+        ...base.suggested_strategy!,
+        strategy: "fark-yarat",
+        band: "behind",
+        points_ahead_of_rival: -140,
+      },
+    };
+    renderControls(`/league/members/${ENTRY}`, index, "en");
+
+    const marked = screen.getByRole("radio", { name: /Create a gap.*The rule's pick/s });
+    expect(marked).not.toBeChecked();
+    // The rule marks; the URL still chooses. Nothing was selected on the member's behalf.
+    expect(screen.getByDisplayValue("saf-puan")).toBeChecked();
+    expect(screen.getByText(/A declared rule marks one option/)).toBeInTheDocument();
+    // The two inputs the rule read are on the page, so the member can check it.
+    expect(screen.getByText(/\(-140\)/)).toBeInTheDocument();
+    expect(screen.getByText(/37 gameweeks still to play/)).toBeInTheDocument();
+  });
+
+  it("says the rule is declared rather than measured, in both languages", () => {
+    const claims = [
+      [/written down, not measured/, /nothing has tested whether following it does better/],
+      [/Kural yazılı, ölçülmüş değil/, /uymanın uymamaktan daha iyi olduğu test edilmedi/],
+    ] as const;
+    for (const [language, patterns] of [
+      ["en", claims[0]],
+      ["tr", claims[1]],
+    ] as const) {
       const { container, unmount } = renderControls(
-        `/league/members/${ENTRY}?mode=ortak-koru`,
+        `/league/members/${ENTRY}`,
         undefined,
         language,
       );
       const text = container.textContent ?? "";
-      expect(text).not.toMatch(/%|probabilit|olasılık|\bP\(/i);
-      expect(text).not.toMatch(/chance of falling behind|geride kalma ihtimalini/i);
+      for (const pattern of patterns) expect(text).toMatch(pattern);
       unmount();
+    }
+  });
+
+  it("shows no rule label when the producer could not state one", () => {
+    const base = mockEntryAdviceIndex(ENTRY).payload;
+    renderControls(`/league/members/${ENTRY}`, { ...base, suggested_strategy: null }, "en");
+    expect(screen.queryByText(/A declared rule marks one option/)).toBeNull();
+    expect(screen.queryByText("The rule's pick")).toBeNull();
+  });
+
+  it("never shows a probability or a chance, in either language", () => {
+    for (const language of ["tr", "en"] as const) {
+      for (const mode of ["ortak-koru", "fark-yarat", "saf-puan"] as const) {
+        const { container, unmount } = renderControls(
+          `/league/members/${ENTRY}?mode=${mode}`,
+          undefined,
+          language,
+        );
+        const text = container.textContent ?? "";
+        // The rule's label is on the page for this sweep, not merely available to it.
+        expect(text).toMatch(/rule's pick|Kuralın seçimi/i);
+        expect(text).not.toMatch(/%|probabilit|olasılık|\bP\(/i);
+        expect(text).not.toMatch(/chance of falling behind|geride kalma ihtimalini/i);
+        unmount();
+      }
+    }
+  });
+
+  it("phrases the rule as a band on the gap, never as a chance of catching up", () => {
+    // The page-wide sweep above cannot carry these words: the honesty note that denies
+    // probability says "chance" itself. So the rule's own copy is swept on its own, in
+    // both languages, against every word that would turn a band into a likelihood.
+    const AS_A_CHANCE = /chance|likelihood|odds|ihtimal|şans|yüzde|olasılık|probabilit|%/i;
+    for (const language of ["tr", "en"] as const) {
+      const copy = MESSAGES[language].leagueMembers;
+      for (const line of [copy.rulePickBadge, copy.rulePickNote("Half Space", "-140", 37)]) {
+        expect(line.length).toBeGreaterThan(0);
+        expect(line).not.toMatch(AS_A_CHANCE);
+      }
     }
   });
 });

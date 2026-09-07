@@ -75,6 +75,10 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # expected points) and the sentences naming what the window assumes.
         "plan_weeks",
         "stated_limits",
+        # The declared rule's pick for the week, with the gap and the weeks remaining it
+        # read (``strategies/rule.py``). A band on points, stamped with the rule's id and
+        # version — never a chance of catching up, which is why it fits in here at all.
+        "suggested_strategy",
     }
 )
 
