@@ -29,6 +29,7 @@ from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
+from squadopt.application.advice import member_horizon_builder
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import (
     MemberRender,
@@ -146,6 +147,11 @@ def _worker_init(
         inputs=inputs,
         projection=project(inputs, panel, in_season=in_season),
         rules=read_season_rules(snapshot, season=season),
+        # The multi-week horizon is built once per window in each worker and shared by
+        # every member the worker renders; it is the same bytes in every process.
+        horizon_builder=member_horizon_builder(
+            snapshot, season=season, panel=panel, in_season=in_season
+        ),
     )
 
 
@@ -331,13 +337,22 @@ def main() -> int:
                 mode_paths=mode_paths,
                 rival_menu=not arguments.no_rival_menu,
                 mapper=mapper,
+                # The saf-puan three- and five-week windows, from the same capture and
+                # handoff the one-week advice reads.
+                horizon_builder=member_horizon_builder(
+                    snapshot, season=season, panel=panel, in_season=in_season
+                ),
             )
         print(f"Rendered {report.rendered_count} of {len(report.members)} members into {out_dir}")
         for member in report.members:
             if not member.rendered:
                 print(f"  not rendered  {member.entry_id}  {member.reason}")
         menu_files = sum(1 for name in report.files if "/vs-" in name)
-        print(f"Wrote {len(report.files)} files, {menu_files} of them rival-menu entries")
+        window_files = sum(1 for name in report.files if name.endswith(("/3.json", "/5.json")))
+        print(
+            f"Wrote {len(report.files)} files, {menu_files} of them rival-menu entries and "
+            f"{window_files} of them multi-week windows"
+        )
         return 0
     except (DataError, OSError, ValueError) as error:
         print(f"build_league_site failed:\n  {error}", file=sys.stderr)

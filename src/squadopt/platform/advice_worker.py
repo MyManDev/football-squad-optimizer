@@ -135,6 +135,7 @@ def build_advice_compute(
             inputs=capture.inputs,
             projection=capture.projection,
             rules=capture.rules,
+            horizon_builder=capture.horizon_builder,
         )
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
