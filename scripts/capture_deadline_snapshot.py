@@ -34,6 +34,8 @@ def main() -> int:
     )
     arguments = parser.parse_args()
     if arguments.list:
+        # Deliberately unfiltered: this prints the root's contents rather than choosing a
+        # capture from it, and an operator asking what is held wants every collector's.
         identifiers = list_snapshot_ids(SNAPSHOT_ROOT)
         if not identifiers:
             print(f"No snapshots under {SNAPSHOT_ROOT}.")

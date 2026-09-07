@@ -626,7 +626,13 @@ def test_the_latest_capture_is_the_latest_live_one(world: dict[str, Any]) -> Non
     """A Top-100 capture sharing the root sorts after every live one and is not a
     projection input."""
 
-    (world["snapshot_root"] / "fpl-top100-99999999T000000Z-ffffffffffff").mkdir()
+    write_snapshot(
+        world["snapshot_root"],
+        source="fpl-top100",
+        captured_at_utc="2099-01-01T00:00:00Z",
+        payloads={"league-352490-standings-page-1.json": b"{}"},
+    )
+
     assert producer._latest_snapshot_id(world["snapshot_root"]).startswith("fpl-live-")
 
 

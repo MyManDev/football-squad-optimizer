@@ -6,10 +6,18 @@ machine that produced one and fail everywhere else.
 """
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
-from scripts.build_league_site import last_scored_gameweek, member_points
+from scripts.build_league_site import (
+    last_scored_gameweek,
+    member_points,
+    resolve_live_snapshot_id,
+)
+
+from squadopt.data.errors import DataError
+from squadopt.data.snapshots import write_snapshot
 
 
 def _history(rows: list[dict[str, Any]]) -> bytes:
@@ -98,3 +106,41 @@ def test_the_pool_mapper_runs_render_member_only() -> None:
             render_member, provider=None, inputs=None, projection=None, rules=None
         )
         assert list(mapper(bound, [])) == []  # type: ignore[arg-type]
+
+
+def test_the_league_tree_is_built_from_the_latest_live_capture(tmp_path: Path) -> None:
+    """A cohort capture must not win the selection on the strength of its name.
+
+    Top-100 and elite-picks captures share the snapshot root and their identifiers sort
+    after every ``fpl-live`` one, so "the last directory" is not "the latest capture".
+    Only a live capture carries the entry histories and standings the tree is built from.
+    """
+
+    live = write_snapshot(
+        tmp_path,
+        source="fpl-live",
+        captured_at_utc="2026-08-21T15:00:00Z",
+        payloads={"bootstrap-static.json": b"{}"},
+    ).snapshot_id
+    cohort = write_snapshot(
+        tmp_path,
+        source="fpl-top100",
+        captured_at_utc="2026-01-01T12:00:00Z",
+        payloads={"league-352490-standings-page-1.json": b"{}"},
+    ).snapshot_id
+
+    assert resolve_live_snapshot_id(tmp_path, None) == live
+    # Naming a capture is the operator's own choice and is checked against them all.
+    assert resolve_live_snapshot_id(tmp_path, cohort) == cohort
+
+
+def test_a_root_holding_no_live_capture_names_what_is_missing(tmp_path: Path) -> None:
+    write_snapshot(
+        tmp_path,
+        source="fpl-elite-picks",
+        captured_at_utc="2026-08-21T15:00:00Z",
+        payloads={"league-352490-standings-page-1.json": b"{}"},
+    )
+
+    with pytest.raises(DataError, match="No fpl-live"):
+        resolve_live_snapshot_id(tmp_path, None)

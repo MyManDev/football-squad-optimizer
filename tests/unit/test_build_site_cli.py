@@ -70,10 +70,9 @@ def _cohort_capture(root: Path, *, source: str, captured_at: str) -> None:
 
 
 def _argv(tmp_path: Path) -> list[str]:
-    # --no-status skips the season tick, which does its own unfiltered capture selection in
-    # `squadopt.application.season._read_state` and therefore fails on a mixed root before
-    # this shell's selection is reached. That call site is the application owner's; these
-    # tests are about the selection this shell makes.
+    # --no-status skips the season tick, keeping these tests about the selection this shell
+    # makes. The tick makes its own, in `squadopt.application.season._read_state`; that one
+    # names its source too now, and `tests/unit/test_season_tick.py` pins it.
     return [
         "build_site",
         "--no-status",

@@ -41,6 +41,7 @@ from squadopt.application.league_views import (
 from squadopt.application.mode_selection import build_mode_paths
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     EntryGameweekPoints,
     fpl_entry_history_points,
@@ -98,23 +99,22 @@ SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
 ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
 REGISTRY_PATH = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
 
-#: Only a live capture can serve the league tree; Top-100 and elite-picks captures share
-#: the snapshot root and sort after it by name, so "the latest snapshot" must not be
-#: "the last directory".
-LIVE_SNAPSHOT_PREFIX = "fpl-live-"
-
 
 def resolve_live_snapshot_id(root: Path, requested: str | None) -> str:
-    """The capture to read: the one named, or the most recent *live* one held."""
+    """The capture to read: the one named, or the most recent *live* one held.
 
-    identifiers = list_snapshot_ids(root)
+    Only a live capture can serve the league tree; Top-100 and elite-picks captures share
+    the snapshot root and sort after it by name, so "the latest snapshot" must not be
+    "the last directory".
+    """
+
     if requested:
-        if requested not in identifiers:
+        if requested not in list_snapshot_ids(root):
             raise DataError(f"No snapshot {requested!r} under {root}.")
         return requested
-    live = [name for name in identifiers if name.startswith(LIVE_SNAPSHOT_PREFIX)]
+    live = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
     if not live:
-        raise DataError(f"No {LIVE_SNAPSHOT_PREFIX}* snapshots under {root}; capture one first.")
+        raise DataError(f"No {FPL_LIVE_SOURCE}-* snapshots under {root}; capture one first.")
     return live[-1]
 
 
