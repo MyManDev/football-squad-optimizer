@@ -23,15 +23,30 @@ def _plan(**overrides: object):  # type: ignore[no-untyped-def]
 
 def test_a_fresh_week_runs_every_producing_step_and_leaves_publishing_to_a_flag() -> None:
     plan = _plan()
-    assert plan.steps == ("capture", "top100", "handoff", "league", "site")
+    # Top-100 first: the projection refuses evidence captured after the decision capture.
+    assert plan.steps == ("top100", "capture", "handoff", "league", "site")
     assert "publish" in plan.reasons
     assert "publish" in plan.describe()
 
 
 def test_a_named_capture_skips_capturing_and_says_which_one_it_reuses() -> None:
-    plan = _plan(snapshot_id="fpl-live-20260911T100000Z-abc123def456")
+    plan = _plan(
+        snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        cohort_snapshot="fpl-top100-x",
+        elite_snapshot="fpl-elite-picks-y",
+    )
     assert "capture" not in plan.steps
     assert "fpl-live-20260911T100000Z-abc123def456" in plan.reasons["capture"]
+
+
+def test_a_reused_capture_refuses_fresh_top100_captures() -> None:
+    """Evidence captured after the decision capture is refused at the handoff, so the
+    plan refuses the combination up front rather than an hour in."""
+
+    with pytest.raises(WeekError, match="taken before it"):
+        _plan(snapshot_id="fpl-live-20260911T100000Z-abc123def456")
+    plan = _plan(snapshot_id="fpl-live-20260911T100000Z-abc123def456", skip_top100=True)
+    assert plan.steps == ("handoff", "league", "site")
 
 
 def test_skipping_top100_removes_the_whole_step() -> None:
@@ -43,7 +58,7 @@ def test_skipping_top100_removes_the_whole_step() -> None:
 def test_reused_top100_captures_still_run_the_export() -> None:
     plan = _plan(cohort_snapshot="fpl-top100-x", elite_snapshot="fpl-elite-picks-y")
     assert "top100" in plan.steps
-    assert "export still runs" in plan.reasons["top100"]
+    assert "export reused" in plan.reasons["top100"]
 
 
 def test_publish_is_the_last_step_when_asked() -> None:

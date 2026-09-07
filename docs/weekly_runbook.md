@@ -15,16 +15,18 @@ Run it from the checkout you mean to publish from, with that checkout's `src` on
 
 | step | script | what it needs | what it leaves |
 | --- | --- | --- | --- |
-| capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league id | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, the last five event-live documents, every member's three documents and the standings page |
 | top100 | `scripts.capture_top100_cohort`, `scripts.capture_elite_picks`, `scripts.export_player_evidence` | before the deadline; target gameweek ≥ 2 | `fpl-top100-*` and `fpl-elite-picks-*` snapshots; `artifacts/phase_b/player_evidence_v1_<season>_gw<NN>_top100.{csv,manifest.json}` |
-| handoff | `scripts.build_projection_handoff --snapshot-id <capture>` | the capture above | `data/handoffs/<season>-gw<NN>.json` — the Phase C component route by default; `--projection elite` applies the Top-100 uplift on the legacy blend instead |
+| capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league id | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, the last five event-live documents, every member's three documents and the standings page |
+| handoff | `scripts.build_projection_handoff --snapshot-id <capture> --evidence-table … --evidence-manifest …` | the capture above and the evidence | `data/handoffs/<season>-gw<NN>.json` — the Phase C component projection with the bounded Top-100 uplift on top (`phase-c-component-elite-top100-v1`); `--projection component-only` leaves the uplift out; without settled live history the producer falls back to the legacy blend and says so |
 | league | `scripts.build_league_site --workers N` | the capture and the handoff | `web/public/data/league/**`: `members.json`, `entries/<id>.json`, `advice/<id>/saf-puan/1.json`, `advice/<id>/<strategy>/1.json` (the standings neighbour), `advice/<id>/<strategy>/1/vs-<rival>.json`, `advice/<id>/index.json` |
 | site | `scripts.build_site` | the ledger and captures | `web/public/data/**` season views |
 | publish | `scripts.publish_gameweek_site --league … --snapshot-id … --in-season-projection … --workers …` (only with `--publish`) | a clean `origin/develop` | a worktree, a commit of `web/public/data`, a push, a pull request; then the printed human steps: merge, release, tag, dispatch |
 
-Every step is skippable by naming its output: `--snapshot-id` reuses a capture,
-`--cohort-snapshot` / `--elite-snapshot` reuse the Top-100 captures (the export still
-runs), `--skip-top100` leaves the evidence out. The command stops at the first refusal
+Every step is skippable by naming its output: `--cohort-snapshot` / `--elite-snapshot`
+reuse the Top-100 captures (an export already on disk for that picks capture is reused),
+`--snapshot-id` reuses a live capture — then the Top-100 captures must be reused or
+skipped too, because the projection refuses evidence captured after the decision capture
+— and `--skip-top100` leaves the evidence out. The command stops at the first refusal
 and prints what refused.
 
 ## Timing
