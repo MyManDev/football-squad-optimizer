@@ -40,6 +40,7 @@ from scripts._experiment_cli import REPOSITORY_ROOT, write_json
 from squadopt.application.entries import ENTRY_REGISTRY_CONTRACT_VERSION, EntryRegistry
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     LeagueStanding,
     fpl_league_standings,
@@ -58,13 +59,22 @@ def _standings_bytes(
     if standings_file is not None:
         return standings_file.read_bytes(), f"file {standings_file}"
 
-    identifiers = list_snapshot_ids(SNAPSHOT_ROOT)
-    if not identifiers:
-        raise DataError(
-            f"No snapshots under {SNAPSHOT_ROOT}. Capture one with the league endpoint "
-            "wired in, or pass --standings-file for the first seed."
-        )
-    chosen = snapshot_id or identifiers[-1]
+    if snapshot_id is not None:
+        chosen = snapshot_id
+    else:
+        # Only a live capture carries the league standings pages. Several collectors
+        # share this root and an identifier begins with its source, so a lexical listing
+        # orders by collector before capture time: a `fpl-top100` capture sorts after
+        # every `fpl-live` one however old it is, and picking it would fail below on a
+        # payload it was never going to hold. Naming a capture outright still reaches
+        # every capture held, whatever took it.
+        live = list_snapshot_ids(SNAPSHOT_ROOT, source=FPL_LIVE_SOURCE)
+        if not live:
+            raise DataError(
+                f"No {FPL_LIVE_SOURCE} snapshots under {SNAPSHOT_ROOT}. Capture one with "
+                "the league endpoint wired in, or pass --standings-file for the first seed."
+            )
+        chosen = live[-1]
     snapshot = read_snapshot(SNAPSHOT_ROOT, chosen)
     name = league_standings_payload(league_id)
     if name not in snapshot.payloads:
