@@ -3,6 +3,7 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import type { DataClient, Loaded } from "./client";
 import { StaticDataClient } from "./client";
+import type { LiveScoreView } from "./liveScore";
 import type {
   LeagueView,
   LedgerView,
@@ -19,6 +20,21 @@ export function useDataClient(): DataClient {
 }
 
 const STALE = 60_000;
+
+export function useLiveScore(
+  season: string,
+  gameweek: number,
+  enabled: boolean,
+): UseQueryResult<Loaded<LiveScoreView>> {
+  const client = useDataClient();
+  return useQuery({
+    queryKey: ["liveScore", season, gameweek],
+    queryFn: () => client.getLiveScore!(season, gameweek),
+    enabled: enabled && client.getLiveScore !== undefined,
+    staleTime: STALE,
+    retry: false,
+  });
+}
 
 export function useIndex(): UseQueryResult<Loaded<SiteIndex>> {
   const client = useDataClient();

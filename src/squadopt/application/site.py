@@ -7,11 +7,13 @@
     data/<season>/ledger.json                    LedgerView
     data/<season>/gw<NN>/recommendation.json     RecommendationView
     data/<season>/gw<NN>/pool.json               PoolView (why these players)
+    data/<season>/gw<NN>/live.json               live_score_v1 (replaceable score)
 
 An explicitly supplied horizon batch may add sanitized solver evidence to the matching
 recommendation's metadata. The ledger decision remains the rendered action.
 
-Every file is a ``ViewEnvelope``; the tree is deterministic for a given ledger and clock
+Views use ``ui_view_v1`` except the separate ``live_score_v1`` envelope. The tree is
+deterministic for a given ledger, capture and clock
 (sorted keys, fixed indent, LF line ends) and each file lands through a temporary file
 and one rename, so a reader never sees a half-written JSON.
 """
@@ -33,6 +35,11 @@ from squadopt.application.build import (
 from squadopt.application.contract import UI_VIEW_CONTRACT_VERSION, ui_view_schema
 from squadopt.application.horizon_publish import load_public_horizon_evidence
 from squadopt.application.league import league_view, ownership_view
+from squadopt.application.live_score import (
+    LIVE_SCORE_CONTRACT_VERSION,
+    live_score_schema,
+    live_score_view,
+)
 from squadopt.application.views import (
     JsonValue,
     LedgerView,
@@ -131,6 +138,16 @@ def build_site(
             )
         emit(f"{season}/gw{entry.gameweek:02d}/recommendation.json", view.to_dict())
         emit(f"{season}/gw{entry.gameweek:02d}/pool.json", pool_view(entry).to_dict())
+        live_path = f"{season}/gw{entry.gameweek:02d}/live.json"
+        _write_json(
+            data_dir / live_path,
+            {
+                "contract_version": LIVE_SCORE_CONTRACT_VERSION,
+                "generated_at_utc": generated,
+                "payload": live_score_view(entry, snapshot, generated_at_utc=generated).to_dict(),
+            },
+        )
+        written.append(live_path)
 
     ledger: LedgerView = ledger_view(Path(ledger_root), season)
     emit(f"{season}/ledger.json", ledger.to_dict())
@@ -164,6 +181,9 @@ def build_site(
     schema_path = data_dir / SCHEMA_RELATIVE_PATH
     _write_json(schema_path, ui_view_schema())
     written.append(SCHEMA_RELATIVE_PATH)
+    live_schema_path = f"schema/{LIVE_SCORE_CONTRACT_VERSION}.schema.json"
+    _write_json(data_dir / live_schema_path, live_score_schema())
+    written.append(live_schema_path)
 
     gameweeks = tuple(row.gameweek for row in ledger.rows)
     latest: dict[str, JsonValue] | None = None

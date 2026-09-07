@@ -21,6 +21,7 @@ import {
   utcShort,
 } from "../../../lib/format";
 import { Pitch } from "../components/Pitch";
+import { LiveScoreCard } from "../components/LiveScoreCard";
 import styles from "./SquadPage.module.css";
 
 /** A clock that ticks; the countdown text is derived during render. */
@@ -213,6 +214,8 @@ function Squad({
       </StatRow>
 
       {ledger && ledger.settled_gameweeks > 0 ? <SeasonStanding ledger={ledger} /> : null}
+
+      <LiveScoreCard view={view} now={now} />
 
       {view.settled && view.outcome_realized_score !== null ? (
         <Card title={copy.settledTitle} aside={<Badge tone="good">{copy.settledAside}</Badge>}>
