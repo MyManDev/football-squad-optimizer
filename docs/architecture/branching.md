@@ -15,13 +15,16 @@ latest successful immutable `site-...` deployment tag, so production may deliber
 
 ## Protection
 
-Both branches are protected. Current required checks on `develop` are the two Python gate
-contexts, `gates (py3.11)` and `gates (py3.13)`, with strict up-to-date branches. Each context
-runs the five Python gates below. The web job also runs in CI but is not currently a protected
-required context.
+Both branches are protected. Required checks on `develop` are `gates (py3.11)`,
+`gates (py3.13)` and `web (node 22)`, with strict up-to-date branches. Each Python context
+runs the five Python gates below; the web context protects the application shipped to Pages.
+
+The backend container check becomes required after its workflow lands on `develop` and passes
+there. Do not require a check before the branch's workflow can emit it. Read the protection
+settings to verify that transition; a green optional check is not a protected merge gate.
 
 The required approving review count is zero, matching the team's check-then-squash workflow.
-Force-push and branch deletion are disabled. `main` uses the same two required contexts and
+Force-push and branch deletion are disabled. `main` requires the two Python contexts and
 normal changes reach it through a deliberate release pull request from `develop`.
 
 `main` additionally allows no direct pushes at all: it moves by release merge only.
