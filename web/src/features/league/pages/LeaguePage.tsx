@@ -11,6 +11,7 @@ import { verdictText } from "../../../i18n/reasons";
 import { percent, points, signedPoints, utcShort } from "../../../lib/format";
 import { AverageChart } from "../components/AverageChart";
 import { CumulativeChart } from "../components/CumulativeChart";
+import { ScoreboardSection } from "../components/ScoreboardCard";
 import styles from "./LeaguePage.module.css";
 
 export function LeaguePage() {
@@ -76,6 +77,8 @@ export function LeaguePage() {
           <Link to="/league/members">{messages.leagueMembers.linkLabel}</Link>
         </p>
       </Card>
+
+      <ScoreboardSection />
 
       {view.rows.length > 1 ? (
         <Card title={copy.cumulative} aside={copy.points}>
