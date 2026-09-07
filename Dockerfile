@@ -14,14 +14,22 @@
 # *measured* on x86-64, and a deployment on an unmeasured architecture would be claiming
 # numbers nobody has. aarch64 becomes eligible the day its parity is measured.
 #
-# 3.13, because `constraints.txt` is the environment the committed measurements were made in
-# and it cannot be installed on anything older: `numpy==2.5.2` and `scipy==1.18.0` both
-# declare `requires_python >=3.12`, so pip refuses them on 3.11 before wheels even enter the
-# question. The alternatives were to install the declared ranges here and let the deployed
-# image drift from the measured environment, or to weaken a scientific pin so an older
-# interpreter could take it — a packaging decision quietly rewriting a measurement. So the
-# image runs the interpreter the pins were resolved on, and the 3.11 support floor keeps its
-# own proof where it already lived: CI's `gates (py3.11)` installs the declared ranges.
+# 3.13 for one demonstrated reason: the pinned set cannot be installed on 3.11.
+# `numpy==2.5.2` and `scipy==1.18.0` declare `requires_python >=3.12`, so pip refuses them
+# there before wheel availability is even consulted. An image that installs
+# `constraints.txt` therefore runs 3.13, and the 3.11 support floor keeps its own proof
+# where it already lived: CI's `gates (py3.11)` installs the declared ranges.
+#
+# What this earns, stated no wider than it is: the image holds the same package versions as
+# `constraints.txt`. It does **not** establish numerical equivalence with the environment the
+# committed measurements were recorded in — that was a different operating system, and
+# comparing the two is its own measurement, not a packaging claim. Nor is this the repair of
+# a build that was broken: the previous image installed the declared ranges and built fine.
+# What changed is what the image pins to.
+#
+# `python:3.13-slim` is a mutable tag. It is the right thing to name in a build, and the
+# wrong thing to name in a deployment: a release runs the digest of the image that was
+# actually tested (see docs/backend_runbook.md), never the tag it was built from.
 FROM --platform=linux/amd64 python:3.13-slim
 
 ENV PYTHONUNBUFFERED=1 \

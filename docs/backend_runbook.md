@@ -227,10 +227,20 @@ docker run --rm squadopt-backend python -VV    # expect 3.13.x
 docker run --rm squadopt-backend python -m pip freeze
 ```
 
-The image is Python 3.13 while the package still supports 3.11. That is not drift: the pinned
-measurement environment cannot be installed on 3.11 at all — `numpy==2.5.2` and
-`scipy==1.18.0` declare `requires_python >=3.12` — so the deployed image runs the interpreter
-the pins were resolved on, and CI's `gates (py3.11)` keeps proving the declared-range floor.
+The image is Python 3.13 while the package still supports 3.11, for one demonstrated reason:
+the pinned set cannot be installed on 3.11 at all — `numpy==2.5.2` and `scipy==1.18.0` declare
+`requires_python >=3.12`. An image that installs `constraints.txt` therefore runs 3.13, and
+CI's `gates (py3.11)` keeps proving the declared-range floor.
+
+Claim no more than that. The image holds the same package **versions** as `constraints.txt`;
+it does not establish numerical equivalence with the environment the committed measurements
+were recorded in, which was a different operating system. Comparing the two is a measurement
+of its own, and none has been run.
+
+**A release names a digest, not a tag.** `python:3.13-slim` is mutable, and so is any tag put
+on the image built from it: a rebuild a month later can be a different base with the same
+name. Record the digest of the image the container gate actually passed against, and deploy
+that digest. The tag belongs in the build command and nowhere downstream of it.
 
 Then the same two commands, in two containers, over one volume and read-only inputs:
 

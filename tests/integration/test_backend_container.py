@@ -78,8 +78,13 @@ JOB_DEADLINE = 240.0
 STOP_GRACE = 120
 
 
-def _docker(*arguments: str, check: bool = True, timeout: float = 180.0) -> str:
-    """One place runs docker, so a failure carries the command that produced it."""
+def _run_docker(*arguments: str, check: bool = True, timeout: float = 180.0) -> tuple[str, str]:
+    """One place runs docker, so a failure carries the command that produced it.
+
+    Both streams come back because ``docker logs`` splits them the way the container did:
+    the container's stdout on stdout, its stderr on stderr. A caller that keeps only the
+    first loses a crashed process's traceback at exactly the moment it is being reported.
+    """
 
     executable = shutil.which("docker")
     assert executable is not None, "Docker CLI not on PATH; this module is opt-in."
@@ -95,7 +100,13 @@ def _docker(*arguments: str, check: bool = True, timeout: float = 180.0) -> str:
             f"docker {' '.join(arguments)} exited {finished.returncode}\n"
             f"stdout: {finished.stdout}\nstderr: {finished.stderr}"
         )
-    return finished.stdout.strip()
+    return finished.stdout.strip(), finished.stderr.strip()
+
+
+def _docker(*arguments: str, check: bool = True, timeout: float = 180.0) -> str:
+    """The stdout of a docker command, for the callers that want one value."""
+
+    return _run_docker(*arguments, check=check, timeout=timeout)[0]
 
 
 def _environment_arguments(**overrides: str) -> list[str]:
@@ -136,21 +147,6 @@ def _deployment(tmp_path: Path) -> Iterator[dict[str, Any]]:
 
     suffix = uuid4().hex[:10]
     volume = f"squadopt-store-{suffix}"
-    _docker("volume", "create", volume)
-    # The documented prepare step, run from the image itself so no second image is needed:
-    # the mount arrives root-owned, and the backend will not create its own store root.
-    _docker(
-        "run",
-        "--rm",
-        "--user",
-        "0:0",
-        "--volume",
-        f"{volume}:{MOUNT}",
-        IMAGE,
-        "sh",
-        "-c",
-        f"mkdir -p {STORE_ROOT} && chown {RUNTIME_UID}:{RUNTIME_GID} {STORE_ROOT}",
-    )
     containers: list[str] = []
     state = {
         "volume": volume,
@@ -159,11 +155,32 @@ def _deployment(tmp_path: Path) -> Iterator[dict[str, Any]]:
         "suffix": suffix,
         "containers": containers,
     }
+    # The volume is created inside the try, so a prepare step that fails still runs the
+    # teardown below. Outside it, a broken mount permission left a named volume behind on
+    # every run — and the next developer's `docker volume ls` paid for it.
     try:
+        _docker("volume", "create", volume)
+        # The documented prepare step, run from the image itself so no second image is
+        # needed: the mount arrives root-owned, and the backend will not create its own
+        # store root.
+        _docker(
+            "run",
+            "--rm",
+            "--user",
+            "0:0",
+            "--volume",
+            f"{volume}:{MOUNT}",
+            IMAGE,
+            "sh",
+            "-c",
+            f"mkdir -p {STORE_ROOT} && chown {RUNTIME_UID}:{RUNTIME_GID} {STORE_ROOT}",
+        )
         yield state
     finally:
         for name in containers:
             _docker("rm", "--force", name, check=False, timeout=90.0)
+        # `check=False` covers the case this ordering exists for: the create itself failed,
+        # so there is nothing to remove.
         _docker("volume", "rm", "--force", volume, check=False, timeout=60.0)
 
 
@@ -201,10 +218,17 @@ def _origin(container: str) -> str:
 
 
 def _logs(state: dict[str, Any]) -> str:
-    return "\n\n".join(
-        f"--- {name} ---\n{_docker('logs', name, check=False, timeout=60.0)}"
-        for name in state["containers"]
-    )
+    """Every container's own account of itself, both streams, for a failure message.
+
+    The worker writes its JSON events to stdout and dies on stderr, so a report that keeps
+    one of the two is empty in the case worth reading.
+    """
+
+    blocks = []
+    for name in state["containers"]:
+        out, err = _run_docker("logs", name, check=False, timeout=60.0)
+        blocks.append(f"--- {name} stdout ---\n{out}\n--- {name} stderr ---\n{err}")
+    return "\n\n".join(blocks)
 
 
 def _get(url: str, deadline: float, state: dict[str, Any], *, expect: int = 200) -> Any:
