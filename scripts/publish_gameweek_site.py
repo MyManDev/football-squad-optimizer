@@ -39,9 +39,11 @@ class LeaguePublish:
     snapshot_id: str
     in_season_projection: Path | None
     workers: int = 1
+    cohort_snapshot: str | None = None
     snapshot_root: Path = REPOSITORY_ROOT / "data" / "snapshots"
     registry: Path = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
     archive_root: Path = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
+    ledger_root: Path = REPOSITORY_ROOT / "data" / "ledger"
 
     def __post_init__(self) -> None:
         if self.league_id < 1:
@@ -52,6 +54,35 @@ class LeaguePublish:
             )
         if self.workers < 1:
             raise PublishError(f"workers must be at least 1, got {self.workers!r}.")
+        if self.cohort_snapshot is not None and not self.cohort_snapshot.startswith("fpl-top100-"):
+            raise PublishError(
+                f"The Top-100 mean is read from an fpl-top100 capture; got "
+                f"{self.cohort_snapshot!r}."
+            )
+
+    def scoreboard_arguments(self, out: Path) -> list[str]:
+        """The scoreboard beside the league tree: same capture, the ledger, the cohort."""
+
+        arguments = [
+            sys.executable,
+            "-m",
+            "scripts.build_scoreboard",
+            "--league",
+            str(self.league_id),
+            "--snapshot-id",
+            self.snapshot_id,
+            "--snapshot-root",
+            str(self.snapshot_root),
+            "--registry",
+            str(self.registry),
+            "--ledger-root",
+            str(self.ledger_root),
+            "--out",
+            str(out),
+        ]
+        if self.cohort_snapshot is not None:
+            arguments += ["--cohort-snapshot", self.cohort_snapshot]
+        return arguments
 
     def build_arguments(self, out: Path) -> list[str]:
         arguments = [
@@ -211,6 +242,8 @@ def publish(
             # The members' tree beside the season views, from the same capture and the
             # same projection the decision reads; solved in this worktree's code.
             print(_run(league.build_arguments(worktree / "web" / "public"), cwd=worktree))
+            # The scoreboard reads the ledger, so it follows the site views and the tree.
+            print(_run(league.scoreboard_arguments(worktree / "web" / "public"), cwd=worktree))
         _run(["git", "add", "web/public/data"], cwd=worktree)
         if _run(["git", "status", "--porcelain"], cwd=worktree) == "":
             print("The build changed nothing; there is nothing to publish.")
@@ -260,6 +293,9 @@ def main() -> int:
     parser.add_argument("--snapshot-id", help="the live capture the league tree reads")
     parser.add_argument("--in-season-projection", type=Path, help="the handoff it projects with")
     parser.add_argument("--workers", type=int, default=1, help="league tree solver processes")
+    parser.add_argument(
+        "--cohort-snapshot", help="the fpl-top100 capture the scoreboard's Top-100 mean reads"
+    )
     arguments = parser.parse_args()
     try:
         names = PublishNames(
@@ -274,6 +310,7 @@ def main() -> int:
                 snapshot_id=arguments.snapshot_id,
                 in_season_projection=arguments.in_season_projection,
                 workers=arguments.workers,
+                cohort_snapshot=arguments.cohort_snapshot,
             )
         return publish(
             names, force_branch=arguments.force_branch, dry_run=arguments.dry_run, league=league

@@ -1,16 +1,20 @@
-"""The weekly loop as one command: capture, Top-100, handoff, league tree, site, publish.
+"""The weekly loop as one command: capture, Top-100, handoff, our decision, league tree,
+site, scoreboard, publish.
 
     python -m scripts.run_week --season 2026-27 --gameweek 4 --league 352490
     python -m scripts.run_week --season 2026-27 --gameweek 4 --league 352490 --dry-run
     python -m scripts.run_week ... --snapshot-id <fpl-live id>      # reuse a capture
+    python -m scripts.run_week ... --decide [--chip bboost]         # record our own squad
     python -m scripts.run_week ... --publish                        # open the site PR too
 
 Every step already existed as its own script and was typed by hand, in order, under
 deadline pressure; this runs them in order, with the ids each one produced handed to the
-next, and stops at the first refusal. Nothing here decides anything of ours: the league
-tree is computed from each member's own squad, the ledger is untouched, and the outward
-half of publishing (merge, release, tag, dispatch) stays a person's act, printed at the
-end exactly as ``publish_gameweek_site`` prints it.
+next, and stops at the first refusal. The league tree is computed from each member's own
+squad and never reads our ledger. Our own squad is decided only when ``--decide`` asks for
+it, in-process and stamped ``live``, from the capture and handoff this run produced; the
+ledger is otherwise untouched, and settling stays ``squadopt gameweek settle``. The outward
+half of publishing (merge, release, tag, dispatch) stays a person's act, printed at the end
+exactly as ``publish_gameweek_site`` prints it.
 
 Steps, each skippable by naming its output:
 
@@ -27,10 +31,18 @@ Steps, each skippable by naming its output:
 3. handoff         the projection handoff for this capture: the Phase C component base
                    with the bounded Top-100 uplift on top when the evidence was exported
                    (``--projection component-only`` leaves the uplift out)
-4. league          the league tree: every member's baseline and the rival menu
+4. decide          optional: our own squad for this gameweek, frozen into the ledger
+                   (``--decide``, with ``--chip`` as ``squadopt gameweek decide`` takes
+                   it). Before anything is captured, the ledger is checked: it must hold
+                   the previous gameweek's decision and not yet this one, so no capture is
+                   spent on a run that would refuse an hour later.
+5. league          the league tree: every member's baseline and the rival menu
                    (``--workers``)
-5. site            the season views
-6. publish         optional: worktree, commit, push, PR (``--publish``)
+6. site            the season views (they read the ledger, so after the decision)
+7. scoreboard      the weekly scoreboard beside the league tree: our paper ledger, the
+                   members' net, the Top-100 mean when a cohort capture is known, the
+                   game's average and highest
+8. publish         optional: worktree, commit, push, PR (``--publish``)
 
 Timing rules the scripts enforce and this one states up front: the Top-100 captures
 must happen before the deadline and after the previous gameweek's picks are public; the
@@ -46,10 +58,19 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from squadopt.application.commands import DecideRequest, decide
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources.fpl_live import gameweek_deadlines, next_open_deadline
-from squadopt.live import handoff_path_for
+from squadopt.live import (
+    CHIP_NAMES,
+    LedgerError,
+    handoff_path_for,
+    held_squad_from_ledger,
+    load_ledger,
+)
+from squadopt.optimization import OptimizationConfig
+from squadopt.planning import CHIP_NAMES as PLANNER_CHIP_NAMES
 from squadopt.platform.fpl_capture import capture
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +78,7 @@ SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
 ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
 REGISTRY_PATH = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
 HANDOFF_ROOT = REPOSITORY_ROOT / "data" / "handoffs"
+LEDGER_ROOT = REPOSITORY_ROOT / "data" / "ledger"
 EVIDENCE_ROOT = REPOSITORY_ROOT / "artifacts" / "phase_b"
 SITE_OUT = REPOSITORY_ROOT / "web" / "public"
 
@@ -64,7 +86,10 @@ LIVE_PREFIX = "fpl-live-"
 COHORT_PREFIX = "fpl-top100-"
 ELITE_PREFIX = "fpl-elite-picks-"
 
-STEPS = ("top100", "capture", "handoff", "league", "site", "publish")
+STEPS = ("top100", "capture", "handoff", "decide", "league", "site", "scoreboard", "publish")
+#: The chips ``--decide`` may play: the ones the season rules name that the planner models,
+#: exactly the choices ``squadopt gameweek decide --chip`` offers.
+CHIP_CHOICES = tuple(sorted(set(CHIP_NAMES) & set(PLANNER_CHIP_NAMES)))
 
 
 class WeekError(RuntimeError):
@@ -99,6 +124,8 @@ def plan_week(
     elite_snapshot: str | None,
     skip_top100: bool,
     publish: bool,
+    decide: bool = False,
+    chip: str | None = None,
 ) -> WeekPlan:
     """Decide the steps from what the caller already has; pure, so it can be tested."""
 
@@ -106,6 +133,10 @@ def plan_week(
         raise WeekError(
             "The weekly loop serves gameweeks 2..38; the opening week is decided by hand."
         )
+    if chip is not None and not decide:
+        raise WeekError("--chip names the chip our own decision plays; it needs --decide.")
+    if chip is not None and chip not in CHIP_CHOICES:
+        raise WeekError(f"--chip must be one of {list(CHIP_CHOICES)!r}, got {chip!r}.")
     steps: list[str] = []
     reasons: dict[str, str] = {}
     if skip_top100:
@@ -126,7 +157,12 @@ def plan_week(
         reasons["capture"] = f"reusing {snapshot_id}"
     else:
         steps.append("capture")
-    steps.extend(["handoff", "league", "site"])
+    steps.append("handoff")
+    if decide:
+        steps.append("decide")
+    else:
+        reasons["decide"] = "pass --decide to record our own squad in the ledger"
+    steps.extend(["league", "site", "scoreboard"])
     if publish:
         steps.append("publish")
     else:
@@ -143,6 +179,35 @@ def new_snapshot(before: Sequence[str], after: Sequence[str], prefix: str) -> st
             f"Expected exactly one new {prefix}* snapshot, found {added!r}. Nothing else was run."
         )
     return added[0]
+
+
+def preflight_decide(ledger_root: Path, season: str, gameweek: int) -> None:
+    """Refuse a decision the ledger cannot start, before any capture is spent on it.
+
+    ``decide`` itself checks both conditions, but only after the Top-100 captures, the
+    live capture and the handoff have all been made; a refusal there wastes the week's
+    captures. The same two questions are asked here first: does the ledger already hold
+    this gameweek (a recorded decision is immutable), and can it supply the squad this
+    gameweek starts from (``held_squad_from_ledger`` wants exactly the previous week).
+    """
+
+    recorded = sorted(entry.gameweek for entry in load_ledger(ledger_root, season))
+    if gameweek in recorded:
+        raise WeekError(
+            f"The ledger already holds {season} GW{gameweek}; recorded decisions are "
+            "immutable, so --decide has nothing to do this week."
+        )
+    try:
+        held_squad_from_ledger(
+            ledger_root,
+            season,
+            before_gameweek=gameweek,
+            budget_tenths=OptimizationConfig().budget_tenths,
+        )
+    except LedgerError as error:
+        raise WeekError(
+            f"The ledger cannot supply the squad GW{gameweek} starts from: {error}"
+        ) from error
 
 
 def latest_live_snapshot(root: Path) -> str | None:
@@ -197,6 +262,8 @@ def run_week(arguments: argparse.Namespace) -> int:
         elite_snapshot=arguments.elite_snapshot,
         skip_top100=arguments.skip_top100,
         publish=arguments.publish,
+        decide=arguments.decide,
+        chip=arguments.chip,
     )
     print(plan.describe(), flush=True)
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -209,13 +276,17 @@ def run_week(arguments: argparse.Namespace) -> int:
             f"No entry registry at {REGISTRY_PATH}; seed it first with "
             "`python -m scripts.seed_entry_registry --league <id>`."
         )
+    if "decide" in plan.steps:
+        # Before any capture: a ledger that cannot start this gameweek refuses now.
+        preflight_decide(LEDGER_ROOT, plan.season, plan.gameweek)
+        print(f"ledger can start gameweek {plan.gameweek}; --decide will record it")
 
     # 1. Top-100: cohort, picks, evidence export — before the live capture, so the
     # evidence predates the decision capture it will be applied to
     evidence_table: Path | None = None
     evidence_manifest: Path | None = None
+    cohort: str | None = arguments.cohort_snapshot
     if "top100" in plan.steps:
-        cohort = arguments.cohort_snapshot
         if not cohort:
             before = list_snapshot_ids(SNAPSHOT_ROOT)
             _python(
@@ -318,7 +389,29 @@ def run_week(arguments: argparse.Namespace) -> int:
     if not handoff.is_file():
         raise WeekError(f"The handoff {handoff} was not written.")
 
-    # 4. league tree, 5. site views — into the checkout's web/public
+    # 4. our own decision, in-process, stamped live: this capture, this handoff
+    if "decide" in plan.steps:
+        result = decide(
+            DecideRequest(
+                snapshot_root=SNAPSHOT_ROOT,
+                ledger_root=LEDGER_ROOT,
+                archive_root=ARCHIVE_ROOT,
+                snapshot_id=snapshot_id,
+                gameweek=plan.gameweek,
+                season=plan.season,
+                in_season_projection=handoff,
+                chip=arguments.chip,
+                mode="live",
+            )
+        )
+        print(result.report, flush=True)
+        print(
+            f"decided {result.season} gameweek {result.gameweek} ({result.mode}) "
+            f"into {result.decision_directory}",
+            flush=True,
+        )
+
+    # 5. league tree, 6. site views — into the checkout's web/public
     out = Path(arguments.out)
     _python(
         "scripts.build_league_site",
@@ -341,31 +434,51 @@ def run_week(arguments: argparse.Namespace) -> int:
     )
     _python("scripts.build_site", "--season", plan.season, "--out", str(out))
 
-    # 6. publish
+    # 7. scoreboard — after the site, because it reads the ledger the decision just wrote
+    cohort_arguments = ["--cohort-snapshot", cohort] if cohort else []
+    _python(
+        "scripts.build_scoreboard",
+        "--league",
+        str(plan.league_id),
+        "--snapshot-id",
+        snapshot_id,
+        "--snapshot-root",
+        str(SNAPSHOT_ROOT),
+        "--registry",
+        str(REGISTRY_PATH),
+        "--ledger-root",
+        str(LEDGER_ROOT),
+        "--season",
+        plan.season,
+        "--out",
+        str(out),
+        *cohort_arguments,
+    )
+
+    # 8. publish
+    publish_arguments = [
+        "--kind",
+        "decision",
+        "--gameweek",
+        str(plan.gameweek),
+        "--season",
+        plan.season,
+        "--league",
+        str(plan.league_id),
+        "--snapshot-id",
+        snapshot_id,
+        "--in-season-projection",
+        str(handoff),
+        "--workers",
+        str(arguments.workers),
+        *cohort_arguments,
+    ]
     if "publish" in plan.steps:
-        _python(
-            "scripts.publish_gameweek_site",
-            "--kind",
-            "decision",
-            "--gameweek",
-            str(plan.gameweek),
-            "--season",
-            plan.season,
-            "--league",
-            str(plan.league_id),
-            "--snapshot-id",
-            snapshot_id,
-            "--in-season-projection",
-            str(handoff),
-            "--workers",
-            str(arguments.workers),
-        )
+        _python("scripts.publish_gameweek_site", *publish_arguments)
     else:
         print(
             "\nNot published. To open the site PR from this capture:\n"
-            f"  python -m scripts.publish_gameweek_site --kind decision --gameweek {plan.gameweek} "
-            f"--season {plan.season} --league {plan.league_id} --snapshot-id {snapshot_id} "
-            f"--in-season-projection {handoff} --workers {arguments.workers}"
+            f"  python -m scripts.publish_gameweek_site {' '.join(publish_arguments)}"
         )
     return 0
 
@@ -387,6 +500,17 @@ def main() -> int:
         default="component",
         help="component: the Phase C component base with the bounded Top-100 uplift when "
         "the evidence was exported; component-only: the bare component base",
+    )
+    parser.add_argument(
+        "--decide",
+        action="store_true",
+        help="also decide our own squad for this gameweek, in-process, into the ledger",
+    )
+    parser.add_argument(
+        "--chip",
+        choices=CHIP_CHOICES,
+        help="the chip our decision plays (needs --decide); the choices squadopt gameweek "
+        "decide offers",
     )
     parser.add_argument("--workers", type=int, default=8, help="league tree solver processes")
     parser.add_argument("--out", default=str(SITE_OUT), help="site output root (web/public)")
