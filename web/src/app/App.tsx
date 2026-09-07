@@ -40,10 +40,10 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
 
-export function App({ basename = import.meta.env.BASE_URL }: { basename?: string }) {
+export function App() {
   return (
     <LanguageProvider>
-      <LocalizedApp basename={basename} />
+      <LocalizedApp basename={import.meta.env.BASE_URL} />
     </LanguageProvider>
   );
 }

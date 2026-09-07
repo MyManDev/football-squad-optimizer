@@ -8,8 +8,8 @@ import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
-import { percent, points, pounds } from "../../../lib/format";
-import { PointsBar, ProbabilityBar } from "../components/ProbabilityBar";
+import { points, pounds } from "../../../lib/format";
+import { PointsBar } from "../components/PointsBar";
 import styles from "./RivalsPage.module.css";
 
 const POSITIONS: Array<PoolPlayerView["position"]> = ["GK", "DEF", "MID", "FWD"];
@@ -147,69 +147,21 @@ export function RivalsPage() {
   );
 }
 
+/**
+ * No producer scores a rival squad against a decision, so `risk.rivals` is empty in every
+ * published document; this section says so rather than drawing a comparison nobody made.
+ */
 function Rivals({ view }: { view: RecommendationView }) {
-  const { locale, messages } = useLanguage();
+  const { messages } = useLanguage();
   const copy = messages.rivals;
-  const rivals = view.risk.rivals;
   return (
     <section className={styles.section}>
       <h2 className={styles.sectionTitle}>{copy.against}</h2>
-      {rivals.length === 0 ? (
-        <EmptyState title={copy.noRivalTitle}>
-          {copy.noRivalBeforeStatus}
-          <strong>{messages.squad.riskStatus[view.risk.status]}</strong>
-          {copy.noRivalAfterStatus}
-        </EmptyState>
-      ) : (
-        <Card title={copy.probabilityTitle} aside={copy.probabilityAside}>
-          <table className={styles.rivalTable}>
-            <caption className="visually-hidden">{copy.rivalComparisons}</caption>
-            <thead>
-              <tr>
-                <th scope="col">{copy.rival}</th>
-                <th scope="col">{copy.probabilityInterval}</th>
-                <th scope="col" className={styles.right}>
-                  P
-                </th>
-                <th scope="col" className={styles.right}>
-                  {copy.meanGap}
-                </th>
-                <th scope="col" className={styles.right}>
-                  {copy.shared}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rivals.map((rival) => (
-                <tr key={rival.rival}>
-                  <td>{rival.rival}</td>
-                  <td>
-                    <ProbabilityBar
-                      probability={rival.probability_ahead}
-                      interval={rival.probability_ahead_interval}
-                      label={copy.probabilityLabel(rival.rival)}
-                    />
-                  </td>
-                  <td className={`${styles.right} num`}>
-                    {percent(rival.probability_ahead, 0, locale)}
-                  </td>
-                  <td className={`${styles.right} num`}>
-                    {points(rival.mean_difference, 1, locale)}
-                  </td>
-                  <td className={`${styles.right} num`}>{rival.shared_starters}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {view.risk.stated_limits.length > 0 && (
-            <ul className={styles.list}>
-              {view.risk.stated_limits.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      )}
+      <EmptyState title={copy.noRivalTitle}>
+        {copy.noRivalBeforeStatus}
+        <strong>{messages.squad.riskStatus[view.risk.status]}</strong>
+        {copy.noRivalAfterStatus}
+      </EmptyState>
       <p className={styles.sub}>
         {copy.linksBefore}
         <Link to="/">{copy.squadPage}</Link>
