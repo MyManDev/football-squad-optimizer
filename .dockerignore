@@ -1,0 +1,16 @@
+# Deny everything, then name the four things the build actually needs. An allowlist rather
+# than a deny list on purpose: a later COPY of a path nobody added here fails loudly at build
+# time instead of silently shipping whatever the repository happens to hold.
+#
+# data/ is why this matters rather than merely being tidy: data/snapshots/, data/ledger/,
+# data/handoffs/ and data/entries/ are gitignored precisely because captures and the entry
+# payloads inside them are personal, and `docker build` does not read .gitignore.
+*
+
+!pyproject.toml
+!README.md
+!constraints.txt
+!src
+
+**/__pycache__
+**/*.py[codz]

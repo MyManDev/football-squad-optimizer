@@ -22,6 +22,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from squadopt.api.app import create_app
+from squadopt.platform.advice_observability import configure_advice_logging
 from squadopt.platform.backend_runtime import AdviceBackend, backend_from_environment
 
 __all__ = ["app_for_backend", "build_app"]
@@ -48,4 +49,10 @@ def app_for_backend(backend: AdviceBackend) -> FastAPI:
 def build_app() -> FastAPI:
     """The deployment's application, read from the server's own environment."""
 
+    # Here rather than in ``app_for_backend``: this is the process entry point uvicorn
+    # calls, while the injected form is also how tests build the app, and a test that gets
+    # handlers attached to a module-level logger has been given a side effect it did not ask
+    # for. uvicorn configures only its own loggers, so without this the advice events —
+    # every accepted request, every rejection reason — go nowhere.
+    configure_advice_logging()
     return app_for_backend(backend_from_environment())

@@ -69,6 +69,61 @@ jobs:
       - name: Pytest (full suite is the merge gate)
         run: python -m pytest -q -p no:cacheprovider -n auto --dist loadscope --durations=15
 
+  # The image the deployment runs, built and exercised once per commit. Not folded into the
+  # matrix above: the artifact does not vary by the interpreter CI happens to install, and a
+  # second copy of a four-minute build would buy nothing. Not a required check yet either —
+  # branch protection lists only the two gate contexts, so adding this one there is a
+  # separate, deliberate change.
+  container:
+    name: container (linux/amd64)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      # The commit that is actually being built. On a pull request `actions/checkout` leaves
+      # the merge ref in the working tree, so `git rev-parse HEAD` is the tree the image
+      # contains; the pull request's head sha names different code.
+      - name: Build the image
+        run: |
+          docker build --platform linux/amd64 \
+            --build-arg SQUADOPT_REPOSITORY_COMMIT="$(git rev-parse HEAD)" \
+            --tag squadopt-backend:ci .
+
+      # Recorded in the log, because a tag is not an identity: a rollback needs the digest and
+      # an operator needs to know which interpreter and which pins answered.
+      - name: Image identity
+        run: |
+          docker image inspect --format \
+            'id={{.Id}} arch={{.Architecture}}/{{.Os}} bytes={{.Size}}' squadopt-backend:ci
+          docker image inspect --format '{{range .Config.Env}}{{println .}}{{end}}' \
+            squadopt-backend:ci | grep '^SQUADOPT_REPOSITORY_COMMIT='
+          docker run --rm squadopt-backend:ci id
+          docker run --rm squadopt-backend:ci python -VV
+          docker run --rm squadopt-backend:ci python -m pip freeze
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints.txt
+
+      - name: Install (pinned measurement environment)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -c constraints.txt -e ".[api,dev]"
+
+      # One entry point, opt-in by an environment variable so the gate jobs above — which run
+      # the whole suite — never try to reach a Docker daemon. Serial: xdist workers would
+      # contend for the daemon and for the published port.
+      - name: Container smoke
+        env:
+          SQUADOPT_CONTAINER_SMOKE: "1"
+          SQUADOPT_CONTAINER_IMAGE: squadopt-backend:ci
+        run: python -m pytest tests/integration/test_backend_container.py -q -p no:cacheprovider -rA
+
   web:
     name: web (node 22)
     runs-on: ubuntu-latest

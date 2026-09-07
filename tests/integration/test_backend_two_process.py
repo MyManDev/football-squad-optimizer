@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient
 from squadopt.api.runtime import app_for_backend
 from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
 from squadopt.platform.backend_runtime import BackendConfig, StoreProbeGate, build_backend
-from squadopt.platform.store_probe import probe_store
+from squadopt.platform.store_probe import StoreProbeResult, probe_store
 
 LEAGUE_ID = deployment_module.LEAGUE_ID
 ENTRY_ID = deployment_module.ENTRY_ID
@@ -241,16 +241,19 @@ def test_repeated_probes_do_not_grow_the_store(tmp_path: Path) -> None:
     gate = StoreProbeGate(store, recheck_seconds=30.0, clock=lambda: now[0])
 
     counts: list[int] = []
-    seen: list[int] = []
+    # The results themselves, not their ids: the gate drops each one when it re-probes, and
+    # a freed object's address can be handed straight to the next allocation, so a list of
+    # bare ids could collapse to fewer than four entries while the gate behaved correctly.
+    seen: list[StoreProbeResult] = []
     for _ in range(4):
         now[0] += 100.0  # past the TTL, so each round is a real probe
         assert gate.passed()
-        seen.append(id(gate.result()))
+        seen.append(gate.result())
         counts.append(len(list((store / "probe").iterdir())))
 
     # Four distinct results: the gate re-probed rather than replaying a cached pass, which
     # is what makes the count below mean anything.
-    assert len(set(seen)) == 4, seen
+    assert len({id(result) for result in seen}) == 4, seen
     assert counts == [0, 0, 0, 0], counts
 
 

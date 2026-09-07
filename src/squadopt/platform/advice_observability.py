@@ -20,16 +20,26 @@ requests by reason.
 touches no dependency; ``/ready`` answers "can this deployment serve" — is the cache
 store writable, is a capture context loaded, is the league tree readable. Folded into
 one endpoint, a full disk looks healthy; that is the failure this split exists for.
+
+The structured log needs somewhere to go, which is why ``configure_advice_logging`` is
+here. Nothing under ``squadopt.api`` or ``squadopt.platform`` attached a handler, and
+uvicorn configures only its own loggers, so every line above was formatted and then
+dropped: a worker container produced an empty log while the code claimed to report a
+missing store "loudly, and at once". A process entry point calls it; a library never
+does, because a library that configures logging steals the decision from its caller.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import sys
 import time
 from bisect import bisect_left
 from collections.abc import Mapping
 from typing import Final
+
+ADVICE_LOGGER_NAME: Final[str] = "advice"
 
 _HISTOGRAM_BUCKETS: Final[tuple[float, ...]] = (
     0.1,
@@ -45,12 +55,36 @@ _HISTOGRAM_BUCKETS: Final[tuple[float, ...]] = (
 )
 
 
+def configure_advice_logging(level: int = logging.INFO) -> None:
+    """Send the advice events to stdout, once, from a process entry point.
+
+    stdout because both container platforms this deployment targets collect it as the
+    process's log stream, and the records are already single-line JSON, so no formatter is
+    wanted on top of them. Idempotent: uvicorn may call the app factory more than once, and
+    a second handler would double every line.
+    """
+
+    logger = logging.getLogger(ADVICE_LOGGER_NAME)
+    logger.setLevel(level)
+    # Not propagated to the root logger: a caller that configures its own root handlers
+    # would otherwise see each advice event twice.
+    logger.propagate = False
+    if any(getattr(handler, "_squadopt_advice_handler", False) for handler in logger.handlers):
+        return
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    handler._squadopt_advice_handler = True  # type: ignore[attr-defined]
+    logger.addHandler(handler)
+
+
 class AdviceLog:
     """JSON-line events for the advice path; one object per line, stable names."""
 
     def __init__(self, component: str, logger: logging.Logger | None = None) -> None:
         self._component = component
-        self._logger = logger if logger is not None else logging.getLogger(f"advice.{component}")
+        self._logger = (
+            logger if logger is not None else logging.getLogger(f"{ADVICE_LOGGER_NAME}.{component}")
+        )
 
     def event(self, name: str, **fields: object) -> None:
         record = {

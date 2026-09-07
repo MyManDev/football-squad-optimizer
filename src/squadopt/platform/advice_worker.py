@@ -44,7 +44,11 @@ from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.advice_documents import validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpecStore
-from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics
+from squadopt.platform.advice_observability import (
+    AdviceLog,
+    AdviceMetrics,
+    configure_advice_logging,
+)
 from squadopt.platform.advice_queue import (
     DEFAULT_LEASE_SECONDS,
     AdviceComputeRefused,
@@ -285,6 +289,9 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
     if arguments.max_attempts < 1:
         parser.error("--max-attempts must be at least one.")
 
+    # Before anything that logs. The store check below is the first thing an operator needs
+    # to read, and without a handler on the advice logger it was formatted and discarded.
+    configure_advice_logging()
     running = backend if backend is not None else backend_from_environment()
     probe = running.probe.result()
     if not probe.ok:
