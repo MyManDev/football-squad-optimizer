@@ -64,18 +64,6 @@
   font-size: 12px;
 }
 
-.para {
-  margin: 0;
-  max-width: var(--measure);
-}
-
-.list {
-  margin: 0;
-  padding-left: 1.2em;
-  color: var(--color-text-muted);
-  font-size: var(--step--1);
-}
-
 .dl {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -120,26 +108,4 @@
   max-width: var(--measure);
   color: var(--color-text-muted);
   font-size: var(--step--1);
-}
-
-.rivalTable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--step--1);
-}
-
-.rivalTable th,
-.rivalTable td {
-  padding: 10px 8px;
-  border-top: 1px solid var(--color-line);
-  text-align: left;
-  vertical-align: middle;
-}
-
-.rivalTable thead th {
-  border-top: none;
-  color: var(--color-text-muted);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
