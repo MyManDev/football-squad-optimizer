@@ -6,6 +6,15 @@ league publication. The existing `scripts.build_site` caller supplies the latest
 capture; `--no-league` supplies none and therefore publishes unavailable live views.
 No new upstream collection, endpoint, worker, or scheduling is involved.
 
+The operational caller still needs a source-aware latest-capture selection:
+`scripts/build_site.py` currently takes `list_snapshot_ids(root)[-1]`, which sorts
+source-prefixed IDs lexically. In a mixed `fpl-live`/`fpl-top100` root this selects
+the top100 capture even when a live capture is newer. The platform handoff is to
+select the newest verified `fpl-live` capture by `captured_at_utc` and pass that one
+to `build_site(snapshot=...)`; missing live payloads in it must remain unavailable.
+The application cannot repair the caller's selection by mixing captures. This
+operational dependency must be resolved before #251 is closed for that workflow.
+
 The document uses the separate, closed `live_score_v1` contract. `ui_view_v1` is
 unchanged. The site includes both schemas. Older publications without `live.json`
 keep rendering decisions and settled results; the provisional card says unavailable.
