@@ -406,6 +406,100 @@ def test_the_price_tag_and_the_gap_are_net_of_hits(world: dict[str, Any]) -> Non
     )
 
 
+def _club_legal_squad(world: dict[str, Any]) -> list[int]:
+    """A fifteen the game would accept as held: 2/5/5/3, at most three per club, nobody
+    unavailable — so one free transfer is a real budget rather than an impossibility."""
+
+    inputs, projection, _ = _world_context(world)
+    unavailable = set(projection.unavailable_players)
+    quotas = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
+    per_club: dict[str, int] = {}
+    chosen: list[int] = []
+    rows = inputs.players.sort_values("player_id")
+    for position, quota in quotas.items():
+        taken = 0
+        for _, row in rows.loc[rows["position"] == position].iterrows():
+            player = int(str(row["player_id"]))
+            club = str(row["team_id"])
+            if player in unavailable or per_club.get(club, 0) >= 3:
+                continue
+            chosen.append(player)
+            per_club[club] = per_club.get(club, 0) + 1
+            taken += 1
+            if taken == quota:
+                break
+        assert taken == quota, (position, taken)
+    return chosen
+
+
+def test_a_rival_strategy_spends_the_free_transfers_before_it_spends_hits(
+    world: dict[str, Any],
+) -> None:
+    """Every extra transfer costs four points; a one-week band is not worth buying. The
+    strategy solves the band within the free transfers (the band relaxed to what they
+    reach) and again at its target with hits, keeps the higher net expected points, and
+    publishes the other as the alternative with its price."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _club_legal_squad(world)
+    provider = _Provider(
+        {
+            101: _member_picks(world, 101, squad),
+            202: _member_picks(world, 202, _rival_squad(world)),
+        }
+    )
+    payload = advise_entry(
+        _request(strategy="ortak-koru", rival_entry_id=202),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+    assert payload["transfer_cap"] == 1  # the public endpoints show no banked transfer
+    assert payload["overlap_target"] == 9
+    applied = payload["overlap_applied"]
+    assert isinstance(applied, int) and 1 <= applied <= 9
+    assert payload["plan_kind"] in {"within_free_transfers", "with_hits"}
+    hits = sum(float(str(move["expected_points_cost"])) for move in payload["moves"][:1])
+    if payload["plan_kind"] == "within_free_transfers":
+        assert len(payload["moves"]) <= 1 and hits == 0.0
+        alternative = payload["alternative_plan"]
+        if alternative is not None:
+            assert alternative["kind"] == "with_hits"
+            assert alternative["overlap_applied"] == 9
+            assert alternative["transfer_hit_points"] >= 0.0
+    else:
+        assert applied == 9
+        alternative = payload["alternative_plan"]
+        assert alternative is None or alternative["kind"] == "within_free_transfers"
+
+
+def test_a_squad_that_needs_transfers_to_be_legal_falls_back_to_the_hit_plan(
+    world: dict[str, Any],
+) -> None:
+    """This world's shared 'legal' fifteen holds four from one club: the planner needs two
+    transfers before any band applies, so nothing is reachable within one free transfer
+    and the with-hits plan is the only candidate — stated as such, not refused."""
+
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider(
+        {
+            101: _member_picks(world, 101, _legal_squad(world)),
+            202: _member_picks(world, 202, _rival_squad(world)),
+        }
+    )
+    payload = advise_entry(
+        _request(strategy="fark-yarat", rival_entry_id=202),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+    assert payload["plan_kind"] == "with_hits"
+    assert payload["overlap_applied"] == payload["overlap_target"] == 5
+    assert payload["alternative_plan"] is None
+
+
 def test_the_rival_changes_labels_not_the_baseline(world: dict[str, Any]) -> None:
     """The saf-puan answer is byte-identical whether or not a rival entry exists in the
     capture: the rival is a parameter of rival strategies, never an input to the

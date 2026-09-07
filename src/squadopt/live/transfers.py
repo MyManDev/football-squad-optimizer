@@ -225,8 +225,14 @@ def _prepare_planning(
     *,
     optimization: OptimizationConfig | None,
     chip: str | None,
+    transfer_cap: int | None = None,
 ) -> _PreparedPlanning:
-    """Validate the held squad against the capture and build the one-week horizon."""
+    """Validate the held squad against the capture and build the one-week horizon.
+
+    ``transfer_cap`` bounds the week's transfers (a wildcard is exempt, as in the
+    planner); ``None`` is the historical planner, which pays for any transfer the
+    objective can justify.
+    """
 
     settings = OptimizationConfig() if optimization is None else optimization
     gameweek = int(inputs.deadline.gameweek)
@@ -276,7 +282,14 @@ def _prepare_planning(
             "expected_points": table["expected_points"].astype("float64"),
         }
     )
-    transfer_config = _transfer_config(rules)
+    transfer_config = (
+        _transfer_config(rules)
+        if transfer_cap is None
+        else TransferPlanningConfig(
+            max_free_transfers=rules.transfers.max_free_transfers,
+            max_transfers_per_gameweek=int(transfer_cap),
+        )
+    )
     state = InitialSquadState(
         held.squad_player_ids,
         bank_tenths=held.bank_tenths,
@@ -468,13 +481,16 @@ def plan_transfers_with_overlap(
     first_week_overlap: FirstWeekOverlap,
     *,
     optimization: OptimizationConfig | None = None,
+    transfer_cap: int | None = None,
 ) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
     """``plan_transfers`` under a first-week overlap band against a rival's eleven.
 
-    Same preparation, same solver, same decision packaging — the only difference is
-    the band handed to ``optimize_transfer_plan``. Kept as its own entry point rather
-    than a parameter on ``plan_transfers`` so the baseline call sites cannot change
-    behavior by accident: the saf-puan path stays byte-identical by construction.
+    Same preparation, same solver, same decision packaging — the only differences are
+    the band handed to ``optimize_transfer_plan`` and, when given, a cap on the week's
+    transfers (the free ones, so a band cannot buy itself with hits). Kept as its own
+    entry point rather than a parameter on ``plan_transfers`` so the baseline call
+    sites cannot change behavior by accident: the saf-puan path stays byte-identical
+    by construction.
 
     As in ``plan_transfers``, an unproven plan is returned rather than raised on: a
     banded plan the solver found but could not prove is publishable **with its status**
@@ -485,7 +501,13 @@ def plan_transfers_with_overlap(
     """
 
     prepared = _prepare_planning(
-        inputs, projection, held, rules, optimization=optimization, chip=None
+        inputs,
+        projection,
+        held,
+        rules,
+        optimization=optimization,
+        chip=None,
+        transfer_cap=transfer_cap,
     )
     plan = optimize_transfer_plan(
         prepared.horizon,
