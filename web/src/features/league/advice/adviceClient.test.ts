@@ -1,6 +1,6 @@
 /** The boundary's whole contract: empty origin is today's site; a dead backend degrades. */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { mockEntryAdviceEnvelope } from "../../../fixtures/league";
 import { LeagueDataMissing } from "../data";
@@ -68,6 +68,31 @@ describe("StaticOnlyAdviceClient", () => {
 });
 
 describe("HttpAdviceClient", () => {
+  it("calls browser fetch with a valid receiver for reads, requests and job polls", async () => {
+    // Native browser fetch rejects a client instance as its receiver. Injected
+    // arrow-function fetch stubs do not exercise that browser requirement.
+    const browserFetch = vi.fn(function (this: unknown, url: string, init?: RequestInit) {
+      if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+      if (url.endsWith("/advice-jobs/job-1")) {
+        return Promise.resolve(jsonResponse(200, { job_id: "job-1", status: "completed" }));
+      }
+      if (init?.method === "POST") {
+        return Promise.resolve(jsonResponse(202, { job_id: "job-1", status: "queued" }));
+      }
+      return Promise.resolve(jsonResponse(200, mockEntryAdviceEnvelope(101, "saf-puan", 1)));
+    });
+    vi.stubGlobal("fetch", browserFetch);
+    try {
+      const client = new HttpAdviceClient("https://api.example");
+      expect((await client.readAdvice(REQUEST)).kind).toBe("advice");
+      expect(await client.requestAdvice(REQUEST)).toEqual({ kind: "job", jobId: "job-1" });
+      expect(await client.readJob("job-1")).toEqual({ jobId: "job-1", status: "completed" });
+      expect(browserFetch).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("reads a cache hit and carries the rival in the query", async () => {
     const calls: string[] = [];
     const envelope = mockEntryAdviceEnvelope(101, "saf-puan", 1);

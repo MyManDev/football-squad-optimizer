@@ -16,6 +16,14 @@ targets and the modelling frame are package API; this shell computes the fold bo
 with the repository's own splitter, hands them in as data, and writes the bytes.
 
 The 2025-26 locked holdout is refused before anything is read.
+
+**Phase C v2 development scope.** ``--development-scope v2`` is a separate, explicitly
+development-only path: it may read 2025-26 (a season the repository has used before, so
+nothing measured on it is an unseen final test), writes the distinct
+`phase_c_component_oof_development_v2` contract, and fits either arm of the declared
+comparison -- ``--season-weighting equal`` (the control) or ``season_half_life`` (the one
+declared candidate). The v1 path, its default seasons, its artifacts and its refusals are
+unchanged.
 """
 
 import argparse
@@ -50,6 +58,7 @@ from squadopt.features.component_targets import (
     TARGET_CONTRACT_VERSION,
 )
 from squadopt.prediction.component_dataset import (
+    COMPONENT_DEVELOPMENT_SEASONS_V2,
     COMPONENT_FEATURE_CONFIG,
     COMPONENT_TRAINING_SEASONS,
     DATASET_CONTRACT_VERSION,
@@ -62,18 +71,49 @@ from squadopt.prediction.component_dataset import (
 )
 from squadopt.prediction.component_models import (
     COMPONENT_MODEL_VERSION,
+    EQUAL_WEIGHTING,
+    SEASON_HALF_LIFE_WEIGHTING,
+    SEASON_WEIGHT_BASE,
+    SEASON_WEIGHTED_MODEL_VERSION,
     ComponentModelConfig,
+    SeasonAgeWeighting,
     fit_component_models,
     predict_components,
 )
 from squadopt.preflight import compute_table_sha256
 
 OOF_CONTRACT_VERSION = "phase_c_component_oof_v1"
+DEVELOPMENT_OOF_CONTRACT_VERSION = "phase_c_component_oof_development_v2"
 
 # The chronological development seasons. 2025-26 is the locked holdout and 2020-21 sits
 # before the window every recorded development measurement uses, so neither is a default.
 DEFAULT_SEASONS = COMPONENT_TRAINING_SEASONS
 LOCKED_HOLDOUT_SEASON = "2025-26"
+
+# The v2 development scope adds 2025-26 and nothing else; the two arms of the declared
+# comparison differ only in how the training rows are weighted.
+DEVELOPMENT_SCOPES = ("v1", "v2")
+DEVELOPMENT_SEASONS_V2 = COMPONENT_DEVELOPMENT_SEASONS_V2
+SEASON_WEIGHTINGS = ("equal", "season_half_life")
+WEIGHTING_LABELS = {"equal": EQUAL_WEIGHTING, "season_half_life": SEASON_HALF_LIFE_WEIGHTING}
+WEIGHTING_RULES = {
+    "equal": "every training row weighs 1",
+    "season_half_life": (
+        f"weight = {SEASON_WEIGHT_BASE} ** (prediction season start year - row season start year)"
+    ),
+}
+WEIGHT_NORMALIZATION = (
+    "mean 1 within each fitted subset -- complete-feature rows for the appearance model, "
+    "appeared rows with both conditional targets for the minutes and points models -- and "
+    "the same weights are passed to the StandardScaler and to the estimator of each pipeline"
+)
+RULE_ERA_NOTE = (
+    "2025-26 total_points already include the defensive-contribution points introduced "
+    "that season, so points_target embeds the new scoring era for 2025-26 rows while "
+    "2021-22..2024-25 were scored without it. No defensive-action column enters the panel, "
+    "the features or the targets; nothing is added, re-thresholded or imputed, and an "
+    "absent action count in an earlier season is absent, not a measured zero."
+)
 
 OOF_COLUMNS = (
     "contract_version",
@@ -146,11 +186,14 @@ PUBLIC_POINTS_BOUND = (
 def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
-    parser.add_argument("--seasons", default=",".join(DEFAULT_SEASONS))
+    # `None` defaults resolve per scope in `main`; the v1 defaults are what they always were.
+    parser.add_argument("--seasons", default=None)
+    parser.add_argument("--development-scope", choices=DEVELOPMENT_SCOPES, default="v1")
+    parser.add_argument("--season-weighting", choices=SEASON_WEIGHTINGS, default="equal")
     parser.add_argument(
         "--output-dir", type=Path, default=REPOSITORY_ROOT / "artifacts" / "phase_c"
     )
-    parser.add_argument("--table-name", default=OOF_CONTRACT_VERSION)
+    parser.add_argument("--table-name", default=None)
     parser.add_argument("--minimum-training-rows", type=int, default=200)
     return parser.parse_args()
 
@@ -260,9 +303,13 @@ class FoldRecord:
     model_version: str
     feature_contract_version: str
     target_contract_version: str
+    # Only the v2 development contract records how the training rows were weighted; a v1
+    # record carries neither field, so the v1 manifest schema is exactly what it was.
+    weighting: str | None = None
+    training_weight_by_season: dict[str, float] | None = None
 
     def as_record(self) -> dict[str, object]:
-        return {
+        record: dict[str, object] = {
             "fold_id": self.fold_id,
             "season": self.season,
             "target_gameweek": self.target_gameweek,
@@ -278,6 +325,10 @@ class FoldRecord:
             "feature_contract_version": self.feature_contract_version,
             "target_contract_version": self.target_contract_version,
         }
+        if self.weighting is not None:
+            record["weighting"] = self.weighting
+            record["training_weight_by_season"] = dict(self.training_weight_by_season or {})
+        return record
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,20 +341,47 @@ class WalkSummary:
     folds: tuple[FoldRecord, ...]
 
 
+def declared_season_weights(
+    seasons: Sequence[str], *, rule: SeasonAgeWeighting | None
+) -> dict[str, float]:
+    """The un-normalized weight each training season carries under the arm's rule."""
+
+    return {season: 1.0 if rule is None else rule.season_weight(season) for season in seasons}
+
+
 def build_oof_table(
     frame: pd.DataFrame,
     decisions: Sequence[DecisionPoint],
     *,
     season_order: Sequence[str],
     config: ComponentModelConfig | None = None,
+    weighting: str = "equal",
+    contract_version: str = OOF_CONTRACT_VERSION,
 ) -> tuple[pd.DataFrame, WalkSummary]:
     """Walk the decisions, fitting before each and predicting at it.
 
     Separated from :func:`main` so the property the whole table rests on -- that no row was
     in the training slice of the model that predicted it -- is testable on a synthetic
     frame, without an archive. The test suite is offline by design.
+
+    ``weighting`` names the arm. Under the v1 contract only ``equal`` is admissible; the
+    v2 development contract fits either arm and records, per fold, the weight every
+    training season carried.
     """
 
+    if weighting not in SEASON_WEIGHTINGS:
+        raise DataError(f"Unknown season weighting {weighting!r}.")
+    if contract_version not in (OOF_CONTRACT_VERSION, DEVELOPMENT_OOF_CONTRACT_VERSION):
+        raise DataError(f"Unknown out-of-fold contract {contract_version!r}.")
+    development = contract_version == DEVELOPMENT_OOF_CONTRACT_VERSION
+    if weighting != "equal" and not development:
+        raise DataError(
+            "Season-age weighting is a Phase C v2 development candidate; the v1 contract "
+            "fits only the equal-weight control."
+        )
+    arm_model_version = (
+        COMPONENT_MODEL_VERSION if weighting == "equal" else SEASON_WEIGHTED_MODEL_VERSION
+    )
     columns = component_feature_columns()
     ranks = {season: rank for rank, season in enumerate(season_order)}
     pieces: list[pd.DataFrame] = []
@@ -341,11 +419,32 @@ def build_oof_table(
                 f"Fold {decision.fold_id} appears in its own training set; the walk is not "
                 "out of fold."
             )
-        models = fit_component_models(training, feature_columns=columns, config=config)
+        rule = (
+            SeasonAgeWeighting(target_season=decision.season)
+            if weighting == "season_half_life"
+            else None
+        )
+        training_seasons = sorted(
+            {str(season) for season in training["season"].astype("string")},
+            key=lambda season: ranks[season],
+        )
+        season_weights = declared_season_weights(training_seasons, rule=rule)
+        models = fit_component_models(
+            training, feature_columns=columns, config=config, weighting=rule
+        )
         if models is None:
             refused.append(decision.fold_id)
         else:
             training_rows += models.appearance_rows
+            # The fit records the weights it actually used; they must be the declared ones.
+            fitted_weights = dict(models.season_weights)
+            if models.model_version != arm_model_version or any(
+                fitted_weights[season] != season_weights[season] for season in fitted_weights
+            ):
+                raise DataError(
+                    f"Fold {decision.fold_id} was fitted under weights that differ from the "
+                    "declared rule."
+                )
         records.append(
             FoldRecord(
                 fold_id=decision.fold_id,
@@ -360,9 +459,11 @@ def build_oof_table(
                 training_rows=len(training),
                 scored_rows=len(scoring),
                 model_fitted=models is not None,
-                model_version=COMPONENT_MODEL_VERSION,
+                model_version=arm_model_version,
                 feature_contract_version=FEATURE_CONTRACT_VERSION,
                 target_contract_version=TARGET_CONTRACT_VERSION,
+                weighting=WEIGHTING_LABELS[weighting] if development else None,
+                training_weight_by_season=season_weights if development else None,
             )
         )
         predicted = predict_components(models, scoring, feature_columns=columns)
@@ -393,8 +494,8 @@ def build_oof_table(
 
     table = pd.concat(pieces, ignore_index=True)
     table = table.rename(columns={"gameweek": "target_gameweek"})
-    table["contract_version"] = OOF_CONTRACT_VERSION
-    table["model_version"] = COMPONENT_MODEL_VERSION
+    table["contract_version"] = contract_version
+    table["model_version"] = arm_model_version
     table["feature_contract_version"] = FEATURE_CONTRACT_VERSION
     table["target_contract_version"] = TARGET_CONTRACT_VERSION
     table["dataset_contract_version"] = DATASET_CONTRACT_VERSION
@@ -454,18 +555,40 @@ def build_decision_roster(panel: pd.DataFrame, table: pd.DataFrame) -> pd.DataFr
 
 def main() -> int:
     arguments = _parse_arguments()
-    seasons = tuple(
-        season.strip() for season in str(arguments.seasons).split(",") if season.strip()
+    scope = str(arguments.development_scope)
+    weighting = str(arguments.season_weighting)
+    development = scope == "v2"
+    contract_version = DEVELOPMENT_OOF_CONTRACT_VERSION if development else OOF_CONTRACT_VERSION
+    default_seasons = DEVELOPMENT_SEASONS_V2 if development else DEFAULT_SEASONS
+    seasons = (
+        default_seasons
+        if arguments.seasons is None
+        else tuple(season.strip() for season in str(arguments.seasons).split(",") if season.strip())
     )
     if not seasons:
         print("At least one season is required.")
         return 1
-    if LOCKED_HOLDOUT_SEASON in seasons:
-        print(
-            f"{LOCKED_HOLDOUT_SEASON} is the locked holdout. It is not read, listed or "
-            "measured here; spending it is a three-owner decision under its own protocol."
-        )
-        return 1
+    if not development:
+        if weighting != "equal":
+            print(
+                "Season-age weighting is a Phase C v2 development candidate. Run it with "
+                "--development-scope v2; the v1 contract fits only the equal-weight control."
+            )
+            return 1
+        if LOCKED_HOLDOUT_SEASON in seasons:
+            print(
+                f"{LOCKED_HOLDOUT_SEASON} is the locked holdout. It is not read, listed or "
+                "measured here; spending it is a three-owner decision under its own protocol."
+            )
+            return 1
+    else:
+        outside = [season for season in seasons if season not in DEVELOPMENT_SEASONS_V2]
+        if outside:
+            print(
+                f"The v2 development scope covers {', '.join(DEVELOPMENT_SEASONS_V2)}; "
+                f"{outside!r} lies outside it."
+            )
+            return 1
     revision, dirty = _git_revision()
     if dirty:
         # The manifest records the commit this artifact came from, and a commit reproduces
@@ -495,25 +618,42 @@ def main() -> int:
         decisions = walk_forward_decision_points(panel, seasons=seasons)
         if not decisions:
             raise DataError("The panel produced no decision points.")
-        table, walk = build_oof_table(frame, decisions, season_order=season_order, config=config)
+        table, walk = build_oof_table(
+            frame,
+            decisions,
+            season_order=season_order,
+            config=config,
+            weighting=weighting,
+            contract_version=contract_version,
+        )
         roster = build_decision_roster(panel, table)
     except DataError as error:
         print(f"Component out-of-fold export refused: {error}")
         return 1
 
+    if arguments.table_name is not None:
+        table_name = str(arguments.table_name)
+    elif development:
+        table_name = f"{contract_version}_{weighting}"
+    else:
+        table_name = contract_version
     output_dir: Path = arguments.output_dir
-    table_path = output_dir / f"{arguments.table_name}.csv"
-    manifest_path = output_dir / f"{arguments.table_name}.manifest.json"
-    roster_path = output_dir / f"{arguments.table_name}.roster.csv"
+    table_path = output_dir / f"{table_name}.csv"
+    manifest_path = output_dir / f"{table_name}.manifest.json"
+    roster_path = output_dir / f"{table_name}.roster.csv"
     write_export_table(table, table_path)
     write_export_table(roster, roster_path)
     digest = compute_table_sha256(table_path)
     roster_digest = compute_table_sha256(roster_path)
 
     modelled = int((table["composition_route"] == "component_model").sum())
+    model_version = str(table["model_version"].iloc[0])
+    command = "python -m scripts.export_component_oof" + (
+        f" --development-scope v2 --season-weighting {weighting}" if development else ""
+    )
     manifest = {
-        "contract_version": OOF_CONTRACT_VERSION,
-        "model_version": COMPONENT_MODEL_VERSION,
+        "contract_version": contract_version,
+        "model_version": model_version,
         "feature_contract_version": FEATURE_CONTRACT_VERSION,
         "target_contract_version": TARGET_CONTRACT_VERSION,
         "dataset_contract_version": DATASET_CONTRACT_VERSION,
@@ -572,10 +712,9 @@ def main() -> int:
         "reproduce": (
             "This artifact reads only the pinned public archive, so it can be rebuilt "
             "rather than transferred: python -m scripts.fetch_historical_data (verifies "
-            "against the committed checksum manifest), then python -m "
-            "scripts.export_component_oof, at the repository_commit below. Byte-identical "
-            "output is the check -- compare table_sha256 and roster_sha256. Only "
-            "generated_at_utc differs between runs."
+            f"against the committed checksum manifest), then {command}, at the "
+            "repository_commit below. Byte-identical output is the check -- compare "
+            "table_sha256 and roster_sha256. Only generated_at_utc differs between runs."
         ),
         "repository_commit": revision,
         "working_tree_dirty": dirty,
@@ -605,12 +744,41 @@ def main() -> int:
         "locked_holdout_season": LOCKED_HOLDOUT_SEASON,
         "promotes_anything": False,
     }
+    if development:
+        manifest.update(
+            {
+                "development_scope": scope,
+                "development_only": True,
+                "development_note": (
+                    "Phase C v2 development path. 2025-26 is read here as development "
+                    "data under this separate contract; the repository has used that "
+                    "season before, so nothing measured on it is an unseen final test. "
+                    "The v1 contract, its artifacts and its refusals are unchanged, and "
+                    "this artifact is not binding evidence for any later phase."
+                ),
+                "weighting": {
+                    "label": WEIGHTING_LABELS[weighting],
+                    "model_version": model_version,
+                    "rule": WEIGHTING_RULES[weighting],
+                    "base": None if weighting == "equal" else SEASON_WEIGHT_BASE,
+                    "normalization": WEIGHT_NORMALIZATION,
+                    "declared_before_measurement": True,
+                },
+                "rule_era": {
+                    "defensive_contribution_seasons": [
+                        season for season in seasons if season >= LOCKED_HOLDOUT_SEASON
+                    ],
+                    "note": RULE_ERA_NOTE,
+                },
+                "locked_holdout_read": LOCKED_HOLDOUT_SEASON in seasons,
+            }
+        )
     write_json(manifest_path, manifest)
 
     print(f"Wrote {table_path}")
     print(f"      {roster_path}")
     print(f"      {manifest_path}")
-    print(f"  contract          {OOF_CONTRACT_VERSION}")
+    print(f"  contract          {contract_version}")
     print(f"  seasons           {', '.join(seasons)}")
     print(
         f"  folds             {walk.scored_folds} scored of {len(decisions)} "
@@ -623,7 +791,12 @@ def main() -> int:
     print(f"  roster rows       {len(roster)}")
     print(f"  table sha256      {digest}")
     print(f"  roster sha256     {roster_digest}")
-    print(f"  locked holdout    not read ({LOCKED_HOLDOUT_SEASON})")
+    if development:
+        print(f"  scope             v2 development (weighting {weighting})")
+        read = "read as development data" if manifest["locked_holdout_read"] else "not read"
+        print(f"  locked holdout    {read} ({LOCKED_HOLDOUT_SEASON})")
+    else:
+        print(f"  locked holdout    not read ({LOCKED_HOLDOUT_SEASON})")
     return 0
 
 

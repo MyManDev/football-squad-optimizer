@@ -55,8 +55,18 @@ def _capture(snapshot_root: Path) -> str:
     return written.snapshot_id
 
 
-def _handoff(handoff_root: Path, snapshot_id: str, *, gameweek: int = 2) -> Path:
+def _handoff(
+    handoff_root: Path,
+    snapshot_id: str,
+    *,
+    gameweek: int = 2,
+    expected_points: float | None = None,
+) -> Path:
+    """Write the capture's handoff; ``expected_points`` republishes a different one."""
+
     expected = {code: 2.0 + (code % 3) * 0.5 for code in range(1001, 1025)}
+    if expected_points is not None:
+        expected = dict.fromkeys(expected, expected_points)
     projection = InSeasonProjection(
         season=SEASON,
         gameweek=gameweek,
@@ -70,7 +80,8 @@ def _handoff(handoff_root: Path, snapshot_id: str, *, gameweek: int = 2) -> Path
     return write_projection_handoff(handoff_path_for(handoff_root, SEASON, gameweek), projection)
 
 
-def _publish_members(site_root: Path) -> None:
+def _publish_members(site_root: Path, *entry_ids: int) -> None:
+    members = (ENTRY_ID, *entry_ids)
     document = {
         "contract_version": "provisional_league_ui_v1",
         "payload": {
@@ -78,7 +89,7 @@ def _publish_members(site_root: Path) -> None:
             "league_name": "Test League",
             "season": SEASON,
             "gameweek": 2,
-            "members": [{"member_kind": "human", "entry_id": ENTRY_ID}],
+            "members": [{"member_kind": "human", "entry_id": one} for one in members],
         },
     }
     path = site_root / "league" / "members.json"
@@ -95,8 +106,10 @@ def _deployment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, An
     snapshot_id = _capture(snapshot_root)
     _handoff(handoff_root, snapshot_id)
     _publish_members(site_root)
+    store_root = tmp_path / "store"
+    store_root.mkdir()  # the mount exists before the process does; the backend never creates it
     config = BackendConfig(
-        store_root=tmp_path / "store",
+        store_root=store_root,
         site_data_root=site_root,
         snapshot_root=snapshot_root,
         handoff_root=handoff_root,
@@ -195,9 +208,11 @@ def test_a_deployment_without_a_capture_is_unready_rather_than_broken(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "b" * 40)
+    store_root = tmp_path / "store"
+    store_root.mkdir()
     backend = build_backend(
         BackendConfig(
-            store_root=tmp_path / "store",
+            store_root=store_root,
             site_data_root=tmp_path / "site",
             snapshot_root=tmp_path / "snapshots",
             handoff_root=tmp_path / "handoffs",

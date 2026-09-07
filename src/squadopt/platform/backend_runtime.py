@@ -32,7 +32,8 @@ import os
 import re
 import subprocess
 import threading
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -40,6 +41,7 @@ from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.platform.advice_cache import FileAdviceCache
+from squadopt.platform.advice_job_spec import AdviceJobSpecStore, FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics, readiness_report
 from squadopt.platform.advice_queue import FileJobQueue
 from squadopt.platform.advice_read import AdviceReadStore, AdviceRequestContext, FileLeagueDirectory
@@ -47,15 +49,18 @@ from squadopt.platform.advice_submit import AdviceSubmitService, FixedWindowRate
 from squadopt.platform.capture_context import (
     AdviceCaptureContext,
     CaptureIdentity,
+    handoff_fingerprint_for,
     latest_snapshot_id,
     load_capture_context,
     load_capture_identity,
 )
+from squadopt.platform.store_probe import StoreProbeResult, probe_store
 
 __all__ = [
     "BackendConfig",
     "BackendConfigError",
     "CaptureContextProvider",
+    "StoreProbeGate",
     "backend_from_environment",
     "build_backend",
     "computable_strategies",
@@ -66,6 +71,9 @@ _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 DEFAULT_RATE_LIMIT = 30
 DEFAULT_RATE_WINDOW_SECONDS = 60.0
+# Long enough that a readiness poll is not a syscall storm, short enough that a store
+# which stops working is noticed in the same minute it does.
+DEFAULT_PROBE_RECHECK_SECONDS = 30.0
 
 
 class BackendConfigError(ValueError):
@@ -169,6 +177,10 @@ class BackendConfig:
     def cache_root(self) -> Path:
         return self.store_root / "cache"
 
+    @property
+    def spec_root(self) -> Path:
+        return self.store_root / "specs"
+
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] | None = None) -> BackendConfig:
         """Read the configuration, naming every variable that is missing at once."""
@@ -242,12 +254,19 @@ def _positive_float(source: Mapping[str, str], variable: str, default: float) ->
 
 
 class CaptureContextProvider:
-    """The current capture, re-resolved cheaply and re-read only when it changes.
+    """The current context, re-resolved cheaply and re-read only when it changes.
 
     ``current()`` runs inside a request, so it must be quick and it must never raise: a
     capture that cannot be read is a backend that is not ready, not a five-hundred on a
-    member's page. The reason is kept for the operator, logged once per capture rather
+    member's page. The reason is kept for the operator, logged once per context rather
     than once per request.
+
+    "Changed" means more than a new capture. A cache key is seven fields, and ops can
+    republish a **corrected handoff for the capture already loaded** — same capture id,
+    different projection. Keying the cache on the capture id alone made that correction
+    invisible for the life of the process, so the handoff's fingerprint is re-read on
+    every resolve. It is one small JSON; the expensive halves (the capture and its
+    projection) stay cached behind it.
 
     Both processes use this class, which is what makes "the worker computes under the
     context the api validated" a property of the code rather than of a convention.
@@ -280,7 +299,16 @@ class CaptureContextProvider:
         with self._lock:
             held = self._identity
             if held is not None and held.context.capture_snapshot_id == snapshot_id:
-                return held
+                published = handoff_fingerprint_for(
+                    self._config.handoff_root, held.context.season, held.context.gameweek
+                )
+                if published == held.context.projection_handoff_fingerprint:
+                    return held
+                # A handoff that cannot be confirmed counts as changed: falling through
+                # rebuilds, and a rebuild that fails reports unready rather than serving
+                # answers under a projection identity nobody can name any more.
+                self._identity = None
+                self._context = None
             try:
                 identity = load_capture_identity(
                     snapshot_root=self._config.snapshot_root,
@@ -312,25 +340,27 @@ class CaptureContextProvider:
         identity = self.identity()
         return None if identity is None else identity.context
 
-    def capture(self, snapshot_id: str) -> AdviceCaptureContext | None:
-        """The projected bundle for one named capture, or ``None`` if it is not current.
+    def capture(self, context: AdviceRequestContext) -> AdviceCaptureContext | None:
+        """The projected bundle for one **whole** context, or ``None`` if it is not current.
 
-        Named rather than implicit: a worker holds a job that was accepted under a
-        particular capture and must be told whether *that* capture is still the one this
-        process can answer from. Answering "here is the current bundle" to a question
-        about an older capture is the silent-corruption path this exists to close.
+        The argument is the entire ``AdviceRequestContext`` rather than a capture id, and
+        the comparison is equality over all seven fields, because all seven are in the
+        cache key. Matching on the capture alone left three ways to compute an answer with
+        inputs the key does not describe: a redeployed commit, a changed configuration, and
+        a republished handoff. Answering "here is the current bundle" to a question about
+        any other context is the silent-corruption path this exists to close.
         """
 
         identity = self.identity()
-        if identity is None or identity.context.capture_snapshot_id != snapshot_id:
+        if identity is None or identity.context != context:
             return None
         with self._lock:
             held = self._context
-            if held is not None and held.context.capture_snapshot_id == snapshot_id:
+            if held is not None and held.context == context:
                 return held
-            context = load_capture_context(identity)
-            self._context = context
-            return context
+            bundle = load_capture_context(identity)
+            self._context = bundle
+            return bundle
 
     def _report(self, event: str, **fields: object) -> None:
         marker = f"{event}:{fields.get('snapshot_id', '')}:{fields.get('reason', '')}"
@@ -339,6 +369,58 @@ class CaptureContextProvider:
         self._reported = marker
         if self._log is not None:
             self._log.event(event, **fields)
+
+
+class StoreProbeGate:
+    """ADR 0006's capability probe, held for a short while rather than for ever.
+
+    A pass is remembered so a proven mount is not re-exercised on every readiness poll,
+    but only for ``recheck_seconds``: a store can stop working after it started, and a
+    gate that cached its first success would keep reporting a mount that has since gone
+    away. A failure is never cached, so a mount that arrives late brings the service up
+    without a restart.
+
+    There is deliberately no local-disk fallback. A failed probe keeps the service
+    unready, which is a loud problem rather than a quiet correctness one.
+    """
+
+    def __init__(
+        self,
+        root: Path,
+        *,
+        recheck_seconds: float = DEFAULT_PROBE_RECHECK_SECONDS,
+        clock: Callable[[], float] = time.monotonic,
+        log: AdviceLog | None = None,
+    ) -> None:
+        self._root = root
+        self._recheck = recheck_seconds
+        self._clock = clock
+        self._log = log
+        self._passed: StoreProbeResult | None = None
+        self._passed_at = 0.0
+
+    def result(self) -> StoreProbeResult:
+        held = self._passed
+        if held is not None and self._clock() - self._passed_at < self._recheck:
+            return held
+        outcome = probe_store(self._root)
+        if outcome.ok:
+            self._passed = outcome
+            self._passed_at = self._clock()
+            if self._log is not None:
+                self._log.event("advice_store_probe_passed", root=str(self._root))
+        else:
+            self._passed = None
+            if self._log is not None:
+                self._log.event(
+                    "advice_store_probe_failed",
+                    root=str(self._root),
+                    failed=",".join(outcome.failures()),
+                )
+        return outcome
+
+    def passed(self) -> bool:
+        return self.result().ok
 
 
 @dataclass(frozen=True, slots=True)
@@ -351,6 +433,8 @@ class AdviceBackend:
     reader: AdviceReadStore
     submit: AdviceSubmitService
     contexts: CaptureContextProvider
+    job_specs: AdviceJobSpecStore
+    probe: StoreProbeGate
     metrics: AdviceMetrics
     log: AdviceLog
 
@@ -365,37 +449,29 @@ class AdviceBackend:
         return readiness_report(
             context_loaded=self.contexts.current() is not None,
             league_tree_readable=(self.config.site_data_root / "league" / "members.json").is_file(),
-            cache_writable=_store_writable(self.config.cache_root),
+            cache_writable=self.probe.passed(),
         )
 
 
-def _store_writable(root: Path) -> bool:
-    """Whether the cache root can be created and written; never raises."""
+def build_backend(
+    config: BackendConfig,
+    *,
+    log: AdviceLog | None = None,
+    probe: StoreProbeGate | None = None,
+) -> AdviceBackend:
+    """Open one store and wire every collaborator that reads or writes it.
 
-    probe = root / ".writable-probe"
-    try:
-        root.mkdir(parents=True, exist_ok=True)
-        descriptor = os.open(probe, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        # Another process is probing right now; the store is plainly writable.
-        return True
-    except OSError:
-        return False
-    os.close(descriptor)
-    try:
-        probe.unlink()
-    except OSError:
-        return False
-    return True
-
-
-def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> AdviceBackend:
-    """Open one store and wire every collaborator that reads or writes it."""
+    ``probe`` is injectable for the same reason ``log`` is: the gate holds a pass for a
+    staleness budget, and a caller that wants to observe a store failing after it passed
+    supplies a gate that rechecks immediately rather than fabricating a clock.
+    """
 
     component_log = log if log is not None else AdviceLog("backend")
     metrics = AdviceMetrics()
     queue = FileJobQueue(config.queue_root)
     cache = FileAdviceCache(config.cache_root)
+    specs = FileAdviceJobSpecStore(config.spec_root)
+    gate = probe if probe is not None else StoreProbeGate(config.store_root, log=component_log)
     contexts = CaptureContextProvider(
         config,
         repository_commit=_repository_commit(),
@@ -412,6 +488,10 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
         reader,
         queue,
         rate_limiter=FixedWindowRateLimiter(config.rate_limit, config.rate_window_seconds),
+        specs=specs,
+        # Accepting work the store cannot hold is a promise the deployment cannot keep:
+        # the job write would fail, or succeed onto storage nobody will read again.
+        store_ready=gate.passed,
     )
     return AdviceBackend(
         config=config,
@@ -420,6 +500,8 @@ def build_backend(config: BackendConfig, *, log: AdviceLog | None = None) -> Adv
         reader=reader,
         submit=submit,
         contexts=contexts,
+        job_specs=specs,
+        probe=gate,
         metrics=metrics,
         log=component_log,
     )

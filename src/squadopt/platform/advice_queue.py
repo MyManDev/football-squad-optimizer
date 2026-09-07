@@ -26,6 +26,7 @@ from __future__ import annotations
 import contextlib
 import os
 import re
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -65,6 +66,22 @@ def sanitize_error_message(message: str, *, limit: int = 200) -> str:
     return trimmed or "unspecified failure"
 
 
+class AdviceComputeRefused(ValueError):
+    """The worker will not compute this job, and names a stable reason.
+
+    Distinct from a bug. A bug is unexpected and lands as ``ADVICE_FAILED`` with a
+    sanitized message; this is a decision the compute side reached deliberately — the
+    capture the job was accepted under is gone, its request cannot be read back, it has
+    been retried too often — and the operator (and the member's page) deserve to be told
+    which. The code travels with the exception so the worker step stays the only place
+    that writes a terminal record.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+
+
 class AdviceQueueError(ValueError):
     """A queue operation violates the store's contract."""
 
@@ -83,6 +100,8 @@ class JobQueue(Protocol):
     def load(self, job_id: str) -> AdviceJob | None: ...
 
     def jobs(self) -> tuple[AdviceJob, ...]: ...
+
+    def heartbeat(self, job_id: str) -> None: ...
 
     def recover(
         self, *, at_utc: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
@@ -115,20 +134,29 @@ class FileJobQueue:
             raise AdviceQueueError(f"job_id has an invalid format: {job_id!r}.")
         return job_id
 
-    def _open_index(self, fingerprint: str) -> Path:
-        return self._root / f"open-{fingerprint}.idx"
+    def _open_index(self, cache_key: str) -> Path:
+        return self._root / f"open-{cache_key}.idx"
 
     def submit_unique(self, job: AdviceJob) -> tuple[AdviceJob, bool]:
-        """Enqueue at most one open job per request fingerprint, atomically.
+        """Enqueue at most one open job per **answer**, atomically.
 
         The reviewed race: a scan followed by submit lets two api processes enqueue
         duplicates. The open-job index file is created with the same link-once
         primitive as everything else here; the loser reads the winner's job id and
         returns that job with ``created=False``. The index is released when the job
         reaches a terminal state, so a failed request can be asked again.
+
+        The index is keyed on the **cache key**, not the request fingerprint, because the
+        cache key is the answer's address and the answer is what a caller is waiting for.
+        The fingerprint is a narrower fact — it omits the handoff, the repository commit
+        and the configuration — so keying on it collapsed two requests that wanted
+        *different* answers onto one job: the second caller was handed a job whose result
+        would land at a key it never reads, and would poll a completed job into a "not
+        computed" reply. Keying on the address also stops two requests that differ only in
+        a parameter the strategy ignores from buying two solves of the same plan.
         """
 
-        index = self._open_index(job.request_fingerprint)
+        index = self._open_index(job.cache_key)
         self._root.mkdir(parents=True, exist_ok=True)
         import tempfile
 
@@ -206,8 +234,10 @@ class FileJobQueue:
         self._write(path, job)
         if job.is_terminal:
             self._claim_marker(job.job_id).unlink(missing_ok=True)
-            # Release the open-job index so the same request can be asked again.
-            index = self._open_index(job.request_fingerprint)
+            # Release the open-job index so the same answer can be asked for again.
+            # Reserved and released under the same key, or a terminal job would leave a
+            # reservation nothing can ever clear.
+            index = self._open_index(job.cache_key)
             with contextlib.suppress(FileNotFoundError):
                 if index.read_text(encoding="utf-8").strip() == job.job_id:
                     index.unlink(missing_ok=True)
@@ -321,6 +351,7 @@ def run_advice_worker_once(
     compute: Callable[[AdviceJob], bytes],
     *,
     at_utc: str,
+    heartbeat_seconds: float | None = None,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
 ) -> AdviceJob | None:
@@ -331,6 +362,15 @@ def run_advice_worker_once(
     compute callable at all, which is how "the api imports no solver" stays a property
     of the composition rather than a hope. Returns the terminal record, or ``None``
     when the queue is empty.
+
+    ``heartbeat_seconds`` refreshes the claim while ``compute`` runs. It belongs here
+    because this function owns the claim's whole lifetime — from the ``O_EXCL`` marker to
+    the terminal record — and nothing else can see when the computation starts and stops.
+    One member's plan is not one solve: a rival strategy runs the control plan, the banded
+    plan, and the payload's own plan, so the wall time that matters is a multiple of the
+    single-solve measurement the lease was compared against. Without a heartbeat a
+    long-running claim goes stale under a live worker and a second worker recovers work
+    that was never abandoned; two solves then race for one immutable key.
     """
 
     from time import perf_counter
@@ -352,6 +392,19 @@ def run_advice_worker_once(
             attempt=job.attempt,
         )
     started = perf_counter()
+    stop_beating = threading.Event()
+    beating: threading.Thread | None = None
+    if heartbeat_seconds is not None and heartbeat_seconds > 0.0:
+
+        def beat() -> None:
+            # Refuse to outlive the computation: the wait is the sleep, so a finished job
+            # stops the thread immediately rather than after one more interval.
+            while not stop_beating.wait(heartbeat_seconds):
+                with contextlib.suppress(Exception):
+                    queue.heartbeat(job.job_id)
+
+        beating = threading.Thread(target=beat, name=f"advice-heartbeat-{job.job_id}", daemon=True)
+        beating.start()
     try:
         payload = compute(job)
         if not isinstance(payload, bytes) or not payload:
@@ -374,6 +427,19 @@ def run_advice_worker_once(
         return failed
     except BackendJobsContractError:
         raise
+    except AdviceComputeRefused as refusal:
+        failed = job.transition(
+            "failed",
+            at_utc=at_utc,
+            error=JobError(code=refusal.code, message=sanitize_error_message(str(refusal))),
+        )
+        queue.store(failed)
+        if metrics is not None:
+            metrics.solve_seconds(perf_counter() - started)
+            metrics.increment("advice_jobs_total", outcome="refused")
+        if log is not None:
+            log.event("advice_job_refused", job_id=job.job_id, code=refusal.code)
+        return failed
     except Exception as error:
         failed = job.transition(
             "failed",
@@ -392,6 +458,12 @@ def run_advice_worker_once(
         if log is not None:
             log.event("advice_job_failed", job_id=job.job_id, code="ADVICE_FAILED")
         return failed
+    finally:
+        # Every path out of the computation, including the re-raise: a heartbeat that
+        # outlived its job would keep a finished claim looking alive to recovery.
+        stop_beating.set()
+        if beating is not None:
+            beating.join(timeout=1.0)
     completed = job.transition("completed", at_utc=at_utc, result_ref=job.cache_key)
     queue.store(completed)
     if metrics is not None:

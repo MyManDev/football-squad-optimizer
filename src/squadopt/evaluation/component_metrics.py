@@ -1,7 +1,7 @@
 """Leakage-agnostic scoring of already-produced Phase C OOF component rows."""
 
 import math
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from numbers import Integral, Real
 from types import MappingProxyType
@@ -153,7 +153,28 @@ def _validate_binary_target(frame: pd.DataFrame, column: str) -> pd.Series:
     return numeric
 
 
-def _validate_oof(value: object) -> pd.DataFrame:
+def _development_allowance(development_seasons: Collection[str]) -> frozenset[str]:
+    """Which locked seasons the caller has explicitly declared as development data.
+
+    Only a season in :data:`PHASE_C_LOCKED_HOLDOUT_SEASONS` can be named here; the
+    declaration is a statement about the caller's protocol, not a way to widen this scorer.
+    """
+
+    if isinstance(development_seasons, str | bytes):
+        raise EvaluationValidationError("development_seasons must be a collection of labels.")
+    declared = frozenset(development_seasons)
+    if any(not isinstance(season, str) for season in declared):
+        raise EvaluationValidationError("development_seasons must contain season labels.")
+    unknown = sorted(declared - PHASE_C_LOCKED_HOLDOUT_SEASONS)
+    if unknown:
+        raise EvaluationValidationError(
+            f"development_seasons may only name locked seasons, not {unknown!r}."
+        )
+    return declared
+
+
+def _validate_oof(value: object, *, development_seasons: Collection[str] = ()) -> pd.DataFrame:
+    refused_seasons = PHASE_C_LOCKED_HOLDOUT_SEASONS - _development_allowance(development_seasons)
     if not isinstance(value, pd.DataFrame):
         raise EvaluationValidationError("oof_rows must be a pandas DataFrame.")
     duplicates = value.columns[value.columns.duplicated()].tolist()
@@ -189,7 +210,7 @@ def _validate_oof(value: object) -> pd.DataFrame:
         raise EvaluationValidationError("fold_id must contain non-empty strings.")
     if bool((~frame["position"].isin(_POSITIONS)).any()):
         raise EvaluationValidationError("position must contain only GK, DEF, MID or FWD.")
-    if bool(frame["season"].isin(PHASE_C_LOCKED_HOLDOUT_SEASONS).any()):
+    if bool(frame["season"].isin(refused_seasons).any()):
         raise EvaluationValidationError("The locked 2025-26 holdout must not be evaluated.")
 
     player_ids = frame["player_id"].tolist()
@@ -548,10 +569,17 @@ def _slices(frame: pd.DataFrame, column: str) -> Mapping[str, ComponentMetricSet
     )
 
 
-def evaluate_component_oof(oof_rows: pd.DataFrame) -> PhaseCComponentEvaluation:
-    """Score validated component rows without independently proving OOF chronology."""
+def evaluate_component_oof(
+    oof_rows: pd.DataFrame, *, development_seasons: Collection[str] = ()
+) -> PhaseCComponentEvaluation:
+    """Score validated component rows without independently proving OOF chronology.
 
-    frame = _validate_oof(oof_rows)
+    The locked holdout is refused unless the caller names it in ``development_seasons``,
+    which is the explicit declaration the Phase C v2 development path makes and the v1
+    path never does. The default is the v1 behaviour, unchanged.
+    """
+
+    frame = _validate_oof(oof_rows, development_seasons=development_seasons)
     return PhaseCComponentEvaluation(
         overall=_score(frame),
         by_season=_slices(frame, "season"),
