@@ -7,6 +7,7 @@ presses a button for.
 """
 
 import json
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import replace
@@ -619,3 +620,176 @@ def test_the_claim_stays_alive_while_a_long_computation_runs(
     )
     assert processed is not None and processed.status == "completed"
     assert stolen == [], "a heartbeat-refreshed claim was recovered from under its owner"
+
+
+def test_an_idempotency_key_replayed_in_a_new_context_is_a_conflict(
+    running: dict[str, Any],
+) -> None:
+    """The key names a retry of one request, and the answer moved out from under it.
+
+    The fingerprint cannot see a republished handoff, so the replay matched the older job
+    and was handed it with a 202. The caller would poll that job to completion and then be
+    told its own answer had never been computed.
+    """
+
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    body = {"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW}
+    header = {"Idempotency-Key": "client:advise:merge-review"}
+
+    first = client.post(route, json=body, headers=header)
+    assert first.status_code == 202, first.text
+
+    # The same key, replayed under the same context, still means "this again".
+    replay = client.post(route, json=body, headers=header)
+    assert replay.status_code == 202, replay.text
+    assert replay.json()["job_id"] == first.json()["job_id"]
+
+    deployment_module._handoff(
+        running["handoff_root"], running["snapshot_id"], expected_points=6.75
+    )
+    moved = client.post(route, json=body, headers=header)
+    assert moved.status_code == 409, moved.text
+    assert moved.json()["error"]["code"] == "IDEMPOTENCY_CONFLICT"
+    # And no job was created for the new context under the old job's name.
+    assert len(backend.queue.jobs()) == 1
+
+
+def test_two_concurrent_contexts_get_two_job_ids_rather_than_a_collision(
+    running: dict[str, Any],
+) -> None:
+    """A redeploy sharing a mount: same store, same capture, same request, two commits.
+
+    It has to be concurrent to bite. Run in sequence, the second submission counts the
+    first and picks the next ordinal, so the names differ by accident. Run together — both
+    reading the queue before either writes, which is what two api replicas do — naming the
+    job after the request fingerprint gives them one name, and a create-once name means one
+    caller gets 202 and the other a 500.
+
+    The barrier sits inside the queue read, so the interleaving is pinned rather than hoped
+    for, and it has a timeout so a regression fails rather than hangs.
+    """
+
+    config = running["backend"].config
+    older = build_backend(config)
+    with pytest.MonkeyPatch.context() as redeployed:
+        redeployed.setenv("SQUADOPT_REPOSITORY_COMMIT", "d" * 40)
+        newer = build_backend(config)
+
+    assert older.contexts.current() != newer.contexts.current()
+    # Warm both gates here, in one thread. The race under test is the queue read; letting
+    # two threads probe the same store at once would add noise this test is not about.
+    assert older.probe.passed() and newer.probe.passed()
+
+    barrier = threading.Barrier(2)
+
+    class _Together:
+        """The real queue, with both submitters made to read history at the same moment."""
+
+        def __init__(self, inner: Any) -> None:
+            self._inner = inner
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self._inner, name)
+
+        def jobs(self) -> Any:
+            history = self._inner.jobs()
+            barrier.wait(timeout=10.0)
+            return history
+
+    outcomes: dict[str, Any] = {}
+
+    def submit(name: str, backend: Any) -> None:
+        try:
+            outcomes[name] = backend.submit.submit(
+                league_id=LEAGUE_ID,
+                entry_id=ENTRY_ID,
+                strategy=COMPUTED_MODE,
+                window=COMPUTED_WINDOW,
+                rival_entry_id=None,
+                idempotency_key=None,
+                client_bucket="test",
+                at_utc=_now_stamp(),
+            )
+        except Exception as error:  # recorded, so the assertion names it
+            outcomes[name] = error
+
+    threads = [
+        threading.Thread(target=submit, args=("older", older), daemon=True),
+        threading.Thread(target=submit, args=("newer", newer), daemon=True),
+    ]
+    for backend in (older, newer):
+        object.__setattr__(backend.submit, "_queue", _Together(backend.queue))
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30.0)
+        assert not thread.is_alive()
+
+    for name, outcome in outcomes.items():
+        assert not isinstance(outcome, Exception), f"{name}: {outcome!r}"
+        assert outcome.job is not None
+
+    jobs = older.queue.jobs()
+    assert len({job.job_id for job in jobs}) == 2, jobs
+    assert len({job.cache_key for job in jobs}) == 2, jobs
+
+
+def test_a_store_that_breaks_later_stops_the_worker_taking_new_work(
+    running: dict[str, Any],
+) -> None:
+    """Healthy at startup is not healthy for ever, and the gate is asked every round."""
+
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+    client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW},
+    )
+    claims: list[str] = []
+    recoveries: list[str] = []
+
+    class _Watched:
+        """The real queue, with the two calls that take work made observable."""
+
+        def __init__(self, inner: Any) -> None:
+            self._inner = inner
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(self._inner, name)
+
+        def claim(self, *, at_utc: str) -> Any:
+            claims.append(at_utc)
+            return self._inner.claim(at_utc=at_utc)
+
+        def recover(self, *, at_utc: str, lease_seconds: float = 300.0) -> Any:
+            recoveries.append(at_utc)
+            return self._inner.recover(at_utc=at_utc, lease_seconds=lease_seconds)
+
+    healthy = [True]
+    processed = run_advice_worker(
+        _Watched(backend.queue),
+        backend.cache,
+        lambda job: b'{"contract_version":"x"}',
+        should_stop=_stop_after(4),
+        store_ready=lambda: healthy[0],
+        idle_seconds=0.0,
+        heartbeat_seconds=None,
+    )
+    assert processed == 1
+    assert claims and recoveries
+
+    healthy[0] = False
+    before_claims, before_recoveries = len(claims), len(recoveries)
+    run_advice_worker(
+        _Watched(backend.queue),
+        backend.cache,
+        lambda job: b'{"contract_version":"x"}',
+        should_stop=_stop_after(5),
+        store_ready=lambda: healthy[0],
+        idle_seconds=0.0,
+        heartbeat_seconds=None,
+    )
+    assert len(claims) == before_claims, "a broken store was still claimed against"
+    assert len(recoveries) == before_recoveries, "a broken store was still recovered from"
