@@ -6,6 +6,7 @@ import type {
   LeagueViewEnvelope,
   AdviceStrategy,
   EntryAdviceIndex,
+  Scoreboard,
 } from "./types";
 
 const CONTRACT_VERSION = "provisional_league_ui_v1";
@@ -135,4 +136,14 @@ export async function loadEntryAdviceIndex(
   return readOrExample<EntryAdviceIndex>(`advice/${entryId}/index.json`, async () =>
     (await mockModule()).mockEntryAdviceIndex(entryId),
   );
+}
+
+/**
+ * The weekly scoreboard has no example: it is a real-data surface, and a page that showed
+ * an invented league table while nothing was published would be the fiction the example
+ * gate above was narrowed to avoid. Missing arrives as `LeagueDataMissing`, and the page
+ * says "not published yet".
+ */
+export async function loadScoreboard(): Promise<LeagueViewEnvelope<Scoreboard>> {
+  return read<Scoreboard>("scoreboard.json");
 }

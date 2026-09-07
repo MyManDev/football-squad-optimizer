@@ -231,3 +231,75 @@ export interface EntryAdvice {
   data_quality: EntryDataQuality;
   missing_fields: string[];
 }
+
+/**
+ * The weekly scoreboard (`data/league/scoreboard.json`), written by
+ * `scripts/build_scoreboard.py` from one live capture, the registry, the ledger and an
+ * optional Top-100 capture. Every field is what a file on disk says; `null` is "the file
+ * does not say", never a zero standing in for an absence.
+ */
+export interface ScoreboardOurs {
+  /** The ledger's settled net (named eleven, captain, chip, minus hits); null until settled. */
+  net: number | null;
+  xi: number | null;
+  hits: number;
+  projected: number;
+  /** `live`: decided before the deadline; `replay`: recorded afterwards from a pre-deadline capture. */
+  mode: "live" | "replay" | null;
+}
+
+export interface ScoreboardTop100 {
+  gameweek: number;
+  /** Mean `event_total` over ranks 1..100 of the cohort capture, for its own gameweek. */
+  mean_event_total: number;
+  cohort_size: number;
+  /** True only when that gameweek was finished and checked in the cohort capture's bootstrap. */
+  final: boolean;
+}
+
+export interface ScoreboardMember {
+  entry_id: number;
+  /** Gross, as the member's history publishes it. */
+  points: number;
+  hit_cost: number | null;
+  /** `points - hit_cost`: the same net our ledger records. Null when the cost is unknown. */
+  net: number | null;
+  total_points: number;
+}
+
+export interface ScoreboardGameweek {
+  gameweek: number;
+  deadline_utc: string;
+  finished: boolean;
+  data_checked: boolean;
+  average_entry_score: number | null;
+  highest_score: number | null;
+  ours: ScoreboardOurs | null;
+  top100: ScoreboardTop100 | null;
+  members: ScoreboardMember[];
+  members_mean_net: number | null;
+  members_counted: number;
+}
+
+export interface ScoreboardCumulative {
+  through_gameweek: number | null;
+  gameweeks: number[];
+  ours_net: number | null;
+  /** The gameweeks `ours_net` covers; a subset of `gameweeks` until the ledger catches up. */
+  ours_gameweeks: number[];
+  members_mean_total_points: number | null;
+  members_counted: number;
+  average_entry_score: number | null;
+}
+
+export interface Scoreboard {
+  season: string;
+  league_id: number;
+  source_snapshot_id: string;
+  captured_at_utc: string;
+  cohort_snapshot_id: string | null;
+  registered_members: number;
+  histories_held: number;
+  gameweeks: ScoreboardGameweek[];
+  cumulative: ScoreboardCumulative;
+}

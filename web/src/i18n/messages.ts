@@ -321,6 +321,34 @@ const en = {
     gameAverage: "official FPL average",
     lastWeek: (points: string) => `last scored week difference: ${points}`,
   },
+  leagueScoreboard: {
+    title: "Weekly scoreboard",
+    aside: (snapshot: string) => `capture ${snapshot.slice(0, 24)}…`,
+    loading: "Loading the scoreboard…",
+    notPublished:
+      "The scoreboard is not published yet. It appears after the first weekly run that writes it.",
+    notAvailable: "The scoreboard could not be read.",
+    caption:
+      "Per finished gameweek: our paper ledger, the league members' mean net, the Top-100 mean, the FPL average and the highest score",
+    gameweek: "GW",
+    ours: "SquadOpt · paper ledger",
+    members: "league members · mean net",
+    membersCounted: (count: number) => `${count} member${count === 1 ? "" : "s"}`,
+    top100: "Top-100 · mean",
+    top100NotFinal: "not final",
+    average: "FPL average",
+    highest: "highest",
+    notSettled: "decided, not settled",
+    noGameweek: "No gameweek has finished in this capture yet.",
+    cumulative: (gameweek: number) => `cumulative through GW${gameweek}`,
+    oursCovers: (gameweeks: string) => `GW ${gameweeks} only`,
+    oursNone: "no settled week",
+    membersTotal: (count: number) => `mean total of ${count}`,
+    paperLedger:
+      "Our squad is a paper ledger, not an FPL entry: its net counts the captain, the chip and transfer hits, with no autosubs. A member's net is their week minus the transfer cost, read from their own history — the same net our ledger records.",
+    modeNote:
+      "live: decided before the deadline. replay: recorded afterwards from a capture taken before that deadline.",
+  },
   leagueMembers: {
     loading: "Loading league members…",
     computeTitle: "Compute this plan",
@@ -949,6 +977,34 @@ const tr: MessageSchema<typeof en> = {
     ourNet: "kaydedilen kadro neti",
     gameAverage: "resmi FPL ortalaması",
     lastWeek: (pointsValue) => `son puanlanan hafta farkı: ${pointsValue}`,
+  },
+  leagueScoreboard: {
+    title: "Haftalık skor tablosu",
+    aside: (snapshot) => `capture ${snapshot.slice(0, 24)}…`,
+    loading: "Skor tablosu yükleniyor…",
+    notPublished:
+      "Skor tablosu henüz yayımlanmadı. Onu yazan ilk haftalık çalıştırmadan sonra görünür.",
+    notAvailable: "Skor tablosu okunamadı.",
+    caption:
+      "Biten her oyun haftası için: kâğıt ledger'ımız, lig üyelerinin ortalama neti, Top-100 ortalaması, FPL ortalaması ve en yüksek puan",
+    gameweek: "OH",
+    ours: "SquadOpt · kâğıt ledger",
+    members: "lig üyeleri · ortalama net",
+    membersCounted: (count) => `${count} üye`,
+    top100: "Top-100 · ortalama",
+    top100NotFinal: "kesin değil",
+    average: "FPL ortalaması",
+    highest: "en yüksek",
+    notSettled: "kararlaştırıldı, sonuçlanmadı",
+    noGameweek: "Bu capture'da henüz biten oyun haftası yok.",
+    cumulative: (gameweek) => `OH${gameweek} sonuna kadar kümülatif`,
+    oursCovers: (gameweeks) => `yalnız OH ${gameweeks}`,
+    oursNone: "sonuçlanmış hafta yok",
+    membersTotal: (count) => `${count} üyenin ortalama toplamı`,
+    paperLedger:
+      "Kadromuz bir FPL takımı değil, kâğıt üstünde bir ledger: neti kaptanı, çipi ve transfer cezalarını sayar; otomatik değişiklik yoktur. Bir üyenin neti, kendi geçmişinden okunan hafta puanı eksi transfer cezasıdır — ledger'ımızın kaydettiği netle aynı ölçü.",
+    modeNote:
+      "live: son tarihten önce kararlaştırıldı. replay: son tarihten önce alınmış bir capture'dan sonradan kaydedildi.",
   },
   leagueMembers: {
     computeTitle: "Bu planı hesapla",
