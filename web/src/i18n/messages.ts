@@ -276,7 +276,7 @@ const en = {
     fromGw2: "from gameweek 2",
     onePoint:
       "One gameweek is a point, not a line. The chart starts once a second decision exists; the realized line starts once the first gameweek settles.",
-    againstLeague: "Against the rest of the league",
+    againstLeague: "Recorded squad and FPL average",
     comparisonMissing:
       "The comparison is built from the capture the decision used; this site build did not include one, so nothing about the league is claimed here.",
     firstRow: "The first row appears once gameweek 1 is decided.",
@@ -290,7 +290,7 @@ const en = {
     hits: "hits",
     chip: "chip",
     state: "state",
-    note: "Realized points come from the settle step and are never edited by hand; a projection error is realized minus projected for the frozen XI (captain counted twice, no automatic substitutions).",
+    note: "SquadOpt's recorded squad net includes captain/chip effects and transfer hits, but no autosubs or vice-captain replacement. It is not directly comparable with official FPL scores.",
     weeklySummary: (snapshot: string) =>
       `the game's own weekly summary · capture ${snapshot.slice(0, 24)}…`,
     chartStarts:
@@ -319,10 +319,10 @@ const en = {
     realizedCumulative: "realized, cumulative",
     afterSettle: " (after the first settle)",
     averageLabel: (count: number) =>
-      `Our net score against the game's average over ${count} scored gameweeks`,
-    ourNet: "our net score",
-    gameAverage: "the game's average",
-    lastWeek: (points: string) => `last scored week: ${points} against it`,
+      `Recorded squad net and official FPL average over ${count} scored gameweeks`,
+    ourNet: "recorded squad net",
+    gameAverage: "official FPL average",
+    lastWeek: (points: string) => `last scored week difference: ${points}`,
   },
   leagueMembers: {
     loading: "Loading league members…",
@@ -426,7 +426,7 @@ const en = {
       "Advice is labelled only with a point trade-off. Crowd-relative window diagnostics are never dressed up as a chance of winning.",
     independentAdviceRule:
       "Your advice is calculated only from your squad and your objective. SquadOpt's own team does not enter that calculation: the system cannot protect its rank by giving anyone worse advice; every member is evaluated independently by the same decision function.",
-    squadoptComparisonTitle: "Against the SquadOpt team",
+    squadoptComparisonTitle: "Recorded score difference",
     squadoptComparison: (difference: string) =>
       `Your point difference from SquadOpt's squad this gameweek: ${difference}`,
     noMove: "No move clears the selected example point trade-off.",
@@ -834,7 +834,7 @@ const tr: MessageSchema<typeof en> = {
     fromGw2: "ikinci oyun haftasından itibaren",
     onePoint:
       "Tek oyun haftası bir noktadır, çizgi değildir. Grafik ikinci karar oluşunca; gerçekleşen çizgisi ilk hafta sonuçlanınca başlar.",
-    againstLeague: "Ligin geri kalanına karşı",
+    againstLeague: "Kaydedilen kadro ve FPL ortalaması",
     comparisonMissing:
       "Karşılaştırma, kararın kullandığı capture üzerinden kurulur. Bu site build'i capture içermediği için lig hakkında bir iddia gösterilmiyor.",
     firstRow: "İlk satır, birinci oyun haftası kararlaştırılınca görünür.",
@@ -848,7 +848,7 @@ const tr: MessageSchema<typeof en> = {
     hits: "ceza",
     chip: "çip",
     state: "durum",
-    note: "Gerçekleşen puanlar settle adımından gelir ve elle değiştirilmez; projeksiyon hatası dondurulmuş ilk 11 için gerçekleşen eksi tahmindir (kaptan iki kez sayılır, otomatik değişiklik yoktur).",
+    note: "SquadOpt’un kaydedilen kadro neti kaptan/çip ve transfer cezasını içerir; otomatik değişiklik ve kaptan yedeği uygulanmaz. Resmi FPL puanlarıyla birebir karşılaştırılamaz.",
     weeklySummary: (snapshot) => `oyunun haftalık özeti · capture ${snapshot.slice(0, 24)}…`,
     chartStarts:
       "Grafik ilk puanlanan oyun haftasıyla başlar. Oyun ortalamayı hafta bittikten sonra yayımladığı için henüz çizilecek veri yok.",
@@ -874,10 +874,11 @@ const tr: MessageSchema<typeof en> = {
     projectedCumulative: "tahmin, kümülatif",
     realizedCumulative: "gerçekleşen, kümülatif",
     afterSettle: " (ilk sonuçtan sonra)",
-    averageLabel: (count) => `${count} puanlanmış haftada net puanımız ve oyun ortalaması`,
-    ourNet: "net puanımız",
-    gameAverage: "oyun ortalaması",
-    lastWeek: (pointsValue) => `son puanlanan hafta: ortalamaya karşı ${pointsValue}`,
+    averageLabel: (count) =>
+      `${count} puanlanmış haftada kaydedilen kadro neti ve resmi FPL ortalaması`,
+    ourNet: "kaydedilen kadro neti",
+    gameAverage: "resmi FPL ortalaması",
+    lastWeek: (pointsValue) => `son puanlanan hafta farkı: ${pointsValue}`,
   },
   leagueMembers: {
     computeTitle: "Bu planı hesapla",
@@ -979,7 +980,7 @@ const tr: MessageSchema<typeof en> = {
       "Öneriler yalnızca puan ödünleşimi etiketi taşır. Kalabalık-göreli pencere diagnostikleri kazanma ihtimali gibi sunulmaz.",
     independentAdviceRule:
       "Sana verilen öneri yalnızca senin kadrondan ve senin hedefinden hesaplanır. Sistemin kendi takımı bu hesaba girmez. Sistem kendi sırasını korumak için kimseye kötü öneri veremez; her üyenin önerisi bağımsız olarak aynı karar fonksiyonundan çıkar.",
-    squadoptComparisonTitle: "SquadOpt takımına karşı",
+    squadoptComparisonTitle: "Kaydedilen puan farkı",
     squadoptComparison: (difference) =>
       `SquadOpt'un bu haftaki kadrosuyla puan farkın: ${difference}`,
     noMove: "Seçilen örnek puan ödünleşimini geçen bir hamle yok.",

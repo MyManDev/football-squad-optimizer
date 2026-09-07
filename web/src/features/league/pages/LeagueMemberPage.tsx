@@ -228,6 +228,7 @@ function LeagueMemberContent({
 
       {view.squadopt_comparison ? (
         <Card title={copy.squadoptComparisonTitle}>
+          <p className={styles.notice}>{messages.league.note}</p>
           <p className={`${styles.comparison} num`}>
             {copy.squadoptComparison(
               signedPoints(view.squadopt_comparison.difference_points, 0, locale),

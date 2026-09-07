@@ -162,6 +162,9 @@ export function LeagueMembersView({
         {view.scored_gameweek === null ? (
           <p className={styles.notice}>{copy.noScoredWeek}</p>
         ) : null}
+        {rows.some((member) => member.member_kind === "system") && (
+          <p className={styles.notice}>{messages.league.note}</p>
+        )}
       </Card>
     </div>
   );

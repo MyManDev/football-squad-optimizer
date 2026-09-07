@@ -132,7 +132,7 @@ export function LeaguePage() {
         </Card>
       )}
 
-      <p className={styles.note}>{copy.note}</p>
+      {!league.data && <p className={styles.note}>{copy.note}</p>}
     </div>
   );
 }
@@ -155,6 +155,7 @@ function AgainstTheLeague({ view }: { view: LeagueView }) {
   return (
     <>
       <Card title={copy.againstLeague} aside={copy.weeklySummary(view.source_snapshot_id)}>
+        <p className={styles.note}>{copy.note}</p>
         <p className={styles.para}>
           {verdictText(messages, view.verdict_code, view.verdict_params, view.verdict)}
         </p>
