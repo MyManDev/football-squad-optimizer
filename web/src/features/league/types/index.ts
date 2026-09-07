@@ -120,11 +120,42 @@ export interface EntryAdviceIndex {
   gameweek: number;
   entry_id: number;
   window: WindowSize;
+  /**
+   * Per strategy, the windows whose file the producer wrote: pure points at one, three
+   * and five weeks where each solved, every rival strategy at one week. Absent on an
+   * index from before the windows existed, which means window one only.
+   */
+  windows?: Partial<Record<string, WindowSize[]>>;
   strategies: string[];
   rival_entry_ids: number[];
   default_rival_entry_id: number | null;
   computed: { strategy: string; rival_entry_id: number; path: string }[];
-  unavailable: { strategy: string; rival_entry_id: number; reason: string }[];
+  /**
+   * A (strategy, rival) pair with no plan, or — with `rival_entry_id` null and the
+   * `window` named — a pure-points window that did not solve, each with its reason.
+   */
+  unavailable: {
+    strategy: string;
+    rival_entry_id: number | null;
+    window?: WindowSize;
+    reason: string;
+  }[];
+}
+
+/**
+ * One gameweek of a three- or five-week plan: the transfers it makes, the hit points
+ * it pays, the chip it plays, the free transfers around it and the planner's expected
+ * points for that week's eleven (captain doubled, before hits).
+ */
+export interface AdvicePlanWeek {
+  gameweek: number;
+  transfers_in: AdvicePlayer[];
+  transfers_out: AdvicePlayer[];
+  transfer_hit_points: number;
+  chip: AdviceChip | null;
+  free_transfers_before: number;
+  free_transfers_after: number;
+  expected_points: number;
 }
 
 export interface EntryAdvice {
@@ -189,6 +220,14 @@ export interface EntryAdvice {
   starting_xi?: AdvicePlayer[] | null;
   bench?: AdvicePlayer[] | null;
   chip?: AdviceChip | null;
+  /**
+   * A three- or five-week window: one row per gameweek, and the sentences the
+   * producer states about what the window assumes (the first week's projection
+   * repeated over the fixture calendar, among others). The moves and the lineup
+   * above are the first week's. Absent on one-week documents.
+   */
+  plan_weeks?: AdvicePlanWeek[] | null;
+  stated_limits?: string[] | null;
   data_quality: EntryDataQuality;
   missing_fields: string[];
 }

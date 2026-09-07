@@ -453,8 +453,78 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
         </div>
       )}
       <LineupSection view={view} />
+      <WindowSection view={view} />
       <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
     </Card>
+  );
+}
+
+/**
+ * A three- or five-week window: what it assumes, in the producer's own sentences, and
+ * one row per gameweek — transfers, hit points, chip, expected points. The moves and
+ * the lineup above are the first week's; the rest of the window lives here. Rendered
+ * only when the producer published it, so a one-week document shows nothing extra.
+ */
+function WindowSection({ view }: { view: EntryAdvice }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const weeks = view.plan_weeks;
+  if (!weeks || weeks.length === 0) return null;
+  const limits = view.stated_limits ?? [];
+  const names = (players: AdvicePlayer[]) =>
+    players.length === 0 ? "—" : players.map((player) => player.name).join(", ");
+  const title = copy.windowTitle(weeks.length);
+  return (
+    <section className={styles.window} aria-label={title}>
+      <h3 className={styles.lineupTitle}>{title}</h3>
+      <p className={styles.honesty}>{copy.windowRule}</p>
+      {limits.length > 0 ? (
+        <>
+          <h4 className={styles.lineupSub}>{copy.windowLimitsLabel}</h4>
+          <ul className={styles.limits}>
+            {limits.map((sentence) => (
+              // The producer's sentence in this language where the site knows it; the
+              // producer's own words otherwise, never dropped.
+              <li key={sentence}>{copy.statedLimits[sentence] ?? sentence}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      <div className={styles.windowScroll}>
+        <table className={styles.windowTable}>
+          <thead>
+            <tr>
+              <th scope="col">{copy.windowWeek}</th>
+              <th scope="col">{copy.in}</th>
+              <th scope="col">{copy.out}</th>
+              <th scope="col" className={styles.right}>
+                {copy.windowHits}
+              </th>
+              <th scope="col">{copy.chipLabel}</th>
+              <th scope="col" className={styles.right}>
+                {copy.windowPoints}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {weeks.map((week) => (
+              <tr key={week.gameweek}>
+                <th scope="row" className="num">
+                  {copy.windowWeekOf(week.gameweek)}
+                </th>
+                <td>{names(week.transfers_in)}</td>
+                <td>{names(week.transfers_out)}</td>
+                <td className={`${styles.right} num`}>
+                  {points(week.transfer_hit_points, 0, locale)}
+                </td>
+                <td>{week.chip ? (copy.chipNames[week.chip] ?? week.chip) : "—"}</td>
+                <td className={`${styles.right} num`}>{points(week.expected_points, 1, locale)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 

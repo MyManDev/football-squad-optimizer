@@ -13,8 +13,10 @@ the league capture, which contains neither the requesting user's secrets nor our
 paper entry, so nothing a member is told can depend on the system's own squad.
 """
 
+import functools
 import logging
 import math
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -29,24 +31,46 @@ from squadopt.application.entries import (
 from squadopt.application.phase_e import TransferAdviceDiagnostic, run_transfer_advice_diagnostic
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.errors import DataSourceError
+from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.live import (
     Projection,
     RecommendationInputs,
     SeasonRules,
+    make_projection_horizon_builder,
+    plan_transfer_horizon,
     plan_transfers,
     plan_transfers_with_overlap,
 )
+from squadopt.live.recommendation import InSeasonProjection
 from squadopt.live.transfers import HeldSquad, TransferDecision
+from squadopt.optimization import OptimizationConfig
 from squadopt.planning import (
     FirstWeekOverlap,
     PlanningWeekResult,
+    ProjectionHorizon,
     TransferPlanningConfig,
     TransferPlanResult,
 )
 
-#: The one combination computed today: the deterministic planner's own answer.
+#: The baseline combination: the deterministic planner's own one-week answer. Every
+#: rival strategy is computed at this window only.
 COMPUTED_MODE = "saf-puan"
 COMPUTED_WINDOW = 1
+#: The windows ``saf-puan`` is computed for. A longer window is the multi-week planner
+#: over the week-1 projection repeated across the captured calendar — a plan under
+#: stated limits, not a forecast of the later weeks.
+MEMBER_WINDOWS: tuple[int, ...] = (1, 3, 5)
+#: The multi-week solve's budget, as the system's own horizon path spends it: twenty
+#: deterministic units per gameweek, under one wall-clock ceiling. A plan the budget
+#: cannot prove is published FEASIBLE with its gap, never dropped.
+WINDOW_DETERMINISTIC_UNITS_PER_WEEK = 20.0
+WINDOW_WALL_CEILING_SECONDS = 300.0
+
+#: Builds the projection horizon for the requested consecutive gameweeks from the one
+#: capture the advice is answered from. Bound by the caller (``member_horizon_builder``)
+#: so the request stays wire-shaped and the horizon is built once per window, not per
+#: member: it depends on the capture and the handoff only, never on whose squad asks.
+HorizonBuilder = Callable[[tuple[int, ...]], ProjectionHorizon]
 
 #: Pitch order for the published eleven and the outfield bench.
 _POSITION_ORDER: tuple[str, ...] = ("GK", "DEF", "MID", "FWD")
@@ -154,6 +178,84 @@ _NO_LINEUP: dict[str, object] = {
     "bench": None,
     "chip": None,
 }
+
+
+def _moves(
+    outs: Sequence[int],
+    ins: Sequence[int],
+    *,
+    hit_points: object,
+    by_id: "dict[int, pd.Series[Any]]",
+    pool_by_id: "dict[int, pd.Series[Any]]",
+    gameweek: int,
+    reason_code: str,
+) -> list[dict[str, object]]:
+    """The published moves: out/in pairs by position, each with its expected-points delta
+    and the week's hit points. ``by_id`` resolves the incoming players (the plan's own
+    squad rows), ``pool_by_id`` the outgoing ones (the shared projection)."""
+
+    moves: list[dict[str, object]] = []
+    for index in range(max(len(outs), len(ins))):
+        player_out = outs[index] if index < len(outs) else None
+        player_in = ins[index] if index < len(ins) else None
+        delta = 0.0
+        if player_in is not None and player_in in by_id:
+            delta += float(str(by_id[player_in]["expected_points"]))
+        if player_out is not None and player_out in pool_by_id:
+            delta -= float(str(pool_by_id[player_out]["expected_points"]))
+        moves.append(
+            {
+                "move_id": f"gw{gameweek:02d}-{index + 1}",
+                "player_out": (
+                    _advice_player(pool_by_id[player_out])
+                    if player_out is not None and player_out in pool_by_id
+                    else None
+                ),
+                "player_in": (
+                    _advice_player(by_id[player_in])
+                    if player_in is not None and player_in in by_id
+                    else None
+                ),
+                "expected_points_delta": delta,
+                "expected_points_cost": float(str(hit_points)),
+                "reason_code": reason_code,
+            }
+        )
+    return moves
+
+
+def _missing_fields(picks: EntryPicks) -> list[str]:
+    missing: list[str] = []
+    if not picks.free_transfers_known:
+        missing.append("free_transfers")
+    if not picks.purchase_prices_known:
+        missing.append("purchase_prices")
+    return missing
+
+
+def member_horizon_builder(
+    snapshot: CapturedSnapshot,
+    *,
+    season: str,
+    panel: pd.DataFrame | None = None,
+    in_season: InSeasonProjection | None = None,
+) -> HorizonBuilder:
+    """Bind one capture (and its handoff or panel) into the builder ``advise_entry`` takes.
+
+    The horizon for a window is a function of the capture, the handoff and the target
+    gameweeks — nothing about the member — so it is memoised per target tuple: a batch
+    of fifteen members builds the three-week horizon once, not fifteen times. Its
+    first week is the same ``project`` call the one-week advice reads, so a window's
+    opening numbers are the one-week numbers, bit for bit.
+    """
+
+    build = make_projection_horizon_builder(panel, season=season, in_season=in_season)
+
+    @functools.cache
+    def horizon_for(target_gameweeks: tuple[int, ...]) -> ProjectionHorizon:
+        return build(snapshot, tuple(int(week) for week in target_gameweeks))
+
+    return horizon_for
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,37 +407,16 @@ def build_advice_payload(
         ins_raw = record.get("transfers_in", [])
         outs = [int(str(v)) for v in outs_raw] if isinstance(outs_raw, list | tuple) else []
         ins = [int(str(v)) for v in ins_raw] if isinstance(ins_raw, list | tuple) else []
-        for index in range(max(len(outs), len(ins))):
-            player_out = outs[index] if index < len(outs) else None
-            player_in = ins[index] if index < len(ins) else None
-            delta = 0.0
-            if player_in is not None and player_in in by_id:
-                delta += float(str(by_id[player_in]["expected_points"]))
-            if player_out is not None and player_out in pool_by_id:
-                delta -= float(str(pool_by_id[player_out]["expected_points"]))
-            moves.append(
-                {
-                    "move_id": f"gw{picks.gameweek + 1:02d}-{index + 1}",
-                    "player_out": (
-                        _advice_player(pool_by_id[player_out])
-                        if player_out is not None and player_out in pool_by_id
-                        else None
-                    ),
-                    "player_in": (
-                        _advice_player(by_id[player_in])
-                        if player_in is not None and player_in in by_id
-                        else None
-                    ),
-                    "expected_points_delta": delta,
-                    "expected_points_cost": float(str(record.get("transfer_hit_points", 0.0))),
-                    "reason_code": reason_code,
-                }
-            )
-    missing: list[str] = []
-    if not picks.free_transfers_known:
-        missing.append("free_transfers")
-    if not picks.purchase_prices_known:
-        missing.append("purchase_prices")
+        moves = _moves(
+            outs,
+            ins,
+            hit_points=record.get("transfer_hit_points", 0.0),
+            by_id=by_id,
+            pool_by_id=pool_by_id,
+            gameweek=picks.gameweek + 1,
+            reason_code=reason_code,
+        )
+    missing = _missing_fields(picks)
     return {
         "season": picks.season,
         "gameweek": picks.gameweek + 1,
@@ -362,6 +443,131 @@ def build_advice_payload(
     }
 
 
+#: What a three- or five-week window assumes, stated in the payload beside the plan so
+#: the reader gets the limits with the answer. Every sentence names a mechanism the code
+#: applies; none of them is softened.
+WINDOW_STATED_LIMITS: tuple[str, ...] = (
+    "The first week's projection is repeated over the later weeks, scaled by each "
+    "club's fixture count from the captured calendar; the later weeks are not "
+    "projected separately.",
+    "Availability is applied once, from the capture: injuries, rotation and "
+    "suspensions after it are not seen.",
+    "Every week inside the window, the first included, is capped at one transfer "
+    "(a wildcard week excepted); the one-week plan has no such cap.",
+    "The Top-100 uplift is inside the first week's numbers, and the repetition "
+    "carries it into every later week.",
+    "Prices are held at the captured values; no price change is modelled.",
+    "No chip is offered inside the window. A finite window counts nothing for "
+    "holding a chip back, so a planner that could reach one would spend it; chip "
+    "timing is a season-long decision this window cannot price.",
+)
+
+
+def build_window_payload(
+    picks: EntryPicks,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    *,
+    league_id: int,
+    window: int,
+    horizon_builder: HorizonBuilder | None,
+) -> dict[str, object]:
+    """One member's ``saf-puan`` advice over a three- or five-week window.
+
+    The horizon is the week-1 projection repeated over the captured calendar
+    (``build_projection_horizon``), the plan is the multi-week planner under the system's
+    own horizon budget and no chip offered — a finite window counts nothing for holding
+    one back, so a planner that could reach a chip would spend it, and the system's own
+    horizon path declines them for the same reason — and the payload is the one-week
+    shape plus ``plan_weeks``
+    — one row per gameweek — and ``stated_limits``. The first week is published through
+    the same ``lineup_fields`` and moves as the one-week advice, so the page's existing
+    card renders it unchanged; the whole window's transfers live in ``plan_weeks``.
+
+    A per-week component rescoring was measured to move only the venue effect, below the
+    solver's proof resolution, so the later weeks are the first week's numbers by
+    design and the limits say so. A plan the budget found but could not prove is
+    published FEASIBLE with its gap, as the one-week path publishes its own.
+    """
+
+    if window not in MEMBER_WINDOWS or window == COMPUTED_WINDOW:
+        raise EntryError(f"Window {window} is not a multi-week member window.")
+    if horizon_builder is None:
+        raise EntryError(
+            f"Window {window} needs a projection horizon builder for this capture; none "
+            "was supplied."
+        )
+    gameweek = int(inputs.deadline.gameweek)
+    targets = tuple(range(gameweek, gameweek + window))
+    # A target the captured calendar does not publish is refused by the builder itself.
+    horizon = horizon_builder(targets)
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    held = held_squad_from_picks(picks, current_prices=prices)
+    plan, _transfer_config = plan_transfer_horizon(
+        inputs,
+        horizon,
+        held,
+        rules,
+        optimization=OptimizationConfig(
+            solver_time_limit_seconds=WINDOW_WALL_CEILING_SECONDS,
+            solver_deterministic_time_limit=WINDOW_DETERMINISTIC_UNITS_PER_WEEK * window,
+        ),
+    )
+    first = plan.weeks[0]
+    pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
+    by_id = {int(str(row["player_id"])): row for _, row in first.selected_squad.iterrows()}
+    raw_gap = plan.diagnostics.get("absolute_optimality_gap")
+    missing = _missing_fields(picks)
+    return {
+        "season": picks.season,
+        "gameweek": picks.gameweek + 1,
+        "entry_id": picks.entry_id,
+        "league_id": league_id,
+        "mode": COMPUTED_MODE,
+        "window": int(window),
+        "source_snapshot_id": picks.source_snapshot_id,
+        # The first week's moves, in the one-week shape the page already renders.
+        "moves": _moves(
+            [int(str(v)) for v in first.transfers_out["player_id"].tolist()],
+            [int(str(v)) for v in first.transfers_in["player_id"].tolist()],
+            hit_points=float(first.transfer_hit_points),
+            by_id=by_id,
+            pool_by_id=pool_by_id,
+            gameweek=picks.gameweek + 1,
+            reason_code="window_value",
+        ),
+        "expected_points_cost": 0.0,
+        "rival_label": None,
+        # The solver's own account of the whole window: OPTIMAL is a proof, FEASIBLE is
+        # the plan it found with the measured bound gap beside it.
+        "solver_status": plan.solver_status.name,
+        "optimality_gap": float(str(raw_gap)) if raw_gap is not None else None,
+        **lineup_fields(first),
+        # One row per gameweek. ``expected_points`` is the planner's projected score
+        # for that week's eleven with the captain's multiplier, before hits.
+        "plan_weeks": [
+            {
+                "gameweek": int(week.gameweek),
+                "transfers_in": [_advice_player(row) for _, row in week.transfers_in.iterrows()],
+                "transfers_out": [_advice_player(row) for _, row in week.transfers_out.iterrows()],
+                "transfer_hit_points": float(week.transfer_hit_points),
+                "chip": week.chip,
+                "free_transfers_before": int(week.free_transfers_before),
+                "free_transfers_after": int(week.free_transfers_for_next_gameweek),
+                "expected_points": float(week.projected_score),
+            }
+            for week in plan.weeks
+        ],
+        "stated_limits": list(WINDOW_STATED_LIMITS),
+        "data_quality": "partial" if missing else "complete",
+        "missing_fields": missing,
+    }
+
+
 def advise_entry(
     request: AdviseEntryRequest,
     *,
@@ -371,20 +577,28 @@ def advise_entry(
     rules: SeasonRules,
     control: MemberControl | None = None,
     phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
+    horizon_builder: HorizonBuilder | None = None,
 ) -> dict[str, object]:
     """Compute one member's advice for a validated request.
 
     The request is checked against the capture it will be answered from: the season and
     gameweek must be the capture's own, and the strategy and window must be a
     combination that is actually computed — an advice file for a combination nobody
-    computed would make the site show an answer where none was measured. The rival
-    parameter is validated against the strategy that asks for it: ``saf-puan`` is
-    rival-free and refuses one, a catalogue strategy whose overlap band reaches the
-    solver requires one, and nobody may name themselves.
+    computed would make the site show an answer where none was measured. ``saf-puan``
+    is computed at every window in ``MEMBER_WINDOWS``; a rival strategy at window one
+    only, because its band is a first-week constraint and nothing about a later week
+    is known that would let it be priced there. The rival parameter is validated
+    against the strategy that asks for it: ``saf-puan`` is rival-free and refuses one,
+    a catalogue strategy whose overlap band reaches the solver requires one, and
+    nobody may name themselves.
 
     ``control`` is an optional precomputed ``MemberControl`` for this member (the batch
     solves it once and renders the whole rival menu from it); it must have been solved
     from the same picks, and the bytes are identical with or without it.
+
+    ``horizon_builder`` is the collaborator a multi-week window needs — the capture's
+    projection horizon for the window's gameweeks (``member_horizon_builder``). A
+    window asked for without one is refused, never answered from the one-week plan.
 
     ``phase_e_diagnostic`` is a local collaborator for saf-puan only, not a request
     field. It is dormant until a reviewed calibration pin exists.
@@ -403,8 +617,12 @@ def advise_entry(
         raise EntryError("The advice rules belong to another season.")
     if rules.source_snapshot_id != inputs.snapshot_id:
         raise EntryError("The advice rules belong to another capture.")
-    if request.window != COMPUTED_WINDOW:
-        raise EntryError(f"Window {request.window} is not computed; only {COMPUTED_WINDOW} is.")
+    if request.window not in MEMBER_WINDOWS:
+        raise EntryError(
+            f"Window {request.window} is not computed; {COMPUTED_MODE!r} windows are "
+            f"{MEMBER_WINDOWS} and rival strategies are computed at window "
+            f"{COMPUTED_WINDOW} only."
+        )
     if request.strategy == COMPUTED_MODE:
         if request.rival_entry_id is not None:
             raise EntryError(
@@ -412,6 +630,16 @@ def advise_entry(
                 "strategy from the catalogue."
             )
         picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
+        if request.window != COMPUTED_WINDOW:
+            return build_window_payload(
+                picks,
+                inputs,
+                projection,
+                rules,
+                league_id=request.league_id,
+                window=request.window,
+                horizon_builder=horizon_builder,
+            )
         return build_advice_payload(
             picks,
             inputs,
@@ -424,6 +652,11 @@ def advise_entry(
     strategy = STRATEGY_CATALOG.get(request.strategy)
     if strategy is None:
         raise EntryError(f"Strategy {request.strategy!r} is not in the catalogue.")
+    if request.window != COMPUTED_WINDOW:
+        raise EntryError(
+            f"Strategy {request.strategy!r} is computed at window {COMPUTED_WINDOW} only; "
+            f"windows {MEMBER_WINDOWS[1:]} are {COMPUTED_MODE!r} only."
+        )
     floor = strategy.constraints.overlap_floor
     ceiling = strategy.constraints.overlap_ceiling
     if floor is None and ceiling is None:
@@ -688,11 +921,16 @@ def _advise_against_rival(
 __all__: tuple[str, ...] = (
     "COMPUTED_MODE",
     "COMPUTED_WINDOW",
+    "MEMBER_WINDOWS",
+    "WINDOW_STATED_LIMITS",
     "AdviseEntryRequest",
+    "HorizonBuilder",
     "MemberControl",
     "advise_entry",
     "build_advice_payload",
+    "build_window_payload",
     "lineup_fields",
+    "member_horizon_builder",
     "net_expected_points",
     "solve_member_control",
 )
