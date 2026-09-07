@@ -173,6 +173,9 @@ class LedgerRowView(_View):
     gameweek: int
     snapshot_id: str
     deadline_utc: str
+    mode: str | None
+    """``live``: decided before this deadline. ``replay``: recorded after it, from a
+    capture taken before it. ``None`` on an entry recorded before the mode was stamped."""
     solver_status: str
     decision_kind: str
     captain_player_id: int

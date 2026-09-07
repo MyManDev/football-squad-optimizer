@@ -183,6 +183,7 @@ export interface LedgerRowView {
   deadline_utc: string;
   decision_kind: "opening" | "transfer";
   gameweek: number;
+  mode?: string | null;
   projected_score: number;
   projection_error: number | null;
   realized_net_score: number | null;
