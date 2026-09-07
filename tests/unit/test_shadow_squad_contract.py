@@ -93,6 +93,8 @@ _PUBLISHED_ENVELOPE = frozenset(
         "starting_xi",
         "bench",
         "chip",
+        "control_solver_status",
+        "control_optimality_gap",
     }
 )
 

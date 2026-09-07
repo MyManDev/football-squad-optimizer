@@ -284,9 +284,13 @@ def test_a_rival_missing_from_the_projection_is_refused_not_scored_as_zero(
         )
 
 
-def test_an_unproven_control_does_not_publish_an_expected_points_cost(
+def test_an_unproven_control_is_published_with_its_own_account(
     world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """A control the solver found but could not prove still anchors the price tag —
+    the tag then carries the control's status and bound gap beside it, instead of the
+    member vanishing from the rival strategies."""
+
     inputs, projection, rules = _world_context(world)
     provider = _Provider(
         {
@@ -298,18 +302,108 @@ def test_an_unproven_control_does_not_publish_an_expected_points_cost(
 
     def feasible_control(*args: Any, **kwargs: Any) -> tuple[Any, ...]:
         plan, decision, config = original(*args, **kwargs)
-        return dataclasses.replace(plan, solver_status=SolverStatus.FEASIBLE), decision, config
+        return (
+            dataclasses.replace(
+                plan,
+                solver_status=SolverStatus.FEASIBLE,
+                diagnostics={**dict(plan.diagnostics), "absolute_optimality_gap": 0.75},
+            ),
+            decision,
+            config,
+        )
 
     monkeypatch.setattr(advice_service, "plan_transfers", feasible_control)
 
-    with pytest.raises(EntryError, match="control plan must be OPTIMAL"):
-        advise_entry(
-            _request(strategy="fark-yarat", rival_entry_id=202),
+    payload = advise_entry(
+        _request(strategy="fark-yarat", rival_entry_id=202),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+    assert payload["control_solver_status"] == "FEASIBLE"
+    assert payload["control_optimality_gap"] == 0.75
+    assert isinstance(payload["expected_points_cost"], float)
+
+
+def test_a_precomputed_control_gives_the_same_bytes(world: dict[str, Any]) -> None:
+    """The batch solves each member's control once and renders the whole rival menu
+    from it; the answer must be byte-identical to the per-request solve."""
+
+    from squadopt.application.advice import solve_member_control
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad(world))
+    provider = _Provider({101: picks, 202: _member_picks(world, 202, _rival_squad(world))})
+    control = solve_member_control(picks, inputs, projection, rules)
+    for request in (_request(), _request(strategy="fark-yarat", rival_entry_id=202)):
+        direct = advise_entry(
+            request, provider=provider, inputs=inputs, projection=projection, rules=rules
+        )
+        reused = advise_entry(
+            request,
             provider=provider,
             inputs=inputs,
             projection=projection,
             rules=rules,
+            control=control,
         )
+        assert json.dumps(reused, sort_keys=True) == json.dumps(direct, sort_keys=True)
+    # Another member's control is refused, not silently used.
+    other = dataclasses.replace(control, picks=dataclasses.replace(picks, entry_id=202))
+    with pytest.raises(EntryError, match="solved for entry 202"):
+        advise_entry(
+            _request(),
+            provider=provider,
+            inputs=inputs,
+            projection=projection,
+            rules=rules,
+            control=other,
+        )
+
+
+def test_the_price_tag_and_the_gap_are_net_of_hits(world: dict[str, Any]) -> None:
+    """A band that forces paid transfers costs those hits: the tag is the control's
+    points minus its hits against the banded plan's points minus its hits, and the gap
+    against the rival subtracts the plan's own hits."""
+
+    from squadopt.application.advice import net_expected_points, solve_member_control
+    from squadopt.application.entries import held_squad_from_picks
+    from squadopt.live import plan_transfers_with_overlap
+    from squadopt.planning import FirstWeekOverlap
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad(world))
+    rival = _member_picks(world, 202, _rival_squad(world))
+    provider = _Provider({101: picks, 202: rival})
+    payload = advise_entry(
+        _request(strategy="fark-yarat", rival_entry_id=202),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+    control = solve_member_control(picks, inputs, projection, rules)
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    held = held_squad_from_picks(picks, current_prices=prices)
+    band = FirstWeekOverlap(player_ids=frozenset(rival.starting_xi), minimum=None, maximum=5)
+    plan, _decision, _config = plan_transfers_with_overlap(inputs, projection, held, rules, band)
+    assert payload["expected_points_cost"] == pytest.approx(
+        net_expected_points(control.plan) - net_expected_points(plan)
+    )
+    expected = {
+        int(str(row["player_id"])): float(str(row["expected_points"]))
+        for _, row in projection.table.iterrows()
+    }
+    rival_expected = sum(expected[p] for p in rival.starting_xi) + expected[rival.captain]
+    own = payload["expected_own_points"]
+    assert isinstance(own, float)
+    assert payload["expected_gap_vs_rival"] == pytest.approx(
+        own - float(plan.total_transfer_hit_points or 0.0) - rival_expected
+    )
 
 
 def test_the_rival_changes_labels_not_the_baseline(world: dict[str, Any]) -> None:

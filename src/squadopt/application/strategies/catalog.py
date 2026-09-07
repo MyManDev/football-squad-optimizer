@@ -64,6 +64,8 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         "starting_xi",
         "bench",
         "chip",
+        "control_solver_status",
+        "control_optimality_gap",
     }
 )
 
@@ -252,7 +254,14 @@ _BASELINE_PUBLISHES: Final = frozenset(
     }
 )
 _RIVAL_PUBLISHES: Final = _BASELINE_PUBLISHES | frozenset(
-    {"expected_gap_vs_rival", "overlap_count", "captain_agreement", "difference_makers"}
+    {
+        "expected_gap_vs_rival",
+        "overlap_count",
+        "captain_agreement",
+        "difference_makers",
+        "control_solver_status",
+        "control_optimality_gap",
+    }
 )
 
 

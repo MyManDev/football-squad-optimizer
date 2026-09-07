@@ -1,7 +1,8 @@
 """Render per-member league views: the JSON tree the site's league pages read.
 
-The web side (Package 5) reads ``data/league/members.json``, ``entries/{id}.json`` and
-``advice/{id}/{mode}/{window}.json`` under the provisional contract its
+The web side (Package 5) reads ``data/league/members.json``, ``entries/{id}.json``,
+``advice/{id}/{mode}/{window}.json``, ``advice/{id}/{strategy}/{window}/vs-{rival}.json``
+and ``advice/{id}/index.json`` under the provisional contract its
 ``PROVISIONAL_CONTRACT.md`` records; this module is the producing half. It consumes the
 `EntryPicksProvider` seam — today a test double, after #127 the capture-built provider —
 and turns each member's held squad into a transfer plan with the same planner that
@@ -22,8 +23,9 @@ Two rules are load-bearing and tested rather than asserted:
   plan cannot be solved is recorded as failed with the reason, and the rest render.
 """
 
+import functools
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,6 +39,7 @@ from squadopt.application.advice import (
     AdviseEntryRequest,
     advise_entry,
     build_advice_payload,
+    solve_member_control,
 )
 from squadopt.application.entries import (
     EntryError,
@@ -51,6 +54,7 @@ from squadopt.application.mode_selection import (
     rival_squad_from_picks,
     select_member_modes,
 )
+from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.errors import DataError
 from squadopt.experiments.config import ExperimentError
 from squadopt.live import (
@@ -63,6 +67,120 @@ from squadopt.scenarios import RivalSquad
 from squadopt.scenarios.paths import ScenarioPathSet
 
 LEAGUE_VIEW_CONTRACT_VERSION = "provisional_league_ui_v1"
+
+
+def computable_rival_strategies() -> tuple[str, ...]:
+    """The catalogue's rival strategies whose constraint reaches the solver today."""
+
+    return tuple(
+        slug
+        for slug, strategy in STRATEGY_CATALOG.items()
+        if strategy.rival_required
+        and (
+            strategy.constraints.overlap_floor is not None
+            or strategy.constraints.overlap_ceiling is not None
+        )
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class MemberRenderTask:
+    """One member's unit of work: the baseline plus the rival menu, from their picks.
+
+    Primitives and tuples only, so a caller may hand the tasks to a process pool. The
+    rival ids are the other members whose picks the capture holds; the default rival is
+    the standings neighbour the site shows before any rival is chosen.
+    """
+
+    entry_id: int
+    label: str
+    season: str
+    gameweek: int
+    league_id: int
+    rival_ids: tuple[int, ...]
+    default_rival_id: int | None
+    rival_strategies: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class MemberRender:
+    """What one member's task produced: payloads, not files."""
+
+    entry_id: int
+    baseline: dict[str, object] | None
+    reason: str
+    rival_payloads: tuple[tuple[str, int, dict[str, object]], ...]
+    unavailable: tuple[tuple[str, int, str], ...]
+
+
+def render_member(
+    task: MemberRenderTask,
+    *,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+) -> MemberRender:
+    """Solve one member's control once, then every (rival strategy, rival) from it.
+
+    The baseline is ``advise_entry`` byte for byte; the rival files are ``advise_entry``
+    with the same control handed back in, so nothing here can drift from the on-demand
+    seam. One rival that cannot be priced — a band the squad cannot satisfy, a rival
+    with players the projection lacks — is recorded as unavailable with its reason and
+    the rest of the menu renders; a baseline that fails takes the member out of the
+    menu entirely, with the reason on the members row.
+    """
+
+    try:
+        picks = provider.picks(task.entry_id, task.season, task.gameweek - 1)
+        control = solve_member_control(picks, inputs, projection, rules)
+        baseline = advise_entry(
+            AdviseEntryRequest(
+                season=task.season,
+                gameweek=task.gameweek,
+                league_id=task.league_id,
+                entry_id=task.entry_id,
+            ),
+            provider=provider,
+            inputs=inputs,
+            projection=projection,
+            rules=rules,
+            control=control,
+        )
+    except (EntryError, DataError) as error:
+        return MemberRender(task.entry_id, None, str(error), (), ())
+    payloads: list[tuple[str, int, dict[str, object]]] = []
+    unavailable: list[tuple[str, int, str]] = []
+    for strategy in task.rival_strategies:
+        for rival_id in task.rival_ids:
+            try:
+                payload = advise_entry(
+                    AdviseEntryRequest(
+                        season=task.season,
+                        gameweek=task.gameweek,
+                        league_id=task.league_id,
+                        entry_id=task.entry_id,
+                        strategy=strategy,
+                        rival_entry_id=rival_id,
+                    ),
+                    provider=provider,
+                    inputs=inputs,
+                    projection=projection,
+                    rules=rules,
+                    control=control,
+                )
+            except (EntryError, DataError) as error:
+                unavailable.append((strategy, rival_id, str(error)))
+                continue
+            payloads.append((strategy, rival_id, payload))
+    return MemberRender(task.entry_id, baseline, "", tuple(payloads), tuple(unavailable))
+
+
+#: How a caller runs the member tasks: ``map`` in-process, or a process pool's ``map``.
+MemberMapper = Callable[
+    [Callable[[MemberRenderTask], MemberRender], Iterable[MemberRenderTask]],
+    Iterable[MemberRender],
+]
 
 # The site addresses advice by mode and window. The baseline pair — saf-puan at window
 # one — is always computed, and it is always the deterministic planner's own answer.
@@ -218,12 +336,23 @@ def build_league_views(
     now: datetime | None = None,
     mode_paths: ScenarioPathSet | None = None,
     menu_plan_count: int = 5,
+    rival_strategies: tuple[str, ...] | None = None,
+    rival_menu: bool = True,
+    mapper: MemberMapper = map,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
     The system's own squad is deliberately not an input: member advice must be
     invariant to it (the test pins this bit-for-bit), and the system's row on the
     members page is rendered by the site from its own ledger views, not here.
+
+    ``rival_menu`` renders, beside the baseline, every computable rival strategy
+    (``rival_strategies``, default: the catalogue's) against every other member whose
+    picks the capture holds: ``advice/{id}/{strategy}/{window}/vs-{rival}.json``, plus
+    ``advice/{id}/{strategy}/{window}.json`` for the standings-neighbour default and
+    ``advice/{id}/index.json`` naming what was computed and what was not, with the
+    reason. ``mapper`` runs the per-member tasks — ``map`` here, or a process pool's
+    ``map`` from the site script; the bytes do not depend on which.
 
     ``mode_paths`` — one-week scenario paths for this deadline — turns on the
     competitive modes: each member's transfer menu is priced on the shared paths
@@ -290,44 +419,86 @@ def build_league_views(
         except (EntryError, DataError) as error:
             fetched[entry_id] = str(error)
     rival_squads: dict[int, RivalSquad] = {}
-    ranks: dict[int, int] = {}
-    if mode_paths is not None:
-        for registration in registrations:
-            entry_id = int(registration.entry_id)
-            picks_or_error = fetched[entry_id]
-            if isinstance(picks_or_error, EntryPicks):
-                placing = placings.get(entry_id)
-                label = placing.team_name if placing is not None else registration.label
-                rival_squads[entry_id] = rival_squad_from_picks(picks_or_error, label=label)
-        ranks = {entry_id: placing.rank for entry_id, placing in placings.items()}
-        prices = {
-            int(str(row["player_id"])): int(str(row["price_tenths"]))
-            for _, row in inputs.players.iterrows()
-        }
-
     for registration in registrations:
         entry_id = int(registration.entry_id)
         picks_or_error = fetched[entry_id]
-        try:
-            if not isinstance(picks_or_error, EntryPicks):
-                raise EntryError(picks_or_error)
-            picks = picks_or_error
-            advice = advise_entry(
-                AdviseEntryRequest(
-                    season=season,
-                    gameweek=gameweek,
-                    league_id=league_id,
-                    entry_id=entry_id,
-                ),
+        if isinstance(picks_or_error, EntryPicks):
+            placing = placings.get(entry_id)
+            label = placing.team_name if placing is not None else registration.label
+            rival_squads[entry_id] = rival_squad_from_picks(picks_or_error, label=label)
+    ranks = {entry_id: placing.rank for entry_id, placing in placings.items()}
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    strategies = (
+        tuple(rival_strategies) if rival_strategies is not None else computable_rival_strategies()
+    )
+    for slug in strategies:
+        if slug not in computable_rival_strategies():
+            raise ValueError(f"Rival strategy {slug!r} is not computable on this path.")
+
+    def _default_rival(entry_id: int) -> int | None:
+        candidates = {i: squad for i, squad in rival_squads.items() if i != entry_id}
+        chosen = choose_rival(entry_id, ranks, candidates)
+        if chosen is None:
+            return None
+        return next(i for i, squad in candidates.items() if squad is chosen)
+
+    tasks = [
+        MemberRenderTask(
+            entry_id=int(registration.entry_id),
+            label=registration.label,
+            season=season,
+            gameweek=gameweek,
+            league_id=int(league_id),
+            rival_ids=(
+                tuple(i for i in rival_squads if i != int(registration.entry_id))
+                if rival_menu
+                else ()
+            ),
+            default_rival_id=_default_rival(int(registration.entry_id)) if rival_menu else None,
+            rival_strategies=strategies if rival_menu else (),
+        )
+        for registration in registrations
+    ]
+    renders = {
+        render.entry_id: render
+        for render in mapper(
+            functools.partial(
+                render_member,
                 provider=provider,
                 inputs=inputs,
                 projection=projection,
                 rules=rules,
+            ),
+            tasks,
+        )
+    }
+
+    def _write(relative: str, payload: Mapping[str, object]) -> None:
+        path = out / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(_envelope(payload, generated_at_utc=generated), indent=2),
+            encoding="utf-8",
+            newline="\n",
+        )
+        written.append(relative)
+
+    for registration, task in zip(registrations, tasks, strict=True):
+        entry_id = int(registration.entry_id)
+        picks_or_error = fetched[entry_id]
+        render = renders[entry_id]
+        if not isinstance(picks_or_error, EntryPicks) or render.baseline is None:
+            reason = (
+                render.reason if isinstance(picks_or_error, EntryPicks) else str(picks_or_error)
             )
-        except (EntryError, DataError) as error:
-            results.append(MemberViewResult(entry_id, registration.label, False, reason=str(error)))
+            results.append(MemberViewResult(entry_id, registration.label, False, reason=reason))
             member_rows.append(_row(entry_id, registration.label, "empty"))
             continue
+        picks = picks_or_error
+        advice = render.baseline
         quality = str(advice["data_quality"])
         member_row = _row(entry_id, registration.label, quality)
         raw_missing = advice.get("missing_fields")
@@ -353,14 +524,36 @@ def build_league_views(
         )
         written.append(f"entries/{entry_id}.json")
 
-        advice_path = out / "advice" / str(entry_id) / COMPUTED_MODE / f"{COMPUTED_WINDOW}.json"
-        advice_path.parent.mkdir(parents=True, exist_ok=True)
-        advice_path.write_text(
-            json.dumps(_envelope(advice, generated_at_utc=generated), indent=2),
-            encoding="utf-8",
-            newline="\n",
-        )
-        written.append(f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json")
+        _write(f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json", advice)
+
+        # The rival menu: one file per (strategy, rival), the standings neighbour's copy
+        # at the strategy's plain path, and an index that says what exists and why not.
+        computed: list[dict[str, object]] = []
+        for strategy, rival_id, payload in render.rival_payloads:
+            relative = f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}/vs-{rival_id}.json"
+            _write(relative, payload)
+            computed.append({"strategy": strategy, "rival_entry_id": rival_id, "path": relative})
+            if rival_id == task.default_rival_id:
+                _write(f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}.json", payload)
+        if rival_menu:
+            _write(
+                f"advice/{entry_id}/index.json",
+                {
+                    "league_id": int(league_id),
+                    "season": season,
+                    "gameweek": gameweek,
+                    "entry_id": entry_id,
+                    "window": COMPUTED_WINDOW,
+                    "strategies": [COMPUTED_MODE, *task.rival_strategies],
+                    "rival_entry_ids": list(task.rival_ids),
+                    "default_rival_entry_id": task.default_rival_id,
+                    "computed": computed,
+                    "unavailable": [
+                        {"strategy": strategy, "rival_entry_id": rival_id, "reason": reason}
+                        for strategy, rival_id, reason in render.unavailable
+                    ],
+                },
+            )
 
         mode_note = ""
         rival = (
