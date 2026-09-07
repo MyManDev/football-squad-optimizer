@@ -39,6 +39,9 @@ from squadopt.scenarios.selection import (
 )
 
 PHASE_E_SHADOW_CONTRACT: Final = "phase_e_shadow_evaluation_v1"
+# A shadow evaluation under a candidate sampler, read against candidate (non-binding) Phase D
+# evidence, is development evidence only. Its own contract keeps it out of the E4 hook.
+PHASE_E_SHADOW_DEVELOPMENT_CONTRACT: Final = "phase_e_shadow_development_v1"
 PHASE_E_BOOTSTRAP_POLICY: Final = PromotionPolicy(bootstrap_resamples=2000)
 PHASE_E_COMPARISON_ID: Final = "phase_e_vs_phase_c"
 _UTILITY_DENOMINATOR: Final = (
@@ -89,6 +92,7 @@ class PhaseEShadowFold:
     error: str | None = None
     scenario_fingerprint: str | None = None
     component_fingerprint: str | None = None
+    sampler_contract_version: str | None = None
 
     @property
     def disagrees(self) -> bool:

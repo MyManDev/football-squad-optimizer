@@ -37,7 +37,10 @@ def load_shadow_eligibility(
         document = json.loads(payload)
         if (
             binding.status != "calibrated_internal"
+            or not binding.binding
             or document["contract_version"] != PHASE_E_SHADOW_CONTRACT
+            or document.get("binding", True) is not True
+            or document.get("development_only", False) is not False
             or document["preregistration_version"] != probe.PREREGISTRATION_VERSION
             or document["prereg_document"] != probe.PREREGISTRATION
             or document["binding_artifact_sha256"] != binding.sha256

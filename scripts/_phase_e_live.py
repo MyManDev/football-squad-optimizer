@@ -21,6 +21,7 @@ from squadopt.scenarios.components import (
     ComponentScenarioDraw,
     ComponentScenarioInputs,
     ComponentScenarioProvenance,
+    ConditionalResidualConfig,
     paired_conditional_residuals,
     sample_component_scenarios,
 )
@@ -33,6 +34,7 @@ def live_component_decision(
     archive_root: Path,
     *,
     binding_evidence: PhaseDBindingEvidence,
+    conditional_residuals: ConditionalResidualConfig | None = None,
 ) -> probe.DecisionPoint:
     """Recover raw components with the existing producer and verify the frozen projection.
 
@@ -151,7 +153,12 @@ def live_component_decision(
             ),
         )
         return sample_component_scenarios(
-            scenario_inputs, snapshot, residuals, target, ScenarioConfig(deterministic_seed=seed)
+            scenario_inputs,
+            snapshot,
+            residuals,
+            target,
+            ScenarioConfig(deterministic_seed=seed),
+            conditional_residuals=conditional_residuals,
         )
 
     return probe.DecisionPoint(

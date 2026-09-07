@@ -310,7 +310,7 @@ def test_command_writes_once_and_carries_both_artifact_digests(
     monkeypatch.setattr(runner, "prepare_phase_e_folds", lambda *args: ((), 12))
     seen = []
 
-    def evaluate(handoff, folds, binding, *, frozen_candidate_count):
+    def evaluate(handoff, folds, binding, *, frozen_candidate_count, conditional_residuals=None):
         seen.append(frozen_candidate_count)
         return {
             "binding_artifact_sha256": binding.sha256,
