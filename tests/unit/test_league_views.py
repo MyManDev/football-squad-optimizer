@@ -11,7 +11,7 @@ import pytest
 import tests.unit.test_live_transfers as world_module
 
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
-from squadopt.application.league_views import build_league_views
+from squadopt.application.league_views import MemberStanding, build_league_views
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live import read_inputs, read_season_rules
 from squadopt.live.recommendation import project, read_projection_handoff
@@ -356,6 +356,7 @@ def test_only_the_computed_mode_and_window_are_published(
         league_id=352490,
         league_name="Test League",
         out_dir=tmp_path / "league",
+        rival_menu=False,
     )
     published = sorted(
         path.relative_to(tmp_path / "league").as_posix()
@@ -535,6 +536,7 @@ def test_with_paths_every_mode_is_published_and_none_carries_a_probability(
         standings=_two_member_standings(),
         scored_gameweek=1,
         mode_paths=_WorldPaths(projection, 2),  # type: ignore[arg-type]
+        rival_menu=False,
     )
     assert report.rendered_count == 2
     published = sorted(
@@ -672,6 +674,7 @@ def test_without_a_rival_only_the_baseline_is_published(
         league_name="Test League",
         out_dir=tmp_path / "league",
         mode_paths=_WorldPaths(projection, 2),  # type: ignore[arg-type]
+        rival_menu=False,
     )
     published = sorted(
         path.relative_to(tmp_path / "league").as_posix()
@@ -728,4 +731,283 @@ def test_paths_for_the_wrong_gameweek_are_refused(world: dict[str, Any], tmp_pat
             league_name="Test League",
             out_dir=tmp_path / "league",
             mode_paths=_WorldPaths(projection, 3),  # type: ignore[arg-type]
+        )
+
+
+# --- the rival menu --------------------------------------------------------------------
+
+
+def _squad_b(world: dict[str, Any]) -> list[int]:
+    # A second legal fifteen sharing few players with `_legal_squad`, so the overlap
+    # bands bind rather than being satisfied for free.
+    return [
+        1001,
+        1003,
+        1004,
+        1005,
+        1006,
+        1009,
+        1010,
+        1012,
+        1013,
+        1017,
+        1018,
+        1019,
+        1020,
+        1023,
+        1024,
+    ]
+
+
+def _squad_c(world: dict[str, Any]) -> list[int]:
+    return [
+        1002,
+        1003,
+        1005,
+        1007,
+        1008,
+        1010,
+        1011,
+        1013,
+        1014,
+        1016,
+        1017,
+        1019,
+        1021,
+        1022,
+        1023,
+    ]
+
+
+def _three_member_league(world: dict[str, Any]) -> tuple[_Provider, tuple[EntryRegistration, ...]]:
+    provider = _Provider(
+        {
+            101: _member_picks(world, 101, _legal_squad(world)),
+            202: _member_picks(world, 202, _squad_b(world)),
+            303: _member_picks(world, 303, _squad_c(world)),
+        }
+    )
+    registrations = tuple(
+        EntryRegistration(entry_id, f"member-{entry_id}", "2026-08-23T00:00:00Z")
+        for entry_id in (101, 202, 303)
+    )
+    return provider, registrations
+
+
+def _standings(*ranked: int) -> dict[int, MemberStanding]:
+    return {
+        entry_id: MemberStanding(
+            entry_id=entry_id,
+            team_name=f"Team {entry_id}",
+            manager_name=f"Manager {entry_id}",
+            rank=rank,
+        )
+        for rank, entry_id in enumerate(ranked, start=1)
+    }
+
+
+def test_the_rival_menu_is_published_per_strategy_and_rival(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Every member gets every computable rival strategy against every other member,
+    the standings neighbour's copy at the plain path, and an index that says so."""
+
+    import datetime
+
+    from squadopt.application.league_views import computable_rival_strategies
+
+    inputs, projection, rules = _world_context(world)
+    provider, registrations = _three_member_league(world)
+    when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    report = build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "menu",
+        standings=_standings(101, 202, 303),
+        now=when,
+    )
+    strategies = computable_rival_strategies()
+    assert strategies == ("ortak-koru", "fark-yarat")
+    assert report.rendered_count == 3
+    files = set(report.files)
+    expected_defaults = {101: 202, 202: 101, 303: 202}  # leader defends; others chase
+    unavailable_seen: list[tuple[int, str, int]] = []
+    for entry_id in (101, 202, 303):
+        others = [other for other in (101, 202, 303) if other != entry_id]
+        assert f"advice/{entry_id}/saf-puan/1.json" in files
+        assert f"advice/{entry_id}/index.json" in files
+        index = json.loads(
+            (tmp_path / "menu" / "advice" / str(entry_id) / "index.json").read_text(
+                encoding="utf-8"
+            )
+        )["payload"]
+        assert index["strategies"] == ["saf-puan", *strategies]
+        assert index["rival_entry_ids"] == others
+        assert index["default_rival_entry_id"] == expected_defaults[entry_id]
+        assert index["window"] == 1
+        computed = {(c["strategy"], c["rival_entry_id"]) for c in index["computed"]}
+        unavailable = {(u["strategy"], u["rival_entry_id"]) for u in index["unavailable"]}
+        # Every (strategy, rival) pair is accounted for exactly once: a file, or a reason.
+        assert computed | unavailable == {(s, r) for s in strategies for r in others}
+        assert not (computed & unavailable)
+        for strategy, rival in computed:
+            assert f"advice/{entry_id}/{strategy}/1/vs-{rival}.json" in files
+        for entry in index["unavailable"]:
+            assert entry["reason"]
+            unavailable_seen.append((entry_id, entry["strategy"], entry["rival_entry_id"]))
+            assert (
+                f"advice/{entry_id}/{entry['strategy']}/1/vs-{entry['rival_entry_id']}.json"
+                not in files
+            )
+        default = expected_defaults[entry_id]
+        for strategy in strategies:
+            plain_path = tmp_path / "menu" / "advice" / str(entry_id) / strategy / "1.json"
+            chosen_path = (
+                tmp_path / "menu" / "advice" / str(entry_id) / strategy / "1" / f"vs-{default}.json"
+            )
+            if (strategy, default) in computed:
+                # The standings neighbour's copy at the plain path, byte for byte.
+                assert plain_path.read_bytes() == chosen_path.read_bytes()
+                payload = json.loads(chosen_path.read_bytes())["payload"]
+                assert payload["rival_entry_id"] == default
+                assert payload["mode"] == strategy
+                assert payload["control_solver_status"] in {"OPTIMAL", "FEASIBLE"}
+                assert isinstance(payload["captain"], dict)
+            else:
+                assert not plain_path.exists()
+    # This world holds one pair no plan can satisfy — squad B cannot drop to five of
+    # member 101's eleven within its budget — and it is a recorded reason, not a crash.
+    assert unavailable_seen == [(202, "fark-yarat", 101)]
+
+
+def test_the_menu_does_not_move_the_baseline_bytes(world: dict[str, Any], tmp_path: Path) -> None:
+    import datetime
+
+    inputs, projection, rules = _world_context(world)
+    provider, registrations = _three_member_league(world)
+    when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    for name, menu in (("plain", False), ("menu", True)):
+        build_league_views(
+            provider,
+            registrations,
+            inputs,
+            projection,
+            rules,
+            league_id=352490,
+            league_name="Test League",
+            out_dir=tmp_path / name,
+            standings=_standings(101, 202, 303),
+            now=when,
+            rival_menu=menu,
+        )
+    for entry_id in (101, 202, 303):
+        first = (tmp_path / "plain" / "advice" / str(entry_id) / "saf-puan" / "1.json").read_bytes()
+        second = (tmp_path / "menu" / "advice" / str(entry_id) / "saf-puan" / "1.json").read_bytes()
+        assert first == second
+    assert not (tmp_path / "plain" / "advice" / "101" / "index.json").exists()
+
+
+def test_a_rival_that_cannot_be_priced_is_recorded_not_fatal(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """A rival whose players the projection lacks is unavailable with its reason; the
+    member's baseline and the rest of the menu render, and the batch does not sink."""
+
+    import dataclasses
+    import datetime
+
+    inputs, projection, rules = _world_context(world)
+    provider, registrations = _three_member_league(world)
+    # 1003 is in squads B and C but not in member 101's fifteen.
+    incomplete = dataclasses.replace(
+        projection,
+        table=projection.table.loc[projection.table["player_id"] != 1003].reset_index(drop=True),
+    )
+    when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    report = build_league_views(
+        provider,
+        registrations,
+        inputs,
+        incomplete,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "gap",
+        standings=_standings(101, 202, 303),
+        now=when,
+    )
+    by_id = {member.entry_id: member for member in report.members}
+    assert by_id[101].rendered
+    assert not by_id[202].rendered and not by_id[303].rendered
+    index = json.loads(
+        (tmp_path / "gap" / "advice" / "101" / "index.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert index["computed"] == []
+    assert len(index["unavailable"]) == 4
+    assert all("missing" in entry["reason"] for entry in index["unavailable"])
+    assert {entry["rival_entry_id"] for entry in index["unavailable"]} == {202, 303}
+    assert not (tmp_path / "gap" / "advice" / "101" / "fark-yarat").exists()
+
+
+def test_the_mapper_is_only_a_scheduler(world: dict[str, Any], tmp_path: Path) -> None:
+    """A pool's map and the built-in map produce the same tree, byte for byte."""
+
+    import datetime
+    from concurrent.futures import ThreadPoolExecutor
+
+    inputs, projection, rules = _world_context(world)
+    provider, registrations = _three_member_league(world)
+    when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    seen: list[int] = []
+
+    def counting_map(function: Any, tasks: Any) -> Any:
+        items = list(tasks)
+        seen.extend(task.entry_id for task in items)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            return list(pool.map(function, items))
+
+    reports = []
+    for name, mapper in (("serial", map), ("pool", counting_map)):
+        reports.append(
+            build_league_views(
+                provider,
+                registrations,
+                inputs,
+                projection,
+                rules,
+                league_id=352490,
+                league_name="Test League",
+                out_dir=tmp_path / name,
+                standings=_standings(101, 202, 303),
+                now=when,
+                mapper=mapper,
+            )
+        )
+    assert seen == [101, 202, 303]
+    assert reports[0].files == reports[1].files
+    for relative in reports[0].files:
+        assert (tmp_path / "serial" / relative).read_bytes() == (
+            tmp_path / "pool" / relative
+        ).read_bytes()
+
+
+def test_an_unknown_rival_strategy_is_refused(world: dict[str, Any], tmp_path: Path) -> None:
+    inputs, projection, rules = _world_context(world)
+    provider, registrations = _three_member_league(world)
+    with pytest.raises(ValueError, match="not computable"):
+        build_league_views(
+            provider,
+            registrations,
+            inputs,
+            projection,
+            rules,
+            league_id=352490,
+            league_name="Test League",
+            out_dir=tmp_path / "bad",
+            rival_strategies=("kaptan-ayris",),
         )

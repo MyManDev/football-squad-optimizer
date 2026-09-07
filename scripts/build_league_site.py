@@ -20,14 +20,22 @@ is the public post-deadline picture the league's own standings page already show
 """
 
 import argparse
+import functools
+import multiprocessing
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import Executor, ProcessPoolExecutor
+from contextlib import ExitStack
 from pathlib import Path
+from typing import Any
 
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import (
+    MemberRender,
+    MemberRenderTask,
     MemberStanding,
     build_league_views,
+    render_member,
 )
 from squadopt.application.mode_selection import build_mode_paths
 from squadopt.data.errors import DataError
@@ -89,6 +97,67 @@ ARCHIVE_ROOT = Path("data/raw/vaastav-fpl")
 REGISTRY_PATH = Path("data/entries/registry.json")
 
 
+# --- the process pool ----------------------------------------------------------------
+#
+# The capture context (snapshot payloads, inputs, projection, season rules) holds
+# read-only mapping proxies and is not picklable, and it is large; so a worker does not
+# receive it — it rebuilds the same context from the same paths once, at start, and the
+# tasks that cross the process boundary are the primitive ``MemberRenderTask`` records.
+# The projection is a deterministic function of the capture and the handoff, so a
+# worker's context is the batch's context, and the bytes are the same (the in-process
+# mapper test pins the scheduler-only property; the real run is checked by hand).
+
+_WORKER_CONTEXT: dict[str, Any] = {}
+
+
+def _worker_init(
+    snapshot_root: str,
+    snapshot_id: str,
+    season: str,
+    handoff: str | None,
+    archive_root: str,
+) -> None:
+    snapshot = read_snapshot(Path(snapshot_root), snapshot_id)
+    inputs = read_inputs(snapshot, season=season, gameweek=None)
+    panel = build_panel(Path(archive_root))
+    in_season = read_projection_handoff(Path(handoff)) if handoff else None
+    _WORKER_CONTEXT.update(
+        provider=CapturePicksProvider(snapshot, snapshot_id),
+        inputs=inputs,
+        projection=project(inputs, panel, in_season=in_season),
+        rules=read_season_rules(snapshot, season=season),
+    )
+
+
+def _render_in_worker(task: MemberRenderTask) -> MemberRender:
+    return render_member(task, **_WORKER_CONTEXT)
+
+
+def pool_mapper(
+    executor: Executor,
+) -> Callable[
+    [Callable[[MemberRenderTask], MemberRender], Iterable[MemberRenderTask]],
+    Iterable[MemberRender],
+]:
+    """A ``build_league_views`` mapper over a pool whose workers hold their own context.
+
+    The function the batch hands over is ``render_member`` bound to the batch's own
+    context; the pool cannot carry that context, so it runs the same ``render_member``
+    against the worker's — and refuses anything else, so a different function can never
+    be silently replaced by this one.
+    """
+
+    def mapper(
+        function: Callable[[MemberRenderTask], MemberRender],
+        tasks: Iterable[MemberRenderTask],
+    ) -> Iterable[MemberRender]:
+        if not (isinstance(function, functools.partial) and function.func is render_member):
+            raise ValueError("The pool mapper runs render_member only.")
+        return executor.map(_render_in_worker, list(tasks))
+
+    return mapper
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--league", type=int, required=True)
@@ -110,8 +179,23 @@ def main() -> int:
         "paths from; turns on the competitive play modes. When given, a history that "
         "cannot honestly support paths fails the run rather than silently downgrading.",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="member tasks solved in parallel processes (each solver stays single-threaded); "
+        "the bytes do not depend on this",
+    )
+    parser.add_argument(
+        "--no-rival-menu",
+        action="store_true",
+        help="write the saf-puan baseline only; skip the rival strategies against every "
+        "other member",
+    )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     arguments = parser.parse_args()
+    if arguments.workers < 1:
+        parser.error("--workers must be at least 1")
 
     try:
         from scripts.recommend_current_squad import resolve_snapshot_id
@@ -191,23 +275,49 @@ def main() -> int:
                 f"{inputs.deadline.gameweek} from {history.source_id}"
             )
         out_dir = Path(arguments.out) / "data" / "league"
-        report = build_league_views(
-            CapturePicksProvider(snapshot, snapshot_id),
-            registry.entries,
-            inputs,
-            projection,
-            read_season_rules(snapshot, season=season),
-            league_id=arguments.league,
-            league_name=league_name,
-            out_dir=out_dir,
-            standings=standings,
-            scored_gameweek=scored,
-            mode_paths=mode_paths,
-        )
+        with ExitStack() as stack:
+            mapper: Callable[..., Iterable[MemberRender]] = map
+            if arguments.workers > 1:
+                executor = stack.enter_context(
+                    ProcessPoolExecutor(
+                        max_workers=arguments.workers,
+                        mp_context=multiprocessing.get_context("spawn"),
+                        initializer=_worker_init,
+                        initargs=(
+                            str(SNAPSHOT_ROOT),
+                            snapshot_id,
+                            season,
+                            (
+                                str(arguments.in_season_projection)
+                                if arguments.in_season_projection
+                                else None
+                            ),
+                            str(arguments.archive_root),
+                        ),
+                    )
+                )
+                mapper = pool_mapper(executor)
+            report = build_league_views(
+                CapturePicksProvider(snapshot, snapshot_id),
+                registry.entries,
+                inputs,
+                projection,
+                read_season_rules(snapshot, season=season),
+                league_id=arguments.league,
+                league_name=league_name,
+                out_dir=out_dir,
+                standings=standings,
+                scored_gameweek=scored,
+                mode_paths=mode_paths,
+                rival_menu=not arguments.no_rival_menu,
+                mapper=mapper,
+            )
         print(f"Rendered {report.rendered_count} of {len(report.members)} members into {out_dir}")
         for member in report.members:
             if not member.rendered:
                 print(f"  not rendered  {member.entry_id}  {member.reason}")
+        menu_files = sum(1 for name in report.files if "/vs-" in name)
+        print(f"Wrote {len(report.files)} files, {menu_files} of them rival-menu entries")
         return 0
     except (DataError, OSError, ValueError) as error:
         print(f"build_league_site failed:\n  {error}", file=sys.stderr)
