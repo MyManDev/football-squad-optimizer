@@ -1,8 +1,14 @@
 # Phase C operational elite-evidence policy
 
-Status: frozen legacy candidate. It was the owner-approved gameweek 3 convention, but the
-component base is now the operational default. This rule remains reproducible and explicit; it
-is not combined with the component model.
+Status: one frozen rule, now applied on **two** bases. It was the owner-approved gameweek 3
+convention on the legacy in-season blend, and since #395 the same bounded uplift is applied
+on the Phase C component base, which is the operational default. The rule itself is
+unchanged and stays reproducible and explicit; what changed is what it multiplies, and each
+base carries its own model version so a handoff always says which one produced it. The
+record used to say the rule "is not combined with the component model"; that stopped being
+true when #395 shipped and this document did not move with it. See "Identity and rollback"
+below for both identities and for the boundary in `phase_c_operational_component.md` that
+this combination does not satisfy.
 
 ## Purpose and boundary
 
@@ -52,20 +58,58 @@ the control value. Evidence rows for players outside the current roster are igno
 counts are recorded, so ordinary roster churn is visible without making a deadline run
 impossible.
 
-The producer selects this candidate only when both evidence artifact paths are supplied.
-Supplying only one path is an error. Invalid requested evidence never falls back silently. With
-neither path, the producer attempts the operational component base; `--control-only` explicitly
+The producer applies this rule only when both evidence artifact paths are supplied. Supplying
+only one path is an error. Invalid requested evidence never falls back silently. With neither
+path, the producer attempts the operational component base; `--control-only` explicitly
 selects the legacy in-season control.
+
+Which base the rule lands on is decided before the evidence is read, and is recorded rather
+than assumed: the producer builds the component base when the capture carries the settled
+live history it needs, and the legacy blend otherwise or on `--control-only`. The uplift is
+then applied to whichever base was chosen, the handoff records the base it started from in
+`elite_evidence_base_selection`, and `projection_selection` reads `phase_c_component_elite`
+or `legacy_elite_candidate` accordingly. On an ordinary mid-season capture with both
+evidence paths supplied, that is the component base.
 
 ## Identity and rollback
 
-The evidence-aware handoff uses model version `in-season-carry-over-elite-top100-v1` and
-feature contract `in-season-carry-over-elite-top100-features-v1`. Diagnostics record both
-artifact digests, the policy version, cohort counts, affected-player counts and the applied
-projection deltas. The optimizer and public payload continue to receive only expected points.
+One policy, two identities. On the legacy blend the evidence-aware handoff uses model
+version `in-season-carry-over-elite-top100-v1` with feature contract
+`in-season-carry-over-elite-top100-features-v1`. On the component base it uses
+`phase-c-component-elite-top100-v1` with feature contract
+`phase-c-component-elite-top100-features-v1`. Both stamp
+`elite_evidence_policy_version = phase_c_operational_elite_policy_v1`, which is this
+document, so a decision report that names this policy may be reporting either. Diagnostics
+record both artifact digests, the policy version, cohort counts, affected-player counts and
+the applied projection deltas. The optimizer and public payload continue to receive only
+expected points.
+
+Both identities are listed in `IN_SEASON_CONTROL_MODEL_VERSIONS`
+(`squadopt.live.recommendation`), which is where this codebase makes a promotion: the tuple's
+own contract says pinning a version there *is* the promotion decision, made in a reviewed
+change, and the handoff's `version_is_promoted` is a membership test against it. The
+component-elite identity was pinned by #395 and is therefore promoted in that sense.
+
+**What is not satisfied, stated rather than left to a reader.**
+`phase_c_operational_component.md` requires that optional Phase B evidence families "must
+enter as separately measured candidates". No separate measurement of the uplift on the
+component base exists: there is no artifact and no row in `measurements_index.md` for it,
+and `phase_c_component_evaluation` — the component base's own evaluation — is descriptive
+and promoted nothing. What #395 did satisfy is the same clause's other half: the uplift is
+not *silently* multiplied into the component output. It carries its own model version and
+feature contract, the contract is enforced at construction, the base it started from is
+recorded, `--projection component-only` on the weekly runner and `--control-only` on the
+producer opt out, and the decision report states that the rule is an owner-approved evidence
+rule and not a calibrated superiority claim. So the position on record is: an owner-approved
+operational multiplier of the same governance class as the legacy one, extended to a new
+base by a reviewed pin, with the "separately measured candidate" clause **unmet**. That is a
+disagreement between two operational records, and it is written down here rather than
+resolved by this change.
 
 Rollback is the existing `in-season-carry-over-v1` producer path selected explicitly with
-`--control-only`.
+`--control-only`, and `--projection component-only` on `scripts.run_week` for the composed
+identity. Rolling back the composition means removing its version from
+`IN_SEASON_CONTROL_MODEL_VERSIONS`, which is the same reviewed decision in reverse.
 Future prospective outcomes may justify a new coefficient or a learned component model, but
 must create a new version rather than rewriting this rule after observing its results.
 

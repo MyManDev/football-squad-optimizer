@@ -343,7 +343,6 @@ def compare_fixed_decisions(
     optimization_result: OptimizationResult,
     rival: RivalSquad,
     scenarios: ScenarioSet,
-    config: ScenarioEvaluationConfig | None = None,
     *,
     rival_edge_points: float = 0.0,
     rival_edge_samples: tuple[float, ...] = (),
@@ -357,11 +356,19 @@ def compare_fixed_decisions(
     common ground twice. The location shift is applied to neither: it corrects a
     selected squad's optimism, and both squads were selected, so it cancels in the
     difference (stated in the diagnostics rather than assumed silently).
+
+    This takes no :class:`ScenarioEvaluationConfig`. It used to accept one, validate it
+    and then never read it, so a caller could ask for a correction that quietly reached
+    no number here. Of that config's controls only ``dispersion_scale`` could ever have
+    applied, and applying it would be a claim nothing measured: it is a *squad-level*
+    marginal correction, attributed in `docs/scenario_calibration_correction_note.md` to
+    an underestimated gameweek-wide component — the very component that cancels when two
+    squads are scored in one matrix, which is the same argument that drops the location
+    shift. Whether a differential needs a scale of its own is unmeasured, so the choice
+    made here is to stop announcing the control rather than to apply it, and the
+    diagnostics say plainly that the difference is read off the raw spread.
     """
 
-    settings = ScenarioEvaluationConfig() if config is None else config
-    if not isinstance(settings, ScenarioEvaluationConfig):
-        raise ScenarioValidationError("config must be a ScenarioEvaluationConfig.")
     if not isinstance(rival, RivalSquad):
         raise ScenarioValidationError("rival must be a RivalSquad.")
     if not isinstance(optimization_result, OptimizationResult):
@@ -434,6 +441,12 @@ def compare_fixed_decisions(
             "location_shift_note": (
                 "the selection-optimism shift is not applied to the difference: both squads "
                 "were selected, so it cancels"
+            ),
+            "dispersion_scale_applied": False,
+            "dispersion_scale_note": (
+                "the squad-level dispersion correction is not applied to the difference: it "
+                "was measured on a squad's own spread, and no measurement says what a "
+                "differential needs, so this reads the raw spread"
             ),
             "scoring_policy": "starting_xi_plus_captain_double_v1",
             "probability_ties_counted_as_behind": True,

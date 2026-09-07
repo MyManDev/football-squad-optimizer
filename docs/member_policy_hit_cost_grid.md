@@ -1,4 +1,4 @@
-# Member planning policy: transfer hit cost grid (local, not committed)
+# Member planning policy: transfer hit cost grid
 
 Lookahead-1 season chain, chips off (the member path's planner offers no chip unless the
 operator names one), five seasons with 2025-26 walked as declared development data
@@ -65,6 +65,72 @@ as one.
   essentially all proven and the differences are not solver noise. The interval is a
   season-aware moving-block bootstrap on 184 paired gameweeks; a season is still one
   observation, and five is not many.
+
+## Standing of the record itself
+
+The numbers above moved a live planning control, so what this record does and does not
+establish is written down rather than inferred. Nothing here re-runs the measurement or
+edits the artifact after the fact; the artifact is left exactly as it was written.
+
+- **It is reproducible, and this is the command.** The artifact's provenance names
+  repository commit `0b9e0ecc4097…`, which resolves in this repository and is #401's own
+  commit, "feat(scripts): let the season chain take a planning hit cost and the v2
+  development scope". `git diff 0b9e0ec..HEAD -- scripts/run_season_chain_seasons.py
+  src/squadopt/experiments/season_chain_runs.py` is empty, so the runner that produced the
+  cells is byte-identical to the runner on `develop` today. One cell is
+
+  ```console
+  python -m scripts.run_season_chain_seasons --seasons <SEASON> --development-scope v2 \
+    --lookaheads 1 --chips off --hit-cost <COST> --deterministic-time-limit 8
+  ```
+
+  run once per season and hit cost — the 25 cells the timing section below lists.
+
+- **The statistics are repository code; the wrapper around them is not.** The per-cell
+  chain and the paired comparison come from the committed `season_chain_runs` /
+  `chain_comparison` code, with the bootstrap parameters the artifact records. What is
+  local is the driver that ran the 25 cells and assembled them into one document, which is
+  what the artifact's own `contract_version` announces by ending in `_local_v1`: no code in
+  this repository writes this schema, so regenerating the *document* means re-running the
+  cells and reassembling them, not calling one script.
+
+- **No measurement kind covers it, so no preflight applies.**
+  `squadopt.preflight.measurement.MEASUREMENT_KINDS` registers eight kinds and none of them
+  describes a season-chain grid, and `tests/unit/test_measurement_preflight.py` gates five
+  named artifacts, none of this family. `scripts.run_measurement_preflight` therefore has no
+  kind to run this file under. That is an absence of a gate, not a gate it fails; running it
+  under a kind meant for a different artifact family fails on that family's required fields
+  and says nothing about this one.
+
+- **Its provenance encoding is non-standard, and that is the one real defect here.**
+  `repository_commit`, `archive_commit`, `archive_manifest_sha256` and `working_tree_dirty`
+  are stored as one-element lists holding JSON-encoded strings — `["\"0b9e0ecc…\""]`,
+  `["false"]` — and this is the only committed artifact of the 92 in `docs/` whose core
+  provenance fields are not plain scalars. A reader matching on shape cannot read them, and
+  a truthiness test on `working_tree_dirty` inverts: the list is truthy while the value it
+  encodes is `false`, i.e. the tree was **clean**. Decoded by hand every value resolves —
+  the repository commit is above, the archive commit is the `ARCHIVE_COMMIT` 75 other
+  committed artifacts record, and the manifest digest matches four of them. Any future
+  regeneration should write these as bare strings and a JSON boolean.
+
+- **Two self-descriptions in the artifact went stale when #401 committed it.** The JSON
+  carries `"committed": false`, and this file used to be titled "(local, not committed)",
+  from the run that produced them; the file was then committed and indexed. No code reads
+  the `committed` key — it appears in no module under `src/`, `scripts/` or `tests/`, and
+  no other artifact carries it — so the stale value decides nothing. The title is corrected
+  here; the artifact's own field is left untouched, because hand-editing a measurement
+  artifact after the fact is worse than a stale field that is written down.
+
+- **`policy_id` names the policy in force when the run happened**, `member_planning_policy_v1`
+  at hit cost 4, while the sibling `decision` block records the pre-declared *rule's*
+  verdict. Those are not in conflict: the rule fired, #401 still shipped v1 at 4, and acting
+  on the reading was the separate later change recorded above.
+
+- **What it does not establish.** The 90% block-bootstrap intervals cannot be re-derived
+  from this record alone: that needs the per-gameweek paired series, which ADR 0003 keeps in
+  the gitignored evidence tier. The method, the resample count, the block length and the
+  paired-gameweek count are recorded; the underlying weekly arrays are not. And the grid is
+  five seasons of one projection rule at one solver budget — a season is one observation.
 
 ## Timing
 

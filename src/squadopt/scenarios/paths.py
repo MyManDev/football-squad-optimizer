@@ -13,7 +13,9 @@ path is **0.983x** as wide as three independent weeks, not wider: a player who b
 projection one week tends to fall back the next, and that mean reversion cancels part of what
 independent draws add up. See `docs/scenario_path_dependence.md`. The effect is small, and the
 point is not its size or its sign — it is that independence asserts a dependence structure the
-data does not have, while a path uses the one it does.
+data does not have, while a path uses the one it does. That figure was measured before the
+team block held a club by identity (see the team bullet below) and has not been re-measured;
+a horizon-one path is unchanged by that fix, a longer one may not be.
 
 This module keeps the same hierarchical decomposition and replaces independent draws with a
 **block bootstrap over consecutive gameweeks**. One scenario is a *path*: a run of
@@ -21,7 +23,11 @@ This module keeps the same hierarchical decomposition and replaces independent d
 the length of the block at every level.
 
 - the **common** component walks the run, so a league-wide scoring lull persists;
-- a **team** shock keeps the same source club across the run, so form persists;
+- a **team** shock keeps the same source *club* across the run, so form persists. A fold's
+  club set changes whenever a club blanks, so the club is held by identity rather than by
+  its position in the fold's sorted clubs; a week the held club did not play contributes
+  zero rather than a stranger's shock, and ``truncated_team_blocks`` counts the blocks that
+  lost a week that way;
 - a player's **idiosyncratic** draws follow one source player across the run, so his minutes
   persist — which is the piece that matters most, because not playing is sticky.
 
@@ -462,15 +468,22 @@ def generate_scenario_paths(
             dtype="float64",
         )
     )
-    teams_by_fold = {
-        fold_id: _centered(
+    # Keyed by club, not by position: a fold's club set changes whenever a club blanks, so
+    # an index into one fold's sorted clubs names a different club in the next one.
+    teams_by_fold: dict[str, dict[object, float]] = {}
+    team_order_by_fold: dict[str, tuple[object, ...]] = {}
+    for fold_id in fold_ids:
+        grouped = (
             decomposed.loc[decomposed["fold_id"] == fold_id]
             .groupby("team_id", sort=True)["team_component"]
             .first()
-            .to_numpy(dtype="float64")
         )
-        for fold_id in fold_ids
-    }
+        order = tuple(grouped.index)
+        shocks = _centered(grouped.to_numpy(dtype="float64"))
+        team_order_by_fold[fold_id] = order
+        teams_by_fold[fold_id] = {
+            team_id: float(shock) for team_id, shock in zip(order, shocks, strict=True)
+        }
 
     rng = np.random.default_rng(settings.deterministic_seed)
     chosen = rng.integers(0, len(starts), size=settings.scenario_count)
@@ -492,15 +505,23 @@ def generate_scenario_paths(
     truncated_team_blocks = 0
     for scenario_index in range(settings.scenario_count):
         block = source_fold_blocks[scenario_index]
-        pool = teams_by_fold[block[0]]
-        choices = rng.integers(0, len(pool), size=len(target_teams))
-        for step, fold_id in enumerate(block):
-            week_pool = teams_by_fold[fold_id]
-            if len(week_pool) == len(pool):
-                team_draws[scenario_index, step] = week_pool[choices]
-            else:
-                # The source week fields a different number of clubs, so the held index no
-                # longer names the same club. Zero is the honest shock, not a borrowed one.
+        first_order = team_order_by_fold[block[0]]
+        # Drawn against the first fold's club array, exactly as before, so the random
+        # stream and a horizon-one path are unchanged; what is held is the club the index
+        # named there, not the index.
+        choices = rng.integers(0, len(first_order), size=len(target_teams))
+        for column, choice in enumerate(choices):
+            source_team_id = first_order[int(choice)]
+            held_every_week = True
+            for step, fold_id in enumerate(block):
+                shock = teams_by_fold[fold_id].get(source_team_id)
+                if shock is None:
+                    # The source club did not play that week, so it has no shock to carry.
+                    # Zero is the honest value; another club's shock is not this club's form.
+                    held_every_week = False
+                    continue
+                team_draws[scenario_index, step, column] = shock
+            if not held_every_week:
                 truncated_team_blocks += 1
     team_column = {team_id: index for index, team_id in enumerate(target_teams)}
     player_team_columns = np.asarray(

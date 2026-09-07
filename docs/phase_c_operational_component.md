@@ -30,6 +30,18 @@ elite, ownership, transfer and availability evidence is not part of this model. 
 must enter as separately measured candidates; the old fixed Top-100 uplift is never silently
 multiplied into the component output.
 
+**Where that boundary stands today.** The model above is unchanged: no evidence family is
+fitted into it. But since #395 the bounded Top-100 uplift is applied *on top of* this base
+whenever the producer is given both evidence artifact paths, which on an ordinary mid-season
+capture is the default weekly path. The "never silently" half of the boundary holds — the
+composition is a separate model version, `phase-c-component-elite-top100-v1`, with its own
+feature contract enforced at construction, its base recorded in the handoff, an opt-out on
+both runners and a decision report that names the rule. The "separately measured candidate"
+half does **not**: no measurement of the uplift on this base exists, and no row in
+`measurements_index.md` describes one. That is recorded here rather than argued away, and
+`phase_c_operational_elite_policy.md` carries the same statement beside both identities.
+Nothing in that record changes this model or its rollback.
+
 ## Fallback and rollback
 
 A player absent from any required historical payload receives the existing in-season estimate for
