@@ -17,13 +17,28 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from scripts.measure_component_fidelity import (
+    DEVELOPMENT_FIDELITY_CONTRACT_VERSION,
     FIDELITY_CONTRACT_VERSION,
     METRIC_NAMES,
+    FidelityBindingError,
+    _development_from_arguments,
     measure_fidelity,
+    provenance_block,
 )
 
+from squadopt.evaluation import DEVELOPMENT_OOF_CONTRACT_VERSION
 from squadopt.experiments.shadow_report import ShadowReportError, write_document_once
+from squadopt.prediction.component_models import (
+    COMPONENT_MODEL_VERSION,
+    EQUAL_WEIGHTING,
+    SEASON_HALF_LIFE_WEIGHTING,
+)
 from squadopt.scenarios import ScenarioConfig
+from squadopt.scenarios.components import (
+    COMPONENT_SCENARIO_CONTRACT_VERSION,
+    CONDITIONAL_RESIDUAL_CONTRACT_VERSION,
+    ConditionalResidualConfig,
+)
 
 PLAYERS = (101, 102, 103)
 HISTORY_FOLDS = ("2026-27-gw01", "2026-27-gw02")
@@ -300,3 +315,241 @@ def test_an_identical_rerun_replays_and_a_different_document_conflicts(
 
     with pytest.raises(ShadowReportError):
         write_document_once({**document, "diagnostic_only": False}, destination)
+
+
+# --- the Phase C v2 development path -----------------------------------------
+
+DEVELOPMENT_SEASON = "2025-26"
+DEVELOPMENT_FOLDS = tuple(f"{DEVELOPMENT_SEASON}-gw{gameweek:02d}" for gameweek in (1, 2, 3))
+SAMPLER = ConditionalResidualConfig(fraction=0.15, minimum_rows=30)
+
+
+def _development_manifest(**overrides: object) -> dict[str, object]:
+    manifest: dict[str, object] = {
+        **MANIFEST,
+        "contract_version": DEVELOPMENT_OOF_CONTRACT_VERSION,
+        "development_only": True,
+        "locked_holdout_read": True,
+        "development_seasons": [DEVELOPMENT_SEASON],
+        "weighting": {"label": EQUAL_WEIGHTING, "model_version": COMPONENT_MODEL_VERSION},
+        "model_version": COMPONENT_MODEL_VERSION,
+        "repository_commit": "e" * 40,
+    }
+    manifest.update(overrides)
+    return manifest
+
+
+def _development_frames() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The same synthetic shape as the v1 fixtures, relabelled into the locked season."""
+
+    def relabel(frame: pd.DataFrame) -> pd.DataFrame:
+        renamed = frame.copy(deep=True)
+        mapping = dict(zip(ALL_FOLDS, DEVELOPMENT_FOLDS, strict=True))
+        renamed["fold_id"] = renamed["fold_id"].map(mapping)
+        if "season" in renamed.columns:
+            renamed["season"] = DEVELOPMENT_SEASON
+        return renamed
+
+    return relabel(_oof()), relabel(_roster())
+
+
+def _development_document(
+    *,
+    conditional_residuals: ConditionalResidualConfig | None = SAMPLER,
+    manifest: dict[str, object] | None = None,
+) -> dict[str, object]:
+    oof, roster = _development_frames()
+    return measure_fidelity(
+        oof,
+        roster,
+        _development_manifest() if manifest is None else manifest,
+        config=CONFIG,
+        development_contract=DEVELOPMENT_OOF_CONTRACT_VERSION,
+        conditional_residuals=conditional_residuals,
+    )
+
+
+def test_the_development_document_names_its_contract_scope_and_sampler() -> None:
+    document = _development_document()
+
+    assert document["contract_version"] == DEVELOPMENT_FIDELITY_CONTRACT_VERSION
+    assert document["contract_version"] != FIDELITY_CONTRACT_VERSION
+    assert document["development_only"] is True
+    assert document["phase_c_contract"] == DEVELOPMENT_OOF_CONTRACT_VERSION
+    assert document["locked_holdout_read"] is True
+    assert document["diagnostic_only"] is True
+    assert document["registers_any_threshold"] is False
+    assert document["sampler"] == {
+        "contract_version": CONDITIONAL_RESIDUAL_CONTRACT_VERSION,
+        "residual_selection": "conditional_neighbourhood",
+        "conditional_residual_fraction": SAMPLER.fraction,
+        "conditional_residual_minimum_rows": SAMPLER.minimum_rows,
+    }
+    population = document["population"]
+    assert isinstance(population, dict)
+    assert population["development_seasons"] == [DEVELOPMENT_SEASON]
+    assert population["seasons_present"] == [DEVELOPMENT_SEASON]
+    assert population["locked_holdout_rows_present"] == len(ALL_FOLDS) * len(PLAYERS)
+    assert population["measured_fold_ids"] == [DEVELOPMENT_FOLDS[-1]]
+    # The measurement itself is the frozen method: the five metrics are still there.
+    assert set(document["pooled"]) == set(METRIC_NAMES)  # type: ignore[arg-type]
+
+
+def test_the_foundation_sampler_is_named_when_the_run_asks_for_it() -> None:
+    document = _development_document(conditional_residuals=None)
+
+    assert document["sampler"] == {
+        "contract_version": COMPONENT_SCENARIO_CONTRACT_VERSION,
+        "residual_selection": "fold_uniform",
+        "conditional_residual_fraction": None,
+        "conditional_residual_minimum_rows": None,
+    }
+
+
+def test_the_v1_document_gains_no_development_key() -> None:
+    """The frozen artifact's shape is what the frozen consumer reads; it must not move."""
+
+    document = _measure()
+
+    for key in ("development_only", "phase_c_contract", "locked_holdout_read", "sampler"):
+        assert key not in document
+    assert document["contract_version"] == FIDELITY_CONTRACT_VERSION
+    population = document["population"]
+    assert isinstance(population, dict)
+    assert population["locked_holdout_rows_present"] == 0
+
+
+@pytest.mark.parametrize(
+    ("overrides", "match"),
+    [
+        ({"contract_version": "phase_c_component_oof_v1"}, "development contract"),
+        ({"development_only": False}, "development-only"),
+        ({"development_seasons": ["2024-25"]}, "does not declare"),
+    ],
+)
+def test_a_manifest_that_is_not_the_development_export_is_refused(
+    overrides: dict[str, object], match: str
+) -> None:
+    with pytest.raises(FidelityBindingError, match=match):
+        _development_document(manifest=_development_manifest(**overrides))
+
+
+def test_an_unsupported_development_contract_is_refused() -> None:
+    oof, roster = _development_frames()
+
+    with pytest.raises(FidelityBindingError, match="Unsupported"):
+        measure_fidelity(
+            oof,
+            roster,
+            _development_manifest(),
+            config=CONFIG,
+            development_contract="phase_c_component_oof_v3",
+        )
+
+
+def _arguments(**overrides: object) -> object:
+    from types import SimpleNamespace
+
+    fields: dict[str, object] = {
+        "phase_c_contract": "v1",
+        "expected_table_sha256": None,
+        "expected_roster_sha256": None,
+        "expected_manifest_sha256": None,
+        "conditional_residual_fraction": None,
+        "conditional_residual_minimum_rows": None,
+        "json_output": Path("fidelity.json"),
+    }
+    fields.update(overrides)
+    return SimpleNamespace(**fields)
+
+
+def _development_arguments(**overrides: object) -> object:
+    fields: dict[str, object] = {
+        "phase_c_contract": "development_v2",
+        "expected_table_sha256": "a" * 64,
+        "expected_roster_sha256": "b" * 64,
+        "expected_manifest_sha256": "c" * 64,
+        "conditional_residual_fraction": 0.15,
+        "conditional_residual_minimum_rows": 30,
+    }
+    fields.update(overrides)
+    return _arguments(**fields)
+
+
+def test_the_v1_diagnostic_refuses_every_development_option() -> None:
+    assert _development_from_arguments(_arguments()) is None  # type: ignore[arg-type]
+
+    for name in (
+        "expected_table_sha256",
+        "expected_roster_sha256",
+        "expected_manifest_sha256",
+        "conditional_residual_fraction",
+        "conditional_residual_minimum_rows",
+    ):
+        value: object = 0.15 if name == "conditional_residual_fraction" else "a" * 64
+        if name == "conditional_residual_minimum_rows":
+            value = 30
+        with pytest.raises(FidelityBindingError, match="development_v2 only"):
+            _development_from_arguments(_arguments(**{name: value}))  # type: ignore[arg-type]
+
+
+def test_the_development_run_is_pinned_to_the_reference_and_its_sampler() -> None:
+    pinned = _development_from_arguments(_development_arguments())  # type: ignore[arg-type]
+    assert pinned is not None
+    assert (pinned.table_sha256, pinned.roster_sha256, pinned.manifest_sha256) == (
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+    )
+    assert pinned.conditional_residuals == SAMPLER
+
+    with pytest.raises(FidelityBindingError, match="64-hex"):
+        _development_from_arguments(_development_arguments(expected_manifest_sha256=None))  # type: ignore[arg-type]
+    with pytest.raises(FidelityBindingError, match="64-hex"):
+        _development_from_arguments(_development_arguments(expected_table_sha256="abc"))  # type: ignore[arg-type]
+    with pytest.raises(FidelityBindingError, match="both"):
+        _development_from_arguments(  # type: ignore[arg-type]
+            _development_arguments(conditional_residual_minimum_rows=None)
+        )
+
+
+def test_a_development_run_cannot_overwrite_the_frozen_artifact_path() -> None:
+    from scripts.measure_component_fidelity import DEFAULT_OUTPUT
+
+    with pytest.raises(FidelityBindingError, match="frozen v1 artifact path"):
+        _development_from_arguments(_development_arguments(json_output=DEFAULT_OUTPUT))  # type: ignore[arg-type]
+
+
+def test_the_development_provenance_names_the_reference_it_read() -> None:
+    manifest = _development_manifest()
+    files = {
+        "oof_table": ("table.csv", "1" * 64),
+        "roster": ("roster.csv", "2" * 64),
+        "manifest": ("manifest.json", "3" * 64),
+    }
+
+    frozen = provenance_block(
+        MANIFEST, revision="f" * 40, dirty=False, files=files, development=False
+    )
+    development = provenance_block(
+        manifest, revision="f" * 40, dirty=False, files=files, development=True
+    )
+
+    assert "phase_c_contract" not in frozen
+    assert development["phase_c_contract"] == DEVELOPMENT_OOF_CONTRACT_VERSION
+    assert development["phase_c_weighting"] == EQUAL_WEIGHTING
+    assert development["phase_c_producer_repository_commit"] == manifest["repository_commit"]
+    assert development["manifest_locked_holdout_read"] is True
+    assert development["oof_table_sha256"] == "1" * 64
+    assert development["manifest_table_sha256"] == manifest["table_sha256"]
+    assert development["target_contract_version"] == manifest["target_contract_version"]
+    assert development["dataset_contract_version"] == manifest["dataset_contract_version"]
+
+    weighted = provenance_block(
+        _development_manifest(weighting={"label": SEASON_HALF_LIFE_WEIGHTING}),
+        revision="f" * 40,
+        dirty=False,
+        files=files,
+        development=True,
+    )
+    assert weighted["phase_c_weighting"] == SEASON_HALF_LIFE_WEIGHTING

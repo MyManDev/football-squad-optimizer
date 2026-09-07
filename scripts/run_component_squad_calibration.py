@@ -10,9 +10,11 @@ development handoff (the equal-weight A reference, pinned by its three digests) 
 the frozen v1 artifact, admits its 2025-26 decisions, and writes the distinct
 ``phase_d_component_squad_calibration_development_v2`` document with ``binding: false``. Its
 population is computed from the handoff under the preregistered eligibility rule rather than
-asserted against the frozen 137, no v2 fidelity artifact exists yet so the S1/S2 verdict
-abstains by protocol while the readings are reported as development observations, and
-``--folds`` restricts the measured folds for a pilot. The v1 binding path is unchanged.
+asserted against the frozen 137, and ``--folds`` restricts the measured folds for a pilot. A
+matching development fidelity record (``scripts.measure_component_fidelity --phase-c-contract
+development_v2``) may be given with ``--fidelity``; it is verified against the same reference,
+sampler and configuration before the S1/S2 verdict is computed, and without it the run keeps
+abstaining by protocol. The v1 binding path is unchanged.
 """
 
 from __future__ import annotations
@@ -34,6 +36,8 @@ from typing import Final, cast
 
 import pandas as pd
 from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT, REPOSITORY_ROOT, artifact_metadata
+from scripts.measure_component_fidelity import METRIC_NAMES as FIDELITY_METRIC_NAMES
+from scripts.measure_component_fidelity import OBSERVATION_UNIT as FIDELITY_OBSERVATION_UNIT
 
 from squadopt.backtest import (
     BacktestConfigurationError,
@@ -84,6 +88,7 @@ from squadopt.scenarios import (
     summarize_component_decision_distribution,
 )
 from squadopt.scenarios.components import (
+    COMPONENT_SCENARIO_CONTRACT_VERSION,
     ComponentScenarioInputs,
     ComponentScenarioProvenance,
     ConditionalResidualConfig,
@@ -93,6 +98,7 @@ from squadopt.scenarios.components import (
 
 REPORT_VERSION: Final = "phase_d_component_squad_calibration_binding_v1"
 FIDELITY_VERSION: Final = "phase_d_component_fidelity_v1"
+DEVELOPMENT_FIDELITY_VERSION: Final = "phase_d_component_fidelity_development_v2"
 HISTORY_SEASONS: Final = (
     "2020-21",
     "2021-22",
@@ -136,7 +142,7 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--roster", type=Path, required=True)
     # Required under the v1 binding contract, checked in `_development_from_arguments`;
-    # refused under development_v2, which has no fidelity contract yet.
+    # optional under development_v2, where it must be the matching development record.
     parser.add_argument("--fidelity", type=Path, default=None)
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
     parser.add_argument("--json-output", type=Path, default=DEFAULT_OUTPUT)
@@ -203,6 +209,7 @@ class DevelopmentInputs:
     roster_sha256: str
     manifest_sha256: str
     folds: tuple[str, ...] | None
+    fidelity: Path | None = None
 
 
 def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInputs | None:
@@ -211,8 +218,8 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
     Under v1 nothing changes: the fidelity artifact stays required. Under development_v2 the
     three A digests are required so the run cannot silently bind to another export (the
     season-weighted B arm shares the roster digest and differs only in its table), the
-    fidelity artifact is refused because no v2 fidelity contract exists, and the output path
-    can never be the binding artifact's.
+    fidelity artifact is optional and must be the matching development record when given, and
+    the output path can never be the binding artifact's.
     """
 
     contract = str(getattr(arguments, "phase_c_contract", "v1"))
@@ -231,11 +238,6 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
         return None
     if contract != "development_v2":
         raise BindingCalibrationError(f"Unknown Phase C contract {contract!r}.")
-    if getattr(arguments, "fidelity", None) is not None:
-        raise BindingCalibrationError(
-            "No Phase D fidelity contract exists for the v2 development handoff; the "
-            "development reading abstains from a verdict by protocol. Drop --fidelity."
-        )
     digests: dict[str, str] = {}
     for name in ("expected_table_sha256", "expected_roster_sha256", "expected_manifest_sha256"):
         value = getattr(arguments, name, None)
@@ -260,6 +262,7 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
         roster_sha256=digests["expected_roster_sha256"],
         manifest_sha256=digests["expected_manifest_sha256"],
         folds=folds,
+        fidelity=getattr(arguments, "fidelity", None),
     )
 
 
@@ -292,6 +295,143 @@ def _read_handoff(
             f"weighting {handoff.weighting!r} and model {handoff.model_version!r}."
         )
     return handoff
+
+
+def _sampler_record(candidate_sampler: ConditionalResidualConfig | None) -> dict[str, object]:
+    """The sampler identity a fidelity record has to match, from this run's own setting."""
+
+    if candidate_sampler is None:
+        return {
+            "contract_version": COMPONENT_SCENARIO_CONTRACT_VERSION,
+            "conditional_residual_fraction": None,
+            "conditional_residual_minimum_rows": None,
+        }
+    return {
+        "contract_version": candidate_sampler.contract_version,
+        "conditional_residual_fraction": candidate_sampler.fraction,
+        "conditional_residual_minimum_rows": candidate_sampler.minimum_rows,
+    }
+
+
+def _load_verified_development_fidelity(
+    path: Path,
+    handoff: PhaseCComponentHandoff,
+    *,
+    settings: ScenarioConfig,
+    candidate_sampler: ConditionalResidualConfig | None,
+) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
+    """Verify the development fidelity record and return its digest and its two fold lists.
+
+    Structural and identity verification only, exactly as on the v1 path: the diagnostic
+    registers no numeric threshold, so nothing here reads its measured differences as a gate.
+    What is checked is that this record was produced on *this* reference, by *this* sampler
+    and configuration, over a population that can contain the folds this run measures.
+    """
+
+    fidelity_digest = _sha256(path)
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise BindingCalibrationError(f"Cannot read fidelity artifact {path}: {error}") from error
+    fidelity = _mapping(document, "fidelity artifact")
+    _finite_numbers(fidelity)
+    if fidelity.get("contract_version") != DEVELOPMENT_FIDELITY_VERSION:
+        raise BindingCalibrationError(
+            f"The development run needs a {DEVELOPMENT_FIDELITY_VERSION!r} fidelity record; "
+            "the frozen v1 artifact and any other contract are refused."
+        )
+    if (
+        fidelity.get("diagnostic_only") is not True
+        or fidelity.get("promotes_anything") is not False
+        or fidelity.get("registers_any_threshold") is not False
+        or fidelity.get("development_only") is not True
+    ):
+        raise BindingCalibrationError("Fidelity artifact changes its diagnostic-only meaning.")
+    if fidelity.get("phase_c_contract") != DEVELOPMENT_OOF_CONTRACT_VERSION:
+        raise BindingCalibrationError("Fidelity artifact names a different Phase C contract.")
+    if fidelity.get("observation_unit") != FIDELITY_OBSERVATION_UNIT:
+        raise BindingCalibrationError(
+            "Fidelity artifact does not use the diagnostic's own observation unit."
+        )
+
+    config = _mapping(fidelity.get("config"), "fidelity.config")
+    expected_config = {
+        "scenario_count": settings.scenario_count,
+        "deterministic_seed": settings.deterministic_seed,
+        "min_history_folds": settings.min_history_folds,
+    }
+    if dict(config) != expected_config:
+        raise BindingCalibrationError(
+            "Fidelity artifact was measured under a different scenario configuration."
+        )
+    sampler = dict(_mapping(fidelity.get("sampler"), "fidelity.sampler"))
+    if {name: sampler.get(name) for name in _sampler_record(candidate_sampler)} != _sampler_record(
+        candidate_sampler
+    ):
+        raise BindingCalibrationError(
+            "Fidelity artifact was measured on a different sampler than this run uses."
+        )
+
+    provenance = _mapping(fidelity.get("provenance"), "fidelity.provenance")
+    if (
+        provenance.get("working_tree_dirty") is not False
+        or provenance.get("phase_c_contract") != DEVELOPMENT_OOF_CONTRACT_VERSION
+        or provenance.get("phase_c_weighting") != handoff.weighting
+        or provenance.get("oof_table_sha256") != handoff.table_sha256
+        or provenance.get("manifest_table_sha256") != handoff.table_sha256
+        or provenance.get("roster_sha256") != handoff.roster_sha256
+        or provenance.get("manifest_roster_sha256") != handoff.roster_sha256
+        or provenance.get("manifest_sha256") != handoff.manifest_sha256
+        or provenance.get("manifest_locked_holdout_read") is not True
+        or provenance.get("model_version") != handoff.model_version
+        or provenance.get("feature_contract_version") != handoff.feature_contract_version
+        or provenance.get("target_contract_version") != handoff.target_contract_version
+        or provenance.get("dataset_contract_version") != handoff.dataset_contract_version
+        # The commit that produced the Phase C export, not the commit that produced this
+        # record: it is what proves both studies read the same export.
+        or provenance.get("phase_c_producer_repository_commit") != handoff.repository_commit
+    ):
+        raise BindingCalibrationError("Fidelity artifact does not describe this Phase C handoff.")
+
+    population = _mapping(fidelity.get("population"), "fidelity.population")
+    measured_ids = _string_list(population.get("measured_fold_ids"), "measured_fold_ids")
+    folds = fidelity.get("folds")
+    exclusions = fidelity.get("excluded_folds")
+    warnings_value = fidelity.get("warnings")
+    if not isinstance(folds, list) or not isinstance(exclusions, list):
+        raise BindingCalibrationError("Fidelity artifact fold records are missing.")
+    if not isinstance(warnings_value, list) or any(
+        not isinstance(item, str) for item in warnings_value
+    ):
+        raise BindingCalibrationError("Fidelity warnings must be a list of strings.")
+    record_ids = tuple(str(_mapping(item, "fidelity fold").get("fold_id")) for item in folds)
+    excluded_ids = tuple(str(_mapping(item, "excluded fold").get("fold_id")) for item in exclusions)
+    handoff_ids = tuple(str(value) for value in handoff.rows["fold_id"].drop_duplicates())
+    if (
+        not measured_ids
+        or record_ids != measured_ids
+        or len(set(measured_ids)) != len(measured_ids)
+        or population.get("fold_count_measured") != len(measured_ids)
+        or population.get("fold_count_excluded") != len(exclusions)
+        or population.get("fold_count_total") != len(handoff_ids)
+        or population.get("composition_route_measured") != COMPONENT_MODEL_ROUTE
+        or population.get("locked_holdout_season") != LOCKED_HOLDOUT_SEASON
+    ):
+        raise BindingCalibrationError("Fidelity artifact fold records contradict its population.")
+    outside = sorted((set(measured_ids) | set(excluded_ids)) - set(handoff_ids))
+    if outside:
+        raise BindingCalibrationError(
+            f"Fidelity artifact names folds outside this handoff: {outside[:5]!r}."
+        )
+    for name, block in (
+        ("pooled", fidelity.get("pooled")),
+        ("fold_summary", fidelity.get("fold_summary")),
+    ):
+        measured = _mapping(block, f"fidelity.{name}")
+        missing = [metric for metric in FIDELITY_METRIC_NAMES if metric not in measured]
+        if missing:
+            raise BindingCalibrationError(f"Fidelity artifact {name} is missing {missing!r}.")
+    return fidelity_digest, measured_ids, excluded_ids
 
 
 def _history_fold_ids(rows: pd.DataFrame) -> tuple[str, ...]:
@@ -759,8 +899,23 @@ def _measure_development(
     candidate_sampler: ConditionalResidualConfig | None,
     development: DevelopmentInputs,
 ) -> tuple[dict[str, object], int]:
-    """The development_v2 reading: computed population, pinned inputs, no binding verdict."""
+    """The development_v2 reading: computed population, pinned inputs, its own contract.
 
+    A fidelity record is verified first, before the expensive control walk, so a record that
+    does not describe this reference costs a second rather than an hour.
+    """
+
+    settings = ScenarioConfig()
+    fidelity_digest: str | None = None
+    fidelity_measured: tuple[str, ...] = ()
+    fidelity_excluded: tuple[str, ...] = ()
+    if development.fidelity is not None:
+        fidelity_digest, fidelity_measured, fidelity_excluded = _load_verified_development_fidelity(
+            development.fidelity,
+            handoff,
+            settings=settings,
+            candidate_sampler=candidate_sampler,
+        )
     handoff_seasons = {str(value) for value in handoff.rows["season"].dropna().unique()}
     outside = sorted(handoff_seasons - set(DEVELOPMENT_HISTORY_SEASONS[1:]))
     if outside:
@@ -781,10 +936,21 @@ def _measure_development(
         handoff, controls, development_contract=DEVELOPMENT_OOF_CONTRACT_VERSION
     )
     all_ids = tuple(fold.fold_id for fold in prepared)
-    settings = ScenarioConfig()
     burn_in, history_eligible = _development_population(
         handoff.rows, all_ids, min_history_folds=settings.min_history_folds
     )
+    # Both sides decide "enough history" from the same inputs by different code -- the pool's
+    # own refusal there, `_history_fold_ids` here -- so the two lists are compared rather than
+    # assumed to agree. This is the eligibility relation; the folds this run finally measures
+    # are a subset of it, checked separately once the solves are known.
+    if fidelity_digest is not None and (
+        fidelity_measured != history_eligible or fidelity_excluded != burn_in
+    ):
+        raise BindingCalibrationError(
+            "The fidelity record and this run disagree on which folds have enough history: "
+            f"{len(fidelity_measured)} measured / {len(fidelity_excluded)} excluded there, "
+            f"{len(history_eligible)} eligible / {len(burn_in)} burn-in here."
+        )
     requested = development.folds
     if requested is not None:
         unknown = sorted(set(requested) - set(all_ids))
@@ -854,6 +1020,16 @@ def _measure_development(
         readings.append(reading)
         fold_records.append(record)
 
+    # The fidelity study's unit is one (fold, player) pair over every component row of a
+    # fold; this run's unit is one frozen 15-player decision per fold. They are not the same
+    # observation, so the only relation checked is containment: every fold measured here must
+    # have had its sampler measured there.
+    if fidelity_digest is not None:
+        unmeasured = sorted(set(measured_ids) - set(fidelity_measured))
+        if unmeasured:
+            raise BindingCalibrationError(
+                f"The fidelity record does not cover every measured fold: {unmeasured[:5]!r}."
+            )
     verdict: dict[str, object] | None = None
     verdict_note = (
         "No verdict: fewer than the minimum folds for a calibration reading were measured "
@@ -864,12 +1040,17 @@ def _measure_development(
             evaluate_component_squad_calibration(
                 readings,
                 expected_fold_ids=tuple(measured_ids),
-                sampler_fidelity_verified=False,
+                sampler_fidelity_verified=fidelity_digest is not None,
             )
         )
         verdict_note = (
-            "The verdict abstains by protocol: no sampler-fidelity artifact exists for the v2 "
-            "development handoff. The S1/S2 readings are reported as development observations."
+            "The verdict was evaluated on a verified development fidelity record against the "
+            "inherited S1/S2 bounds. It is a development reading on seen folds, not the "
+            "binding verdict."
+            if fidelity_digest is not None
+            else "The verdict abstains by protocol: no verified sampler-fidelity record was "
+            "given for the v2 development handoff. The S1/S2 readings are reported as "
+            "development observations."
         )
     return (
         {
@@ -884,11 +1065,16 @@ def _measure_development(
                 "feature_contract_version": handoff.feature_contract_version,
                 "target_contract_version": handoff.target_contract_version,
                 "dataset_contract_version": handoff.dataset_contract_version,
-                "fidelity_artifact_sha256": None,
+                "fidelity_artifact_sha256": fidelity_digest,
+                "fidelity_contract_version": (
+                    DEVELOPMENT_FIDELITY_VERSION if fidelity_digest is not None else None
+                ),
+                "fidelity_measured_fold_count": len(fidelity_measured) or None,
                 "pinned_by_arguments": True,
             },
             "config": asdict(settings),
             "solver_profile": _solver_profile(),
+            "sampler_fidelity_verified": fidelity_digest is not None,
             "candidate": _candidate_record(candidate_sampler, reference=DEVELOPMENT_REPORT_VERSION),
             "sampler_contract_version": (
                 candidate_sampler.contract_version

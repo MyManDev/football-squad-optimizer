@@ -44,6 +44,31 @@ artifact and its frozen 137-fold population.
   pinned digests, the fixed solver profile, the sampler record and, per fold, the complete
   decision identity (squad, starting eleven, captain, bench order) beside the readings.
 
+## The sampler-fidelity record
+
+The protocol's precondition is a committed sampler-fidelity diagnostic, and the frozen one
+describes the v1 export under the foundation sampler. `scripts.measure_component_fidelity
+--phase-c-contract development_v2` produces the matching record for this path: the same five
+differences by the same method, read from the same reference through the development reader
+and pinned to its three digests, drawn on the same declared candidate sampler, written under
+the distinct contract `phase_d_component_fidelity_development_v2`. It never writes the frozen
+v1 artifact path, and the v1 diagnostic refuses every option that belongs to this path.
+
+`--fidelity` then hands that record to the calibration run, which verifies before it measures:
+the contract; the diagnostic-only flags; the configuration, field by field, against this run's
+own `ScenarioConfig`; the sampler contract, fraction and minimum rows against this run's own
+sampler; the three artifact digests, the model, the weighting, the four contract versions and
+the Phase C producer commit against the handoff; and the record's own fold bookkeeping. Once
+the population is computed, the record's measured and excluded folds must equal this run's
+history-eligible and burn-in folds, which are decided by different code from the same inputs,
+and every fold this run measures must be covered by the record.
+
+The two studies do not share an observation. The diagnostic's unit is one (fold, player) pair
+over every component row of a fold; this run's unit is one frozen fifteen-player decision per
+fold. So a verified record answers only "was this sampler, on this reference, measured over
+these folds" — never anything numeric about the squad distributions, and never whether there
+are enough folds to read: a pilot with a verified record still produces no verdict.
+
 ## Readings and status
 
 The development reading is taken with the registered candidate sampler,
@@ -53,7 +78,9 @@ Phase D candidate measurement passed it; the report's `candidate` block records 
 the development contract as its reference. Per-fold readings are the existing PIT, q10 and
 lower-tail indicator from the official scorer. The inherited gates are reported beside the
 readings as a development observation (mean PIT against `[0.43, 0.57]`, lower-tail rate
-against `[0.04, 0.16]`). No sampler-fidelity artifact exists for the v2 handoff, so the
-protocol's verdict abstains (`sampler_fidelity_not_verified`) on a full run and is not
-computed at all on a pilot with fewer than the minimum folds. Nothing in the sampler, the
-scenario configuration, the solver profile or the gates is changed to alter that reading.
+against `[0.04, 0.16]`). Without a verified fidelity record the protocol's verdict abstains
+(`sampler_fidelity_not_verified`); with one it is evaluated against those inherited bounds and
+may read `calibrated_internal` or `failed`. Either way it is a development reading on seen
+folds, not the binding verdict, and a pilot below the minimum fold count produces no verdict
+at all. Nothing in the sampler, the scenario configuration, the solver profile or the gates is
+changed to alter that reading.
