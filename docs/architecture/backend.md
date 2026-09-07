@@ -103,6 +103,60 @@ here: a projection whose identity nobody can name has no business entering a cac
 capture, no handoff, or an unreadable one means no context, and no context means `/ready`
 reports `capture_context: false` rather than the service answering from whatever it can find.
 
+## What a queued job is for, and who computes it
+
+`AdviceJob` carries three identities and every one is a one-way SHA-256 digest — `job_id`
+names the record, `request_fingerprint` names the normalized request, `cache_key` names the
+answer's address. Keeping them apart is what stops a cache serving one member another
+member's plan, but it leaves a claimed job unable to say which member or strategy it was
+asked about. A digest does not invert.
+
+So the request travels *beside* the job. `AdviceSubmitService` writes one
+`advice_job_spec_v1` record at the answer's own address before the job is enqueued — before,
+never after, because a worker may claim the instant the record lands. The worker reads it
+back by `job.cache_key`. Nothing about `backend_jobs_v1`, its schema, or the public job view
+changes.
+
+The spec also records the context the request was **accepted under**, which is what lets the
+worker tell two situations apart:
+
+- the capture it names is still the one this process answers from — compute;
+- the deployment has moved to a newer capture — refuse with `CONTEXT_UNAVAILABLE`. Computing
+  from today's inputs and filing the answer under yesterday's key would be silent corruption,
+  and the member is better told to ask again.
+
+A rival that the strategy ignores is dropped from the spec exactly as `advice_cache_key`
+drops it before hashing. Requests that reach one address describe one question, or a
+write-once store is right to refuse them.
+
+`compute` returns the served document, and `generated_at_utc` is the **capture's** instant,
+not the clock's. These bytes live at a content-addressed key whose immutability is checked on
+every write, so a wall-clock field would make an honest recomputation — after a recovered
+claim, say — indistinguishable from a determinism defect.
+
+### The loop
+
+```console
+python -m squadopt.platform.advice_worker
+```
+
+Deployment configuration, the startup store probe, a local two-process run and the rollback
+step are in the [advice backend runbook](../backend_runbook.md).
+
+One computation at a time per worker: CP-SAT runs a single search worker by design and a
+replica scales by replication (ADR 0006). An empty queue waits rather than spins. SIGTERM and
+SIGINT are honoured *after* the job in hand finishes, so a container stop costs nobody their
+solve. Abandoned claims are walked back periodically through the contract's own
+`running -> queued` edge, which increments `attempt`; past `--max-attempts` (default 3) the
+job is failed with `TOO_MANY_ATTEMPTS` rather than crash-looping. The claim's lease is 300
+seconds against a measured 3.0–29.6 s solve, so `queue.heartbeat` is not called — the loop
+does not pretend to need it.
+
+Refusals the compute side reaches deliberately carry their own code (`CONTEXT_UNAVAILABLE`,
+`REQUEST_UNREADABLE`, `TOO_MANY_ATTEMPTS`); an unexpected exception is still `ADVICE_FAILED`
+with a sanitized message. Neither shape puts a traceback, a local path or a secret on a
+public endpoint.
+
 ## Version and media type
 
 Versioned routes live below `/api/v1`. JSON responses use `application/json`; UTF-8 is assumed.

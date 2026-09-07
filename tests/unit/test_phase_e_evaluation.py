@@ -111,7 +111,7 @@ def test_prepared_runner_retains_every_binding_fold_in_its_artifact(
     ids = _binding_population(_all_fold_ids(), DIRECT_CONTROL_ABSTENTIONS)
     evidence = replace(evidence, fold_ids=ids)
 
-    def reading(handoff, fold, evidence, *, frozen_candidate_count):
+    def reading(handoff, fold, evidence, *, frozen_candidate_count, conditional_residuals=None):
         return PhaseEShadowFold(
             fold.fold_id,
             "FALLBACK_PHASE_D_NOT_CALIBRATED",

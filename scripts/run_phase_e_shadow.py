@@ -20,14 +20,20 @@ from scripts._phase_e_evaluation import evaluate_phase_e_prepared_folds
 from scripts._phase_e_inputs import (
     PhaseDBindingEvidence,
     load_phase_d_binding,
+    load_phase_d_candidate,
     prepare_phase_e_folds,
 )
 
 from squadopt.data import DataError
 from squadopt.evaluation import EvaluationError, read_phase_c_component_handoff
-from squadopt.experiments.phase_e_shadow import PHASE_E_SHADOW_CONTRACT, PhaseEShadowError
+from squadopt.experiments.phase_e_shadow import (
+    PHASE_E_SHADOW_CONTRACT,
+    PHASE_E_SHADOW_DEVELOPMENT_CONTRACT,
+    PhaseEShadowError,
+)
 from squadopt.experiments.shadow_report import _internal_destination, write_document_once
 from squadopt.scenarios import ScenarioError
+from squadopt.scenarios.components import ConditionalResidualConfig
 from squadopt.scenarios.selection import PHASE_E_CANDIDATE_COUNTS
 
 
@@ -57,13 +63,31 @@ def _seconds(value: object, name: str) -> float:
 
 
 def load_phase_e_runtime(
-    path: Path, binding_evidence: PhaseDBindingEvidence
+    path: Path,
+    binding_evidence: PhaseDBindingEvidence,
+    *,
+    conditional_residuals: ConditionalResidualConfig | None = None,
 ) -> PhaseERuntimeEvidence:
-    """Recompute the existing E2 rule instead of trusting the artifact's frozen_k label."""
+    """Recompute the existing E2 rule instead of trusting the artifact's frozen_k label.
+
+    The artifact must have been probed under the same sampler the E3 run draws with: a
+    foundation probe carries the binding contract, a candidate-sampler probe the development
+    contract and a matching sampler block, and every scored historical draw declares it.
+    """
 
     payload = path.read_bytes()
     document = _object(json.loads(payload), "E2 artifact")
     binding._finite_numbers(document, "E2 artifact")
+    expected_sampler = probe.sampler_record(conditional_residuals)
+    if (
+        document.get("contract_version") != probe.probe_contract_version(conditional_residuals)
+        or document.get("sampler", probe.sampler_record(None)) != expected_sampler
+        or document.get("development_only", False) is not (conditional_residuals is not None)
+    ):
+        raise PhaseEShadowError(
+            "E2 must have been probed under the sampler this E3 run draws with, under that "
+            "sampler's own probe contract."
+        )
     expected_constants = {
         "candidate_counts": list(PHASE_E_CANDIDATE_COUNTS),
         "sensitivity_seeds": list(probe.SENSITIVITY_SEEDS),
@@ -73,8 +97,7 @@ def load_phase_e_runtime(
         "tail_fraction": 0.10,
     }
     if (
-        document.get("contract_version") != probe.PROBE_CONTRACT_VERSION
-        or document.get("preregistration") != probe.PREREGISTRATION
+        document.get("preregistration") != probe.PREREGISTRATION
         or document.get("preregistration_version") != probe.PREREGISTRATION_VERSION
         or document.get("diagnostic_only") is not True
         or document.get("promotes_anything") is not False
@@ -147,6 +170,11 @@ def load_phase_e_runtime(
                 draw = _object(scoring.get("draw"), "E2 draw")
                 if draw.get("scenario_count") != 1000 or draw.get("deterministic_seed") != 0:
                     raise PhaseEShadowError("E2 draws must use N=1000 and seed 0.")
+                declared = draw.get(
+                    "component_sampler_contract_version", probe.COMPONENT_SCENARIO_CONTRACT_VERSION
+                )
+                if declared != expected_sampler["contract_version"]:
+                    raise PhaseEShadowError("An E2 draw was not made with the requested sampler.")
                 for key in ("draw_repeat_identical", "selection_repeat_identical"):
                     if not isinstance(scoring.get(key), bool):
                         raise PhaseEShadowError(f"E2 {key} must be a measured boolean.")
@@ -238,17 +266,62 @@ def load_phase_e_runtime(
     return PhaseERuntimeEvidence(frozen, hashlib.sha256(payload).hexdigest())
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("binding", "runtime-probe", "table", "roster", "manifest", "json-output"):
+    for name in ("runtime-probe", "table", "roster", "manifest", "json-output"):
         parser.add_argument(f"--{name}", type=Path, required=True)
+    parser.add_argument("--binding", type=Path, help="binding Phase D artifact (foundation)")
+    parser.add_argument(
+        "--phase-d-candidate",
+        type=Path,
+        help="candidate Phase D artifact (binding: false) for a development sampler run",
+    )
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
-    arguments = parser.parse_args(argv)
+    parser.add_argument(
+        "--sampler",
+        choices=probe.SAMPLER_CHOICES,
+        default="foundation",
+        help="the component sampler every E3 draw uses; conditional is development only",
+    )
+    parser.add_argument("--conditional-residual-fraction", type=float, default=None)
+    parser.add_argument("--conditional-residual-minimum-rows", type=int, default=None)
+    return parser.parse_args(argv)
+
+
+def _evidence(
+    arguments: argparse.Namespace, conditional_residuals: ConditionalResidualConfig | None
+) -> PhaseDBindingEvidence:
+    """Binding evidence for the foundation sampler; candidate evidence for a candidate one."""
+
+    if conditional_residuals is None:
+        if arguments.binding is None or arguments.phase_d_candidate is not None:
+            raise PhaseEShadowError(
+                "A foundation E3 run reads --binding and never a --phase-d-candidate artifact."
+            )
+        return load_phase_d_binding(arguments.binding)
+    if arguments.phase_d_candidate is None or arguments.binding is not None:
+        raise PhaseEShadowError(
+            "A development E3 run reads --phase-d-candidate and never the --binding artifact."
+        )
+    return load_phase_d_candidate(
+        arguments.phase_d_candidate, conditional_residuals=conditional_residuals
+    )
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    arguments = _parse_arguments(argv)
     started = datetime.now(UTC)
     try:
+        conditional_residuals = probe.conditional_from_arguments(
+            arguments.sampler,
+            arguments.conditional_residual_fraction,
+            arguments.conditional_residual_minimum_rows,
+        )
         # These gates precede all historical data access and cannot be bypassed by a K flag.
-        evidence = load_phase_d_binding(arguments.binding)
-        runtime = load_phase_e_runtime(arguments.runtime_probe, evidence)
+        evidence = _evidence(arguments, conditional_residuals)
+        runtime = load_phase_e_runtime(
+            arguments.runtime_probe, evidence, conditional_residuals=conditional_residuals
+        )
         destination = _internal_destination(arguments.json_output, "E3 artifacts")
         if destination.exists():
             raise PhaseEShadowError(
@@ -263,7 +336,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         folds, panel_rows = prepare_phase_e_folds(handoff, evidence, arguments.archive_root)
         measured = evaluate_phase_e_prepared_folds(
-            handoff, folds, evidence, frozen_candidate_count=runtime.candidate_count
+            handoff,
+            folds,
+            evidence,
+            frozen_candidate_count=runtime.candidate_count,
+            conditional_residuals=conditional_residuals,
         )
         metadata = artifact_metadata(panel_rows=panel_rows, history_seasons=binding.HISTORY_SEASONS)
         final_provenance = _object(metadata["provenance"], "repository provenance")
@@ -275,11 +352,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "Repository changed during E3; measurement will not be written."
             )
         finished = datetime.now(UTC)
+        development = conditional_residuals is not None
         document = {
-            "contract_version": PHASE_E_SHADOW_CONTRACT,
+            "contract_version": (
+                PHASE_E_SHADOW_DEVELOPMENT_CONTRACT if development else PHASE_E_SHADOW_CONTRACT
+            ),
             "prereg_document": probe.PREREGISTRATION,
             "preregistration_version": probe.PREREGISTRATION_VERSION,
             "internal_only": True,
+            "binding": not development,
+            "development_only": development,
+            "e4_permitted": False if development else None,
+            "sampler": probe.sampler_record(conditional_residuals),
+            "phase_d_evidence": {
+                "contract_version": (
+                    binding.CANDIDATE_REPORT_VERSION if development else binding.REPORT_VERSION
+                ),
+                "binding": evidence.binding,
+                "status": evidence.status,
+                "sha256": evidence.sha256,
+                "sampler_contract_version": evidence.sampler_contract_version,
+            },
             "operational_control_changed": False,
             "member_facing_probability_published": False,
             "locked_holdout_accessed": False,

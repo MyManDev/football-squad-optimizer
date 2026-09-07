@@ -28,8 +28,13 @@ That override is labelled on every record, is not the production pin and claims 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
+import multiprocessing
+import os
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -43,6 +48,13 @@ from scripts._experiment_cli import (
     REPOSITORY_ROOT,
     artifact_metadata,
     write_json,
+)
+from scripts._phase_e_checkpoints import (
+    CheckpointError,
+    CheckpointStore,
+    jsonable,
+    utc_now,
+    write_status,
 )
 from scripts._phase_e_inputs import PhaseDBindingEvidence, load_phase_d_binding
 from scripts.run_component_squad_calibration import (
@@ -89,9 +101,11 @@ from squadopt.scenarios import (
     select_phase_e_candidate,
 )
 from squadopt.scenarios.components import (
+    COMPONENT_SCENARIO_CONTRACT_VERSION,
     ComponentScenarioDraw,
     ComponentScenarioInputs,
     ComponentScenarioProvenance,
+    ConditionalResidualConfig,
     paired_conditional_residuals,
     sample_component_scenarios,
 )
@@ -104,6 +118,16 @@ from squadopt.scenarios.selection import (
 )
 
 PROBE_CONTRACT_VERSION: Final = "phase_e_runtime_probe_v2"
+# A run under any sampler other than the frozen foundation sampler is a development probe: it
+# carries its own contract version so the binding E3 loader and the E4 hook cannot read it.
+DEVELOPMENT_PROBE_CONTRACT_VERSION: Final = "phase_e_runtime_probe_development_v1"
+SAMPLER_CHOICES: Final = ("foundation", "conditional")
+BLAS_THREAD_VARIABLES: Final = (
+    "OPENBLAS_NUM_THREADS",
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+)
 PREREGISTRATION: Final = "docs/phase_e_candidate_selection_prereg.md"
 PREREGISTRATION_VERSION: Final = "phase_e_development_k_amendment_v1"
 SENSITIVITY_SEEDS: Final = (1, 2, 3, 4)
@@ -177,6 +201,88 @@ class DecisionPoint:
             raise ProbeError(f"{self.label}: pool is missing {missing!r}.")
         if (self.draw_factory is None) == (self.draw_unavailable_reason is None):
             raise ProbeError(f"{self.label}: exactly one of draw_factory or its reason is set.")
+
+
+# --------------------------------------------------------------------------------------
+# The sampler a run draws with
+# --------------------------------------------------------------------------------------
+
+
+def sampler_record(conditional_residuals: ConditionalResidualConfig | None) -> Record:
+    """The sampler stated in every artifact, checkpoint identity and draw identity."""
+
+    if conditional_residuals is None:
+        return {
+            "contract_version": COMPONENT_SCENARIO_CONTRACT_VERSION,
+            "residual_selection": "fold_uniform",
+            "conditional_residual_fraction": None,
+            "conditional_residual_minimum_rows": None,
+        }
+    return {
+        "contract_version": conditional_residuals.contract_version,
+        "residual_selection": "conditional_neighbourhood",
+        "conditional_residual_fraction": conditional_residuals.fraction,
+        "conditional_residual_minimum_rows": conditional_residuals.minimum_rows,
+    }
+
+
+def probe_contract_version(conditional_residuals: ConditionalResidualConfig | None) -> str:
+    return (
+        PROBE_CONTRACT_VERSION
+        if conditional_residuals is None
+        else DEVELOPMENT_PROBE_CONTRACT_VERSION
+    )
+
+
+def pool_digest(pool: pd.DataFrame) -> str:
+    """A digest of the decision pool a probe measures: the same players, prices and points.
+
+    Row order does not matter; every value does, with expected points compared bit for bit.
+    """
+
+    frame = pool.loc[:, list(POOL_COLUMNS)].sort_values("player_id", kind="stable")
+    rows = [
+        {
+            "player_id": str(row["player_id"]),
+            "name": str(row["name"]),
+            "team_id": str(row["team_id"]),
+            "position": str(row["position"]),
+            "price_tenths": int(row["price_tenths"]),
+            "expected_points": float(row["expected_points"]).hex(),
+        }
+        for _, row in frame.iterrows()
+    ]
+    payload = json.dumps(rows, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def draw_sampler_version(draw: ComponentScenarioDraw) -> str:
+    """The sampler contract a draw declares; a draw without the key is the foundation one."""
+
+    return str(
+        draw.scenarios.diagnostics.get(
+            "component_sampler_contract_version", draw.inputs.contract_version
+        )
+    )
+
+
+def conditional_from_arguments(
+    sampler: str, fraction: float | None, minimum_rows: int | None
+) -> ConditionalResidualConfig | None:
+    """The opt-in candidate sampler, or None for the frozen foundation sampler."""
+
+    if sampler not in SAMPLER_CHOICES:
+        raise ProbeError(f"--sampler must be one of {list(SAMPLER_CHOICES)}, got {sampler!r}.")
+    if sampler == "foundation":
+        if fraction is not None or minimum_rows is not None:
+            raise ProbeError("conditional residual settings need --sampler conditional.")
+        return None
+    if fraction is None or minimum_rows is None:
+        raise ProbeError(
+            "--sampler conditional needs both --conditional-residual-fraction and "
+            "--conditional-residual-minimum-rows."
+        )
+    return ConditionalResidualConfig(fraction=fraction, minimum_rows=minimum_rows)
 
 
 # --------------------------------------------------------------------------------------
@@ -328,6 +434,8 @@ def _draw_identity(draw: ComponentScenarioDraw) -> Record:
         "scenario_count": len(draw.scenarios.scenario_ids),
         "covered_player_count": int(draw.scenarios.scenario_points.shape[1]),
         "deterministic_seed": draw.scenarios.config.deterministic_seed,
+        "component_sampler_contract_version": draw_sampler_version(draw),
+        "residual_selection": draw.scenarios.diagnostics.get("residual_selection"),
     }
 
 
@@ -352,7 +460,10 @@ def _probe_scoring(
     scored, scoring_seconds = _score(candidates.candidates, draw, covered)
 
     production = _select(candidates, draw, PHASE_E_CALIBRATED_VERSIONS)
-    probe_pin = ((draw.inputs.provenance.model_version, draw.inputs.contract_version),)
+    # The selector identifies a draw by the sampler it declares, so the probe-only pin must
+    # name that sampler: a foundation-shaped pin would send every candidate-sampler draw into
+    # the not-calibrated fallback before any scenario was scored.
+    probe_pin = ((draw.inputs.provenance.model_version, draw_sampler_version(draw)),)
     diagnostic = _select(candidates, draw, probe_pin)
 
     repeated_draw = point.draw_factory(0)
@@ -392,9 +503,9 @@ def _probe_scoring(
             **diagnostic,
             "pin": [list(pair) for pair in probe_pin],
             "note": (
-                "probe-only pin equal to the draw's own provenance, used to reach the "
-                "scenarios for repeatability and seed sensitivity; not the production pin "
-                "and no calibration claim"
+                "probe-only pin equal to the draw's own provenance and declared sampler, used "
+                "to reach the scenarios for repeatability and seed sensitivity; not the "
+                "production pin and no calibration claim"
             ),
         },
         "draw_repeat_identical": draw_repeat_identical,
@@ -727,7 +838,11 @@ def fold_pool_and_inputs(
 
 
 def _fold_point(
-    handoff: PhaseCComponentHandoff, fold_id: str, projections: pd.DataFrame
+    handoff: PhaseCComponentHandoff,
+    fold_id: str,
+    projections: pd.DataFrame,
+    *,
+    conditional_residuals: ConditionalResidualConfig | None = None,
 ) -> DecisionPoint:
     pool, joined, covered = fold_pool_and_inputs(handoff.rows, projections, fold_id)
     target = _target(fold_id)
@@ -774,7 +889,12 @@ def _fold_point(
             ),
         )
         return sample_component_scenarios(
-            inputs, snapshot, residuals, target, ScenarioConfig(deterministic_seed=seed)
+            inputs,
+            snapshot,
+            residuals,
+            target,
+            ScenarioConfig(deterministic_seed=seed),
+            conditional_residuals=conditional_residuals,
         )
 
     return DecisionPoint(
@@ -798,10 +918,10 @@ def binding_fold_ids(handoff: PhaseCComponentHandoff) -> tuple[str, ...]:
     return eligible
 
 
-def fold_decision_points(
+def prepare_fold_projections(
     handoff: PhaseCComponentHandoff, fold_ids: Sequence[str], archive_root: Path
-) -> tuple[list[DecisionPoint], int]:
-    """Build fold pools from outcome-free control projections and the Phase C handoff."""
+) -> tuple[dict[str, pd.DataFrame], int]:
+    """Outcome-free decision rosters per fold: plain frames a worker process can receive."""
 
     panel = build_panel(archive_root, seasons=HISTORY_SEASONS)
     decisions = {
@@ -809,14 +929,34 @@ def fold_decision_points(
         for decision in walk_forward_decision_points(panel, seasons=DECISION_SEASONS)
     }
     builder = make_ridge_projection_builder(cross_season=CrossSeasonConfig())
-    points: list[DecisionPoint] = []
+    projections: dict[str, pd.DataFrame] = {}
     for fold_id in fold_ids:
         if fold_id not in decisions:
             raise ProbeError(f"fold {fold_id!r} has no walk-forward decision point.")
         control = outcome_free_control_projection(panel, decisions[fold_id], builder)
-        projections = fold_projection_roster(handoff.rows, handoff.roster, fold_id, control)
-        points.append(_fold_point(handoff, fold_id, projections))
-    return points, len(panel)
+        projections[fold_id] = fold_projection_roster(
+            handoff.rows, handoff.roster, fold_id, control
+        )
+    return projections, len(panel)
+
+
+def fold_decision_points(
+    handoff: PhaseCComponentHandoff,
+    fold_ids: Sequence[str],
+    archive_root: Path,
+    *,
+    conditional_residuals: ConditionalResidualConfig | None = None,
+) -> tuple[list[DecisionPoint], int]:
+    """Build fold pools from outcome-free control projections and the Phase C handoff."""
+
+    projections, panel_rows = prepare_fold_projections(handoff, fold_ids, archive_root)
+    points = [
+        _fold_point(
+            handoff, fold_id, projections[fold_id], conditional_residuals=conditional_residuals
+        )
+        for fold_id in fold_ids
+    ]
+    return points, panel_rows
 
 
 def live_point_from_capture(
@@ -915,6 +1055,41 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--sensitivity-seeds", type=int, nargs="*", default=list(SENSITIVITY_SEEDS))
     parser.add_argument("--skip-scoring", action="store_true", help="generation and coverage only")
+    parser.add_argument(
+        "--sampler",
+        choices=SAMPLER_CHOICES,
+        default="foundation",
+        help="the component sampler every draw uses; conditional is a development probe",
+    )
+    parser.add_argument(
+        "--conditional-residual-fraction",
+        type=float,
+        default=None,
+        help="candidate sampler: fraction of a source fold's rows a player may draw from",
+    )
+    parser.add_argument(
+        "--conditional-residual-minimum-rows",
+        type=int,
+        default=None,
+        help="candidate sampler: the smallest such window, whole fold when the fold is smaller",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="pools probed concurrently in separate processes; CP-SAT keeps one search worker",
+    )
+    parser.add_argument(
+        "--checkpoint-dir",
+        type=Path,
+        default=None,
+        help="directory for per-pool checkpoints bound to this run's identity",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="reuse complete checkpoints of the same run identity in --checkpoint-dir",
+    )
     parser.add_argument("--json-output", type=Path, required=True)
     return parser.parse_args(argv)
 
@@ -938,6 +1113,21 @@ def _validate(arguments: argparse.Namespace) -> None:
     if not (wants_folds or arguments.live_decision or arguments.live_pool):
         raise ProbeError(
             "nothing to probe: give --fold, --all-binding-folds, --live-decision or --live-pool."
+        )
+    if isinstance(arguments.workers, bool) or arguments.workers < 1:
+        raise ProbeError("--workers must be a positive integer.")
+    if (arguments.workers > 1 or arguments.resume) and arguments.checkpoint_dir is None:
+        raise ProbeError("--workers above 1 and --resume need --checkpoint-dir.")
+    if arguments.checkpoint_dir is not None and (
+        arguments.live_decision or arguments.live_components
+    ):
+        raise ProbeError(
+            "checkpointed runs take recorded --live-pool files; --live-decision is probed "
+            "in-process without checkpoints."
+        )
+    if arguments.json_output.exists():
+        raise ProbeError(
+            f"{arguments.json_output} already exists; an E2 artifact is never replaced."
         )
 
 
@@ -966,16 +1156,203 @@ def _summary_line(point: Record) -> str:
     return "\n".join(parts)
 
 
+# --------------------------------------------------------------------------------------
+# Pools probed one per process, each checkpointed under the run identity
+# --------------------------------------------------------------------------------------
+
+_WORKER: dict[str, Any] = {}
+
+
+def _worker_initialize(state: Record) -> None:
+    _WORKER.clear()
+    _WORKER.update(state)
+
+
+def _build_point(state: Record, label: str) -> DecisionPoint:
+    live_specs: dict[str, str] = state["live_specs"]
+    if label in live_specs:
+        return live_point_from_csv(f"{label}={live_specs[label]}")
+    return _fold_point(
+        state["handoff"],
+        label,
+        state["fold_projections"][label],
+        conditional_residuals=state["conditional_residuals"],
+    )
+
+
+def _probe_label(label: str) -> Record:
+    """Probe one pool count by count, checkpointing after each count under the run identity.
+
+    The pool is rebuilt here and digested before any checkpoint is read: a checkpoint is
+    reused only for the very pool this run prepared for its label.
+    """
+
+    state = _WORKER
+    store: CheckpointStore | None = state["store"]
+    counts: list[int] = list(state["candidate_counts"])
+    point = _build_point(state, label)
+    digest = pool_digest(point.pool)
+    expected_digest = state["pool_digests"].get(label)
+    if expected_digest is not None and digest != expected_digest:
+        raise CheckpointError(
+            f"{label}: the pool built in the worker differs from the one the coordinator prepared."
+        )
+    existing = store.load(label, pool_sha256=digest) if store is not None else None
+    completed: list[int] = list(existing["completed_counts"]) if existing else []
+    runs: list[Record] = list(existing["record"]["runs"]) if existing else []
+    warnings: list[str] = list(existing["record"]["warnings"]) if existing else []
+    record: Record | None = existing["record"] if existing else None
+    if record is not None and all(count in completed for count in counts):
+        return record
+    order = {count: index for index, count in enumerate(counts)}
+    for count in counts:
+        if count in completed:
+            continue
+        partial = probe_decision_point(
+            point,
+            candidate_counts=(count,),
+            sensitivity_seeds=state["sensitivity_seeds"],
+            scoring=state["scoring"],
+        )
+        runs.extend(partial["runs"])
+        warnings.extend(partial["warnings"])
+        completed.append(count)
+        record = {
+            **partial,
+            "runs": sorted(runs, key=lambda run: order[int(run["candidate_count"])]),
+            "warnings": warnings,
+        }
+        if store is not None:
+            store.save(
+                label,
+                kind=point.kind,
+                completed_counts=completed,
+                record=record,
+                pool_sha256=digest,
+            )
+    assert record is not None
+    return record
+
+
+def _dispatch(
+    labels: Sequence[str],
+    state: Record,
+    *,
+    workers: int,
+    status_directory: Path | None,
+    identity: Record,
+) -> tuple[dict[str, Record], dict[str, str]]:
+    """Run every label, keep every failure by name, and never let one pool hide another."""
+
+    records: dict[str, Record] = {}
+    failures: dict[str, str] = {}
+    started = perf_counter()
+    started_at = utc_now()
+
+    def publish(status: str) -> None:
+        if status_directory is not None:
+            write_status(
+                status_directory,
+                status=status,
+                identity=identity,
+                workers=workers,
+                expected_labels=len(labels),
+                completed_labels=[label for label in labels if label in records],
+                failed_labels=failures,
+                started_at_utc=started_at,
+                elapsed_seconds=perf_counter() - started,
+            )
+
+    def finish(label: str) -> None:
+        if label in records:
+            print(_summary_line(records[label]), flush=True)
+        else:
+            print(f"{label}: failed: {failures[label]}", flush=True)
+        publish("running")
+
+    publish("running")
+    if workers == 1:
+        _worker_initialize(state)
+        for label in labels:
+            try:
+                records[label] = _probe_label(label)
+            except Exception as error:  # a pool failure is recorded, never hidden
+                failures[label] = f"{type(error).__name__}: {error}"
+            finish(label)
+    else:
+        with ProcessPoolExecutor(
+            max_workers=workers,
+            mp_context=multiprocessing.get_context("spawn"),
+            initializer=_worker_initialize,
+            initargs=(state,),
+        ) as executor:
+            pending = {executor.submit(_probe_label, label): label for label in labels}
+            while pending:
+                done, _ = wait(pending, return_when=FIRST_COMPLETED)
+                for future in done:
+                    label = pending.pop(future)
+                    try:
+                        records[label] = future.result()
+                    except Exception as error:  # a worker failure is recorded, never hidden
+                        failures[label] = f"{type(error).__name__}: {error}"
+                    finish(label)
+    publish("failed" if failures else "completed")
+    return records, failures
+
+
+def _run_identity(
+    arguments: argparse.Namespace,
+    conditional_residuals: ConditionalResidualConfig | None,
+    source: Record | None,
+    provenance: Mapping[str, object],
+) -> Record:
+    """Everything a checkpoint must share with the run that reuses it.
+
+    The execution settings are part of it because the recorded timings, and therefore the
+    budget rule, depend on how many pools ran at once and on how many threads each had.
+    """
+
+    return {
+        "contract_version": probe_contract_version(conditional_residuals),
+        "sampler": sampler_record(conditional_residuals),
+        "candidate_counts": sorted(set(arguments.candidate_counts)),
+        "sensitivity_seeds": list(arguments.sensitivity_seeds),
+        "budget_seconds": BUDGET_SECONDS,
+        "scoring_requested": not arguments.skip_scoring,
+        "source": source,
+        "archive": {
+            "archive_commit": provenance.get("archive_commit"),
+            "archive_manifest_sha256": provenance.get("archive_manifest_sha256"),
+        },
+        "repository_commit": provenance.get("repository_commit"),
+        "optimization_config": jsonable(OptimizationConfig()),
+        "scenario_config": jsonable(ScenarioConfig()),
+        "execution": {
+            "workers": int(arguments.workers),
+            "blas_threads": {name: os.environ.get(name) for name in BLAS_THREAD_VARIABLES},
+        },
+    }
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parse_arguments(argv)
     try:
         _validate(arguments)
+        conditional_residuals = conditional_from_arguments(
+            arguments.sampler,
+            arguments.conditional_residual_fraction,
+            arguments.conditional_residual_minimum_rows,
+        )
         points: list[DecisionPoint] = []
         panel_rows = 0
         expected_fold_ids: tuple[str, ...] | None = None
         live_handoff = None
         source = None
         live_evidence = None
+        fold_projections: dict[str, pd.DataFrame] = {}
+        fold_ids: list[str] = []
+        live_specs: dict[str, str] = {}
+        preparation_started = perf_counter()
         if arguments.live_components:
             if not arguments.live_decision or not all(
                 (arguments.table, arguments.roster, arguments.manifest)
@@ -999,7 +1376,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "manifest_sha256": live_handoff.manifest_sha256,
             }
         for spec in arguments.live_pool:
-            points.append(live_point_from_csv(spec))
+            label, separator, path = spec.partition("=")
+            if not separator or not label.strip() or not path.strip():
+                raise ProbeError(f"--live-pool needs LABEL=PATH, got {spec!r}.")
+            if label.strip() in live_specs:
+                raise ProbeError(f"--live-pool label {label.strip()!r} is given twice.")
+            live_specs[label.strip()] = path.strip()
         for spec in arguments.live_decision:
             points.append(
                 live_point_from_capture(
@@ -1010,6 +1392,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     binding_evidence=live_evidence,
                 )
             )
+        handoff = None
         if arguments.fold or arguments.all_binding_folds:
             handoff = read_phase_c_component_handoff(
                 arguments.table, arguments.roster, arguments.manifest
@@ -1023,11 +1406,55 @@ def main(argv: Sequence[str] | None = None) -> int:
             fold_ids = (
                 list(expected_fold_ids) if arguments.all_binding_folds else list(arguments.fold)
             )
-            fold_points, panel_rows = fold_decision_points(
+            fold_projections, panel_rows = prepare_fold_projections(
                 handoff, fold_ids, arguments.archive_root
             )
-            points.extend(fold_points)
+        preparation_seconds = perf_counter() - preparation_started
 
+        if arguments.workers > 1:
+            # One BLAS thread per process: concurrency is the number of pools, not threads.
+            for name in BLAS_THREAD_VARIABLES:
+                os.environ.setdefault(name, "1")
+        metadata = artifact_metadata(panel_rows=panel_rows, history_seasons=HISTORY_SEASONS)
+        provenance = metadata["provenance"]
+        assert isinstance(provenance, dict)
+        identity = _run_identity(arguments, conditional_residuals, source, provenance)
+        pool_digests: dict[str, str] = {
+            label: pool_digest(live_point_from_csv(f"{label}={path}").pool)
+            for label, path in live_specs.items()
+        }
+        pool_digests.update({label: pool_digest(fold_projections[label]) for label in fold_ids})
+        store: CheckpointStore | None = None
+        resumed_labels: list[str] = []
+        labels = [*live_specs, *fold_ids]
+        if arguments.checkpoint_dir is not None:
+            store = CheckpointStore(arguments.checkpoint_dir, identity)
+            store.refuse_foreign_work(pool_digests)
+            present = [label for label in labels if store.path(label).exists()]
+            if present and not arguments.resume:
+                raise ProbeError(
+                    f"{arguments.checkpoint_dir} already holds {len(present)} checkpoint(s) of "
+                    "this run identity; give --resume to continue that run."
+                )
+            for label in present:
+                checkpoint = store.load(label, pool_sha256=pool_digests[label])
+                if checkpoint is not None and sorted(checkpoint["completed_counts"]) == sorted(
+                    set(arguments.candidate_counts)
+                ):
+                    resumed_labels.append(label)
+        state: Record = {
+            "handoff": handoff,
+            "fold_projections": fold_projections,
+            "live_specs": live_specs,
+            "pool_digests": pool_digests,
+            "conditional_residuals": conditional_residuals,
+            "candidate_counts": list(arguments.candidate_counts),
+            "sensitivity_seeds": list(arguments.sensitivity_seeds),
+            "scoring": not arguments.skip_scoring,
+            "store": store,
+        }
+
+        # Capture-based live decisions carry snapshot objects; they are probed in-process.
         records: list[Record] = []
         for point in points:
             record = probe_decision_point(
@@ -1036,19 +1463,33 @@ def main(argv: Sequence[str] | None = None) -> int:
                 sensitivity_seeds=arguments.sensitivity_seeds,
                 scoring=not arguments.skip_scoring,
             )
-            print(_summary_line(record))
+            print(_summary_line(record), flush=True)
             records.append(record)
+        dispatched, failures = _dispatch(
+            labels,
+            state,
+            workers=arguments.workers,
+            status_directory=arguments.checkpoint_dir,
+            identity=identity,
+        )
+        if failures:
+            raise ProbeError(
+                f"{len(failures)} pool(s) failed and no artifact was written: "
+                + "; ".join(f"{label}: {reason}" for label, reason in failures.items())
+            )
+        records.extend(dispatched[label] for label in labels)
         rule = candidate_count_rule(
             records, arguments.candidate_counts, expected_fold_ids=expected_fold_ids
         )
         document: Record = {
-            "contract_version": PROBE_CONTRACT_VERSION,
+            "contract_version": probe_contract_version(conditional_residuals),
             "preregistration": PREREGISTRATION,
             "preregistration_version": PREREGISTRATION_VERSION,
             "source": source,
             "generated_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
             "diagnostic_only": True,
             "promotes_anything": False,
+            "development_only": conditional_residuals is not None,
             "reads_realized_outcomes": False,
             "outcome_policy": OUTCOME_POLICY,
             "constants": {
@@ -1059,6 +1500,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "risk_weight": PHASE_E_RISK_WEIGHT / PHASE_E_WEIGHT_SCALE,
                 "tail_fraction": PHASE_E_TAIL_COUNT / PHASE_E_SCENARIO_COUNT,
             },
+            "sampler": sampler_record(conditional_residuals),
             "production_pin": [list(pair) for pair in PHASE_E_CALIBRATED_VERSIONS],
             "production_pin_empty": not PHASE_E_CALIBRATED_VERSIONS,
             "scoring_requested": not arguments.skip_scoring,
@@ -1067,10 +1509,36 @@ def main(argv: Sequence[str] | None = None) -> int:
             "frozen_k": rule["frozen_k"],
             "frozen_k_reason": rule["frozen_k_reason"],
             "warnings": [warning for record in records for warning in record["warnings"]],
-            **artifact_metadata(panel_rows=panel_rows, history_seasons=HISTORY_SEASONS),
+            "execution": {
+                "workers": arguments.workers,
+                "solver_search_workers": 1,
+                "solver_time_limit_seconds": OptimizationConfig().solver_time_limit_seconds,
+                "solver_deterministic_time_limit": (
+                    OptimizationConfig().solver_deterministic_time_limit
+                ),
+                "blas_threads": {name: os.environ.get(name) for name in BLAS_THREAD_VARIABLES},
+                "timing_context": (
+                    "isolated_single_process"
+                    if arguments.workers == 1
+                    else "concurrent_local_execution"
+                ),
+                "checkpoint_dir": (
+                    None if arguments.checkpoint_dir is None else str(arguments.checkpoint_dir)
+                ),
+                "resumed_labels": resumed_labels,
+                "preparation_seconds": preparation_seconds,
+            },
+            **metadata,
         }
         write_json(arguments.json_output, document)
-    except (ProbeError, DataError, ScenarioValidationError, ValueError, OSError) as error:
+    except (
+        CheckpointError,
+        ProbeError,
+        DataError,
+        ScenarioValidationError,
+        ValueError,
+        OSError,
+    ) as error:
         print(f"probe refused: {error}", file=sys.stderr)
         return 1
     print(f"frozen_k: {rule['frozen_k']} ({rule['frozen_k_reason']})")

@@ -51,6 +51,17 @@ COMPONENT_TRAINING_SEASONS: Final = (
     "2023-24",
     "2024-25",
 )
+# The separate Phase C v2 *development* scope. It adds 2025-26, which the v1 path above
+# keeps as its locked holdout: that season has been used elsewhere in the repository, so a
+# v2 measurement is development evidence and is never presented as an unseen final test.
+# Only the v2 export reads this tuple; every v1 constant, artifact and refusal is unchanged.
+COMPONENT_DEVELOPMENT_SEASONS_V2: Final = (
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25",
+    "2025-26",
+)
 
 # Declared locally on purpose. The frozen mapping's own version string lives in
 # ``backtest.policy_evaluation``, which sits above this layer, so importing it would

@@ -19,9 +19,11 @@ from squadopt.prediction import PredictionProvenance, prepare_optimizer_projecti
 from squadopt.prediction.components import COMPONENT_MODEL_ROUTE
 from squadopt.scenarios import ScenarioConfig
 from squadopt.scenarios.components import (
+    COMPONENT_SCENARIO_CONTRACT_VERSION,
     ComponentScenarioDraw,
     ComponentScenarioInputs,
     ComponentScenarioProvenance,
+    ConditionalResidualConfig,
     paired_conditional_residuals,
     sample_component_scenarios,
 )
@@ -29,29 +31,93 @@ from squadopt.scenarios.components import (
 
 @dataclass(frozen=True, slots=True)
 class PhaseDBindingEvidence:
-    """A binding verdict, fixed population and digest to carry into the E3 artifact."""
+    """A Phase D verdict, fixed population, digest and sampler to carry into the E3 artifact.
+
+    ``binding`` is False only for the candidate-sampler development evidence loaded by
+    ``load_phase_d_candidate``; ``sampler_contract_version`` names the sampler the evidence
+    calibrated, and the E3 draw must declare the same one.
+    """
 
     status: str
     fold_ids: tuple[str, ...]
     sha256: str
     model_version: str
+    binding: bool = True
+    sampler_contract_version: str = COMPONENT_SCENARIO_CONTRACT_VERSION
 
 
-def load_phase_d_binding(path: Path) -> PhaseDBindingEvidence:
-    """Require binding evidence before loading historical inputs or evaluating anything."""
-
+def _phase_d_document(path: Path, *, contract_version: str, label: str) -> tuple[dict, bytes]:
     payload = path.read_bytes()
-    document = binding._mapping(json.loads(payload), "Phase D binding artifact")
-    binding._finite_numbers(document, "Phase D binding artifact")
+    document = binding._mapping(json.loads(payload), label)
+    binding._finite_numbers(document, label)
     if (
-        document.get("contract_version") != binding.REPORT_VERSION
+        document.get("contract_version") != contract_version
         or document.get("evaluation_contract_version")
         != binding.COMPONENT_SQUAD_CALIBRATION_CONTRACT_VERSION
         or document.get("locked_holdout_accessed") is not False
         or document.get("operational_control_changed") is not False
         or document.get("internal_only") is not True
     ):
-        raise PhaseEShadowError("Phase D evidence is not the internal binding artifact.")
+        raise PhaseEShadowError(f"Phase D evidence is not the internal {label}.")
+    return dict(document), payload
+
+
+def load_phase_d_binding(path: Path) -> PhaseDBindingEvidence:
+    """Require binding evidence before loading historical inputs or evaluating anything."""
+
+    document, payload = _phase_d_document(
+        path, contract_version=binding.REPORT_VERSION, label="binding artifact"
+    )
+    if document.get("binding", True) is not True or document.get("candidate") is not None:
+        raise PhaseEShadowError("Phase D binding evidence must not carry a candidate sampler.")
+    return _phase_d_evidence(document, payload)
+
+
+def load_phase_d_candidate(
+    path: Path, *, conditional_residuals: ConditionalResidualConfig
+) -> PhaseDBindingEvidence:
+    """Development evidence for exactly this candidate sampler; never a binding verdict.
+
+    The candidate report keeps the binding population, inputs and gates but declares
+    ``binding: false`` and its sampler settings. It is accepted only when those settings are
+    the ones the E3 development run will draw with, so evidence and draw name one sampler.
+    """
+
+    document, payload = _phase_d_document(
+        path, contract_version=binding.CANDIDATE_REPORT_VERSION, label="candidate artifact"
+    )
+    expected = {
+        "sampler_contract_version": conditional_residuals.contract_version,
+        "conditional_residual_fraction": conditional_residuals.fraction,
+        "conditional_residual_minimum_rows": conditional_residuals.minimum_rows,
+        "reference_contract_version": binding.REPORT_VERSION,
+        "development_data_only": True,
+        "binding": False,
+    }
+    if document.get("binding") is not False or document.get("candidate") != expected:
+        raise PhaseEShadowError(
+            "Phase D candidate evidence must declare binding: false and exactly the requested "
+            "conditional residual settings."
+        )
+    folds = document.get("folds")
+    if not isinstance(folds, list) or any(
+        not isinstance(fold, dict)
+        or fold.get("sampler_contract_version") != conditional_residuals.contract_version
+        for fold in folds
+    ):
+        raise PhaseEShadowError("Every candidate fold must record the candidate sampler.")
+    evidence = _phase_d_evidence(document, payload)
+    return PhaseDBindingEvidence(
+        evidence.status,
+        evidence.fold_ids,
+        evidence.sha256,
+        evidence.model_version,
+        binding=False,
+        sampler_contract_version=conditional_residuals.contract_version,
+    )
+
+
+def _phase_d_evidence(document: dict, payload: bytes) -> PhaseDBindingEvidence:
     provenance = binding._mapping(document.get("provenance"), "binding.provenance")
     if provenance.get("working_tree_dirty") is not False:
         raise PhaseEShadowError("Binding evidence must name a clean repository revision.")
@@ -128,13 +194,17 @@ def prepare_phase_e_folds(
 
 
 def draw_phase_e_fold(
-    handoff: PhaseCComponentHandoff, fold: EvaluationFold
+    handoff: PhaseCComponentHandoff,
+    fold: EvaluationFold,
+    *,
+    conditional_residuals: ConditionalResidualConfig | None = None,
 ) -> ComponentScenarioDraw:
     """Draw every scenario-eligible player once; never narrow the optimizer's pool.
 
     Direct-control rows have no component prediction and cannot be simulated. They remain
     in the optimizer roster and their candidates are subject to the selector's coverage rule.
-    Target outcomes are never passed into the sampler or its residual history.
+    Target outcomes are never passed into the sampler or its residual history. With
+    ``conditional_residuals`` given, the draw uses the candidate sampler and declares it.
     """
 
     target = binding._target(fold.fold_id)
@@ -192,4 +262,11 @@ def draw_phase_e_fold(
     residuals = paired_conditional_residuals(
         history, target=target, min_history_folds=settings.min_history_folds
     )
-    return sample_component_scenarios(inputs, snapshot, residuals, target, settings)
+    return sample_component_scenarios(
+        inputs,
+        snapshot,
+        residuals,
+        target,
+        settings,
+        conditional_residuals=conditional_residuals,
+    )

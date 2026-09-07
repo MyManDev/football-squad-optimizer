@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "**/advice-backend.spec.ts", // opt-in: playwright.backend.config.ts
   timeout: 30_000,
   fullyParallel: true,
   reporter: process.env.CI ? "github" : "list",

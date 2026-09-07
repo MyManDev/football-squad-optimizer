@@ -27,13 +27,25 @@ below zero -- it does not clip them. So the clipping happens here, at the model'
 output boundary, and the unclipped conditional points value is kept beside it as
 ``raw_expected_points_if_appearance`` for diagnostics. The frozen component contract is not
 touched.
+
+**Training-row weighting.** The equal-weight fit above is the control. The one declared
+alternative is :class:`SeasonAgeWeighting`: every training row is weighted by
+``0.5 ** (prediction season start year - row season start year)``, so the season being
+predicted weighs 1, the season before it 0.5, the one before that 0.25. The weights are
+normalized to a mean of one inside each fitted subset and handed to the scaler and the
+estimator alike, so the same rows are weighted the same way at every step. Nothing else
+changes between the two fits -- same features, targets and hyperparameters -- and a
+weighted fit carries its own model version. The half-life is a declared constant, not a
+searched one.
 """
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from sklearn.linear_model import LogisticRegression, Ridge  # type: ignore[import-untyped]
 from sklearn.pipeline import Pipeline, make_pipeline  # type: ignore[import-untyped]
@@ -48,6 +60,17 @@ from squadopt.prediction.components import (
 from squadopt.prediction.config import PredictionConfigurationError
 
 COMPONENT_MODEL_VERSION: Final = "phase_c_control_components_v1"
+
+# The single declared season-age weighting candidate. Same features, targets and
+# hyperparameters as the control; only the training rows are weighted by
+# ``0.5 ** (prediction season start year - row season start year)``, normalized to a mean
+# of one inside each fitted subset. The half-life is fixed here, not searched, and a fit
+# that uses it carries its own model version so a consumer cannot mistake it for the
+# equal-weight control.
+SEASON_WEIGHTED_MODEL_VERSION: Final = "phase_c_components_season_half_life_v1"
+EQUAL_WEIGHTING: Final = "equal_weights_v1"
+SEASON_HALF_LIFE_WEIGHTING: Final = "season_half_life_0.5_v1"
+SEASON_WEIGHT_BASE: Final = 0.5
 
 # One full match, and the physical ceiling a conditional minutes prediction is clipped to
 # once multiplied by the gameweek's fixture count.
@@ -98,7 +121,12 @@ class ComponentModelConfig:
 
 @dataclass(frozen=True, slots=True)
 class FittedComponentModels:
-    """The three fitted estimators, with the rows each was fitted on."""
+    """The three fitted estimators, with the rows each was fitted on.
+
+    ``season_weights`` records the declared, un-normalized weight of every training season
+    that reached the fit, so a manifest can show which rows counted for how much without
+    re-deriving the rule. Under equal weighting every season weighs 1.
+    """
 
     appearance: Pipeline
     minutes: Pipeline
@@ -107,6 +135,87 @@ class FittedComponentModels:
     appearance_rows: int
     conditional_rows: int
     model_version: str = COMPONENT_MODEL_VERSION
+    weighting: str = EQUAL_WEIGHTING
+    season_weights: tuple[tuple[str, float], ...] = ()
+
+
+_SEASON_LABEL: Final = re.compile(r"(?P<start>\d{4})-(?P<end>\d{2})")
+
+
+def season_start_year(season: object) -> int:
+    """The start year of a canonical ``YYYY-YY`` season label, refusing anything else."""
+
+    if not isinstance(season, str) or _SEASON_LABEL.fullmatch(season) is None:
+        raise PredictionConfigurationError(
+            f"season must be a canonical YYYY-YY label, got {season!r}."
+        )
+    start = int(season[:4])
+    if int(season[5:]) != (start + 1) % 100:
+        raise PredictionConfigurationError(f"season label {season!r} does not span two years.")
+    return start
+
+
+@dataclass(frozen=True, slots=True)
+class SeasonAgeWeighting:
+    """The declared season-age weighting rule, bound to the season being predicted.
+
+    A rule rather than a bag of weights, so the fit can compute the weights from the
+    training rows' own season labels and record them: a caller cannot hand in weights that
+    silently belong to a different row set.
+    """
+
+    target_season: str
+
+    def __post_init__(self) -> None:
+        season_start_year(self.target_season)
+
+    @property
+    def label(self) -> str:
+        return SEASON_HALF_LIFE_WEIGHTING
+
+    @property
+    def model_version(self) -> str:
+        return SEASON_WEIGHTED_MODEL_VERSION
+
+    def season_weight(self, season: str) -> float:
+        """The un-normalized weight of one training season under this rule."""
+
+        age = season_start_year(self.target_season) - season_start_year(season)
+        if age < 0:
+            raise PredictionConfigurationError(
+                f"Training season {season!r} lies after the prediction season "
+                f"{self.target_season!r}; that is a leak, not a weighting question."
+            )
+        return float(SEASON_WEIGHT_BASE**age)
+
+
+def season_age_weights(seasons: pd.Series, *, weighting: SeasonAgeWeighting) -> pd.Series:
+    """Un-normalized row weights, aligned to ``seasons``' index, under the declared rule."""
+
+    if not isinstance(seasons, pd.Series):
+        raise PredictionConfigurationError("seasons must be a pandas Series of season labels.")
+    if bool(seasons.isna().any()):
+        raise PredictionConfigurationError("Every training row must carry a season label.")
+    by_season = {str(season): weighting.season_weight(str(season)) for season in seasons.unique()}
+    weights = seasons.astype("string").map(by_season)
+    return pd.Series(weights.to_numpy(dtype="float64"), index=seasons.index, dtype="float64")
+
+
+def normalize_weights(weights: pd.Series) -> pd.Series:
+    """Rescale positive weights to a mean of one over exactly the rows given.
+
+    The estimators' regularization is declared against unweighted row counts, so weights
+    whose mean is not one would quietly change how strong that regularization is. A
+    non-positive or non-finite weight is refused: excluding a row is the caller's decision
+    and has to be visible as one.
+    """
+
+    if not isinstance(weights, pd.Series) or weights.empty:
+        raise PredictionConfigurationError("weights must be a non-empty pandas Series.")
+    values = pd.to_numeric(weights, errors="raise").astype("float64")
+    if not bool(np.isfinite(values.to_numpy()).all()) or bool((values <= 0.0).any()):
+        raise PredictionConfigurationError("Every weight must be a finite positive number.")
+    return values / float(values.mean())
 
 
 def _design(frame: pd.DataFrame, feature_columns: Sequence[str]) -> pd.DataFrame:
@@ -138,11 +247,15 @@ def fit_component_models(
     *,
     feature_columns: Sequence[str],
     config: ComponentModelConfig | None = None,
+    weighting: SeasonAgeWeighting | None = None,
 ) -> FittedComponentModels | None:
     """Fit the three control estimators, or return ``None`` when history is too thin.
 
     ``None`` is a refusal the caller must record, not a silent failure: every row it then
     produces carries the ``direct_control`` route, and the count travels in the manifest.
+
+    With ``weighting`` the same estimators are fitted on the same rows under the declared
+    season-age weights; without it the fit is the equal-weight control, unchanged.
     """
 
     settings = ComponentModelConfig() if config is None else config
@@ -171,6 +284,39 @@ def fit_component_models(
     if len(conditional) < settings.minimum_training_rows:
         return None
 
+    # The weights are computed from each subset's own season labels and normalized within
+    # that subset, so the appearance fit and the conditional fits each see a mean weight of
+    # one over exactly the rows they are fitted on.
+    if weighting is None:
+        appearance_fit: dict[str, npt.NDArray[np.float64]] = {}
+        minutes_fit: dict[str, npt.NDArray[np.float64]] = {}
+        points_fit: dict[str, npt.NDArray[np.float64]] = {}
+        season_weights = tuple(
+            (str(season), 1.0) for season in sorted(usable["season"].astype("string").unique())
+        )
+    else:
+        if not isinstance(weighting, SeasonAgeWeighting):
+            raise PredictionConfigurationError("weighting must be a SeasonAgeWeighting.")
+        usable_weights = normalize_weights(
+            season_age_weights(usable["season"], weighting=weighting)
+        ).to_numpy(dtype="float64")
+        conditional_weights = normalize_weights(
+            season_age_weights(conditional["season"], weighting=weighting)
+        ).to_numpy(dtype="float64")
+        appearance_fit = {
+            "standardscaler__sample_weight": usable_weights,
+            "logisticregression__sample_weight": usable_weights,
+        }
+        minutes_fit = {
+            "standardscaler__sample_weight": conditional_weights,
+            "ridge__sample_weight": conditional_weights,
+        }
+        points_fit = dict(minutes_fit)
+        season_weights = tuple(
+            (str(season), weighting.season_weight(str(season)))
+            for season in sorted(usable["season"].astype("string").unique())
+        )
+
     appearance_model = make_pipeline(
         StandardScaler(),
         LogisticRegression(
@@ -180,7 +326,9 @@ def fit_component_models(
             random_state=RANDOM_STATE,
         ),
     )
-    appearance_model.fit(_design(usable, columns), appearance_target.astype("int64"))
+    appearance_model.fit(
+        _design(usable, columns), appearance_target.astype("int64"), **appearance_fit
+    )
 
     minutes_model = make_pipeline(
         StandardScaler(), Ridge(alpha=settings.minutes_alpha, solver="cholesky")
@@ -188,6 +336,7 @@ def fit_component_models(
     minutes_model.fit(
         _design(conditional, columns),
         pd.to_numeric(conditional["minutes_target"], errors="raise").astype("float64"),
+        **minutes_fit,
     )
 
     points_model = make_pipeline(
@@ -196,6 +345,7 @@ def fit_component_models(
     points_model.fit(
         _design(conditional, columns),
         pd.to_numeric(conditional["points_target"], errors="raise").astype("float64"),
+        **points_fit,
     )
 
     return FittedComponentModels(
@@ -205,6 +355,9 @@ def fit_component_models(
         feature_columns=columns,
         appearance_rows=len(usable),
         conditional_rows=len(conditional),
+        model_version=COMPONENT_MODEL_VERSION if weighting is None else weighting.model_version,
+        weighting=EQUAL_WEIGHTING if weighting is None else weighting.label,
+        season_weights=season_weights,
     )
 
 

@@ -1,4 +1,11 @@
-"""Read and verify the Phase C component OOF table and decision roster."""
+"""Read and verify the Phase C component OOF table and decision roster.
+
+Two contracts are read here and kept apart. The default is the frozen v1 handoff, which
+proves that the locked 2025-26 holdout was not read. The other is the separate Phase C v2
+*development* contract, which a caller has to name explicitly: it may carry 2025-26 rows,
+its manifest must say so, and it must declare itself development-only. Nothing a v2
+artifact says can pass the v1 reader, and nothing the v1 reader accepts is a v2 artifact.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +21,7 @@ import pandas as pd
 from squadopt.evaluation.models import EvaluationValidationError
 
 OOF_CONTRACT_VERSION: Final = "phase_c_component_oof_v1"
+DEVELOPMENT_OOF_CONTRACT_VERSION: Final = "phase_c_component_oof_development_v2"
 ROSTER_CONTRACT_VERSION: Final = "phase_c_decision_roster_v1"
 LOCKED_HOLDOUT_SEASON: Final = "2025-26"
 HANDOFF_KEY: Final = ("season", "target_gameweek", "fold_id", "player_id")
@@ -72,6 +80,11 @@ class PhaseCComponentHandoff:
     feature_contract_version: str
     target_contract_version: str
     dataset_contract_version: str
+    # ``None`` for the frozen v1 handoff. A v2 development artifact names its contract and
+    # the training-row weighting it was produced under, so a consumer cannot mistake one
+    # arm for the other or either for binding evidence.
+    development_contract: str | None = None
+    weighting: str | None = None
 
 
 def _manifest(path: Path) -> dict[str, object]:
@@ -139,7 +152,9 @@ def _fold_rank(fold_id: object, season_ranks: dict[str, int]) -> tuple[int, int]
     return season_ranks[match.group("season")], int(match.group("gameweek"))
 
 
-def _validate_chronology(document: dict[str, object], table: pd.DataFrame) -> None:
+def _validate_chronology(
+    document: dict[str, object], table: pd.DataFrame, *, locked_holdout_allowed: bool
+) -> None:
     seasons = document.get("development_seasons")
     folds = document.get("folds")
     fold_ids = document.get("fold_ids")
@@ -148,7 +163,7 @@ def _validate_chronology(document: dict[str, object], table: pd.DataFrame) -> No
         or not seasons
         or any(not isinstance(value, str) or not value for value in seasons)
         or len(seasons) != len(set(seasons))
-        or LOCKED_HOLDOUT_SEASON in seasons
+        or (LOCKED_HOLDOUT_SEASON in seasons and not locked_holdout_allowed)
     ):
         raise EvaluationValidationError("Phase C development_seasons are invalid.")
     if not isinstance(folds, list) or not isinstance(fold_ids, list):
@@ -207,12 +222,45 @@ def _validate_chronology(document: dict[str, object], table: pd.DataFrame) -> No
                 )
 
 
+def _development_weighting(document: dict[str, object]) -> str:
+    weighting = document.get("weighting")
+    if (
+        not isinstance(weighting, dict)
+        or not isinstance(weighting.get("label"), str)
+        or not weighting["label"]
+        or weighting.get("model_version") != document.get("model_version")
+    ):
+        raise EvaluationValidationError(
+            "A Phase C development manifest must declare its weighting label and model version."
+        )
+    return str(weighting["label"])
+
+
 def read_phase_c_component_handoff(
-    table_path: Path, roster_path: Path, manifest_path: Path
+    table_path: Path,
+    roster_path: Path,
+    manifest_path: Path,
+    *,
+    development_contract: str | None = None,
 ) -> PhaseCComponentHandoff:
-    """Return checksum-, schema- and chronology-verified Phase C component data."""
+    """Return checksum-, schema- and chronology-verified Phase C component data.
+
+    Without ``development_contract`` this is the frozen v1 reader and refuses any trace of
+    the locked holdout. With it -- and it must equal
+    :data:`DEVELOPMENT_OOF_CONTRACT_VERSION` -- the artifact must instead carry the v2
+    development contract, declare ``development_only``, name its weighting, and say
+    honestly whether 2025-26 was read; only then may its rows contain that season.
+    """
 
     table_path, roster_path, manifest_path = map(Path, (table_path, roster_path, manifest_path))
+    if development_contract is not None and development_contract != (
+        DEVELOPMENT_OOF_CONTRACT_VERSION
+    ):
+        raise EvaluationValidationError(
+            f"Unsupported Phase C development contract {development_contract!r}."
+        )
+    development = development_contract is not None
+    expected_contract = DEVELOPMENT_OOF_CONTRACT_VERSION if development else OOF_CONTRACT_VERSION
     document = _manifest(manifest_path)
     manifest_digest = _file_sha256(manifest_path, "manifest")
     required = {
@@ -237,19 +285,37 @@ def read_phase_c_component_handoff(
         "locked_holdout_read",
         "locked_holdout_season",
     }
+    if development:
+        required |= {"development_only", "development_seasons", "weighting"}
     missing = sorted(required - document.keys())
     if missing:
         raise EvaluationValidationError(f"Phase C manifest is missing fields {missing!r}.")
-    if document["contract_version"] != OOF_CONTRACT_VERSION:
+    if document["contract_version"] != expected_contract:
         raise EvaluationValidationError("Phase C OOF contract version is unsupported.")
     if document["roster_contract_version"] != ROSTER_CONTRACT_VERSION:
         raise EvaluationValidationError("Phase C roster contract version is unsupported.")
     if document["working_tree_dirty"] is not False:
         raise EvaluationValidationError("Phase C artifact must come from a clean working tree.")
-    if (
-        document["locked_holdout_read"] is not False
-        or document["locked_holdout_season"] != LOCKED_HOLDOUT_SEASON
-    ):
+    if document["locked_holdout_season"] != LOCKED_HOLDOUT_SEASON:
+        raise EvaluationValidationError("Phase C artifact names a different locked holdout.")
+    weighting: str | None = None
+    holdout_declared = False
+    if development:
+        if document["development_only"] is not True:
+            raise EvaluationValidationError(
+                "A Phase C development artifact must declare itself development-only."
+            )
+        declared_seasons = document["development_seasons"]
+        holdout_declared = isinstance(declared_seasons, list) and (
+            LOCKED_HOLDOUT_SEASON in declared_seasons
+        )
+        if document["locked_holdout_read"] is not holdout_declared:
+            raise EvaluationValidationError(
+                "A Phase C development manifest must say whether 2025-26 was read, and only "
+                "when it lists that season."
+            )
+        weighting = _development_weighting(document)
+    elif document["locked_holdout_read"] is not False:
         raise EvaluationValidationError("Phase C artifact does not prove locked-holdout exclusion.")
     if document["table_file"] != table_path.name or document["roster_file"] != roster_path.name:
         raise EvaluationValidationError("Phase C manifest names different artifact files.")
@@ -280,8 +346,9 @@ def read_phase_c_component_handoff(
         or roster.duplicated(list(HANDOFF_KEY)).any()
     ):
         raise EvaluationValidationError("Phase C handoff keys must be non-empty and unique.")
-    if LOCKED_HOLDOUT_SEASON in set(table["season"]) or LOCKED_HOLDOUT_SEASON in set(
-        roster["season"]
+    if not holdout_declared and (
+        LOCKED_HOLDOUT_SEASON in set(table["season"])
+        or LOCKED_HOLDOUT_SEASON in set(roster["season"])
     ):
         raise EvaluationValidationError("The locked 2025-26 holdout must not be read.")
     for field in (
@@ -302,7 +369,7 @@ def read_phase_c_component_handoff(
         )
     if bool(roster[["name", "team_id", "position", "price_tenths"]].isna().any().any()):
         raise EvaluationValidationError("Phase C roster has missing optimizer fields.")
-    _validate_chronology(document, table)
+    _validate_chronology(document, table, locked_holdout_allowed=holdout_declared)
 
     table_keys = (
         table.loc[:, list(HANDOFF_KEY)].sort_values(list(HANDOFF_KEY)).reset_index(drop=True)
@@ -329,10 +396,13 @@ def read_phase_c_component_handoff(
         feature_contract_version=str(document["feature_contract_version"]),
         target_contract_version=str(document["target_contract_version"]),
         dataset_contract_version=str(document["dataset_contract_version"]),
+        development_contract=development_contract,
+        weighting=weighting,
     )
 
 
 __all__ = [
+    "DEVELOPMENT_OOF_CONTRACT_VERSION",
     "HANDOFF_KEY",
     "OOF_ARTIFACT_COLUMNS",
     "OOF_CONTRACT_VERSION",
