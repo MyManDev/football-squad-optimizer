@@ -29,6 +29,7 @@ from squadopt.backtest.export_precision import write_export_table
 from squadopt.data.errors import DataError
 from squadopt.data.fixtures import aggregate_team_gameweek
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
@@ -73,11 +74,18 @@ def _parse_arguments() -> argparse.Namespace:
 def main() -> int:
     arguments = _parse_arguments()
     try:
-        identifiers = list_snapshot_ids(arguments.snapshot_root)
-        if not identifiers:
-            print(f"No snapshots under {arguments.snapshot_root}. Capture one first.")
-            return 1
-        snapshot_id = arguments.snapshot_id or identifiers[-1]
+        # Cohort collectors share the snapshot root and their identifiers sort after
+        # every `fpl-live` one, so "the latest" has to name the source it means.
+        snapshot_id = arguments.snapshot_id
+        if snapshot_id is None:
+            identifiers = list_snapshot_ids(arguments.snapshot_root, source=FPL_LIVE_SOURCE)
+            if not identifiers:
+                print(
+                    f"No {FPL_LIVE_SOURCE} snapshots under {arguments.snapshot_root}. "
+                    "Capture one first."
+                )
+                return 1
+            snapshot_id = identifiers[-1]
         snapshot = read_snapshot(arguments.snapshot_root, snapshot_id)
         season = arguments.season or infer_season(snapshot)
 

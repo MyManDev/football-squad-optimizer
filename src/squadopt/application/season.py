@@ -27,6 +27,7 @@ from squadopt.data.snapshots import (
     list_snapshot_ids,
     read_snapshot,
 )
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import LedgerError, infer_season, load_ledger
 from squadopt.live.tick import (
@@ -114,7 +115,18 @@ class TickResult:
 def _read_state(
     request: TickRequest,
 ) -> tuple[list[HeldSnapshot], CapturedSnapshot | None, str | None, LedgerState]:
-    identifiers = list_snapshot_ids(request.snapshot_root)
+    # Four collectors share this root and an identifier begins with its source, so a
+    # lexical listing orders by collector before capture time: a `fpl-top100` capture
+    # sorts after every `fpl-live` one however old it is. The tick's whole plan is about
+    # the live game state — the deadline calendar it reads, its capture window, its
+    # decide and settle rules — so it reads live captures only.
+    #
+    # ``held`` is filtered too, not only the ``latest`` selection: it is not merely the
+    # report's tally. ``plan_tick`` re-sorts it by capture time and takes the last one's
+    # identifier for the decide and settle actions it emits, so an unfiltered listing
+    # would aim those at a cohort capture and disagree with the ``latest`` whose calendar
+    # they were planned from.
+    identifiers = list_snapshot_ids(request.snapshot_root, source=FPL_LIVE_SOURCE)
     held: list[HeldSnapshot] = []
     latest: CapturedSnapshot | None = None
     for identifier in identifiers:

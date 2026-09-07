@@ -38,7 +38,8 @@ from typing import Final
 import pandas as pd
 from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT
 
-from squadopt.data.snapshots import read_snapshot
+from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
@@ -107,14 +108,13 @@ def _latest_snapshot_id(snapshot_root: Path) -> str:
 
     Identifiers begin with the capture instant in a sortable spelling, so the newest is the
     last in lexical order — among the live captures: Top-100 and elite-picks captures share
-    the root and sort after every ``fpl-live-`` name, and a projection of the Overall
+    the root and sort after every ``fpl-live`` name, and a projection of the Overall
     standings pages is not a projection of anything.
     """
 
-    directories = sorted(path.name for path in snapshot_root.iterdir() if path.is_dir())
-    live = [name for name in directories if name.startswith("fpl-live-")]
+    live = list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE)
     if not live:
-        raise SystemExit(f"No fpl-live captures under {snapshot_root}.")
+        raise SystemExit(f"No {FPL_LIVE_SOURCE} captures under {snapshot_root}.")
     return live[-1]
 
 
