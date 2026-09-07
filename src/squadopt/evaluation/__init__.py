@@ -31,6 +31,7 @@ from squadopt.evaluation.component_decisions import (
     prepare_phase_c_component_folds,
 )
 from squadopt.evaluation.component_handoff import (
+    DEVELOPMENT_OOF_CONTRACT_VERSION,
     HANDOFF_KEY,
     OOF_ARTIFACT_COLUMNS,
     OOF_CONTRACT_VERSION,
@@ -74,6 +75,7 @@ __all__ = [
     "APPEARANCE_DIAGNOSTICS_VERSION",
     "APPEARANCE_LOG_LOSS_EPSILON",
     "APPEARANCE_RELIABILITY_BIN_COUNT",
+    "DEVELOPMENT_OOF_CONTRACT_VERSION",
     "HANDOFF_KEY",
     "OOF_ARTIFACT_COLUMNS",
     "OOF_CONTRACT_VERSION",
