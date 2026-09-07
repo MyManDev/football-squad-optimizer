@@ -12,7 +12,8 @@ import { useSearchParams } from "react-router";
 
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { isPlayMode, type PlayMode } from "../../moves/modePrices";
+import { isPlayMode } from "../../moves/modePrices";
+import { isMemberStrategy, type AdviceStrategy } from "../types";
 import {
   builtinTemplates,
   LocalTemplateStore,
@@ -26,27 +27,35 @@ const DEFAULT_STORE = new LocalTemplateStore();
 export function TemplatePicker({ store = DEFAULT_STORE }: { store?: TemplateStore }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const modeCopy = messages.decision.modes;
   const [searchParams, setSearchParams] = useSearchParams();
   const [saved, setSaved] = useState<GameTemplate[]>(() => store.list());
   const [draftName, setDraftName] = useState("");
 
   const builtins = builtinTemplates({
-    "saf-puan": modeCopy.pure,
-    garantici: modeCopy.safe,
-    agresif: modeCopy.aggressive,
-    "asiri-agresif": modeCopy.extreme,
+    "saf-puan": copy.strategies["saf-puan"].name,
+    "ortak-koru": copy.strategies["ortak-koru"].name,
+    "fark-yarat": copy.strategies["fark-yarat"].name,
   });
 
-  const activeMode: PlayMode = isPlayMode(searchParams.get("mode"))
-    ? (searchParams.get("mode") as PlayMode)
-    : "saf-puan";
+  const rawMode = searchParams.get("mode");
+  const activeMode: AdviceStrategy = isMemberStrategy(rawMode)
+    ? rawMode
+    : isPlayMode(rawMode)
+      ? rawMode
+      : "saf-puan";
   const activeWindow = searchParams.get("window") ?? "1";
+  const rawRival = Number(searchParams.get("rival"));
+  const activeRival: number | "nearest_above" =
+    Number.isInteger(rawRival) && rawRival > 0 ? rawRival : "nearest_above";
 
   function apply(template: GameTemplate): void {
     const next = new URLSearchParams(searchParams);
     next.set("mode", template.strategy);
     next.set("window", String(template.window));
+    // A named rival travels with the template; the standings neighbour is the
+    // producer's default and needs no parameter.
+    if (template.rival === "nearest_above") next.delete("rival");
+    else next.set("rival", String(template.rival));
     setSearchParams(next);
   }
 
@@ -58,7 +67,7 @@ export function TemplatePicker({ store = DEFAULT_STORE }: { store?: TemplateStor
       name,
       strategy: activeMode,
       window: Number(activeWindow) === 3 ? 3 : Number(activeWindow) === 5 ? 5 : 1,
-      rival: "nearest_above",
+      rival: activeRival,
     };
     store.save(template);
     setSaved(store.list());
@@ -76,7 +85,9 @@ export function TemplatePicker({ store = DEFAULT_STORE }: { store?: TemplateStor
       <div className={styles.list}>
         {[...builtins, ...saved].map((template) => {
           const active =
-            template.strategy === activeMode && String(template.window) === activeWindow;
+            template.strategy === activeMode &&
+            String(template.window) === activeWindow &&
+            template.rival === activeRival;
           return (
             <span key={template.id} className={styles.item}>
               <button
@@ -86,7 +97,15 @@ export function TemplatePicker({ store = DEFAULT_STORE }: { store?: TemplateStor
               >
                 {template.name}
                 <span className={styles.meta}>
-                  {copy.templateMeta(template.strategy, template.window)}
+                  {copy.templateMeta(
+                    isMemberStrategy(template.strategy)
+                      ? copy.strategies[template.strategy].name
+                      : template.strategy,
+                    template.window,
+                    template.rival === "nearest_above"
+                      ? copy.computeRivalNearest
+                      : `#${template.rival}`,
+                  )}
                 </span>
               </button>
               {template.builtin ? null : (

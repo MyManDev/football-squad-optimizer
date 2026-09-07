@@ -83,6 +83,8 @@ from squadopt.prediction.component_models import (
 )
 from squadopt.prediction.components import DIRECT_CONTROL_ROUTE, prepare_component_prediction
 from squadopt.prediction.elite_evidence import (
+    COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
+    COMPONENT_ELITE_MODEL_VERSION,
     ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION,
     ELITE_EVIDENCE_MODEL_VERSION,
     apply_elite_evidence,
@@ -101,16 +103,19 @@ DEFAULT_HANDOFF_ROOT: Final = Path("data/handoffs")
 
 
 def _latest_snapshot_id(snapshot_root: Path) -> str:
-    """Return the most recent capture's identifier.
+    """Return the most recent live capture's identifier.
 
     Identifiers begin with the capture instant in a sortable spelling, so the newest is the
-    last in lexical order.
+    last in lexical order — among the live captures: Top-100 and elite-picks captures share
+    the root and sort after every ``fpl-live-`` name, and a projection of the Overall
+    standings pages is not a projection of anything.
     """
 
     directories = sorted(path.name for path in snapshot_root.iterdir() if path.is_dir())
-    if not directories:
-        raise SystemExit(f"No captures under {snapshot_root}.")
-    return directories[-1]
+    live = [name for name in directories if name.startswith("fpl-live-")]
+    if not live:
+        raise SystemExit(f"No fpl-live captures under {snapshot_root}.")
+    return live[-1]
 
 
 def _frame_fingerprint(frame: pd.DataFrame) -> str:
@@ -325,27 +330,11 @@ def build(
     if development_only:
         diagnostics["fallback_training_seasons"] = list(COMPONENT_TRAINING_SEASONS)
     evidence_fingerprint: str | None = None
-    if evidence_table_path is not None and evidence_manifest_path is not None:
-        evidence = read_player_evidence_artifact(evidence_table_path, evidence_manifest_path)
-        adjusted = apply_elite_evidence(
-            projected_table,
-            evidence,
-            season=season,
-            target_gameweek=target,
-            deadline_timestamp_utc=target_deadline.deadline_utc,
-            decision_captured_at_utc=captured_at,
-        )
-        projected_table = adjusted.table
-        model_version = ELITE_EVIDENCE_MODEL_VERSION
-        feature_contract_version = ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION
-        diagnostics.update(adjusted.diagnostics)
-        manifest_digest = hashlib.sha256(evidence_manifest_path.read_bytes()).hexdigest()
-        diagnostics["elite_evidence_manifest_sha256"] = manifest_digest
-        evidence_fingerprint = hashlib.sha256(
-            f"{evidence.attrs['table_sha256']}:{manifest_digest}".encode()
-        ).hexdigest()
-        diagnostics["projection_selection"] = "legacy_elite_candidate"
-    elif control_only:
+    # The base projection first — the component model when the capture carries settled
+    # history, the legacy blend otherwise or on request — then, when the Top-100 evidence
+    # is supplied, the same bounded uplift on whichever base was chosen. The two used to
+    # be exclusive routes; they are one policy on two bases, and the handoff names which.
+    if control_only:
         diagnostics["projection_selection"] = "explicit_legacy_control"
     else:
         history_weeks = tuple(range(max(1, target - COMPONENT_HISTORY_WINDOW), target))
@@ -389,6 +378,37 @@ def build(
                 feature_contract_version = COMPONENT_FEATURE_CONTRACT_VERSION
                 diagnostics.update(component_diagnostics)
                 diagnostics["projection_selection"] = "phase_c_component_default"
+
+    if evidence_table_path is not None and evidence_manifest_path is not None:
+        evidence = read_player_evidence_artifact(evidence_table_path, evidence_manifest_path)
+        adjusted = apply_elite_evidence(
+            projected_table,
+            evidence,
+            season=season,
+            target_gameweek=target,
+            deadline_timestamp_utc=target_deadline.deadline_utc,
+            decision_captured_at_utc=captured_at,
+        )
+        projected_table = adjusted.table
+        on_component = model_version == COMPONENT_MODEL_VERSION
+        model_version = (
+            COMPONENT_ELITE_MODEL_VERSION if on_component else ELITE_EVIDENCE_MODEL_VERSION
+        )
+        feature_contract_version = (
+            COMPONENT_ELITE_FEATURE_CONTRACT_VERSION
+            if on_component
+            else ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION
+        )
+        diagnostics.update(adjusted.diagnostics)
+        manifest_digest = hashlib.sha256(evidence_manifest_path.read_bytes()).hexdigest()
+        diagnostics["elite_evidence_manifest_sha256"] = manifest_digest
+        evidence_fingerprint = hashlib.sha256(
+            f"{evidence.attrs['table_sha256']}:{manifest_digest}".encode()
+        ).hexdigest()
+        diagnostics["elite_evidence_base_selection"] = diagnostics.get("projection_selection")
+        diagnostics["projection_selection"] = (
+            "phase_c_component_elite" if on_component else "legacy_elite_candidate"
+        )
 
     expected = {
         int(code): float(points)
@@ -468,7 +488,9 @@ def main() -> int:
         "--evidence-table",
         type=Path,
         default=None,
-        help="explicit legacy elite candidate input; requires --evidence-manifest",
+        help="the player_evidence_v1 table: applies the bounded Top-100 uplift on the "
+        "chosen base (component by default, the legacy blend on fallback or "
+        "--control-only); requires --evidence-manifest",
     )
     parser.add_argument(
         "--evidence-manifest",
@@ -477,11 +499,6 @@ def main() -> int:
         help="manifest paired with --evidence-table",
     )
     arguments = parser.parse_args()
-
-    if arguments.control_only and (
-        arguments.evidence_table is not None or arguments.evidence_manifest is not None
-    ):
-        parser.error("--control-only cannot be combined with evidence artifact arguments")
 
     if not arguments.snapshot_root.is_dir():
         print(f"No snapshot directory at {arguments.snapshot_root}.")

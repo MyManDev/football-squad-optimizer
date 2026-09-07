@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   mockEntryAdviceEnvelope,
+  mockEntryAdviceIndex,
   mockEntrySquadEnvelopes,
   mockLeagueMembersEnvelope,
 } from "../../../fixtures/league";
@@ -22,7 +23,13 @@ import type {
   AdviceRequestResult,
 } from "../advice/adviceClient";
 import { HttpAdviceClient } from "../advice/adviceClient";
-import type { AdviceMove, EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
+import type {
+  AdviceMove,
+  EntryAdvice,
+  EntryAdviceIndex,
+  EntrySquad,
+  LeagueViewEnvelope,
+} from "../types";
 import { LeagueMemberView, type AdviceIssue } from "./LeagueMemberPage";
 
 afterEach(cleanup);
@@ -101,12 +108,14 @@ function renderView({
   client,
   initialEntry = `/league/members/${ENTRY}`,
   language = "tr",
+  index = mockEntryAdviceIndex(ENTRY).payload,
 }: {
   advice: LeagueViewEnvelope<EntryAdvice> | null;
   adviceIssue?: AdviceIssue;
   client: AdviceClient;
   initialEntry?: string;
   language?: "tr" | "en";
+  index?: EntryAdviceIndex | null;
 }) {
   const content = (squad: LeagueViewEnvelope<EntrySquad>) => (
     <LanguageProvider initialLanguage={language}>
@@ -117,6 +126,7 @@ function renderView({
           advice={advice}
           adviceIssue={adviceIssue}
           members={MEMBERS}
+          index={index}
           client={client}
         />
       </MemoryRouter>
@@ -171,7 +181,7 @@ describe("league member advice flow", () => {
     });
 
     expect(screen.getByRole("button", { name: "Hesapla" })).toBeInTheDocument();
-    expect(screen.getByText("Bu mod ve ufuk bu yayın için hesaplanmadı.")).toBeInTheDocument();
+    expect(screen.getByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeInTheDocument();
     expect(screen.getByText("Yukarıdaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
   });
 
@@ -193,7 +203,7 @@ describe("league member advice flow", () => {
     expect(screen.getByText("Plan hazır")).toBeInTheDocument();
     expect(screen.queryByText("Şimdi hesaplandı")).toBeNull();
     expect(screen.getByText(/Capture fpl-live-computed/)).toBeInTheDocument();
-    expect(screen.queryByText("Bu mod ve ufuk bu yayın için hesaplanmadı.")).toBeNull();
+    expect(screen.queryByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeNull();
   });
 
   it("leaves the published plan standing when the request fails", async () => {
@@ -238,9 +248,6 @@ describe("league member advice flow", () => {
   });
 
   it.each([
-    ["garantici", 1],
-    ["agresif", 1],
-    ["asiri-agresif", 1],
     ["saf-puan", 3],
     ["saf-puan", 5],
   ] as const)(
@@ -259,12 +266,49 @@ describe("league member advice flow", () => {
       expect(screen.getByDisplayValue(mode)).toBeChecked();
       expect(screen.getByRole("radio", { name: new RegExp(`${window} hafta`) })).toBeChecked();
       expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled();
-      expect(screen.getByText(/Hesapla şu anda yalnız Saf Puan/)).toBeInTheDocument();
+      expect(screen.getByText(/Hesapla bir haftalık planları destekler/)).toBeInTheDocument();
       expect(screen.queryByText("Yukarıdaki Hesapla ile isteyebilirsin.")).toBeNull();
       await compute();
       expect(requests).toEqual([]);
     },
   );
+
+  it("does not submit a rival strategy when no rival can be named", async () => {
+    const requests: AdviceRequest[] = [];
+    renderView({
+      advice: null,
+      initialEntry: `/league/members/${ENTRY}?mode=ortak-koru`,
+      index: null,
+      client: new FakeClient(async (request) => {
+        requests.push(request);
+        return { kind: "unavailable" };
+      }),
+    });
+    // Without an index the members list still offers rivals; strip them to prove the gate.
+    expect(screen.getByDisplayValue("ortak-koru")).toBeChecked();
+    await compute();
+    expect(requests.every((request) => request.rivalEntryId !== null)).toBe(true);
+  });
+
+  it("submits a rival strategy with the producer's default rival", async () => {
+    const requests: AdviceRequest[] = [];
+    const rival = mockEntryAdviceIndex(ENTRY).payload.default_rival_entry_id;
+    renderView({
+      advice: null,
+      initialEntry: `/league/members/${ENTRY}?mode=ortak-koru`,
+      client: new FakeClient(async (request) => {
+        requests.push(request);
+        return { kind: "unavailable" };
+      }),
+    });
+    expect(screen.getByRole("combobox", { name: "Karşısında oynadığın üye" })).toHaveValue(
+      String(rival),
+    );
+    expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
+    await compute();
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ strategy: "ortak-koru", window: 1, rivalEntryId: rival });
+  });
 
   it("explains unsupported selections in English without promising a calculation", () => {
     renderView({
@@ -274,7 +318,7 @@ describe("league member advice flow", () => {
       client: new FakeClient(async () => ({ kind: "unavailable" })),
     });
     expect(screen.getByRole("button", { name: "Compute" })).toBeDisabled();
-    expect(screen.getByText(/Compute currently supports only Pure Points/)).toBeInTheDocument();
+    expect(screen.getByText(/Compute supports one-week plans/)).toBeInTheDocument();
     expect(screen.queryByText("You can ask for it with Compute above.")).toBeNull();
   });
 
@@ -346,7 +390,7 @@ describe("league member advice flow", () => {
       });
 
       expect(screen.queryByText("Computed Striker")).toBeNull();
-      expect(screen.getByText("Bu mod ve ufuk bu yayın için hesaplanmadı.")).toBeInTheDocument();
+      expect(screen.getByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
     },
   );

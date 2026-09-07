@@ -62,12 +62,6 @@ from squadopt.application.league import (
     ownership_by_player,
     ownership_view,
 )
-from squadopt.application.rivals import (
-    TEMPLATE_RIVAL_SOURCE,
-    LeagueRivalProvider,
-    TemplateRivalProvider,
-    iter_rivals,
-)
 from squadopt.application.season import (
     PerformedTickAction,
     TickObserver,
@@ -98,7 +92,6 @@ __all__ = [
     "HORIZON_BATCH_CONTRACT_VERSION",
     "HORIZON_EVIDENCE_CONTRACT_VERSION",
     "HORIZON_PLAN_ARTIFACT_CONTRACT_VERSION",
-    "TEMPLATE_RIVAL_SOURCE",
     "UI_VIEW_CONTRACT_VERSION",
     "UI_VIEW_SCHEMA_PATH",
     "DecideRequest",
@@ -110,7 +103,6 @@ __all__ = [
     "HorizonPlanRequest",
     "HorizonPlanResult",
     "LeagueError",
-    "LeagueRivalProvider",
     "LeagueView",
     "LeagueWeekView",
     "LedgerRowView",
@@ -128,7 +120,6 @@ __all__ = [
     "SiteBuildReport",
     "SiteIndex",
     "StatusView",
-    "TemplateRivalProvider",
     "TickObserver",
     "TickRequest",
     "TickResult",
@@ -138,7 +129,6 @@ __all__ = [
     "build_site",
     "decide",
     "horizon_plan_document",
-    "iter_rivals",
     "league_view",
     "ledger_view",
     "load_public_horizon_evidence",

@@ -64,6 +64,13 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         "starting_xi",
         "bench",
         "chip",
+        "control_solver_status",
+        "control_optimality_gap",
+        "transfer_cap",
+        "overlap_target",
+        "overlap_applied",
+        "plan_kind",
+        "alternative_plan",
     }
 )
 
@@ -252,7 +259,19 @@ _BASELINE_PUBLISHES: Final = frozenset(
     }
 )
 _RIVAL_PUBLISHES: Final = _BASELINE_PUBLISHES | frozenset(
-    {"expected_gap_vs_rival", "overlap_count", "captain_agreement", "difference_makers"}
+    {
+        "expected_gap_vs_rival",
+        "overlap_count",
+        "captain_agreement",
+        "difference_makers",
+        "control_solver_status",
+        "control_optimality_gap",
+        "transfer_cap",
+        "overlap_target",
+        "overlap_applied",
+        "plan_kind",
+        "alternative_plan",
+    }
 )
 
 
@@ -274,7 +293,8 @@ def _catalog() -> Mapping[str, Strategy]:
             evidence=EvidenceStatus.PREREG_OPEN,
             knobs={"overlap_floor": _integer_knob("overlap_floor", 6, 11)},
             rival_required=True,
-            tagline="Hold the shared core with the rival; spend the rest on expected points.",
+            tagline="Hold the shared core with the rival within the free transfers; spend the "
+            "rest on expected points.",
         ),
         Strategy(
             slug="fark-yarat",
@@ -284,7 +304,8 @@ def _catalog() -> Mapping[str, Strategy]:
             evidence=EvidenceStatus.PREREG_OPEN,
             knobs={"overlap_ceiling": _integer_knob("overlap_ceiling", 3, 8)},
             rival_required=True,
-            tagline="Cap the overlap with the rival; unshared players decide the gap.",
+            tagline="Cap the overlap with the rival within the free transfers; unshared players "
+            "decide the gap.",
         ),
         Strategy(
             slug="kaptan-ayris",

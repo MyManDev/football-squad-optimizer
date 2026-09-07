@@ -1,6 +1,25 @@
 import type { PlayerView } from "../../../data/schema";
 import type { PlayMode, WindowSize } from "../../moves/modePrices";
 
+/**
+ * The strategies the producer computes for a league member: the catalogue's computable
+ * ones. `saf-puan` is rival-free; the other two are solved against a named rival, and
+ * the producer publishes one file per (strategy, rival) plus an index.
+ */
+export const MEMBER_STRATEGIES = ["saf-puan", "ortak-koru", "fark-yarat"] as const;
+export type MemberStrategy = (typeof MEMBER_STRATEGIES)[number];
+
+export function isMemberStrategy(value: unknown): value is MemberStrategy {
+  return MEMBER_STRATEGIES.some((slug) => slug === value);
+}
+
+export function strategyNeedsRival(strategy: string): boolean {
+  return strategy === "ortak-koru" || strategy === "fark-yarat";
+}
+
+/** A strategy a request may name: a member strategy, or a legacy play mode. */
+export type AdviceStrategy = PlayMode | MemberStrategy;
+
 // Provisional: until these types move to docs/contracts, this file—not İbo's #127
 // schema—is the source of truth for the mock-first league UI.
 export interface LeagueViewEnvelope<T> {
@@ -94,12 +113,26 @@ export interface AdviceMove {
   reason_code: "window_value" | "mode_tradeoff";
 }
 
+/** What the producer computed for one member, and what it could not, with the reason. */
+export interface EntryAdviceIndex {
+  league_id: number;
+  season: string;
+  gameweek: number;
+  entry_id: number;
+  window: WindowSize;
+  strategies: string[];
+  rival_entry_ids: number[];
+  default_rival_entry_id: number | null;
+  computed: { strategy: string; rival_entry_id: number; path: string }[];
+  unavailable: { strategy: string; rival_entry_id: number; reason: string }[];
+}
+
 export interface EntryAdvice {
   league_id: number;
   season: string;
   gameweek: number;
   entry_id: number;
-  mode: PlayMode;
+  mode: AdviceStrategy;
   window: WindowSize;
   source_snapshot_id: string | null;
   moves: AdviceMove[];
@@ -119,6 +152,30 @@ export interface EntryAdvice {
   solver_status?: string | null;
   /** The measured bound gap beside a FEASIBLE plan; 0 under proof. */
   optimality_gap?: number | null;
+  /** Rival strategies: the rival the plan was priced against and the set arithmetic. */
+  rival_entry_id?: number;
+  overlap_count?: number;
+  expected_gap_vs_rival?: number;
+  captain_agreement?: boolean;
+  /** The control the price tag anchors on, with its own proof status and bound gap. */
+  control_solver_status?: string | null;
+  control_optimality_gap?: number | null;
+  /**
+   * The transfer rule the strategy played under: the free transfers it could spend
+   * without hits, the overlap it asked for, the overlap it applied, and which of the
+   * two candidates won — within the free transfers, or the target with hits. The
+   * other candidate travels as the alternative with its own price.
+   */
+  transfer_cap?: number;
+  overlap_target?: number;
+  overlap_applied?: number;
+  plan_kind?: "within_free_transfers" | "with_hits";
+  alternative_plan?: {
+    kind: "within_free_transfers" | "with_hits";
+    overlap_applied: number;
+    transfer_hit_points: number | null;
+    expected_points_cost: number;
+  } | null;
   /**
    * The rest of the decision, published since the producer carried the plan's first
    * week: the eleven plus the captain's double in expected points, the armband, the

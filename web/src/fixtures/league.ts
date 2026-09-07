@@ -2,14 +2,17 @@ import type { PlayerView } from "../data/schema";
 import type {
   AdviceMove,
   AdvicePlayer,
+  AdviceStrategy,
   EntryAdvice,
+  EntryAdviceIndex,
   EntrySquad,
   EntryView,
   HumanEntryView,
   LeagueMembers,
   LeagueViewEnvelope,
 } from "../features/league/types";
-import type { PlayMode, WindowSize } from "../features/moves/modePrices";
+import { isMemberStrategy, strategyNeedsRival } from "../features/league/types";
+import type { WindowSize } from "../features/moves/modePrices";
 
 const GENERATED_AT = "2026-08-22T04:00:00Z";
 const LEAGUE_ID = 352490;
@@ -347,15 +350,20 @@ const advicePlayers = {
   },
 } satisfies Record<string, import("../features/league/types").AdvicePlayer>;
 
-function moveFor(mode: PlayMode, window: WindowSize): AdviceMove[] {
+function moveFor(mode: AdviceStrategy, window: WindowSize): AdviceMove[] {
   if (mode === "saf-puan" && window === 1) return [];
   const incoming =
-    mode === "garantici"
+    mode === "garantici" || mode === "ortak-koru"
       ? advicePlayers.safe
-      : mode === "asiri-agresif"
+      : mode === "asiri-agresif" || mode === "fark-yarat"
         ? advicePlayers.extreme
         : advicePlayers.aggressive;
-  const cost = mode === "garantici" ? 1.6 : mode === "asiri-agresif" ? 1.5 : 1.8;
+  const cost =
+    mode === "garantici" || mode === "ortak-koru"
+      ? 1.6
+      : mode === "asiri-agresif" || mode === "fark-yarat"
+        ? 1.5
+        : 1.8;
   return [
     {
       move_id: `${mode}-${window}-reed`,
@@ -421,10 +429,104 @@ function lineupFor(
   };
 }
 
+const humanMembers = mockMembers.filter(
+  (member): member is HumanEntryView => member.member_kind === "human",
+);
+
+/** The producer's default rival: the member just above in the standings; the leader
+ * defends against the member just below. */
+export function mockDefaultRival(entryId: number): number | null {
+  const own = humanMembers.find((member) => member.entry_id === entryId);
+  if (!own) return null;
+  const others = humanMembers
+    .filter((member) => member.entry_id !== entryId)
+    .sort((a, b) => a.rank - b.rank);
+  const above = others.filter((member) => member.rank < own.rank);
+  const chosen = above.length > 0 ? above[above.length - 1] : others[0];
+  return chosen?.entry_id ?? null;
+}
+
+/**
+ * What the producer wrote for this member: every rival strategy against every other
+ * member, except one pair recorded as unavailable so the page's "not computed" path
+ * renders in development and tests too.
+ */
+export function mockEntryAdviceIndex(entryId: number): LeagueViewEnvelope<EntryAdviceIndex> {
+  const rivals = humanMembers
+    .filter((member) => member.entry_id !== entryId)
+    .map((member) => member.entry_id);
+  const strategies: AdviceStrategy[] = ["ortak-koru", "fark-yarat"];
+  const unavailableRival = rivals[rivals.length - 1] ?? null;
+  const computed: EntryAdviceIndex["computed"] = [];
+  const unavailable: EntryAdviceIndex["unavailable"] = [];
+  for (const strategy of strategies) {
+    for (const rival of rivals) {
+      if (strategy === "fark-yarat" && rival === unavailableRival) {
+        unavailable.push({
+          strategy,
+          rival_entry_id: rival,
+          reason: "The 'fark-yarat' band cannot be satisfied from this squad: no plan exists.",
+        });
+      } else {
+        computed.push({
+          strategy,
+          rival_entry_id: rival,
+          path: `advice/${entryId}/${strategy}/1/vs-${rival}.json`,
+        });
+      }
+    }
+  }
+  return envelope({
+    league_id: LEAGUE_ID,
+    season: SEASON,
+    gameweek: GAMEWEEK,
+    entry_id: entryId,
+    window: 1,
+    strategies: ["saf-puan", ...strategies],
+    rival_entry_ids: rivals,
+    default_rival_entry_id: mockDefaultRival(entryId),
+    computed,
+    unavailable,
+  });
+}
+
+function rivalFields(
+  entryId: number,
+  mode: AdviceStrategy,
+  rivalEntryId: number | null,
+): Partial<EntryAdvice> {
+  if (!isMemberStrategy(mode) || !strategyNeedsRival(mode)) return {};
+  const rival = rivalEntryId ?? mockDefaultRival(entryId);
+  if (rival === null) return {};
+  return {
+    rival_entry_id: rival,
+    rival_label: `entry-${rival}`,
+    overlap_count: mode === "ortak-koru" ? 9 : 4,
+    expected_gap_vs_rival: mode === "ortak-koru" ? 1.2 : -0.4,
+    captain_agreement: mode === "ortak-koru",
+    control_solver_status: "OPTIMAL",
+    control_optimality_gap: 0,
+    transfer_cap: 1,
+    overlap_target: mode === "ortak-koru" ? 9 : 5,
+    overlap_applied: mode === "ortak-koru" ? 7 : 5,
+    plan_kind: "within_free_transfers",
+    alternative_plan:
+      mode === "ortak-koru"
+        ? {
+            kind: "with_hits",
+            overlap_applied: 9,
+            transfer_hit_points: 8,
+            expected_points_cost: 6.4,
+          }
+        : null,
+  };
+}
+
 export function mockEntryAdviceEnvelope(
   entryId: number,
-  mode: PlayMode,
+  mode: AdviceStrategy,
   window: WindowSize,
+  rivalEntryId: number | null = null,
 ): LeagueViewEnvelope<EntryAdvice> {
   const squad = mockEntrySquadEnvelopes[entryId]?.payload;
   const quality = squad?.data_quality ?? "empty";
@@ -442,6 +544,7 @@ export function mockEntryAdviceEnvelope(
     expected_points_cost: mode === "saf-puan" ? 0 : 0.8,
     rival_label: mode === "saf-puan" ? null : "Harbor Rovers",
     ...lineupFor(squad),
+    ...rivalFields(entryId, mode, rivalEntryId),
     data_quality: quality,
     missing_fields: quality === "complete" ? [] : (squad?.missing_fields ?? ["entry"]),
   });

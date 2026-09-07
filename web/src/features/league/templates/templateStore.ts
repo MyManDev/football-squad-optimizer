@@ -12,14 +12,15 @@
  * never know which one they were handed — the plan's stated design for this step.
  */
 
-import type { PlayMode, WindowSize } from "../../moves/modePrices";
+import type { WindowSize } from "../../moves/modePrices";
+import { MEMBER_STRATEGIES, type AdviceStrategy, type MemberStrategy } from "../types";
 
 const STORAGE_KEY = "squadopt.templates";
 
 export interface GameTemplate {
   id: string;
   name: string;
-  strategy: PlayMode;
+  strategy: AdviceStrategy;
   window: WindowSize;
   /** A specific member's entry id, or the standings neighbour just above you. */
   rival: number | "nearest_above";
@@ -83,16 +84,15 @@ export class LocalTemplateStore implements TemplateStore {
 }
 
 /**
- * One ready-made template per computed play mode, at the one-week window — the
- * combinations the producer actually publishes today. Names come from the caller
- * (the i18n layer), so this module carries no copy.
+ * One ready-made template per member strategy, at the one-week window, against the
+ * standings neighbour — the combinations the producer actually publishes. Names come
+ * from the caller (the i18n layer), so this module carries no copy.
  */
-export function builtinTemplates(names: Record<PlayMode, string>): GameTemplate[] {
-  const modes: PlayMode[] = ["saf-puan", "garantici", "agresif", "asiri-agresif"];
-  return modes.map((mode) => ({
-    id: `builtin:${mode}:1`,
-    name: names[mode],
-    strategy: mode,
+export function builtinTemplates(names: Record<MemberStrategy, string>): GameTemplate[] {
+  return MEMBER_STRATEGIES.map((slug) => ({
+    id: `builtin:${slug}:1`,
+    name: names[slug],
+    strategy: slug,
     window: 1 as WindowSize,
     rival: "nearest_above" as const,
     builtin: true,

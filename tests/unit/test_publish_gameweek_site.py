@@ -49,3 +49,29 @@ def test_the_next_steps_name_the_tag_and_the_dispatch() -> None:
     assert "https://example.invalid/pr/1" in text
     # The outward half is printed, never performed: these are instructions, not calls.
     assert "git tag -a" in text
+
+
+def test_the_league_tree_is_built_from_a_live_capture_with_absolute_roots() -> None:
+    from pathlib import Path
+
+    from scripts.publish_gameweek_site import LeaguePublish
+
+    league = LeaguePublish(
+        league_id=352490,
+        snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        in_season_projection=Path("data/handoffs/2026-27-gw04.json"),
+        workers=8,
+    )
+    arguments = league.build_arguments(Path("/tmp/site/web/public"))
+    assert arguments[1:3] == ["-m", "scripts.build_league_site"]
+    assert "--snapshot-root" in arguments and "--registry" in arguments
+    assert arguments[arguments.index("--workers") + 1] == "8"
+    assert arguments[arguments.index("--in-season-projection") + 1].endswith("2026-27-gw04.json")
+    for flag in ("--snapshot-root", "--registry", "--archive-root"):
+        assert Path(arguments[arguments.index(flag) + 1]).is_absolute()
+    with pytest.raises(PublishError, match="live capture"):
+        LeaguePublish(league_id=352490, snapshot_id="fpl-top100-x", in_season_projection=None)
+    with pytest.raises(PublishError, match="workers"):
+        LeaguePublish(
+            league_id=352490, snapshot_id="fpl-live-x", in_season_projection=None, workers=0
+        )
