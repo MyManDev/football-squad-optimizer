@@ -355,16 +355,30 @@ def read_snapshot(root: Path | str, snapshot_id: str) -> CapturedSnapshot:
     return CapturedSnapshot(metadata=metadata, payloads=payloads)
 
 
-def list_snapshot_ids(root: Path | str) -> tuple[str, ...]:
-    """Return the identifiers of every snapshot under ``root``, in capture order.
+def list_snapshot_ids(root: Path | str, *, source: str | None = None) -> tuple[str, ...]:
+    """Return the identifiers of the snapshots under ``root``, in capture order.
 
-    The identifier embeds a fixed-width UTC timestamp, so lexical order is capture
-    order and no metadata has to be opened to sort the listing.
+    An identifier is ``{source}-{stamp}-{digest}`` (``build_snapshot_id``) and the stamp is
+    a fixed-width rendering of ``captured_at_utc``, so a lexical sort orders **one source's**
+    captures by capture time without opening any metadata. Across sources it orders by
+    source name first, which is not a time at all: `fpl-top200` sorts after `fpl-live`
+    however old it is.
+
+    That is why ``source`` exists. Several collectors default to the same root, so a caller
+    that wants "the newest capture of this kind" has to say which kind, and only then does
+    the last entry of the returned tuple mean the newest one. Without it the tuple is every
+    capture the root holds, which is a listing rather than a choice.
     """
 
     directory = Path(root)
     if not directory.is_dir():
         return ()
+    prefix = None if source is None else f"{_require_source(source)}-"
     return tuple(
-        sorted(entry.name for entry in directory.iterdir() if (entry / METADATA_FILENAME).is_file())
+        sorted(
+            entry.name
+            for entry in directory.iterdir()
+            if (entry / METADATA_FILENAME).is_file()
+            and (prefix is None or entry.name.startswith(prefix))
+        )
     )
