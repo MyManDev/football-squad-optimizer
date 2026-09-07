@@ -21,6 +21,7 @@ from scripts._phase_e_inputs import (
     PhaseDBindingEvidence,
     load_phase_d_binding,
     load_phase_d_candidate,
+    load_phase_d_development,
     prepare_phase_e_folds,
 )
 
@@ -29,6 +30,7 @@ from squadopt.evaluation import EvaluationError, read_phase_c_component_handoff
 from squadopt.experiments.phase_e_shadow import (
     PHASE_E_SHADOW_CONTRACT,
     PHASE_E_SHADOW_DEVELOPMENT_CONTRACT,
+    PHASE_E_SHADOW_DEVELOPMENT_V2_CONTRACT,
     PhaseEShadowError,
 )
 from squadopt.experiments.shadow_report import _internal_destination, write_document_once
@@ -79,8 +81,14 @@ def load_phase_e_runtime(
     document = _object(json.loads(payload), "E2 artifact")
     binding._finite_numbers(document, "E2 artifact")
     expected_sampler = probe.sampler_record(conditional_residuals)
+    v2 = binding_evidence.development_contract is not None
+    expected_contract = (
+        probe.DEVELOPMENT_V2_PROBE_CONTRACT_VERSION
+        if v2
+        else probe.probe_contract_version(conditional_residuals)
+    )
     if (
-        document.get("contract_version") != probe.probe_contract_version(conditional_residuals)
+        document.get("contract_version") != expected_contract
         or document.get("sampler", probe.sampler_record(None)) != expected_sampler
         or document.get("development_only", False) is not (conditional_residuals is not None)
     ):
@@ -109,12 +117,42 @@ def load_phase_e_runtime(
         raise PhaseEShadowError(
             "E2 must use the frozen, outcome-free probe contract and constants."
         )
-    if document.get("source") != {
-        "table_sha256": binding.PHASE_C_TABLE_SHA256,
-        "roster_sha256": binding.PHASE_C_ROSTER_SHA256,
-        "manifest_sha256": binding.PHASE_C_MANIFEST_SHA256,
-    }:
+    expected_source = (
+        binding_evidence.phase_c_source
+        if v2
+        else {
+            "table_sha256": binding.PHASE_C_TABLE_SHA256,
+            "roster_sha256": binding.PHASE_C_ROSTER_SHA256,
+            "manifest_sha256": binding.PHASE_C_MANIFEST_SHA256,
+        }
+    )
+    if document.get("source") != expected_source:
         raise PhaseEShadowError("E2 source must match the binding run's frozen Phase C inputs.")
+    if v2:
+        population = _object(document.get("population"), "E2 v2 population")
+        if (
+            document.get("phase_c_contract") != "development_v2"
+            or document.get("binding") is not False
+            or document.get("measured_fold_ids") != list(binding_evidence.fold_ids)
+            or population.get("eligibility_complete") is not True
+            or population.get("eligible_fold_ids") != list(binding_evidence.fold_ids)
+            or population.get("history_eligible_fold_ids")
+            != list(binding_evidence.history_eligible_fold_ids)
+            or population.get("history_burn_in_fold_ids")
+            != list(binding_evidence.history_burn_in_fold_ids)
+            or population.get("direct_control_abstentions")
+            != list(binding_evidence.direct_control_fold_ids)
+            or population.get("all_fold_ids")
+            != sorted(
+                (
+                    *binding_evidence.history_burn_in_fold_ids,
+                    *binding_evidence.history_eligible_fold_ids,
+                )
+            )
+        ):
+            raise PhaseEShadowError(
+                "E2 v2 must cover the complete Phase D v2 population, not a pilot."
+            )
     provenance = _object(document.get("provenance"), "E2 provenance")
     if provenance.get("working_tree_dirty") is not False or not provenance.get("repository_commit"):
         raise PhaseEShadowError("E2 must name a clean producer repository revision.")
@@ -175,6 +213,14 @@ def load_phase_e_runtime(
                 )
                 if declared != expected_sampler["contract_version"]:
                     raise PhaseEShadowError("An E2 draw was not made with the requested sampler.")
+                if (
+                    v2
+                    and historical
+                    and draw.get("development_contract") != binding_evidence.development_contract
+                ):
+                    raise PhaseEShadowError(
+                        "An E2 draw does not name the Phase D v2 development scope."
+                    )
                 for key in ("draw_repeat_identical", "selection_repeat_identical"):
                     if not isinstance(scoring.get(key), bool):
                         raise PhaseEShadowError(f"E2 {key} must be a measured boolean.")
@@ -255,7 +301,10 @@ def load_phase_e_runtime(
             if run.get("candidates_found") != len(candidates) or run["all_optimal"] != proven:
                 raise PhaseEShadowError("E2 optimality flags contradict candidate records.")
     rule = probe.candidate_count_rule(
-        points, PHASE_E_CANDIDATE_COUNTS, expected_fold_ids=binding_evidence.fold_ids
+        points,
+        PHASE_E_CANDIDATE_COUNTS,
+        expected_fold_ids=binding_evidence.fold_ids,
+        **({"phase_c_contract": "development_v2"} if v2 else {}),
     )
     recorded = _object(document.get("candidate_count_rule"), "E2 candidate-count rule")
     if recorded != rule or document.get("frozen_k") != rule["frozen_k"]:
@@ -277,6 +326,12 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
         help="candidate Phase D artifact (binding: false) for a development sampler run",
     )
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
+    parser.add_argument("--phase-c-contract", choices=binding.PHASE_C_CONTRACTS, default="v1")
+    parser.add_argument(
+        "--phase-d-development", type=Path, help="complete Phase D v2 development evidence"
+    )
+    for name in ("expected-table-sha256", "expected-roster-sha256", "expected-manifest-sha256"):
+        parser.add_argument(f"--{name}")
     parser.add_argument(
         "--sampler",
         choices=probe.SAMPLER_CHOICES,
@@ -293,6 +348,30 @@ def _evidence(
 ) -> PhaseDBindingEvidence:
     """Binding evidence for the foundation sampler; candidate evidence for a candidate one."""
 
+    if arguments.phase_c_contract == "development_v2":
+        if (
+            conditional_residuals is None
+            or arguments.phase_d_development is None
+            or arguments.binding is not None
+            or arguments.phase_d_candidate is not None
+        ):
+            raise PhaseEShadowError(
+                "E3 v2 requires --phase-d-development and the conditional sampler only."
+            )
+        development = binding._development_from_arguments(arguments)
+        assert development is not None
+        return load_phase_d_development(
+            arguments.phase_d_development,
+            development=development,
+            conditional_residuals=conditional_residuals,
+        )
+    if arguments.phase_d_development is not None or any(
+        getattr(arguments, name) is not None
+        for name in ("expected_table_sha256", "expected_roster_sha256", "expected_manifest_sha256")
+    ):
+        raise PhaseEShadowError(
+            "V2 evidence and input digest flags require --phase-c-contract development_v2."
+        )
     if conditional_residuals is None:
         if arguments.binding is None or arguments.phase_d_candidate is not None:
             raise PhaseEShadowError(
@@ -319,6 +398,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         # These gates precede all historical data access and cannot be bypassed by a K flag.
         evidence = _evidence(arguments, conditional_residuals)
+        if evidence.development_contract is not None and evidence.status != "calibrated_internal":
+            raise PhaseEShadowError("Phase D v2 did not pass its development calibration gates.")
         runtime = load_phase_e_runtime(
             arguments.runtime_probe, evidence, conditional_residuals=conditional_residuals
         )
@@ -327,12 +408,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise PhaseEShadowError(
                 "E3 output already exists; an existing measurement is never replaced."
             )
-        metadata = artifact_metadata(panel_rows=0, history_seasons=binding.HISTORY_SEASONS)
+        history_seasons = evidence.history_seasons or binding.HISTORY_SEASONS
+        metadata = artifact_metadata(panel_rows=0, history_seasons=history_seasons)
         initial_provenance = _object(metadata["provenance"], "repository provenance")
         if initial_provenance["working_tree_dirty"]:
             raise PhaseEShadowError("Commit working-tree changes before measuring E3.")
-        handoff = read_phase_c_component_handoff(
-            arguments.table, arguments.roster, arguments.manifest
+        handoff = (
+            binding._read_handoff(arguments, binding._development_from_arguments(arguments))
+            if evidence.development_contract is not None
+            else read_phase_c_component_handoff(
+                arguments.table, arguments.roster, arguments.manifest
+            )
         )
         folds, panel_rows = prepare_phase_e_folds(handoff, evidence, arguments.archive_root)
         measured = evaluate_phase_e_prepared_folds(
@@ -342,7 +428,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             frozen_candidate_count=runtime.candidate_count,
             conditional_residuals=conditional_residuals,
         )
-        metadata = artifact_metadata(panel_rows=panel_rows, history_seasons=binding.HISTORY_SEASONS)
+        metadata = artifact_metadata(panel_rows=panel_rows, history_seasons=history_seasons)
         final_provenance = _object(metadata["provenance"], "repository provenance")
         if (
             final_provenance["working_tree_dirty"]
@@ -353,9 +439,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         finished = datetime.now(UTC)
         development = conditional_residuals is not None
+        v2 = evidence.development_contract is not None
         document = {
             "contract_version": (
-                PHASE_E_SHADOW_DEVELOPMENT_CONTRACT if development else PHASE_E_SHADOW_CONTRACT
+                PHASE_E_SHADOW_DEVELOPMENT_V2_CONTRACT
+                if v2
+                else PHASE_E_SHADOW_DEVELOPMENT_CONTRACT
+                if development
+                else PHASE_E_SHADOW_CONTRACT
             ),
             "prereg_document": probe.PREREGISTRATION,
             "preregistration_version": probe.PREREGISTRATION_VERSION,
@@ -366,7 +457,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             "sampler": probe.sampler_record(conditional_residuals),
             "phase_d_evidence": {
                 "contract_version": (
-                    binding.CANDIDATE_REPORT_VERSION if development else binding.REPORT_VERSION
+                    binding.DEVELOPMENT_REPORT_VERSION
+                    if v2
+                    else binding.CANDIDATE_REPORT_VERSION
+                    if development
+                    else binding.REPORT_VERSION
                 ),
                 "binding": evidence.binding,
                 "status": evidence.status,
@@ -375,9 +470,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             },
             "operational_control_changed": False,
             "member_facing_probability_published": False,
-            "locked_holdout_accessed": False,
+            "locked_holdout_accessed": v2 and "2025-26" in history_seasons,
             "runtime_probe_sha256": runtime.sha256,
-            "source": {
+            "source": evidence.phase_c_source
+            if v2
+            else {
                 "table_sha256": handoff.table_sha256,
                 "roster_sha256": handoff.roster_sha256,
                 "manifest_sha256": handoff.manifest_sha256,

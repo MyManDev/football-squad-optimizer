@@ -14,6 +14,7 @@ from typing import Final
 import pandas as pd
 from scipy.stats import spearmanr
 
+from squadopt.evaluation.component_handoff import DEVELOPMENT_OOF_CONTRACT_VERSION
 from squadopt.evaluation.scoring import (
     complete_optimization_decision,
     score_frozen_squad_decision,
@@ -42,12 +43,16 @@ PHASE_E_SHADOW_CONTRACT: Final = "phase_e_shadow_evaluation_v1"
 # A shadow evaluation under a candidate sampler, read against candidate (non-binding) Phase D
 # evidence, is development evidence only. Its own contract keeps it out of the E4 hook.
 PHASE_E_SHADOW_DEVELOPMENT_CONTRACT: Final = "phase_e_shadow_development_v1"
+PHASE_E_SHADOW_DEVELOPMENT_V2_CONTRACT: Final = "phase_e_shadow_development_v2"
 PHASE_E_BOOTSTRAP_POLICY: Final = PromotionPolicy(bootstrap_resamples=2000)
 PHASE_E_COMPARISON_ID: Final = "phase_e_vs_phase_c"
 _UTILITY_DENOMINATOR: Final = (
     PHASE_E_POINTS_SCALE * PHASE_E_SCENARIO_COUNT * PHASE_E_TAIL_COUNT * PHASE_E_WEIGHT_SCALE
 )
 _FOLD_ID = re.compile(r"^(2021-22|2022-23|2023-24|2024-25)-gw(0[1-9]|[12][0-9]|3[0-8])$")
+_DEVELOPMENT_FOLD_ID = re.compile(
+    r"^(2021-22|2022-23|2023-24|2024-25|2025-26)-gw(0[1-9]|[12][0-9]|3[0-8])$"
+)
 
 
 class PhaseEShadowError(ValueError):
@@ -115,9 +120,11 @@ def score_phase_e_shadow_fold(
     draw: ComponentScenarioDraw | None = None,
     generation_seconds: float = 0.0,
     scoring_seconds: float = 0.0,
+    development_contract: str | None = None,
 ) -> PhaseEShadowFold:
     """Read outcomes only after selection; reuse the official autosub/captain scorer."""
 
+    _validate_fold_id(fold_id, development_contract=development_contract)
     frozen = tuple(candidates)
     rank = selection.selected_candidate_rank
     if (
@@ -213,13 +220,20 @@ def score_phase_e_shadow_fold(
             draw.component_fingerprint if draw else selection.component_fingerprint
         ),
     )
-    _validate_fold(record)
+    _validate_fold(record, development_contract=development_contract)
     return record
 
 
-def _validate_fold(fold: PhaseEShadowFold) -> None:
-    if _FOLD_ID.fullmatch(fold.fold_id) is None:
+def _validate_fold_id(fold_id: str, *, development_contract: str | None) -> None:
+    if development_contract not in (None, DEVELOPMENT_OOF_CONTRACT_VERSION):
+        raise PhaseEShadowError("Unsupported Phase C development contract for shadow scoring.")
+    pattern = _FOLD_ID if development_contract is None else _DEVELOPMENT_FOLD_ID
+    if pattern.fullmatch(fold_id) is None:
         raise PhaseEShadowError("Shadow folds must be canonical development-season gameweeks.")
+
+
+def _validate_fold(fold: PhaseEShadowFold, *, development_contract: str | None = None) -> None:
+    _validate_fold_id(fold.fold_id, development_contract=development_contract)
     for value in (fold.generation_seconds, fold.scoring_seconds):
         if not isfinite(value) or value < 0:
             raise PhaseEShadowError("Fold runtimes must be finite and non-negative.")
@@ -293,7 +307,11 @@ def _optional_interval(values: list[float | None]) -> tuple[float, float] | None
 
 
 def evaluate_phase_e_shadow(
-    folds: Sequence[PhaseEShadowFold], *, expected_fold_ids: Sequence[str], phase_d_status: str
+    folds: Sequence[PhaseEShadowFold],
+    *,
+    expected_fold_ids: Sequence[str],
+    phase_d_status: str,
+    development_contract: str | None = None,
 ) -> dict[str, object]:
     """Evaluate the frozen gates without removing fallback or failed folds."""
 
@@ -308,7 +326,7 @@ def evaluate_phase_e_shadow(
     ):
         raise PhaseEShadowError("Shadow records must match the entire expected population exactly.")
     for fold in ordered:
-        _validate_fold(fold)
+        _validate_fold(fold, development_contract=development_contract)
     differences = [(fold.fold_id[:7], fold.difference) for fold in ordered]
     complete_scores = all(value is not None for _, value in differences)
     available = [(season, value) for season, value in differences if value is not None]
@@ -358,7 +376,11 @@ def evaluate_phase_e_shadow(
         status = "shadow_eligible"
     tail_count = ceil(count * 0.1)
     return {
-        "contract_version": PHASE_E_SHADOW_CONTRACT,
+        "contract_version": (
+            PHASE_E_SHADOW_CONTRACT
+            if development_contract is None
+            else PHASE_E_SHADOW_DEVELOPMENT_V2_CONTRACT
+        ),
         "status": status,
         "phase_d_status": phase_d_status,
         "fold_count": count,
