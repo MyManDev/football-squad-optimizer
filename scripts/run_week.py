@@ -14,12 +14,16 @@ end exactly as ``publish_gameweek_site`` prints it.
 
 Steps, each skippable by naming its output:
 
-1. capture         one fpl-live snapshot with the registered entries and the league page
-                   (``--snapshot-id`` reuses one; the capture's open deadline must be the
-                   requested gameweek)
-2. top100          the Overall Top-100 cohort, its members' last picks, and the
+1. top100          the Overall Top-100 cohort, its members' last picks, and the
                    player_evidence_v1 export (``--cohort-snapshot`` / ``--elite-snapshot``
-                   reuse captures; ``--skip-top100`` leaves the evidence out entirely)
+                   reuse captures, and an export already on disk for that picks capture
+                   is reused; ``--skip-top100`` leaves the evidence out entirely). First,
+                   because the projection refuses evidence captured after the decision
+                   capture it is applied to.
+2. capture         one fpl-live snapshot with the registered entries and the league page
+                   (``--snapshot-id`` reuses one — then the Top-100 captures must be reused
+                   or skipped too, for the same reason; the capture's open deadline must be
+                   the requested gameweek)
 3. handoff         the projection handoff for this capture: the Phase C component base
                    with the bounded Top-100 uplift on top when the evidence was exported
                    (``--projection component-only`` leaves the uplift out)
@@ -60,7 +64,7 @@ LIVE_PREFIX = "fpl-live-"
 COHORT_PREFIX = "fpl-top100-"
 ELITE_PREFIX = "fpl-elite-picks-"
 
-STEPS = ("capture", "top100", "handoff", "league", "site", "publish")
+STEPS = ("top100", "capture", "handoff", "league", "site", "publish")
 
 
 class WeekError(RuntimeError):
@@ -104,17 +108,24 @@ def plan_week(
         )
     steps: list[str] = []
     reasons: dict[str, str] = {}
+    if skip_top100:
+        reasons["top100"] = "--skip-top100"
+    elif cohort_snapshot and elite_snapshot:
+        reasons["top100"] = f"reusing {cohort_snapshot} and {elite_snapshot} (export reused)"
+        steps.append("top100")
+    elif snapshot_id:
+        # The evidence must predate the decision capture it is applied to; a fresh
+        # Top-100 capture after a reused live capture would be refused at the handoff.
+        raise WeekError(
+            "A reused live capture needs Top-100 captures taken before it: pass "
+            "--cohort-snapshot and --elite-snapshot, or --skip-top100."
+        )
+    else:
+        steps.append("top100")
     if snapshot_id:
         reasons["capture"] = f"reusing {snapshot_id}"
     else:
         steps.append("capture")
-    if skip_top100:
-        reasons["top100"] = "--skip-top100"
-    elif cohort_snapshot and elite_snapshot:
-        reasons["top100"] = f"reusing {cohort_snapshot} and {elite_snapshot} (export still runs)"
-        steps.append("top100")
-    else:
-        steps.append("top100")
     steps.extend(["handoff", "league", "site"])
     if publish:
         steps.append("publish")
@@ -199,7 +210,76 @@ def run_week(arguments: argparse.Namespace) -> int:
             "`python -m scripts.seed_entry_registry --league <id>`."
         )
 
-    # 1. capture
+    # 1. Top-100: cohort, picks, evidence export — before the live capture, so the
+    # evidence predates the decision capture it will be applied to
+    evidence_table: Path | None = None
+    evidence_manifest: Path | None = None
+    if "top100" in plan.steps:
+        cohort = arguments.cohort_snapshot
+        if not cohort:
+            before = list_snapshot_ids(SNAPSHOT_ROOT)
+            _python(
+                "scripts.capture_top100_cohort",
+                "--target-gameweek",
+                str(plan.gameweek),
+                "--cohort-size",
+                "100",
+            )
+            cohort = new_snapshot(before, list_snapshot_ids(SNAPSHOT_ROOT), COHORT_PREFIX)
+        cohort_target, deadline_utc, _ = capture_deadline(SNAPSHOT_ROOT, cohort)
+        if cohort_target != plan.gameweek:
+            raise WeekError(
+                f"Cohort capture {cohort} is open for gameweek {cohort_target}, "
+                f"not {plan.gameweek}."
+            )
+        elite = arguments.elite_snapshot
+        if not elite:
+            before = list_snapshot_ids(SNAPSHOT_ROOT)
+            _python(
+                "scripts.capture_elite_picks",
+                "--cohort-snapshot",
+                cohort,
+                "--target-gameweek",
+                str(plan.gameweek),
+                "--deadline-utc",
+                deadline_utc,
+            )
+            elite = new_snapshot(before, list_snapshot_ids(SNAPSHOT_ROOT), ELITE_PREFIX)
+        # The export never overwrites a different artifact at the same path, and a
+        # rehearsal earlier in the week is a different artifact from Friday's; the picks
+        # capture's own hash makes the name unique per capture, and an export already on
+        # disk for that capture is the same artifact, so it is reused rather than remade.
+        table_name = f"player_evidence_v1_{plan.season}_gw{plan.gameweek:02d}_top100_{elite[-12:]}"
+        evidence_table = EVIDENCE_ROOT / f"{table_name}.csv"
+        evidence_manifest = EVIDENCE_ROOT / f"{table_name}.manifest.json"
+        if evidence_table.is_file() and evidence_manifest.is_file():
+            print(f"evidence {evidence_table.name} already exported for {elite}; reused")
+        else:
+            output = _python(
+                "scripts.export_player_evidence",
+                "--season",
+                plan.season,
+                "--target-gameweek",
+                str(plan.gameweek),
+                "--deadline-utc",
+                deadline_utc,
+                "--cohort-snapshot",
+                cohort,
+                "--snapshot",
+                elite,
+                "--output-dir",
+                str(EVIDENCE_ROOT),
+                "--table-name",
+                table_name,
+            )
+            written_paths = _wrote_paths(output)
+            evidence_table = next((p for p in written_paths if p.suffix == ".csv"), None)
+            evidence_manifest = next((p for p in written_paths if p.suffix == ".json"), None)
+            if evidence_table is None or evidence_manifest is None:
+                raise WeekError("The evidence export did not report its table and manifest paths.")
+            print(f"evidence {evidence_table.name} / {evidence_manifest.name}", flush=True)
+
+    # 2. capture
     snapshot_id = arguments.snapshot_id
     if "capture" in plan.steps:
         written = capture(
@@ -222,62 +302,6 @@ def run_week(arguments: argparse.Namespace) -> int:
     print(
         f"capture {snapshot_id}: gameweek {target}, deadline {deadline_utc}, captured {captured_at}"
     )
-
-    # 2. Top-100: cohort, picks, evidence export
-    evidence_table: Path | None = None
-    evidence_manifest: Path | None = None
-    if "top100" in plan.steps:
-        cohort = arguments.cohort_snapshot
-        if not cohort:
-            before = list_snapshot_ids(SNAPSHOT_ROOT)
-            _python(
-                "scripts.capture_top100_cohort",
-                "--target-gameweek",
-                str(plan.gameweek),
-                "--cohort-size",
-                "100",
-            )
-            cohort = new_snapshot(before, list_snapshot_ids(SNAPSHOT_ROOT), COHORT_PREFIX)
-        elite = arguments.elite_snapshot
-        if not elite:
-            before = list_snapshot_ids(SNAPSHOT_ROOT)
-            _python(
-                "scripts.capture_elite_picks",
-                "--cohort-snapshot",
-                cohort,
-                "--target-gameweek",
-                str(plan.gameweek),
-                "--deadline-utc",
-                deadline_utc,
-            )
-            elite = new_snapshot(before, list_snapshot_ids(SNAPSHOT_ROOT), ELITE_PREFIX)
-        # The export never overwrites a different artifact at the same path, and a
-        # rehearsal earlier in the week is a different artifact from Friday's; the picks
-        # capture's own hash makes the name unique per capture.
-        table_name = f"player_evidence_v1_{plan.season}_gw{plan.gameweek:02d}_top100_{elite[-12:]}"
-        output = _python(
-            "scripts.export_player_evidence",
-            "--season",
-            plan.season,
-            "--target-gameweek",
-            str(plan.gameweek),
-            "--deadline-utc",
-            deadline_utc,
-            "--cohort-snapshot",
-            cohort,
-            "--snapshot",
-            elite,
-            "--output-dir",
-            str(EVIDENCE_ROOT),
-            "--table-name",
-            table_name,
-        )
-        written_paths = _wrote_paths(output)
-        evidence_table = next((p for p in written_paths if p.suffix == ".csv"), None)
-        evidence_manifest = next((p for p in written_paths if p.suffix == ".json"), None)
-        if evidence_table is None or evidence_manifest is None:
-            raise WeekError("The evidence export did not report its table and manifest paths.")
-        print(f"evidence {evidence_table.name} / {evidence_manifest.name}", flush=True)
 
     # 3. handoff: the component base, with the Top-100 uplift on top when the evidence
     # was exported this run and the caller did not ask for the bare projection
