@@ -1,3 +1,4 @@
+import { NotFoundError } from "../../../data/client";
 import { useLiveScore } from "../../../data/queries";
 import type { RecommendationView } from "../../../data/schema";
 import { Badge } from "../../../design/components/Badge";
@@ -23,6 +24,22 @@ export function LiveScoreCard({ view, now }: { view: RecommendationView; now: Da
   const age = captured ? now.getTime() - Date.parse(captured) : Number.NaN;
   const available = matches && data?.status === "available" && age >= 0;
   const stale = age > 60 * 60 * 1000;
+  const reason = data?.reason;
+  let unavailable = copy.liveUnavailableNote;
+  if ((data && !matches) || reason === "season_mismatch" || reason === "gameweek_mismatch") {
+    unavailable = copy.liveMismatch;
+  } else if (
+    live.error instanceof NotFoundError ||
+    ["missing_capture", "missing_payload", "before_deadline"].includes(reason ?? "")
+  ) {
+    unavailable = copy.liveMissing;
+  } else if (
+    ["capture_mismatch", "missing_players", "invalid_payload", "invalid_decision"].includes(
+      reason ?? "",
+    )
+  ) {
+    unavailable = copy.liveUnverified;
+  }
   const timestamp = (value: string) =>
     new Date(value).toLocaleString(locale, {
       year: "numeric",
@@ -75,7 +92,7 @@ export function LiveScoreCard({ view, now }: { view: RecommendationView; now: Da
           </div>
         </>
       ) : (
-        <p className={styles.note}>{live.isFetching ? copy.loading : copy.liveUnavailableNote}</p>
+        <p className={styles.note}>{live.isFetching ? copy.loading : unavailable}</p>
       )}
     </Card>
   );

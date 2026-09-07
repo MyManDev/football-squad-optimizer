@@ -59,6 +59,9 @@ const en = {
     liveUnavailable: "Score unavailable",
     liveUnavailableNote:
       "No verified live score is available for this decision. Missing data is not zero points.",
+    liveMissing: "No live score data was found for this gameweek.",
+    liveMismatch: "Score data does not match the selected decision or gameweek.",
+    liveUnverified: "Score data is incomplete or could not be verified.",
     liveNamed: "Selected XI + chip",
     liveNet: "Provisional net",
     liveHit: (hit: string) => `${hit} transfer-hit points deducted once`,
@@ -615,6 +618,9 @@ const tr: MessageSchema<typeof en> = {
     liveUnavailable: "Puan mevcut değil",
     liveUnavailableNote:
       "Bu karar için doğrulanmış canlı puan mevcut değil. Eksik veri sıfır puan değildir.",
+    liveMissing: "Bu hafta için canlı puan verisi bulunamadı.",
+    liveMismatch: "Puan verisi seçili karar veya haftayla uyuşmuyor.",
+    liveUnverified: "Puan verisi eksik veya doğrulanamadı.",
     liveNamed: "Seçilen XI + chip",
     liveNet: "Geçici net puan",
     liveHit: (hit: string) => `${hit} transfer cezası bir kez düşüldü`,
