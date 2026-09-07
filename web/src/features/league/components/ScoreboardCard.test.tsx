@@ -26,6 +26,7 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
     source_snapshot_id: "fpl-live-20260907T131414Z-db9314d00961",
     captured_at_utc: "2026-09-07T13:14:14Z",
     cohort_snapshot_id: "fpl-top100-20260907T131112Z-1b1419176245",
+    cohort_picks_snapshot_id: "fpl-elite-picks-20260907T131133Z-6517b37b5afe",
     registered_members: 15,
     histories_held: 15,
     gameweeks: [
@@ -36,7 +37,15 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
         data_checked: true,
         average_entry_score: 50,
         highest_score: 131,
-        ours: { net: 26, xi: 26, hits: 0, projected: 56.1, mode: "live" },
+        ours: {
+          net: 26,
+          xi: 26,
+          hits: 0,
+          projected: 56.1,
+          mode: "live",
+          scoring_basis: "named_eleven_no_autosubs",
+          vice_captain_named: false,
+        },
         top100: null,
         members: [],
         members_mean_net: 54.3,
@@ -49,7 +58,15 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
         data_checked: true,
         average_entry_score: 81,
         highest_score: 161,
-        ours: { net: null, xi: null, hits: 4, projected: 60.2, mode: "replay" },
+        ours: {
+          net: null,
+          xi: null,
+          hits: 4,
+          projected: 60.2,
+          mode: "replay",
+          scoring_basis: "named_eleven_no_autosubs",
+          vice_captain_named: false,
+        },
         top100: null,
         members: [],
         members_mean_net: 86.3,
@@ -63,7 +80,15 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
         average_entry_score: 51,
         highest_score: 119,
         ours: null,
-        top100: { gameweek: 3, mean_event_total: 68.79, cohort_size: 100, final: true },
+        top100: {
+          gameweek: 3,
+          basis: "net",
+          mean_score: 68.75,
+          hit_points: 4,
+          picks_snapshot_id: "fpl-elite-picks-20260907T131133Z-6517b37b5afe",
+          cohort_size: 100,
+          final: true,
+        },
         members: [],
         members_mean_net: 58.7,
         members_counted: 15,
@@ -160,8 +185,64 @@ describe("scoreboard card", () => {
     const unchecked = structuredClone(scoreboard);
     unchecked.payload.gameweeks[2].top100!.final = false;
     renderCard(unchecked);
-    expect(screen.getByText("not final")).toBeInTheDocument();
+    expect(screen.getByText(/not final/)).toBeInTheDocument();
   });
+
+  it.each(["tr", "en"] as const)("names the basis the Top-100 mean is on in %s", (language) => {
+    const copy = MESSAGES[language].leagueScoreboard;
+    // Net: the cohort's own picks capture covered all hundred, so the column is on the
+    // same basis as the members' and ours, and nothing warns the reader off it.
+    const net = renderCard(scoreboard, language);
+    expect(net.container.textContent).toContain(copy.top100Net);
+    expect(net.container.textContent).not.toContain(copy.grossNote);
+    cleanup();
+
+    // Gross: the standings' own weekly total, before hits. It says so in the cell, the
+    // card says why it does not compare, and the cell is ruled off from the net columns.
+    const gross = structuredClone(scoreboard);
+    const week = gross.payload.gameweeks[2].top100!;
+    week.basis = "gross";
+    week.mean_score = 68.79;
+    week.hit_points = null;
+    week.picks_snapshot_id = null;
+    const rendered = renderCard(gross, language);
+    expect(rendered.container.textContent).toContain(copy.top100Gross);
+    expect(screen.getByText(copy.grossNote)).toBeInTheDocument();
+    const cell = screen.getAllByRole("row")[3].querySelectorAll("td")[2];
+    expect(cell.className).toMatch(/gross/);
+  });
+
+  it.each(["tr", "en"] as const)(
+    "marks a finished week that is not data-checked as provisional in %s",
+    (language) => {
+      const copy = MESSAGES[language].leagueScoreboard;
+      // Every week checked: nothing to warn about.
+      expect(renderCard(scoreboard, language).container.textContent).not.toContain(
+        copy.provisionalNote,
+      );
+      cleanup();
+
+      // Finished but not data-checked: bonus lands fixture by fixture, so the row moves.
+      const provisional = structuredClone(scoreboard);
+      provisional.payload.gameweeks[2].data_checked = false;
+      renderCard(provisional, language);
+      expect(screen.getAllByRole("row")[3].textContent).toContain(copy.provisional);
+      expect(screen.getByText(copy.provisionalNote)).toBeInTheDocument();
+    },
+  );
+
+  it.each(["tr", "en"] as const)(
+    "says our figure is the named eleven, without autosubs or a vice-captain, in %s",
+    (language) => {
+      const copy = MESSAGES[language].leagueScoreboard;
+      const { container } = renderCard(scoreboard, language);
+      // The payload marks the basis; the copy states it, and states that it reads low.
+      expect(scoreboard.payload.gameweeks[0].ours!.scoring_basis).toBe("named_eleven_no_autosubs");
+      expect(scoreboard.payload.gameweeks[0].ours!.vice_captain_named).toBe(false);
+      expect(screen.getByText(copy.paperLedger)).toBeInTheDocument();
+      expect(container.textContent).toContain(copy.ours);
+    },
+  );
 
   it("names the weeks the cumulative figures cover", () => {
     renderCard(scoreboard);

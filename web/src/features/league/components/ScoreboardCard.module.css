@@ -51,3 +51,11 @@
   color: var(--color-text-muted);
   font-size: 12px;
 }
+
+/* A gross Top-100 mean is not on the net columns' basis; it is ruled off from them
+   rather than sitting flush in the same run of numbers. */
+.gross {
+  border-left: 2px solid var(--color-line);
+  border-right: 2px solid var(--color-line);
+  color: var(--color-text-muted);
+}

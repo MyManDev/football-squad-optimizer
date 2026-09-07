@@ -2,7 +2,7 @@
 
     python -m scripts.build_scoreboard --league 352490 --out web/public
     python -m scripts.build_scoreboard --league 352490 --snapshot-id <fpl-live id> \\
-        --cohort-snapshot <fpl-top100 id>
+        --cohort-snapshot <fpl-top100 id> --elite-snapshot <fpl-elite-picks id>
 
 Writes ``<out>/data/league/scoreboard.json`` in the provisional league envelope: one row
 per gameweek whose deadline had passed when the live capture was taken, each carrying what
@@ -22,13 +22,29 @@ Where each number comes from, and what it is:
   which is what makes the two columns comparable.
 - ``ours``: the ledger entry for the gameweek, when one exists: the settled net and named-
   eleven score, the hit points, the projection, and the mode the decision was made in
-  (``live`` before the deadline, ``replay`` from a pre-deadline capture afterwards). It is
-  a paper squad — captain, chip and hits count, autosubs do not — so it is the ledger's
-  number, not an official FPL score.
-- ``top100``: the mean ``event_total`` over the Overall Top-100 in the cohort capture, for
-  that capture's current gameweek only. The cohort is re-ranked every week, so a total is
-  never differenced across captures; ``final`` says whether the gameweek was finished and
-  checked in the cohort capture's own bootstrap.
+  (``live`` before the deadline, ``replay`` from a pre-deadline capture afterwards). Its
+  ``scoring_basis`` is ``named_eleven_no_autosubs``, and that is not FPL's own net: the
+  eleven the decision named is scored as named, the game's automatic substitutions are
+  not applied, and the ledger's decision carries no vice-captain to recover a captain who
+  did not play. Both corrections only ever add points, so our figure reads low beside a
+  member's ``points - event_transfers_cost``. Neither is computable from what the ledger
+  holds — the frozen decision records the bench as a set, not in the order the game's
+  autosubs walk it, and it names no vice-captain — so the basis is published rather than
+  guessed.
+- ``top100``: the Top-100 cohort's mean week, for the cohort capture's current gameweek
+  only. The cohort is re-ranked every week, so a total is never differenced across
+  captures; ``final`` says whether the gameweek was finished and checked in the cohort
+  capture's own bootstrap. ``basis`` says what the mean is:
+
+  - ``net`` — every one of ranks 1..100 was found in the elite-picks capture for that same
+    gameweek, so the mean is over each member's ``entry_history.points`` minus their
+    ``event_transfers_cost``. ``hit_points`` is the cost taken off across the cohort. This
+    is the same net the members' and our columns carry, so the numbers compare.
+  - ``gross`` — no picks capture covered the cohort, so the mean is over the standings'
+    ``event_total``, which is **before** the transfer cost (in the 2026-09-07 capture,
+    entry 7018833's standings row reads ``event_total 78`` while its own history reads
+    ``points 78, event_transfers_cost 4``). A gross mean is not comparable with the net
+    columns, and the card says so rather than letting it sit beside them unmarked.
 """
 
 import argparse
@@ -64,8 +80,12 @@ SITE_OUT = REPOSITORY_ROOT / "web" / "public"
 LIVE_SNAPSHOT_PREFIX: Final = "fpl-live-"
 SCOREBOARD_FILE: Final = "scoreboard.json"
 TOP100_SIZE: Final = 100
+#: What our own row's numbers are, and are not: see the module docstring.
+OUR_SCORING_BASIS: Final = "named_eleven_no_autosubs"
 #: The Overall standings pages a cohort capture holds, in page order.
 _COHORT_PAGE = re.compile(r"^league-314-standings-page-(\d+)\.json$")
+#: One cohort member's picks inside an elite-picks capture.
+_COHORT_PICKS = re.compile(r"^entry-(\d+)-picks-gw(\d+)\.json$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +96,23 @@ class CohortCapture:
     captured_at_utc: str
     bootstrap: bytes
     pages: tuple[bytes, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CohortPicks:
+    """An elite-picks capture as the scoreboard reads it: one gameweek's net per entry.
+
+    ``capture_elite_picks`` writes each cohort member's picks document for the gameweek
+    before the one it was taken for, and each carries that member's own ``entry_history``
+    — the same block a member's history row is read from. ``net`` is that row's ``points``
+    minus its ``event_transfers_cost``, and ``hits`` is the cost, so the cohort's mean can
+    be stated on the same basis as every other column.
+    """
+
+    snapshot_id: str
+    gameweek: int
+    net: Mapping[int, int]
+    hits: Mapping[int, int]
 
 
 def played_gameweeks(bootstrap: bytes, *, as_of_utc: str) -> list[int]:
@@ -107,20 +144,14 @@ def _number(value: object) -> float | None:
     return float(value)
 
 
-def top100_week(cohort: CohortCapture) -> dict[str, object] | None:
-    """The Top-100's mean ``event_total`` for the cohort capture's current gameweek.
+def cohort_standings(cohort: CohortCapture) -> dict[int, tuple[int, int]]:
+    """Ranks 1..100 of a cohort capture: rank to (entry id, ``event_total``).
 
-    Ranks 1..100 must all be present exactly once across the pages: a cohort missing a
-    rank is not a smaller cohort but one whose composition depends on which page failed.
-    ``None`` only when no deadline had passed at capture time, so the pages describe no
-    played week at all.
+    All 100 must be present exactly once across the pages: a cohort missing a rank is not
+    a smaller cohort but one whose composition depends on which page failed.
     """
 
-    played = played_gameweeks(cohort.bootstrap, as_of_utc=cohort.captured_at_utc)
-    if not played:
-        return None
-    gameweek = played[-1]
-    totals: dict[int, int] = {}
+    rows: dict[int, tuple[int, int]] = {}
     for page in cohort.pages:
         document = json.loads(page.decode("utf-8"))
         section = document.get("standings") if isinstance(document, dict) else None
@@ -130,26 +161,69 @@ def top100_week(cohort: CohortCapture) -> dict[str, object] | None:
         for row in results:
             if not isinstance(row, dict):
                 continue
-            rank, total = row.get("rank_sort"), row.get("event_total")
+            rank, total, entry = row.get("rank_sort"), row.get("event_total"), row.get("entry")
             if isinstance(rank, bool) or not isinstance(rank, int):
                 raise DataError("A cohort standings row has no integer rank_sort.")
             if rank > TOP100_SIZE:
                 continue
             if isinstance(total, bool) or not isinstance(total, int):
                 raise DataError(f"Cohort rank {rank} has no integer event_total.")
-            if rank in totals:
+            if isinstance(entry, bool) or not isinstance(entry, int):
+                raise DataError(f"Cohort rank {rank} has no integer entry id.")
+            if rank in rows:
                 raise DataError(f"Cohort rank {rank} appears on more than one page.")
-            totals[rank] = total
-    if set(totals) != set(range(1, TOP100_SIZE + 1)):
+            rows[rank] = (entry, total)
+    if set(rows) != set(range(1, TOP100_SIZE + 1)):
         raise DataError(
-            f"The cohort pages hold {len(totals)} of ranks 1..{TOP100_SIZE}; the mean over a "
+            f"The cohort pages hold {len(rows)} of ranks 1..{TOP100_SIZE}; the mean over a "
             "partial cohort would be a number nobody can place."
         )
-    return {
+    return rows
+
+
+def top100_week(
+    cohort: CohortCapture, picks: CohortPicks | None = None
+) -> dict[str, object] | None:
+    """The Top-100's mean week for the cohort capture's current gameweek, and its basis.
+
+    Net when ``picks`` covers every one of the hundred for that same gameweek — the
+    standings publish ``event_total`` before the transfer cost, so the picks capture's own
+    ``entry_history`` is what makes the cohort comparable with the net columns. Gross, and
+    labelled gross, when no picks capture covers them. ``None`` only when no deadline had
+    passed at capture time, so the pages describe no played week at all.
+    """
+
+    played = played_gameweeks(cohort.bootstrap, as_of_utc=cohort.captured_at_utc)
+    if not played:
+        return None
+    gameweek = played[-1]
+    rows = cohort_standings(cohort)
+    week: dict[str, object] = {
         "gameweek": gameweek,
-        "mean_event_total": sum(totals.values()) / TOP100_SIZE,
         "cohort_size": TOP100_SIZE,
         "final": gameweek in scored_gameweeks(cohort.bootstrap),
+    }
+    entries = {entry for entry, _ in rows.values()}
+    if picks is not None and picks.gameweek != gameweek:
+        raise DataError(
+            f"The picks capture {picks.snapshot_id} holds gameweek {picks.gameweek}, which "
+            f"is not the cohort capture's gameweek {gameweek}; netting one week's cohort "
+            "with another week's costs would be a number nobody can place."
+        )
+    if picks is not None and entries <= set(picks.net):
+        return {
+            **week,
+            "basis": "net",
+            "mean_score": sum(picks.net[entry] for entry in entries) / TOP100_SIZE,
+            "hit_points": float(sum(picks.hits[entry] for entry in entries)),
+            "picks_snapshot_id": picks.snapshot_id,
+        }
+    return {
+        **week,
+        "basis": "gross",
+        "mean_score": sum(total for _, total in rows.values()) / TOP100_SIZE,
+        "hit_points": None,
+        "picks_snapshot_id": None,
     }
 
 
@@ -164,6 +238,9 @@ def _ours(entry: LedgerEntry) -> dict[str, object]:
         "hits": float(str(block.get("transfer_hit_points", 0.0))),
         "projected": float(str(decision["projected_score"])),
         "mode": decision_mode(decision),
+        # Not FPL's net: no automatic substitutions, and no vice-captain to fall back on.
+        "scoring_basis": OUR_SCORING_BASIS,
+        "vice_captain_named": decision.get("vice_captain_player_id") is not None,
     }
 
 
@@ -192,6 +269,7 @@ def scoreboard_payload(
     registered: Sequence[int],
     ledger_entries: Sequence[LedgerEntry],
     cohort: CohortCapture | None,
+    cohort_picks: CohortPicks | None = None,
     generated_at_utc: str,
 ) -> dict[str, object]:
     """The scoreboard envelope, from bytes and ledger entries alone; pure, so testable."""
@@ -205,7 +283,7 @@ def scoreboard_payload(
         for entry_id, payload in histories.items()
     }
     ledger = {entry.gameweek: entry for entry in ledger_entries}
-    top100 = top100_week(cohort) if cohort is not None else None
+    top100 = top100_week(cohort, cohort_picks) if cohort is not None else None
     if top100 is not None and top100["gameweek"] not in played:
         raise DataError(
             f"The cohort capture describes gameweek {top100['gameweek']}, which the live "
@@ -285,6 +363,7 @@ def scoreboard_payload(
             "source_snapshot_id": source_snapshot_id,
             "captured_at_utc": captured_at_utc,
             "cohort_snapshot_id": None if cohort is None else cohort.snapshot_id,
+            "cohort_picks_snapshot_id": None if cohort_picks is None else cohort_picks.snapshot_id,
             "registered_members": len(registered),
             "histories_held": len(histories),
             "gameweeks": rows,
@@ -329,6 +408,48 @@ def read_cohort(root: Path, snapshot_id: str) -> CohortCapture:
     )
 
 
+def read_cohort_picks(root: Path, snapshot_id: str) -> CohortPicks:
+    """One elite-picks capture's net week per cohort member, from their own histories.
+
+    Every picks document in the capture must describe the same gameweek and carry an
+    ``entry_history`` with both ``points`` and ``event_transfers_cost``: a mean netted
+    from some rows and not others would be neither gross nor net.
+    """
+
+    snapshot = read_snapshot(root, snapshot_id)
+    net: dict[int, int] = {}
+    hits: dict[int, int] = {}
+    gameweeks: set[int] = set()
+    for name, payload in snapshot.payloads.items():
+        match = _COHORT_PICKS.match(name)
+        if match is None:
+            continue
+        entry_id, gameweek = int(match.group(1)), int(match.group(2))
+        document = json.loads(payload.decode("utf-8"))
+        history = document.get("entry_history") if isinstance(document, dict) else None
+        if not isinstance(history, Mapping):
+            raise DataError(f"{name} in {snapshot_id} carries no entry_history block.")
+        points, cost = history.get("points"), history.get("event_transfers_cost")
+        if isinstance(points, bool) or not isinstance(points, int):
+            raise DataError(f"{name} in {snapshot_id} has no integer entry_history.points.")
+        if isinstance(cost, bool) or not isinstance(cost, int):
+            raise DataError(
+                f"{name} in {snapshot_id} has no integer entry_history.event_transfers_cost; "
+                "without it the row is gross and the cohort's mean cannot be netted."
+            )
+        gameweeks.add(gameweek)
+        net[entry_id] = points - cost
+        hits[entry_id] = cost
+    if not net:
+        raise DataError(f"Picks capture {snapshot_id} holds no entry-<id>-picks-gwNN.json.")
+    if len(gameweeks) != 1:
+        raise DataError(
+            f"Picks capture {snapshot_id} spans gameweeks {sorted(gameweeks)}; one capture "
+            "describes one week."
+        )
+    return CohortPicks(snapshot_id=snapshot_id, gameweek=gameweeks.pop(), net=net, hits=hits)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -339,6 +460,11 @@ def main() -> int:
     parser.add_argument("--registry", type=Path, default=REGISTRY_PATH)
     parser.add_argument("--ledger-root", type=Path, default=LEDGER_ROOT)
     parser.add_argument("--cohort-snapshot", help="an fpl-top100 capture for the Top-100 mean")
+    parser.add_argument(
+        "--elite-snapshot",
+        help="the fpl-elite-picks capture of that cohort's same week; without it the "
+        "Top-100 mean is published gross of transfer costs and labelled gross",
+    )
     parser.add_argument("--season", help="default: inferred from the capture")
     parser.add_argument("--out", type=Path, default=SITE_OUT, help="site root (web/public)")
     arguments = parser.parse_args()
@@ -366,6 +492,11 @@ def main() -> int:
             if arguments.cohort_snapshot
             else None
         )
+        cohort_picks = (
+            read_cohort_picks(arguments.snapshot_root, arguments.elite_snapshot)
+            if arguments.elite_snapshot
+            else None
+        )
         document = scoreboard_payload(
             season=season,
             league_id=arguments.league,
@@ -376,6 +507,7 @@ def main() -> int:
             registered=registered,
             ledger_entries=entries,
             cohort=cohort,
+            cohort_picks=cohort_picks,
             generated_at_utc=datetime.now(UTC)
             .replace(microsecond=0)
             .isoformat()
@@ -394,12 +526,22 @@ def main() -> int:
     assert isinstance(payload, dict)
     rows = payload["gameweeks"]
     ours = [row["gameweek"] for row in rows if row["ours"] is not None]
-    top100 = [row["gameweek"] for row in rows if row["top100"] is not None]
+    top100 = [row["top100"] for row in rows if row["top100"] is not None]
+    cohort_line = (
+        "no gameweek"
+        if not top100
+        else ", ".join(f"GW{week['gameweek']} {week['basis']}" for week in top100)
+    )
     print(
         f"capture {snapshot_id}: {season}, gameweeks {[row['gameweek'] for row in rows]} "
         f"played; histories for {len(histories)} of {len(registered)} registered; "
-        f"ours recorded for {ours}; Top-100 for {top100 or 'no gameweek'}"
+        f"ours recorded for {ours} ({OUR_SCORING_BASIS}); Top-100 for {cohort_line}"
     )
+    if any(week["basis"] == "gross" for week in top100):
+        print(
+            "  The Top-100 mean is gross of transfer costs: no elite-picks capture covered "
+            "every one of the hundred for that week. Pass --elite-snapshot to net it."
+        )
     print(f"Wrote {target}")
     return 0
 

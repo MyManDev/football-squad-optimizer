@@ -87,20 +87,41 @@ def test_the_scoreboard_is_built_beside_the_tree_from_the_same_capture_and_the_l
         snapshot_id="fpl-live-20260911T100000Z-abc123def456",
         in_season_projection=None,
         cohort_snapshot="fpl-top100-20260911T090000Z-abc123def456",
+        elite_snapshot="fpl-elite-picks-20260911T091000Z-abc123def456",
     )
-    arguments = league.scoreboard_arguments(Path("/tmp/site/web/public"))
+    arguments = league.scoreboard_arguments(Path("/tmp/site/web/public"), "2026-27")
     assert arguments[1:3] == ["-m", "scripts.build_scoreboard"]
     assert arguments[arguments.index("--snapshot-id") + 1] == league.snapshot_id
     assert arguments[arguments.index("--cohort-snapshot") + 1] == league.cohort_snapshot
+    assert arguments[arguments.index("--elite-snapshot") + 1] == league.elite_snapshot
+    # The season the rest of the publish resolved, not one inferred again from the
+    # capture: the committed copy must name the season the views beside it name.
+    assert arguments[arguments.index("--season") + 1] == "2026-27"
     for flag in ("--snapshot-root", "--registry", "--ledger-root"):
         assert Path(arguments[arguments.index(flag) + 1]).is_absolute()
     # Without a cohort capture the scoreboard is still built; its Top-100 column is null.
     bare = LeaguePublish(league_id=352490, snapshot_id="fpl-live-x", in_season_projection=None)
-    assert "--cohort-snapshot" not in bare.scoreboard_arguments(Path("/tmp/site"))
+    assert "--cohort-snapshot" not in bare.scoreboard_arguments(Path("/tmp/site"), "2026-27")
     with pytest.raises(PublishError, match="fpl-top100"):
         LeaguePublish(
             league_id=352490,
             snapshot_id="fpl-live-x",
             in_season_projection=None,
             cohort_snapshot="fpl-live-y",
+        )
+    with pytest.raises(PublishError, match="fpl-elite-picks"):
+        LeaguePublish(
+            league_id=352490,
+            snapshot_id="fpl-live-x",
+            in_season_projection=None,
+            cohort_snapshot="fpl-top100-y",
+            elite_snapshot="fpl-live-z",
+        )
+    # An elite-picks capture nets a cohort; on its own it has nothing to net.
+    with pytest.raises(PublishError, match="pass --cohort-snapshot"):
+        LeaguePublish(
+            league_id=352490,
+            snapshot_id="fpl-live-x",
+            in_season_projection=None,
+            elite_snapshot="fpl-elite-picks-y",
         )

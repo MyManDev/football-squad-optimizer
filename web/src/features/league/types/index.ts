@@ -246,12 +246,31 @@ export interface ScoreboardOurs {
   projected: number;
   /** `live`: decided before the deadline; `replay`: recorded afterwards from a pre-deadline capture. */
   mode: "live" | "replay" | null;
+  /**
+   * What the net is, and is not. `named_eleven_no_autosubs`: the eleven the decision
+   * named, scored as named — the game's automatic substitutions are not applied and the
+   * decision names no vice-captain, so a captain who did not play is not recovered.
+   * Both corrections only add points, so this reads low beside a real FPL entry's net.
+   */
+  scoring_basis: "named_eleven_no_autosubs";
+  /** False on every decision the ledger holds: the frozen decision names no vice-captain. */
+  vice_captain_named: boolean;
 }
 
 export interface ScoreboardTop100 {
   gameweek: number;
-  /** Mean `event_total` over ranks 1..100 of the cohort capture, for its own gameweek. */
-  mean_event_total: number;
+  /**
+   * The cohort's mean week on the basis `basis` names: `net` is the mean of each member's
+   * own `points - event_transfers_cost`, the same basis as the members' and our columns;
+   * `gross` is the mean of the standings' `event_total`, which is before the transfer
+   * cost and therefore not comparable with them.
+   */
+  mean_score: number;
+  basis: "net" | "gross";
+  /** The transfer cost taken off across the cohort; null when the mean is gross. */
+  hit_points: number | null;
+  /** The elite-picks capture the net was read from; null when the mean is gross. */
+  picks_snapshot_id: string | null;
   cohort_size: number;
   /** True only when that gameweek was finished and checked in the cohort capture's bootstrap. */
   final: boolean;
@@ -298,6 +317,8 @@ export interface Scoreboard {
   source_snapshot_id: string;
   captured_at_utc: string;
   cohort_snapshot_id: string | null;
+  /** The elite-picks capture the builder was handed, whether or not it netted the cohort. */
+  cohort_picks_snapshot_id: string | null;
   registered_members: number;
   histories_held: number;
   gameweeks: ScoreboardGameweek[];

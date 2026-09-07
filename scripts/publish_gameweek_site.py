@@ -40,6 +40,7 @@ class LeaguePublish:
     in_season_projection: Path | None
     workers: int = 1
     cohort_snapshot: str | None = None
+    elite_snapshot: str | None = None
     snapshot_root: Path = REPOSITORY_ROOT / "data" / "snapshots"
     registry: Path = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
     archive_root: Path = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
@@ -59,9 +60,25 @@ class LeaguePublish:
                 f"The Top-100 mean is read from an fpl-top100 capture; got "
                 f"{self.cohort_snapshot!r}."
             )
+        if self.elite_snapshot is not None and not self.elite_snapshot.startswith(
+            "fpl-elite-picks-"
+        ):
+            raise PublishError(
+                f"The Top-100 mean is netted from an fpl-elite-picks capture; got "
+                f"{self.elite_snapshot!r}."
+            )
+        if self.elite_snapshot is not None and self.cohort_snapshot is None:
+            raise PublishError(
+                "An elite-picks capture nets a cohort; pass --cohort-snapshot with it."
+            )
 
-    def scoreboard_arguments(self, out: Path) -> list[str]:
-        """The scoreboard beside the league tree: same capture, the ledger, the cohort."""
+    def scoreboard_arguments(self, out: Path, season: str) -> list[str]:
+        """The scoreboard beside the league tree: same capture, same season, the ledger.
+
+        The season is the one the rest of the publish resolves, not one inferred again
+        from the capture: the committed copy must name the same season as the views it
+        is committed beside.
+        """
 
         arguments = [
             sys.executable,
@@ -77,11 +94,15 @@ class LeaguePublish:
             str(self.registry),
             "--ledger-root",
             str(self.ledger_root),
+            "--season",
+            season,
             "--out",
             str(out),
         ]
         if self.cohort_snapshot is not None:
             arguments += ["--cohort-snapshot", self.cohort_snapshot]
+        if self.elite_snapshot is not None:
+            arguments += ["--elite-snapshot", self.elite_snapshot]
         return arguments
 
     def build_arguments(self, out: Path) -> list[str]:
@@ -243,7 +264,12 @@ def publish(
             # same projection the decision reads; solved in this worktree's code.
             print(_run(league.build_arguments(worktree / "web" / "public"), cwd=worktree))
             # The scoreboard reads the ledger, so it follows the site views and the tree.
-            print(_run(league.scoreboard_arguments(worktree / "web" / "public"), cwd=worktree))
+            print(
+                _run(
+                    league.scoreboard_arguments(worktree / "web" / "public", names.season),
+                    cwd=worktree,
+                )
+            )
         _run(["git", "add", "web/public/data"], cwd=worktree)
         if _run(["git", "status", "--porcelain"], cwd=worktree) == "":
             print("The build changed nothing; there is nothing to publish.")
@@ -296,6 +322,11 @@ def main() -> int:
     parser.add_argument(
         "--cohort-snapshot", help="the fpl-top100 capture the scoreboard's Top-100 mean reads"
     )
+    parser.add_argument(
+        "--elite-snapshot",
+        help="the fpl-elite-picks capture that nets that cohort's week; without it the "
+        "Top-100 mean is published gross of transfer costs and labelled gross",
+    )
     arguments = parser.parse_args()
     try:
         names = PublishNames(
@@ -311,6 +342,7 @@ def main() -> int:
                 in_season_projection=arguments.in_season_projection,
                 workers=arguments.workers,
                 cohort_snapshot=arguments.cohort_snapshot,
+                elite_snapshot=arguments.elite_snapshot,
             )
         return publish(
             names, force_branch=arguments.force_branch, dry_run=arguments.dry_run, league=league

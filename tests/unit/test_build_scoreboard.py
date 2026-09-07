@@ -4,8 +4,9 @@ Hand-built rather than captured, for the reason ``test_build_league_site`` gives
 captures are gitignored, and a test that needs one passes only where one exists. What is
 pinned here is every rule the scoreboard rests on — a member's week is gross in the source
 and net on the board, an unfinished week has no average, our row is the ledger entry with
-its mode, the Top-100 mean belongs to the cohort capture's own week and is final only when
-that week is scored, and the cumulative figures name what they cover.
+its mode and the basis its number is on, the Top-100 mean belongs to the cohort capture's
+own week and is net only when a picks capture covers all hundred, and the cumulative
+figures name what they cover.
 """
 
 import json
@@ -16,8 +17,11 @@ from typing import Any
 import pytest
 import scripts.build_scoreboard as cli
 from scripts.build_scoreboard import (
+    OUR_SCORING_BASIS,
     CohortCapture,
+    CohortPicks,
     played_gameweeks,
+    read_cohort_picks,
     scoreboard_payload,
     top100_week,
 )
@@ -55,6 +59,21 @@ def _bootstrap(events: list[dict[str, Any]]) -> bytes:
 
 def _history(rows: list[dict[str, Any]]) -> bytes:
     return json.dumps({"chips": [], "current": rows}).encode("utf-8")
+
+
+def _picks(gameweek: int, *, points: int, cost: int) -> bytes:
+    return json.dumps(
+        {
+            "active_chip": None,
+            "automatic_subs": [],
+            "entry_history": {
+                "event": gameweek,
+                "points": points,
+                "event_transfers_cost": cost,
+            },
+            "picks": [],
+        }
+    ).encode("utf-8")
 
 
 def _page(page: int, ranks: range, *, event_total: int | None = None) -> bytes:
@@ -115,6 +134,7 @@ def _payload(**overrides: Any) -> dict[str, Any]:
         "registered": [11, 22],
         "ledger_entries": (),
         "cohort": None,
+        "cohort_picks": None,
         "generated_at_utc": "2026-09-07T13:20:00Z",
     }
     fields.update(overrides)
@@ -212,6 +232,8 @@ def test_our_row_is_the_ledger_entry_with_its_mode_and_null_where_unsettled() ->
         "hits": 0.0,
         "projected": 56.1,
         "mode": "live",
+        "scoring_basis": OUR_SCORING_BASIS,
+        "vice_captain_named": False,
     }
     assert rows[2]["ours"] == {
         "net": None,
@@ -219,8 +241,21 @@ def test_our_row_is_the_ledger_entry_with_its_mode_and_null_where_unsettled() ->
         "hits": 4.0,
         "projected": 56.1,
         "mode": "replay",
+        "scoring_basis": OUR_SCORING_BASIS,
+        "vice_captain_named": False,
     }
     assert rows[3]["ours"] is None
+
+
+def test_our_row_says_its_net_is_the_named_eleven_and_names_no_vice_captain() -> None:
+    """Our net is ``score_named_eleven`` minus hits: no automatic substitutions, and the
+    frozen decision names no vice-captain to recover a captain who did not play. Both
+    only ever add points, so the row reads low beside a member's own net — and the basis
+    travels with the number rather than being left for the reader to infer."""
+
+    ours = _rows(_payload(ledger_entries=(_entry(1, mode="live", settled=True),)))[1]["ours"]
+    assert ours["scoring_basis"] == "named_eleven_no_autosubs"
+    assert ours["vice_captain_named"] is False
 
 
 def test_an_entry_recorded_before_the_mode_was_stamped_has_a_null_mode() -> None:
@@ -240,6 +275,18 @@ def _cohort(events: list[dict[str, Any]], *, captured: str, ranks: int = 100) ->
     )
 
 
+def _cohort_picks(gameweek: int = 3, *, ranks: range = range(1, 101), cost: int = 0) -> CohortPicks:
+    """A picks capture for the same hundred the pages carry, with ``event_total`` as the
+    gross week: rank ``n``'s ``event_total`` is ``n``, so its net is ``n - cost``."""
+
+    return CohortPicks(
+        snapshot_id="fpl-elite-picks-test",
+        gameweek=gameweek,
+        net={900_000 + rank: rank - cost for rank in ranks},
+        hits={900_000 + rank: cost for rank in ranks},
+    )
+
+
 def test_the_top100_mean_belongs_to_the_cohort_captures_own_week_only() -> None:
     """The cohort is re-ranked weekly, so its pages describe one gameweek: the last
     deadline passed when it was captured. Final only when that week is scored there."""
@@ -255,7 +302,10 @@ def test_the_top100_mean_belongs_to_the_cohort_captures_own_week_only() -> None:
     week = top100_week(cohort)
     assert week == {
         "gameweek": 3,
-        "mean_event_total": pytest.approx(5050 / 100),
+        "basis": "gross",
+        "mean_score": pytest.approx(5050 / 100),
+        "hit_points": None,
+        "picks_snapshot_id": None,
         "cohort_size": 100,
         "final": False,
     }
@@ -268,6 +318,53 @@ def test_the_top100_mean_belongs_to_the_cohort_captures_own_week_only() -> None:
     # Finished but unchecked is not final: bonus has not landed.
     unchecked = [*scored[:2], _event(3, finished=True, checked=False), _event(4, finished=False)]
     assert top100_week(_cohort(unchecked, captured="2026-09-07T13:11:12Z"))["final"] is False
+
+
+def test_the_standings_event_total_is_gross_so_the_picks_capture_is_what_nets_it() -> None:
+    """A standings row's ``event_total`` is the week before the transfer cost — in the
+    2026-09-07 capture, entry 7018833 reads ``event_total 78`` in the league standings and
+    ``points 78, event_transfers_cost 4`` in its own history. The same is true of the
+    Overall standings the cohort is read from, so the cohort's own picks capture, which
+    carries each member's ``entry_history``, is what puts the mean on the members' basis."""
+
+    cohort = _cohort(THREE_WEEKS, captured="2026-09-07T13:11:12Z")
+    gross = top100_week(cohort)
+    net = top100_week(cohort, _cohort_picks(cost=4))
+
+    assert gross["basis"] == "gross" and gross["hit_points"] is None
+    assert net == {
+        "gameweek": 3,
+        "basis": "net",
+        "mean_score": pytest.approx(5050 / 100 - 4),
+        "hit_points": 400.0,
+        "picks_snapshot_id": "fpl-elite-picks-test",
+        "cohort_size": 100,
+        "final": False,
+    }
+    payload = _payload(cohort=cohort, cohort_picks=_cohort_picks(cost=4))
+    assert _rows(payload)[3]["top100"] == net
+    assert payload["cohort_picks_snapshot_id"] == "fpl-elite-picks-test"
+
+
+def test_a_picks_capture_missing_one_of_the_hundred_publishes_a_gross_mean() -> None:
+    """One unreadable member is not a failed capture — ``capture_elite_picks`` skips it —
+    but a mean netted over 99 and grossed over the hundredth would be neither. The whole
+    mean falls back to gross, and it says gross."""
+
+    week = top100_week(
+        _cohort(THREE_WEEKS, captured="2026-09-07T13:11:12Z"),
+        _cohort_picks(ranks=range(1, 100), cost=4),
+    )
+    assert week["basis"] == "gross"
+    assert week["mean_score"] == pytest.approx(5050 / 100)
+    assert week["picks_snapshot_id"] is None
+
+
+def test_a_picks_capture_from_another_week_is_refused_rather_than_netted() -> None:
+    with pytest.raises(DataError, match="not the cohort capture's gameweek"):
+        top100_week(
+            _cohort(THREE_WEEKS, captured="2026-09-07T13:11:12Z"), _cohort_picks(gameweek=2)
+        )
 
 
 def test_a_partial_cohort_is_refused_rather_than_averaged() -> None:
@@ -287,6 +384,41 @@ def test_a_cohort_from_a_week_the_live_capture_has_not_played_is_refused() -> No
 
 def test_a_cohort_captured_before_any_deadline_has_no_week() -> None:
     assert top100_week(_cohort(THREE_WEEKS, captured="2026-08-01T00:00:00Z")) is None
+
+
+def test_the_picks_capture_is_read_as_one_weeks_net_per_entry(tmp_path: Path) -> None:
+    """``read_cohort_picks`` reads the block ``capture_elite_picks`` wrote: one gameweek,
+    one ``entry_history`` per member, and a cost on every row — a mean netted from some
+    rows and grossed on others would be neither."""
+
+    snapshots = tmp_path / "snapshots"
+    written = write_snapshot(
+        snapshots,
+        source="fpl-elite-picks",
+        captured_at_utc="2026-09-07T13:11:33Z",
+        payloads={
+            "entry-900001-picks-gw03.json": _picks(3, points=66, cost=0),
+            "entry-900002-picks-gw03.json": _picks(3, points=78, cost=4),
+        },
+    )
+
+    picks = read_cohort_picks(snapshots, written.snapshot_id)
+    assert picks.gameweek == 3
+    assert picks.net == {900001: 66, 900002: 74}
+    assert picks.hits == {900001: 0, 900002: 4}
+
+
+def test_a_picks_row_without_a_transfer_cost_refuses_the_whole_capture(tmp_path: Path) -> None:
+    snapshots = tmp_path / "snapshots"
+    payload = json.dumps({"entry_history": {"event": 3, "points": 66}}).encode("utf-8")
+    written = write_snapshot(
+        snapshots,
+        source="fpl-elite-picks",
+        captured_at_utc="2026-09-07T13:11:33Z",
+        payloads={"entry-900001-picks-gw03.json": payload},
+    )
+    with pytest.raises(DataError, match="event_transfers_cost"):
+        read_cohort_picks(snapshots, written.snapshot_id)
 
 
 # --- cumulative: each figure names what it covers --------------------------------------
@@ -369,6 +501,17 @@ def test_the_shell_writes_the_scoreboard_beside_the_league_tree(
             "league-314-standings-page-02.json": _page(2, range(51, 101)),
         },
     )
+    # Rank n's standings event_total is n, gross; each took a 1-point hit, so its net is
+    # n - 1 and the cohort's mean drops by exactly one.
+    elite = write_snapshot(
+        snapshots,
+        source="fpl-elite-picks",
+        captured_at_utc="2026-09-07T13:11:33Z",
+        payloads={
+            f"entry-{900_000 + rank}-picks-gw03.json": _picks(3, points=rank, cost=1)
+            for rank in range(1, 101)
+        },
+    )
     registry = tmp_path / "registry.json"
     registry.write_text(
         json.dumps(
@@ -394,6 +537,8 @@ def test_the_shell_writes_the_scoreboard_beside_the_league_tree(
             str(tmp_path / "ledger"),
             "--cohort-snapshot",
             cohort.snapshot_id,
+            "--elite-snapshot",
+            elite.snapshot_id,
             "--out",
             str(tmp_path / "site"),
         ],
@@ -411,7 +556,15 @@ def test_the_shell_writes_the_scoreboard_beside_the_league_tree(
     assert payload["histories_held"] == 1 and payload["registered_members"] == 2
     rows = {row["gameweek"]: row for row in payload["gameweeks"]}
     assert rows[1]["members"][0]["net"] == 64
-    assert rows[3]["top100"]["mean_event_total"] == pytest.approx(50.5)
+    assert rows[3]["top100"] == {
+        "gameweek": 3,
+        "basis": "net",
+        "mean_score": pytest.approx(50.5 - 1),
+        "hit_points": 100.0,
+        "picks_snapshot_id": elite.snapshot_id,
+        "cohort_size": 100,
+        "final": False,
+    }
     assert all(row["ours"] is None for row in rows.values()), "no ledger, no row of ours"
 
 

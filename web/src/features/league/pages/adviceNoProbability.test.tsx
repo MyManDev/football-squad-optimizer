@@ -19,7 +19,8 @@ import {
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import type { Language } from "../../../i18n/messages";
-import type { EntryAdvice, LeagueViewEnvelope } from "../types";
+import { ScoreboardCard } from "../components/ScoreboardCard";
+import type { EntryAdvice, LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 
 afterEach(cleanup);
@@ -94,6 +95,103 @@ describe("no advice state shows a probability, in either language", () => {
         const match = text.match(FORBIDDEN);
         expect(match, match ? `forbidden fragment: …${match[0]}…` : undefined).toBeNull();
         expect(text.match(MODE_PROMISE)).toBeNull();
+      });
+    }
+  }
+});
+
+/** One scoreboard, in the state named: a netted Top-100, a gross one, or nothing finished. */
+function mockScoreboardEnvelope(state: "net" | "gross" | "empty"): LeagueViewEnvelope<Scoreboard> {
+  const week: ScoreboardGameweek = {
+    gameweek: 3,
+    deadline_utc: "2026-09-04T17:30:00Z",
+    finished: state !== "empty",
+    data_checked: false,
+    average_entry_score: 51,
+    highest_score: 119,
+    ours: {
+      net: 26,
+      xi: 26,
+      hits: 0,
+      projected: 56.1,
+      mode: "replay",
+      scoring_basis: "named_eleven_no_autosubs",
+      vice_captain_named: false,
+    },
+    top100:
+      state === "net"
+        ? {
+            gameweek: 3,
+            basis: "net",
+            mean_score: 68.75,
+            hit_points: 4,
+            picks_snapshot_id: "fpl-elite-picks-test",
+            cohort_size: 100,
+            final: true,
+          }
+        : {
+            gameweek: 3,
+            basis: "gross",
+            mean_score: 68.79,
+            hit_points: null,
+            picks_snapshot_id: null,
+            cohort_size: 100,
+            final: true,
+          },
+    members: [],
+    members_mean_net: 58.7,
+    members_counted: 15,
+  };
+  return {
+    contract_version: "provisional_league_ui_v1",
+    generated_at_utc: "2026-09-07T13:20:00Z",
+    source_kind: "live",
+    payload: {
+      season: "2026-27",
+      league_id: 352490,
+      source_snapshot_id: "fpl-live-20260907T131414Z-db9314d00961",
+      captured_at_utc: "2026-09-07T13:14:14Z",
+      cohort_snapshot_id: "fpl-top100-test",
+      cohort_picks_snapshot_id: state === "net" ? "fpl-elite-picks-test" : null,
+      registered_members: 15,
+      histories_held: 15,
+      gameweeks: [week],
+      cumulative: {
+        through_gameweek: state === "empty" ? null : 3,
+        gameweeks: state === "empty" ? [] : [3],
+        ours_net: state === "empty" ? null : 26,
+        ours_gameweeks: state === "empty" ? [] : [3],
+        members_mean_total_points: state === "empty" ? null : 199.2,
+        members_counted: state === "empty" ? 0 : 15,
+        average_entry_score: state === "empty" ? null : 182,
+      },
+    },
+  };
+}
+
+// The scoreboard card lives on /league, not on the member page, so the states above
+// never render it: a probability could reach a published page through the one surface
+// this gate did not cover. Same regex, both languages, both Top-100 bases.
+const SCOREBOARD_STATES: Array<[string, LeagueViewEnvelope<Scoreboard>]> = [
+  ["net Top-100", mockScoreboardEnvelope("net")],
+  ["gross Top-100", mockScoreboardEnvelope("gross")],
+  ["nothing finished", mockScoreboardEnvelope("empty")],
+];
+
+describe("the weekly scoreboard shows no probability, in either language", () => {
+  for (const language of ["tr", "en"] as const) {
+    for (const [name, envelope] of SCOREBOARD_STATES) {
+      it(`${language}: ${name}`, () => {
+        const { container, unmount } = render(
+          <LanguageProvider initialLanguage={language}>
+            <ScoreboardCard envelope={envelope} />
+          </LanguageProvider>,
+        );
+        const text = container.textContent ?? "";
+        unmount();
+        expect(text.length).toBeGreaterThan(0);
+        const match = text.match(FORBIDDEN);
+        expect(match, match ? `forbidden fragment: …${match[0]}…` : undefined).toBeNull();
       });
     }
   }
