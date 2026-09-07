@@ -33,6 +33,7 @@ from squadopt.application.advice import HorizonBuilder, member_horizon_builder
 from squadopt.application.entries import EntryPicks
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import fpl_entry_picks
 from squadopt.live import (
     InSeasonProjection,
@@ -163,13 +164,21 @@ class AdviceCaptureContext:
 
 
 def latest_snapshot_id(snapshot_root: Path | str) -> str | None:
-    """The most recent capture held, or ``None`` when the root holds none.
+    """The most recent live capture held, or ``None`` when the root holds none.
 
     ``None`` rather than a raise: an operator who has not yet published a capture is not
     a failure the API should log per request, it is a deployment that is not ready.
+
+    Live captures only. Several collectors share this root and an identifier begins with
+    its source, so a lexical listing orders by collector before capture time: a
+    ``fpl-top100`` capture sorts after every ``fpl-live`` one however old it is. This is
+    the whole of what the HTTP adapter serves advice from — there is no ``--snapshot-id``
+    on a request to override it — and advice needs the game state only a live capture
+    carries, so a root holding cohort captures alone reads as not ready rather than as
+    ready with the wrong capture.
     """
 
-    identifiers = list_snapshot_ids(snapshot_root)
+    identifiers = list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE)
     return identifiers[-1] if identifiers else None
 
 

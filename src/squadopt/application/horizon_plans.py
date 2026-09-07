@@ -22,6 +22,7 @@ import pandas as pd
 
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.live import (
     CONTROL_MODEL_NAME,
     IN_SEASON_CONTROL_MODEL_VERSIONS,
@@ -115,18 +116,28 @@ class HorizonPlanResult:
 
 
 def _resolve_snapshot(root: Path, requested: str | None) -> tuple[str, CapturedSnapshot]:
-    identifiers = list_snapshot_ids(root)
+    """The capture a horizon plan projects from, named or chosen.
+
+    Several collectors share this root and an identifier begins with its source, so a
+    lexical listing orders by collector before capture time. A multi-week plan needs the
+    prices, availability and deadline calendar that only a live capture carries, so the
+    automatic pick says which source it means; a capture named outright is still checked
+    against everything held.
+    """
+
     if requested is not None:
+        identifiers = list_snapshot_ids(root)
         if requested not in identifiers:
             raise DataError(
                 f"No snapshot {requested!r} under {root}. Held: "
                 f"{identifiers[-3:] if identifiers else 'none'}."
             )
         snapshot_id = requested
-    elif identifiers:
-        snapshot_id = identifiers[-1]
     else:
-        raise DataError(f"No snapshots under {root}.")
+        live = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
+        if not live:
+            raise DataError(f"No {FPL_LIVE_SOURCE} snapshots under {root}.")
+        snapshot_id = live[-1]
     return snapshot_id, read_snapshot(root, snapshot_id)
 
 

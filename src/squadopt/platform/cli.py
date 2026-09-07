@@ -45,6 +45,7 @@ from squadopt.data.snapshots import (
     list_snapshot_ids,
     read_snapshot,
 )
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
     CHIP_NAMES,
@@ -285,12 +286,23 @@ def _files(root: Path) -> tuple[Path, ...]:
 
 
 def _snapshot_files(root: Path, requested: str | None) -> tuple[str, tuple[Path, ...]]:
-    identifiers = list_snapshot_ids(root)
+    """The capture a command reads, and the files it read, for the run log.
+
+    Several collectors share this root and an identifier begins with its source, so a
+    lexical listing orders by collector before capture time: a ``fpl-top100`` capture
+    sorts after every ``fpl-live`` one however old it is. The automatic pick therefore
+    names the source it means, while a capture named outright is still looked for among
+    everything held.
+    """
+
     if requested is None:
-        if not identifiers:
-            raise DataError(f"No snapshots under {root}. Run 'squadopt season tick' first.")
-        identifier = identifiers[-1]
-    elif requested not in identifiers:
+        live = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
+        if not live:
+            raise DataError(
+                f"No {FPL_LIVE_SOURCE} snapshots under {root}. Run 'squadopt season tick' first."
+            )
+        identifier = live[-1]
+    elif requested not in list_snapshot_ids(root):
         raise DataError(f"No snapshot {requested!r} under {root}.")
     else:
         identifier = requested
