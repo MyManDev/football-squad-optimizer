@@ -16,6 +16,7 @@ import pandas as pd
 
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
     CONTROL_MODEL_NAME,
@@ -145,21 +146,33 @@ class SettleResult:
 
 
 def _resolve_snapshot(root: Path, requested: str | None) -> tuple[str, CapturedSnapshot]:
-    identifiers = list_snapshot_ids(root)
+    """The capture a decide or settle runs against, named or chosen.
+
+    Several collectors share this root and an identifier begins with its source, so a
+    lexical listing orders by collector before capture time: a ``fpl-top100`` capture
+    sorts after every ``fpl-live`` one however old it is. Deciding and settling are about
+    the live game state, so the automatic pick says which source it means.
+
+    Naming a capture skips that pick and is checked against everything held, because
+    which capture to replay is the operator's choice, not this function's.
+    """
+
     if requested:
+        identifiers = list_snapshot_ids(root)
         if requested not in identifiers:
             raise DataError(
                 f"No snapshot {requested!r} under {root}. Held: "
                 f"{identifiers[-3:] if identifiers else 'none'}."
             )
         snapshot_id = requested
-    elif identifiers:
-        snapshot_id = identifiers[-1]
     else:
-        raise DataError(
-            f"No snapshots under {root}. Capture one first with "
-            "'python -m scripts.capture_deadline_snapshot'."
-        )
+        live = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
+        if not live:
+            raise DataError(
+                f"No {FPL_LIVE_SOURCE} snapshots under {root}. Capture one first with "
+                "'python -m scripts.capture_deadline_snapshot'."
+            )
+        snapshot_id = live[-1]
     return snapshot_id, read_snapshot(root, snapshot_id)
 
 

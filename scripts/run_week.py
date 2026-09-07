@@ -61,6 +61,7 @@ from pathlib import Path
 from squadopt.application.commands import DecideRequest, decide
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import gameweek_deadlines, next_open_deadline
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live import (
@@ -86,7 +87,9 @@ LEDGER_ROOT = REPOSITORY_ROOT / "data" / "ledger"
 EVIDENCE_ROOT = REPOSITORY_ROOT / "artifacts" / "phase_b"
 SITE_OUT = REPOSITORY_ROOT / "web" / "public"
 
-LIVE_PREFIX = "fpl-live-"
+# The cohort and elite steps find the capture they just wrote by name difference, which
+# is a prefix match rather than a source filter; the live listing uses `FPL_LIVE_SOURCE`
+# through `list_snapshot_ids(source=...)` instead of a fourth copy of its prefix.
 COHORT_PREFIX = "fpl-top100-"
 ELITE_PREFIX = "fpl-elite-picks-"
 
@@ -267,7 +270,13 @@ def preflight_decide(
 
 
 def latest_live_snapshot(root: Path) -> str | None:
-    live = [name for name in list_snapshot_ids(root) if name.startswith(LIVE_PREFIX)]
+    """The newest live capture held, or ``None``.
+
+    This step's own cohort and elite captures land in the same root, so the listing has
+    to name the source it means; `list_snapshot_ids` takes that as a `source=` filter.
+    """
+
+    live = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
     return live[-1] if live else None
 
 

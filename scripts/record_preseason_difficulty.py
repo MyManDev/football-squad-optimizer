@@ -23,6 +23,7 @@ from scripts._experiment_cli import REPOSITORY_ROOT, artifact_metadata, write_js
 
 from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import list_snapshot_ids
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.experiments import ExperimentError
 from squadopt.experiments.preseason_difficulty import (
     build_preseason_record,
@@ -42,8 +43,8 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--snapshot-id",
         default=None,
-        help="Capture to record. Defaults to the earliest stored capture, which is the one "
-        "most likely to precede the first kickoff.",
+        help="Capture to record. Defaults to the earliest live capture stored, which is the "
+        "one most likely to precede the first kickoff.",
     )
     parser.add_argument("--season", default="2026-27")
     parser.add_argument(
@@ -73,11 +74,22 @@ def main() -> int:
         return 1
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
     try:
-        stored = list_snapshot_ids(root)
-        if not stored:
-            print(f"No captures stored under {root}.")
-            return 1
-        snapshot_id = str(arguments.snapshot_id or stored[0])
+        if arguments.snapshot_id is not None:
+            snapshot_id = str(arguments.snapshot_id)
+        else:
+            # The earliest *live* capture, which is the mirror image of the "last entry"
+            # bug: several collectors share this root and an identifier begins with its
+            # source, so a lexical listing orders by collector before capture time, and
+            # `fpl-elite-picks` sorts *before* `fpl-live`. Taking the first entry of an
+            # unfiltered listing therefore returns whichever elite-picks capture exists,
+            # however recent — the opposite of the pre-season capture wanted here, and a
+            # capture holding no fixture difficulty at all. Naming one with --snapshot-id
+            # still reaches every capture held.
+            stored = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
+            if not stored:
+                print(f"No {FPL_LIVE_SOURCE} captures stored under {root}.")
+                return 1
+            snapshot_id = stored[0]
         LOGGER.info("Recording %s for %s", snapshot_id, arguments.season)
         record = build_preseason_record(root, snapshot_id, season=str(arguments.season))
         drift = None
