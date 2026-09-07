@@ -31,7 +31,13 @@ year, one bench boost and one triple captain per season — and it is recorded i
 artifact as an assumption. The 2026-27 rules (two chip sets, one per half) come from
 the capture via `season_rules_v1` and can be expressed with the same table.
 
-Measurement only. The locked 2025-26 holdout is refused.
+Measurement only. The locked 2025-26 holdout is refused under the default
+``--development-scope v1``; ``--development-scope v2`` admits it as declared development
+data — the scope Phase C v2 declared (`COMPONENT_DEVELOPMENT_SEASONS_V2`): a season the
+repository has used before, so a walk over it is development evidence and never an unseen
+final test. The artifact records `development_scope` and `locked_holdout_accessed`
+truthfully either way. ``--hit-cost`` sets the planner's own hit cost under every mode but
+``tuned`` (which keeps ``--tuned-hit-cost``); the game's charge stays 4 on the sheet.
 """
 
 import argparse
@@ -75,12 +81,20 @@ from squadopt.planning import TransferPlanningConfig
 LOGGER = logging.getLogger(__name__)
 SEASON_CHAIN_SEASONS_CONTRACT_VERSION = "season_chain_seasons_v1"
 DEFAULT_SEASONS = "2021-22,2022-23,2023-24,2024-25"
+DEVELOPMENT_SCOPES = ("v1", "v2")
 
 
 def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
     parser.add_argument("--seasons", default=DEFAULT_SEASONS)
+    parser.add_argument(
+        "--development-scope",
+        choices=DEVELOPMENT_SCOPES,
+        default="v1",
+        help="v1 refuses the locked 2025-26 holdout; v2 admits it as declared development "
+        "data (the Phase C v2 scope) and records that it was walked",
+    )
     parser.add_argument("--lookaheads", default="1,3", help="comma list; 1 is the myopic baseline")
     parser.add_argument(
         "--chips",
@@ -106,6 +120,13 @@ def _parse_arguments() -> argparse.Namespace:
         "--tuned-holding-values",
         default="bboost=0,3xc=20,wildcard=24,freehit=0",
         help="holding values of the tuned mode (default: the chip_bayesopt candidate)",
+    )
+    parser.add_argument(
+        "--hit-cost",
+        type=float,
+        default=4.0,
+        help="the planner's own hit cost under every mode but tuned (default: the rule's 4; "
+        "the game's charge stays 4 in the ledger)",
     )
     parser.add_argument(
         "--tuned-hit-cost",
@@ -272,7 +293,12 @@ def _markdown(
         "scores zero.",
         "- The first decision gameweek is the season's second (in-season features need one "
         "prior gameweek); the opening squad is optimized from that week's pool.",
-        f"- Seasons: {', '.join(seasons)}. The 2025-26 holdout was not read.",
+        f"- Seasons: {', '.join(seasons)}. "
+        + (
+            f"The {LOCKED_HOLDOUT_SEASON} holdout was walked as declared development data."
+            if LOCKED_HOLDOUT_SEASON in seasons
+            else f"The {LOCKED_HOLDOUT_SEASON} holdout was not read."
+        ),
         "",
     ]
     return "\n".join(lines)
@@ -375,6 +401,7 @@ def _merge(arguments: argparse.Namespace) -> int:
         "chain_contract_version": SEASON_CHAIN_CONTRACT_VERSION,
         "projection_rule": first.get("projection_rule", NAIVE_PROJECTION_RULE),
         "merged_from": [str(path) for path in sources],
+        "development_scope": first.get("development_scope", "v1"),
         "seasons": seasons,
         "lookaheads": list(lookaheads),
         "chip_modes": list(chip_modes),
@@ -390,7 +417,7 @@ def _merge(arguments: argparse.Namespace) -> int:
         "comparisons": comparisons,
         "chains": chains,
         "measurement_only": True,
-        "locked_holdout_accessed": False,
+        "locked_holdout_accessed": LOCKED_HOLDOUT_SEASON in seasons,
     }
     markdown = _markdown(tuple(seasons), chains, comparisons, assumptions)
     write_json(arguments.json_output, document)
@@ -410,8 +437,12 @@ def main() -> int:
         print(f"Archive not found at {arguments.archive_root}.")
         return 1
     seasons = tuple(value.strip() for value in str(arguments.seasons).split(","))
-    if LOCKED_HOLDOUT_SEASON in seasons:
-        print(f"{LOCKED_HOLDOUT_SEASON} is the locked holdout and may not be walked.")
+    scope = str(arguments.development_scope)
+    if LOCKED_HOLDOUT_SEASON in seasons and scope != "v2":
+        print(
+            f"{LOCKED_HOLDOUT_SEASON} is the locked holdout and may not be walked under "
+            f"--development-scope {scope}; v2 admits it as declared development data."
+        )
         return 1
     lookaheads = tuple(int(value.strip()) for value in str(arguments.lookaheads).split(","))
     chip_modes = tuple(value.strip() for value in str(arguments.chips).split(","))
@@ -421,6 +452,7 @@ def main() -> int:
     holding_values = parse_holding_values(arguments.chip_holding_values)
     tuned_holding_values = parse_holding_values(arguments.tuned_holding_values)
     tuned_hit_cost = float(arguments.tuned_hit_cost)
+    hit_cost = float(arguments.hit_cost)
 
     created_utc = datetime.now(UTC).isoformat(timespec="seconds")
     panel = build_panel(arguments.archive_root)
@@ -457,6 +489,7 @@ def main() -> int:
                     else:
                         transfer_config = TransferPlanningConfig(
                             max_free_transfers=cap,
+                            transfer_hit_cost_points=hit_cost,
                             chip_holding_value_points=(
                                 holding_values if mode in {"value", "hybrid"} else {}
                             ),
@@ -518,6 +551,7 @@ def main() -> int:
         "max_free_transfers": caps,
         "chip_windows_source": "assumed; not read from a capture",
         "projection_rule": str(arguments.projection_rule),
+        "planning_hit_cost": hit_cost,
         "chip_holding_values_points": (
             holding_values if {"value", "hybrid"} & set(chip_modes) else None
         ),
@@ -535,6 +569,7 @@ def main() -> int:
         "contract_version": SEASON_CHAIN_SEASONS_CONTRACT_VERSION,
         "chain_contract_version": SEASON_CHAIN_CONTRACT_VERSION,
         "projection_rule": str(arguments.projection_rule),
+        "development_scope": scope,
         "seasons": list(seasons),
         "lookaheads": list(lookaheads),
         "chip_modes": list(chip_modes),
@@ -553,7 +588,7 @@ def main() -> int:
         "comparisons": comparisons,
         "chains": chains,
         "measurement_only": True,
-        "locked_holdout_accessed": False,
+        "locked_holdout_accessed": LOCKED_HOLDOUT_SEASON in seasons,
     }
     markdown = _markdown(seasons, chains, comparisons, assumptions)
     write_json(arguments.json_output, document)

@@ -164,8 +164,6 @@ const en = {
     shareable: "Shareable in the URL",
     intro:
       "The horizon and play mode save how you want to read the recommendation. This screen shows the current ledger decision; changing a selection does not run a new optimization yet.",
-    entryIntro:
-      "The horizon and play mode select this member's example advice. These controls describe a point trade-off; they never claim how likely you are to beat the league.",
     horizon: "Planning Horizon",
     week: (count: number) => `${count} week${count === 1 ? "" : "s"}`,
     liveControl: "live control",
@@ -211,7 +209,6 @@ const en = {
       aheadFive: "P(5+ ahead)",
       cost: "cost",
       points: "points",
-      expectedPointCost: (points: string) => `~${points} expected-point cost`,
     },
   },
   rivals: {
@@ -327,10 +324,9 @@ const en = {
   leagueMembers: {
     loading: "Loading league members…",
     computeTitle: "Compute this plan",
-    computeBodySelf: "Compute a one-week pure-points plan from your own squad.",
+    computeBodySelf: "Compute this one-week plan from your own squad.",
     computeBodyOther:
       "You are viewing another member. The computation starts from this member's public squad.",
-    computeRival: "Rival",
     computeRivalNearest: "Nearest above in the standings",
     computeButton: "Compute",
     computeRequesting: "Sending the request…",
@@ -341,7 +337,7 @@ const en = {
     computeDone: "Plan available",
     computePublished: "Published plan",
     computeUnsupportedSelection:
-      "Compute currently supports only Pure Points / 1 week. Other modes and horizons can show published research plans, but cannot request a new calculation yet.",
+      "Compute supports one-week plans: pure points, or a strategy with a rival chosen. Longer windows are not computed for members yet.",
     computeProvenance: (capture: string, at: string) => `Capture ${capture}, result dated ${at}.`,
     computeStaticFallback: "The backend was unreachable; this is the published static answer.",
     computeUnavailable:
@@ -361,10 +357,57 @@ const en = {
     viewerSelected: (name: string) =>
       `Viewing as ${name}. Advice pages will start from this squad.`,
     viewerClear: "Clear selection",
+    viewerOpenMine: "Open my squad →",
+    notYourPageTitle: "Not your page",
+    notYourPageBody: "You picked another row as yourself; this page advises this member.",
+    notYourPageLink: "Go to my page →",
+    strategyTitle: "Your play",
+    strategyIntro:
+      "Every option below was solved from your own squad; a rival strategy names the member you play against.",
+    strategyLegend: "Strategy",
+    strategies: {
+      "saf-puan": {
+        name: "Pure points",
+        description: "The highest expected points, no rival in the equation.",
+      },
+      "ortak-koru": {
+        name: "Keep the shared core",
+        description:
+          "Hold as many of the rival's eleven as the free transfers reach, up to nine; a hit is spent only where it pays for itself.",
+      },
+      "fark-yarat": {
+        name: "Create a gap",
+        description:
+          "Hold as few of the rival's eleven as the free transfers allow, down to five; the players you do not share decide the gap.",
+      },
+    } as Record<"saf-puan" | "ortak-koru" | "fark-yarat", { name: string; description: string }>,
+    rivalLegend: "Rival",
+    rivalLabel: "The member you are playing against",
+    rivalDefaultSuffix: "(nearest above in the standings)",
+    rivalUnavailableSuffix: "(not computed)",
+    rivalNone: "No other member's squad is published for this week.",
+    rivalNote: "The rival's public eleven is a constraint and a comparison, nothing more.",
+    windowLegend: "Window",
+    windowNotComputed:
+      "One week at a time: three- and five-week plans are not computed, because the multi-week projection has not been measured for this path.",
+    controlUnprovenBody: (gap: string) =>
+      `The pure-points plan behind this price was not proven optimal (gap ≤ ${gap} pts): the tag is a reading with that bound, not a proof.`,
+    overlapLine: (count: number) => `${count} of the rival's eleven in your fifteen`,
+    gapLine: (points: string) => `expected gap vs rival ${points}`,
+    captainShared: "same captain",
+    planWithinFree: (cap: number, target: number, applied: number) =>
+      `Played within ${cap} free transfer${cap === 1 ? "" : "s"}, no hits: the strategy asked for ${target} of the rival's eleven and ${applied} was reachable.`,
+    planWithHits: (cap: number, target: number) =>
+      `Reaching ${target} of the rival's eleven needed more than the ${cap} free transfer${cap === 1 ? "" : "s"}; the hits are charged in the price and still came out ahead.`,
+    alternativeWithHits: (applied: number, hits: string, cost: string) =>
+      `Not taken: reaching ${applied} with hits would have cost ${hits} hit points, ${cost} expected points against pure points.`,
+    alternativeWithinFree: (applied: number, cost: string) =>
+      `Not taken: staying within the free transfers reached ${applied} at ${cost} expected points against pure points.`,
     templatesTitle: "Game templates",
     templatesBody:
       "A template is a named strategy-and-window pair. Applying one sets the same shareable selection the controls read; your own templates live in this browser.",
-    templateMeta: (strategy: string, window: number) => `${strategy} · ${window}w`,
+    templateMeta: (strategy: string, window: number, rival: string) =>
+      `${strategy} · ${window}w · ${rival}`,
     templateNamePlaceholder: "Name this combination",
     templateSave: "Save current",
     templateRemove: (name: string) => `Remove template ${name}`,
@@ -372,9 +415,9 @@ const en = {
     notAvailableBody:
       "The page is ready for the post-deadline public entry feed. No example records are shipped in the production build.",
     loadingEntry: "Loading this member's squad…",
-    adviceNotComputed: "This mode and horizon were not computed for this publish.",
+    adviceNotComputed: "This combination was not computed for this publish.",
     adviceNotComputedBody:
-      "The site publishes the decision it actually solved. Pure points over one week is the computed pair; the competitive modes are priced on the controls above rather than solved for each member.",
+      "The site publishes the decisions it actually solved from your squad: pure points, and each strategy against each rival where a plan exists. A pair that has no plan says so in the rival list.",
     entryNotAvailable: "This member is not available yet.",
     entryNotAvailableBody:
       "The public post-deadline squad or its advice has not been published to this site build.",
@@ -444,8 +487,25 @@ const en = {
     modeTradeoffReason:
       "The mode changes the point trade-off, never a claimed chance of beating a rival.",
     planCost: (points: string) =>
-      `This mode's plan gives up ~${points} expected points against the pure-points pick.`,
+      `This strategy gives up ~${points} expected points against the pure-points pick, hits included.`,
     planRival: (name: string) => `priced against ${name}'s squad`,
+    lineupTitle: "Your gameweek",
+    lineupRule:
+      "Captain, vice-captain, eleven and bench order follow the same projection as the moves; the bench is listed in the order the game's automatic substitutions walk it.",
+    expectedOwnPoints: (points: string) =>
+      `${points} expected points for the eleven with the captain doubled`,
+    captainLabel: "Captain",
+    viceCaptainLabel: "Vice-captain",
+    startingXiLabel: "Starting eleven",
+    benchOrderLabel: "Bench order",
+    chipLabel: "Chip",
+    chipNone: "No chip this gameweek",
+    chipNames: {
+      bboost: "Bench Boost",
+      "3xc": "Triple Captain",
+      wildcard: "Wildcard",
+      freehit: "Free Hit",
+    } as Record<string, string>,
     linkTitle: "Classic league 352490",
     linkBody:
       "The member surface is prepared mock-first; every row will link to that entry's public post-deadline squad and suggested moves.",
@@ -722,8 +782,6 @@ const tr: MessageSchema<typeof en> = {
     shareable: "URL'de paylaşılabilir",
     intro:
       "Pencere ve oyun modu, öneriyi hangi açıdan okumak istediğinizi kaydeder. Bu ekran mevcut ledger kararını gösterir; seçimi değiştirmek henüz yeni bir optimizasyon çalıştırmaz.",
-    entryIntro:
-      "Pencere ve oyun modu bu üyenin örnek önerisini seçer. Bu kontroller bir puan ödünleşimini anlatır; ligi geçme olasılığı iddia etmez.",
     horizon: "Planlama Penceresi",
     week: (count) => `${count} hafta`,
     liveControl: "canlı kontrol",
@@ -768,7 +826,6 @@ const tr: MessageSchema<typeof en> = {
       aheadFive: "P(5+ önde)",
       cost: "maliyet",
       points: "puan",
-      expectedPointCost: (pointsValue) => `~${pointsValue} beklenen puan maliyeti`,
     },
   },
   rivals: {
@@ -882,10 +939,9 @@ const tr: MessageSchema<typeof en> = {
   },
   leagueMembers: {
     computeTitle: "Bu planı hesapla",
-    computeBodySelf: "Kendi kadrondan bir haftalık saf puan planı hesaplat.",
+    computeBodySelf: "Bu bir haftalık planı kendi kadrondan hesaplat.",
     computeBodyOther:
       "Başka bir üyeye bakıyorsun. Hesap bu üyenin herkese açık kadrosundan başlar.",
-    computeRival: "Rakip",
     computeRivalNearest: "Sıralamada hemen üstündeki",
     computeButton: "Hesapla",
     computeRequesting: "İstek gönderiliyor…",
@@ -896,7 +952,7 @@ const tr: MessageSchema<typeof en> = {
     computeDone: "Plan hazır",
     computePublished: "Yayınlanmış plan",
     computeUnsupportedSelection:
-      "Hesapla şu anda yalnız Saf Puan / 1 hafta için kullanılabilir. Diğer mod ve ufuklarda yayınlanmış araştırma planları görüntülenebilir; henüz yeni hesap istenemez.",
+      "Hesapla bir haftalık planları destekler: saf puan ya da rakip seçilmiş bir strateji. Daha uzun pencereler üyeler için henüz hesaplanmıyor.",
     computeProvenance: (capture: string, at: string) => `Capture ${capture}, sonuç tarihi ${at}.`,
     computeStaticFallback: "Backend'e ulaşılamadı; bu, yayınlanmış statik cevap.",
     computeUnavailable: "Şu an yalnız yayınlanmış site var; bu kombinasyon yayınlanmamış.",
@@ -914,10 +970,57 @@ const tr: MessageSchema<typeof en> = {
     viewerSelected: (name: string) =>
       `${name} olarak bakıyorsun. Tavsiye sayfaları bu kadrodan başlayacak.`,
     viewerClear: "Seçimi kaldır",
+    viewerOpenMine: "Kadromu aç →",
+    notYourPageTitle: "Bu senin sayfan değil",
+    notYourPageBody: "Kendin olarak başka bir satırı seçtin; bu sayfa bu üyeye öneri verir.",
+    notYourPageLink: "Kendi sayfama git →",
+    strategyTitle: "Oyunun",
+    strategyIntro:
+      "Aşağıdaki her seçenek senin kadrondan çözüldü; rakip stratejisi karşısında oynadığın üyeyi adlandırır.",
+    strategyLegend: "Strateji",
+    strategies: {
+      "saf-puan": {
+        name: "Saf puan",
+        description: "En yüksek beklenen puan; denklemde rakip yok.",
+      },
+      "ortak-koru": {
+        name: "Ortak çekirdeği koru",
+        description:
+          "Rakibin on birinden ücretsiz transferlerin ulaştığı kadarını tut, en çok dokuz; hit yalnız kendini ödüyorsa harcanır.",
+      },
+      "fark-yarat": {
+        name: "Fark yarat",
+        description:
+          "Rakibin on birinden ücretsiz transferlerin izin verdiği kadar azını tut, en az beş; paylaşmadığın oyuncular farkı belirler.",
+      },
+    },
+    rivalLegend: "Rakip",
+    rivalLabel: "Karşısında oynadığın üye",
+    rivalDefaultSuffix: "(sıralamada hemen üstün)",
+    rivalUnavailableSuffix: "(hesaplanamadı)",
+    rivalNone: "Bu hafta için başka bir üyenin kadrosu yayınlanmamış.",
+    rivalNote: "Rakibin açık on biri bir kısıt ve bir karşılaştırmadır, başka bir şey değil.",
+    windowLegend: "Pencere",
+    windowNotComputed:
+      "Haftalık: üç ve beş haftalık planlar hesaplanmıyor, çünkü çok haftalı projeksiyon bu yol için ölçülmedi.",
+    controlUnprovenBody: (gap: string) =>
+      `Bu fiyatın arkasındaki saf puan planı en iyi diye kanıtlanamadı (fark ≤ ${gap} puan): etiket o sınırla bir okuma, kanıt değil.`,
+    overlapLine: (count: number) => `rakibin on birinden ${count} tanesi senin on beşinde`,
+    gapLine: (pointsValue: string) => `rakibe karşı beklenen fark ${pointsValue}`,
+    captainShared: "aynı kaptan",
+    planWithinFree: (cap: number, target: number, applied: number) =>
+      `${cap} ücretsiz transfer içinde, hit yok: strateji rakibin on birinden ${target} istedi, ${applied} ulaşılabilirdi.`,
+    planWithHits: (cap: number, target: number) =>
+      `Rakibin on birinden ${target} tanesine ulaşmak ${cap} ücretsiz transferden fazlasını istedi; hit'ler fiyata dahil ve yine de önde çıktı.`,
+    alternativeWithHits: (applied: number, hits: string, cost: string) =>
+      `Tercih edilmedi: hit'lerle ${applied} tanesine ulaşmak ${hits} hit puanı, saf puana göre ${cost} beklenen puan mal olurdu.`,
+    alternativeWithinFree: (applied: number, cost: string) =>
+      `Tercih edilmedi: ücretsiz transferlerde kalmak ${applied} tanesine ulaşırdı, saf puana göre ${cost} beklenen puana.`,
     templatesTitle: "Oyun şablonları",
     templatesBody:
       "Şablon, adlandırılmış bir strateji-pencere çiftidir. Uygulamak, kontrollerin okuduğu paylaşılabilir seçimi kurar; kendi şablonların bu tarayıcıda durur.",
-    templateMeta: (strategy: string, window: number) => `${strategy} · ${window}h`,
+    templateMeta: (strategy: string, window: number, rival: string) =>
+      `${strategy} · ${window}h · ${rival}`,
     templateNamePlaceholder: "Bu kombinasyonu adlandır",
     templateSave: "Seçimi kaydet",
     templateRemove: (name: string) => `${name} şablonunu kaldır`,
@@ -926,9 +1029,9 @@ const tr: MessageSchema<typeof en> = {
     notAvailableBody:
       "Sayfa son tarih sonrası public entry akışına hazırdır. Örnek kayıtlar production paketine dahil edilmez.",
     loadingEntry: "Üyenin kadrosu yükleniyor…",
-    adviceNotComputed: "Bu mod ve ufuk bu yayın için hesaplanmadı.",
+    adviceNotComputed: "Bu kombinasyon bu yayın için hesaplanmadı.",
     adviceNotComputedBody:
-      "Site yalnızca gerçekten çözdüğü kararı yayınlar. Hesaplanan çift saf puan / 1 hafta; rekabetçi modlar her üye için çözülmek yerine yukarıdaki kontrollerde fiyatlanır.",
+      "Site, kadrondan gerçekten çözdüğü kararları yayınlar: saf puan ve plan bulunan her rakibe karşı her strateji. Planı olmayan bir çift rakip listesinde bunu söyler.",
     entryNotAvailable: "Bu üye henüz kullanılamıyor.",
     entryNotAvailableBody:
       "Son tarih sonrası public kadro veya öneri bu site paketine henüz yayımlanmadı.",
@@ -998,8 +1101,24 @@ const tr: MessageSchema<typeof en> = {
     modeTradeoffReason:
       "Mod, rakibi geçme olasılığı iddia etmek yerine puan ödünleşimini değiştirir.",
     planCost: (pointsValue) =>
-      `Bu modun planı, saf puan seçimine göre ~${pointsValue} beklenen puandan vazgeçiyor.`,
+      `Bu strateji, saf puan seçimine göre ~${pointsValue} beklenen puandan vazgeçiyor (hit'ler dahil).`,
     planRival: (name) => `${name} kadrosuna göre fiyatlandı`,
+    lineupTitle: "Bu haftaki kadron",
+    lineupRule:
+      "Kaptan, yedek kaptan, ilk on bir ve yedek sırası hamlelerle aynı projeksiyondan gelir; yedekler oyunun otomatik değişikliklerinin izlediği sırayla listelenir.",
+    expectedOwnPoints: (pointsValue) => `${pointsValue} beklenen puan (ilk on bir, kaptan iki kat)`,
+    captainLabel: "Kaptan",
+    viceCaptainLabel: "Yedek kaptan",
+    startingXiLabel: "İlk on bir",
+    benchOrderLabel: "Yedek sırası",
+    chipLabel: "Çip",
+    chipNone: "Bu hafta çip yok",
+    chipNames: {
+      bboost: "Bench Boost",
+      "3xc": "Triple Captain",
+      wildcard: "Wildcard",
+      freehit: "Free Hit",
+    },
     linkTitle: "Klasik lig 352490",
     linkBody:
       "Üye yüzeyi mock-first hazırlandı; her satır üyenin son tarih sonrası public kadrosuna ve önerilen hamlelerine bağlanacak.",

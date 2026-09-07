@@ -26,14 +26,15 @@ The mechanism has grown without a home. Measured on `b031ef1`:
 
   | Literal | Sites |
   | --- | --- |
-  | `single_gameweek_realized_squad_points_v1` | `backtest/candidate_residuals.py:33`, `backtest/policy_evaluation.py:46`, `backtest/production_benchmark.py:129`, `bayesopt/evaluation.py:27`, `experiments/policy_objective.py:43` |
+  | `single_gameweek_realized_squad_points_v1` | `backtest/candidate_residuals.py:33`, `backtest/production_benchmark.py:129`, `bayesopt/evaluation.py:27`, `experiments/policy_objective.py:43` (a fifth site, `backtest/policy_evaluation.py:46`, was removed with that dead module) |
   | `linear_fixture_count_scaling_v1` | `backtest/horizon_decay.py:50`, `live/horizon.py:74` |
-  | `form_window_v1` | `backtest/policy_evaluation.py:47` as `FORM_WINDOW_MAPPING_VERSION`, `prediction/factors.py:10` as `FEATURE_GENERATION_CONTRACT_VERSION` |
+  | `form_window_v1` | `prediction/factors.py:10` as `FEATURE_GENERATION_CONTRACT_VERSION`; the duplicate, `backtest/policy_evaluation.py:47` as `FORM_WINDOW_MAPPING_VERSION`, was removed with that dead module |
 
-The last row is the one that should worry us. The same contract identity is asserted under two
-different names in two different layers. Nothing detects it if one of them is bumped and the
-other is not, and the artifacts would then claim two versions of one thing while looking
-perfectly self-consistent.
+The last row was the one that should worry us. The same contract identity was asserted under
+two different names in two different layers. Nothing detected it if one of them was bumped and
+the other was not, and the artifacts would then have claimed two versions of one thing while
+looking perfectly self-consistent. Deleting the dead module closed that instance; the decision
+below is what stops the next one.
 
 ## Decision
 

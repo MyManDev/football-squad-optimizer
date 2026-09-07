@@ -11,15 +11,15 @@
  * here in the boundary, not in page-by-page error handling.
  */
 
-import type { PlayMode, WindowSize } from "../../moves/modePrices";
+import type { WindowSize } from "../../moves/modePrices";
 import { LeagueDataError, LeagueDataMissing, loadEntryAdvice } from "../data";
-import type { EntryAdvice, LeagueViewEnvelope } from "../types";
+import type { AdviceStrategy, EntryAdvice, LeagueViewEnvelope } from "../types";
 import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
 
 export interface AdviceRequest {
   leagueId: number;
   entryId: number;
-  strategy: PlayMode;
+  strategy: AdviceStrategy;
   window: WindowSize;
   rivalEntryId?: number | null;
   /** Display context only; the server resolves its own immutable computation inputs. */
@@ -55,8 +55,9 @@ export interface AdviceJobStatus {
 
 type AdviceLoader = (
   entryId: number,
-  mode: PlayMode,
+  mode: AdviceStrategy,
   window: WindowSize,
+  rivalEntryId?: number | null,
 ) => Promise<LeagueViewEnvelope<EntryAdvice>>;
 
 /** Serves the published static tree — today's site, byte for byte. */
@@ -70,7 +71,12 @@ export class StaticOnlyAdviceClient implements AdviceClient {
   async readAdvice(request: AdviceRequest): Promise<AdviceReadResult> {
     try {
       const envelope = checkedAdvice(
-        await this.loader(request.entryId, request.strategy, request.window),
+        await this.loader(
+          request.entryId,
+          request.strategy,
+          request.window,
+          request.rivalEntryId ?? null,
+        ),
         request,
       );
       return { kind: "advice", envelope, source: "static" };

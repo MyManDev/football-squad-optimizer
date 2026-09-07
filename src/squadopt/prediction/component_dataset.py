@@ -63,11 +63,10 @@ COMPONENT_DEVELOPMENT_SEASONS_V2: Final = (
     "2025-26",
 )
 
-# Declared locally on purpose. The frozen mapping's own version string lives in
-# ``backtest.policy_evaluation``, which sits above this layer, so importing it would
-# invert the dependency the layer contract enforces. This name identifies *this* feature
-# set, which is the default windows plus the appearance decomposition the component split
-# needs, and it moves only when that set moves.
+# Declared locally on purpose. The frozen mapping's own version string is
+# ``FEATURE_GENERATION_CONTRACT_VERSION`` in ``prediction.factors``; this name is not a copy
+# of it. It identifies *this* feature set, which is the default windows plus the appearance
+# decomposition the component split needs, and it moves only when that set moves.
 FEATURE_CONTRACT_VERSION: Final = "phase_c_component_form_window_v1"
 
 # The appearance decomposition is the reason for a non-default config: `appearance_rate`

@@ -360,13 +360,18 @@ def test_the_artifact_is_written_exactly_once(tmp_path: Path) -> None:
 def test_no_field_this_study_records_can_reach_a_published_payload() -> None:
     """The study's names are internal; the published surface is a closed set."""
 
+    # The decision's ``captain`` — a player pick — is publishable; what this study
+    # records about the captain are realized errors, and those are named here by their
+    # own keys so the guard keeps them out of any payload.
     recorded = {
         "classification",
         "eligible_scales",
         "scale_levels",
         "control_replay",
         "common_shock",
-        "captain",
+        "captain_realized_error",
+        "mean_captain_realized_error_below_lower_quantile",
+        "mean_captain_realized_error_elsewhere",
         "mean_probability_integral_transform",
         "below_lower_quantile_rate",
         "below_lower_quantile_folds",

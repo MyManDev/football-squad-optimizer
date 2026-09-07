@@ -7,19 +7,33 @@ import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
-import { DecisionControls } from "../../moves/components/DecisionControls";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { createAdviceClient, type AdviceClient, type AdviceSource } from "../advice/adviceClient";
 import { canComputeAdvice, selectedAdviceRequest } from "../advice/adviceSelection";
 import { checkedAdvice } from "../advice/adviceResponse";
+import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { sameAdviceRequest, useAdviceJob } from "../advice/useAdviceJob";
+import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
-import { useDecisionSelection } from "../../moves/decisionSelection";
 import { Pitch } from "../../squad/components/Pitch";
 import { SquadPage } from "../../squad/pages/SquadPage";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import { LeagueDataMissing, loadEntryAdvice, loadEntrySquad, loadLeagueMembers } from "../data";
-import type { AdviceMove, EntryAdvice, EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
+import {
+  LeagueDataMissing,
+  loadEntryAdvice,
+  loadEntryAdviceIndex,
+  loadEntrySquad,
+  loadLeagueMembers,
+} from "../data";
+import type {
+  AdviceMove,
+  AdvicePlayer,
+  EntryAdvice,
+  EntryAdviceIndex,
+  EntrySquad,
+  EntryView,
+  LeagueViewEnvelope,
+} from "../types";
 import styles from "./LeagueMemberPage.module.css";
 
 /** Why no published advice is on hand for the selection: never published, or not loadable. */
@@ -30,7 +44,7 @@ export function LeagueMemberPage() {
   const copy = messages.leagueMembers;
   const entryParam = useParams().entryId;
   const entryId = Number(entryParam);
-  const { mode, windowSize } = useDecisionSelection();
+  const [searchParams] = useSearchParams();
   const validEntryId = Number.isSafeInteger(entryId) && entryId > 0;
   const squad = useQuery({
     queryKey: ["provisional-entry-squad", entryId],
@@ -38,15 +52,41 @@ export function LeagueMemberPage() {
     enabled: validEntryId,
     staleTime: 60_000,
   });
-  const advice = useQuery({
-    queryKey: ["provisional-entry-advice", entryId, mode, windowSize],
-    queryFn: () => loadEntryAdvice(entryId, mode, windowSize),
-    enabled: validEntryId,
-    staleTime: 60_000,
-  });
   const membersQuery = useQuery({
     queryKey: ["provisional-league-members"],
     queryFn: loadLeagueMembers,
+    staleTime: 60_000,
+  });
+  // The index says which (strategy, rival) files the producer wrote for this member; a
+  // tree from before the menu has none, and the page then offers the baseline only.
+  const indexQuery = useQuery({
+    queryKey: ["provisional-entry-advice-index", entryId],
+    queryFn: () => loadEntryAdviceIndex(entryId),
+    enabled: validEntryId,
+    staleTime: 60_000,
+    retry: false,
+  });
+  const members = membersQuery.data?.payload.members ?? [];
+  const index = indexQuery.data?.payload ?? null;
+  const request = selectedAdviceRequest(
+    searchParams,
+    squad.data?.payload.league_id ?? 0,
+    entryId,
+    members,
+    undefined,
+    index?.default_rival_entry_id ?? null,
+  );
+  const advice = useQuery({
+    queryKey: [
+      "provisional-entry-advice",
+      entryId,
+      request.strategy,
+      request.window,
+      request.rivalEntryId,
+    ],
+    queryFn: () =>
+      loadEntryAdvice(entryId, request.strategy, request.window, request.rivalEntryId ?? null),
+    enabled: validEntryId && !membersQuery.isPending && !indexQuery.isPending,
     staleTime: 60_000,
   });
 
@@ -70,7 +110,8 @@ export function LeagueMemberPage() {
       squad={squad.data}
       advice={advice.isError ? null : advice.data}
       adviceIssue={adviceIssue}
-      members={membersQuery.data?.payload.members ?? []}
+      members={members}
+      index={index}
     />
   );
 }
@@ -110,6 +151,7 @@ interface LeagueMemberViewProps {
   advice: LeagueViewEnvelope<EntryAdvice> | null;
   adviceIssue?: AdviceIssue;
   members?: EntryView[];
+  index?: EntryAdviceIndex | null;
   client?: AdviceClient;
 }
 
@@ -132,20 +174,26 @@ function LeagueMemberContent({
   advice,
   adviceIssue,
   members = [],
+  index = null,
   client,
 }: LeagueMemberViewProps) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = squad.payload;
   const [searchParams] = useSearchParams();
+  const { viewer } = useViewerEntry();
   const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
   const job = useAdviceJob(adviceClient);
   const leagueId = view.league_id;
   const entryId = view.entry.entry_id;
-  const request = selectedAdviceRequest(searchParams, leagueId, entryId, members, {
-    season: view.season,
-    gameweek: view.gameweek,
-  });
+  const request = selectedAdviceRequest(
+    searchParams,
+    leagueId,
+    entryId,
+    members,
+    { season: view.season, gameweek: view.gameweek },
+    index?.default_rival_entry_id ?? null,
+  );
   const requestKey = [
     request.leagueId,
     request.entryId,
@@ -271,11 +319,19 @@ function LeagueMemberContent({
         <h2 className="visually-hidden" id="entry-advice-title">
           {copy.advice}
         </h2>
+        {viewer !== null && viewer.entryId !== entryId ? (
+          <Card tone="muted" title={copy.notYourPageTitle}>
+            <p className={styles.notice}>
+              {copy.notYourPageBody}{" "}
+              <Link to={`/league/members/${viewer.entryId}`}>{copy.notYourPageLink}</Link>
+            </p>
+          </Card>
+        ) : null}
         <TemplatePicker />
-        <DecisionControls variant="entry" />
+        <MemberDecisionControls entryId={entryId} members={members} index={index} />
         <AdviceRequestPanel request={request} job={job} />
         {shown ? (
-          <AdviceCard shown={shown} />
+          <AdviceCard shown={shown} members={members} />
         ) : (
           <MissingAdviceCard
             issue={advice && !published ? "not-computed" : (adviceIssue ?? "not-computed")}
@@ -305,11 +361,18 @@ function MissingAdviceCard({ issue, canCompute }: { issue: AdviceIssue; canCompu
   );
 }
 
-function AdviceCard({ shown }: { shown: ShownAdvice }) {
+function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: EntryView[] }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
   const view = envelope.payload;
+  const rival =
+    view.rival_entry_id === undefined
+      ? null
+      : (members.find(
+          (member) => member.member_kind === "human" && member.entry_id === view.rival_entry_id,
+        ) ?? null);
+  const rivalName = rival ? (rival.team_name ?? rival.manager_name ?? null) : null;
   return (
     <Card
       title={copy.advice}
@@ -339,7 +402,43 @@ function AdviceCard({ shown }: { shown: ShownAdvice }) {
           <strong className="num">
             {copy.planCost(points(view.expected_points_cost, 1, locale))}
           </strong>
-          {view.rival_label ? <span> · {copy.planRival(view.rival_label)}</span> : null}
+          {(rivalName ?? view.rival_label) ? (
+            <span> · {copy.planRival(rivalName ?? String(view.rival_label))}</span>
+          ) : null}
+        </p>
+      ) : null}
+      {view.control_solver_status === "FEASIBLE" ? (
+        <p className={styles.honesty}>
+          <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
+          {copy.controlUnprovenBody(points(view.control_optimality_gap ?? 0, 1, locale))}
+        </p>
+      ) : null}
+      {view.overlap_count != null && view.expected_gap_vs_rival != null ? (
+        <p className={styles.muted}>
+          {copy.overlapLine(view.overlap_count)} ·{" "}
+          {copy.gapLine(signedPoints(view.expected_gap_vs_rival, 1, locale))}
+          {view.captain_agreement ? ` · ${copy.captainShared}` : ""}
+        </p>
+      ) : null}
+      {view.plan_kind && view.transfer_cap != null && view.overlap_target != null ? (
+        <p className={styles.muted}>
+          {view.plan_kind === "within_free_transfers"
+            ? copy.planWithinFree(view.transfer_cap, view.overlap_target, view.overlap_applied ?? 0)
+            : copy.planWithHits(view.transfer_cap, view.overlap_target)}
+          {view.alternative_plan
+            ? ` ${
+                view.alternative_plan.kind === "with_hits"
+                  ? copy.alternativeWithHits(
+                      view.alternative_plan.overlap_applied,
+                      points(view.alternative_plan.transfer_hit_points ?? 0, 0, locale),
+                      points(view.alternative_plan.expected_points_cost, 1, locale),
+                    )
+                  : copy.alternativeWithinFree(
+                      view.alternative_plan.overlap_applied,
+                      points(view.alternative_plan.expected_points_cost, 1, locale),
+                    )
+              }`
+            : ""}
         </p>
       ) : null}
       {view.moves.length === 0 ? (
@@ -353,8 +452,105 @@ function AdviceCard({ shown }: { shown: ShownAdvice }) {
           ))}
         </div>
       )}
+      <LineupSection view={view} />
       <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
     </Card>
+  );
+}
+
+/**
+ * The rest of the decision: armband, chip, the eleven and the bench order. Rendered only
+ * when the producer published them — a document from before the producer carried the
+ * plan week, or a decision handed over without it, shows the moves alone.
+ */
+function LineupSection({ view }: { view: EntryAdvice }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const { captain, vice_captain: vice, starting_xi: eleven, bench } = view;
+  if (!captain || !vice || !eleven || !bench) return null;
+  const chipName = view.chip ? (copy.chipNames[view.chip] ?? view.chip) : null;
+  const mark = (player: AdvicePlayer) =>
+    player.player_id === captain.player_id ? "C" : player.player_id === vice.player_id ? "V" : null;
+  return (
+    <section className={styles.lineup} aria-label={copy.lineupTitle}>
+      <h3 className={styles.lineupTitle}>{copy.lineupTitle}</h3>
+      <p className={styles.honesty}>{copy.lineupRule}</p>
+      {view.expected_own_points != null ? (
+        <p className={styles.planCost}>
+          <strong className="num">
+            {copy.expectedOwnPoints(points(view.expected_own_points, 1, locale))}
+          </strong>
+        </p>
+      ) : null}
+      <dl className={styles.armband}>
+        <div>
+          <dt>{copy.captainLabel}</dt>
+          <dd>
+            <strong>{captain.name}</strong>{" "}
+            <span className={styles.muted}>
+              {captain.team} · {captain.position}
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt>{copy.viceCaptainLabel}</dt>
+          <dd>
+            <strong>{vice.name}</strong>{" "}
+            <span className={styles.muted}>
+              {vice.team} · {vice.position}
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt>{copy.chipLabel}</dt>
+          <dd>{chipName ? <Badge tone="good">{chipName}</Badge> : copy.chipNone}</dd>
+        </div>
+      </dl>
+      <h4 className={styles.lineupSub}>{copy.startingXiLabel}</h4>
+      <div className={styles.bench}>
+        {eleven.map((player, index) => (
+          <LineupRow key={player.player_id} player={player} order={index + 1} mark={mark(player)} />
+        ))}
+      </div>
+      <h4 className={styles.lineupSub}>{copy.benchOrderLabel}</h4>
+      <div className={styles.bench}>
+        {bench.map((player, index) => (
+          <LineupRow key={player.player_id} player={player} order={index + 1} mark={null} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function LineupRow({
+  player,
+  order,
+  mark,
+}: {
+  player: AdvicePlayer;
+  order: number;
+  mark: "C" | "V" | null;
+}) {
+  const { locale } = useLanguage();
+  return (
+    <div className={styles.benchRow}>
+      <span className="num">{order}</span>
+      <strong>
+        {player.name}
+        {mark ? (
+          <>
+            {" "}
+            <Badge tone={mark === "C" ? "good" : "neutral"}>{mark}</Badge>
+          </>
+        ) : null}
+      </strong>
+      <span className={styles.muted}>
+        {player.team} · {player.position}
+      </span>
+      <span className={`${styles.benchPoints} num`}>
+        {player.expected_points != null ? `${points(player.expected_points, 1, locale)} xP` : ""}
+      </span>
+    </div>
   );
 }
 

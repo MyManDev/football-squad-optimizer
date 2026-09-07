@@ -34,7 +34,7 @@ one top-level module:
 | Runtime and registries | `platform` |
 | Convenience wiring | `integration.py`, `squadopt/__init__.py` |
 
-Outside the package: 77 files in `scripts/` and a `web/` frontend, which is not a Python
+Outside the package: 105 files in `scripts/` and a `web/` frontend, which is not a Python
 package and is therefore outside the import contract entirely — see
 [platform and runtime boundary](platform_runtime.md).
 
@@ -143,7 +143,7 @@ concepts. They belong in `evaluation`, which sits below both.
 - **`scripts/` and `tests/` inversions.** `src/` imports neither, so the useful direction of
   that arrow is preserved. But `tests/` imports `scripts/` at 24 sites, several reaching
   private members (for example `tests/unit/test_risk_reporting.py:5`, which imports three),
-  and 77 entry-point modules are unchecked by two of the five gates. Ruff is **not** one of
+  and 105 `scripts/` modules are unchecked by two of the five gates. Ruff is **not** one of
   them: `ruff check .` and `ruff format --check .` both cover `scripts/`, and ruff's `src`
   setting governs first-party import resolution rather than which files are checked. The two
   that stop at the package boundary are mypy (`files = ["src/squadopt"]`) and `lint-imports`,
