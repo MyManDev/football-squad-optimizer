@@ -405,6 +405,7 @@ def _pinned(draw: ComponentScenarioDraw, calibrated_versions: Sequence[tuple[str
     identity = (provenance.model_version, draw_sampler_version(draw))
     return (
         identity in tuple(calibrated_versions)
+        and provenance.development_contract is None
         and provenance.model_version == projection_provenance.model_version
         and provenance.feature_contract_version == projection_provenance.feature_contract_version
         and provenance.season == draw.scenarios.target.season

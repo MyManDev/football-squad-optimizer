@@ -84,7 +84,47 @@ a property of the budget, not of the sampler. And realized-score equality betwee
 necessary condition for identical decisions, never a proof, because artifacts before this
 change carry no decision identity for the Phase D control.
 
-## Member transfer decisions are a different scope
+## Phase C/D v2 inputs
+
+The explicit `--phase-c-contract development_v2` path reads the equal-weight A reference
+through the existing v2 reader, pinned by `--expected-table-sha256`,
+`--expected-roster-sha256` and `--expected-manifest-sha256`. This extends the development
+population to the declared v2 seasons, including 2025-26. It does not change the v1
+137-fold path, the sampler settings, the candidate counts, utility, budget or acceptance
+thresholds. These are development readings on seen data.
+
+E2 uses `--all-development-folds` for the complete population, or `--fold` for an explicit
+pilot. Each pool is prepared with decision-week outcomes masked. History eligibility
+uses only earlier residual rows; direct-control abstention is determined by a full-pool
+control solve. Failed controls are named failures. A pilot never establishes the complete
+eligible population and cannot freeze K. Full preparation includes those control solves
+in its reported duration; it is not free preprocessing. The original three live captures
+remain generation diagnostics and are not backfilled.
+
+The probe writes `phase_e_runtime_probe_development_v2`; its source, full/eligible/measured
+fold lists and exclusions join the sampler, worker/BLAS settings and producer revision in
+checkpoint identity. A v1 checkpoint or a different v2 reference cannot be resumed as this
+run. The fold rule uses the complete declared v2 eligible population rather than the old
+137 constant. A partial or failed record is not a completed measurement.
+
+E3 requires `--phase-d-development` naming a complete
+`phase_d_component_squad_calibration_development_v2` record, the same three pinned inputs,
+and the matching conditional sampler. A pilot, unverified fidelity, omitted/unsolved/unscored
+fold, changed reference or conflicting sampler is refused. The recorded D verdict is
+recomputed from its fold readings. The handoff independently supplies history eligibility
+again, and E2 must name that same population and development provenance. Before scoring,
+each regenerated E3 control must equal D's complete recorded decision identity. A mismatch
+is a named error; equal realized totals alone do not establish equal decisions.
+
+The experiment-only selector in `scripts._phase_e_development` preserves provenance and
+uses the existing candidate validation, official scorer, integer utility, coverage and
+first-rank tie rule. The production selector and member-transfer core continue refusing
+development draws even under a matching model/sampler pin. The E3 result and aggregate use
+`phase_e_shadow_development_v2`, with `binding: false`, `e4_permitted: false` and honest
+holdout-access metadata. The default scorer/aggregate still refuse 2025-26 without the
+explicit development contract. A development result cannot enter E4 or change the pin.
+
+## Member transfer application connection
 
 Phase E generates complete squads from the full pool. The member advice path plans transfers
 from a held squad under bank, free-transfer, hit and chip rules. A full-pool E2/E3 result says
@@ -92,3 +132,10 @@ nothing about that path. The core connection for scoring transfer candidates on 
 component draw (`squadopt.scenarios.transfer_decisions`) keeps those rules, applies the
 transfer hit once, and carries its own small validation plan; it makes no claim about the
 public mode names.
+
+The application accepts an optional local diagnostic hook around its already-solved
+single-week saf-puan control. With no reviewed pin or no hook it does not adapt candidates,
+generate a menu, draw scenarios or score alternatives. With both, the hook can supply
+existing planner alternatives and one eligible draw to the transfer core and record the
+returned diagnostic internally. The result never replaces the advice payload or adds a
+public field; member-transfer promotion still requires its own evidence.

@@ -23,6 +23,14 @@ back before any scenario is scored, so that early fallback's runtime is recorded
 and scoring runtime is measured directly. Repeatability and seed sensitivity, which need a
 selection that reaches the scenarios, use a probe-only pin equal to the draw's own provenance.
 That override is labelled on every record, is not the production pin and claims no calibration.
+
+``--phase-c-contract development_v2`` explicitly reads the three-SHA-pinned equal-weight
+Phase C v2 reference with the conditional sampler. Its history and direct-control eligibility
+are computed from outcome-free pools; ``--all-development-folds`` establishes that complete
+population, while ``--fold`` is a partial pilot that cannot freeze K. Development provenance
+is retained and the experiment-only selection helper measures its probe pin; the production
+selector continues to refuse development draws. This path emits its own v2 contract and
+cannot reuse a v1 checkpoint.
 """
 
 from __future__ import annotations
@@ -43,6 +51,7 @@ from typing import Any, Final
 
 import numpy as np
 import pandas as pd
+from scripts import run_component_squad_calibration as binding
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
@@ -56,10 +65,10 @@ from scripts._phase_e_checkpoints import (
     utc_now,
     write_status,
 )
+from scripts._phase_e_development import select_development_candidate
 from scripts._phase_e_inputs import PhaseDBindingEvidence, load_phase_d_binding
 from scripts.run_component_squad_calibration import (
     BINDING_FOLD_COUNT,
-    DECISION_SEASONS,
     DIRECT_CONTROL_ABSTENTIONS,
     HISTORY_BURN_IN_FOLDS,
     HISTORY_SEASONS,
@@ -85,13 +94,14 @@ from squadopt.optimization import (
     SquadCandidateSet,
     decision_signature,
     generate_squad_candidates,
+    optimize_squad,
 )
 from squadopt.prediction import (
     PredictionProvenance,
     PredictionSnapshot,
     prepare_optimizer_projection,
 )
-from squadopt.prediction.components import COMPONENT_MODEL_ROUTE
+from squadopt.prediction.components import COMPONENT_MODEL_ROUTE, DIRECT_CONTROL_ROUTE
 from squadopt.scenarios import (
     ScenarioConfig,
     ScenarioTarget,
@@ -121,6 +131,7 @@ PROBE_CONTRACT_VERSION: Final = "phase_e_runtime_probe_v2"
 # A run under any sampler other than the frozen foundation sampler is a development probe: it
 # carries its own contract version so the binding E3 loader and the E4 hook cannot read it.
 DEVELOPMENT_PROBE_CONTRACT_VERSION: Final = "phase_e_runtime_probe_development_v1"
+DEVELOPMENT_V2_PROBE_CONTRACT_VERSION: Final = "phase_e_runtime_probe_development_v2"
 SAMPLER_CHOICES: Final = ("foundation", "conditional")
 BLAS_THREAD_VARIABLES: Final = (
     "OPENBLAS_NUM_THREADS",
@@ -192,6 +203,7 @@ class DecisionPoint:
     draw_unavailable_reason: str | None = None
     covered_player_ids: frozenset[int] | None = None
     source: Record | None = None
+    development_only: bool = False
 
     def __post_init__(self) -> None:
         if self.kind not in ("live", "fold"):
@@ -226,7 +238,11 @@ def sampler_record(conditional_residuals: ConditionalResidualConfig | None) -> R
     }
 
 
-def probe_contract_version(conditional_residuals: ConditionalResidualConfig | None) -> str:
+def probe_contract_version(
+    conditional_residuals: ConditionalResidualConfig | None, *, phase_c_contract: str = "v1"
+) -> str:
+    if phase_c_contract == "development_v2":
+        return DEVELOPMENT_V2_PROBE_CONTRACT_VERSION
     return (
         PROBE_CONTRACT_VERSION
         if conditional_residuals is None
@@ -408,14 +424,20 @@ def _select(
     candidates: SquadCandidateSet,
     draw: ComponentScenarioDraw,
     pins: tuple[tuple[str, str], ...],
+    *,
+    development_only: bool = False,
 ) -> Record:
     started = perf_counter()
-    selection = select_phase_e_candidate(
-        candidates.candidates,
-        draw,
-        candidate_count_requested=candidates.candidate_count_requested,
-        candidate_set_complete=candidates.complete,
-        calibrated_versions=pins,
+    selection = (
+        select_development_candidate(candidates, draw, calibrated_versions=pins)
+        if development_only
+        else select_phase_e_candidate(
+            candidates.candidates,
+            draw,
+            candidate_count_requested=candidates.candidate_count_requested,
+            candidate_set_complete=candidates.complete,
+            calibrated_versions=pins,
+        )
     )
     return {
         "status": selection.selection_status.value,
@@ -436,6 +458,11 @@ def _draw_identity(draw: ComponentScenarioDraw) -> Record:
         "deterministic_seed": draw.scenarios.config.deterministic_seed,
         "component_sampler_contract_version": draw_sampler_version(draw),
         "residual_selection": draw.scenarios.diagnostics.get("residual_selection"),
+        **(
+            {"development_contract": draw.inputs.provenance.development_contract}
+            if draw.inputs.provenance.development_contract is not None
+            else {}
+        ),
     }
 
 
@@ -464,10 +491,12 @@ def _probe_scoring(
     # name that sampler: a foundation-shaped pin would send every candidate-sampler draw into
     # the not-calibrated fallback before any scenario was scored.
     probe_pin = ((draw.inputs.provenance.model_version, draw_sampler_version(draw)),)
-    diagnostic = _select(candidates, draw, probe_pin)
+    diagnostic = _select(candidates, draw, probe_pin, development_only=point.development_only)
 
     repeated_draw = point.draw_factory(0)
-    repeated_selection = _select(candidates, repeated_draw, probe_pin)
+    repeated_selection = _select(
+        candidates, repeated_draw, probe_pin, development_only=point.development_only
+    )
     draw_repeat_identical = _draw_identity(repeated_draw) == _draw_identity(draw)
     selection_repeat_identical = (
         repeated_selection["status"] == diagnostic["status"]
@@ -478,7 +507,9 @@ def _probe_scoring(
     by_seed: dict[str, Record] = {"0": diagnostic}
     changes = 0
     for seed in sensitivity_seeds:
-        seeded = _select(candidates, point.draw_factory(seed), probe_pin)
+        seeded = _select(
+            candidates, point.draw_factory(seed), probe_pin, development_only=point.development_only
+        )
         by_seed[str(seed)] = seeded
         if seeded["selected_candidate_rank"] != diagnostic["selected_candidate_rank"]:
             changes += 1
@@ -622,11 +653,13 @@ def candidate_count_rule(
     *,
     expected_live_labels: Sequence[str] = E2_LIVE_LABELS,
     expected_fold_ids: Sequence[str] | None = None,
+    phase_c_contract: str = "v1",
 ) -> Record:
-    """Freeze historical K on 137 folds; retain three original live pools as diagnostics.
+    """Freeze historical K on the complete population; retain three live pool diagnostics.
 
     Every pool needs all three K records. Only historical folds enter the scoring budget
-    and repeatability gate. This rule establishes no prospective live readiness.
+    and repeatability gate. V1 requires 137 folds; explicit v2 uses its computed eligible
+    population. This rule establishes no prospective live readiness.
     """
 
     live_labels = [str(point["label"]) for point in decision_points if point["kind"] == "live"]
@@ -635,7 +668,11 @@ def candidate_count_rule(
         _unique_matches(live_labels, expected_live_labels)
         and len(expected_live_labels) == 3
         and expected_fold_ids is not None
-        and len(expected_fold_ids) == E2_FOLD_COUNT
+        and (
+            bool(expected_fold_ids)
+            if phase_c_contract == "development_v2"
+            else len(expected_fold_ids) == E2_FOLD_COUNT
+        )
         and _unique_matches(fold_labels, expected_fold_ids)
         and len(decision_points) == len(live_labels) + len(fold_labels)
     )
@@ -713,7 +750,11 @@ def candidate_count_rule(
         reason = "largest K proven, repeatable and within budget on every historical E2 fold"
     return {
         "preregistration_version": PREREGISTRATION_VERSION,
-        "gating_population": "binding_development_folds_only",
+        "gating_population": (
+            "phase_c_development_v2_eligible_folds_only"
+            if phase_c_contract == "development_v2"
+            else "binding_development_folds_only"
+        ),
         "live_readiness_established": False,
         "candidate_counts": sorted(set(candidate_counts)),
         "required_candidate_counts": list(PHASE_E_CANDIDATE_COUNTS),
@@ -886,6 +927,7 @@ def _fold_point(
                 season=target.season,
                 target_gameweek=target.gameweek,
                 deterministic_seed=seed,
+                development_contract=handoff.development_contract,
             ),
         )
         return sample_component_scenarios(
@@ -898,7 +940,12 @@ def _fold_point(
         )
 
     return DecisionPoint(
-        label=fold_id, kind="fold", pool=pool, draw_factory=factory, covered_player_ids=covered
+        label=fold_id,
+        kind="fold",
+        pool=pool,
+        draw_factory=factory,
+        covered_player_ids=covered,
+        development_only=handoff.development_contract is not None,
     )
 
 
@@ -918,15 +965,92 @@ def binding_fold_ids(handoff: PhaseCComponentHandoff) -> tuple[str, ...]:
     return eligible
 
 
+def fold_history_seasons(handoff: PhaseCComponentHandoff) -> tuple[str, ...]:
+    if handoff.development_contract is None:
+        return HISTORY_SEASONS
+    seasons = {str(value) for value in handoff.rows["season"].dropna().unique()}
+    outside = seasons - set(binding.DEVELOPMENT_HISTORY_SEASONS[1:])
+    if outside:
+        raise ProbeError(f"development handoff seasons outside the v2 scope: {sorted(outside)!r}.")
+    return (
+        binding.DEVELOPMENT_HISTORY_SEASONS[0],
+        *(season for season in binding.DEVELOPMENT_HISTORY_SEASONS[1:] if season in seasons),
+    )
+
+
+def prepare_development_population(
+    handoff: PhaseCComponentHandoff,
+    archive_root: Path,
+    *,
+    requested: Sequence[str] | None,
+) -> tuple[dict[str, pd.DataFrame], int, Record]:
+    """Apply D v2 eligibility to outcome-free control pools, without scoring outcomes.
+
+    A pilot prepares only its requested folds and never claims the full eligible population.
+    For each decision the history test receives strictly earlier rows; even eligibility does
+    not inspect that decision's observed appearance, minutes or points.
+    """
+
+    ordered = tuple(sorted(str(value) for value in handoff.rows["fold_id"].drop_duplicates()))
+    history_eligible: list[str] = []
+    burn_in: list[str] = []
+    for fold_id in ordered:
+        history = handoff.rows.loc[handoff.rows["fold_id"].astype("string") < fold_id]
+        excluded, eligible = binding._development_population(
+            history, (fold_id,), min_history_folds=ScenarioConfig().min_history_folds
+        )
+        burn_in.extend(excluded)
+        history_eligible.extend(eligible)
+    if requested is not None:
+        if not requested or len(set(requested)) != len(requested):
+            raise ProbeError("--fold must name distinct development fold ids.")
+        invalid = sorted(set(requested) - set(history_eligible))
+        if invalid:
+            raise ProbeError(f"--fold names unknown or history-ineligible folds: {invalid!r}.")
+    selected = (
+        history_eligible
+        if requested is None
+        else [fold_id for fold_id in history_eligible if fold_id in requested]
+    )
+    projections, panel_rows = prepare_fold_projections(handoff, selected, archive_root)
+    direct_control: list[str] = []
+    eligible_ids: list[str] = []
+    for fold_id in selected:
+        result = optimize_squad(projections[fold_id], OptimizationConfig())
+        if not result.has_solution:
+            raise ProbeError(
+                f"{fold_id}: development eligibility control could not be solved "
+                f"({result.solver_status.value}); the population is unresolved."
+            )
+        selected_rows = handoff.rows.loc[
+            handoff.rows["fold_id"].eq(fold_id)
+            & handoff.rows["player_id"].isin(result.selected_squad["player_id"])
+        ]
+        if bool(selected_rows["composition_route"].eq(DIRECT_CONTROL_ROUTE).any()):
+            direct_control.append(fold_id)
+        else:
+            eligible_ids.append(fold_id)
+    population: Record = {
+        "all_fold_ids": list(ordered),
+        "history_burn_in_fold_ids": burn_in,
+        "history_eligible_fold_ids": history_eligible,
+        "eligible_fold_ids": eligible_ids,
+        "direct_control_abstentions": direct_control,
+        "eligibility_complete": requested is None,
+    }
+    return {fold: projections[fold] for fold in eligible_ids}, panel_rows, population
+
+
 def prepare_fold_projections(
     handoff: PhaseCComponentHandoff, fold_ids: Sequence[str], archive_root: Path
 ) -> tuple[dict[str, pd.DataFrame], int]:
     """Outcome-free decision rosters per fold: plain frames a worker process can receive."""
 
-    panel = build_panel(archive_root, seasons=HISTORY_SEASONS)
+    history_seasons = fold_history_seasons(handoff)
+    panel = build_panel(archive_root, seasons=history_seasons)
     decisions = {
         decision.fold_id: decision
-        for decision in walk_forward_decision_points(panel, seasons=DECISION_SEASONS)
+        for decision in walk_forward_decision_points(panel, seasons=history_seasons[1:])
     }
     builder = make_ridge_projection_builder(cross_season=CrossSeasonConfig())
     projections: dict[str, pd.DataFrame] = {}
@@ -1031,10 +1155,18 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--table", type=Path, help="Phase C component OOF table")
     parser.add_argument("--roster", type=Path, help="Phase C decision roster")
     parser.add_argument("--manifest", type=Path, help="Phase C component manifest")
+    parser.add_argument("--phase-c-contract", choices=binding.PHASE_C_CONTRACTS, default="v1")
+    for name in ("table", "roster", "manifest"):
+        parser.add_argument(f"--expected-{name}-sha256", help="pin the Phase C v2 A reference")
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
     parser.add_argument("--fold", action="append", default=[], help="fold id to probe; repeatable")
     parser.add_argument(
         "--all-binding-folds", action="store_true", help="probe the 137-fold population"
+    )
+    parser.add_argument(
+        "--all-development-folds",
+        action="store_true",
+        help="probe every eligible fold of the pinned Phase C development_v2 handoff",
     )
     parser.add_argument("--snapshot-root", type=Path, default=DEFAULT_SNAPSHOT_ROOT)
     parser.add_argument("--binding", type=Path, help="calibrated Phase D evidence for live draws")
@@ -1095,6 +1227,29 @@ def _parse_arguments(argv: Sequence[str] | None) -> argparse.Namespace:
 
 
 def _validate(arguments: argparse.Namespace) -> None:
+    if arguments.all_development_folds:
+        if arguments.phase_c_contract != "development_v2":
+            raise ProbeError("--all-development-folds needs --phase-c-contract development_v2.")
+        if arguments.all_binding_folds:
+            raise ProbeError("choose only one all-folds flag.")
+    if arguments.phase_c_contract == "development_v2":
+        if arguments.all_binding_folds:
+            raise ProbeError(
+                "development_v2 uses --all-development-folds, not --all-binding-folds."
+            )
+        if arguments.live_components or arguments.binding is not None:
+            raise ProbeError("development_v2 cannot use binding evidence or live component draws.")
+        if not (arguments.fold or arguments.all_development_folds):
+            raise ProbeError("development_v2 needs --fold or --all-development-folds.")
+        if arguments.sampler != "conditional":
+            raise ProbeError(
+                "development_v2 needs --sampler conditional and its explicit settings."
+            )
+    elif any(
+        getattr(arguments, f"expected_{name}_sha256") is not None
+        for name in ("table", "roster", "manifest")
+    ):
+        raise ProbeError("expected SHA-256 pins apply to --phase-c-contract development_v2 only.")
     unsupported = sorted(set(arguments.candidate_counts) - set(PHASE_E_CANDIDATE_COUNTS))
     if unsupported or not arguments.candidate_counts:
         raise ProbeError(
@@ -1104,12 +1259,14 @@ def _validate(arguments: argparse.Namespace) -> None:
     bad_seeds = sorted(set(arguments.sensitivity_seeds) - set(SENSITIVITY_SEEDS))
     if bad_seeds:
         raise ProbeError(f"sensitivity seeds must be drawn from {list(SENSITIVITY_SEEDS)}.")
-    wants_folds = bool(arguments.fold) or arguments.all_binding_folds
+    wants_folds = (
+        bool(arguments.fold) or arguments.all_binding_folds or arguments.all_development_folds
+    )
     handoff_given = all(
         value is not None for value in (arguments.table, arguments.roster, arguments.manifest)
     )
     if wants_folds and not handoff_given:
-        raise ProbeError("--fold and --all-binding-folds need --table, --roster and --manifest.")
+        raise ProbeError("fold probes need --table, --roster and --manifest.")
     if not (wants_folds or arguments.live_decision or arguments.live_pool):
         raise ProbeError(
             "nothing to probe: give --fold, --all-binding-folds, --live-decision or --live-pool."
@@ -1305,6 +1462,9 @@ def _run_identity(
     conditional_residuals: ConditionalResidualConfig | None,
     source: Record | None,
     provenance: Mapping[str, object],
+    *,
+    population: Record | None = None,
+    measured_fold_ids: Sequence[str] = (),
 ) -> Record:
     """Everything a checkpoint must share with the run that reuses it.
 
@@ -1313,7 +1473,18 @@ def _run_identity(
     """
 
     return {
-        "contract_version": probe_contract_version(conditional_residuals),
+        "contract_version": probe_contract_version(
+            conditional_residuals, phase_c_contract=arguments.phase_c_contract
+        ),
+        **(
+            {
+                "phase_c_contract": arguments.phase_c_contract,
+                "population": population,
+                "measured_fold_ids": list(measured_fold_ids),
+            }
+            if arguments.phase_c_contract == "development_v2"
+            else {}
+        ),
         "sampler": sampler_record(conditional_residuals),
         "candidate_counts": sorted(set(arguments.candidate_counts)),
         "sensitivity_seeds": list(arguments.sensitivity_seeds),
@@ -1343,15 +1514,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             arguments.conditional_residual_fraction,
             arguments.conditional_residual_minimum_rows,
         )
+        development = (
+            binding._development_from_arguments(arguments)
+            if arguments.phase_c_contract == "development_v2"
+            else None
+        )
         points: list[DecisionPoint] = []
         panel_rows = 0
         expected_fold_ids: tuple[str, ...] | None = None
         live_handoff = None
-        source = None
+        source: Record | None = None
         live_evidence = None
         fold_projections: dict[str, pd.DataFrame] = {}
         fold_ids: list[str] = []
         live_specs: dict[str, str] = {}
+        population: Record | None = None
+        history_seasons: tuple[str, ...] = HISTORY_SEASONS
         preparation_started = perf_counter()
         if arguments.live_components:
             if not arguments.live_decision or not all(
@@ -1393,32 +1571,67 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             )
         handoff = None
-        if arguments.fold or arguments.all_binding_folds:
-            handoff = read_phase_c_component_handoff(
-                arguments.table, arguments.roster, arguments.manifest
+        if arguments.fold or arguments.all_binding_folds or arguments.all_development_folds:
+            handoff = (
+                binding._read_handoff(arguments, development)
+                if development is not None
+                else read_phase_c_component_handoff(
+                    arguments.table, arguments.roster, arguments.manifest
+                )
             )
             source = {
                 "table_sha256": handoff.table_sha256,
                 "roster_sha256": handoff.roster_sha256,
                 "manifest_sha256": handoff.manifest_sha256,
             }
-            expected_fold_ids = binding_fold_ids(handoff)
-            fold_ids = (
-                list(expected_fold_ids) if arguments.all_binding_folds else list(arguments.fold)
-            )
-            fold_projections, panel_rows = prepare_fold_projections(
-                handoff, fold_ids, arguments.archive_root
-            )
+            if development is not None:
+                source.update(
+                    {
+                        "development_contract": handoff.development_contract,
+                        "model_version": handoff.model_version,
+                        "feature_contract_version": handoff.feature_contract_version,
+                        "target_contract_version": handoff.target_contract_version,
+                        "dataset_contract_version": handoff.dataset_contract_version,
+                        "weighting": handoff.weighting,
+                    }
+                )
+                fold_projections, panel_rows, population = prepare_development_population(
+                    handoff,
+                    arguments.archive_root,
+                    requested=None if arguments.all_development_folds else arguments.fold,
+                )
+                fold_ids = list(fold_projections)
+                expected_fold_ids = (
+                    tuple(population["eligible_fold_ids"])
+                    if population["eligibility_complete"]
+                    else None
+                )
+                history_seasons = fold_history_seasons(handoff)
+            else:
+                expected_fold_ids = binding_fold_ids(handoff)
+                fold_ids = (
+                    list(expected_fold_ids) if arguments.all_binding_folds else list(arguments.fold)
+                )
+                fold_projections, panel_rows = prepare_fold_projections(
+                    handoff, fold_ids, arguments.archive_root
+                )
         preparation_seconds = perf_counter() - preparation_started
 
         if arguments.workers > 1:
             # One BLAS thread per process: concurrency is the number of pools, not threads.
             for name in BLAS_THREAD_VARIABLES:
                 os.environ.setdefault(name, "1")
-        metadata = artifact_metadata(panel_rows=panel_rows, history_seasons=HISTORY_SEASONS)
+        metadata = artifact_metadata(panel_rows=panel_rows, history_seasons=history_seasons)
         provenance = metadata["provenance"]
         assert isinstance(provenance, dict)
-        identity = _run_identity(arguments, conditional_residuals, source, provenance)
+        identity = _run_identity(
+            arguments,
+            conditional_residuals,
+            source,
+            provenance,
+            population=population,
+            measured_fold_ids=fold_ids,
+        )
         pool_digests: dict[str, str] = {
             label: pool_digest(live_point_from_csv(f"{label}={path}").pool)
             for label, path in live_specs.items()
@@ -1479,13 +1692,28 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         records.extend(dispatched[label] for label in labels)
         rule = candidate_count_rule(
-            records, arguments.candidate_counts, expected_fold_ids=expected_fold_ids
+            records,
+            arguments.candidate_counts,
+            expected_fold_ids=expected_fold_ids,
+            phase_c_contract=arguments.phase_c_contract,
         )
         document: Record = {
-            "contract_version": probe_contract_version(conditional_residuals),
+            "contract_version": probe_contract_version(
+                conditional_residuals, phase_c_contract=arguments.phase_c_contract
+            ),
             "preregistration": PREREGISTRATION,
             "preregistration_version": PREREGISTRATION_VERSION,
             "source": source,
+            **(
+                {
+                    "phase_c_contract": arguments.phase_c_contract,
+                    "binding": False,
+                    "population": population,
+                    "measured_fold_ids": fold_ids,
+                }
+                if development is not None
+                else {}
+            ),
             "generated_at_utc": datetime.now(UTC).isoformat(timespec="seconds"),
             "diagnostic_only": True,
             "promotes_anything": False,

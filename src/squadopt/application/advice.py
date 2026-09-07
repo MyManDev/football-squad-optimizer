@@ -13,6 +13,7 @@ the league capture, which contains neither the requesting user's secrets nor our
 paper entry, so nothing a member is told can depend on the system's own squad.
 """
 
+import logging
 import math
 from dataclasses import dataclass
 from typing import Any
@@ -25,6 +26,7 @@ from squadopt.application.entries import (
     EntryPicksProvider,
     held_squad_from_picks,
 )
+from squadopt.application.phase_e import TransferAdviceDiagnostic, run_transfer_advice_diagnostic
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.errors import DataSourceError
 from squadopt.live import (
@@ -98,6 +100,7 @@ def build_advice_payload(
     rival_label: str | None = None,
     solver_status: str | None = None,
     optimality_gap: float | None = None,
+    phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
 ) -> dict[str, object]:
     """One member's advice payload — from their squad and the shared projection only.
 
@@ -112,6 +115,9 @@ def build_advice_payload(
     A plan the solver found but could not prove optimal is published with
     ``solver_status: "FEASIBLE"`` and the measured bound gap, not discarded: the plan
     it found is real, the missing proof is stated, and the reader decides.
+
+    An optional ``phase_e_diagnostic`` inspects this function's solved saf-puan control
+    internally; its result never supplies a member-facing decision or payload field.
     """
 
     if mode != COMPUTED_MODE and decision is None:
@@ -123,7 +129,18 @@ def build_advice_payload(
             for _, row in inputs.players.iterrows()
         }
         held = held_squad_from_picks(picks, current_prices=prices)
-        plan, plan_decision, _ = plan_transfers(inputs, projection, held, rules)
+        plan, plan_decision, transfer_config = plan_transfers(inputs, projection, held, rules)
+        try:
+            run_transfer_advice_diagnostic(
+                plan,
+                held,
+                gameweek=int(inputs.deadline.gameweek),
+                transfer_hit_cost_points=transfer_config.transfer_hit_cost_points,
+                diagnostic=phase_e_diagnostic,
+            )
+        except Exception:
+            # An opt-in internal diagnostic cannot invalidate the already-solved advice.
+            logging.getLogger(__name__).warning("Phase E advice diagnostic failed", exc_info=True)
         transfers: TransferDecision | None = plan_decision
         by_id = {
             int(str(row["player_id"])): row for _, row in plan.weeks[0].selected_squad.iterrows()
@@ -202,6 +219,7 @@ def advise_entry(
     inputs: RecommendationInputs,
     projection: Projection,
     rules: SeasonRules,
+    phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
 ) -> dict[str, object]:
     """Compute one member's advice for a validated request.
 
@@ -212,6 +230,9 @@ def advise_entry(
     parameter is validated against the strategy that asks for it: ``saf-puan`` is
     rival-free and refuses one, a catalogue strategy whose overlap band reaches the
     solver requires one, and nobody may name themselves.
+
+    ``phase_e_diagnostic`` is a local collaborator for saf-puan only, not a request
+    field. It is dormant until a reviewed calibration pin exists.
     """
 
     if request.season != str(inputs.season):
@@ -242,6 +263,7 @@ def advise_entry(
             projection,
             rules,
             league_id=request.league_id,
+            phase_e_diagnostic=phase_e_diagnostic,
         )
     strategy = STRATEGY_CATALOG.get(request.strategy)
     if strategy is None:

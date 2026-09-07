@@ -7,8 +7,9 @@ from dataclasses import asdict, replace
 from numbers import Integral
 from time import perf_counter
 
+from scripts._phase_e_development import select_development_candidate
 from scripts._phase_e_inputs import PhaseDBindingEvidence, draw_phase_e_fold
-from scripts.run_component_squad_calibration import BINDING_FOLD_COUNT
+from scripts.run_component_squad_calibration import BINDING_FOLD_COUNT, _decision_identity
 
 from squadopt.evaluation import EvaluationError, EvaluationFold
 from squadopt.evaluation.component_handoff import PhaseCComponentHandoff
@@ -71,6 +72,10 @@ def evaluate_phase_e_decision(
         generated_at = perf_counter()
         # Preserve the existing completion failure before any scenario work is attempted.
         complete_optimization_decision(generated.control)
+        if evidence.control_identities is not None and (
+            _decision_identity(generated.control) != evidence.control_identities.get(fold.fold_id)
+        ):
+            raise PhaseEShadowError("E3 control decision differs from the Phase D v2 control.")
         draw = draw_phase_e_fold(handoff, fold, conditional_residuals=conditional_residuals)
         if draw.scenarios.target.fold_id != fold.fold_id:
             raise PhaseEShadowError("The shared scenario draw names a different decision fold.")
@@ -80,17 +85,25 @@ def evaluate_phase_e_decision(
                 f"The draw declares sampler {sampler_version!r} but the Phase D evidence "
                 f"calibrated {evidence.sampler_contract_version!r}."
             )
+        if draw.inputs.provenance.development_contract != evidence.development_contract:
+            raise PhaseEShadowError(
+                "The draw and Phase D evidence name different development scopes."
+            )
         pins = (
             ((evidence.model_version, sampler_version),)
             if evidence.status == "calibrated_internal"
             else ()
         )
-        selection = select_phase_e_candidate(
-            generated.candidates,
-            draw,
-            candidate_count_requested=generated.candidate_count_requested,
-            candidate_set_complete=generated.complete,
-            calibrated_versions=pins,
+        selection = (
+            select_development_candidate(generated, draw, calibrated_versions=pins)
+            if evidence.development_contract is not None
+            else select_phase_e_candidate(
+                generated.candidates,
+                draw,
+                candidate_count_requested=generated.candidate_count_requested,
+                candidate_set_complete=generated.complete,
+                calibrated_versions=pins,
+            )
         )
         reading = score_phase_e_shadow_fold(
             fold.fold_id,
@@ -99,6 +112,11 @@ def evaluate_phase_e_decision(
             fold.realized_points,
             candidate_set_complete=generated.complete,
             draw=draw,
+            **(
+                {"development_contract": evidence.development_contract}
+                if evidence.development_contract
+                else {}
+            ),
         )
         return replace(
             reading,
@@ -131,9 +149,8 @@ def evaluate_phase_e_prepared_folds(
 
     ordered = tuple(sorted(folds, key=lambda fold: fold.fold_id))
     if (
-        len(evidence.fold_ids) != BINDING_FOLD_COUNT
-        or tuple(fold.fold_id for fold in ordered) != evidence.fold_ids
-    ):
+        evidence.development_contract is None and len(evidence.fold_ids) != BINDING_FOLD_COUNT
+    ) or tuple(fold.fold_id for fold in ordered) != evidence.fold_ids:
         raise PhaseEShadowError("E3 must evaluate the complete binding population of 137 folds.")
     readings = tuple(
         evaluate_phase_e_decision(
@@ -150,6 +167,13 @@ def evaluate_phase_e_prepared_folds(
         "frozen_candidate_count": frozen_candidate_count,
         "folds": [asdict(reading) for reading in readings],
         "verdict": evaluate_phase_e_shadow(
-            readings, expected_fold_ids=evidence.fold_ids, phase_d_status=evidence.status
+            readings,
+            expected_fold_ids=evidence.fold_ids,
+            phase_d_status=evidence.status,
+            **(
+                {"development_contract": evidence.development_contract}
+                if evidence.development_contract
+                else {}
+            ),
         ),
     }
