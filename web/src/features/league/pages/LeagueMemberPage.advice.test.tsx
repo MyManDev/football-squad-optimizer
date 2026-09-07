@@ -53,8 +53,7 @@ const COMPUTED_MOVE: AdviceMove = {
     team: "HAR",
   },
   expected_points_delta: 2.5,
-  expected_points_cost: 0,
-  reason_code: "window_value",
+  reason_code: "points_gain",
 };
 
 function computedEnvelope(): LeagueViewEnvelope<EntryAdvice> {

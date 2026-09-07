@@ -170,3 +170,15 @@ def test_an_unknown_slug_is_refused_loudly() -> None:
 def test_the_catalogue_is_immutable() -> None:
     with pytest.raises(TypeError):
         STRATEGY_CATALOG["yeni"] = strategy("saf-puan")  # type: ignore[index]
+
+
+def test_the_meta_gate_catches_the_probability_prefix_convention() -> None:
+    """``p_ahead`` is the shape a probability arrives under, and the pattern's last
+    alternative exists to stop it. The word boundary is load-bearing in both directions:
+    without it the same alternative would also reject ``overlap_count``, which is set
+    arithmetic and is published."""
+
+    for name in ("p_ahead", "p_win", "p_beat_rival"):
+        assert FORBIDDEN_FIELD_PATTERN.search(name), name
+    for name in ("overlap_count", "overlap_target", "overlap_applied", "transfer_hit_points"):
+        assert not FORBIDDEN_FIELD_PATTERN.search(name), name

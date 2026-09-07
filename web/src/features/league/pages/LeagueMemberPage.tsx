@@ -446,11 +446,20 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
           {view.data_quality === "complete" ? copy.noMove : copy.noAdviceMissingData}
         </p>
       ) : (
-        <div className={styles.moves}>
-          {view.moves.map((move) => (
-            <AdviceRow key={move.move_id} move={move} />
-          ))}
-        </div>
+        <>
+          <div className={styles.moves}>
+            {view.moves.map((move) => (
+              <AdviceRow key={move.move_id} move={move} />
+            ))}
+          </div>
+          {/* The week's hit charge, once, because the game charges the week and not any
+              one move. Absent on documents published before the producer stated it. */}
+          {view.transfer_hit_points != null ? (
+            <p className={styles.muted}>
+              {copy.weekTransferCost(points(view.transfer_hit_points, 1, locale))}
+            </p>
+          ) : null}
+        </>
       )}
       <LineupSection view={view} />
       <WindowSection view={view} />
@@ -624,6 +633,15 @@ function LineupRow({
   );
 }
 
+type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
+
+/** The caption under a move, keyed on the reason the producer stated for it. */
+function reasonFor(copy: MemberCopy, code: AdviceMove["reason_code"]): string {
+  if (code === "window_value") return copy.windowValueReason;
+  if (code === "points_gain") return copy.pointsGainReason;
+  return copy.modeTradeoffReason;
+}
+
 function AdviceRow({ move }: { move: AdviceMove }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -639,11 +657,8 @@ function AdviceRow({ move }: { move: AdviceMove }) {
       </div>
       <div className={styles.moveNumbers}>
         <span>{copy.projectedGain(points(move.expected_points_delta, 1, locale))}</span>
-        <strong>{copy.expectedPointCost(points(move.expected_points_cost, 1, locale))}</strong>
       </div>
-      <p className={styles.muted}>
-        {move.reason_code === "window_value" ? copy.windowValueReason : copy.modeTradeoffReason}
-      </p>
+      <p className={styles.muted}>{reasonFor(copy, move.reason_code)}</p>
     </article>
   );
 }

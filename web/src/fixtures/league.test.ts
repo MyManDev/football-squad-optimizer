@@ -73,7 +73,10 @@ describe("provisional league fixtures", () => {
     const advice = mockEntryAdviceEnvelope(35249001, "agresif", 3).payload;
 
     expect(advice).toMatchObject({ entry_id: 35249001, mode: "agresif", window: 3 });
-    expect(advice.moves[0]?.expected_points_cost).toBeGreaterThan(0);
+    expect(advice.moves[0]?.expected_points_delta).toBeGreaterThan(0);
+    // The week's charge is on the payload, once; a move row carries no cost of its own.
+    expect(advice.transfer_hit_points).toBe(0);
+    expect(advice.moves[0]).not.toHaveProperty("expected_points_cost");
   });
 
   it("records unknown transfer and purchase-price inputs without silently trusting them", () => {
