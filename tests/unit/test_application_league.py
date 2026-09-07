@@ -110,6 +110,7 @@ def _row(gameweek: int, *, realized: float | None, net: float | None = None) -> 
         gameweek=gameweek,
         snapshot_id="fpl-live-test",
         deadline_utc=f"2026-08-{20 + gameweek:02d}T17:30:00Z",
+        mode="live",
         solver_status="OPTIMAL",
         decision_kind="opening" if gameweek == 1 else "transfer",
         captain_player_id=900_001,

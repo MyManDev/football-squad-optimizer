@@ -29,6 +29,9 @@ export function LeaguePage() {
   }
   if (!season || !ledger.data) return <EmptyState title={copy.noSeason} />;
   const view = ledger.data.payload;
+  // The chart draws every recorded gameweek the same way; the count says how many of
+  // them were recorded after their own deadline rather than before it.
+  const replayed = view.rows.filter((row) => row.mode === "replay").length;
   return (
     <div className={styles.page}>
       <header className={styles.head}>
@@ -83,6 +86,7 @@ export function LeaguePage() {
       {view.rows.length > 1 ? (
         <Card title={copy.cumulative} aside={copy.points}>
           <CumulativeChart rows={view.rows} />
+          {replayed > 0 && <p className={styles.note}>{copy.chartReplays(replayed)}</p>}
         </Card>
       ) : view.rows.length === 1 ? (
         <Card tone="muted" title={copy.cumulative} aside={copy.fromGw2}>
@@ -132,6 +136,7 @@ export function LeaguePage() {
               </tbody>
             </table>
           </div>
+          <p className={styles.note}>{copy.modeNote}</p>
         </Card>
       )}
 
@@ -213,6 +218,7 @@ function Row({ row, season }: { row: LedgerRowView; season: string }) {
         </div>
         <div className={styles.sub}>
           {copy.deadline} {utcShort(row.deadline_utc, locale)} · {row.solver_status}
+          {row.mode ? ` · ${row.mode}` : ""}
         </div>
       </td>
       <td className={`${styles.right} num`}>{points(row.projected_score, 1, locale)}</td>

@@ -34,7 +34,7 @@ from squadopt.application.views import (
     positions_in_order,
     short_name,
 )
-from squadopt.live.ledger import LedgerEntry, load_ledger
+from squadopt.live.ledger import LedgerEntry, decision_mode, load_ledger
 from squadopt.live.report import Recommendation
 from squadopt.live.risk import LiveRiskDiagnostics
 from squadopt.live.tick import LedgerState, TickPlan
@@ -445,6 +445,7 @@ def _ledger_row(entry: LedgerEntry) -> LedgerRowView:
         gameweek=int(str(decision["gameweek"])),
         snapshot_id=str(decision["snapshot_id"]),
         deadline_utc=str(decision["deadline_utc"]),
+        mode=decision_mode(decision),
         solver_status=str(decision["solver_status"]),
         decision_kind="transfer" if block else "opening",
         captain_player_id=int(str(decision["captain_player_id"])),
