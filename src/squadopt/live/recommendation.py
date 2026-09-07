@@ -275,13 +275,26 @@ def _training_identity(panel: pd.DataFrame) -> tuple[str, str]:
     return cutoff, fingerprint
 
 
+def season_from_bootstrap(bootstrap: bytes) -> str:
+    """Name the season a bootstrap payload describes, from its own published deadlines.
+
+    A season is named for the calendar year it starts in, and its first deadline falls in
+    that year, so the earliest published deadline settles it. Taking bytes rather than a
+    whole capture is what lets a caller that already holds one collector's bootstrap — a
+    Top-100 cohort capture, say — name its season without a second home for the rule.
+    """
+
+    deadlines = gameweek_deadlines(bootstrap)
+    earliest = min(deadlines, key=lambda entry: entry.gameweek)
+    start = as_instant(earliest.deadline_utc).year
+    return f"{start}-{(start + 1) % 100:02d}"
+
+
 def infer_season(snapshot: CapturedSnapshot) -> str:
     """Name the season a capture describes, from its own published deadlines.
 
-    A season is named for the calendar year it starts in, and its first deadline falls in
-    that year, so the earliest published deadline settles it. Deriving it beats asking the
-    caller: a season passed by hand can be wrong, and a capture filed under the wrong
-    season would join the wrong history.
+    Deriving it beats asking the caller: a season passed by hand can be wrong, and a
+    capture filed under the wrong season would join the wrong history.
     """
 
     bootstrap = snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
@@ -290,10 +303,7 @@ def infer_season(snapshot: CapturedSnapshot) -> str:
             f"Snapshot {snapshot.metadata.snapshot_id!r} carries no {BOOTSTRAP_PAYLOAD!r} "
             "payload, so its season cannot be determined."
         )
-    deadlines = gameweek_deadlines(bootstrap)
-    earliest = min(deadlines, key=lambda entry: entry.gameweek)
-    start = as_instant(earliest.deadline_utc).year
-    return f"{start}-{(start + 1) % 100:02d}"
+    return season_from_bootstrap(bootstrap)
 
 
 @dataclass(frozen=True, slots=True)

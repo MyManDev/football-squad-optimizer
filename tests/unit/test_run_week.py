@@ -12,7 +12,9 @@ from scripts.run_week import (
     STEPS,
     WeekError,
     _wrote_paths,
+    check_evidence_for_reused_capture,
     decision_mode_for,
+    evidence_artifact,
     new_snapshot,
     plan_week,
     preflight_decide,
@@ -75,9 +77,69 @@ def test_skipping_top100_removes_the_whole_step() -> None:
 
 
 def test_reused_top100_captures_still_run_the_export() -> None:
+    """The plan names the captures it reuses and does not claim the export is reused too.
+
+    Whether the export is reused depends on what is on disk, which ``plan_week`` does not
+    read; saying "export reused" unconditionally was false exactly when it mattered — the
+    run that then re-exported and was refused at the handoff.
+    """
+
     plan = _plan(cohort_snapshot="fpl-top100-x", elite_snapshot="fpl-elite-picks-y")
     assert "top100" in plan.steps
-    assert "export reused" in plan.reasons["top100"]
+    assert plan.reasons["top100"] == "reusing fpl-top100-x and fpl-elite-picks-y"
+
+
+# --- the other half of "the evidence must predate the decision capture" ----------------
+
+
+def test_a_reused_capture_refuses_when_its_evidence_export_is_not_on_disk(
+    tmp_path: Path,
+) -> None:
+    """``apply_elite_evidence`` checks the artifact's generation time as well as the
+    evidence's capture time, and a re-export is stamped with the wall clock — which is
+    always after a capture already taken. Refused up front rather than after the export."""
+
+    with pytest.raises(WeekError, match="already on disk"):
+        check_evidence_for_reused_capture(
+            tmp_path,
+            season="2026-27",
+            gameweek=4,
+            elite_snapshot="fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb",
+            snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        )
+
+
+def test_a_reused_capture_with_its_export_already_on_disk_is_allowed(tmp_path: Path) -> None:
+    table, manifest = evidence_artifact(
+        tmp_path, "2026-27", 4, "fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb"
+    )
+    assert table.name == "player_evidence_v1_2026-27_gw04_top100_bbbbbbbbbbbb.csv"
+    table.write_text("player_id\n1\n", encoding="utf-8")
+    manifest.write_text("{}", encoding="utf-8")
+
+    check_evidence_for_reused_capture(
+        tmp_path,
+        season="2026-27",
+        gameweek=4,
+        elite_snapshot="fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb",
+        snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+    )
+
+
+def test_a_half_written_export_does_not_count_as_reusable(tmp_path: Path) -> None:
+    table, _manifest = evidence_artifact(
+        tmp_path, "2026-27", 4, "fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb"
+    )
+    table.write_text("player_id\n1\n", encoding="utf-8")
+
+    with pytest.raises(WeekError, match="already on disk"):
+        check_evidence_for_reused_capture(
+            tmp_path,
+            season="2026-27",
+            gameweek=4,
+            elite_snapshot="fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb",
+            snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        )
 
 
 def test_publish_is_the_last_step_when_asked() -> None:

@@ -280,9 +280,9 @@ const en = {
     state: "state",
     note: "SquadOpt's recorded squad net includes captain/chip effects and transfer hits, but no autosubs or vice-captain replacement. It is not directly comparable with official FPL scores.",
     modeNote:
-      "Each row says the mode it was recorded in — live: decided before that deadline; replay: recorded after it, from a capture taken before it. A row with no mode was recorded before the ledger stamped one.",
+      "Each row says the mode it was recorded in — live: decided before that deadline, from a capture that run took; replay: recorded after that deadline, or from a capture the run did not take but named. A row with no mode was recorded before the ledger stamped one.",
     chartReplays: (count: number) =>
-      `${count} of the gameweeks drawn here were recorded as replay, after their own deadline; the table below says which.`,
+      `${count} of the gameweeks drawn here were recorded as replay rather than live; the table below says which.`,
     weeklySummary: (snapshot: string) =>
       `the game's own weekly summary · capture ${snapshot.slice(0, 24)}…`,
     chartStarts:
@@ -342,6 +342,7 @@ const en = {
     oursCovers: (gameweeks: string) => `GW ${gameweeks} only`,
     oursNone: "no settled week",
     membersTotal: (count: number) => `mean total of ${count}`,
+    membersCovers: (gameweeks: string) => `covers GW ${gameweeks}`,
     paperLedger:
       "Our squad is a paper ledger, not an FPL entry. Its figure is the eleven the decision named, scored as named: the game's automatic substitutions are not applied, and the frozen decision names no vice-captain, so a captain who did not play is not recovered. Both would only add points, so our number reads low beside a real entry's. A member's net is their week minus the transfer cost, read from their own history.",
     grossNote:
@@ -349,7 +350,7 @@ const en = {
     provisionalNote:
       "A gameweek marked provisional has finished but has not been data-checked in this capture: bonus points land fixture by fixture, so its scores can still move.",
     modeNote:
-      "live: decided before the deadline. replay: recorded afterwards from a capture taken before that deadline.",
+      "live: decided before the deadline, from a capture that run took. replay: recorded after that deadline, or from a capture the run did not take but named.",
   },
   leagueMembers: {
     loading: "Loading league members…",
@@ -946,9 +947,9 @@ const tr: MessageSchema<typeof en> = {
     state: "durum",
     note: "SquadOpt’un kaydedilen kadro neti kaptan/çip ve transfer cezasını içerir; otomatik değişiklik ve kaptan yedeği uygulanmaz. Resmi FPL puanlarıyla birebir karşılaştırılamaz.",
     modeNote:
-      "Her satır hangi modda kaydedildiğini söyler — live: o son tarihten önce kararlaştırıldı; replay: son tarihten önce alınmış bir capture'dan sonradan kaydedildi. Modu olmayan bir satır, ledger mod damgalamaya başlamadan önce kaydedilmiştir.",
+      "Her satır hangi modda kaydedildiğini söyler — live: o son tarihten önce, o koşunun kendi aldığı capture'dan kararlaştırıldı; replay: o son tarihten sonra kaydedildi ya da koşunun kendisinin almadığı, adıyla verilen bir capture'dan kararlaştırıldı. Modu olmayan bir satır, ledger mod damgalamaya başlamadan önce kaydedilmiştir.",
     chartReplays: (count) =>
-      `Burada çizilen oyun haftalarının ${count} tanesi kendi son tarihinden sonra replay olarak kaydedildi; hangileri olduğunu aşağıdaki tablo söylüyor.`,
+      `Burada çizilen oyun haftalarının ${count} tanesi live değil replay olarak kaydedildi; hangileri olduğunu aşağıdaki tablo söylüyor.`,
     weeklySummary: (snapshot) => `oyunun haftalık özeti · capture ${snapshot.slice(0, 24)}…`,
     chartStarts:
       "Grafik ilk puanlanan oyun haftasıyla başlar. Oyun ortalamayı hafta bittikten sonra yayımladığı için henüz çizilecek veri yok.",
@@ -1006,6 +1007,7 @@ const tr: MessageSchema<typeof en> = {
     oursCovers: (gameweeks) => `yalnız OH ${gameweeks}`,
     oursNone: "sonuçlanmış hafta yok",
     membersTotal: (count) => `${count} üyenin ortalama toplamı`,
+    membersCovers: (gameweeks) => `OH ${gameweeks} kapsıyor`,
     paperLedger:
       "Kadromuz bir FPL takımı değil, kâğıt üstünde bir ledger. Sayısı, kararın yazdığı on birin yazıldığı gibi puanlanmasıdır: oyunun otomatik değişiklikleri uygulanmaz ve dondurulmuş karar hiç yardımcı kaptan yazmaz, dolayısıyla oynamayan bir kaptanın yerine kimse geçmez. İkisi de yalnızca puan ekleyeceği için sayımız gerçek bir takımın yanında düşük okunur. Bir üyenin neti, kendi geçmişinden okunan hafta puanı eksi transfer cezasıdır.",
     grossNote:
@@ -1013,7 +1015,7 @@ const tr: MessageSchema<typeof en> = {
     provisionalNote:
       "Geçici işaretli bir oyun haftası bitmiştir ama bu capture'da veri denetimi tamamlanmamıştır: bonus puanlar maç maç işlendiği için puanları hâlâ değişebilir.",
     modeNote:
-      "live: son tarihten önce kararlaştırıldı. replay: son tarihten önce alınmış bir capture'dan sonradan kaydedildi.",
+      "live: son tarihten önce, o koşunun kendi aldığı capture'dan kararlaştırıldı. replay: son tarihten sonra kaydedildi ya da koşunun kendisinin almadığı, adıyla verilen bir capture'dan kararlaştırıldı.",
   },
   leagueMembers: {
     computeTitle: "Bu planı hesapla",
