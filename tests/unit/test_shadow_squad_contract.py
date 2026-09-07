@@ -102,6 +102,7 @@ _PUBLISHED_ENVELOPE = frozenset(
         "alternative_plan",
         "plan_weeks",
         "stated_limits",
+        "suggested_strategy",
     }
 )
 

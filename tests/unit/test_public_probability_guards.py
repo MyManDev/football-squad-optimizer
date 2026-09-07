@@ -23,7 +23,7 @@ from scripts.build_scoreboard import CohortCapture, CohortPicks, scoreboard_payl
 
 from squadopt.application.build import _risk_from_status
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
-from squadopt.application.league_views import build_league_views
+from squadopt.application.league_views import MemberStanding, build_league_views
 from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live import LedgerEntry, read_inputs, read_season_rules
@@ -90,20 +90,45 @@ def test_every_published_league_file_is_probability_free(
     handoff = read_projection_handoff(world_module._handoff(world))
     projection = project(inputs, in_season=handoff)
     rules = read_season_rules(snapshot, season=SEASON)
-    provider = _Provider({101: _member_picks(world, 101, _legal_squad())})
+    squad = _legal_squad()
+    chaser = [*squad[:10], 1017, 1018, *squad[12:]]
+    provider = _Provider(
+        {101: _member_picks(world, 101, squad), 202: _member_picks(world, 202, chaser)}
+    )
     out_dir = tmp_path / "league"
+    # Two members with proven totals far apart, so the declared strategy rule actually
+    # fires and its published band travels through this sweep rather than sitting null.
+    standings = {
+        entry_id: MemberStanding(
+            entry_id=entry_id,
+            team_name=f"Team {entry_id}",
+            manager_name=f"Manager {entry_id}",
+            rank=rank,
+            total_points=total,
+        )
+        for rank, (entry_id, total) in enumerate(((101, 400), (202, 100)), start=1)
+    }
     build_league_views(
         provider,
-        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        (
+            EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),
+            EntryRegistration(202, "member-b", "2026-08-23T00:00:00Z"),
+        ),
         inputs,
         projection,
         rules,
         league_id=352490,
         league_name="Test League",
         out_dir=out_dir,
+        standings=standings,
+        scored_gameweek=1,
     )
     published = sorted(out_dir.rglob("*.json"))
     assert published, "the builder wrote nothing — the sweep has no subject"
+    suggested = json.loads((out_dir / "advice" / "101" / "index.json").read_text(encoding="utf-8"))[
+        "payload"
+    ]["suggested_strategy"]
+    assert suggested is not None, "the rule's band must be in the swept tree, not null"
     offenders: list[str] = []
     for file in published:
         raw = file.read_text(encoding="utf-8")

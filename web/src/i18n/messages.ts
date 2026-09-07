@@ -411,6 +411,9 @@ const en = {
           "Hold as few of the rival's eleven as the free transfers allow, down to five; the players you do not share decide the gap.",
       },
     } as Record<"saf-puan" | "ortak-koru" | "fark-yarat", { name: string; description: string }>,
+    rulePickBadge: "The rule's pick",
+    rulePickNote: (rival: string, gap: string, weeks: number) =>
+      `A declared rule marks one option from two numbers: your league points against ${rival} (${gap}) and the ${weeks} gameweeks still to play. The rule is written down, not measured — nothing has tested whether following it does better than ignoring it — so it labels an option and never chooses for you.`,
     rivalLegend: "Rival",
     rivalLabel: "The member you are playing against",
     rivalDefaultSuffix: "(nearest above in the standings)",
@@ -1067,6 +1070,9 @@ const tr: MessageSchema<typeof en> = {
           "Rakibin on birinden ücretsiz transferlerin izin verdiği kadar azını tut, en az beş; paylaşmadığın oyuncular farkı belirler.",
       },
     },
+    rulePickBadge: "Kuralın seçimi",
+    rulePickNote: (rival: string, gap: string, weeks: number) =>
+      `Tanımlı bir kural, iki sayıya bakarak seçeneklerden birini işaretler: ${rival} karşısındaki lig puanın (${gap}) ve oynanacak ${weeks} hafta. Kural yazılı, ölçülmüş değil — uymanın uymamaktan daha iyi olduğu test edilmedi — yani bir seçeneği etiketler, senin yerine seçmez.`,
     rivalLegend: "Rakip",
     rivalLabel: "Karşısında oynadığın üye",
     rivalDefaultSuffix: "(sıralamada hemen üstün)",
