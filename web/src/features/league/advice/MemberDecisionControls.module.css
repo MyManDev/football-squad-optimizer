@@ -68,6 +68,13 @@
   gap: 2px;
 }
 
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .description {
   color: var(--color-text-muted);
   font-size: var(--step--1);

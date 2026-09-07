@@ -129,6 +129,27 @@ export interface EntryAdviceIndex {
   strategies: string[];
   rival_entry_ids: number[];
   default_rival_entry_id: number | null;
+  /**
+   * The declared rule's pick among the three strategies, and the two numbers it read:
+   * the member's league points against their default rival (signed, negative when
+   * behind) and the gameweeks still to be played, plus the band edge those were
+   * compared against, so a reader can re-apply the rule instead of trusting it.
+   *
+   * It is a band on points and nothing else: no bench has compared a member who
+   * follows it with one who ignores it, so the page labels it a declared rule rather
+   * than an edge. `null` when the standings do not prove both totals; absent on an
+   * index published before the rule existed.
+   */
+  suggested_strategy?: {
+    strategy: MemberStrategy;
+    rule_id: string;
+    band: "behind" | "level" | "ahead";
+    rival_entry_id: number;
+    points_ahead_of_rival: number;
+    scored_gameweek: number;
+    gameweeks_remaining: number;
+    band_edge_points: number;
+  } | null;
   computed: { strategy: string; rival_entry_id: number; path: string }[];
   /**
    * A (strategy, rival) pair with no plan, or — with `rival_entry_id` null and the

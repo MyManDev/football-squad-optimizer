@@ -483,6 +483,40 @@ export function mockDefaultRival(entryId: number): number | null {
 }
 
 /**
+ * The producer's declared rule as it publishes it: the pick, the two numbers it read —
+ * the member's league points against their default rival and the gameweeks left — and
+ * the band edge those met. Recorded here, not re-derived: the rule lives in the producer
+ * (`application/strategies/rule.py`) and this is one document it could have written.
+ *
+ * These mock standings sit a handful of points apart with most of a season to play, so
+ * every gap is inside the band and the rule names pure points — which is the answer a
+ * short gap and a long season should get. A member whose total is not published gets no
+ * suggestion at all.
+ */
+export function mockSuggestedStrategy(entryId: number): EntryAdviceIndex["suggested_strategy"] {
+  const rivalId = mockDefaultRival(entryId);
+  const own = humanMembers.find((member) => member.entry_id === entryId);
+  const rival = humanMembers.find((member) => member.entry_id === rivalId);
+  if (rivalId === null || own === undefined || rival === undefined) return null;
+  if (own.total_points === null || rival.total_points === null) return null;
+  const gap = own.total_points - rival.total_points;
+  // The producer's edge for the 37 gameweeks left after this one: one measured
+  // week-to-week points differential between two members, carried over those weeks.
+  const edge = 128.9;
+  const band = gap < -edge ? "behind" : gap > edge ? "ahead" : "level";
+  return {
+    strategy: band === "behind" ? "fark-yarat" : band === "ahead" ? "ortak-koru" : "saf-puan",
+    rule_id: "gap_and_weeks_strategy_rule_v1",
+    band,
+    rival_entry_id: rivalId,
+    points_ahead_of_rival: gap,
+    scored_gameweek: GAMEWEEK - 1,
+    gameweeks_remaining: 38 - GAMEWEEK + 1,
+    band_edge_points: edge,
+  };
+}
+
+/**
  * What the producer wrote for this member: every rival strategy against every other
  * member, except one pair recorded as unavailable so the page's "not computed" path
  * renders in development and tests too.
@@ -523,6 +557,7 @@ export function mockEntryAdviceIndex(entryId: number): LeagueViewEnvelope<EntryA
     strategies: ["saf-puan", ...strategies],
     rival_entry_ids: rivals,
     default_rival_entry_id: mockDefaultRival(entryId),
+    suggested_strategy: mockSuggestedStrategy(entryId),
     computed,
     unavailable,
   });

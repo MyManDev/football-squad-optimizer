@@ -19,6 +19,13 @@ contract. They do not redefine the data-zone dataclass.
   solve is an `unavailable` entry with `rival_entry_id: null`, the `window` and the reason. A
   multi-week document adds `plan_weeks` (one row per gameweek) and `stated_limits` (the
   producer's sentences on what the window assumes); its `moves` and lineup are the first week's.
+- The index carries `suggested_strategy`: a declared rule's pick among the three strategies, with
+  the two numbers it read — `points_ahead_of_rival` (signed, against `default_rival_entry_id`, as
+  of `scored_gameweek`) and `gameweeks_remaining` — and the `band_edge_points` they were compared
+  against, so a reader can re-apply the rule. It is a band on points and carries no probability
+  wording; `null` when the standings do not prove both totals, and absent on an index published
+  before the rule existed. The rule is declared, not measured: the page labels it as such, and
+  the per-strategy advice documents are unchanged by it.
 
 ## Fields awaiting Issue #127 confirmation
 

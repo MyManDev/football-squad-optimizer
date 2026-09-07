@@ -57,6 +57,7 @@ from squadopt.application.mode_selection import (
     select_member_modes,
 )
 from squadopt.application.strategies import STRATEGY_CATALOG
+from squadopt.application.strategies.rule import RIVAL_RULE_STRATEGIES, suggest_strategy
 from squadopt.data.errors import DataError
 from squadopt.experiments.config import ExperimentError
 from squadopt.live import (
@@ -364,6 +365,50 @@ def _entry_squad_payload(
     }
 
 
+def _suggested_strategy(
+    task: MemberRenderTask,
+    *,
+    placings: Mapping[int, MemberStanding],
+    gameweek: int,
+    scored_gameweek: int | None,
+) -> dict[str, object] | None:
+    """The declared rule's pick for this member, or ``None`` when it cannot be stated.
+
+    The rule reads two numbers: the member's league total minus their default rival's,
+    and the gameweeks left in the season (``strategies/rule.py``). Both totals must be
+    proven for the same scored week — ``MemberStanding`` carries ``None`` rather than a
+    zero when they are not — and both rival strategies must actually have been computed,
+    or the rule could name a file this batch never wrote. Anything missing makes the
+    suggestion absent, which is a smaller claim than a guessed one.
+
+    The rule names a strategy, not a file. Whether that strategy solved against this
+    particular rival is a separate fact, already recorded in ``computed`` and
+    ``unavailable`` beside it, and the page reads both.
+
+    This decides which of the member's own three advice files to point at. It does not
+    enter any of them: every advice file is still computed from that member's squad
+    alone, and the invariance test pins that.
+    """
+
+    rival_id = task.default_rival_id
+    if rival_id is None or scored_gameweek is None:
+        return None
+    if any(slug not in task.rival_strategies for slug in RIVAL_RULE_STRATEGIES):
+        return None
+    mine = placings.get(task.entry_id)
+    theirs = placings.get(rival_id)
+    if mine is None or theirs is None:
+        return None
+    if mine.total_points is None or theirs.total_points is None:
+        return None
+    return suggest_strategy(
+        rival_entry_id=int(rival_id),
+        points_ahead_of_rival=int(mine.total_points) - int(theirs.total_points),
+        gameweek=int(gameweek),
+        scored_gameweek=int(scored_gameweek),
+    ).to_dict()
+
+
 def build_league_views(
     provider: EntryPicksProvider,
     registrations: tuple[EntryRegistration, ...],
@@ -397,6 +442,12 @@ def build_league_views(
     ``advice/{id}/index.json`` naming what was computed and what was not, with the
     reason. ``mapper`` runs the per-member tasks — ``map`` here, or a process pool's
     ``map`` from the site script; the bytes do not depend on which.
+
+    The index also carries ``suggested_strategy``: the declared rule's pick among the
+    three, from the member's points gap to their default rival and the gameweeks
+    remaining (``strategies/rule.py``), with those inputs published beside it so a
+    reader can re-apply the rule. It is a pointer at one of the files below, not an
+    input to any of them, and it is ``null`` whenever either total is unproven.
 
     ``horizon_builder`` turns on the saf-puan windows beyond one week
     (``advice/{id}/saf-puan/3.json``, ``5.json``): the index then lists, per strategy,
@@ -632,6 +683,14 @@ def build_league_views(
                     "strategies": [COMPUTED_MODE, *task.rival_strategies],
                     "rival_entry_ids": list(task.rival_ids),
                     "default_rival_entry_id": task.default_rival_id,
+                    # The declared rule's pick among the three, with the gap and the
+                    # weeks remaining it read; null when either input is unproven.
+                    "suggested_strategy": _suggested_strategy(
+                        task,
+                        placings=placings,
+                        gameweek=gameweek,
+                        scored_gameweek=scored_gameweek,
+                    ),
                     "computed": computed,
                     "unavailable": unavailable,
                 },
