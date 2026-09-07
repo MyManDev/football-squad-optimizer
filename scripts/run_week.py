@@ -251,7 +251,10 @@ def run_week(arguments: argparse.Namespace) -> int:
                 deadline_utc,
             )
             elite = new_snapshot(before, list_snapshot_ids(SNAPSHOT_ROOT), ELITE_PREFIX)
-        table_name = f"player_evidence_v1_{plan.season}_gw{plan.gameweek:02d}_top100"
+        # The export never overwrites a different artifact at the same path, and a
+        # rehearsal earlier in the week is a different artifact from Friday's; the picks
+        # capture's own hash makes the name unique per capture.
+        table_name = f"player_evidence_v1_{plan.season}_gw{plan.gameweek:02d}_top100_{elite[-12:]}"
         output = _python(
             "scripts.export_player_evidence",
             "--season",
