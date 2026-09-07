@@ -19,7 +19,14 @@ import { Pitch } from "../../squad/components/Pitch";
 import { SquadPage } from "../../squad/pages/SquadPage";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { LeagueDataMissing, loadEntryAdvice, loadEntrySquad, loadLeagueMembers } from "../data";
-import type { AdviceMove, EntryAdvice, EntrySquad, EntryView, LeagueViewEnvelope } from "../types";
+import type {
+  AdviceMove,
+  AdvicePlayer,
+  EntryAdvice,
+  EntrySquad,
+  EntryView,
+  LeagueViewEnvelope,
+} from "../types";
 import styles from "./LeagueMemberPage.module.css";
 
 /** Why no published advice is on hand for the selection: never published, or not loadable. */
@@ -353,8 +360,105 @@ function AdviceCard({ shown }: { shown: ShownAdvice }) {
           ))}
         </div>
       )}
+      <LineupSection view={view} />
       <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
     </Card>
+  );
+}
+
+/**
+ * The rest of the decision: armband, chip, the eleven and the bench order. Rendered only
+ * when the producer published them — a document from before the producer carried the
+ * plan week, or a decision handed over without it, shows the moves alone.
+ */
+function LineupSection({ view }: { view: EntryAdvice }) {
+  const { locale, messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const { captain, vice_captain: vice, starting_xi: eleven, bench } = view;
+  if (!captain || !vice || !eleven || !bench) return null;
+  const chipName = view.chip ? (copy.chipNames[view.chip] ?? view.chip) : null;
+  const mark = (player: AdvicePlayer) =>
+    player.player_id === captain.player_id ? "C" : player.player_id === vice.player_id ? "V" : null;
+  return (
+    <section className={styles.lineup} aria-label={copy.lineupTitle}>
+      <h3 className={styles.lineupTitle}>{copy.lineupTitle}</h3>
+      <p className={styles.honesty}>{copy.lineupRule}</p>
+      {view.expected_own_points != null ? (
+        <p className={styles.planCost}>
+          <strong className="num">
+            {copy.expectedOwnPoints(points(view.expected_own_points, 1, locale))}
+          </strong>
+        </p>
+      ) : null}
+      <dl className={styles.armband}>
+        <div>
+          <dt>{copy.captainLabel}</dt>
+          <dd>
+            <strong>{captain.name}</strong>{" "}
+            <span className={styles.muted}>
+              {captain.team} · {captain.position}
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt>{copy.viceCaptainLabel}</dt>
+          <dd>
+            <strong>{vice.name}</strong>{" "}
+            <span className={styles.muted}>
+              {vice.team} · {vice.position}
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt>{copy.chipLabel}</dt>
+          <dd>{chipName ? <Badge tone="good">{chipName}</Badge> : copy.chipNone}</dd>
+        </div>
+      </dl>
+      <h4 className={styles.lineupSub}>{copy.startingXiLabel}</h4>
+      <div className={styles.bench}>
+        {eleven.map((player, index) => (
+          <LineupRow key={player.player_id} player={player} order={index + 1} mark={mark(player)} />
+        ))}
+      </div>
+      <h4 className={styles.lineupSub}>{copy.benchOrderLabel}</h4>
+      <div className={styles.bench}>
+        {bench.map((player, index) => (
+          <LineupRow key={player.player_id} player={player} order={index + 1} mark={null} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function LineupRow({
+  player,
+  order,
+  mark,
+}: {
+  player: AdvicePlayer;
+  order: number;
+  mark: "C" | "V" | null;
+}) {
+  const { locale } = useLanguage();
+  return (
+    <div className={styles.benchRow}>
+      <span className="num">{order}</span>
+      <strong>
+        {player.name}
+        {mark ? (
+          <>
+            {" "}
+            <Badge tone={mark === "C" ? "good" : "neutral"}>{mark}</Badge>
+          </>
+        ) : null}
+      </strong>
+      <span className={styles.muted}>
+        {player.team} · {player.position}
+      </span>
+      <span className={`${styles.benchPoints} num`}>
+        {player.expected_points != null ? `${points(player.expected_points, 1, locale)} xP` : ""}
+      </span>
+    </div>
   );
 }
 

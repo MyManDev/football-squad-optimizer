@@ -1,6 +1,7 @@
 import type { PlayerView } from "../data/schema";
 import type {
   AdviceMove,
+  AdvicePlayer,
   EntryAdvice,
   EntrySquad,
   EntryView,
@@ -367,6 +368,59 @@ function moveFor(mode: PlayMode, window: WindowSize): AdviceMove[] {
   ];
 }
 
+function lineupFor(
+  squad: EntrySquad | undefined,
+): Pick<
+  EntryAdvice,
+  "expected_own_points" | "captain" | "vice_captain" | "starting_xi" | "bench" | "chip"
+> {
+  if (!squad || squad.starting_xi.length === 0) {
+    return {
+      expected_own_points: null,
+      captain: null,
+      vice_captain: null,
+      starting_xi: null,
+      bench: null,
+      chip: null,
+    };
+  }
+  const toAdvice = (player: PlayerView): AdvicePlayer => ({
+    player_id: player.player_id,
+    name: player.name,
+    short_name: player.short_name,
+    position: player.position,
+    team: player.team,
+    expected_points: player.expected_points,
+  });
+  // The producer's completion rule: captain as decided, vice-captain the eleven's
+  // next-highest expected points, the bench goalkeeper first then outfield by points.
+  const eleven = squad.starting_xi.map(toAdvice);
+  const captain =
+    eleven.find((p) =>
+      squad.starting_xi.some((s) => s.player_id === p.player_id && s.is_captain),
+    ) ?? eleven[0]!;
+  const vice = eleven
+    .filter((p) => p.player_id !== captain.player_id)
+    .sort((a, b) => (b.expected_points ?? 0) - (a.expected_points ?? 0))[0]!;
+  const benchAll = squad.bench.map(toAdvice);
+  const bench = [
+    ...benchAll.filter((p) => p.position === "GK"),
+    ...benchAll
+      .filter((p) => p.position !== "GK")
+      .sort((a, b) => (b.expected_points ?? 0) - (a.expected_points ?? 0)),
+  ];
+  const own =
+    eleven.reduce((sum, p) => sum + (p.expected_points ?? 0), 0) + (captain.expected_points ?? 0);
+  return {
+    expected_own_points: Number(own.toFixed(2)),
+    captain,
+    vice_captain: vice,
+    starting_xi: eleven,
+    bench,
+    chip: null,
+  };
+}
+
 export function mockEntryAdviceEnvelope(
   entryId: number,
   mode: PlayMode,
@@ -387,6 +441,7 @@ export function mockEntryAdviceEnvelope(
     // points only; the example mirrors that shape so the page renders it in dev/test.
     expected_points_cost: mode === "saf-puan" ? 0 : 0.8,
     rival_label: mode === "saf-puan" ? null : "Harbor Rovers",
+    ...lineupFor(squad),
     data_quality: quality,
     missing_fields: quality === "complete" ? [] : (squad?.missing_fields ?? ["entry"]),
   });
