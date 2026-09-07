@@ -63,7 +63,6 @@ from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION, EQUAL_
 from squadopt.scenarios import ScenarioConfig, ScenarioTarget, ScenarioValidationError
 from squadopt.scenarios.components import (
     COMPONENT_MODEL_ROUTE,
-    COMPONENT_SCENARIO_CONTRACT_VERSION,
     DIRECT_CONTROL_ROUTE,
     MINUTES_PER_FIXTURE,
     ComponentScenarioInputs,
@@ -131,7 +130,9 @@ class DevelopmentInputs:
     table_sha256: str
     roster_sha256: str
     manifest_sha256: str
-    conditional_residuals: ConditionalResidualConfig
+    # ``None`` is the foundation sampler, which the calibration run also admits; the two
+    # sides declare it the same way so a foundation run can be fidelity-verified too.
+    conditional_residuals: ConditionalResidualConfig | None
 
 
 def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInputs | None:
@@ -140,8 +141,8 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
     Under v1 nothing changes and every v2-only option is refused. Under development_v2 the
     three digests are required so the run cannot silently measure another export (the
     season-weighted arm shares the reference's roster digest and differs only in its table),
-    both sampler controls are required so the sampler cannot be half-declared, and the v1
-    artifact path is refused.
+    the two sampler controls are both-or-neither -- neither meaning the foundation sampler,
+    exactly as the calibration run declares it -- and the v1 artifact path is refused.
     """
 
     contract = str(getattr(arguments, "phase_c_contract", "v1"))
@@ -171,11 +172,11 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
                 "under --phase-c-contract development_v2."
             )
         digests[name] = value
-    if fraction is None or minimum_rows is None:
+    if (fraction is None) != (minimum_rows is None):
         raise FidelityBindingError(
-            "A development_v2 run needs both --conditional-residual-fraction and "
-            "--conditional-residual-minimum-rows: the fidelity record has to name the same "
-            "sampler the calibration run will use."
+            "A development_v2 run takes both --conditional-residual-fraction and "
+            "--conditional-residual-minimum-rows or neither: the record has to name the same "
+            "sampler the calibration run will use, and a half-declared sampler names nothing."
         )
     if Path(arguments.json_output).resolve() == DEFAULT_OUTPUT.resolve():
         raise FidelityBindingError(
@@ -185,8 +186,10 @@ def _development_from_arguments(arguments: argparse.Namespace) -> DevelopmentInp
         table_sha256=digests["expected_table_sha256"],
         roster_sha256=digests["expected_roster_sha256"],
         manifest_sha256=digests["expected_manifest_sha256"],
-        conditional_residuals=ConditionalResidualConfig(
-            fraction=fraction, minimum_rows=minimum_rows
+        conditional_residuals=(
+            None
+            if fraction is None
+            else ConditionalResidualConfig(fraction=fraction, minimum_rows=minimum_rows)
         ),
     )
 
@@ -449,7 +452,7 @@ def measure_fidelity(
         "players_never_appearing": 0,
     }
     warnings: list[str] = []
-    sampler_records: set[tuple[str, str]] = set()
+    sampler_records: set[tuple[str, str, float | None, int | None]] = set()
 
     for fold_id in fold_ids:
         target = _fold_target(fold_id)
@@ -496,10 +499,14 @@ def measure_fidelity(
         # The draw declares the sampler it used; the record reports that rather than the
         # setting this run asked for, so the document cannot name a sampler it did not draw on.
         diagnostics = draw.scenarios.diagnostics
+        drawn_fraction = diagnostics.get("conditional_residual_fraction")
+        drawn_minimum = diagnostics.get("conditional_residual_minimum_rows")
         sampler_records.add(
             (
                 str(diagnostics["component_sampler_contract_version"]),
                 str(diagnostics["residual_selection"]),
+                None if drawn_fraction is None else float(drawn_fraction),  # type: ignore[arg-type]
+                None if drawn_minimum is None else int(drawn_minimum),  # type: ignore[call-overload]
             )
         )
         series, counts = _fold_differences(
@@ -583,20 +590,23 @@ def measure_fidelity(
         )
     development_block: dict[str, object] = {}
     if development:
-        drawn = sorted(sampler_records)
+        if not sampler_records:
+            # A record with no measured fold would name a sampler nothing was drawn on: a
+            # claim about a draw that never happened.
+            raise FidelityBindingError(
+                "No fold could be measured, so there is no sampler to record."
+            )
+        # Every field here is what the draws themselves declared, not what this run asked for.
+        version, selection, drawn_fraction, drawn_minimum = sorted(sampler_records)[0]
         development_block = {
             "development_only": True,
             "phase_c_contract": development_contract,
             "locked_holdout_read": LOCKED_HOLDOUT_SEASON in seasons,
             "sampler": {
-                "contract_version": (drawn[0][0] if drawn else COMPONENT_SCENARIO_CONTRACT_VERSION),
-                "residual_selection": drawn[0][1] if drawn else None,
-                "conditional_residual_fraction": (
-                    None if conditional_residuals is None else conditional_residuals.fraction
-                ),
-                "conditional_residual_minimum_rows": (
-                    None if conditional_residuals is None else conditional_residuals.minimum_rows
-                ),
+                "contract_version": version,
+                "residual_selection": selection,
+                "conditional_residual_fraction": drawn_fraction,
+                "conditional_residual_minimum_rows": drawn_minimum,
             },
         }
     return {

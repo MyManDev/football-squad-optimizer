@@ -478,6 +478,8 @@ def _development_population(
 
 def _development_observation(
     readings: Sequence[ComponentCalibrationFold],
+    *,
+    fidelity_verified: bool = False,
 ) -> dict[str, object] | None:
     """The S1/S2 point readings as development observations, never as a verdict."""
 
@@ -509,9 +511,12 @@ def _development_observation(
         "tail_rate_within_s2_bounds": within(tail_rate, S2_LOWER_TAIL_BOUNDS),
         "minimum_folds_for_a_verdict": MIN_CALIBRATION_FOLDS,
         "note": (
-            "Development observation on the folds measured in this run. It is not a "
-            "calibration verdict: the verdict abstains until a v2 sampler-fidelity artifact "
-            "exists, and a pilot's folds are far too few to read."
+            "Development observation on the folds measured in this run, beside a verdict "
+            "read on the declared population. It is not the binding verdict."
+            if fidelity_verified
+            else "Development observation on the folds measured in this run. It is not a "
+            "calibration verdict: without a verified sampler-fidelity record the verdict "
+            "abstains by protocol."
         ),
     }
 
@@ -946,10 +951,14 @@ def _measure_development(
     if fidelity_digest is not None and (
         fidelity_measured != history_eligible or fidelity_excluded != burn_in
     ):
+        # The record can also exclude a fold for a reason of its own -- one with no component
+        # row at all -- so the message names the folds rather than only the counts.
         raise BindingCalibrationError(
-            "The fidelity record and this run disagree on which folds have enough history: "
-            f"{len(fidelity_measured)} measured / {len(fidelity_excluded)} excluded there, "
-            f"{len(history_eligible)} eligible / {len(burn_in)} burn-in here."
+            "The fidelity record and this run disagree on which folds it covers: measured "
+            f"differ by {sorted(set(fidelity_measured) ^ set(history_eligible))[:5]!r}, "
+            f"excluded differ by {sorted(set(fidelity_excluded) ^ set(burn_in))[:5]!r} "
+            f"({len(fidelity_measured)}/{len(fidelity_excluded)} there, "
+            f"{len(history_eligible)}/{len(burn_in)} here)."
         )
     requested = development.folds
     if requested is not None:
@@ -1030,16 +1039,33 @@ def _measure_development(
             raise BindingCalibrationError(
                 f"The fidelity record does not cover every measured fold: {unmeasured[:5]!r}."
             )
-    verdict: dict[str, object] | None = None
-    verdict_note = (
-        "No verdict: fewer than the minimum folds for a calibration reading were measured "
-        "(a pilot). The S1/S2 readings are development observations only."
+    # The population a verdict is read against is declared before any outcome: every
+    # history-eligible fold except the preregistered direct-control abstentions. A fold that
+    # then fails to solve or loses its realized score is a population mismatch the evaluator
+    # has to see, never a smaller denominator.
+    abstentions = set(direct_control)
+    expected_population = tuple(
+        fold_id for fold_id in history_eligible if fold_id not in abstentions
     )
-    if len(measured_ids) >= MIN_CALIBRATION_FOLDS:
+    verdict: dict[str, object] | None = None
+    if requested is not None:
+        # `--folds` is an operator's choice of folds, which is not the outcome-independent
+        # population the protocol reads S1/S2 against, however many folds it names.
+        verdict_note = (
+            "No verdict: --folds restricts the run to an operator-chosen subset rather than "
+            "the preregistered outcome-independent population. The S1/S2 readings are "
+            "development observations only."
+        )
+    elif len(expected_population) < MIN_CALIBRATION_FOLDS:
+        verdict_note = (
+            "No verdict: fewer than the minimum folds for a calibration reading are eligible. "
+            "The S1/S2 readings are development observations only."
+        )
+    else:
         verdict = asdict(
             evaluate_component_squad_calibration(
                 readings,
-                expected_fold_ids=tuple(measured_ids),
+                expected_fold_ids=expected_population,
                 sampler_fidelity_verified=fidelity_digest is not None,
             )
         )
@@ -1094,6 +1120,7 @@ def _measure_development(
                 "unsolved_fold_ids": unsolved,
                 "unscored_fold_ids": unscored,
                 "measured_fold_ids": measured_ids,
+                "verdict_population_fold_ids": list(expected_population),
                 "eligibility_note": (
                     "History eligibility is computed from the handoff for every fold; the "
                     "direct-control condition is known only for the folds whose full-pool "
@@ -1101,7 +1128,9 @@ def _measure_development(
                 ),
             },
             "folds": fold_records,
-            "development_observation": _development_observation(readings),
+            "development_observation": _development_observation(
+                readings, fidelity_verified=fidelity_digest is not None
+            ),
             "verdict": verdict,
             "verdict_note": verdict_note,
         },

@@ -54,6 +54,20 @@ and pinned to its three digests, drawn on the same declared candidate sampler, w
 the distinct contract `phase_d_component_fidelity_development_v2`. It never writes the frozen
 v1 artifact path, and the v1 diagnostic refuses every option that belongs to this path.
 
+Two clauses of the frozen documents are deliberately inverted here, and only here. The
+fidelity pre-registration says the locked 2025-26 holdout "is not read, listed or hashed" and
+requires `locked_holdout_read: false`; the calibration pre-registration folds the same
+exclusion into what "verified" means. A v2 record is measured over the reference's whole
+five-season population and therefore carries `locked_holdout_read: true` with a non-zero
+`locked_holdout_rows_present`. That is the same development-scope decision the Phase C v2
+contract already made, not a relaxation of either frozen document: both keep governing the v1
+path, which still refuses that season outright.
+
+The record itself is a measurement output. It is produced locally beside the other Phase D v2
+measurements and is not committed, so the run's verdict rests on a verified but unreviewed
+artifact — weaker than the v1 path, where the diagnostic is committed and reviewed. A verdict
+read this way is development evidence and nothing more.
+
 `--fidelity` then hands that record to the calibration run, which verifies before it measures:
 the contract; the diagnostic-only flags; the configuration, field by field, against this run's
 own `ScenarioConfig`; the sampler contract, fraction and minimum rows against this run's own
@@ -67,7 +81,7 @@ The two studies do not share an observation. The diagnostic's unit is one (fold,
 over every component row of a fold; this run's unit is one frozen fifteen-player decision per
 fold. So a verified record answers only "was this sampler, on this reference, measured over
 these folds" — never anything numeric about the squad distributions, and never whether there
-are enough folds to read: a pilot with a verified record still produces no verdict.
+are enough folds to read.
 
 ## Readings and status
 
@@ -81,6 +95,11 @@ readings as a development observation (mean PIT against `[0.43, 0.57]`, lower-ta
 against `[0.04, 0.16]`). Without a verified fidelity record the protocol's verdict abstains
 (`sampler_fidelity_not_verified`); with one it is evaluated against those inherited bounds and
 may read `calibrated_internal` or `failed`. Either way it is a development reading on seen
-folds, not the binding verdict, and a pilot below the minimum fold count produces no verdict
-at all. Nothing in the sampler, the scenario configuration, the solver profile or the gates is
-changed to alter that reading.
+folds, not the binding verdict.
+
+The population a verdict is read against is declared before any outcome: every history-eligible
+fold except the direct-control abstentions the pre-registration already excludes. A fold that
+then fails to solve or loses its realized score is a population mismatch the evaluator sees,
+never a smaller denominator. A `--folds` run names an operator's own subset, which is not that
+population, so it produces no verdict however many folds it names. Nothing in the sampler, the
+scenario configuration, the solver profile or the gates is changed to alter any of this.
