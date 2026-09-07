@@ -149,8 +149,10 @@ SIGINT are honoured *after* the job in hand finishes, so a container stop costs 
 solve. Abandoned claims are walked back periodically through the contract's own
 `running -> queued` edge, which increments `attempt`; past `--max-attempts` (default 3) the
 job is failed with `TOO_MANY_ATTEMPTS` rather than crash-looping. The claim's lease is 300
-seconds against a measured 3.0–29.6 s solve, so `queue.heartbeat` is not called — the loop
-does not pretend to need it.
+seconds against a measured 3.0–29.6 s *single* solve, and one member's plan is several
+solves, so the claim is kept alive while the computation runs: `run_advice_worker_once`
+refreshes it through `queue.heartbeat` on a background thread every `heartbeat_seconds`,
+and the loop's default is a third of the lease.
 
 Refusals the compute side reaches deliberately carry their own code (`CONTEXT_UNAVAILABLE`,
 `REQUEST_UNREADABLE`, `TOO_MANY_ATTEMPTS`); an unexpected exception is still `ADVICE_FAILED`
@@ -215,10 +217,13 @@ and configured request buckets can reject excess submissions. The in-memory limi
 process; replicas do not share it automatically.
 
 `run_advice_worker_once` claims a job, calls an injected compute function, writes the immutable
-cache entry and records completion or failure. The real compute function must invoke the public
-application advice service with the captured picks, projection and rules. The worker primitive
-and API tests do not by themselves provide a production worker loop, a capture-context provider
-or a deployed shared store. The default `app = create_app()` does not assemble those services.
+cache entry and records completion or failure. The production compute function lives in
+`squadopt.platform.advice_worker`: it reads the job's spec back, checks the capture it names
+against the current capture context, and calls the public application advice service with the
+captured picks, projection and rules. The worker loop (`advice_worker.py`), the capture-context
+provider (`backend_runtime.CaptureContextProvider` over `capture_context.py`) and the one-store
+composition (`backend_runtime.py`) are in the repository; what is not is a running deployment
+of them, and the default `app = create_app()` deliberately does not assemble those services.
 
 The API accepts window values 1, 3 and 5 at the transport boundary. That is not a claim that the
 current engine computes all three: `advise_entry` currently computes window 1 and refuses the
@@ -228,15 +233,18 @@ not member-facing probability claims.
 
 The frontend's general pages still use `StaticDataClient`. The member advice client optionally
 uses `VITE_ADVICE_API_ORIGIN` and can fall back to the published static answer. The member page
-renders returned advice and retains compute controls when published advice is absent. Of the
-existing UI mode/window choices, only `saf-puan` with window 1 can request a computation; the
-other choices may display published research plans. They are not aliases for the application's
-`ortak-koru` and `fark-yarat` strategies.
+renders returned advice and retains compute controls when published advice is absent. Which
+selections may request a computation is decided in one place, `canComputeAdvice` in
+`web/src/features/league/advice/adviceSelection.ts`, and it mirrors `advise_entry`'s own
+refusals: window 1 only, and either `saf-puan` (rival-free) or a member strategy
+(`ortak-koru`, `fark-yarat`) with a rival named. Longer windows and the legacy play modes are
+displayed from the published tree only; the play modes are not aliases for the member
+strategies.
 
 Advice responses must match the selected league, member, mode, window and displayed season/week.
 A refreshed squad invalidates earlier jobs and results. Static answers are labelled published
 plans, and request rejections are not turned into successful static computations. Enabling an
-origin still requires the real worker and capture-context assembly described above.
+origin still requires a deployment of the worker and capture-context assembly described above.
 
 ## Planned operator HTTP commands
 
@@ -327,8 +335,9 @@ it according to the domain result it actually received.
 ## Deliberately absent from v1
 
 - no user or authentication domain;
-- no PostgreSQL, ORM, or migration runtime;
-- no Redis, queue, worker, cache, or background job status;
+- no PostgreSQL, ORM, or migration runtime, and no Redis: the queue, the cache and the worker
+  are the file-backed ones on the shared store of ADR 0006, and the only job status is the
+  `backend_jobs_v1` advice-job resource above;
 - no arbitrary optimization/research endpoint;
 - no upload endpoint for raw snapshots or model artifacts;
 - no browser call directly to the upstream FPL API;

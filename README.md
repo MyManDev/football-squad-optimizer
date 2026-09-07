@@ -23,8 +23,9 @@ calibrated, evidence-aware and multi-gameweek football decision-support system.
 
 The backend and frontend are at different integration stages. Published pages use static
 views; the member page can request and display advice through the optional HTTP/job client,
-with computation restricted to the supported pure-points, one-week choice. Production worker
-and capture-context assembly still need integration. See the
+with computation restricted to one-week plans: pure points, or a member strategy against a
+named rival. The worker loop, capture-context provider and one-store composition exist in
+`squadopt.platform`; what does not exist is a running deployment of them. See the
 [backend boundary](docs/architecture/backend.md).
 
 ## Phase A — Measurement correctness
