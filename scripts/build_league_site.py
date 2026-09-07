@@ -20,17 +20,22 @@ is the public post-deadline picture the league's own standings page already show
 """
 
 import argparse
+import functools
 import multiprocessing
 import sys
-from collections.abc import Mapping, Sequence
-from concurrent.futures import ProcessPoolExecutor
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import Executor, ProcessPoolExecutor
 from contextlib import ExitStack
 from pathlib import Path
+from typing import Any
 
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import (
+    MemberRender,
+    MemberRenderTask,
     MemberStanding,
     build_league_views,
+    render_member,
 )
 from squadopt.application.mode_selection import build_mode_paths
 from squadopt.data.errors import DataError
@@ -90,6 +95,67 @@ def last_scored_gameweek(bootstrap: bytes, *, before: int) -> int | None:
 SNAPSHOT_ROOT = Path("data/snapshots")
 ARCHIVE_ROOT = Path("data/raw/vaastav-fpl")
 REGISTRY_PATH = Path("data/entries/registry.json")
+
+
+# --- the process pool ----------------------------------------------------------------
+#
+# The capture context (snapshot payloads, inputs, projection, season rules) holds
+# read-only mapping proxies and is not picklable, and it is large; so a worker does not
+# receive it — it rebuilds the same context from the same paths once, at start, and the
+# tasks that cross the process boundary are the primitive ``MemberRenderTask`` records.
+# The projection is a deterministic function of the capture and the handoff, so a
+# worker's context is the batch's context, and the bytes are the same (the in-process
+# mapper test pins the scheduler-only property; the real run is checked by hand).
+
+_WORKER_CONTEXT: dict[str, Any] = {}
+
+
+def _worker_init(
+    snapshot_root: str,
+    snapshot_id: str,
+    season: str,
+    handoff: str | None,
+    archive_root: str,
+) -> None:
+    snapshot = read_snapshot(Path(snapshot_root), snapshot_id)
+    inputs = read_inputs(snapshot, season=season, gameweek=None)
+    panel = build_panel(Path(archive_root))
+    in_season = read_projection_handoff(Path(handoff)) if handoff else None
+    _WORKER_CONTEXT.update(
+        provider=CapturePicksProvider(snapshot, snapshot_id),
+        inputs=inputs,
+        projection=project(inputs, panel, in_season=in_season),
+        rules=read_season_rules(snapshot, season=season),
+    )
+
+
+def _render_in_worker(task: MemberRenderTask) -> MemberRender:
+    return render_member(task, **_WORKER_CONTEXT)
+
+
+def pool_mapper(
+    executor: Executor,
+) -> Callable[
+    [Callable[[MemberRenderTask], MemberRender], Iterable[MemberRenderTask]],
+    Iterable[MemberRender],
+]:
+    """A ``build_league_views`` mapper over a pool whose workers hold their own context.
+
+    The function the batch hands over is ``render_member`` bound to the batch's own
+    context; the pool cannot carry that context, so it runs the same ``render_member``
+    against the worker's — and refuses anything else, so a different function can never
+    be silently replaced by this one.
+    """
+
+    def mapper(
+        function: Callable[[MemberRenderTask], MemberRender],
+        tasks: Iterable[MemberRenderTask],
+    ) -> Iterable[MemberRender]:
+        if not (isinstance(function, functools.partial) and function.func is render_member):
+            raise ValueError("The pool mapper runs render_member only.")
+        return executor.map(_render_in_worker, list(tasks))
+
+    return mapper
 
 
 def main() -> int:
@@ -210,15 +276,27 @@ def main() -> int:
             )
         out_dir = Path(arguments.out) / "data" / "league"
         with ExitStack() as stack:
-            mapper = map
+            mapper: Callable[..., Iterable[MemberRender]] = map
             if arguments.workers > 1:
                 executor = stack.enter_context(
                     ProcessPoolExecutor(
                         max_workers=arguments.workers,
                         mp_context=multiprocessing.get_context("spawn"),
+                        initializer=_worker_init,
+                        initargs=(
+                            str(SNAPSHOT_ROOT),
+                            snapshot_id,
+                            season,
+                            (
+                                str(arguments.in_season_projection)
+                                if arguments.in_season_projection
+                                else None
+                            ),
+                            str(arguments.archive_root),
+                        ),
                     )
                 )
-                mapper = executor.map
+                mapper = pool_mapper(executor)
             report = build_league_views(
                 CapturePicksProvider(snapshot, snapshot_id),
                 registry.entries,

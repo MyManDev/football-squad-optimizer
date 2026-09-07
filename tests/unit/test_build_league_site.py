@@ -77,3 +77,24 @@ def test_the_published_week_is_the_last_final_one_before_the_build(
     events: list[dict[str, Any]], before: int, expected: int | None
 ) -> None:
     assert last_scored_gameweek(_events(events), before=before) == expected
+
+
+def test_the_pool_mapper_runs_render_member_only() -> None:
+    """A pool worker rebuilds the batch's context itself, so the mapper must refuse any
+    function but ``render_member`` rather than silently running its own."""
+
+    import functools
+    from concurrent.futures import ThreadPoolExecutor
+
+    from scripts.build_league_site import pool_mapper
+
+    from squadopt.application.league_views import render_member
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        mapper = pool_mapper(executor)
+        with pytest.raises(ValueError, match="render_member only"):
+            mapper(len, [])  # type: ignore[arg-type]
+        bound = functools.partial(
+            render_member, provider=None, inputs=None, projection=None, rules=None
+        )
+        assert list(mapper(bound, [])) == []  # type: ignore[arg-type]
