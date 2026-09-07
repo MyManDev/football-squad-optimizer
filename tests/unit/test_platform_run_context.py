@@ -222,7 +222,7 @@ def test_manifest_write_is_atomic_idempotent_and_refuses_reuse(tmp_path: Path) -
     assert write_run_manifest(path, context) == path
     assert path.read_bytes() == first_bytes
     assert read_run_manifest(path) == context
-    assert not tuple(path.parent.glob(".manifest.json.tmp-*"))
+    assert not tuple(path.parent.glob(".*.tmp"))
 
     with pytest.raises(RunManifestError, match="different content"):
         write_run_manifest(path, replace(context, deterministic_seed=7))

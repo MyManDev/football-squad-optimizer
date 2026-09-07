@@ -84,6 +84,9 @@ _PREREG_BY_VERSION: dict[str, tuple[str, ...]] = {
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _FOLD_ID = re.compile(r"^\d{4}-\d{2}-gw\d{2}$")
 
+_SCRATCH_ENTROPY_BYTES = 4
+_SCRATCH_ATTEMPTS = 8
+
 
 class ShadowReportError(ValueError):
     """Raised when a shadow report violates its own contract."""
@@ -549,6 +552,33 @@ def _internal_destination(path: Path, what: str) -> Path:
     return resolved
 
 
+def _write_scratch(resolved: Path, payload: bytes) -> Path:
+    """Complete and fsync ``payload`` in a sibling scratch file reserved for ``resolved``.
+
+    The scratch name is shorter than every report name rather than derived from one.
+    Windows resolves paths against a 260 character limit, so a scratch name that padded
+    the report name with a process id was rejected in directories where the report
+    itself fits: the extra characters, not concurrency, exhausted the limit. Exclusive
+    creation already carried the reservation, so dropping the padding costs nothing.
+    """
+
+    for _ in range(_SCRATCH_ATTEMPTS):
+        candidate = resolved.with_name(f".{secrets.token_hex(_SCRATCH_ENTROPY_BYTES)}.tmp")
+        try:
+            with candidate.open("xb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except FileExistsError:
+            continue
+        except BaseException:
+            with contextlib.suppress(OSError):
+                candidate.unlink()
+            raise
+        return candidate
+    raise ShadowReportError(f"Could not reserve a scratch file beside {resolved}.")
+
+
 def _publish_once(
     payload: bytes, resolved: Path, *, parse: Callable[[bytes], Mapping[str, object]]
 ) -> str:
@@ -563,12 +593,8 @@ def _publish_once(
     """
 
     resolved.parent.mkdir(parents=True, exist_ok=True)
-    temporary = resolved.with_name(f".{resolved.name}.tmp-{os.getpid()}-{secrets.token_hex(8)}")
+    temporary = _write_scratch(resolved, payload)
     try:
-        with temporary.open("xb") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
         try:
             os.link(temporary, resolved)
             return "written"

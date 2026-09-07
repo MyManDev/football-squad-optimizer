@@ -329,7 +329,7 @@ def test_build_site_writes_a_deterministic_validated_tree(
     assert first.status_written is True and first.decided_gameweeks == (1,)
     assert first.league_written is True
     # No leftover temporary files from the atomic writes.
-    assert not [p for p in (tmp_path / "one").rglob(".*.tmp-*")]
+    assert not [p for p in (tmp_path / "one").rglob(".*.tmp")]
 
 
 def test_live_site_publication_is_read_only_and_replaces_missing_or_settled_scores(

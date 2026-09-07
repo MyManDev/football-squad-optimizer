@@ -62,6 +62,9 @@ _FORBIDDEN_COLUMNS: Final = frozenset(
     {"entry", "entry_id", "entry_name", "player_name", "manager_name", "team_name", "news"}
 )
 
+_SCRATCH_ENTROPY_BYTES: Final = 4
+_SCRATCH_ATTEMPTS: Final = 8
+
 
 @dataclass(frozen=True, slots=True)
 class EvidenceSummary:
@@ -184,7 +187,24 @@ def validate_evidence_table(table: pd.DataFrame) -> EvidenceSummary:
 
 
 def _temporary(final: Path) -> Path:
-    return final.with_name(f".{final.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
+    """Reserve a sibling scratch name for publishing ``final``.
+
+    The scratch name is shorter than every artifact name rather than derived from one.
+    Windows resolves paths against a 260 character limit, so a scratch name that padded
+    the artifact name with a process id was rejected in output directories where the
+    artifact itself fits: the extra characters, not concurrency, exhausted the limit.
+    Creating the reservation exclusively keeps it unambiguous without that padding; the
+    caller then writes the artifact's bytes over the empty file it gets back.
+    """
+
+    for _ in range(_SCRATCH_ATTEMPTS):
+        candidate = final.with_name(f".{secrets.token_hex(_SCRATCH_ENTROPY_BYTES)}.tmp")
+        try:
+            candidate.touch(exist_ok=False)
+        except FileExistsError:
+            continue
+        return candidate
+    raise DataError(f"Could not reserve a scratch file beside {final}.")
 
 
 def _publish(temporary: Path, final: Path) -> None:

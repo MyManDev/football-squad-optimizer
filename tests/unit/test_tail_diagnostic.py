@@ -354,7 +354,7 @@ def test_the_artifact_is_written_exactly_once(tmp_path: Path) -> None:
 
     with pytest.raises(ShadowReportError, match="already holds a different measurement"):
         write_document_once({**document, "classification": "y"}, target)
-    assert [entry.name for entry in tmp_path.iterdir() if ".tmp-" in entry.name] == []
+    assert [entry.name for entry in tmp_path.iterdir() if entry.name.endswith(".tmp")] == []
 
 
 def test_no_field_this_study_records_can_reach_a_published_payload() -> None:

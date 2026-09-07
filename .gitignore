@@ -259,4 +259,4 @@ web/test-results/
 # sibling temporary before publishing it with a no-overwrite link, and removes it on
 # every path; a hard kill can still strand one, and an untracked file beside a report
 # makes every later run record a dirty tree.
-docs/.*.json.tmp-*
+docs/.*.tmp

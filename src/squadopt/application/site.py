@@ -25,6 +25,7 @@ import secrets
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
+from typing import Final
 
 from squadopt.application.build import (
     ledger_view,
@@ -56,6 +57,9 @@ from squadopt.live.tick import LedgerState, TickPlan
 DATA_DIRECTORY = "data"
 SCHEMA_RELATIVE_PATH = f"schema/{UI_VIEW_CONTRACT_VERSION}.schema.json"
 
+_SCRATCH_ENTROPY_BYTES: Final = 4
+_SCRATCH_ATTEMPTS: Final = 8
+
 
 @dataclass(frozen=True, slots=True)
 class SiteBuildReport:
@@ -70,12 +74,36 @@ class SiteBuildReport:
     horizon_evidence_gameweek: int | None
 
 
+def _write_scratch(path: Path, payload: bytes) -> Path:
+    """Write ``payload`` to a sibling scratch file reserved for publishing ``path``.
+
+    The scratch name is shorter than every view name rather than derived from one.
+    Windows resolves paths against a 260 character limit, so a scratch name that padded
+    the view name with a process id was rejected in directories where the view itself
+    fits: the extra characters, not concurrency, exhausted the limit.  Exclusive
+    creation keeps the reservation unambiguous without that padding.
+    """
+
+    for _ in range(_SCRATCH_ATTEMPTS):
+        candidate = path.with_name(f".{secrets.token_hex(_SCRATCH_ENTROPY_BYTES)}.tmp")
+        try:
+            with candidate.open("xb") as handle:
+                handle.write(payload)
+        except FileExistsError:
+            continue
+        except BaseException:
+            with contextlib.suppress(FileNotFoundError):
+                candidate.unlink()
+            raise
+        return candidate
+    raise DataError(f"Could not reserve a scratch file beside {path}.")
+
+
 def _write_json(path: Path, payload: dict[str, JsonValue]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     text = json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
-    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
+    temporary = _write_scratch(path, text.encode("utf-8"))
     try:
-        temporary.write_bytes(text.encode("utf-8"))
         os.replace(temporary, path)
     finally:
         with contextlib.suppress(FileNotFoundError):

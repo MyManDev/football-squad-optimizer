@@ -357,7 +357,7 @@ def _combine(
 
 
 def _residue(directory: Path) -> list[str]:
-    return sorted(entry.name for entry in directory.iterdir() if ".tmp-" in entry.name)
+    return sorted(entry.name for entry in directory.iterdir() if entry.name.endswith(".tmp"))
 
 
 # --- 1. a partial protocol cannot pass ------------------------------------------------

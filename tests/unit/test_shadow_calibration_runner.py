@@ -323,7 +323,7 @@ def test_atomic_writer_accepts_concurrent_identical_content(tmp_path: Path) -> N
 
     assert sorted(outcomes) == ["replay", "written"]
     assert json.loads(target.read_text(encoding="utf-8")) == document
-    assert list(tmp_path.glob(".shadow.json.tmp-*")) == []
+    assert list(tmp_path.glob(".*.tmp")) == []
 
 
 def test_atomic_writer_refuses_a_concurrent_conflict(tmp_path: Path) -> None:
@@ -343,7 +343,7 @@ def test_atomic_writer_refuses_a_concurrent_conflict(tmp_path: Path) -> None:
         outcomes = list(pool.map(attempt, (first, second)))
 
     assert sorted(outcomes) == ["conflict", "written"]
-    assert list(tmp_path.glob(".shadow.json.tmp-*")) == []
+    assert list(tmp_path.glob(".*.tmp")) == []
 
 
 def test_the_bootstrap_is_deterministic_and_refuses_non_finite() -> None:

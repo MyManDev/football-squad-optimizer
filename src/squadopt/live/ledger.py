@@ -54,6 +54,8 @@ _OUTCOME_FILE: Final = "outcome.json"
 _MANIFEST_FILE: Final = "manifest.json"
 _STAGING_MARKER: Final = ".staging-"
 _LOCK_SUFFIX: Final = ".lock"
+_SCRATCH_ENTROPY_BYTES: Final = 4
+_SCRATCH_ATTEMPTS: Final = 8
 STALE_STAGING_SECONDS: Final = 3600.0
 """A staging directory older than this belongs to a writer that died; it is pruned."""
 STALE_LOCK_SECONDS: Final = 900.0
@@ -64,12 +66,36 @@ def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _write_scratch(path: Path, data: bytes) -> Path:
+    """Write ``data`` to a sibling scratch file reserved for publishing ``path``.
+
+    The scratch name is shorter than every ledger file name rather than derived from
+    one. Windows resolves paths against a 260 character limit, so a scratch name that
+    padded the file name with a process id was rejected inside gameweek directories
+    where the file itself fits: the extra characters, not concurrency, exhausted the
+    limit. Exclusive creation keeps the reservation unambiguous without that padding.
+    """
+
+    for _ in range(_SCRATCH_ATTEMPTS):
+        candidate = path.with_name(f".{secrets.token_hex(_SCRATCH_ENTROPY_BYTES)}.tmp")
+        try:
+            with candidate.open("xb") as handle:
+                handle.write(data)
+        except FileExistsError:
+            continue
+        except BaseException:
+            with contextlib.suppress(FileNotFoundError):
+                candidate.unlink()
+            raise
+        return candidate
+    raise LedgerError(f"Could not reserve a scratch file beside {path}.")
+
+
 def _write_atomic(path: Path, data: bytes) -> None:
     """Write bytes to ``path`` through a sibling temporary file and one rename."""
 
-    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
+    temporary = _write_scratch(path, data)
     try:
-        temporary.write_bytes(data)
         os.replace(temporary, path)
     finally:
         with contextlib.suppress(FileNotFoundError):

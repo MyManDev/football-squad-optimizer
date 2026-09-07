@@ -48,6 +48,8 @@ FEATURE_CONTRACT_VERSION: Final = "in-season-carry-over-features-v1"
 #: The prereg's split: fit on 2021-22..2023-24, score 2024-25 frozen.
 DEFAULT_CUTOFF_FOLD_ID: Final = "2023-24-gw38"
 DEFAULT_OUTPUT: Final = REPOSITORY_ROOT / "docs" / "shadow_calibration_in_season.json"
+_SCRATCH_ENTROPY_BYTES: Final = 4
+_SCRATCH_ATTEMPTS: Final = 8
 
 
 def _tree_dirty_ignoring(path: Path) -> bool:
@@ -81,6 +83,33 @@ def _tree_dirty_ignoring(path: Path) -> bool:
     return False
 
 
+def _write_scratch(resolved: Path, payload: bytes) -> Path:
+    """Complete and fsync ``payload`` in a sibling scratch file reserved for ``resolved``.
+
+    The scratch name is shorter than every report name rather than derived from one.
+    Windows resolves paths against a 260 character limit, so a scratch name that padded
+    the report name with a process id was rejected in directories where the report
+    itself fits: the extra characters, not concurrency, exhausted the limit. Exclusive
+    creation already carried the reservation, so dropping the padding costs nothing.
+    """
+
+    for _ in range(_SCRATCH_ATTEMPTS):
+        candidate = resolved.with_name(f".{secrets.token_hex(_SCRATCH_ENTROPY_BYTES)}.tmp")
+        try:
+            with candidate.open("xb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+        except FileExistsError:
+            continue
+        except BaseException:
+            with contextlib.suppress(OSError):
+                candidate.unlink()
+            raise
+        return candidate
+    raise SystemExit(f"Could not reserve a scratch file beside {resolved}.")
+
+
 def _write_once(document: dict[str, object], path: Path) -> str:
     """Atomically create a report, accept a replay, and refuse a conflict."""
 
@@ -91,12 +120,8 @@ def _write_once(document: dict[str, object], path: Path) -> str:
         "utf-8"
     )
     resolved.parent.mkdir(parents=True, exist_ok=True)
-    temporary = resolved.with_name(f".{resolved.name}.tmp-{os.getpid()}-{secrets.token_hex(8)}")
+    temporary = _write_scratch(resolved, payload)
     try:
-        with temporary.open("xb") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
         try:
             os.link(temporary, resolved)
             return "written"

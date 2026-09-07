@@ -17,6 +17,8 @@ from squadopt.platform.context import RunContext
 
 RUN_MANIFEST_CONTRACT_VERSION: Final = "run_manifest_v1"
 RUN_MANIFEST_SCHEMA_PATH: Final = Path("docs") / "contracts" / "run_manifest_v1.schema.json"
+_SCRATCH_ENTROPY_BYTES: Final = 4
+_SCRATCH_ATTEMPTS: Final = 8
 
 
 class RunManifestError(ValueError):
@@ -79,6 +81,31 @@ def parse_run_manifest(data: bytes | str) -> RunContext:
         raise RunManifestError(f"Run manifest context is invalid: {error}") from error
 
 
+def _write_scratch(path: Path, payload: bytes) -> Path:
+    """Write ``payload`` to a sibling scratch file reserved for publishing ``path``.
+
+    The scratch name is shorter than every manifest name rather than derived from one.
+    Windows resolves paths against a 260 character limit, so a scratch name that padded
+    the manifest name with a process id was rejected in run directories where the
+    manifest itself fits: the extra characters, not concurrency, exhausted the limit.
+    Exclusive creation keeps the reservation unambiguous without that padding.
+    """
+
+    for _ in range(_SCRATCH_ATTEMPTS):
+        candidate = path.with_name(f".{secrets.token_hex(_SCRATCH_ENTROPY_BYTES)}.tmp")
+        try:
+            with candidate.open("xb") as handle:
+                handle.write(payload)
+        except FileExistsError:
+            continue
+        except BaseException:
+            with contextlib.suppress(FileNotFoundError):
+                candidate.unlink()
+            raise
+        return candidate
+    raise RunManifestError(f"Could not reserve a scratch file beside {path}.")
+
+
 def write_run_manifest(path: Path | str, context: RunContext) -> Path:
     """Atomically publish one immutable manifest, allowing an identical retry.
 
@@ -90,9 +117,8 @@ def write_run_manifest(path: Path | str, context: RunContext) -> Path:
     target = Path(path)
     payload = serialize_run_manifest(context)
     target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_name(f".{target.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
+    temporary = _write_scratch(target, payload)
     try:
-        temporary.write_bytes(payload)
         try:
             os.link(temporary, target)
         except FileExistsError:

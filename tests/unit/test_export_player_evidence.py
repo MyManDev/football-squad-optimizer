@@ -208,7 +208,7 @@ def test_an_existing_different_artifact_is_never_overwritten(tmp_path: Path) -> 
     assert again.manifest == _read_manifest(again.manifest_path)
     assert again.manifest["generated_at_utc"] == WHEN
     assert first.table_path.read_bytes() == original
-    assert not list(tmp_path.glob(".*.tmp-*")), "no temporary file survives"
+    assert not list(tmp_path.glob(".*.tmp")), "no temporary file survives"
 
 
 def _cli_arguments(tmp_path: Path) -> list[str]:
