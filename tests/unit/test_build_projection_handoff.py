@@ -33,6 +33,8 @@ from squadopt.prediction.component_dataset import (
 )
 from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 from squadopt.prediction.elite_evidence import (
+    COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
+    COMPONENT_ELITE_MODEL_VERSION,
     ELITE_EVIDENCE_MODEL_VERSION,
     ELITE_EVIDENCE_POLICY_VERSION,
 )
@@ -508,6 +510,124 @@ def test_component_model_is_the_default_when_the_capture_has_settled_history(
     assert projection.feature_contract_version == COMPONENT_FEATURE_CONTRACT_VERSION
     assert report["projection_selection"] == "phase_c_component_default"
     assert report["version_is_promoted"] is True
+
+
+def _evidence_for(
+    control: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path, list[int]]:
+    """A verified-looking Top-100 evidence pair: the first eleven players at full support."""
+
+    rows = []
+    ordered_players = sorted(control.expected_points)
+    for offset, player_id in enumerate(ordered_players):
+        count = 100 if offset < 11 else 0
+        rows.append(
+            {
+                "season": SEASON,
+                "target_gameweek": 2,
+                "captured_at_utc": "2026-08-27T08:00:00Z",
+                "deadline_timestamp_utc": EVENTS[1]["deadline_time"],
+                "player_id": player_id,
+                "elite_cohort_size": 100,
+                "elite_members_observed": 100,
+                "elite_start_count_lag1": count,
+                "elite_start_share_lag1": count / 100,
+                "elite_evidence_observed": True,
+            }
+        )
+    evidence = pd.DataFrame(rows)
+    evidence.attrs.update(
+        {
+            "elite_members_missing_picks": 0,
+            "unmapped_picked_elements": (),
+            "table_sha256": "b" * 64,
+            "generated_at_utc": "2026-08-27T09:00:00Z",
+        }
+    )
+    monkeypatch.setattr(producer, "read_player_evidence_artifact", lambda *_: evidence)
+    table_path = tmp_path / "evidence.csv"
+    manifest_path = tmp_path / "evidence.json"
+    table_path.write_text("unused\n", encoding="utf-8")
+    manifest_path.write_text("{}\n", encoding="utf-8")
+    return table_path, manifest_path, ordered_players
+
+
+def test_evidence_on_the_component_base_is_its_own_promoted_identity(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Top-100 uplift and the component model are one policy on two bases: with
+    settled history the uplift sits on the component projection and the handoff names
+    that, round-trips through the consumer's reader, and is promoted."""
+
+    snapshot = write_snapshot(
+        world["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-08-28T15:31:00Z",
+        payloads={
+            BOOTSTRAP_PAYLOAD: _bootstrap(
+                _elements(played={1001: (90, 6), 1004: (20, 4), 1013: (75, 5)})
+            ),
+            FIXTURES_PAYLOAD: _fixtures(),
+            "event-gw01-live.json": b"unused by the injected component builder",
+        },
+    )
+
+    def fake_component(*_args: object, fallback: pd.DataFrame, **_kwargs: object) -> object:
+        table = fallback.loc[:, ["player_id", "expected_points"]].copy(deep=True)
+        table["expected_points"] = table["expected_points"].add(1.0)
+        return table, {"component_fingerprint": "a" * 64}
+
+    monkeypatch.setattr(producer, "_component_table", fake_component)
+    component, _, _ = _build(world, snapshot_id=snapshot.snapshot_id, dry_run=True)
+    assert component.model_version == COMPONENT_MODEL_VERSION
+    table_path, manifest_path, ordered_players = _evidence_for(component, tmp_path, monkeypatch)
+
+    projection, written, report = _build(
+        world,
+        snapshot_id=snapshot.snapshot_id,
+        evidence_table_path=table_path,
+        evidence_manifest_path=manifest_path,
+    )
+
+    assert written is not None
+    assert read_projection_handoff(written).fingerprint == projection.fingerprint
+    assert projection.model_version == COMPONENT_ELITE_MODEL_VERSION
+    assert projection.feature_contract_version == COMPONENT_ELITE_FEATURE_CONTRACT_VERSION
+    assert projection.evidence_fingerprint is not None
+    # The uplift sits on the component numbers, not on the legacy blend beneath them.
+    assert projection.expected_points[1001] == pytest.approx(component.expected_points[1001] * 1.05)
+    last_player = ordered_players[-1]
+    assert projection.expected_points[last_player] == pytest.approx(
+        component.expected_points[last_player]
+    )
+    assert report["projection_selection"] == "phase_c_component_elite"
+    assert report["elite_evidence_base_selection"] == "phase_c_component_default"
+    assert report["version_is_promoted"] is True
+
+
+def test_evidence_without_component_history_stays_the_legacy_elite_candidate(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    control, _, _ = _build(world, snapshot_id=world["after"], dry_run=True)
+    table_path, manifest_path, _ = _evidence_for(control, tmp_path, monkeypatch)
+    projection, _, report = _build(
+        world,
+        snapshot_id=world["after"],
+        evidence_table_path=table_path,
+        evidence_manifest_path=manifest_path,
+        dry_run=True,
+    )
+    assert projection.model_version == ELITE_EVIDENCE_MODEL_VERSION
+    assert report["projection_selection"] == "legacy_elite_candidate"
+    assert report["elite_evidence_base_selection"] == "legacy_control_fallback"
+
+
+def test_the_latest_capture_is_the_latest_live_one(world: dict[str, Any]) -> None:
+    """A Top-100 capture sharing the root sorts after every live one and is not a
+    projection input."""
+
+    (world["snapshot_root"] / "fpl-top100-99999999T000000Z-ffffffffffff").mkdir()
+    assert producer._latest_snapshot_id(world["snapshot_root"]).startswith("fpl-live-")
 
 
 def test_an_older_capture_records_the_legacy_fallback_reason(world: dict[str, Any]) -> None:

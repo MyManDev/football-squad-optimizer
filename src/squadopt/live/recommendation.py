@@ -49,6 +49,8 @@ from squadopt.prediction.component_dataset import (
 from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 from squadopt.prediction.config import BaselineProjectionConfig
 from squadopt.prediction.elite_evidence import (
+    COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
+    COMPONENT_ELITE_MODEL_VERSION,
     ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION,
     ELITE_EVIDENCE_MODEL_VERSION,
 )
@@ -74,6 +76,7 @@ IN_SEASON_CONTROL_MODEL_VERSIONS: Final[tuple[str, ...]] = (
     COMPONENT_MODEL_VERSION,
     IN_SEASON_MODEL_VERSION,
     ELITE_EVIDENCE_MODEL_VERSION,
+    COMPONENT_ELITE_MODEL_VERSION,
 )
 
 
@@ -139,6 +142,14 @@ class InSeasonProjection:
             raise DataSourceError(
                 "The operational elite model requires its evidence fingerprint and exact "
                 f"feature contract {ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION!r}."
+            )
+        if self.model_version == COMPONENT_ELITE_MODEL_VERSION and (
+            self.evidence_fingerprint is None
+            or self.feature_contract_version != COMPONENT_ELITE_FEATURE_CONTRACT_VERSION
+        ):
+            raise DataSourceError(
+                "The component elite model requires its evidence fingerprint and exact "
+                f"feature contract {COMPONENT_ELITE_FEATURE_CONTRACT_VERSION!r}."
             )
         if self.model_version == IN_SEASON_MODEL_VERSION and self.evidence_fingerprint is not None:
             raise DataSourceError(

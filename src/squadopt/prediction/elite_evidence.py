@@ -15,6 +15,10 @@ from squadopt.prediction.config import PredictionConfigurationError
 ELITE_EVIDENCE_POLICY_VERSION: Final = "phase_c_operational_elite_policy_v1"
 ELITE_EVIDENCE_MODEL_VERSION: Final = "in-season-carry-over-elite-top100-v1"
 ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION: Final = "in-season-carry-over-elite-top100-features-v1"
+#: The same bounded rule applied on top of the Phase C component projection instead of
+#: the legacy blend: one policy, two bases, each named so a handoff says which it is.
+COMPONENT_ELITE_MODEL_VERSION: Final = "phase-c-component-elite-top100-v1"
+COMPONENT_ELITE_FEATURE_CONTRACT_VERSION: Final = "phase-c-component-elite-top100-features-v1"
 ELITE_COHORT_SIZE: Final = 100
 ELITE_XI_SIZE: Final = 11
 MAXIMUM_RELATIVE_UPLIFT: Final = 0.05

@@ -20,8 +20,9 @@ Steps, each skippable by naming its output:
 2. top100          the Overall Top-100 cohort, its members' last picks, and the
                    player_evidence_v1 export (``--cohort-snapshot`` / ``--elite-snapshot``
                    reuse captures; ``--skip-top100`` leaves the evidence out entirely)
-3. handoff         the projection handoff for this capture — the Phase C component route
-                   by default, the elite route with ``--projection elite``
+3. handoff         the projection handoff for this capture: the Phase C component base
+                   with the bounded Top-100 uplift on top when the evidence was exported
+                   (``--projection component-only`` leaves the uplift out)
 4. league          the league tree: every member's baseline and the rival menu
                    (``--workers``)
 5. site            the season views
@@ -275,11 +276,10 @@ def run_week(arguments: argparse.Namespace) -> int:
             raise WeekError("The evidence export did not report its table and manifest paths.")
         print(f"evidence {evidence_table.name} / {evidence_manifest.name}", flush=True)
 
-    # 3. handoff
+    # 3. handoff: the component base, with the Top-100 uplift on top when the evidence
+    # was exported this run and the caller did not ask for the bare projection
     handoff_arguments = ["--snapshot-id", snapshot_id, "--snapshot-root", str(SNAPSHOT_ROOT)]
-    if arguments.projection == "elite":
-        if evidence_table is None or evidence_manifest is None:
-            raise WeekError("--projection elite needs the Top-100 evidence; do not --skip-top100.")
+    if arguments.projection == "component" and evidence_table is not None and evidence_manifest:
         handoff_arguments += [
             "--evidence-table",
             str(evidence_table),
@@ -356,10 +356,10 @@ def main() -> int:
     parser.add_argument("--skip-top100", action="store_true", help="no Top-100 captures or export")
     parser.add_argument(
         "--projection",
-        choices=("component", "elite"),
+        choices=("component", "component-only"),
         default="component",
-        help="which handoff route: the Phase C component default, or the elite (Top-100 "
-        "uplift on the legacy blend) route",
+        help="component: the Phase C component base with the bounded Top-100 uplift when "
+        "the evidence was exported; component-only: the bare component base",
     )
     parser.add_argument("--workers", type=int, default=8, help="league tree solver processes")
     parser.add_argument("--out", default=str(SITE_OUT), help="site output root (web/public)")

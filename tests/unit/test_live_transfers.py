@@ -368,6 +368,36 @@ def test_an_evidence_digest_is_bound_into_the_handoff_fingerprint(
         read_projection_handoff(path)
 
 
+def test_the_component_elite_model_requires_its_evidence_identity(
+    world: dict[str, Any],
+) -> None:
+    from squadopt.live.recommendation import (
+        IN_SEASON_CONTROL_MODEL_VERSIONS,
+        read_projection_handoff,
+    )
+    from squadopt.prediction.elite_evidence import (
+        COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
+        COMPONENT_ELITE_MODEL_VERSION,
+    )
+
+    with pytest.raises(DataSourceError, match="component elite model requires"):
+        _handoff(world, version=COMPONENT_ELITE_MODEL_VERSION)
+    with pytest.raises(DataSourceError, match="component elite model requires"):
+        _handoff(
+            world,
+            version=COMPONENT_ELITE_MODEL_VERSION,
+            evidence_fingerprint="c" * 64,
+            feature_contract_version="phase_c_component_form_window_v1",
+        )
+    promoted = _handoff(
+        world,
+        version=COMPONENT_ELITE_MODEL_VERSION,
+        evidence_fingerprint="c" * 64,
+        feature_contract_version=COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
+    )
+    assert read_projection_handoff(promoted).model_version in IN_SEASON_CONTROL_MODEL_VERSIONS
+
+
 def test_the_elite_model_requires_its_evidence_identity(world: dict[str, Any]) -> None:
     with pytest.raises(DataSourceError, match="requires its evidence fingerprint"):
         _handoff(world, version=ELITE_EVIDENCE_MODEL_VERSION)
