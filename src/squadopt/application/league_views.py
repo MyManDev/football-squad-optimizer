@@ -36,7 +36,9 @@ import pandas as pd
 from squadopt.application.advice import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
+    MEMBER_WINDOWS,
     AdviseEntryRequest,
+    HorizonBuilder,
     advise_entry,
     build_advice_payload,
     solve_member_control,
@@ -100,6 +102,8 @@ class MemberRenderTask:
     rival_ids: tuple[int, ...]
     default_rival_id: int | None
     rival_strategies: tuple[str, ...]
+    #: The saf-puan windows beyond one week to solve; empty without a horizon builder.
+    windows: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,6 +115,9 @@ class MemberRender:
     reason: str
     rival_payloads: tuple[tuple[str, int, dict[str, object]], ...]
     unavailable: tuple[tuple[str, int, str], ...]
+    #: The saf-puan windows that solved, and the ones that did not, with the reason.
+    window_payloads: tuple[tuple[int, dict[str, object]], ...] = ()
+    window_unavailable: tuple[tuple[int, str], ...] = ()
 
 
 def render_member(
@@ -120,14 +127,18 @@ def render_member(
     inputs: RecommendationInputs,
     projection: Projection,
     rules: SeasonRules,
+    horizon_builder: HorizonBuilder | None = None,
 ) -> MemberRender:
-    """Solve one member's control once, then every (rival strategy, rival) from it.
+    """Solve one member's control once, then every (rival strategy, rival) from it, and
+    every saf-puan window the task names.
 
     The baseline is ``advise_entry`` byte for byte; the rival files are ``advise_entry``
     with the same control handed back in, so nothing here can drift from the on-demand
     seam. One rival that cannot be priced — a band the squad cannot satisfy, a rival
     with players the projection lacks — is recorded as unavailable with its reason and
-    the rest of the menu renders; a baseline that fails takes the member out of the
+    the rest of the menu renders; a window that cannot be solved — a calendar the
+    capture does not publish that far, no plan inside the budget — is recorded the same
+    way, never dropped silently; a baseline that fails takes the member out of the
     menu entirely, with the reason on the members row.
     """
 
@@ -173,7 +184,37 @@ def render_member(
                 unavailable.append((strategy, rival_id, str(error)))
                 continue
             payloads.append((strategy, rival_id, payload))
-    return MemberRender(task.entry_id, baseline, "", tuple(payloads), tuple(unavailable))
+    window_payloads: list[tuple[int, dict[str, object]]] = []
+    window_unavailable: list[tuple[int, str]] = []
+    for window in task.windows:
+        try:
+            payload = advise_entry(
+                AdviseEntryRequest(
+                    season=task.season,
+                    gameweek=task.gameweek,
+                    league_id=task.league_id,
+                    entry_id=task.entry_id,
+                    window=window,
+                ),
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+                horizon_builder=horizon_builder,
+            )
+        except (EntryError, DataError) as error:
+            window_unavailable.append((window, str(error)))
+            continue
+        window_payloads.append((window, payload))
+    return MemberRender(
+        task.entry_id,
+        baseline,
+        "",
+        tuple(payloads),
+        tuple(unavailable),
+        tuple(window_payloads),
+        tuple(window_unavailable),
+    )
 
 
 #: How a caller runs the member tasks: ``map`` in-process, or a process pool's ``map``.
@@ -186,9 +227,11 @@ MemberMapper = Callable[
 # one — is always computed, and it is always the deterministic planner's own answer.
 # The competitive modes are computed only when the caller supplies scenario paths to
 # price the member's menu on (`mode_paths`); without them the other combinations are
-# simply absent and the page says so. Windows beyond one are not computed at all:
-# publishing a file for a combination nobody computed would make the site show an
-# answer where none was measured.
+# simply absent and the page says so. The saf-puan windows beyond one are computed only
+# when the caller supplies a projection horizon builder for the capture; a rival
+# strategy stays at one week. Publishing a file for a combination nobody computed would
+# make the site show an answer where none was measured, so the index names exactly the
+# windows that solved and records the ones that did not, with the reason.
 
 
 @dataclass(frozen=True, slots=True)
@@ -339,6 +382,7 @@ def build_league_views(
     rival_strategies: tuple[str, ...] | None = None,
     rival_menu: bool = True,
     mapper: MemberMapper = map,
+    horizon_builder: HorizonBuilder | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
@@ -353,6 +397,12 @@ def build_league_views(
     ``advice/{id}/index.json`` naming what was computed and what was not, with the
     reason. ``mapper`` runs the per-member tasks — ``map`` here, or a process pool's
     ``map`` from the site script; the bytes do not depend on which.
+
+    ``horizon_builder`` turns on the saf-puan windows beyond one week
+    (``advice/{id}/saf-puan/3.json``, ``5.json``): the index then lists, per strategy,
+    the windows that solved (``windows``), and a window that did not is in
+    ``unavailable`` with its reason. The one-week baseline's bytes are the same with or
+    without it. Without a builder the index lists window one only, as before.
 
     ``mode_paths`` — one-week scenario paths for this deadline — turns on the
     competitive modes: each member's transfer menu is priced on the shared paths
@@ -445,6 +495,11 @@ def build_league_views(
             return None
         return next(i for i, squad in candidates.items() if squad is chosen)
 
+    windows = (
+        tuple(window for window in MEMBER_WINDOWS if window != COMPUTED_WINDOW)
+        if horizon_builder is not None
+        else ()
+    )
     tasks = [
         MemberRenderTask(
             entry_id=int(registration.entry_id),
@@ -459,6 +514,7 @@ def build_league_views(
             ),
             default_rival_id=_default_rival(int(registration.entry_id)) if rival_menu else None,
             rival_strategies=strategies if rival_menu else (),
+            windows=windows,
         )
         for registration in registrations
     ]
@@ -471,6 +527,7 @@ def build_league_views(
                 inputs=inputs,
                 projection=projection,
                 rules=rules,
+                horizon_builder=horizon_builder,
             ),
             tasks,
         )
@@ -526,6 +583,10 @@ def build_league_views(
 
         _write(f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json", advice)
 
+        # The saf-puan windows beyond one week, beside the baseline at their own paths.
+        for window, payload in render.window_payloads:
+            _write(f"advice/{entry_id}/{COMPUTED_MODE}/{window}.json", payload)
+
         # The rival menu: one file per (strategy, rival), the standings neighbour's copy
         # at the strategy's plain path, and an index that says what exists and why not.
         computed: list[dict[str, object]] = []
@@ -535,7 +596,22 @@ def build_league_views(
             computed.append({"strategy": strategy, "rival_entry_id": rival_id, "path": relative})
             if rival_id == task.default_rival_id:
                 _write(f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}.json", payload)
-        if rival_menu:
+        if rival_menu or task.windows:
+            unavailable: list[dict[str, object]] = [
+                {"strategy": strategy, "rival_entry_id": rival_id, "reason": reason}
+                for strategy, rival_id, reason in render.unavailable
+            ]
+            # A window that did not solve is a recorded reason at the same address the
+            # rival pairs use, with no rival and the window named.
+            unavailable.extend(
+                {
+                    "strategy": COMPUTED_MODE,
+                    "rival_entry_id": None,
+                    "window": window,
+                    "reason": reason,
+                }
+                for window, reason in render.window_unavailable
+            )
             _write(
                 f"advice/{entry_id}/index.json",
                 {
@@ -544,14 +620,20 @@ def build_league_views(
                     "gameweek": gameweek,
                     "entry_id": entry_id,
                     "window": COMPUTED_WINDOW,
+                    # Per strategy, the windows whose file exists: saf-puan's solved
+                    # windows, every rival strategy at one week.
+                    "windows": {
+                        COMPUTED_MODE: [
+                            COMPUTED_WINDOW,
+                            *(window for window, _payload in render.window_payloads),
+                        ],
+                        **{strategy: [COMPUTED_WINDOW] for strategy in task.rival_strategies},
+                    },
                     "strategies": [COMPUTED_MODE, *task.rival_strategies],
                     "rival_entry_ids": list(task.rival_ids),
                     "default_rival_entry_id": task.default_rival_id,
                     "computed": computed,
-                    "unavailable": [
-                        {"strategy": strategy, "rival_entry_id": rival_id, "reason": reason}
-                        for strategy, rival_id, reason in render.unavailable
-                    ],
+                    "unavailable": unavailable,
                 },
             )
 

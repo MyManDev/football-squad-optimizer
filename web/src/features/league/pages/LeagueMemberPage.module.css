@@ -167,6 +167,56 @@
   margin: 0;
 }
 
+.window {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line);
+}
+
+.limits {
+  margin: 0 0 var(--space-3);
+  padding-left: 1.2rem;
+  max-width: var(--measure);
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+
+.limits li + li {
+  margin-top: 4px;
+}
+
+.windowScroll {
+  overflow-x: auto;
+}
+
+.windowTable {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: var(--step--1);
+}
+
+.windowTable th,
+.windowTable td {
+  padding: 8px;
+  border-top: 1px solid var(--color-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.windowTable thead th {
+  border-top: none;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.windowTable .right {
+  text-align: right;
+}
+
 @media (max-width: 640px) {
   .head {
     align-items: flex-start;

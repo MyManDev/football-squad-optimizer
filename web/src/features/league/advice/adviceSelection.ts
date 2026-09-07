@@ -12,9 +12,22 @@ import {
   isMemberStrategy,
   strategyNeedsRival,
   type AdviceStrategy,
+  type EntryAdviceIndex,
   type EntryView,
 } from "../types";
 import type { AdviceRequest } from "./adviceClient";
+
+/**
+ * The windows the producer published for a strategy, from the index. A tree from
+ * before the windows existed, or no index at all, names window one only — the page
+ * never offers a window nobody computed.
+ */
+export function availableWindows(
+  index: EntryAdviceIndex | null | undefined,
+  strategy: AdviceStrategy,
+): WindowSize[] {
+  return index?.windows?.[strategy] ?? [1];
+}
 
 /** The members a rival can be chosen from: the league's other human entries. */
 export function rivalCandidates(members: EntryView[], entryId: number): EntryView[] {
@@ -55,12 +68,12 @@ export function selectedAdviceRequest(
 }
 
 /**
- * The combinations connected to the application compute path: one-week plans — pure
- * points, or a member strategy with a rival named. Longer windows and the legacy play
- * modes are shown from the published tree only.
+ * The combinations connected to the application compute path: pure points at any of
+ * its windows, or a one-week member strategy with a rival named. A rival strategy at a
+ * longer window and the legacy play modes are shown from the published tree only.
  */
 export function canComputeAdvice(request: AdviceRequest): boolean {
-  if (request.window !== 1) return false;
   if (request.strategy === "saf-puan") return true;
+  if (request.window !== 1) return false;
   return isMemberStrategy(request.strategy) && request.rivalEntryId != null;
 }

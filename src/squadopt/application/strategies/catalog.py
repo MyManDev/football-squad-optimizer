@@ -71,6 +71,10 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         "overlap_applied",
         "plan_kind",
         "alternative_plan",
+        # The multi-week window: one row per gameweek (transfers, hit points, chip,
+        # expected points) and the sentences naming what the window assumes.
+        "plan_weeks",
+        "stated_limits",
     }
 )
 
@@ -281,7 +285,9 @@ def _catalog() -> Mapping[str, Strategy]:
             slug="saf-puan",
             constraints=CandidateConstraints(),
             ranks_by=RankingCriterion.EXPECTED_OWN_POINTS,
-            publishes=_BASELINE_PUBLISHES,
+            # The only strategy computed beyond one week: its three- and five-week
+            # windows publish the per-week plan and the window's stated limits.
+            publishes=_BASELINE_PUBLISHES | frozenset({"plan_weeks", "stated_limits"}),
             evidence=EvidenceStatus.PREREG_OPEN,
             tagline="Unconstrained: the highest expected points.",
         ),

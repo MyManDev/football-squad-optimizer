@@ -628,6 +628,7 @@ def plan_transfer_horizon(
     *,
     optimization: OptimizationConfig | None = None,
     transfer_config: TransferPlanningConfig | None = None,
+    chips: ChipAvailability | None = None,
 ) -> tuple[TransferPlanResult, TransferPlanningConfig]:
     """Plan several gameweeks from the held squad and one projection horizon.
 
@@ -643,9 +644,10 @@ def plan_transfer_horizon(
     churned, while the cap removed the mechanism. Callers may provide another explicit
     policy, whose configuration fingerprint remains in the result.
 
-    Chips are not offered automatically. A finite horizon would otherwise spend a chip
-    because its option value after the horizon is unknown; explicit chip scheduling is a
-    separate operating decision, as it is in the one-week live path.
+    Chips are not offered unless the caller names them in ``chips``. A finite horizon
+    values a chip inside the horizon only — its option value after the last week is
+    unknown to the planner — so a caller who offers chips takes on stating that limit,
+    as the member window path does; the system's own horizon path offers none.
     """
 
     if not isinstance(projection_horizon, ProjectionHorizon):
@@ -733,6 +735,7 @@ def plan_transfer_horizon(
         state,
         settings,
         planning_policy,
+        chips=chips,
     )
     if not plan.has_solution or not plan.weeks:
         used = plan.diagnostics.get("deterministic_time_used")

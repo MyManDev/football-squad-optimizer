@@ -100,6 +100,8 @@ _PUBLISHED_ENVELOPE = frozenset(
         "overlap_applied",
         "plan_kind",
         "alternative_plan",
+        "plan_weeks",
+        "stated_limits",
     }
 )
 

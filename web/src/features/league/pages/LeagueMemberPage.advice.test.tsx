@@ -248,10 +248,10 @@ describe("league member advice flow", () => {
   });
 
   it.each([
-    ["saf-puan", 3],
-    ["saf-puan", 5],
+    ["ortak-koru", 3],
+    ["fark-yarat", 5],
   ] as const)(
-    "keeps %s/%i visible but does not submit unsupported calculations",
+    "keeps %s/%i visible but does not submit a rival strategy over a longer window",
     async (mode, window) => {
       const requests: AdviceRequest[] = [];
       renderView({
@@ -266,12 +266,55 @@ describe("league member advice flow", () => {
       expect(screen.getByDisplayValue(mode)).toBeChecked();
       expect(screen.getByRole("radio", { name: new RegExp(`${window} hafta`) })).toBeChecked();
       expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled();
-      expect(screen.getByText(/Hesapla bir haftalık planları destekler/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Rakip stratejisi daha uzun pencerede hesaplanmaz/),
+      ).toBeInTheDocument();
       expect(screen.queryByText("Yukarıdaki Hesapla ile isteyebilirsin.")).toBeNull();
       await compute();
       expect(requests).toEqual([]);
     },
   );
+
+  it.each([3, 5] as const)("submits pure points over a %i-week window", async (window) => {
+    const requests: AdviceRequest[] = [];
+    renderView({
+      advice: null,
+      adviceIssue: "not-computed",
+      initialEntry: `/league/members/${ENTRY}?window=${window}`,
+      client: new FakeClient(async (request) => {
+        requests.push(request);
+        return { kind: "unavailable" };
+      }),
+    });
+
+    expect(screen.getByRole("radio", { name: new RegExp(`${window} hafta`) })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
+    expect(screen.getByText("Yukarıdaki Hesapla ile isteyebilirsin.")).toBeInTheDocument();
+    await compute();
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ strategy: "saf-puan", window, rivalEntryId: null });
+  });
+
+  it("posts the window in the HTTP request body", async () => {
+    const bodies: unknown[] = [];
+    const client = new HttpAdviceClient("https://api.example", async (url, init) => {
+      if (init?.method === "POST") bodies.push(JSON.parse(String(init.body)));
+      const body =
+        init?.method === "POST"
+          ? { job_id: "job-window", status: "queued" }
+          : url.includes("advice-jobs/")
+            ? { job_id: "job-window", status: "failed" }
+            : {};
+      return new Response(JSON.stringify(body), { status: init?.method === "POST" ? 202 : 200 });
+    });
+    renderView({
+      advice: null,
+      initialEntry: `/league/members/${ENTRY}?window=3`,
+      client,
+    });
+    await compute();
+    expect(bodies).toEqual([{ strategy: "saf-puan", window: 3, rival_entry_id: null }]);
+  });
 
   it("does not submit a rival strategy when no rival can be named", async () => {
     const requests: AdviceRequest[] = [];
@@ -313,12 +356,14 @@ describe("league member advice flow", () => {
   it("explains unsupported selections in English without promising a calculation", () => {
     renderView({
       advice: null,
-      initialEntry: `/league/members/${ENTRY}?window=3`,
+      initialEntry: `/league/members/${ENTRY}?mode=ortak-koru&window=3`,
       language: "en",
       client: new FakeClient(async () => ({ kind: "unavailable" })),
     });
     expect(screen.getByRole("button", { name: "Compute" })).toBeDisabled();
-    expect(screen.getByText(/Compute supports one-week plans/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/A rival strategy is not computed over a longer window/),
+    ).toBeInTheDocument();
     expect(screen.queryByText("You can ask for it with Compute above.")).toBeNull();
   });
 

@@ -14,6 +14,11 @@ contract. They do not redefine the data-zone dataclass.
 - `purchase_prices_known` is false when the source cannot publish purchase prices. The UI says
   explicitly that current prices are then used as selling prices and may overstate the budget.
 - `source_snapshot_id` identifies the post-deadline capture used for the entry view and advice.
+- `saf-puan` is published at windows 1, 3 and 5; a rival strategy at window 1 only. The index's
+  `windows` map names, per strategy, the windows whose file exists, and a window that did not
+  solve is an `unavailable` entry with `rival_entry_id: null`, the `window` and the reason. A
+  multi-week document adds `plan_weeks` (one row per gameweek) and `stated_limits` (the
+  producer's sentences on what the window assumes); its `moves` and lineup are the first week's.
 
 ## Fields awaiting Issue #127 confirmation
 
