@@ -786,8 +786,12 @@ def test_settling_a_transfer_week_nets_hits_and_counts_the_boosted_bench(
     assert table.loc[table["gameweek"] == 2, "chip"].iloc[0] == "bboost"
     assert table.loc[table["gameweek"] == 1, "transfers"].iloc[0] == 0
     markdown = summary_markdown(world["ledger_root"], SEASON)
+    assert "| GW | Snapshot | Mode | Solver |" in markdown
     assert "| Transfers | Hits | Chip | Net |" in markdown
     assert "bboost" in markdown
+    # The mode column says how each decision was made; the CLI's explicit-snapshot path
+    # stamps replay, and the summary shows it rather than hiding it in the metadata.
+    assert set(table["mode"]) <= {"live", "replay"}
 
 
 def _residual_export(root: Path, *, model_version: str, tamper: bool = False) -> Path:

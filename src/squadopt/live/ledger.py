@@ -604,8 +604,17 @@ def held_squad_from_ledger(
     )
 
 
+def decision_mode(decision: Mapping[str, object]) -> str | None:
+    """The mode a decision was made in: ``live`` before the deadline, ``replay`` from a
+    pre-deadline capture afterwards; ``None`` on an entry recorded before it was stamped."""
+
+    metadata = decision.get("metadata")
+    mode = metadata.get("mode") if isinstance(metadata, Mapping) else None
+    return None if mode is None else str(mode)
+
+
 def ledger_summary(root: Path, season: str) -> pd.DataFrame:
-    """Return one row per recorded gameweek: projected, realized, hits, and the gap."""
+    """Return one row per recorded gameweek: mode, projected, realized, hits, and the gap."""
 
     rows: list[dict[str, object]] = []
     for entry in load_ledger(root, season):
@@ -618,6 +627,7 @@ def ledger_summary(root: Path, season: str) -> pd.DataFrame:
             {
                 "gameweek": entry.gameweek,
                 "snapshot_id": entry.decision["snapshot_id"],
+                "mode": decision_mode(entry.decision),
                 "solver_status": entry.decision["solver_status"],
                 "projected_score": projected,
                 "realized_score": realized,
@@ -635,6 +645,7 @@ def ledger_summary(root: Path, season: str) -> pd.DataFrame:
         columns=[
             "gameweek",
             "snapshot_id",
+            "mode",
             "solver_status",
             "projected_score",
             "realized_score",
@@ -657,12 +668,14 @@ def summary_markdown(root: Path, season: str) -> str:
         f"# Season Ledger {season}",
         "",
         f"- Contract: `{SEASON_LEDGER_CONTRACT_VERSION}`",
-        "- One row per live decision; raw entries (decision, projections, report, "
+        "- One row per recorded decision; raw entries (decision, projections, report, "
         "outcome) live locally under `data/ledger/` with per-file checksums.",
+        "- Mode: `live` was decided before its deadline; `replay` was recorded afterwards "
+        "from a capture taken before that deadline.",
         "",
-        "| GW | Snapshot | Solver | Projected | Realized | Error | Transfers | Hits | Chip "
-        "| Net | Unavailable |",
-        "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
+        "| GW | Snapshot | Mode | Solver | Projected | Realized | Error | Transfers | Hits "
+        "| Chip | Net | Unavailable |",
+        "| ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
     ]
     for record in table.to_dict(orient="records"):
         realized_value = record["realized_score"]
@@ -672,8 +685,9 @@ def summary_markdown(root: Path, season: str) -> str:
         error = "-" if error_value is None else f"{float(str(error_value)):+.1f}"
         net = "-" if net_value is None else f"{float(str(net_value)):.0f}"
         chip = record["chip"] if record["chip"] is not None else "-"
+        mode = record["mode"] if record["mode"] is not None else "-"
         lines.append(
-            f"| {record['gameweek']} | `{record['snapshot_id']}` "
+            f"| {record['gameweek']} | `{record['snapshot_id']}` | {mode} "
             f"| {record['solver_status']} "
             f"| {float(str(record['projected_score'])):.1f} | {realized} | {error} "
             f"| {record['transfers']} | {float(str(record['transfer_hit_points'])):.0f} "

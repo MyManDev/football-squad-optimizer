@@ -421,6 +421,35 @@ def test_the_summary_shows_settled_and_pending_gameweeks(
     assert "Settled gameweeks: 1" in markdown
 
 
+def test_the_summary_shows_the_mode_each_decision_was_made_in(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """A replayed catch-up is a different kind of record from a live decision, and the
+    committed summary says which is which rather than leaving it in the raw metadata."""
+
+    recommendation, projection, root = decision_world
+    record_decision(
+        root, recommendation, projection, report_text="report", metadata={"mode": "replay"}
+    )
+
+    table = ledger_summary(root, SEASON)
+    assert table.loc[0, "mode"] == "replay"
+    markdown = summary_markdown(root, SEASON)
+    assert "| GW | Snapshot | Mode | Solver |" in markdown
+    assert "| replay | OPTIMAL |" in markdown
+    assert "`replay` was recorded afterwards" in markdown
+
+
+def test_an_entry_recorded_before_the_mode_was_stamped_shows_a_dash(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    recommendation, projection, root = decision_world
+    record_decision(root, recommendation, projection, report_text="report")
+
+    assert ledger_summary(root, SEASON).loc[0, "mode"] is None
+    assert "| - | OPTIMAL |" in summary_markdown(root, SEASON)
+
+
 def test_an_empty_season_loads_as_empty(tmp_path: Path) -> None:
     assert load_ledger(tmp_path / "ledger", SEASON) == ()
     assert ledger_summary(tmp_path / "ledger", SEASON).empty
