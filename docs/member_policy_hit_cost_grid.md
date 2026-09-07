@@ -36,7 +36,7 @@ The rule fires, and the pull request that recorded this measurement (#401) still
 `member_planning_policy_v1` at hit cost 4. Acting on the reading was a second change,
 because it moves what every league member is told.
 
-**Acted on in #PRNUM.** The owner chose 8. `member_planning_policy_v2` plans at 8; the
+**Acted on in #405.** The owner chose 8. `member_planning_policy_v2` plans at 8; the
 new `hit_points_charged` control keeps the game's 4, and every hit a member is shown,
 every hit the ledger records, and every comparison between two solved plans is counted
 at the charge. 8 is the top of this grid, so it sits on an edge rather than at an
