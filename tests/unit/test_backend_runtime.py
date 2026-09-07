@@ -18,13 +18,16 @@ from squadopt.api.runtime import app_for_backend
 from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.snapshots import write_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.live import InSeasonProjection, write_projection_handoff
 from squadopt.live import recommendation as live_recommendation
 from squadopt.live.tick import handoff_path_for
 from squadopt.platform import backend_runtime
+from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.backend_runtime import (
     BackendConfig,
     BackendConfigError,
+    CaptureContextProvider,
     build_backend,
     computable_strategies,
     configuration_fingerprint,
@@ -223,6 +226,61 @@ def test_a_deployment_without_a_capture_is_unready_rather_than_broken(
     assert ready is False
     assert checks["capture_context"] is False
     assert checks["league_tree"] is False
+
+
+def test_a_root_holding_only_cohort_captures_says_which_capture_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The readiness log names the source, because "no capture" would be false here.
+
+    The snapshot root is shared by three collectors, and the adapter serves advice from a
+    live capture only. A root holding the week's Top-100 and elite-picks captures and no
+    live one is unready — but an operator told "no capture under the snapshot root" goes
+    looking at the mount, finds two capture directories sitting in it, and has no line
+    saying what was actually wanted.
+    """
+
+    monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "b" * 40)
+    store_root = tmp_path / "store"
+    store_root.mkdir()
+    snapshot_root = tmp_path / "snapshots"
+    write_snapshot(
+        snapshot_root,
+        source="fpl-top100",
+        captured_at_utc="2026-09-07T13:11:12Z",
+        payloads={"league-314-standings-page-1.json": b"{}"},
+    )
+    write_snapshot(
+        snapshot_root,
+        source="fpl-elite-picks",
+        captured_at_utc="2026-09-07T13:11:33Z",
+        payloads={"entry-1-picks-gw03.json": b"{}"},
+    )
+    reported: list[dict[str, object]] = []
+
+    class _Log(AdviceLog):
+        def event(self, name: str, **fields: object) -> None:
+            reported.append({"event": name, **fields})
+
+    provider = CaptureContextProvider(
+        BackendConfig(
+            store_root=store_root,
+            site_data_root=tmp_path / "site",
+            snapshot_root=snapshot_root,
+            handoff_root=tmp_path / "handoffs",
+        ),
+        repository_commit="b" * 40,
+        fingerprint="f" * 12,
+        log=_Log("test"),
+    )
+
+    assert provider.identity() is None
+    assert reported == [
+        {
+            "event": "advice_context_absent",
+            "reason": f"no {FPL_LIVE_SOURCE} capture under the snapshot root",
+        }
+    ]
 
 
 def test_a_capture_without_its_handoff_yields_no_context(deployment: dict[str, Any]) -> None:

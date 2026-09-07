@@ -328,6 +328,12 @@ export interface ScoreboardCumulative {
   /** The gameweeks `ours_net` covers; a subset of `gameweeks` until the ledger catches up. */
   ours_gameweeks: number[];
   members_mean_total_points: number | null;
+  /**
+   * The gameweeks `members_mean_total_points` covers. It is a running total at
+   * `through_gameweek`, so it spans every week played up to it, finished or not — a
+   * superset of `gameweeks` whenever the finished weeks run with a gap.
+   */
+  members_gameweeks: number[];
   members_counted: number;
   average_entry_score: number | null;
 }

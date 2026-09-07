@@ -2,7 +2,7 @@
 
 - Contract: `season_ledger_v1`
 - One row per recorded decision; raw entries (decision, projections, report, outcome) live locally under `data/ledger/` with per-file checksums.
-- Mode: `live` was decided before its deadline; `replay` was recorded afterwards from a capture taken before that deadline.
+- Mode: `live` was decided before its deadline, from a capture that run took; `replay` was recorded after that deadline, or from a capture the run did not take but named.
 
 | GW | Snapshot | Mode | Solver | Projected | Realized | Error | Transfers | Hits | Chip | Net | Unavailable |
 | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |

@@ -382,6 +382,34 @@ def test_a_cohort_from_a_week_the_live_capture_has_not_played_is_refused() -> No
         _payload(cohort=cohort)
 
 
+def test_a_cohort_from_another_season_is_refused_not_matched_on_a_week_number() -> None:
+    """A gameweek number repeats every season, so the same-week check proves nothing until
+    the season is proven too.
+
+    Nothing prunes the snapshot root, so once a season rolls over it holds cohort captures
+    from both. Last season's GW2 capture against this season's GW2 live capture passes a
+    number-only check, and its mean is published in this season's row marked only ``gross``
+    or ``net`` — a transfer-cost basis, not a season. Both seasons come from the captures'
+    own published deadlines.
+    """
+
+    last_season = [
+        {**event, "deadline_time": event["deadline_time"].replace("2026-", "2025-")}
+        for event in THREE_WEEKS
+    ]
+    cohort = _cohort(last_season, captured="2025-09-07T13:11:12Z")
+
+    with pytest.raises(DataError, match="describes season 2025-26, not 2026-27"):
+        _payload(cohort=cohort)
+
+
+def test_a_cohort_from_this_season_is_still_accepted() -> None:
+    payload = _payload(cohort=_cohort(THREE_WEEKS, captured="2026-09-07T13:11:12Z"))
+
+    assert payload["cohort_snapshot_id"] == "fpl-top100-test"
+    assert _rows(payload)[3]["top100"]["mean_score"] == pytest.approx(50.5)
+
+
 def test_a_cohort_captured_before_any_deadline_has_no_week() -> None:
     assert top100_week(_cohort(THREE_WEEKS, captured="2026-08-01T00:00:00Z")) is None
 
@@ -452,6 +480,7 @@ def test_cumulative_figures_cover_the_finished_weeks_and_say_which_ours_covers()
         "ours_net": 26.0,
         "ours_gameweeks": [1],
         "members_mean_total_points": pytest.approx((138 + 100) / 2),
+        "members_gameweeks": [1, 2],
         "members_counted": 2,
         "average_entry_score": 131.0,
     }
@@ -468,9 +497,48 @@ def test_cumulative_is_null_where_nothing_is_finished() -> None:
         "ours_net": None,
         "ours_gameweeks": [],
         "members_mean_total_points": None,
+        "members_gameweeks": [],
         "members_counted": 0,
         "average_entry_score": None,
     }
+
+
+def test_the_members_cumulative_names_the_weeks_it_covers_when_they_differ() -> None:
+    """The three cumulative figures are summed over different sets, so each names its own.
+
+    ``ours_net`` and ``average_entry_score`` are summed over the finished weeks; the
+    members' figure is FPL's own running total at the last finished week, which advances
+    for every week they played, finished or not. Those are the same weeks while the
+    finished ones run without a gap. Leave GW2 unfinished — a postponed fixture — with GW3
+    finished, and the members' column silently spans a week the other two exclude.
+    """
+
+    payload = _payload(
+        bootstrap=_bootstrap(
+            [
+                _event(1, finished=True, average_entry_score=50, highest_score=120),
+                _event(2, finished=False),
+                _event(3, finished=True, average_entry_score=51, highest_score=122),
+            ]
+        ),
+        histories={
+            11: _history(
+                [
+                    {"event": 1, "points": 50, "total_points": 50, "event_transfers_cost": 0},
+                    {"event": 2, "points": 40, "total_points": 90, "event_transfers_cost": 0},
+                    {"event": 3, "points": 60, "total_points": 150, "event_transfers_cost": 0},
+                ]
+            )
+        },
+    )
+
+    cumulative = payload["cumulative"]
+    assert cumulative["gameweeks"] == [1, 3]
+    assert cumulative["average_entry_score"] == 101.0
+    assert cumulative["members_mean_total_points"] == 150.0
+    # The one figure that spans GW2 says so, rather than sitting beside the other two
+    # under a single "cumulative through GW3" label with nothing to tell them apart.
+    assert cumulative["members_gameweeks"] == [1, 2, 3]
 
 
 # --- the shell ---------------------------------------------------------------------------

@@ -113,6 +113,7 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
       ours_net: 26,
       ours_gameweeks: [1],
       members_mean_total_points: 199.2,
+      members_gameweeks: [1, 2, 3],
       members_counted: 15,
       average_entry_score: 182,
     },
@@ -252,8 +253,44 @@ describe("scoreboard card", () => {
     expect(cells[0].textContent).toContain("GW 1 only");
     expect(cells[1].textContent).toContain("199.2");
     expect(cells[1].textContent).toContain("mean total of 15");
+    // Same weeks as the rest of the row here, so the members' cell says nothing extra.
+    expect(cells[1].textContent).not.toContain("covers GW");
     expect(cells[3].textContent).toBe("182");
   });
+
+  it("says which weeks the members' cumulative covers when they are not the row's", () => {
+    // A postponed fixture leaves GW2 unfinished while GW3 finishes. `ours_net` and the
+    // field average are summed over the finished weeks; the members' figure is FPL's own
+    // running total, which advances for GW2 as well. Under one "cumulative through GW3"
+    // label those are not comparable unless the wider one says so.
+    const gap = structuredClone(scoreboard);
+    gap.payload.gameweeks = gap.payload.gameweeks.map((week) =>
+      week.gameweek === 2 ? { ...week, finished: false } : week,
+    );
+    gap.payload.cumulative = {
+      ...gap.payload.cumulative,
+      gameweeks: [1, 3],
+      members_gameweeks: [1, 2, 3],
+    };
+    renderCard(gap);
+    const foot = screen.getByRole("rowheader", { name: /cumulative through GW3/ }).closest("tr")!;
+    const cells = foot.querySelectorAll("td");
+    expect(cells[1].textContent).toContain("covers GW 1, 2, 3");
+  });
+
+  it.each<[Language]>([["en"], ["tr"]])(
+    "explains both of the reasons a row is stamped replay (%s)",
+    (language) => {
+      // `decide` stamps replay when the run named a capture rather than took one, and
+      // again when the decision was recorded past the deadline. A note giving only the
+      // second is false about a row decided before its deadline from a reused capture.
+      renderCard(scoreboard, language);
+      const note = MESSAGES[language].leagueScoreboard.modeNote;
+      expect(screen.getByText(note)).toBeInTheDocument();
+      expect(note).toContain("capture");
+      expect(note.split("replay")[1]).toContain(language === "en" ? " or " : " ya da ");
+    },
+  );
 
   it("says when no gameweek has finished instead of drawing an empty table", () => {
     const empty = structuredClone(scoreboard);
@@ -264,6 +301,7 @@ describe("scoreboard card", () => {
       ours_net: null,
       ours_gameweeks: [],
       members_mean_total_points: null,
+      members_gameweeks: [],
       members_counted: 0,
       average_entry_score: null,
     };
