@@ -1311,6 +1311,36 @@ def test_the_history_returns_each_played_gameweek_in_order() -> None:
     assert {week.entry_id for week in weeks} == {11}
 
 
+def test_the_history_points_are_gross_and_the_transfer_cost_travels_beside_them() -> None:
+    """The source's own arithmetic: a 78-point week with a 4-point cost advances the total
+    by 74, so ``points`` is gross and the cost is read out separately rather than assumed."""
+
+    from squadopt.data.sources.fpl_live import fpl_entry_history_points
+
+    payload = _history_payload(
+        current=[
+            {"event": 1, "points": 64, "total_points": 64, "event_transfers_cost": 0},
+            {"event": 2, "points": 78, "total_points": 138, "event_transfers_cost": 4},
+        ]
+    )
+
+    weeks = fpl_entry_history_points(payload, entry_id=11)
+
+    assert [(week.points, week.transfer_cost, week.total_points) for week in weeks] == [
+        (64, 0, 64),
+        (78, 4, 138),
+    ]
+    assert weeks[1].points - weeks[1].transfer_cost == weeks[1].total_points - weeks[0].total_points
+
+
+def test_a_history_row_without_a_transfer_cost_reads_none_rather_than_zero() -> None:
+    from squadopt.data.sources.fpl_live import fpl_entry_history_points
+
+    weeks = fpl_entry_history_points(_history_payload(), entry_id=11)
+
+    assert weeks[0].transfer_cost is None
+
+
 def test_a_week_that_ended_negative_after_a_hit_is_read_rather_than_refused() -> None:
     """A minus four is a real score; refusing it would invent data as surely as a zero."""
 

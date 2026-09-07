@@ -1344,15 +1344,21 @@ class EntryGameweekPoints:
     capture this was built against was thirteen hours older than the capture itself; the
     entry documents are fetched in the same pass as the picks.
 
-    ``points`` is net of the week's transfer cost, as the source publishes it, and may be
-    negative after a hit — refusing a negative week would be the same class of error as
-    inventing a positive one.
+    ``points`` is the week's **gross** score: the transfer cost has not been taken off.
+    The source's own arithmetic says so — ``total_points`` advances by ``points`` minus
+    ``event_transfers_cost`` (in the 2026-09-07 capture a 78-point week with a 4-point
+    cost moved the total by 74, and every row of the fifteen histories held agrees). The
+    cost travels as ``transfer_cost`` so a caller can state the net week, the number our
+    ledger records; it is ``None`` only when the row carries no ``event_transfers_cost``
+    at all, which the live source never omits. A negative ``points`` is read rather than
+    refused — refusing it would be the same class of error as inventing a positive one.
     """
 
     entry_id: int
     gameweek: int
     points: int
     total_points: int
+    transfer_cost: int | None = None
 
 
 def fpl_entry_history_points(history: bytes, *, entry_id: int) -> tuple[EntryGameweekPoints, ...]:
@@ -1382,6 +1388,11 @@ def fpl_entry_history_points(history: bytes, *, entry_id: int) -> tuple[EntryGam
                 gameweek=gameweek,
                 points=_integer(record, "points", "Entry history"),
                 total_points=_integer(record, "total_points", "Entry history"),
+                transfer_cost=(
+                    _integer(record, "event_transfers_cost", "Entry history")
+                    if "event_transfers_cost" in record
+                    else None
+                ),
             )
         )
     return tuple(sorted(weeks, key=lambda week: week.gameweek))
