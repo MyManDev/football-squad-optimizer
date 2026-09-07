@@ -135,14 +135,21 @@ def _repository_commit() -> str:
 
     supplied = os.environ.get("SQUADOPT_REPOSITORY_COMMIT", "").strip().lower()
     if not supplied:
-        result = subprocess.run(
-            ["git", "-C", str(Path(__file__).resolve().parents[3]), "rev-parse", "HEAD"],
-            capture_output=True,
-            check=False,
-            text=True,
-            shell=False,
-        )
-        if result.returncode == 0:
+        # OSError, not just a non-zero exit: the deployment image carries neither .git nor
+        # git itself, so the fallback raises FileNotFoundError rather than failing. Letting
+        # that escape turned "the build forgot its build-arg" — the one mistake this code
+        # exists to name — into a traceback at request time.
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(Path(__file__).resolve().parents[3]), "rev-parse", "HEAD"],
+                capture_output=True,
+                check=False,
+                text=True,
+                shell=False,
+            )
+        except OSError:
+            result = None
+        if result is not None and result.returncode == 0:
             supplied = result.stdout.strip().lower()
     if not _COMMIT_PATTERN.fullmatch(supplied):
         raise BackendConfigError(

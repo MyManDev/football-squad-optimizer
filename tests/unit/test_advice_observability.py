@@ -4,13 +4,16 @@ import json
 import logging
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from squadopt.api.app import create_app
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_observability import (
+    ADVICE_LOGGER_NAME,
     AdviceLog,
     AdviceMetrics,
+    configure_advice_logging,
     readiness_report,
 )
 from squadopt.platform.advice_queue import FileJobQueue, run_advice_worker_once
@@ -255,3 +258,39 @@ def test_the_worker_observes_wait_status_and_failed_solves(tmp_path: Path) -> No
     assert "advice_solve_seconds_count 2" in body  # failures are not omitted
     assert 'advice_solver_status_total{status="FEASIBLE"} 1' in body
     assert 'advice_jobs_total{outcome="failed"} 1' in body
+
+
+def test_a_configured_process_actually_emits_the_advice_events(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The events were formatted and dropped: nothing attached a handler.
+
+    Neither ``squadopt.api`` nor ``squadopt.platform`` configured logging, and uvicorn
+    configures only its own loggers, so a worker container produced an empty log while the
+    code claimed to report a missing store loudly and at once. This is the process entry
+    points' one line, tested where a container cannot be assumed.
+    """
+
+    logger = logging.getLogger(ADVICE_LOGGER_NAME)
+    existing = list(logger.handlers)
+    propagated = logger.propagate
+    for handler in existing:
+        logger.removeHandler(handler)
+    try:
+        configure_advice_logging()
+        # Twice, because uvicorn may call the app factory more than once and a second
+        # handler would double every line an operator reads.
+        configure_advice_logging()
+        AdviceLog("worker").event("advice_worker_started", store="/mnt/squadopt-store/store")
+        lines = [line for line in capsys.readouterr().out.splitlines() if line.strip()]
+        assert len(lines) == 1, lines
+        record = json.loads(lines[0])
+        assert record["event"] == "advice_worker_started"
+        assert record["component"] == "worker"
+        assert record["store"] == "/mnt/squadopt-store/store"
+    finally:
+        for handler in list(logger.handlers):
+            logger.removeHandler(handler)
+        for handler in existing:
+            logger.addHandler(handler)
+        logger.propagate = propagated
