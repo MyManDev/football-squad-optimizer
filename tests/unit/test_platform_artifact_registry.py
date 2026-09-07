@@ -1,6 +1,7 @@
 """Artifact provenance records, file-backed storage and run lineage."""
 
 import json
+import os
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
@@ -156,7 +157,43 @@ def test_register_get_and_verify_use_relative_portable_locations(tmp_path: Path)
     record_path = registry.record_directory / f"{ARTIFACT_ID}.json"
     assert record_path.is_file()
     assert record_path.parent.name == ARTIFACT_RECORD_DIRECTORY
-    assert not tuple(record_path.parent.glob(f".{ARTIFACT_ID}.json.tmp-*"))
+    assert not tuple(record_path.parent.glob(".*.tmp"))
+
+
+def test_scratch_file_never_outgrows_the_record_it_publishes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows resolves paths against a 260 character limit.
+
+    A scratch name derived from the record name spends more characters than the
+    record it publishes, so registration failed on directories where the record
+    itself fits.  A parallel test run surfaced it first because the extra worker
+    directory pushed those paths over the limit.
+    """
+
+    registry, root = _registry(tmp_path)
+    path = _write(root, "outputs/decision.json", b"decision-v1\n")
+    scratch_paths: list[Path] = []
+    link = os.link
+
+    def capture(source: object, target: object) -> None:
+        scratch_paths.append(Path(str(source)))
+        link(source, target)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(os, "link", capture)
+
+    record = registry.register_artifact(
+        path,
+        run_id="run-001",
+        role="output",
+        kind="decision",
+        schema_version="decision_v1",
+        now=NOW,
+    )
+
+    assert [scratch.parent for scratch in scratch_paths] == [registry.record_directory]
+    assert len(scratch_paths[0].name) <= len(f"{record.artifact_id}.json")
+    assert not tuple(registry.record_directory.glob(".*.tmp"))
 
 
 def test_exact_registration_retry_is_idempotent_and_preserves_first_timestamp(
