@@ -177,14 +177,16 @@ class _MemberPlanningPolicy(TypedDict):
     """The planner controls the member path fixes; the values are MEMBER_PLANNING_POLICY."""
 
     transfer_hit_cost_points: float
+    hit_points_charged: float
     banked_transfer_value_points: float
     horizon_discount_factor: float
     chip_holding_value_points: Mapping[str, float]
 
 
-MEMBER_PLANNING_POLICY_ID: Final = "member_planning_policy_v1"
+MEMBER_PLANNING_POLICY_ID: Final = "member_planning_policy_v2"
 _MEMBER_PLANNING_POLICY_VALUES: Final[_MemberPlanningPolicy] = {
-    "transfer_hit_cost_points": 4.0,
+    "transfer_hit_cost_points": 8.0,
+    "hit_points_charged": 4.0,
     "banked_transfer_value_points": 0.0,
     "horizon_discount_factor": 1.0,
     "chip_holding_value_points": MappingProxyType({}),
@@ -192,17 +194,27 @@ _MEMBER_PLANNING_POLICY_VALUES: Final[_MemberPlanningPolicy] = {
 MEMBER_PLANNING_POLICY: Final[Mapping[str, object]] = MappingProxyType(
     _MEMBER_PLANNING_POLICY_VALUES
 )
-"""The member path's planning policy, ``member_planning_policy_v1``: the rule values.
+"""The member path's planning policy, ``member_planning_policy_v2``: the rule values.
 
-Every mid-season member decision plans one week ahead under these four controls; the
+Every mid-season member decision plans one week ahead under these five controls; the
 rest of ``TransferPlanningConfig`` is the season's rules (the free-transfer cap, a
-transfer cap when a caller sets one) and the planner's contract. The values are the
-game's own: a hit costs the 4 points the sheet charges, a banked free transfer is worth
-nothing past the week, a single week is not discounted, and no chip carries a holding
-value because the member path offers no chip unless the operator names one
-(``_chip_availability``), which leaves holding values inert here. All four are the
-dataclass defaults, so ``configuration_fingerprint`` is the one every recorded pin was
-made under.
+transfer cap when a caller sets one) and the planner's contract. A banked free transfer
+is worth nothing past the week, a single week is not discounted, and no chip carries a
+holding value because the member path offers no chip unless the operator names one
+(``_chip_availability``), which leaves holding values inert here.
+
+The two hit numbers are the policy's one departure from the dataclass defaults, and they
+mean different things. ``hit_points_charged`` is 4.0, the points the game takes off the
+sheet, and it is what every reported hit is counted at: the moves' ``expected_points_cost``,
+``plan_weeks[].transfer_hit_points``, ``net_expected_points``, the decision the ledger
+records. ``transfer_hit_cost_points`` is 8.0 and lives only inside the solve, where it
+makes the planner decline a transfer whose projected gain is marginal. It is a caution
+margin on a projection that overstates transfer gains, not a rule change, and no member
+ever sees it.
+
+Because the two differ, ``configuration_fingerprint`` is no longer ``TransferPlanningConfig``'s
+default one; the pins recorded under this policy are the ones this docstring's revisit
+rule names.
 
 Provenance — what each measurement said about moving them, in date order:
 
@@ -233,11 +245,18 @@ Provenance — what each measurement said about moving them, in date order:
   [+0.83, +3.44], 8 is +2.44 [+1.04, +3.94]; paid transfers fall from 193 to 37 across
   the five seasons. The rule declared before that run -- beat 4 in pooled mean, an
   interval clear of zero, worse in at most one season -- **fires for 5, 7 and 8**. The
-  value here is still 4: moving it re-prices every member's advice and so belongs in the
-  pull request that re-pins the two hashes below, with an owner's decision behind it.
-  The finding disagrees with ``transfer_discipline``, which reserved chips where this
+  finding disagrees with ``transfer_discipline``, which reserved chips where this
   run turns them off, so it is a reading in the member path's own configuration rather
   than a reversal of that artifact on its terms.
+* **The decision (2026-09-07, Ertugrul Soydal, owner):** act on that artifact and set
+  the planning hit cost to 8.0, the best of the levels the rule passed. Mean season net
+  1861 -> 1951 and season hit points 154 -> 30 across the five seasons; against 4 the
+  paired weekly mean is +2.44 with a 90% season-aware block-bootstrap interval of
+  [+1.04, +3.94]. What the game charges does not move: ``hit_points_charged`` stays 4.0
+  and every number a member is shown, and every comparison between two solved plans, is
+  counted at it. 8 is the top of the measured grid, so it sits on an edge rather than at
+  an interior optimum; the next measurement should widen the range (4-12) before it is
+  read as one.
 
 Revisit rule. These values change only in a pull request that cites a measurement on
 the lookahead-1 season chain with 2025-26 included as a season, and that re-pins
@@ -247,7 +266,7 @@ changes what every member is told. The reading is re-examined at gameweek 19 fro
 (``docs/weekly_scorecard.md``): the season's own hits and what they returned are the
 evidence the development seasons cannot give.
 
-A planning hit cost above 4 would be a caution margin on projected gains, not a rule
+A planning hit cost above 4 is a caution margin on projected gains, not a rule
 change: the ledger and the settle step charge the game's 4 regardless.
 """
 
@@ -438,7 +457,10 @@ def _package_decision(
         planner_contract_version=plan.contract_version,
         transfer_config_fingerprint=transfer_config.configuration_fingerprint,
         max_free_transfers=transfer_config.max_free_transfers,
-        transfer_hit_cost_points=transfer_config.transfer_hit_cost_points,
+        # What the game charges, not what the planner priced a transfer at: this is the
+        # per-hit rate the ledger records and the verifier multiplies the paid transfers
+        # by. The planning cost is inside ``transfer_config_fingerprint`` above.
+        transfer_hit_cost_points=transfer_config.hit_points_charged,
         sell_on_fee=fee,
         diagnostics={
             "held_squad_decided_gameweek": held.decided_gameweek,
@@ -716,11 +738,12 @@ def plan_transfer_horizon(
 
     settings = OptimizationConfig() if optimization is None else optimization
     planning_policy = (
-        TransferPlanningConfig(
-            max_free_transfers=rules.transfers.max_free_transfers,
-            max_transfers_per_gameweek=(
-                None if len(projection_horizon.target_gameweeks) == 1 else 1
-            ),
+        # The same MEMBER_PLANNING_POLICY the one-week path builds from. Spelling the
+        # controls out here instead would price a member's window at one hit cost and
+        # their week at another the moment the policy moves.
+        _transfer_config(
+            rules,
+            transfer_cap=None if len(projection_horizon.target_gameweeks) == 1 else 1,
         )
         if transfer_config is None
         else transfer_config

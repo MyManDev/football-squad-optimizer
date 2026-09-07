@@ -32,13 +32,16 @@ Rule (declared before the run): change the default only if a level beats 4 in po
 
 Levels passing: [5, 7, 8]; the best of them by pooled weekly mean is **8**.
 
-The rule fires, and this pull request still ships `member_planning_policy_v1` at hit
-cost 4. Acting on the reading is a second change, not this one: it moves what every
-league member is told, so it must re-pin `IN_SEASON_MEMBER_ADVICE_SHA256` in
-`tests/unit/test_league_views.py` and the site fixture under `web/public/data` in the
-same commit -- files this pull request does not own and another line of work is editing.
-That is exactly the revisit rule the policy's own docstring states, and it is owed a
-pull request of its own with an owner's decision behind it. Nothing here is promoted.
+The rule fires, and the pull request that recorded this measurement (#401) still shipped
+`member_planning_policy_v1` at hit cost 4. Acting on the reading was a second change,
+because it moves what every league member is told.
+
+**Acted on in #405.** The owner chose 8. `member_planning_policy_v2` plans at 8; the
+new `hit_points_charged` control keeps the game's 4, and every hit a member is shown,
+every hit the ledger records, and every comparison between two solved plans is counted
+at the charge. 8 is the top of this grid, so it sits on an edge rather than at an
+interior optimum: the next measurement should widen the range (4-12) before it is read
+as one.
 
 ## What this does and does not say
 

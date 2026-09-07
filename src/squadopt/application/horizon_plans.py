@@ -205,7 +205,10 @@ def horizon_plan_document(
         "transfer_configuration_fingerprint": transfer_config.configuration_fingerprint,
         "transfer_policy": {
             "max_transfers_per_gameweek": transfer_config.max_transfers_per_gameweek,
+            # The objective's price of a paid transfer, then the game's charge. The
+            # week rows below and ``total_transfer_hit_points`` count at the charge.
             "transfer_hit_cost_points": transfer_config.transfer_hit_cost_points,
+            "hit_points_charged": transfer_config.hit_points_charged,
             "banked_transfer_value_points": transfer_config.banked_transfer_value_points,
         },
         "solver_status": plan.solver_status.name,

@@ -36,6 +36,7 @@ from squadopt.application.league_views import build_league_views
 from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live.recommendation import project
+from squadopt.live.transfers import MEMBER_PLANNING_POLICY
 from squadopt.planning import CHIP_NAMES
 
 ENTRY = 101
@@ -131,6 +132,16 @@ def test_a_window_publishes_the_first_week_and_the_whole_plan(
         assert isinstance(week["free_transfers_before"], int)
         assert isinstance(week["free_transfers_after"], int)
         assert week["chip"] is None or week["chip"] in CHIP_NAMES
+        # A published hit is the game's charge times the paid transfers, never the
+        # caution margin the window was planned under.
+        paid = (
+            0
+            if week["chip"] in {"wildcard", "freehit"}
+            else max(0, len(week["transfers_in"]) - week["free_transfers_before"])
+        )
+        assert week["transfer_hit_points"] == paid * float(
+            str(MEMBER_PLANNING_POLICY["hit_points_charged"])
+        )
         # The per-week cap the window plans under: at most one transfer, a wildcard
         # week excepted.
         assert len(week["transfers_in"]) == len(week["transfers_out"])

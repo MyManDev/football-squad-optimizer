@@ -64,6 +64,7 @@ OPTIMAL_INITIAL = _initial("GK_A", "DEF_A", "MID_A", "FWD_A")
             "may not exceed",
         ),
         ({"transfer_hit_cost_points": -1.0}, "at least 0"),
+        ({"hit_points_charged": -1.0}, "at least 0"),
         ({"horizon_discount_factor": 0.0}, "strictly positive"),
         ({"horizon_discount_factor": 1.1}, "at most 1"),
         ({"objective_weight_scale": 0}, "at least 1"),
@@ -88,6 +89,15 @@ def test_transfer_config_fingerprint_is_stable_and_complete() -> None:
             baseline,
             horizon_discount_factor=0.99,
         ).configuration_fingerprint
+    )
+    # The two hit numbers are separate controls, so each moves the digest on its own.
+    assert (
+        replace(baseline, transfer_hit_cost_points=8.0).configuration_fingerprint
+        != replace(baseline, hit_points_charged=8.0).configuration_fingerprint
+    )
+    assert (
+        baseline.configuration_fingerprint
+        != replace(baseline, hit_points_charged=8.0).configuration_fingerprint
     )
 
 
@@ -257,6 +267,62 @@ def test_a_second_same_week_transfer_pays_the_declared_hit(
     assert week.paid_transfer_count == 1
     assert week.transfer_hit_points == 4.0
     assert result.total_transfer_hit_points == 4.0
+
+
+def _one_week_swap(
+    players: pd.DataFrame,
+    *,
+    mid_a_points: float,
+) -> PlanningHorizon:
+    """One week where the only worthwhile move is MID_B -> MID_A, priced by that value."""
+
+    table = _horizon_table(players, (1,))
+    table.loc[table["player_id"] == "MID_A", "expected_points"] = mid_a_points
+    return PlanningHorizon(table)
+
+
+def test_a_planning_margin_filters_transfers_without_changing_the_hit_reported(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The separation this policy rests on: the margin prices the solve, the game prices
+    the sheet.
+
+    ``transfer_hit_cost_points`` is what the objective pays for a paid transfer;
+    ``hit_points_charged`` is what the game takes. Raising the first declines transfers
+    whose projected gain is marginal; it must never move a reported number, because those
+    are shown to members and compared between plans.
+    """
+
+    held = _initial("GK_A", "DEF_A", "MID_B", "FWD_A", free_transfers=0)
+    margin = TransferPlanningConfig(transfer_hit_cost_points=8.0, hit_points_charged=4.0)
+
+    # MID_B (1.0) -> MID_A (8.0) is worth about 6.3 weighted points: more than the game's
+    # 4, less than the margin's 8.
+    marginal = _one_week_swap(known_optimum_players, mid_a_points=8.0)
+    taken = optimize_transfer_plan(marginal, held, small_config)
+    declined = optimize_transfer_plan(marginal, held, small_config, margin)
+
+    assert taken.weeks[0].paid_transfer_count == 1
+    assert taken.weeks[0].transfer_hit_points == 4.0
+    assert declined.weeks[0].transfer_count == 0
+    assert declined.weeks[0].transfer_hit_points == 0.0
+
+    # A transfer worth more than the margin is still made, and it is still charged 4.
+    worthwhile = _one_week_swap(known_optimum_players, mid_a_points=16.0)
+    result = optimize_transfer_plan(worthwhile, held, small_config, margin)
+
+    week = result.weeks[0]
+    assert week.transfers_in["player_id"].tolist() == ["MID_A"]
+    assert week.paid_transfer_count == 1
+    assert week.transfer_hit_points == 4.0
+    assert result.total_transfer_hit_points == 4.0
+    # The objective still paid the margin: the week's contribution reconstructs
+    # ``objective_value``, so it is charged 8 where the reported hit is 4.
+    assert week.discounted_objective_contribution == pytest.approx(
+        week.projected_score + small_config.bench_weight * week.projected_bench_points - 8.0
+    )
+    assert result.objective_value == pytest.approx(week.discounted_objective_contribution)
 
 
 def test_unused_free_transfers_carry_to_the_configured_cap(

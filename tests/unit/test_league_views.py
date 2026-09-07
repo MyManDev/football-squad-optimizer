@@ -598,7 +598,10 @@ def test_the_baseline_advice_is_byte_identical_with_and_without_paths(
 # (test_live_recommendation.py); this is the same gate for the in-season member path,
 # which that pin never exercised: a held squad, sell prices, and a transfer decision.
 IN_SEASON_MEMBER_ADVICE_SHA256 = "77d790cdc04c6ae924eb34c891af6f0312ff5117ba2b53c9b703805f4a985863"
-# (player_out, player_in, expected_points_delta, expected_points_cost) per move.
+# (player_out, player_in, expected_points_delta, expected_points_cost) per move. The
+# cost is the game's 4 for the one paid transfer, although this plan was solved under
+# MEMBER_PLANNING_POLICY's caution margin of 8: the margin decides what to do, the
+# charge is what the member is told, and only the second reaches these bytes.
 IN_SEASON_MEMBER_MOVES = (
     (1005, 1009, 2.5, 4.0),
     (1020, 1024, 7.0, 4.0),

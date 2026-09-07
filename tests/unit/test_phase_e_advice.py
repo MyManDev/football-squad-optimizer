@@ -144,8 +144,15 @@ def test_advice_keeps_control_bytes_and_compute_counts_while_recording_a_better_
             "transfer_hit_points": hit,
         }
     )
+    # The planner's own cost is a caution margin and must not reach the diagnostic; what
+    # the game charges is what a plan's hit points are counted at, so that is the number
+    # the candidates are scored on.
     solve = Mock(
-        return_value=(control_plan, decision, TransferPlanningConfig(transfer_hit_cost_points=hit))
+        return_value=(
+            control_plan,
+            decision,
+            TransferPlanningConfig(transfer_hit_cost_points=8.0, hit_points_charged=hit),
+        )
     )
     monkeypatch.setattr(advice, "plan_transfers", solve)
     records = []

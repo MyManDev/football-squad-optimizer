@@ -296,7 +296,9 @@ def solve_member_control(
             plan,
             held,
             gameweek=int(inputs.deadline.gameweek),
-            transfer_hit_cost_points=transfer_config.transfer_hit_cost_points,
+            # The diagnostic scores solved candidates against one another, so it charges
+            # what the game charges, not the planner's caution margin.
+            transfer_hit_cost_points=transfer_config.hit_points_charged,
             diagnostic=phase_e_diagnostic,
         )
     except Exception:
@@ -308,7 +310,13 @@ def solve_member_control(
 def net_expected_points(plan: TransferPlanResult) -> float:
     """A plan's expected points as the member would score them: the eleven's projected
     points minus the hits the plan pays. A constraint that forces paid transfers is not
-    cheap because the gross projection barely moved."""
+    cheap because the gross projection barely moved.
+
+    ``total_transfer_hit_points`` is counted at the game's charge, so this compares two
+    already-solved plans at what the member would actually be docked. The planner's
+    caution margin belongs inside each solve, where it decides whether a transfer is
+    worth making at all; applying it again here would price the same caution twice.
+    """
 
     score = plan.total_projected_score
     hits = plan.total_transfer_hit_points
