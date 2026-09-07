@@ -164,7 +164,13 @@ export function LeagueMembersView({
           <p className={styles.notice}>{copy.noScoredWeek}</p>
         ) : null}
         {rows.some((member) => member.member_kind === "system") && (
-          <p className={styles.notice}>{messages.league.note}</p>
+          <>
+            {/* Two bases share the gameweek column: ours is net of our transfer hit, and
+                each member's is their week before their own. members.json carries no hit
+                for them, so the column cannot be netted — it can only say so. */}
+            <p className={styles.notice}>{copy.gameweekBasisNote}</p>
+            <p className={styles.notice}>{messages.league.note}</p>
+          </>
         )}
       </Card>
     </div>

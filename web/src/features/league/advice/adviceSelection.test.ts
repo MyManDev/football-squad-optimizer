@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { mockEntryAdviceIndex, mockLeagueMembersEnvelope } from "../../../fixtures/league";
-import { availableWindows, canComputeAdvice, selectedAdviceRequest } from "./adviceSelection";
+import {
+  availableWindows,
+  canComputeAdvice,
+  publishedSelection,
+  selectedAdviceRequest,
+} from "./adviceSelection";
 
 const MEMBERS = mockLeagueMembersEnvelope.payload.members;
 const HUMANS = MEMBERS.filter((member) => member.member_kind === "human");
@@ -101,6 +106,37 @@ describe("advice selection", () => {
       expect(request).toMatchObject({ strategy: "saf-puan", window, rivalEntryId: null });
       expect(canComputeAdvice(request)).toBe(true);
     }
+  });
+
+  it("answers a carried-over window at a week the index lists for the strategy", () => {
+    // A five-week window chosen under pure points, then a rival strategy: the producer
+    // writes every rival strategy at one week, so the request must name that file rather
+    // than one nobody wrote.
+    const index = mockEntryAdviceIndex(ENTRY).payload;
+    const request = selectedAdviceRequest(
+      publishedSelection(new URLSearchParams("mode=ortak-koru&window=5"), index),
+      352490,
+      ENTRY,
+      MEMBERS,
+      undefined,
+      RIVAL,
+    );
+
+    expect(request).toMatchObject({ strategy: "ortak-koru", window: 1, rivalEntryId: RIVAL });
+    expect(canComputeAdvice(request)).toBe(true);
+  });
+
+  it("leaves a listed window, and a strategy the index says nothing about, as asked", () => {
+    const index = mockEntryAdviceIndex(ENTRY).payload;
+    expect(publishedSelection(new URLSearchParams("window=5"), index).get("window")).toBe("5");
+    // A legacy play mode is shown from the published tree; the index does not govern it.
+    expect(
+      publishedSelection(new URLSearchParams("mode=garantici&window=3"), index).get("window"),
+    ).toBe("3");
+    // Nothing published means nothing to clamp against: the URL stands.
+    expect(
+      publishedSelection(new URLSearchParams("mode=ortak-koru&window=3"), null).get("window"),
+    ).toBe("3");
   });
 
   it("offers the windows the index lists, and one week without an index", () => {

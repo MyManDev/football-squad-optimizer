@@ -5,10 +5,13 @@
  * (strategy, rival) and an index that says which exist — so every option here names
  * something that was actually solved from this member's squad, or says plainly that it
  * was not. The rival list is the league's other members; the standings neighbour the
- * producer chose is the default and is labelled as such. Windows are enabled only where
- * the index lists them — pure points at three and five weeks when this publish solved
- * them — and the note says what a longer window assumes; a rival strategy stays at one
- * week, and a window nobody computed is shown disabled rather than hidden.
+ * producer chose is the default and is labelled as such. Where it named no default, no
+ * rival is shown as chosen — the request would name none, and a control that displayed
+ * one would demand a choice the member appeared to have made. Windows are enabled only
+ * where the index lists them — pure points at three and five weeks when this publish
+ * solved them — and the note says what a longer window assumes; a rival strategy stays at
+ * one week, and a window nobody computed is shown disabled rather than hidden. A window
+ * carried in from another strategy falls back to one the index lists, and says it did.
  *
  * One option may carry the producer's declared rule as a label: the rule reads the
  * member's points gap to their rival and the gameweeks left, and names one of the three.
@@ -34,7 +37,12 @@ import {
   type HumanEntryView,
   type MemberStrategy,
 } from "../types";
-import { availableWindows, rivalCandidates } from "./adviceSelection";
+import {
+  availableWindows,
+  publishedWindow,
+  requestedWindow,
+  rivalCandidates,
+} from "./adviceSelection";
 import styles from "./MemberDecisionControls.module.css";
 
 /** The gap as the rule read it: signed, so behind and ahead are visibly different. */
@@ -56,8 +64,10 @@ export function MemberDecisionControls({
   const [searchParams, setSearchParams] = useSearchParams();
   const rawMode = searchParams.get("mode");
   const strategy: MemberStrategy = isMemberStrategy(rawMode) ? rawMode : "saf-puan";
-  const rawWindow = Number(searchParams.get("window"));
-  const windowSize: WindowSize = rawWindow === 3 ? 3 : rawWindow === 5 ? 5 : 1;
+  // A window chosen under another strategy does not survive into one that never published
+  // it: the selection lands on a week the index lists, and the note below says it moved.
+  const askedWindow = requestedWindow(searchParams);
+  const windowSize: WindowSize = publishedWindow(askedWindow, index, strategy);
   const candidates = rivalCandidates(members, entryId).filter(
     (member): member is HumanEntryView => member.member_kind === "human",
   );
@@ -66,9 +76,10 @@ export function MemberDecisionControls({
     : candidates.map((member) => member.entry_id);
   const defaultRival = index?.default_rival_entry_id ?? null;
   const rawRival = Number(searchParams.get("rival"));
-  const chosenRival: number | null = rivalIds.includes(rawRival)
-    ? rawRival
-    : (defaultRival ?? rivalIds[0] ?? null);
+  // The same rule the request applies: the URL's rival, else the producer's default, else
+  // none. Displaying a rival the request would not name is what made the compute control
+  // demand a choice the member appeared to have already made.
+  const chosenRival: number | null = rivalIds.includes(rawRival) ? rawRival : defaultRival;
   const unavailable = new Set(
     (index?.unavailable ?? [])
       .filter((entry) => entry.strategy === strategy && entry.rival_entry_id !== null)
@@ -155,6 +166,11 @@ export function MemberDecisionControls({
                     })
                   }
                 >
+                  {chosenRival === null ? (
+                    <option value="" disabled>
+                      {copy.rivalChoose}
+                    </option>
+                  ) : null}
                   {rivalIds.map((rivalId) => (
                     <option key={rivalId} value={rivalId}>
                       {nameOf(rivalId)}
@@ -165,6 +181,9 @@ export function MemberDecisionControls({
                 </select>
               </label>
             )}
+            {rivalIds.length > 0 && chosenRival === null ? (
+              <p className={styles.note}>{copy.rivalNoDefault}</p>
+            ) : null}
             <p className={styles.note}>{copy.rivalNote}</p>
           </fieldset>
         ) : null}
@@ -186,6 +205,9 @@ export function MemberDecisionControls({
               </label>
             ))}
           </div>
+          {askedWindow !== windowSize ? (
+            <p className={styles.note}>{copy.windowFellBack(askedWindow, windowSize)}</p>
+          ) : null}
           <p className={styles.note}>
             {windows.length > 1 ? copy.windowLimits : copy.windowNotComputed}
           </p>
