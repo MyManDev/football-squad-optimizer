@@ -320,6 +320,7 @@ POLICY_PROVENANCE_ARTIFACTS = (
     "transfer_discipline.json",
     "chip_bayesopt.json",
     "season_chain_tuned.json",
+    "member_policy_hit_cost_grid.json",
 )
 
 

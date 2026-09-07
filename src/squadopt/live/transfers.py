@@ -226,6 +226,18 @@ Provenance — what each measurement said about moving them, in date order:
   ``tuned`` mode against ``hybrid``: +0.51 a week, 90% block bootstrap [-1.14, +2.13],
   positive-week share 0.43 -- the interval holds zero. The chips were the effect; the
   tuning was not.
+* ``docs/member_policy_hit_cost_grid.json`` (2026-09-07): the hit cost measured where
+  this policy lives -- {4, 5, 6, 7, 8} on the lookahead-1 chain with chips off, five
+  seasons including 2025-26 as declared development data, 184 paired gameweeks. Against
+  4: 5 is +1.24 a week [+0.34, +2.18], 6 is +1.08 [-0.13, +2.02], 7 is +2.11
+  [+0.83, +3.44], 8 is +2.44 [+1.04, +3.94]; paid transfers fall from 193 to 37 across
+  the five seasons. The rule declared before that run -- beat 4 in pooled mean, an
+  interval clear of zero, worse in at most one season -- **fires for 5, 7 and 8**. The
+  value here is still 4: moving it re-prices every member's advice and so belongs in the
+  pull request that re-pins the two hashes below, with an owner's decision behind it.
+  The finding disagrees with ``transfer_discipline``, which reserved chips where this
+  run turns them off, so it is a reading in the member path's own configuration rather
+  than a reversal of that artifact on its terms.
 
 Revisit rule. These values change only in a pull request that cites a measurement on
 the lookahead-1 season chain with 2025-26 included as a season, and that re-pins
