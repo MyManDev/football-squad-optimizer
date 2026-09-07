@@ -27,9 +27,11 @@ from tests.unit.test_public_probability_guards import _FORBIDDEN_TEXT
 from squadopt.application.advice import (
     MEMBER_WINDOWS,
     WINDOW_STATED_LIMITS,
+    WINDOW_TOP100_LIMIT,
     AdviseEntryRequest,
     advise_entry,
     member_horizon_builder,
+    window_stated_limits,
 )
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
 from squadopt.application.league_views import build_league_views
@@ -116,7 +118,11 @@ def test_a_window_publishes_the_first_week_and_the_whole_plan(
     assert payload["gameweek"] == 2
     assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
     assert payload["expected_points_cost"] == 0.0 and payload["rival_label"] is None
-    assert payload["stated_limits"] == list(WINDOW_STATED_LIMITS)
+    # This fixture's handoff carries no elite evidence, so the Top-100 sentence is not
+    # among the limits: a mechanism that was not applied is not claimed.
+    assert payload["stated_limits"] == window_stated_limits(window_world["projection"])
+    assert WINDOW_TOP100_LIMIT in WINDOW_STATED_LIMITS
+    assert WINDOW_TOP100_LIMIT not in payload["stated_limits"]
     # The first week's decision is complete, as the one-week payload's is.
     eleven, bench, captain = payload["starting_xi"], payload["bench"], payload["captain"]
     assert isinstance(eleven, list) and len(eleven) == 11
@@ -157,8 +163,10 @@ def test_a_window_publishes_the_first_week_and_the_whole_plan(
         player["player_id"] for player in first["transfers_out"]
     ]
     assert first["chip"] == payload["chip"]
+    # The week's charge is on the payload once, not copied onto each move row.
+    assert payload["transfer_hit_points"] == first["transfer_hit_points"]
     for move in payload["moves"]:
-        assert move["expected_points_cost"] == first["transfer_hit_points"]
+        assert "expected_points_cost" not in move
         assert move["reason_code"] == "window_value"
     offenders: list[str] = []
     _walk(payload, "payload", offenders)
@@ -257,3 +265,34 @@ def test_the_batch_publishes_the_windows_without_moving_the_baseline_bytes(
     assert index["windows"] == {"saf-puan": [1, 3, 5]}
     assert index["strategies"] == ["saf-puan"]
     assert index["unavailable"] == []
+
+
+def test_the_top100_sentence_is_published_only_when_the_projection_carries_it(
+    window_world: dict[str, Any],
+) -> None:
+    """A window states the uplift as a fact, so it may only say so when it is one.
+
+    The uplift is optional: ``build_projection_handoff`` applies it only when given the
+    evidence table, ``run_week --skip-top100`` and ``--projection component-only`` leave
+    it out, and both un-uplifted model versions are promoted, so a window is published
+    from a projection that carries none. The projection says which it is — an elite
+    handoff carries the evidence fingerprint it was built from, and the un-uplifted
+    versions are forbidden from carrying one — so the sentence is derived from the
+    projection rather than assumed.
+    """
+
+    import dataclasses
+
+    projection = window_world["projection"]
+    assert projection.diagnostics.get("projection_evidence_fingerprint") is None
+    assert WINDOW_TOP100_LIMIT not in window_stated_limits(projection)
+
+    uplifted = dataclasses.replace(
+        projection,
+        diagnostics={**dict(projection.diagnostics), "projection_evidence_fingerprint": "ab" * 32},
+    )
+    assert window_stated_limits(uplifted) == list(WINDOW_STATED_LIMITS)
+    # Nothing else moves: the same sentences, in the same order, either way.
+    assert window_stated_limits(projection) == [
+        sentence for sentence in WINDOW_STATED_LIMITS if sentence != WINDOW_TOP100_LIMIT
+    ]

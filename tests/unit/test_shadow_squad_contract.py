@@ -80,6 +80,7 @@ _SHA = "ab" * 32
 _PUBLISHED_ENVELOPE = frozenset(
     {
         "moves",
+        "transfer_hit_points",
         "expected_own_points",
         "expected_gap_vs_rival",
         "expected_points_cost",

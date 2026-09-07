@@ -205,12 +205,20 @@ holding value because the member path offers no chip unless the operator names o
 
 The two hit numbers are the policy's one departure from the dataclass defaults, and they
 mean different things. ``hit_points_charged`` is 4.0, the points the game takes off the
-sheet, and it is what every reported hit is counted at: the moves' ``expected_points_cost``,
-``plan_weeks[].transfer_hit_points``, ``net_expected_points``, the decision the ledger
-records. ``transfer_hit_cost_points`` is 8.0 and lives only inside the solve, where it
-makes the planner decline a transfer whose projected gain is marginal. It is a caution
-margin on a projection that overstates transfer gains, not a rule change, and no member
-ever sees it.
+sheet, and it is what every reported hit is counted at: the advice payload's
+``transfer_hit_points`` (the week's charge, published once beside ``moves`` because it
+belongs to the week and not to any one move), ``plan_weeks[].transfer_hit_points``,
+``net_expected_points``, the decision the ledger records. ``transfer_hit_cost_points`` is
+8.0 and lives only inside the solve, where it makes the planner decline a transfer whose
+projected gain is marginal. It is a caution margin on a projection that overstates
+transfer gains, not a rule change, and no member ever sees it.
+
+The split also means two solved plans are not ranked the same way by the solve's objective
+and by the charge. Every plan a member is *shown* is solved under the margin; the one
+place that needs a plan solved at the charge is the rival price tag's anchor, which
+compares two solved plans and would otherwise compare maximisers of different objectives
+(``application/advice.py``). That is what ``plan_transfers``' ``transfer_hit_cost_points``
+override exists for, and it is the only caller.
 
 Because the two differ, ``configuration_fingerprint`` is no longer ``TransferPlanningConfig``'s
 default one; the pins recorded under this policy are the ones this docstring's revisit
@@ -272,18 +280,26 @@ change: the ledger and the settle step charge the game's 4 regardless.
 
 
 def _transfer_config(
-    rules: SeasonRules, *, transfer_cap: int | None = None
+    rules: SeasonRules,
+    *,
+    transfer_cap: int | None = None,
+    transfer_hit_cost_points: float | None = None,
 ) -> TransferPlanningConfig:
     """The member planning policy under this season's rules.
 
     ``transfer_cap`` bounds the week's transfers (a wildcard week is exempt, as in the
     planner); ``None`` leaves the count to the objective and the policy's hit cost.
+    ``transfer_hit_cost_points`` replaces the policy's caution margin inside the solve;
+    ``None`` is the policy, which is what every published plan uses.
     """
 
+    values = _MEMBER_PLANNING_POLICY_VALUES.copy()
+    if transfer_hit_cost_points is not None:
+        values["transfer_hit_cost_points"] = float(transfer_hit_cost_points)
     return TransferPlanningConfig(
         max_free_transfers=rules.transfers.max_free_transfers,
         max_transfers_per_gameweek=transfer_cap,
-        **_MEMBER_PLANNING_POLICY_VALUES,
+        **values,
     )
 
 
@@ -336,12 +352,14 @@ def _prepare_planning(
     optimization: OptimizationConfig | None,
     chip: str | None,
     transfer_cap: int | None = None,
+    transfer_hit_cost_points: float | None = None,
 ) -> _PreparedPlanning:
     """Validate the held squad against the capture and build the one-week horizon.
 
     ``transfer_cap`` bounds the week's transfers (a wildcard is exempt, as in the
     planner); ``None`` is the historical planner, which pays for any transfer the
-    objective can justify.
+    objective can justify. ``transfer_hit_cost_points`` overrides the policy's caution
+    margin for this solve alone; ``None`` is the policy.
     """
 
     settings = OptimizationConfig() if optimization is None else optimization
@@ -393,7 +411,9 @@ def _prepare_planning(
         }
     )
     transfer_config = _transfer_config(
-        rules, transfer_cap=None if transfer_cap is None else int(transfer_cap)
+        rules,
+        transfer_cap=None if transfer_cap is None else int(transfer_cap),
+        transfer_hit_cost_points=transfer_hit_cost_points,
     )
     state = InitialSquadState(
         held.squad_player_ids,
@@ -551,11 +571,25 @@ def plan_transfers(
     *,
     optimization: OptimizationConfig | None = None,
     chip: str | None = None,
+    transfer_hit_cost_points: float | None = None,
 ) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
-    """Decide this deadline's transfers from the held squad with a one-week horizon."""
+    """Decide this deadline's transfers from the held squad with a one-week horizon.
+
+    ``transfer_hit_cost_points`` replaces ``MEMBER_PLANNING_POLICY``'s caution margin
+    inside this solve. It defaults to ``None``, the policy, so every call site that does
+    not name it is byte-identical to before; the one caller that does is the price tag's
+    anchor in ``application/advice.py``, which needs a plan that maximises what the game
+    actually charges rather than what the planner is cautious about.
+    """
 
     prepared = _prepare_planning(
-        inputs, projection, held, rules, optimization=optimization, chip=chip
+        inputs,
+        projection,
+        held,
+        rules,
+        optimization=optimization,
+        chip=chip,
+        transfer_hit_cost_points=transfer_hit_cost_points,
     )
     plan = optimize_transfer_plan(
         prepared.horizon,
