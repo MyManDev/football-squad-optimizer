@@ -6,6 +6,7 @@ population from the handoff under the preregistered rule, admit a 2025-26 decisi
 through a development handoff, and carry the decision identity a repeat can be compared to.
 """
 
+import hashlib
 import json
 from collections.abc import Sequence
 from pathlib import Path
@@ -14,7 +15,13 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 from scripts import run_component_squad_calibration as runner
-from scripts.measure_component_fidelity import measure_fidelity, provenance_block
+from scripts.measure_component_fidelity import DevelopmentInputs as FidelityInputs
+from scripts.measure_component_fidelity import (
+    FidelityBindingError,
+    _read_development_reference,
+    measure_fidelity,
+    provenance_block,
+)
 from scripts.run_component_squad_calibration import (
     CANDIDATE_REPORT_VERSION,
     DEFAULT_OUTPUT,
@@ -794,7 +801,7 @@ def test_a_pilot_solves_only_the_requested_folds_and_lists_every_abstention(
         LOCKED,
     ]
     assert measured["verdict"] is None
-    assert "pilot" in str(measured["verdict_note"])
+    assert "--folds restricts the run" in str(measured["verdict_note"])
     assert measured["source"]["phase_c_contract"] == DEVELOPMENT_OOF_CONTRACT_VERSION
     assert measured["source"]["pinned_by_arguments"] is True
     assert measured["candidate"]["reference_contract_version"] == DEVELOPMENT_REPORT_VERSION
@@ -823,43 +830,28 @@ def test_a_pilot_refuses_unknown_and_burn_in_folds(monkeypatch: pytest.MonkeyPat
         )
 
 
-def test_a_full_development_run_abstains_by_protocol_at_the_minimum_fold_count(
+def test_a_full_development_run_abstains_by_protocol_without_a_fidelity_record(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    rows, _ = _v1_shaped_rows((LOCKED,))
+    rows, fold_ids = _v1_shaped_rows((LOCKED,))
     handoff = _handoff(rows, development=True)
-    fold_id = "2021-22-gw11"
-    history = tuple(f"2021-22-gw{gameweek:02d}" for gameweek in range(2, 11))
-    prepared, result = _frozen_decision(fold_id)
-    base, _ = _measure_fold(
-        _handoff(_component_rows((*history, fold_id)), development=True),
-        prepared,
-        result,
-        40.0,
-        tuple(_squad_positions()),
-        ScenarioConfig(scenario_count=64),
-        None,
-    )
-    requested = tuple(f"2023-24-gw{gameweek:02d}" for gameweek in range(2, 32))
-    readings = {
-        item: ComponentCalibrationFold(fold_id=item, readout=base.readout) for item in requested
-    }
-    _patch_measurement(monkeypatch, readings=readings)
+    _, eligible = _development_population(rows, fold_ids, min_history_folds=8)
+    _patch_measurement(monkeypatch, readings=_real_readings(eligible))
 
     measured, _ = _measure_development(
         SimpleNamespace(archive_root=Path(".")),
         handoff,
         None,
-        DevelopmentInputs(TABLE, ROSTER, MANIFEST, requested),
+        DevelopmentInputs(TABLE, ROSTER, MANIFEST, None),
     )
 
     verdict = measured["verdict"]
-    assert verdict is not None
+    assert isinstance(verdict, dict)
     assert verdict["status"] == "abstained"
     assert verdict["abstention_reason"] == "sampler_fidelity_not_verified"
-    assert verdict["fold_count"] == 30
+    assert verdict["expected_fold_count"] == len(eligible)
     assert "abstains by protocol" in str(measured["verdict_note"])
-    assert measured["development_observation"]["fold_count"] == 30
+    assert measured["population"]["verdict_population_fold_ids"] == list(eligible)
 
 
 def test_the_development_document_is_flagged_not_binding(
@@ -1143,40 +1135,42 @@ def test_a_verified_record_turns_the_abstention_into_an_evaluated_verdict(
     rows, fold_ids = _v1_shaped_rows((LOCKED,))
     handoff = _handoff(rows, development=True)
     burn_in, eligible = _development_population(rows, fold_ids, min_history_folds=8)
-    requested = eligible[:30]
-    _patch_measurement(monkeypatch, readings=_real_readings(requested))
+    _patch_measurement(monkeypatch, readings=_real_readings(eligible))
     _patch_fidelity(monkeypatch, eligible, burn_in)
 
     measured, _ = _measure_development(
         SimpleNamespace(archive_root=Path(".")),
         handoff,
         FIDELITY_SAMPLER,
-        DevelopmentInputs(TABLE, ROSTER, MANIFEST, requested, Path("fidelity.json")),
+        DevelopmentInputs(TABLE, ROSTER, MANIFEST, None, Path("fidelity.json")),
     )
 
     verdict = measured["verdict"]
     assert isinstance(verdict, dict)
     assert verdict["status"] != "abstained"
     assert verdict["abstention_reason"] is None
+    assert verdict["expected_fold_count"] == len(eligible)
     assert measured["sampler_fidelity_verified"] is True
     assert measured["source"]["fidelity_artifact_sha256"] == "f" * 64
     assert measured["source"]["fidelity_contract_version"] == DEVELOPMENT_FIDELITY_VERSION
     assert measured["source"]["fidelity_measured_fold_count"] == len(eligible)
     assert "verified development fidelity record" in str(measured["verdict_note"])
+    observation = measured["development_observation"]
+    assert isinstance(observation, dict)
+    assert "not the binding verdict" in str(observation["note"])
 
 
 def test_without_a_record_the_run_keeps_abstaining(monkeypatch: pytest.MonkeyPatch) -> None:
     rows, fold_ids = _v1_shaped_rows((LOCKED,))
     handoff = _handoff(rows, development=True)
     _, eligible = _development_population(rows, fold_ids, min_history_folds=8)
-    requested = eligible[:30]
-    _patch_measurement(monkeypatch, readings=_real_readings(requested))
+    _patch_measurement(monkeypatch, readings=_real_readings(eligible))
 
     measured, _ = _measure_development(
         SimpleNamespace(archive_root=Path(".")),
         handoff,
         FIDELITY_SAMPLER,
-        DevelopmentInputs(TABLE, ROSTER, MANIFEST, requested, None),
+        DevelopmentInputs(TABLE, ROSTER, MANIFEST, None, None),
     )
 
     verdict = measured["verdict"]
@@ -1185,6 +1179,9 @@ def test_without_a_record_the_run_keeps_abstaining(monkeypatch: pytest.MonkeyPat
     assert verdict["abstention_reason"] == "sampler_fidelity_not_verified"
     assert measured["sampler_fidelity_verified"] is False
     assert measured["source"]["fidelity_artifact_sha256"] is None
+    observation = measured["development_observation"]
+    assert isinstance(observation, dict)
+    assert "abstains by protocol" in str(observation["note"])
 
 
 def test_a_record_that_disagrees_on_eligibility_stops_the_run(
@@ -1218,13 +1215,132 @@ def test_a_pilot_with_a_verified_record_still_produces_no_verdict(
     _patch_measurement(monkeypatch)
     _patch_fidelity(monkeypatch, eligible, burn_in)
 
+    # Far more than the minimum fold count, so only the operator's choice can refuse it.
     measured, _ = _measure_development(
         SimpleNamespace(archive_root=Path(".")),
         handoff,
         FIDELITY_SAMPLER,
-        DevelopmentInputs(TABLE, ROSTER, MANIFEST, eligible[:3], Path("fidelity.json")),
+        DevelopmentInputs(TABLE, ROSTER, MANIFEST, eligible[:40], Path("fidelity.json")),
     )
 
     assert measured["verdict"] is None
     assert measured["sampler_fidelity_verified"] is True
-    assert "pilot" in str(measured["verdict_note"])
+    assert "--folds restricts the run" in str(measured["verdict_note"])
+
+
+def test_a_fold_that_fails_to_score_abstains_instead_of_shrinking_the_denominator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The declared population is what S1/S2 are read against, not what happened to survive."""
+
+    rows, fold_ids = _v1_shaped_rows((LOCKED,))
+    handoff = _handoff(rows, development=True)
+    burn_in, eligible = _development_population(rows, fold_ids, min_history_folds=8)
+    lost = (eligible[5], eligible[6])
+    _patch_measurement(monkeypatch, unscored=lost, readings=_real_readings(eligible))
+    _patch_fidelity(monkeypatch, eligible, burn_in)
+
+    measured, _ = _measure_development(
+        SimpleNamespace(archive_root=Path(".")),
+        handoff,
+        FIDELITY_SAMPLER,
+        DevelopmentInputs(TABLE, ROSTER, MANIFEST, None, Path("fidelity.json")),
+    )
+
+    verdict = measured["verdict"]
+    assert isinstance(verdict, dict)
+    assert verdict["status"] == "abstained"
+    assert str(verdict["abstention_reason"]).startswith("population_mismatch")
+    assert verdict["expected_fold_count"] == len(eligible)
+    assert verdict["fold_count"] == len(eligible) - len(lost)
+    assert measured["population"]["unscored_fold_ids"] == list(lost)
+
+
+def test_a_direct_control_fold_leaves_the_declared_population_rather_than_mismatching(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A preregistered abstention is an exclusion; an unsolved fold is a mismatch."""
+
+    rows, fold_ids = _v1_shaped_rows((LOCKED,))
+    abstaining = "2023-24-gw05"
+    picked = rows["fold_id"].eq(abstaining) & rows["player_id"].eq(1)
+    rows.loc[picked, "composition_route"] = DIRECT_CONTROL_ROUTE
+    handoff = _handoff(rows, development=True)
+    burn_in, eligible = _development_population(rows, fold_ids, min_history_folds=8)
+    _patch_measurement(monkeypatch, readings=_real_readings(eligible))
+    _patch_fidelity(monkeypatch, eligible, burn_in)
+
+    measured, _ = _measure_development(
+        SimpleNamespace(archive_root=Path(".")),
+        handoff,
+        FIDELITY_SAMPLER,
+        DevelopmentInputs(TABLE, ROSTER, MANIFEST, None, Path("fidelity.json")),
+    )
+
+    verdict = measured["verdict"]
+    assert isinstance(verdict, dict)
+    assert measured["population"]["direct_control_abstention_fold_ids"] == [abstaining]
+    assert abstaining not in measured["population"]["verdict_population_fold_ids"]
+    assert verdict["expected_fold_count"] == len(eligible) - 1
+    assert verdict["status"] != "abstained"
+
+
+def test_the_producer_reads_only_the_pinned_equal_weight_reference(tmp_path: Path) -> None:
+    """The producer's own binding, on real files the development reader has to accept."""
+
+    from tests.unit.test_phase_c_v2_development_path import _development_table, _write_arm
+
+    equal = _write_arm(
+        tmp_path / "equal",
+        "equal",
+        _development_table(lambda *_: 1.0),
+        seasons=("2024-25", LOCKED),
+        weighting_label=EQUAL_WEIGHTING,
+    )
+    weighted = _write_arm(
+        tmp_path / "weighted",
+        "weighted",
+        _development_table(lambda *_: 1.0, model_version=SEASON_WEIGHTED_MODEL_VERSION),
+        seasons=("2024-25", LOCKED),
+        weighting_label=SEASON_HALF_LIFE_WEIGHTING,
+    )
+
+    def digests(paths: tuple[Path, Path, Path]) -> tuple[str, str, str]:
+        return tuple(  # type: ignore[return-value]
+            hashlib.sha256(item.read_bytes()).hexdigest() for item in paths
+        )
+
+    def arguments(paths: tuple[Path, Path, Path]) -> SimpleNamespace:
+        return SimpleNamespace(oof_table=paths[0], roster=paths[1], manifest=paths[2])
+
+    def pinned(values: tuple[str, str, str], sampler: object = FIDELITY_SAMPLER) -> object:
+        return FidelityInputs(values[0], values[1], values[2], sampler)  # type: ignore[arg-type]
+
+    rows, roster, manifest = _read_development_reference(
+        arguments(equal),
+        pinned(digests(equal)),  # type: ignore[arg-type]
+    )
+    assert manifest["contract_version"] == DEVELOPMENT_OOF_CONTRACT_VERSION
+    assert manifest["model_version"] == COMPONENT_MODEL_VERSION
+    assert not rows.empty and not roster.empty
+
+    drifted = list(digests(equal))
+    drifted[0] = "9" * 64
+    with pytest.raises(FidelityBindingError, match="differ from the pinned reference"):
+        _read_development_reference(arguments(equal), pinned(tuple(drifted)))  # type: ignore[arg-type]
+
+    with pytest.raises(FidelityBindingError, match="equal-weight reference"):
+        _read_development_reference(arguments(weighted), pinned(digests(weighted)))  # type: ignore[arg-type]
+
+    # An artifact that does not declare itself development-only never reaches the digest
+    # check: the development reader refuses it first.
+    undeclared = _write_arm(
+        tmp_path / "undeclared",
+        "undeclared",
+        _development_table(lambda *_: 1.0),
+        seasons=("2024-25", LOCKED),
+        weighting_label=None,
+        development=False,
+    )
+    with pytest.raises(FidelityBindingError, match="handoff refused"):
+        _read_development_reference(arguments(undeclared), pinned(digests(undeclared)))  # type: ignore[arg-type]
