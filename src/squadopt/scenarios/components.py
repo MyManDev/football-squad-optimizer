@@ -37,6 +37,7 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_bool_dtype
 
+from squadopt.evaluation.component_handoff import DEVELOPMENT_OOF_CONTRACT_VERSION
 from squadopt.prediction.components import (
     COMPONENT_EVIDENCE_STATUSES,
     COMPONENT_MODEL_ROUTE,
@@ -126,8 +127,20 @@ class ComponentScenarioProvenance:
     season: str
     target_gameweek: int
     deterministic_seed: int
+    # ``None`` is the frozen path and refuses the locked holdout outright. Naming the Phase C
+    # v2 development contract is the one explicit way to sample a 2025-26 decision, and it
+    # marks the draw's identity so a development draw can never pass for a frozen one.
+    development_contract: str | None = None
 
     def __post_init__(self) -> None:
+        if (
+            self.development_contract is not None
+            and self.development_contract != DEVELOPMENT_OOF_CONTRACT_VERSION
+        ):
+            raise ScenarioValidationError(
+                f"Unsupported development contract {self.development_contract!r}; only "
+                f"{DEVELOPMENT_OOF_CONTRACT_VERSION!r} admits development scenarios."
+            )
         blanks = [
             name
             for name in (
@@ -145,10 +158,10 @@ class ComponentScenarioProvenance:
             raise ScenarioValidationError(
                 f"Component scenario provenance is missing {sorted(blanks)!r}."
             )
-        if self.season == LOCKED_HOLDOUT_SEASON:
+        if self.season == LOCKED_HOLDOUT_SEASON and self.development_contract is None:
             raise ScenarioValidationError(
                 f"{LOCKED_HOLDOUT_SEASON} is the locked holdout; component scenarios are not "
-                "built, listed or fingerprinted for it."
+                "built, listed or fingerprinted for it outside the declared development path."
             )
         if self.target_gameweek < 1:
             raise ScenarioValidationError(
@@ -378,6 +391,9 @@ def _component_fingerprint(
         "target_gameweek": scenarios.target.gameweek,
         "fixture_counts": [int(value) for value in inputs.table["fixture_count"]],
     }
+    # Added only on the development path, so every frozen fingerprint stays byte-identical.
+    if provenance.development_contract is not None:
+        metadata["development_contract"] = provenance.development_contract
     digest = hashlib.sha256(
         json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
     )
@@ -711,9 +727,12 @@ def sample_component_scenarios(
         raise ScenarioValidationError(
             f"The residual pool was built for {residuals.target_fold_id}, not {target.fold_id}."
         )
-    if inputs.provenance.season == LOCKED_HOLDOUT_SEASON or target.season == LOCKED_HOLDOUT_SEASON:
+    if inputs.provenance.development_contract is None and (
+        inputs.provenance.season == LOCKED_HOLDOUT_SEASON or target.season == LOCKED_HOLDOUT_SEASON
+    ):
         raise ScenarioValidationError(
-            f"{LOCKED_HOLDOUT_SEASON} is the locked holdout and is not sampled."
+            f"{LOCKED_HOLDOUT_SEASON} is the locked holdout and is not sampled outside the "
+            "declared development path."
         )
 
     # The inputs' own decision week has to be the one being sampled. A set whose provenance
@@ -891,6 +910,11 @@ def sample_component_scenarios(
             "phase_c_table_sha": inputs.provenance.phase_c_table_sha,
             "roster_sha": inputs.provenance.roster_sha,
             "model_version": inputs.provenance.model_version,
+            **(
+                {"development_contract": inputs.provenance.development_contract}
+                if inputs.provenance.development_contract is not None
+                else {}
+            ),
         },
     )
     return ComponentScenarioDraw(

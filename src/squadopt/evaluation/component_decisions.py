@@ -172,17 +172,23 @@ def _outcomes(rows: pd.DataFrame, actual: pd.DataFrame, fold_id: str) -> pd.Data
 def prepare_phase_c_component_folds(
     handoff: PhaseCComponentHandoff,
     control_folds: Iterable[EvaluationFold],
+    *,
+    development_contract: str | None = None,
 ) -> tuple[EvaluationFold, ...]:
-    """Fill direct-control rows from exact-key control folds and build candidate folds."""
+    """Fill direct-control rows from exact-key control folds and build candidate folds.
+
+    A handoff read under a development contract is admitted only when the caller names that
+    same contract: the frozen v1 evidence path never does, and a development caller cannot
+    be handed a v1 artifact in its place.
+    """
 
     if not isinstance(handoff, PhaseCComponentHandoff):
         raise EvaluationValidationError("handoff must be a PhaseCComponentHandoff.")
-    # The explicit development reader can return 2025-26 rows or a weighted arm. Neither is
-    # admissible here: a decision comparison reads the frozen v1 handoff and nothing else.
-    if handoff.development_contract is not None:
+    if handoff.development_contract != development_contract:
         raise EvaluationValidationError(
-            "Phase C development artifacts are not admissible decision-comparison evidence; "
-            f"{handoff.development_contract!r} is development-only."
+            "Phase C handoff contract mismatch: the handoff was read under "
+            f"{handoff.development_contract!r} and the caller admits "
+            f"{development_contract!r}. Development artifacts are development-only."
         )
     controls = _folds(control_folds)
     handoff_order = handoff.rows["fold_id"].drop_duplicates().tolist()

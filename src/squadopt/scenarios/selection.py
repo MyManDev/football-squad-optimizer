@@ -216,6 +216,13 @@ def select_phase_e_candidate(
     config = validated.scenarios.config
     if (
         identity not in calibrated_versions
+        # A development draw carries the same model version and sampler as the frozen path, so
+        # the pin cannot tell the two apart. Only the frozen path was calibrated; a draw that
+        # names a development contract is refused however the pin reads. This is a
+        # declaration, not a proof: the provenance forces the contract only for the locked
+        # season, and nothing here pins the Phase C digests, so a development export of an
+        # earlier season that leaves the field unset still reads as frozen.
+        or provenance.development_contract is not None
         or provenance.model_version != projection_provenance.model_version
         or provenance.feature_contract_version != projection_provenance.feature_contract_version
         or provenance.season != validated.scenarios.target.season
