@@ -111,7 +111,8 @@ E3 requires `--phase-d-development` naming a complete
 `phase_d_component_squad_calibration_development_v2` record, the same three pinned inputs,
 and the matching conditional sampler. A pilot, unverified fidelity, omitted/unsolved/unscored
 fold, changed reference or conflicting sampler is refused. The recorded D verdict is
-recomputed from its fold readings. The handoff independently supplies history eligibility
+recomputed from its fold readings against its declared `verdict_population_fold_ids`,
+which must equal the complete measured population. The handoff independently supplies history eligibility
 again, and E2 must name that same population and development provenance. Before scoring,
 each regenerated E3 control must equal D's complete recorded decision identity. A mismatch
 is a named error; equal realized totals alone do not establish equal decisions.

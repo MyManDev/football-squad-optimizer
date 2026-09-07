@@ -96,6 +96,7 @@ def _document() -> dict:
             "unsolved_fold_ids": [],
             "unscored_fold_ids": [],
             "measured_fold_ids": ids,
+            "verdict_population_fold_ids": list(ids),
         },
         "folds": [
             {
@@ -217,6 +218,8 @@ def test_v2_evidence_uses_its_complete_population_and_cannot_enter_v1(tmp_path: 
         "holdout",
         "missing_reading",
         "text_pit",
+        "missing_verdict_population",
+        "different_verdict_population",
     ],
 )
 def test_v2_evidence_rejects_mixed_or_incomplete_records(tmp_path: Path, mutation: str) -> None:
@@ -247,6 +250,10 @@ def test_v2_evidence_rejects_mixed_or_incomplete_records(tmp_path: Path, mutatio
         del document["folds"][0]["q10_score"]
     elif mutation == "text_pit":
         document["folds"][0]["probability_integral_transform"] = "0.5"
+    elif mutation == "missing_verdict_population":
+        del document["population"]["verdict_population_fold_ids"]
+    elif mutation == "different_verdict_population":
+        document["population"]["verdict_population_fold_ids"].pop()
     else:
         document["locked_holdout_accessed"] = False
     with pytest.raises(ValueError):

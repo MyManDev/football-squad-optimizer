@@ -253,6 +253,7 @@ def load_phase_d_development(
         return ids
 
     ids = ordered_ids("measured_fold_ids")
+    verdict_population = ordered_ids("verdict_population_fold_ids")
     evaluated = ordered_ids("evaluated_fold_ids")
     burn_in = ordered_ids("history_burn_in_fold_ids")
     direct = ordered_ids("direct_control_abstention_fold_ids")
@@ -262,6 +263,7 @@ def load_phase_d_development(
         or population.get("unsolved_fold_ids") != []
         or population.get("unscored_fold_ids") != []
         or not ids
+        or ids != verdict_population
         or set(ids) & set(direct)
         or tuple(sorted((*ids, *direct))) != evaluated
         or set(evaluated) & set(burn_in)
@@ -351,7 +353,7 @@ def load_phase_d_development(
         )
     verdict = asdict(
         evaluate_component_squad_calibration(
-            readings, expected_fold_ids=ids, sampler_fidelity_verified=True
+            readings, expected_fold_ids=verdict_population, sampler_fidelity_verified=True
         )
     )
     # JSON converts the evaluator's tuple of fold IDs to a list.
