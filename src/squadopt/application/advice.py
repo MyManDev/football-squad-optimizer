@@ -458,8 +458,9 @@ WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "The Top-100 uplift is inside the first week's numbers, and the repetition "
     "carries it into every later week.",
     "Prices are held at the captured values; no price change is modelled.",
-    "A chip the plan plays inside the window is valued inside the window only; what "
-    "it would be worth in a later week is not counted.",
+    "A chip is valued inside the window only, so the plan spends the chips it can "
+    "reach inside it and counts nothing for holding one back: read the chip timing "
+    "here as a within-window reading, not a season-long chip plan.",
 )
 
 

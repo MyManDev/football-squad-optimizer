@@ -1039,8 +1039,8 @@ const tr: MessageSchema<typeof en> = {
         "Top-100 düzeltmesi ilk haftanın sayılarının içindedir ve tekrar onu sonraki her haftaya taşır.",
       "Prices are held at the captured values; no price change is modelled.":
         "Fiyatlar capture'daki değerlerde tutulur; fiyat değişimi modellenmez.",
-      "A chip the plan plays inside the window is valued inside the window only; what it would be worth in a later week is not counted.":
-        "Planın pencere içinde oynadığı çip yalnız pencere içinde değerlenir; sonraki bir haftada ne edeceği sayılmaz.",
+      "A chip is valued inside the window only, so the plan spends the chips it can reach inside it and counts nothing for holding one back: read the chip timing here as a within-window reading, not a season-long chip plan.":
+        "Çip yalnız pencere içinde değerlenir; plan pencere içinde ulaşabildiği çipleri harcar ve elde tutmaya değer biçmez: buradaki çip zamanlamasını pencere içi bir okuma say, sezonluk çip planı değil.",
     },
     controlUnprovenBody: (gap: string) =>
       `Bu fiyatın arkasındaki saf puan planı en iyi diye kanıtlanamadı (fark ≤ ${gap} puan): etiket o sınırla bir okuma, kanıt değil.`,
