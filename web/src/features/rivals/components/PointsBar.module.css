@@ -1,0 +1,11 @@
+.pointsTrack {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.pointsFill {
+  height: 100%;
+  background: var(--color-text-faint);
+}

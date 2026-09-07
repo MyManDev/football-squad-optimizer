@@ -111,43 +111,41 @@ export function DecisionControls({ horizonEvidence }: { horizonEvidence?: unknow
           </div>
         </fieldset>
 
-        {
-          <form
-            className={styles.leagueField}
-            onSubmit={(event) => {
-              event.preventDefault();
-              void connectLeague();
-            }}
-          >
-            <label>
-              <span>{copy.leagueId}</span>
-              <div className={styles.leagueRow}>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder={copy.leaguePlaceholder}
-                  value={leagueInput}
-                  onChange={(event) => {
-                    setLeagueInput(event.target.value);
-                    setLeagueState({ kind: "idle" });
-                  }}
-                />
-                <button type="submit" disabled={leagueState.kind === "checking"}>
-                  {copy.leagueConnect}
-                </button>
-              </div>
-            </label>
-            {leagueState.kind === "invalid" ? (
-              <small role="alert">{copy.leagueInvalid}</small>
-            ) : leagueState.kind === "unavailable" ? (
-              <small role="alert">{copy.leagueUnavailable}</small>
-            ) : leagueState.kind === "mismatch" ? (
-              <small role="alert">{copy.leagueMismatch(leagueState.publishedId)}</small>
-            ) : (
-              <small>{copy.leagueHelp}</small>
-            )}
-          </form>
-        }
+        <form
+          className={styles.leagueField}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void connectLeague();
+          }}
+        >
+          <label>
+            <span>{copy.leagueId}</span>
+            <div className={styles.leagueRow}>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder={copy.leaguePlaceholder}
+                value={leagueInput}
+                onChange={(event) => {
+                  setLeagueInput(event.target.value);
+                  setLeagueState({ kind: "idle" });
+                }}
+              />
+              <button type="submit" disabled={leagueState.kind === "checking"}>
+                {copy.leagueConnect}
+              </button>
+            </div>
+          </label>
+          {leagueState.kind === "invalid" ? (
+            <small role="alert">{copy.leagueInvalid}</small>
+          ) : leagueState.kind === "unavailable" ? (
+            <small role="alert">{copy.leagueUnavailable}</small>
+          ) : leagueState.kind === "mismatch" ? (
+            <small role="alert">{copy.leagueMismatch(leagueState.publishedId)}</small>
+          ) : (
+            <small>{copy.leagueHelp}</small>
+          )}
+        </form>
       </div>
 
       <div
