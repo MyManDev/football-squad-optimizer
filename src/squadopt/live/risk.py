@@ -415,9 +415,11 @@ def evaluate_live_risk(
             fixture_counts=(None if fixture_counts is None else dict(fixture_counts.items())),
         )
         result = evaluate_fixed_decision(optimization_result, scenario_set, evaluation)
+        # The comparison takes no evaluation config: the shift cancels in a difference and
+        # the dispersion scale was measured on a squad's own spread, so neither applies here
+        # and the comparison's own diagnostics say so.
         comparisons: list[ScenarioComparisonResult] = [
-            compare_fixed_decisions(optimization_result, rival, scenario_set, evaluation)
-            for rival in rivals
+            compare_fixed_decisions(optimization_result, rival, scenario_set) for rival in rivals
         ]
     except (PredictionError, ScenarioError) as error:
         raise LiveRiskValidationError(

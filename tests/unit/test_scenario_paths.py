@@ -178,6 +178,107 @@ def test_every_scenario_draws_one_contiguous_run_of_folds() -> None:
         assert len({fold.rsplit("-gw", 1)[0] for fold in block}) == 1
 
 
+def _blanking_history() -> pd.DataFrame:
+    """One club sits out each gameweek in rotation, with the shock recoverable exactly.
+
+    Every fold fields the same *number* of clubs and a different *set* of them, which is
+    what a fixture calendar around a blank looks like and what a guard comparing club
+    counts cannot see. Each fold's residuals are its clubs' centred strengths, so the
+    common component is zero, the idiosyncratic component is zero, and a scenario value
+    minus the projection is exactly the team shock that club received.
+    """
+
+    projection = _snapshot().table
+    clubs = sorted(int(value) for value in projection["team_id"].unique())
+    strength = {club: 10.0 * index for index, club in enumerate(clubs)}
+    records: list[dict[str, object]] = []
+    for gameweek in (2, 3, 4, 5, 6, 7):
+        present = [club for club in clubs if club != clubs[(gameweek - 2) % len(clubs)]]
+        centre = sum(strength[club] for club in present) / len(present)
+        for row in projection.itertuples(index=False):
+            club = int(row.team_id)
+            if club not in present:
+                continue
+            residual = strength[club] - centre
+            predicted = float(row.expected_points)
+            records.append(
+                {
+                    "fold_id": f"{SEASON}-gw{gameweek:02d}",
+                    "season": SEASON,
+                    "gameweek": gameweek,
+                    "player_id": row.player_id,
+                    "team_id": row.team_id,
+                    "position": row.position,
+                    "predicted_points": predicted,
+                    "realized_points": predicted + residual,
+                    "residual": residual,
+                }
+            )
+    return pd.DataFrame.from_records(records)
+
+
+def _fold_shocks(history: pd.DataFrame) -> dict[str, dict[int, float]]:
+    """Per fold, the centred shock each club that played carries."""
+
+    shocks: dict[str, dict[int, float]] = {}
+    for fold_id, fold in history.groupby("fold_id", sort=True):
+        by_club = fold.groupby("team_id", sort=True)["residual"].first()
+        centred = by_club.to_numpy(dtype="float64") - by_club.to_numpy(dtype="float64").mean()
+        shocks[str(fold_id)] = {
+            int(club): float(value) for club, value in zip(by_club.index, centred, strict=True)
+        }
+    return shocks
+
+
+def test_a_team_shock_follows_one_club_and_the_diagnostic_counts_what_it_says() -> None:
+    """The docstring's claim, asserted: a team block holds a club, not an array position.
+
+    A fold's club set changes whenever a club blanks. Holding a position in that fold's
+    sorted clubs silently hands a target club another club's shock at every later step,
+    and a guard that compares only club counts never fires, so the loss goes uncounted.
+    Here every step's shock must be the step-zero source club's own shock in that week,
+    or zero when that club did not play — and `truncated_team_blocks` must count exactly
+    the blocks that lost a week that way.
+    """
+
+    history = _blanking_history()
+    target = ScenarioPathTarget(SEASON, FIRST_GAMEWEEK, 3)
+    path = generate_scenario_paths(
+        {gameweek: _snapshot(gameweek) for gameweek in target.gameweeks}, history, target, CONFIG
+    )
+    shocks = _fold_shocks(history)
+    # The premise: equal club counts at every step, never the same club set.
+    for block in set(path.source_fold_blocks):
+        assert len({len(shocks[fold]) for fold in block}) == 1
+        assert len({tuple(sorted(shocks[fold])) for fold in block}) > 1
+
+    table = path.projections[FIRST_GAMEWEEK].table
+    clubs = sorted(int(value) for value in table["team_id"].unique())
+    columns = [int(list(table["team_id"]).index(club)) for club in clubs]
+    recovered = [
+        path.week(gameweek).to_numpy(dtype="float64")[:, columns]
+        - path.projections[gameweek].table["expected_points"].to_numpy(dtype="float64")[columns]
+        for gameweek in target.gameweeks
+    ]
+
+    truncated = 0
+    for scenario, block in enumerate(path.source_fold_blocks):
+        first = shocks[block[0]]
+        for column in range(len(clubs)):
+            drawn = recovered[0][scenario, column]
+            source = min(first, key=lambda club: abs(first[club] - drawn))
+            assert first[source] == pytest.approx(drawn, abs=1e-9)
+            held = True
+            for step, fold_id in enumerate(block[1:], start=1):
+                expected = shocks[fold_id].get(source, 0.0)
+                held &= source in shocks[fold_id]
+                assert recovered[step][scenario, column] == pytest.approx(expected, abs=1e-9)
+            truncated += int(not held)
+
+    assert truncated > 0, "the fixture must exercise a club that misses a week of its block"
+    assert path.diagnostics["truncated_team_blocks"] == truncated
+
+
 def _three_week_path(*, trending: bool = True, alternating: bool = False):
     history = _residual_history(trending=trending, alternating=alternating)
     target = ScenarioPathTarget(SEASON, FIRST_GAMEWEEK, 3)

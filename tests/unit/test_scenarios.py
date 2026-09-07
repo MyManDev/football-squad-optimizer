@@ -533,6 +533,38 @@ def test_a_rival_comparison_scores_both_squads_in_the_same_world() -> None:
         RivalSquad("bad", tuple(my_starters), 999_999)
 
 
+def test_the_comparison_takes_no_evaluation_config_it_would_not_apply() -> None:
+    """A validated control that reaches no number is worse than no control at all.
+
+    ``compare_fixed_decisions`` used to accept a ``ScenarioEvaluationConfig``, type-check it
+    and never read it, so a caller could ask for the squad-level dispersion correction and
+    receive a bit-identical answer. That correction was measured on a squad's own spread and
+    nothing measured says what a differential needs, so the parameter is gone rather than
+    applied, and the omission is declared beside the location shift's.
+    """
+
+    snapshot = _snapshot()
+    scenarios = generate_scenarios(snapshot, _residual_history(snapshot), TARGET, SMALL_CONFIG)
+    decision = optimize_squad(snapshot.table, OptimizationConfig())
+    assert decision.captain is not None
+    starters = decision.starting_xi["player_id"].tolist()
+    other = next(player for player in starters if player != decision.captain["player_id"])
+    rival = RivalSquad("captain-swap", tuple(starters), other)
+    widened = ScenarioEvaluationConfig(dispersion_scale=1.15)
+
+    # The single-squad evaluation does apply the scale, which is what made the drop invisible.
+    plain = evaluate_fixed_decision(decision, scenarios).metrics.score_standard_deviation
+    scaled = evaluate_fixed_decision(decision, scenarios, widened).metrics
+    assert scaled.score_standard_deviation > plain
+
+    with pytest.raises(TypeError):
+        compare_fixed_decisions(decision, rival, scenarios, widened)
+
+    diagnostics = compare_fixed_decisions(decision, rival, scenarios).diagnostics
+    assert diagnostics["dispersion_scale_applied"] is False
+    assert "raw spread" in str(diagnostics["dispersion_scale_note"])
+
+
 # --- rank-probability objective ---------------------------------------------------------
 
 
