@@ -28,6 +28,8 @@ _NAME_PATTERN: Final = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 _SHA256_PATTERN: Final = re.compile(r"^[0-9a-f]{64}$")
 _ARTIFACT_ID_DIGEST_CHARACTERS: Final = 32
 _CHECKSUM_CHUNK_SIZE: Final = 1024 * 1024
+_SCRATCH_ENTROPY_BYTES: Final = 4
+_SCRATCH_ATTEMPTS: Final = 8
 
 
 class ArtifactRecordError(ValueError):
@@ -343,11 +345,35 @@ def write_artifact_record_schema(path: Path | str | None = None) -> Path:
     return target
 
 
+def _write_scratch(path: Path, payload: bytes) -> Path:
+    """Write ``payload`` to a sibling scratch file reserved for publishing ``path``.
+
+    The scratch name is shorter than every record name rather than derived from one.
+    Windows resolves paths against a 260 character limit, so a scratch name that
+    padded the record name with a process id was rejected on directories where the
+    record itself fits: the extra characters, not concurrency, exhausted the limit.
+    Exclusive creation keeps the reservation unambiguous without that padding.
+    """
+
+    for _ in range(_SCRATCH_ATTEMPTS):
+        candidate = path.with_name(f".{secrets.token_hex(_SCRATCH_ENTROPY_BYTES)}.tmp")
+        try:
+            with candidate.open("xb") as handle:
+                handle.write(payload)
+        except FileExistsError:
+            continue
+        except BaseException:
+            with contextlib.suppress(FileNotFoundError):
+                candidate.unlink()
+            raise
+        return candidate
+    raise ArtifactRegistryError(f"Could not reserve a scratch file beside {path}.")
+
+
 def _write_immutable(path: Path, payload: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
+    temporary = _write_scratch(path, payload)
     try:
-        temporary.write_bytes(payload)
         try:
             os.link(temporary, path)
         except FileExistsError:

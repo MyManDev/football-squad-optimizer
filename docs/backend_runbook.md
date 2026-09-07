@@ -9,6 +9,11 @@ exposed to the internet by running it locally. The hosting decision — Azure Co
 replica, two containers, a durable Azure Files NFS share — is recorded in ADR 0006 and is not
 re-decided here.
 
+The definition of that topology now exists, as
+[`deploy/containerapp.yaml`](../deploy/containerapp.yaml), and **applying it creates paid
+resources**. It has not been applied: no Azure resource exists, and every Azure claim below is
+a parameter awaiting confirmation rather than a measured fact.
+
 ## The two commands
 
 One image, two processes. Only the api gets ingress; the worker has no listener.
@@ -273,6 +278,100 @@ container, the answer surviving the api container's replacement, `docker stop` l
 worker exit 0, and a forgotten volume refused rather than served from ephemeral disk. It is
 evidence about a local volume and says nothing about a cloud filesystem.
 
+## Azure Container Apps
+
+ADR 0006's topology, as [`deploy/containerapp.yaml`](../deploy/containerapp.yaml): one
+replica, two containers from the same image digest, only the api with ingress, both mounting
+the shared store. **Applying it creates paid resources** (see the note at the top of this
+file); nothing below has been applied.
+
+The two mounts of [Configuration](#configuration) are two shares, because they differ in
+access mode: `squadopt-store` ReadWrite and `squadopt-inputs` ReadOnly. Both are
+environment-level storage entries and are created before the app — one
+`az containerapp env storage set` each, and the YAML's header carries both commands.
+
+| Resource | Parameter | Why it is this and not simpler |
+| --- | --- | --- |
+| subscription / resource group / region | `<SUBSCRIPTION_ID>` `<RESOURCE_GROUP>` `<REGION>` | region decides both latency and price |
+| image registry + pull identity | `<REGISTRY_LOGIN_SERVER>` | CI never pushes and holds no cloud credential; whoever pushes records the digest |
+| Container Apps environment, VNet-integrated | `<CONTAINER_APPS_ENVIRONMENT>` `<VNET>` `<SUBNET>` | an NFS mount requires a custom VNet |
+| storage account, premium `FileStorage` | `<STORAGE_ACCOUNT>` | NFS shares need the premium file tier |
+| share `squadopt-store` (ReadWrite) | 100 GiB floor | the queue, the cache and the specs |
+| share `squadopt-inputs` (ReadOnly) | 100 GiB floor | snapshots, handoffs, site data |
+| NSG rules on the subnet | ports 445 and 2049 | NFS and its mount traffic |
+| Log Analytics workspace | `<WORKSPACE>` | the advice events are the only log that matters |
+| allowed frontend origins | `<PAGES_ORIGIN>` | `SQUADOPT_BACKEND_ALLOWED_ORIGINS`; a wildcard is refused at startup |
+
+**Every row above is unconfirmed against current Azure documentation.** The environment this
+was written in cannot reach `learn.microsoft.com`, so the requirements were assembled from
+secondary sources: that an NFS mount needs a custom VNet, that the account must be premium
+`FileStorage`, that Container Apps does not support encryption in transit for NFS (so the
+account's secure-transfer requirement must be off), that ports 445 and 2049 must be open on
+the subnet's NSG, and that a premium share has a 100 GiB provisioned floor. Confirm each
+against the official documentation before spending, and correct this table and the YAML in the
+same change. The YAML marks the individual fields it could not confirm — the
+`terminationGracePeriodSeconds` field and the allowed cpu/memory pairs among them.
+
+**Cost is parameterised on purpose.** The Azure retail pricing API is also unreachable from
+here, so no monthly figure is asserted. The standing charges to price are: the two premium
+shares at their provisioned floor (this is a floor, not usage — it is billed whether the store
+holds anything or not), the replica's compute at `minReplicas: 1` for every hour of the month
+(scale-to-zero is deliberately off, because it would stop the worker with a queue behind it),
+the environment's own base charge, log ingestion and retention, and egress. Price them for
+`<REGION>` and the sizes in the YAML before the first apply.
+
+**Readiness is not the platform's probe.** The YAML probes `/health`, which touches no
+dependency. `/ready` is data-dependent by design — false until ops has published a capture,
+its handoff and the league tree — so wiring it as the platform's probe would keep a correctly
+deployed revision from ever going healthy, and with one replica the platform's own 503 would
+hide which of the three checks failed. `/ready` stays the operator's own `curl`.
+
+**Bootstrap order.** [Preparing the shared mount](#preparing-the-shared-mount) is the same
+`mkdir` and `chown` here as locally, and it runs **before** the first revision that contains
+the worker: the worker exits non-zero when it cannot reach the store, and a container that
+keeps exiting recycles the replica — which can leave no way in to create the directory.
+
+## Publishing what ops owns
+
+The ops process does not move. Captures, decisions, settles and site builds stay on the
+machine that owns the ledger; this is only how the bytes reach the backend's read-only mount.
+
+**Order matters, and getting it wrong takes the whole backend down.** The context is the most
+recent capture that has a handoff — the newest snapshot directory holding `metadata.json`,
+projected through the handoff addressed by *that capture's* season and gameweek. A capture
+published without its handoff is therefore not a partial upgrade: it is the newest capture,
+it has no projection anyone can name, `capture_context` goes false, and **every** advice route
+answers 503 until the handoff lands.
+
+So publish in this order, always:
+
+1. **Site data** — `<inputs>/site/data`. Independent of the pair below, but
+   `league/members.json` is what makes the league connected at all.
+2. **The handoff** — `<inputs>/handoffs/<season>-gw<NN>.json`. Before the capture it belongs
+   to, so it is already there the moment the capture becomes visible.
+3. **The capture** — `<inputs>/snapshots/<snapshot_id>/`: the payloads first, then
+   `metadata.json` last, written to a temporary name in the same directory and renamed into
+   place. Only `metadata.json` makes the directory count as a capture, and a same-directory
+   rename is the only atomicity a shared filesystem offers. A capture whose payloads are
+   present but truncated fails its checksums and takes the backend unready just as surely as a
+   missing handoff, so verify the copy before the rename.
+
+No redeploy is involved: publishing a new pair moves the backend to the new week, and the
+context is re-resolved on every request rather than cached for the life of the process.
+
+**Recovering from a half-published week** is the reverse of step 3: delete the new capture's
+`metadata.json`. The backend falls back to the previous capture — which still has its handoff —
+on the next request, with no restart. Nothing wrong is served in the meantime, because the
+capture id is part of every cache key: answers computed under the older capture are addressed
+under the older capture, and the rolled-back week's entries stay addressable if it is
+republished.
+
+This transport is deliberately not scripted yet. How the bytes cross from a Windows ops
+machine to an Azure Files NFS share — `azcopy`, an SMB sibling share, a jumpbox inside the
+VNet — is exactly what could not be confirmed from here, and a helper encoding a guess would
+be worse than four commands whose order is written down. Script it once the transport is
+decided.
+
 ## Rollback
 
 ADR 0006's own: unset `VITE_ADVICE_API_ORIGIN` in the site build, or let the backend die. The
@@ -280,9 +379,23 @@ site is the static site again, exactly as before. The backend container can be d
 it owns no data the ledger needs: the cache recomputes, and pending jobs are recomputable
 requests by construction.
 
-Rolling back the *image* is the ordinary redeploy of the previous tag. Answers computed by the
-older code stay addressable because `repository_commit` is part of the cache key: the rollback
-does not read the newer code's entries and does not overwrite them.
+Rolling back the *image* is a re-apply of the previous digest: put it back in
+`deploy/containerapp.yaml` and apply the same file.
+
+```bash
+az containerapp update --resource-group <RESOURCE_GROUP> --name squadopt-backend \
+  --yaml deploy/containerapp.yaml
+```
+
+One file, so both containers move together — two containers on different commits would answer
+at two different cache keys. (`az containerapp update --image` is shorter, but which of the two
+containers it means is UNVERIFIED here; the file is unambiguous.) Answers computed by the older
+code stay addressable because `repository_commit` is part of the cache key: the rollback does
+not read the newer code's entries and does not overwrite them.
+
+Image and data roll back independently, and that is why they are kept separate: a bad image is
+the command above, a bad data release is the `metadata.json` deletion under
+[publishing](#publishing-what-ops-owns). Neither needs the other.
 
 ## When a member sees no answer
 
