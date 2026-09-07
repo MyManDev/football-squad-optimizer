@@ -195,7 +195,7 @@ def test_advice_keeps_control_bytes_and_compute_counts_while_recording_a_better_
 
     assert json.dumps(observed, sort_keys=True) == json.dumps(baseline, sort_keys=True)
     assert observed["mode"] == "saf-puan" and observed["window"] == 1
-    assert observed["moves"][0]["expected_points_cost"] == hit
+    assert observed["transfer_hit_points"] == hit
     assert provider.picks.call_count == solve.call_count == 3
     loader.assert_called_once_with()
     record = records[0]

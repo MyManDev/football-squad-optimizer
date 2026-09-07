@@ -7,6 +7,7 @@ from typing import Any, get_type_hints
 
 import pytest
 import tests.unit.test_league_views as league_views_tests
+import tests.unit.test_live_transfers as world_module
 from tests.unit.test_league_views import (
     _legal_squad,
     _member_picks,
@@ -420,8 +421,12 @@ def test_a_member_is_shown_the_games_charge_never_the_planning_margin(
     margin on a projection that overstates transfer gains — and at the game's 4 in every
     number that leaves it. This member's plan pays one hit, so the two would differ if
     the margin leaked: through the plan, the decision the ledger records, the advice
-    payload's ``expected_points_cost``, and ``net_expected_points``, which decides
+    payload's ``transfer_hit_points``, and ``net_expected_points``, which decides
     between two solved plans and must therefore compare at what is actually docked.
+
+    The charge is stated once, on the week. This member's plan makes two transfers and
+    pays for one of them, so a per-move copy of the week's charge would show a reader
+    two rows of 4 for a week the game docks 4 once.
     """
 
     from squadopt.application.advice import net_expected_points, solve_member_control
@@ -455,8 +460,9 @@ def test_a_member_is_shown_the_games_charge_never_the_planning_margin(
         rules=rules,
     )
     moves = payload["moves"]
-    assert isinstance(moves, list) and moves
-    assert {move["expected_points_cost"] for move in moves} == {charge}
+    assert isinstance(moves, list) and len(moves) == 2
+    assert payload["transfer_hit_points"] == charge
+    assert not any("expected_points_cost" in move for move in moves)
 
 
 def _club_legal_squad(world: dict[str, Any]) -> list[int]:
@@ -513,7 +519,7 @@ def test_a_rival_strategy_spends_the_free_transfers_before_it_spends_hits(
     applied = payload["overlap_applied"]
     assert isinstance(applied, int) and 1 <= applied <= 9
     assert payload["plan_kind"] in {"within_free_transfers", "with_hits"}
-    hits = sum(float(str(move["expected_points_cost"])) for move in payload["moves"][:1])
+    hits = float(str(payload["transfer_hit_points"]))
     if payload["plan_kind"] == "within_free_transfers":
         assert len(payload["moves"]) <= 1 and hits == 0.0
         alternative = payload["alternative_plan"]
@@ -669,3 +675,178 @@ def test_picks_without_capture_metadata_keep_their_existing_payload(
 
     assert payload["entry_id"] == 101
     assert payload["source_snapshot_id"] is None
+
+
+# --- what the published rows may say ------------------------------------------------
+
+
+#: A world built so the caution margin and the game's charge disagree about the second
+#: transfer. Everyone is worth 2.0; 1024 is worth 12.0 and 1023 is worth 8.0, so the free
+#: transfer buys 1024 outright and the next transfer's gross gain is 6.0 — above the
+#: game's charge of 4 and below MEMBER_PLANNING_POLICY's caution margin of 8, so the
+#: control declines it. ``ortak-koru``'s floor of nine needs both 1023 and 1024, which is
+#: two transfers on one free transfer: the band buys what the margin refused.
+_MARGIN_SPLIT_MEMBER = [
+    *[1001, 1002],  # GK
+    *[1004, 1006, 1007, 1008, 1009],  # DEF
+    *[1013, 1014, 1015, 1016, 1017],  # MID
+    *[1020, 1021, 1022],  # FWD
+]
+_MARGIN_SPLIT_RIVAL = [
+    *[1023, 1024, 1001, 1002, 1004, 1006, 1007, 1008, 1009, 1003, 1005],  # the public eleven
+    *[1010, 1011, 1012, 1018],  # the bench, outside the band
+]
+
+
+def _margin_split_context(world: dict[str, Any]) -> tuple[Any, Any, Any]:
+    """``_world_context`` with the projection above, rewritten into the same handoff."""
+
+    from squadopt.data.snapshots import read_snapshot
+    from squadopt.live import read_inputs, read_season_rules
+    from squadopt.live.recommendation import project, read_projection_handoff
+
+    points = {code: 2.0 for code in range(1001, 1025)}
+    points[1024] = 12.0
+    points[1023] = 8.0
+    handoff_path = world_module._handoff(world, points=points)
+    snapshot = read_snapshot(world["snapshot_root"], world["gw2_id"])
+    inputs = read_inputs(snapshot, season=league_views_tests.SEASON, gameweek=2)
+    projection = project(inputs, in_season=read_projection_handoff(handoff_path))
+    rules = read_season_rules(snapshot, season=league_views_tests.SEASON)
+    return inputs, projection, rules
+
+
+def _margin_split_payload(world: dict[str, Any]) -> dict[str, object]:
+    inputs, projection, rules = _margin_split_context(world)
+    provider = _Provider(
+        {
+            101: _member_picks(world, 101, _MARGIN_SPLIT_MEMBER),
+            202: _member_picks(world, 202, _MARGIN_SPLIT_RIVAL),
+        }
+    )
+    return advise_entry(
+        _request(strategy="ortak-koru", rival_entry_id=202),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+
+def test_a_strategy_is_never_published_as_giving_up_negative_points(
+    world: dict[str, Any],
+) -> None:
+    """The price tag is a price, never a discount.
+
+    The control and the banded candidates are all solved under the caution margin, and
+    the tag compares them at the game's charge — two different objectives, so the band's
+    forced paid transfer could out-net the control and the tag went negative, telling
+    this member the strategy hands them two expected points. The anchor is now solved at
+    the charge, so the comparison is between maximisers of the same objective, and the
+    alternative carries the same guarantee.
+    """
+
+    payload = _margin_split_payload(world)
+
+    assert payload["plan_kind"] == "with_hits"  # vacuous unless the band buys a hit
+    assert payload["overlap_applied"] == 9
+    cost = payload["expected_points_cost"]
+    assert isinstance(cost, float) and cost >= 0.0
+    alternative = payload["alternative_plan"]
+    assert isinstance(alternative, dict)
+    assert float(str(alternative["expected_points_cost"])) >= 0.0
+
+
+def test_a_multi_transfer_week_states_its_hit_charge_once(world: dict[str, Any]) -> None:
+    """A week's hit charge belongs to the week, not to one move.
+
+    This plan makes two transfers and pays for one of them. Copying the week's charge
+    onto every move row would show a reader two rows of 4 for a week the game docks 4,
+    and nothing measures what share of a week's charge belongs to a single swap — so no
+    move row carries one and the payload states the charge once.
+    """
+
+    payload = _margin_split_payload(world)
+    moves = payload["moves"]
+
+    assert isinstance(moves, list) and len(moves) == 2
+    assert payload["transfer_hit_points"] == 4.0
+    for move in moves:
+        assert "expected_points_cost" not in move
+
+
+def test_every_published_move_names_a_swap_the_game_would_accept(
+    world: dict[str, Any],
+) -> None:
+    """Rows are paired by pitch position, not by the order of two id-sorted lists.
+
+    The planner hands over its transfers sorted by player id, and an FPL element code
+    says nothing about position, so pairing by index publishes rows the game's own
+    transfer screen would refuse. The synthetic world numbers its players in position
+    blocks and so cannot cross them; these are real codes and positions from the
+    published pool (``web/public/data/2026-27/gw01/pool.json``), whose id order does
+    cross. The row set and the summed delta are unchanged by the pairing.
+    """
+
+    import pandas as pd
+
+    pool = {
+        int(str(row["player_id"])): row
+        for _, row in pd.DataFrame(
+            {
+                "player_id": [141746, 200834, 201895, 607464],
+                "name": ["A", "B", "C", "D"],
+                "team_id": ["T", "T", "T", "T"],
+                "position": ["MID", "DEF", "DEF", "MID"],
+                "expected_points": [6.0, 3.0, 5.0, 9.0],
+            }
+        ).iterrows()
+    }
+    moves = advice_service._moves(
+        [141746, 200834],
+        [201895, 607464],
+        by_id=pool,
+        pool_by_id=pool,
+        gameweek=2,
+        reason_code="mode_tradeoff",
+    )
+
+    assert len(moves) == 2
+    for move in moves:
+        assert move["player_out"]["position"] == move["player_in"]["position"]
+    assert sum(float(str(move["expected_points_delta"])) for move in moves) == pytest.approx(5.0)
+    # The real payload agrees: nothing else re-orders the rows.
+    inputs, projection, rules = _world_context(world)
+    payload = advise_entry(
+        _request(),
+        provider=_Provider({101: _member_picks(world, 101, _legal_squad(world))}),
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+    for move in payload["moves"]:
+        assert move["player_out"]["position"] == move["player_in"]["position"]
+
+
+def test_the_one_week_plan_is_not_captioned_as_a_longer_window(world: dict[str, Any]) -> None:
+    """``window_value`` is a claim about a longer window; this payload has none.
+
+    The caption was keyed on the mode, so the default one-week saf-puan advice — the page
+    every member lands on — labelled each move with a sentence about a longer window
+    recovering the transfer cost. The one-week plan has its own reason now, and only the
+    multi-week window keeps ``window_value`` (``test_member_windows``).
+    """
+
+    inputs, projection, rules = _world_context(world)
+    payload = advise_entry(
+        _request(),
+        provider=_Provider({101: _member_picks(world, 101, _legal_squad(world))}),
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+    assert payload["window"] == 1 and payload["mode"] == "saf-puan"
+    moves = payload["moves"]
+    assert isinstance(moves, list) and moves
+    assert {move["reason_code"] for move in moves} == {"points_gain"}

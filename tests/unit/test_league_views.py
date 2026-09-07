@@ -597,15 +597,18 @@ def test_the_baseline_advice_is_byte_identical_with_and_without_paths(
 # thing here that would notice. The planner itself has the GW1 opening pin
 # (test_live_recommendation.py); this is the same gate for the in-season member path,
 # which that pin never exercised: a held squad, sell prices, and a transfer decision.
-IN_SEASON_MEMBER_ADVICE_SHA256 = "77d790cdc04c6ae924eb34c891af6f0312ff5117ba2b53c9b703805f4a985863"
-# (player_out, player_in, expected_points_delta, expected_points_cost) per move. The
-# cost is the game's 4 for the one paid transfer, although this plan was solved under
+IN_SEASON_MEMBER_ADVICE_SHA256 = "cf3846bd66baba6938898a47b9d67b6a42ead8512f4653f4b0193d41a1441477"
+# (player_out, player_in, expected_points_delta) per move, each pair one position. The
+# week's hit charge is not here because it is not a property of a move: this plan makes
+# two transfers and pays for one, and the payload states that once as
+# ``transfer_hit_points``. It is the game's 4, although the plan was solved under
 # MEMBER_PLANNING_POLICY's caution margin of 8: the margin decides what to do, the
 # charge is what the member is told, and only the second reaches these bytes.
 IN_SEASON_MEMBER_MOVES = (
-    (1005, 1009, 2.5, 4.0),
-    (1020, 1024, 7.0, 4.0),
+    (1005, 1009, 2.5),
+    (1020, 1024, 7.0),
 )
+IN_SEASON_MEMBER_TRANSFER_HIT_POINTS = 4.0
 
 
 def test_the_recorded_in_season_member_plan_holds(world: dict[str, Any], tmp_path: Path) -> None:
@@ -647,12 +650,16 @@ def test_the_recorded_in_season_member_plan_holds(world: dict[str, Any], tmp_pat
                 move["player_out"]["player_id"],
                 move["player_in"]["player_id"],
                 move["expected_points_delta"],
-                move["expected_points_cost"],
             )
             for move in payload["moves"]
         )
         == IN_SEASON_MEMBER_MOVES
     )
+    # Every published row is a swap the game would accept, and the week's charge is
+    # stated once rather than repeated onto each of the two rows.
+    for move in payload["moves"]:
+        assert move["player_out"]["position"] == move["player_in"]["position"]
+    assert payload["transfer_hit_points"] == IN_SEASON_MEMBER_TRANSFER_HIT_POINTS
     assert payload["mode"] == "saf-puan"
     assert payload["window"] == 1
     assert payload["expected_points_cost"] == 0.0

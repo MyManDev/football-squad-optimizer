@@ -51,6 +51,10 @@ class StrategyConfigurationError(ValueError):
 PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
     {
         "moves",
+        # The week's hit charge, once. It belongs to the week — the game takes four
+        # points for each transfer beyond the free ones — not to any one move, so it is
+        # published beside ``moves`` and no move row carries it.
+        "transfer_hit_points",
         "expected_own_points",
         "expected_gap_vs_rival",
         "expected_points_cost",
@@ -86,8 +90,11 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
 _SAFETY_LANGUAGE: Final = re.compile(r"g[üu]venli|riskli?|safe|daha az riskli", re.IGNORECASE)
 
 #: Field names that could smuggle a probability into the envelope; a meta-test keeps
-#: PUBLISHABLE_FIELDS clean against this, so the envelope cannot quietly widen.
-FORBIDDEN_FIELD_PATTERN: Final = re.compile(r"probab|olas.l.k|quantile|spread|p_")
+#: PUBLISHABLE_FIELDS clean against this, so the envelope cannot quietly widen. The
+#: last alternative is the ``p_`` naming convention for a probability, and it needs
+#: the word boundary: bare ``p_`` would also match ``overlap_count`` and the rest of
+#: the overlap fields, which are set arithmetic and publishable.
+FORBIDDEN_FIELD_PATTERN: Final = re.compile(r"probab|olas.l.k|quantile|spread|\bp_")
 
 
 class RankingCriterion(StrEnum):
@@ -255,6 +262,7 @@ def _continuous_knob(name: str, lower: float, upper: float, step: float) -> Baye
 _BASELINE_PUBLISHES: Final = frozenset(
     {
         "moves",
+        "transfer_hit_points",
         "expected_own_points",
         "expected_points_cost",
         "solver_status",

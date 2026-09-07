@@ -359,20 +359,16 @@ function moveFor(mode: AdviceStrategy, window: WindowSize): AdviceMove[] {
       : mode === "asiri-agresif" || mode === "fark-yarat"
         ? advicePlayers.extreme
         : advicePlayers.aggressive;
-  const cost =
-    mode === "garantici" || mode === "ortak-koru"
-      ? 1.6
-      : mode === "asiri-agresif" || mode === "fark-yarat"
-        ? 1.5
-        : 1.8;
   return [
     {
       move_id: `${mode}-${window}-reed`,
       player_out: advicePlayers.out,
       player_in: incoming,
       expected_points_delta: Number((0.7 + window * 0.4).toFixed(1)),
-      expected_points_cost: cost,
-      reason_code: mode === "saf-puan" ? "window_value" : "mode_tradeoff",
+      // Only a multi-week window may claim a longer window; a one-week pure-points plan
+      // says what it is, and a competitive mode names its trade-off.
+      reason_code:
+        mode === "saf-puan" ? (window === 1 ? "points_gain" : "window_value") : "mode_tradeoff",
     },
   ];
 }
@@ -381,6 +377,11 @@ function moveFor(mode: AdviceStrategy, window: WindowSize): AdviceMove[] {
  * The producer's limit sentences for a three- or five-week window, as its payload
  * carries them (`WINDOW_STATED_LIMITS` in the application layer). The site's Turkish
  * copy is keyed by these exact strings, and a test pins that every one is known there.
+ *
+ * The Top-100 sentence is the one the producer publishes conditionally — only when the
+ * projection actually carries the uplift — so a real payload may arrive with the other
+ * five and no gap where it was. The example keeps all six, and the page renders whatever
+ * list it is sent.
  */
 export const WINDOW_STATED_LIMITS: readonly string[] = [
   "The first week's projection is repeated over the later weeks, scaled by each club's fixture count from the captured calendar; the later weeks are not projected separately.",
@@ -612,6 +613,9 @@ export function mockEntryAdviceEnvelope(
     window,
     source_snapshot_id: "example-post-deadline-gw02",
     moves: quality === "complete" ? moveFor(mode, window) : [],
+    // The week's hit charge, once, as the producer publishes it: this example week is
+    // played inside the free transfers, so the game charges nothing for it.
+    transfer_hit_points: 0,
     // The producer prices the whole plan against the pure-points pick, in expected
     // points only; the example mirrors that shape so the page renders it in dev/test.
     expected_points_cost: mode === "saf-puan" ? 0 : 0.8,

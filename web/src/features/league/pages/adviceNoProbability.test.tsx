@@ -196,3 +196,67 @@ describe("the weekly scoreboard shows no probability, in either language", () =>
     }
   }
 });
+
+/**
+ * The same rule applied to the two numbers a move card used to overstate: the week's
+ * hit charge, which the game takes once for the week and the card printed once per move,
+ * and the caption, which claimed a longer window under a one-week plan.
+ */
+const MOVE: EntryAdvice["moves"][number] = {
+  move_id: "gw02-1",
+  player_out: {
+    player_id: 901,
+    name: "Static Winger",
+    short_name: "Winger",
+    position: "MID",
+    team: "HAR",
+  },
+  player_in: {
+    player_id: 902,
+    name: "Computed Midfielder",
+    short_name: "Midfielder",
+    position: "MID",
+    team: "HAR",
+  },
+  expected_points_delta: 2.5,
+  reason_code: "points_gain",
+};
+
+describe("a move card claims only what the payload carries", () => {
+  it("states the week's hit charge once, not once per move", () => {
+    const advice = withAdvice({
+      moves: [MOVE, { ...MOVE, move_id: "gw02-2" }],
+      transfer_hit_points: 4,
+    });
+    for (const [language, needle] of [
+      ["en", /expected-point cost/g],
+      ["tr", /beklenen puan maliyeti/g],
+    ] as const) {
+      const text = renderState(language, advice);
+      expect(text.match(needle)).toHaveLength(1);
+    }
+  });
+
+  it("says nothing about a hit on a document published without the week's charge", () => {
+    const legacy = withAdvice({ moves: [MOVE] });
+    delete (legacy.payload as { transfer_hit_points?: number }).transfer_hit_points;
+    expect(renderState("en", legacy)).not.toMatch(/expected-point cost/);
+  });
+
+  it("does not caption a one-week plan with a longer window", () => {
+    const advice = withAdvice({ moves: [MOVE], transfer_hit_points: 0 });
+    expect(advice.payload.window).toBe(1);
+    const english = renderState("en", advice);
+    expect(english).not.toMatch(/longer window/);
+    expect(english).toMatch(/Part of the one-week pure-points plan/);
+    const turkish = renderState("tr", advice);
+    expect(turkish).not.toMatch(/Uzun pencere/);
+    expect(turkish).toMatch(/Bir haftalık saf puan planının parçası/);
+  });
+
+  it("keeps the longer-window caption for a window that solved one", () => {
+    const window = mockEntryAdviceEnvelope(35249001, "saf-puan", 3);
+    expect(window.payload.moves[0]?.reason_code).toBe("window_value");
+    expect(renderState("en", window)).toMatch(/longer window/);
+  });
+});

@@ -28,10 +28,10 @@
           "team": "Leeds"
         },
         "expected_points_delta": 3.1326314266268573,
-        "expected_points_cost": 0.0,
-        "reason_code": "window_value"
+        "reason_code": "points_gain"
       }
     ],
+    "transfer_hit_points": 0.0,
     "data_quality": "partial",
     "missing_fields": [
       "free_transfers",

@@ -528,8 +528,10 @@ const en = {
     out: "Out",
     in: "In",
     projectedGain: (points: string) => `${points} projected gain`,
-    expectedPointCost: (points: string) => `~${points} expected-point cost`,
+    weekTransferCost: (points: string) =>
+      `~${points} expected-point cost for this week's transfers in total: the game charges the week, not each move.`,
     windowValueReason: "The longer window recovers the transfer cost in the example projection.",
+    pointsGainReason: "Part of the one-week pure-points plan, chosen for expected points alone.",
     modeTradeoffReason:
       "The mode changes the point trade-off, never a claimed chance of beating a rival.",
     planCost: (points: string) =>
@@ -1201,8 +1203,11 @@ const tr: MessageSchema<typeof en> = {
     out: "Çıkan",
     in: "Giren",
     projectedGain: (pointsValue) => `${pointsValue} tahmini kazanç`,
-    expectedPointCost: (pointsValue) => `~${pointsValue} beklenen puan maliyeti`,
+    weekTransferCost: (pointsValue) =>
+      `Bu haftanın transferlerinin toplam beklenen puan maliyeti ~${pointsValue}: oyun haftayı ücretlendirir, her hamleyi ayrı ayrı değil.`,
     windowValueReason: "Uzun pencere, örnek projeksiyonda transfer maliyetini geri kazanıyor.",
+    pointsGainReason:
+      "Bir haftalık saf puan planının parçası; yalnızca beklenen puana göre seçildi.",
     modeTradeoffReason:
       "Mod, rakibi geçme olasılığı iddia etmek yerine puan ödünleşimini değiştirir.",
     planCost: (pointsValue) =>

@@ -180,24 +180,83 @@ _NO_LINEUP: dict[str, object] = {
 }
 
 
+def _paired_by_position(
+    outs: Sequence[int],
+    ins: Sequence[int],
+    *,
+    by_id: "dict[int, pd.Series[Any]]",
+    pool_by_id: "dict[int, pd.Series[Any]]",
+) -> list[tuple[int | None, int | None]]:
+    """Match each outgoing player with an incoming player of the same pitch position.
+
+    Both lists arrive sorted by player id — the planner sorts its table with
+    ``sort_players_by_id`` and the decision keeps that order — and an FPL element code
+    says nothing about the player's position, so pairing the two lists by index
+    publishes rows naming swaps the game's own transfer screen would refuse. The squad
+    quotas hold each position's count fixed across a week, so a position-matched pairing
+    always exists for a solved plan.
+
+    A player the projection cannot resolve has no position to match on, and a position
+    whose two counts disagree has no such pairing at all; whatever is left over after
+    the matched pairs is paired in id order at the end rather than dropped, so the row
+    set and the summed delta never change. Those leftovers are the only rows that can
+    name two positions.
+    """
+
+    def position_of(player: int, table: "dict[int, pd.Series[Any]]") -> str | None:
+        row = table.get(player)
+        return None if row is None else str(row["position"])
+
+    waiting: dict[str, list[int]] = {}
+    spare_ins: list[int] = []
+    for player_in in ins:
+        position = position_of(player_in, by_id)
+        if position is None:
+            spare_ins.append(player_in)
+        else:
+            waiting.setdefault(position, []).append(player_in)
+    pairs: list[tuple[int | None, int | None]] = []
+    spare_outs: list[int] = []
+    for player_out in outs:
+        position = position_of(player_out, pool_by_id)
+        queue = waiting.get(position) if position is not None else None
+        if queue:
+            pairs.append((player_out, queue.pop(0)))
+        else:
+            spare_outs.append(player_out)
+    leftover_ins = sorted([*(player for queue in waiting.values() for player in queue), *spare_ins])
+    for index in range(max(len(spare_outs), len(leftover_ins))):
+        pairs.append(
+            (
+                spare_outs[index] if index < len(spare_outs) else None,
+                leftover_ins[index] if index < len(leftover_ins) else None,
+            )
+        )
+    return pairs
+
+
 def _moves(
     outs: Sequence[int],
     ins: Sequence[int],
     *,
-    hit_points: object,
     by_id: "dict[int, pd.Series[Any]]",
     pool_by_id: "dict[int, pd.Series[Any]]",
     gameweek: int,
     reason_code: str,
 ) -> list[dict[str, object]]:
-    """The published moves: out/in pairs by position, each with its expected-points delta
-    and the week's hit points. ``by_id`` resolves the incoming players (the plan's own
-    squad rows), ``pool_by_id`` the outgoing ones (the shared projection)."""
+    """The published moves: out/in pairs by pitch position, each with its expected-points
+    delta. ``by_id`` resolves the incoming players (the plan's own squad rows),
+    ``pool_by_id`` the outgoing ones (the shared projection).
+
+    A move carries no cost of its own. The week's hit charge is a property of the week —
+    the game takes four points once for each transfer beyond the free ones, and nothing
+    here measures what share of that belongs to one swap — so it is published once,
+    beside ``moves``, as the payload's ``transfer_hit_points``.
+    """
 
     moves: list[dict[str, object]] = []
-    for index in range(max(len(outs), len(ins))):
-        player_out = outs[index] if index < len(outs) else None
-        player_in = ins[index] if index < len(ins) else None
+    pairs = _paired_by_position(outs, ins, by_id=by_id, pool_by_id=pool_by_id)
+    for index, (player_out, player_in) in enumerate(pairs):
         delta = 0.0
         if player_in is not None and player_in in by_id:
             delta += float(str(by_id[player_in]["expected_points"]))
@@ -217,7 +276,6 @@ def _moves(
                     else None
                 ),
                 "expected_points_delta": delta,
-                "expected_points_cost": float(str(hit_points)),
                 "reason_code": reason_code,
             }
         )
@@ -407,18 +465,23 @@ def build_advice_payload(
         transfers = decision
         by_id = pool_by_id
     lineup = lineup_fields(week) if week is not None else dict(_NO_LINEUP)
-    reason_code = "window_value" if mode == COMPUTED_MODE else "mode_tradeoff"
+    # The caption the page prints under a move names why the move is in the plan. A
+    # sentence about a longer window belongs only to a payload that solved one
+    # (``build_window_payload``); this function solves a single week, so the pure-points
+    # baseline gets its own reason and a competitive mode keeps its trade-off.
+    reason_code = "points_gain" if mode == COMPUTED_MODE else "mode_tradeoff"
     moves: list[dict[str, object]] = []
+    transfer_hit_points = 0.0
     if transfers is not None:
         record = transfers.as_record()
         outs_raw = record.get("transfers_out", [])
         ins_raw = record.get("transfers_in", [])
         outs = [int(str(v)) for v in outs_raw] if isinstance(outs_raw, list | tuple) else []
         ins = [int(str(v)) for v in ins_raw] if isinstance(ins_raw, list | tuple) else []
+        transfer_hit_points = float(str(record.get("transfer_hit_points", 0.0)))
         moves = _moves(
             outs,
             ins,
-            hit_points=record.get("transfer_hit_points", 0.0),
             by_id=by_id,
             pool_by_id=pool_by_id,
             gameweek=picks.gameweek + 1,
@@ -434,6 +497,10 @@ def build_advice_payload(
         "window": COMPUTED_WINDOW,
         "source_snapshot_id": picks.source_snapshot_id,
         "moves": moves,
+        # The week's hit charge, stated once because that is what it is: the game takes
+        # four points for each transfer beyond the free ones, on the week rather than on
+        # any one move, so no move row carries it.
+        "transfer_hit_points": transfer_hit_points,
         # The mode's whole-plan price against the pure-points pick, in expected points —
         # the only cross-mode number the site may show (no probability ships, ever).
         "expected_points_cost": float(expected_points_cost),
@@ -451,6 +518,15 @@ def build_advice_payload(
     }
 
 
+#: The one sentence in ``WINDOW_STATED_LIMITS`` that is not true of every projection.
+#: The Top-100 uplift is optional — ``build_projection_handoff`` applies it only when it
+#: is given the elite evidence table, and both un-uplifted model versions are promoted —
+#: so ``window_stated_limits`` reads the projection instead of asserting it.
+WINDOW_TOP100_LIMIT: str = (
+    "The Top-100 uplift is inside the first week's numbers, and the repetition "
+    "carries it into every later week."
+)
+
 #: What a three- or five-week window assumes, stated in the payload beside the plan so
 #: the reader gets the limits with the answer. Every sentence names a mechanism the code
 #: applies; none of them is softened.
@@ -462,13 +538,32 @@ WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "suspensions after it are not seen.",
     "Every week inside the window, the first included, is capped at one transfer "
     "(a wildcard week excepted); the one-week plan has no such cap.",
-    "The Top-100 uplift is inside the first week's numbers, and the repetition "
-    "carries it into every later week.",
+    WINDOW_TOP100_LIMIT,
     "Prices are held at the captured values; no price change is modelled.",
     "No chip is offered inside the window. A finite window counts nothing for "
     "holding a chip back, so a planner that could reach one would spend it; chip "
     "timing is a season-long decision this window cannot price.",
 )
+
+
+def window_stated_limits(projection: Projection) -> list[str]:
+    """``WINDOW_STATED_LIMITS`` minus any sentence this projection does not support.
+
+    The uplift sentence states a mechanism as applied, so it may only be published when
+    it *was* applied. The handoff records that itself: an elite projection carries the
+    evidence fingerprint it was built from, and the un-uplifted versions are forbidden
+    from carrying one (``InSeasonProjection``), so a non-null
+    ``projection_evidence_fingerprint`` is the fact rather than an assumption about how
+    the operator ran the week. Absent, the sentence is dropped rather than softened:
+    what the numbers rest on is stated only where it is true.
+    """
+
+    carries_uplift = projection.diagnostics.get("projection_evidence_fingerprint") is not None
+    return [
+        sentence
+        for sentence in WINDOW_STATED_LIMITS
+        if carries_uplift or sentence != WINDOW_TOP100_LIMIT
+    ]
 
 
 def build_window_payload(
@@ -542,12 +637,14 @@ def build_window_payload(
         "moves": _moves(
             [int(str(v)) for v in first.transfers_out["player_id"].tolist()],
             [int(str(v)) for v in first.transfers_in["player_id"].tolist()],
-            hit_points=float(first.transfer_hit_points),
             by_id=by_id,
             pool_by_id=pool_by_id,
             gameweek=picks.gameweek + 1,
             reason_code="window_value",
         ),
+        # The first week's hit charge, once, as the one-week payload carries it; the
+        # rest of the window's charges are on their own rows in ``plan_weeks``.
+        "transfer_hit_points": float(first.transfer_hit_points),
         "expected_points_cost": 0.0,
         "rival_label": None,
         # The solver's own account of the whole window: OPTIMAL is a proof, FEASIBLE is
@@ -570,7 +667,7 @@ def build_window_payload(
             }
             for week in plan.weeks
         ],
-        "stated_limits": list(WINDOW_STATED_LIMITS),
+        "stated_limits": window_stated_limits(projection),
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
     }
@@ -781,13 +878,15 @@ def _advise_against_rival(
     band actually applied. The eleven, the captain and the bench are then chosen
     from the resulting fifteen.
 
-    The price tag is the control's expected points minus the banded plan's, both net
-    of the hits each plan pays and both from this member's own solves. A control the
+    The price tag is the pricing control's expected points minus the banded plan's, both
+    net of the hits each plan pays and both from this member's own solves. A control the
     solver found but could not prove is used as it is and published beside the tag as
     ``control_solver_status`` with its measured gap; only a control with no solution
-    refuses. Everything added to the payload here is in the strategy's declared
-    ``publishes`` set — the mean gap, the overlap count, captain agreement; no spread,
-    no probability, ever.
+    refuses. Beyond ``rival_entry_id`` — the identity field naming whose squad the tag
+    was priced against, which the request itself carries and the reader's client checks
+    the answer against — everything added to the payload here is in the strategy's
+    declared ``publishes`` set: the mean gap, the overlap count, captain agreement; no
+    spread, no probability, ever.
     """
 
     picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
@@ -822,9 +921,10 @@ def _advise_against_rival(
     assert target is not None
     # Two candidates, one decision rule. Within the free transfers: the strictest band
     # level they reach, no hits. With hits: the declared target, every extra transfer
-    # charged four points in the objective. The one with the higher net expected points
-    # is the advice — a hit is spent only where it pays for itself — and the other is
-    # published beside it as the alternative, so the member sees what it would have cost.
+    # charged MEMBER_PLANNING_POLICY's caution margin in the objective. The one with the
+    # higher net expected points is the advice — a hit is spent only where it pays for
+    # itself — and the other is published beside it as the alternative, so the member
+    # sees what it would have cost.
     within_free = _solve_within_free_transfers(
         inputs,
         projection,
@@ -858,10 +958,35 @@ def _advise_against_rival(
         chosen, other, chosen_kind = with_hits, within_free, "with_hits"
     plan, decision, applied = chosen
     raw_gap = plan.diagnostics.get("absolute_optimality_gap")
-    raw_control_gap = control_plan.diagnostics.get("absolute_optimality_gap")
+    # The price tag anchors on a control solved at the game's own charge, not on the
+    # published saf-puan control. Both that control and the banded candidates are solved
+    # under MEMBER_PLANNING_POLICY's caution margin, which is what decides whether a
+    # transfer is worth making at all; but the tag compares two solved plans at what the
+    # game actually docks, and the maximiser of ``score - margin * paid`` is not the
+    # maximiser of ``score - charge * paid``. A band that forces a paid transfer the
+    # margin made the control decline could therefore out-net the control, and the tag
+    # went negative — telling a member a strategy hands them points. Solving the anchor
+    # at the charge makes the comparison like-for-like: the caution margin still governs
+    # what is recommended (every plan published here is solved under it), only the
+    # comparison is between maximisers of the same objective.
+    pricing_plan, _pricing_decision, _pricing_config = plan_transfers(
+        inputs,
+        projection,
+        held,
+        rules,
+        transfer_hit_cost_points=solved.transfer_config.hit_points_charged,
+    )
+    raw_control_gap = pricing_plan.diagnostics.get("absolute_optimality_gap")
     # Net of hits on both sides: a band that forces paid transfers costs those hits.
-    control_net = net_expected_points(control_plan)
     strategy_net = net_expected_points(plan)
+    # The solver's bench weight and its own bound gap sit outside that arithmetic, so
+    # the anchor is floored at the best plan solved here: a banded candidate is itself a
+    # plan with no strategy constraint required, so a member could always play it. The
+    # tag is then a price and can never be published as a discount.
+    solved_nets = [net_expected_points(pricing_plan), strategy_net]
+    if other is not None:
+        solved_nets.append(net_expected_points(other[0]))
+    control_net = max(solved_nets)
     payload = build_advice_payload(
         picks,
         inputs,
@@ -917,9 +1042,9 @@ def _advise_against_rival(
     # computed.
     payload["expected_gap_vs_rival"] = (my_expected - my_hits) - rival_expected
     payload["captain_agreement"] = my_captain == rival_captain
-    # The control's own account beside the price it anchors: a FEASIBLE control makes
-    # the tag a reading with a stated bound, not a proof.
-    payload["control_solver_status"] = control_plan.solver_status.name
+    # The pricing control's own account beside the price it anchors: a FEASIBLE control
+    # makes the tag a reading with a stated bound, not a proof.
+    payload["control_solver_status"] = pricing_plan.solver_status.name
     payload["control_optimality_gap"] = (
         float(str(raw_control_gap)) if raw_control_gap is not None else None
     )
@@ -931,6 +1056,7 @@ __all__: tuple[str, ...] = (
     "COMPUTED_WINDOW",
     "MEMBER_WINDOWS",
     "WINDOW_STATED_LIMITS",
+    "WINDOW_TOP100_LIMIT",
     "AdviseEntryRequest",
     "HorizonBuilder",
     "MemberControl",
@@ -941,4 +1067,5 @@ __all__: tuple[str, ...] = (
     "member_horizon_builder",
     "net_expected_points",
     "solve_member_control",
+    "window_stated_limits",
 )

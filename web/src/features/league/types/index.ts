@@ -104,13 +104,17 @@ export interface AdvicePlayer {
 /** The chips the producer's planner models; the payload names the one it plays, if any. */
 export type AdviceChip = "bboost" | "3xc" | "wildcard" | "freehit";
 
+/**
+ * One out/in swap, matched by pitch position so the row is a transfer the game accepts.
+ * A move carries no cost of its own: the week's hit charge belongs to the week, not to
+ * one swap, and travels on the payload as `transfer_hit_points`.
+ */
 export interface AdviceMove {
   move_id: string;
   player_out: AdvicePlayer | null;
   player_in: AdvicePlayer | null;
   expected_points_delta: number;
-  expected_points_cost: number;
-  reason_code: "window_value" | "mode_tradeoff";
+  reason_code: "window_value" | "mode_tradeoff" | "points_gain";
 }
 
 /** What the producer computed for one member, and what it could not, with the reason. */
@@ -188,6 +192,12 @@ export interface EntryAdvice {
   window: WindowSize;
   source_snapshot_id: string | null;
   moves: AdviceMove[];
+  /**
+   * The week's hit charge, once: the game takes four points for each transfer beyond
+   * the free ones, and it charges the week rather than any one move. Absent on documents
+   * published before the producer stated it here (they carried it on every move row).
+   */
+  transfer_hit_points?: number;
   /**
    * The whole plan's expected-points price against the pure-points pick — the only
    * cross-mode number the producer publishes (never a probability). Absent on documents
