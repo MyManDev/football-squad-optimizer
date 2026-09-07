@@ -13,10 +13,15 @@ projection against gameweek `t`, `t+1`, `t+2` and so on.
 
 Two decisions shape what the numbers mean.
 
-**The shipped scaling is applied at every offset, including zero.** The horizon scales
-expected points by each gameweek's fixture count, so measuring anything else would measure
-a projection nobody ships. At offset zero on a single-fixture row the scaling is the
-identity, which is what ties this population back to the ordinary residual history.
+**Linear fixture-count scaling is applied at every offset, including zero.** At offset
+zero on a single-fixture row the scaling is the identity, which is what ties this
+population back to the ordinary residual history. That treatment is named
+`linear_fixture_count_scaling_v1` and is *not* the rule the live horizon builder ships
+today: the builder preserves the decision week untouched and scales a later week relative
+to the decision week's own fixture count. The two agree wherever the decision gameweek is
+a single fixture, and part on the rows where it is not, so the numbers below describe this
+rule rather than the shipped one on those rows. Re-measuring under the shipped rule is a
+separate run, not a re-reading of this record.
 
 **A player missing at `t+k` is dropped and counted, never scored as an error.** A
 transferred or delisted player is an absence from the data, not a bad projection, and
@@ -45,9 +50,13 @@ from squadopt.features import CrossSeasonConfig
 
 HORIZON_DECAY_CONTRACT_VERSION: Final = "horizon_decay_v1"
 
-# Matches the rule the horizon builder applies, named so a reader can tell the two are
-# the same treatment rather than two implementations that happen to agree today.
-FIXTURE_SCALING_RULE_VERSION: Final = "linear_fixture_count_scaling_v1"
+# The rule *this measurement* applies, named separately from the live builder's so the
+# two cannot be read as one identity. They are not: the builder preserves the decision
+# week and scales later weeks relative to it
+# (`live.horizon.FIXTURE_SCALING_RULE_VERSION`), while this measurement scales every
+# offset by that gameweek's raw fixture count. The committed record was measured under
+# the rule named here, so the value stays as it was recorded.
+MEASURED_FIXTURE_SCALING_RULE_VERSION: Final = "linear_fixture_count_scaling_v1"
 
 FIXTURE_GROUPS: Final = ("blank", "single", "double_plus")
 

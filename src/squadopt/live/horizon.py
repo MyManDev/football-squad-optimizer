@@ -17,15 +17,20 @@ Two consequences are stated rather than buried.
 **The first gameweek preserves the operational control exactly.** Calendar scaling is
 applied only to later shadow weeks. This keeps H1 bit-for-bit identical even when the
 captured calendar contains a blank or double gameweek; changing the decision week's
-numbers here would create a second, unpromoted live policy. Later weeks still scale
-linearly with fixture count, and that uncalibrated extrapolation remains explicit in the
-horizon's post-processing contract.
+numbers here would create a second, unpromoted live policy. Later weeks scale linearly
+with fixture count *relative to the decision week's own count*, because the control's
+number already has the decision week's calendar inside it — the base is calendar-aware, so
+multiplying by a later week's count alone would count the decision week's fixture load
+twice. That uncalibrated extrapolation remains explicit in the horizon's post-processing
+contract.
 
 **The horizon is not gate evidence.** The frozen evaluation objective is single-gameweek
-realized squad points. Nothing measures how far a multi-gameweek projection drifts, and it
-will drift: expected minutes for gameweek t+3 are computed from what was known at t, so
-injuries, rotation and suspensions in between are unseen. Expect the projection to grow
-overconfident as the horizon lengthens, by an amount nobody has measured yet.
+realized squad points, and this table does not measure a model. It will drift: expected
+minutes for gameweek t+3 are computed from what was known at t, so injuries, rotation and
+suspensions in between are unseen, and the projection grows overconfident as the horizon
+lengthens. `docs/horizon_decay` measures that drift over development folds — under the
+earlier `linear_fixture_count_scaling_v1` treatment, which scaled every offset including
+the decision week, rather than the relative rule shipped here.
 """
 
 import hashlib
@@ -64,10 +69,11 @@ from squadopt.prediction.availability import (
 )
 from squadopt.prediction.config import BaselineProjectionConfig
 
-# The calendar rule applied on top of the calendar-blind control. Named in the horizon's
-# post-processing contract so a consumer can tell that the scaling happened outside the
-# model rather than inside it.
-FIXTURE_SCALING_RULE_VERSION: Final = "first_week_control_future_fixture_scaling_v2"
+# The calendar rule applied on top of the control. Named in the horizon's post-processing
+# contract so a consumer can tell that the scaling happened outside the model rather than
+# inside it. This is the only home for this identity: `backtest.horizon_decay` measures a
+# different, earlier rule and names it separately.
+FIXTURE_SCALING_RULE_VERSION: Final = "first_week_control_relative_fixture_scaling_v3"
 HORIZON_POST_PROCESSING_CONTRACT_VERSION: Final = (
     f"{AVAILABILITY_RULE_CONTRACT_VERSION}+{FIXTURE_SCALING_RULE_VERSION}"
 )
@@ -237,12 +243,14 @@ def build_projection_horizon(
         )
     base["team_code"] = base["team_id"].astype("string").map(bridge).astype("int64")
 
+    decision_counts = _fixture_counts_by_team_code(calendar, gameweeks[0])
     frames = [
         _gameweek_rows(
             base,
             calendar,
             gameweek,
             preserve_expected_points=gameweek == gameweeks[0],
+            decision_fixture_counts=decision_counts,
         )
         for gameweek in gameweeks
     ]
@@ -270,12 +278,25 @@ def _projection_identity(diagnostics: Mapping[str, object], name: str) -> str:
     return value
 
 
+def _fixture_counts_by_team_code(calendar: pd.DataFrame, gameweek: int) -> Mapping[int, int]:
+    """The decision gameweek's fixture load per club, which later weeks are relative to."""
+
+    week = calendar.loc[calendar["gameweek"] == int(gameweek), ["team_id", "fixture_count"]]
+    return {
+        int(team): int(count)
+        for team, count in zip(
+            week["team_id"].tolist(), week["fixture_count"].tolist(), strict=True
+        )
+    }
+
+
 def _gameweek_rows(
     base: pd.DataFrame,
     calendar: pd.DataFrame,
     gameweek: int,
     *,
     preserve_expected_points: bool,
+    decision_fixture_counts: Mapping[int, int],
 ) -> pd.DataFrame:
     """Apply one gameweek's calendar to the shared information state.
 
@@ -305,10 +326,21 @@ def _gameweek_rows(
             f"in the decision gameweek (players: {players[:5]!r}); refusing to create a "
             "different H1 policy inside the horizon builder."
         )
+    # The base already carries the decision week's own calendar: the control forces zero
+    # where a club has no fixture and reads fixture count as a feature. So a later week is
+    # this week's fixture load *relative to* the decision week's, not the raw count —
+    # multiplying by the raw count would charge the decision week's fixtures twice.
+    #
+    # A club blank in the decision week divides by one rather than by zero. Its base
+    # points are exactly zero there (the guard above refuses any other value), so the
+    # ratio never matters: every later week stays at zero, because a zero base carries no
+    # per-fixture value to rescale. Its players keep their rows, nothing is dropped, and
+    # no NaN can reach the table. That understates such a club for the whole window, and
+    # the window's stated limits say so.
+    decision_count = rows["team_code"].map(decision_fixture_counts).fillna(0).astype("int64")
+    scale = fixture_count.astype("float64").div(decision_count.clip(lower=1).astype("float64"))
     rows["expected_points"] = (
-        points.clip(lower=0.0)
-        if preserve_expected_points
-        else points.mul(fixture_count.astype("float64")).clip(lower=0.0)
+        points.clip(lower=0.0) if preserve_expected_points else points.mul(scale).clip(lower=0.0)
     )
     return rows
 

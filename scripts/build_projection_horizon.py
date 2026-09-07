@@ -13,9 +13,10 @@ The table itself stays local: it is derived from a third-party payload and from 
 archive, and the repository is not a data store. What is committed is the summary.
 
 This produces planning input, **not gate evidence.** The frozen evaluation objective is
-single-gameweek realized squad points; nothing measures how far a multi-gameweek
-projection drifts, and it will drift, because expected minutes for a later gameweek are
-computed from what was known at the decision point.
+single-gameweek realized squad points. The projection will drift, because expected minutes
+for a later gameweek are computed from what was known at the decision point;
+`docs/horizon_decay` measures that drift on development folds, under the earlier
+`linear_fixture_count_scaling_v1` treatment rather than the rule the builder now ships.
 """
 
 import argparse
@@ -201,8 +202,10 @@ def main() -> int:
     else:
         lines += [
             "The calendar is uneven across this horizon, so the per-gameweek totals differ. "
-            "Blank rows project exactly zero; double rows scale linearly with fixture count "
-            "under `first_week_control_future_fixture_scaling_v2`.",
+            "Blank rows project exactly zero; a later week scales linearly with its fixture "
+            "count relative to the decision week's, under "
+            "`first_week_control_relative_fixture_scaling_v3`. A club blank in the decision "
+            "week has no per-fixture value to rescale and stays at zero throughout.",
         ]
     lines += [
         "",
@@ -214,8 +217,9 @@ def main() -> int:
         "",
         "It will drift. Expected minutes for a later gameweek are computed from what was "
         "known at the decision point, so injuries, rotation and suspensions in between are "
-        "unseen and the projection grows overconfident as the horizon lengthens — by an "
-        "amount nobody has measured yet.",
+        "unseen and the projection grows overconfident as the horizon lengthens. "
+        "`docs/horizon_decay` measures that drift on development folds, under the earlier "
+        "`linear_fixture_count_scaling_v1` treatment rather than the rule this run applies.",
         "",
         "The table is local and not committed; it derives from a third-party payload and "
         "the pinned archive.",

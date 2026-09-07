@@ -6,6 +6,16 @@
 - Post-processing: `captured_availability_rule_v1+linear_fixture_count_scaling_v1`
 - Horizon fingerprint: `217d8be03d202a6c957e6405b23464e1e4158a0ab28486a1614cdb9c7f7ca27a`
 
+**This is a historical record, left as recorded.** The post-processing identity and the
+fingerprint above are the ones in force when the run was made. The builder has since
+changed its scaling rule twice — to `first_week_control_future_fixture_scaling_v2`, which
+stopped scaling the decision week, and then to
+`first_week_control_relative_fixture_scaling_v3`, which scales a later week relative to
+the decision week's own fixture count. That identity is inside the fingerprint payload, so
+the reproduction command below will not reproduce the fingerprint above even on the same
+capture. The per-gameweek totals are unaffected: this capture's calendar is uniform, and
+every scaling rule the builder has shipped is the identity on it.
+
 | Gameweek | Players | Total xP | Blank rows | Double rows | Fixture fingerprint |
 | ---: | ---: | ---: | ---: | ---: | --- |
 | 1 | 584 | 966.02 | 0 | 0 | `7d9083a85e2b…` |
@@ -23,7 +33,7 @@ The consequence for planning is worth stating plainly: from an opening capture, 
 
 This is planning input, not gate evidence. The frozen evaluation objective is single-gameweek realized squad points, and nothing here measures how far a multi-gameweek projection drifts.
 
-It will drift. Expected minutes for a later gameweek are computed from what was known at the decision point, so injuries, rotation and suspensions in between are unseen and the projection grows overconfident as the horizon lengthens — by an amount nobody has measured yet.
+It will drift. Expected minutes for a later gameweek are computed from what was known at the decision point, so injuries, rotation and suspensions in between are unseen and the projection grows overconfident as the horizon lengthens. `docs/horizon_decay` measures that drift on development folds, under the earlier `linear_fixture_count_scaling_v1` treatment rather than the rule this run applies.
 
 The table is local and not committed; it derives from a third-party payload and the pinned archive.
 
