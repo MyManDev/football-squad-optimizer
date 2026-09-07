@@ -28,7 +28,8 @@ Every displayed value is labelled as the last recorded provisional score, with i
 capture ID, full date/time/timezone and publication time. A capture more than 60
 minutes old additionally gets an old-capture label. This is a presentation threshold,
 not a promised upstream refresh cadence. The page uses the existing query lifecycle
-(mount/focus/reconnect with a 60-second stale time), with no polling service. A
+(mount/reconnect with a 60-second stale time; window-focus refresh is disabled by
+the app), with no polling service. A
 document regenerated from an old capture remains old. A settled decision hides the
 card; a later site build replaces its live document with `unavailable/settled`.
 
