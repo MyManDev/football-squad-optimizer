@@ -20,11 +20,11 @@ touched and the loop is the members' loop alone.
 | top100 | `scripts.capture_top100_cohort`, `scripts.capture_elite_picks`, `scripts.export_player_evidence` | before the deadline; target gameweek ≥ 2 | `fpl-top100-*` and `fpl-elite-picks-*` snapshots; `artifacts/phase_b/player_evidence_v1_<season>_gw<NN>_top100.{csv,manifest.json}` |
 | capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league id | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, the last five event-live documents, every member's three documents and the standings page |
 | handoff | `scripts.build_projection_handoff --snapshot-id <capture> --evidence-table … --evidence-manifest …` | the capture above and the evidence | `data/handoffs/<season>-gw<NN>.json` — the Phase C component projection with the bounded Top-100 uplift on top (`phase-c-component-elite-top100-v1`); `--projection component-only` leaves the uplift out; without settled live history the producer falls back to the legacy blend and says so |
-| decide | `squadopt.application.commands.decide`, in-process, stamped `live` (only with `--decide`; `--chip` as `squadopt gameweek decide` takes it) | the capture, the handoff, and a ledger that holds the previous gameweek and not yet this one — checked **before** the first capture, so a ledger that cannot start the week refuses without spending one | `data/ledger/<season>/gw<NN>/` — decision, projections, report, manifest; the report is printed |
+| decide | `squadopt.application.commands.decide`, in-process (only with `--decide`; `--chip` as `squadopt gameweek decide` takes it) | the capture, the handoff, a ledger that holds the previous gameweek, and — with `--chip` — an open, unspent chip window: all checked **before** the first capture, so a week that cannot start refuses without spending one. The mode is derived, never asserted: `live` only when this run took the capture and the clock is still before its deadline; a reused `--snapshot-id`, or a run past the deadline, is recorded `replay`. A gameweek the ledger already holds is skipped rather than refused, so a run that died after the decision can rebuild the rest of the week | `data/ledger/<season>/gw<NN>/` — decision, projections, report, manifest; the report is printed |
 | league | `scripts.build_league_site --workers N` | the capture and the handoff | `web/public/data/league/**`: `members.json`, `entries/<id>.json`, `advice/<id>/saf-puan/1.json`, `advice/<id>/saf-puan/3.json` and `5.json` (the week-1 projection repeated over the calendar, published with its stated limits), `advice/<id>/<strategy>/1.json` (the standings neighbour), `advice/<id>/<strategy>/1/vs-<rival>.json`, `advice/<id>/index.json` (`windows` names what solved per strategy; a window that did not is in `unavailable` with its reason) |
 | site | `scripts.build_site` | the ledger and captures | `web/public/data/**` season views (they read the ledger, so after the decision) |
-| scoreboard | `scripts.build_scoreboard --cohort-snapshot <fpl-top100 id>` | the capture, the registry, the ledger, and the Top-100 capture when one was taken or reused | `web/public/data/league/scoreboard.json` — per played gameweek: the game's average and highest, every member's gross week, hit cost and net, our ledger row with its mode, the Top-100 mean for the cohort capture's own week; `null` wherever a file on disk does not say |
-| publish | `scripts.publish_gameweek_site --league … --snapshot-id … --in-season-projection … --cohort-snapshot … --workers …` (only with `--publish`) | a clean `origin/develop` | a worktree, a commit of `web/public/data` (league tree and scoreboard rebuilt there from the same capture), a push, a pull request; then the printed human steps: merge, release, tag, dispatch |
+| scoreboard | `scripts.build_scoreboard --cohort-snapshot <fpl-top100 id> --elite-snapshot <fpl-elite-picks id>` | the capture, the registry, the ledger, and the Top-100 captures when they were taken or reused | `web/public/data/league/scoreboard.json` — per played gameweek: the game's average and highest, every member's gross week, hit cost and net, our ledger row with its mode and its scoring basis, the Top-100 mean for the cohort capture's own week with the basis it is on; `null` wherever a file on disk does not say |
+| publish | `scripts.publish_gameweek_site --league … --snapshot-id … --in-season-projection … --cohort-snapshot … --elite-snapshot … --workers …` (only with `--publish`) | a clean `origin/develop` | a worktree, a commit of `web/public/data` (league tree and scoreboard rebuilt there from the same capture), a push, a pull request; then the printed human steps: merge, release, tag, dispatch |
 
 Every step is skippable by naming its output: `--cohort-snapshot` / `--elite-snapshot`
 reuse the Top-100 captures (an export already on disk for that picks capture is reused,
@@ -33,6 +33,15 @@ capture — then the Top-100 captures must be reused or skipped too, because the
 projection refuses evidence captured after the decision capture — and `--skip-top100`
 leaves the evidence out (the scoreboard's Top-100 column is then `null`). The command
 stops at the first refusal and prints what refused.
+
+The elite-picks capture travels with the cohort capture into the scoreboard, and it is
+what lets the Top-100 column be **net**: the Overall standings publish `event_total`
+gross of the week's transfer cost, so a mean over the standings alone is not on the
+members' basis. The picks documents carry each member's own `entry_history`, so when the
+capture covers all hundred of that week the mean is `points - event_transfers_cost` per
+member. Without one — `--skip-top100`, or a picks capture that missed a member — the mean
+is published **gross**, labelled gross, and the card says it does not compare with the
+net columns beside it.
 
 ## Timing
 
@@ -78,8 +87,10 @@ squadopt gameweek settle --season 2026-27 --gameweek 3 \
 
 Each decide verifies the handoff against the capture and the model version against the
 promoted in-season controls before anything is written; a refusal leaves the ledger as it
-was. Then the weekly command with `--decide` records GW4 `live` from the capture it
-takes. After the gameweek, settle it from a capture in which it is finished and checked
+was. Then the weekly command with `--decide` records GW4 from the capture it takes, and
+stamps it `live` only if it took that capture itself and the deadline has not passed —
+a catch-up run after the deadline, from the same pre-deadline capture, is recorded
+`replay`, because it was not decided before the deadline whatever it was decided from. After the gameweek, settle it from a capture in which it is finished and checked
 (the Monday capture, or a fresh one):
 
 ```bash
@@ -100,12 +111,24 @@ constraint net of hits, the overlap and the expected gap. The page reads the ind
 know what exists; a pair no plan could satisfy is listed with its reason, not hidden.
 
 The `/league` page carries the weekly scoreboard: per finished gameweek, our paper
-ledger's net (labelled with its mode), the league members' mean net, the Top-100 mean,
-the game's average and its highest score, with a cumulative row that names the weeks
-each figure covers. A member's net is their gross week minus the transfer cost, read
-from their own history — the same net our ledger records — so the two columns compare
-like with like; the members page's own points column stays the gross number the
-standings page shows.
+ledger's figure (labelled with its mode), the league members' mean net, the Top-100 mean
+with the basis it is on, the game's average and its highest score, with a cumulative row
+that names the weeks each figure covers. A member's net is their gross week minus the
+transfer cost, read from their own history, and the Top-100 mean is netted the same way
+when the week's picks capture covers the cohort.
+
+Our own figure is not FPL's net and the card says so in both languages: it is the eleven
+the decision named, scored as named. The game's automatic substitutions are not applied,
+and the frozen decision names no vice-captain, so a captain who did not play is not
+recovered. Neither correction is computable from what the ledger holds — the decision
+records its bench as a set, not in the order autosubs walk it — and both would only add
+points, so the row reads low against a real entry. In GW1 the named starters Watkins and
+Mukiele both played nought minutes while the bench held two defenders who played ninety
+and scored 4 and 1, so the published 26 is roughly five short of what that squad would
+have scored as an FPL entry.
+
+A gameweek that has finished but has not been data-checked in the capture is marked
+provisional: bonus points land fixture by fixture, so its scores can still move.
 
 Windows beyond one week are not computed for members; the page shows them disabled and
 says why.

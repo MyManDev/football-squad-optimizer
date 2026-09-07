@@ -47,6 +47,10 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
   const view = envelope.payload;
   const finished = view.gameweeks.filter((week) => week.finished);
   const total = view.cumulative;
+  // A gross Top-100 mean sits in a net table; the card says so rather than letting the
+  // column read as one more net figure.
+  const anyGross = finished.some((week) => week.top100?.basis === "gross");
+  const anyProvisional = finished.some((week) => !week.data_checked);
   const oursCovers =
     total.ours_net === null
       ? copy.oursNone
@@ -114,6 +118,8 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
           </table>
         </div>
       )}
+      {anyGross && <p className={styles.notice}>{copy.grossNote}</p>}
+      {anyProvisional && <p className={styles.notice}>{copy.provisionalNote}</p>}
       <p className={styles.notice}>{copy.modeNote}</p>
     </Card>
   );
@@ -123,10 +129,13 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
   const { messages } = useLanguage();
   const copy = messages.leagueScoreboard;
   const ours = week.ours;
+  const top100 = week.top100;
   return (
     <tr>
       <th scope="row" className="num">
         {week.gameweek}
+        {/* Finished is not checked: bonus lands fixture by fixture, so the row can move. */}
+        {!week.data_checked && <div className={styles.sub}>{copy.provisional}</div>}
       </th>
       <td className={`${styles.right} num`}>
         {ours === null ? (
@@ -148,13 +157,16 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
         {week.members_mean_net === null ? "—" : points(week.members_mean_net, 1, locale)}
         <div className={styles.sub}>{copy.membersCounted(week.members_counted)}</div>
       </td>
-      <td className={`${styles.right} num`}>
-        {week.top100 === null ? (
+      <td className={`${styles.right} num ${top100?.basis === "gross" ? styles.gross : ""}`.trim()}>
+        {top100 === null ? (
           "—"
         ) : (
           <>
-            {points(week.top100.mean_event_total, 1, locale)}
-            {!week.top100.final && <div className={styles.sub}>{copy.top100NotFinal}</div>}
+            {points(top100.mean_score, 1, locale)}
+            <div className={styles.sub}>
+              {top100.basis === "net" ? copy.top100Net : copy.top100Gross}
+              {!top100.final && ` · ${copy.top100NotFinal}`}
+            </div>
           </>
         )}
       </td>
