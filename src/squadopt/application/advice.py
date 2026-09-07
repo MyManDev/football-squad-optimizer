@@ -36,7 +36,6 @@ from squadopt.live import (
     Projection,
     RecommendationInputs,
     SeasonRules,
-    chip_availability_for,
     make_projection_horizon_builder,
     plan_transfer_horizon,
     plan_transfers,
@@ -458,9 +457,9 @@ WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "The Top-100 uplift is inside the first week's numbers, and the repetition "
     "carries it into every later week.",
     "Prices are held at the captured values; no price change is modelled.",
-    "A chip is valued inside the window only, so the plan spends the chips it can "
-    "reach inside it and counts nothing for holding one back: read the chip timing "
-    "here as a within-window reading, not a season-long chip plan.",
+    "No chip is offered inside the window. A finite window counts nothing for "
+    "holding a chip back, so a planner that could reach one would spend it; chip "
+    "timing is a season-long decision this window cannot price.",
 )
 
 
@@ -478,8 +477,10 @@ def build_window_payload(
 
     The horizon is the week-1 projection repeated over the captured calendar
     (``build_projection_horizon``), the plan is the multi-week planner under the system's
-    own horizon budget with the season's chips offered where the rules and the member's
-    ``chips_used`` allow them, and the payload is the one-week shape plus ``plan_weeks``
+    own horizon budget and no chip offered — a finite window counts nothing for holding
+    one back, so a planner that could reach a chip would spend it, and the system's own
+    horizon path declines them for the same reason — and the payload is the one-week
+    shape plus ``plan_weeks``
     — one row per gameweek — and ``stated_limits``. The first week is published through
     the same ``lineup_fields`` and moves as the one-week advice, so the page's existing
     card renders it unchanged; the whole window's transfers live in ``plan_weeks``.
@@ -515,7 +516,6 @@ def build_window_payload(
             solver_time_limit_seconds=WINDOW_WALL_CEILING_SECONDS,
             solver_deterministic_time_limit=WINDOW_DETERMINISTIC_UNITS_PER_WEEK * window,
         ),
-        chips=chip_availability_for(rules, targets, used=held.chips_used),
     )
     first = plan.weeks[0]
     pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
