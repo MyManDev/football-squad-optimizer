@@ -29,6 +29,55 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 KINDS = ("decision", "settled")
 
 
+@dataclass(frozen=True, slots=True)
+class LeaguePublish:
+    """The league tree beside the season views: which capture, which projection, how many
+    solver processes. Paths are absolute because the build runs in a fresh worktree that
+    holds no data of its own."""
+
+    league_id: int
+    snapshot_id: str
+    in_season_projection: Path | None
+    workers: int = 1
+    snapshot_root: Path = REPOSITORY_ROOT / "data" / "snapshots"
+    registry: Path = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
+    archive_root: Path = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
+
+    def __post_init__(self) -> None:
+        if self.league_id < 1:
+            raise PublishError(f"league_id must be positive, got {self.league_id!r}.")
+        if not self.snapshot_id.startswith("fpl-live-"):
+            raise PublishError(
+                f"The league tree is built from a live capture; got {self.snapshot_id!r}."
+            )
+        if self.workers < 1:
+            raise PublishError(f"workers must be at least 1, got {self.workers!r}.")
+
+    def build_arguments(self, out: Path) -> list[str]:
+        arguments = [
+            sys.executable,
+            "-m",
+            "scripts.build_league_site",
+            "--league",
+            str(self.league_id),
+            "--snapshot-id",
+            self.snapshot_id,
+            "--snapshot-root",
+            str(self.snapshot_root),
+            "--registry",
+            str(self.registry),
+            "--archive-root",
+            str(self.archive_root),
+            "--out",
+            str(out),
+            "--workers",
+            str(self.workers),
+        ]
+        if self.in_season_projection is not None:
+            arguments += ["--in-season-projection", str(self.in_season_projection)]
+        return arguments
+
+
 class PublishError(RuntimeError):
     """A step refused; the message says which and why."""
 
@@ -100,7 +149,13 @@ def next_steps(names: PublishNames, pr_url: str) -> str:
     )
 
 
-def publish(names: PublishNames, *, force_branch: bool, dry_run: bool) -> int:
+def publish(
+    names: PublishNames,
+    *,
+    force_branch: bool,
+    dry_run: bool,
+    league: LeaguePublish | None = None,
+) -> int:
     root = REPOSITORY_ROOT
     worktree = (root / names.worktree_directory).resolve()
     if worktree.exists():
@@ -152,6 +207,10 @@ def publish(names: PublishNames, *, force_branch: bool, dry_run: bool) -> int:
             cwd=worktree,
         )
         print(build)
+        if league is not None:
+            # The members' tree beside the season views, from the same capture and the
+            # same projection the decision reads; solved in this worktree's code.
+            print(_run(league.build_arguments(worktree / "web" / "public"), cwd=worktree))
         _run(["git", "add", "web/public/data"], cwd=worktree)
         if _run(["git", "status", "--porcelain"], cwd=worktree) == "":
             print("The build changed nothing; there is nothing to publish.")
@@ -197,12 +256,28 @@ def main() -> int:
     parser.add_argument("--season", default="2026-27")
     parser.add_argument("--force-branch", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--league", type=int, help="also build this league's member tree")
+    parser.add_argument("--snapshot-id", help="the live capture the league tree reads")
+    parser.add_argument("--in-season-projection", type=Path, help="the handoff it projects with")
+    parser.add_argument("--workers", type=int, default=1, help="league tree solver processes")
     arguments = parser.parse_args()
     try:
         names = PublishNames(
             season=arguments.season, gameweek=arguments.gameweek, kind=arguments.kind
         )
-        return publish(names, force_branch=arguments.force_branch, dry_run=arguments.dry_run)
+        league: LeaguePublish | None = None
+        if arguments.league is not None:
+            if not arguments.snapshot_id:
+                raise PublishError("--league needs --snapshot-id (the live capture to read).")
+            league = LeaguePublish(
+                league_id=arguments.league,
+                snapshot_id=arguments.snapshot_id,
+                in_season_projection=arguments.in_season_projection,
+                workers=arguments.workers,
+            )
+        return publish(
+            names, force_branch=arguments.force_branch, dry_run=arguments.dry_run, league=league
+        )
     except PublishError as error:
         print(f"Refused: {error}")
         return 1
