@@ -25,23 +25,13 @@ type LeagueFieldState =
   | { kind: "unavailable" }
   | { kind: "mismatch"; publishedId: number };
 
-export function DecisionControls({
-  variant = "default",
-  horizonEvidence,
-}: {
-  variant?: "default" | "entry";
-  horizonEvidence?: unknown;
-}) {
+export function DecisionControls({ horizonEvidence }: { horizonEvidence?: unknown }) {
   const { locale, messages } = useLanguage();
   const copy = messages.decision;
   const navigate = useNavigate();
   const [leagueInput, setLeagueInput] = useState("");
   const [leagueState, setLeagueState] = useState<LeagueFieldState>({ kind: "idle" });
-  const playModes = getPlayModes(
-    copy.modes,
-    locale,
-    variant === "entry" ? "point-cost" : "measured",
-  );
+  const playModes = getPlayModes(copy.modes, locale);
   const { mode, windowSize, update } = useDecisionSelection();
 
   async function connectLeague() {
@@ -76,7 +66,7 @@ export function DecisionControls({
 
   return (
     <Card title={copy.title} aside={<Badge tone="accent">{copy.shareable}</Badge>}>
-      <p className={styles.intro}>{variant === "entry" ? copy.entryIntro : copy.intro}</p>
+      <p className={styles.intro}>{copy.intro}</p>
 
       <div className={styles.controls}>
         <fieldset className={styles.fieldset}>
@@ -121,7 +111,7 @@ export function DecisionControls({
           </div>
         </fieldset>
 
-        {variant === "default" ? (
+        {
           <form
             className={styles.leagueField}
             onSubmit={(event) => {
@@ -157,7 +147,7 @@ export function DecisionControls({
               <small>{copy.leagueHelp}</small>
             )}
           </form>
-        ) : null}
+        }
       </div>
 
       <div

@@ -15,7 +15,7 @@ function Selection() {
   const [params] = useSearchParams();
   return (
     <output data-testid="selection">
-      {params.get("mode") ?? "-"}/{params.get("window") ?? "-"}
+      {params.get("mode") ?? "-"}/{params.get("window") ?? "-"}/{params.get("rival") ?? "-"}
     </output>
   );
 }
@@ -65,17 +65,36 @@ describe("the local template store", () => {
 });
 
 describe("the picker", () => {
-  it("shows one builtin per computed mode and applies through the URL", () => {
+  it("shows one builtin per member strategy and applies through the URL", () => {
     renderPicker();
 
-    const garantici = screen.getByRole("button", { name: /Garantici/ });
-    fireEvent.click(garantici);
+    fireEvent.click(screen.getByRole("button", { name: /Ortak çekirdeği koru/ }));
 
-    expect(screen.getByTestId("selection").textContent).toBe("garantici/1");
+    // The standings neighbour is the producer's default: no rival parameter.
+    expect(screen.getByTestId("selection").textContent).toBe("ortak-koru/1/-");
+  });
+
+  it("applies and saves a named rival with the template", () => {
+    renderPicker("/league/members/1?mode=fark-yarat&window=1&rival=42");
+
+    fireEvent.change(screen.getByLabelText("Bu kombinasyonu adlandır"), {
+      target: { value: "Derbi" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Seçimi kaydet" }));
+    expect(new LocalTemplateStore().list()[0]).toMatchObject({
+      strategy: "fark-yarat",
+      window: 1,
+      rival: 42,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Saf puan/ }));
+    expect(screen.getByTestId("selection").textContent).toBe("saf-puan/1/-");
+    fireEvent.click(screen.getByRole("button", { name: /Derbi.*#42/ }));
+    expect(screen.getByTestId("selection").textContent).toBe("fark-yarat/1/42");
   });
 
   it("saves the current selection under a name and can remove it again", () => {
-    renderPicker("/league/members/1?mode=agresif&window=1");
+    renderPicker("/league/members/1?mode=ortak-koru&window=1");
 
     fireEvent.change(screen.getByLabelText("Bu kombinasyonu adlandır"), {
       target: { value: "Derbi planım" },
@@ -89,19 +108,10 @@ describe("the picker", () => {
     expect(new LocalTemplateStore().list()).toHaveLength(0);
   });
 
-  it("builtins cover exactly the computed modes", () => {
-    const names = builtinTemplates({
-      "saf-puan": "a",
-      garantici: "b",
-      agresif: "c",
-      "asiri-agresif": "d",
-    });
-    expect(names.map((t) => t.strategy)).toEqual([
-      "saf-puan",
-      "garantici",
-      "agresif",
-      "asiri-agresif",
-    ]);
+  it("builtins cover exactly the member strategies", () => {
+    const names = builtinTemplates({ "saf-puan": "a", "ortak-koru": "b", "fark-yarat": "c" });
+    expect(names.map((t) => t.strategy)).toEqual(["saf-puan", "ortak-koru", "fark-yarat"]);
     expect(new Set(names.map((t) => t.window))).toEqual(new Set([1]));
+    expect(new Set(names.map((t) => t.rival))).toEqual(new Set(["nearest_above"]));
   });
 });

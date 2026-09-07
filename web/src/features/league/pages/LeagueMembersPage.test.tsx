@@ -192,15 +192,15 @@ describe("league member surfaces", () => {
 
   it("shows point-cost labels and no probability percentage on member advice", () => {
     const entryId = 35249001;
-    const advice = mockEntryAdviceEnvelope(entryId, "agresif", 3);
+    const advice = mockEntryAdviceEnvelope(entryId, "ortak-koru", 1);
     const { container } = renderPage(
       <LeagueMemberView squad={mockEntrySquadEnvelopes[entryId]!} advice={advice} />,
-      `/league/members/${entryId}?mode=agresif&window=3`,
+      `/league/members/${entryId}?mode=ortak-koru&window=1`,
     );
 
     expect(screen.getAllByText("örnek veri").length).toBeGreaterThan(0);
-    expect(screen.getByDisplayValue("agresif")).toBeChecked();
-    expect(screen.getByRole("radio", { name: /3 hafta/ })).toBeChecked();
+    expect(screen.getByDisplayValue("ortak-koru")).toBeChecked();
+    expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getAllByText(/beklenen puan maliyeti/).length).toBeGreaterThan(0);
     expect(screen.getByText(/yalnızca senin kadrondan/)).toBeInTheDocument();
     expect(screen.getByText(/banka edilmiş ikinci transfer/)).toBeInTheDocument();

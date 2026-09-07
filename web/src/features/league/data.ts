@@ -1,5 +1,12 @@
-import type { PlayMode, WindowSize } from "../moves/modePrices";
-import type { EntryAdvice, EntrySquad, LeagueMembers, LeagueViewEnvelope } from "./types";
+import type { WindowSize } from "../moves/modePrices";
+import type {
+  EntryAdvice,
+  EntrySquad,
+  LeagueMembers,
+  LeagueViewEnvelope,
+  AdviceStrategy,
+  EntryAdviceIndex,
+} from "./types";
 
 const CONTRACT_VERSION = "provisional_league_ui_v1";
 const BASE = `${import.meta.env.BASE_URL}data/league/`;
@@ -107,10 +114,25 @@ export async function loadEntrySquad(entryId: number): Promise<LeagueViewEnvelop
 
 export async function loadEntryAdvice(
   entryId: number,
-  mode: PlayMode,
+  mode: AdviceStrategy,
   window: WindowSize,
+  rivalEntryId: number | null = null,
 ): Promise<LeagueViewEnvelope<EntryAdvice>> {
-  return readOrExample<EntryAdvice>(`advice/${entryId}/${mode}/${window}.json`, async () =>
-    (await mockModule()).mockEntryAdviceEnvelope(entryId, mode, window),
+  // A named rival reads the producer's per-rival file; without one, the plain path —
+  // the baseline for saf-puan, the standings neighbour's copy for a rival strategy.
+  const relative =
+    rivalEntryId === null
+      ? `advice/${entryId}/${mode}/${window}.json`
+      : `advice/${entryId}/${mode}/${window}/vs-${rivalEntryId}.json`;
+  return readOrExample<EntryAdvice>(relative, async () =>
+    (await mockModule()).mockEntryAdviceEnvelope(entryId, mode, window, rivalEntryId),
+  );
+}
+
+export async function loadEntryAdviceIndex(
+  entryId: number,
+): Promise<LeagueViewEnvelope<EntryAdviceIndex>> {
+  return readOrExample<EntryAdviceIndex>(`advice/${entryId}/index.json`, async () =>
+    (await mockModule()).mockEntryAdviceIndex(entryId),
   );
 }

@@ -43,15 +43,6 @@ function renderControls(path = "/moves") {
   );
 }
 
-function renderEntryControls(path = "/league/members/35249001?mode=agresif&window=3") {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <DecisionControls variant="entry" />
-      <LocationProbe />
-    </MemoryRouter>,
-  );
-}
-
 function renderEnglishControls(path = "/moves") {
   return render(
     <LanguageProvider initialLanguage="en">
@@ -125,14 +116,5 @@ describe("DecisionControls", () => {
       screen.getByText(/Lig-içi 5 haftalık sonuç bir teşhis göstergesidir/),
     ).toBeInTheDocument();
     expect(screen.getByText(/P\(5\+ önde\) %19/)).toBeInTheDocument();
-  });
-
-  it("uses point-cost labels without percentages on a member page", () => {
-    const { container } = renderEntryControls();
-
-    expect(screen.getByDisplayValue("agresif")).toBeChecked();
-    expect(screen.getByText(/~1,8 beklenen puan maliyeti/)).toBeInTheDocument();
-    expect(container.textContent).not.toContain("%");
-    expect(screen.queryByLabelText("Lig Numarası")).not.toBeInTheDocument();
   });
 });
