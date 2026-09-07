@@ -75,3 +75,32 @@ def test_the_league_tree_is_built_from_a_live_capture_with_absolute_roots() -> N
         LeaguePublish(
             league_id=352490, snapshot_id="fpl-live-x", in_season_projection=None, workers=0
         )
+
+
+def test_the_scoreboard_is_built_beside_the_tree_from_the_same_capture_and_the_ledger() -> None:
+    from pathlib import Path
+
+    from scripts.publish_gameweek_site import LeaguePublish
+
+    league = LeaguePublish(
+        league_id=352490,
+        snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        in_season_projection=None,
+        cohort_snapshot="fpl-top100-20260911T090000Z-abc123def456",
+    )
+    arguments = league.scoreboard_arguments(Path("/tmp/site/web/public"))
+    assert arguments[1:3] == ["-m", "scripts.build_scoreboard"]
+    assert arguments[arguments.index("--snapshot-id") + 1] == league.snapshot_id
+    assert arguments[arguments.index("--cohort-snapshot") + 1] == league.cohort_snapshot
+    for flag in ("--snapshot-root", "--registry", "--ledger-root"):
+        assert Path(arguments[arguments.index(flag) + 1]).is_absolute()
+    # Without a cohort capture the scoreboard is still built; its Top-100 column is null.
+    bare = LeaguePublish(league_id=352490, snapshot_id="fpl-live-x", in_season_projection=None)
+    assert "--cohort-snapshot" not in bare.scoreboard_arguments(Path("/tmp/site"))
+    with pytest.raises(PublishError, match="fpl-top100"):
+        LeaguePublish(
+            league_id=352490,
+            snapshot_id="fpl-live-x",
+            in_season_projection=None,
+            cohort_snapshot="fpl-live-y",
+        )
