@@ -6,14 +6,20 @@ league publication. The existing `scripts.build_site` caller supplies the latest
 capture; `--no-league` supplies none and therefore publishes unavailable live views.
 No new upstream collection, endpoint, worker, or scheduling is involved.
 
-The operational caller still needs a source-aware latest-capture selection:
-`scripts/build_site.py` currently takes `list_snapshot_ids(root)[-1]`, which sorts
-source-prefixed IDs lexically. In a mixed `fpl-live`/`fpl-top100` root this selects
-the top100 capture even when a live capture is newer. The platform handoff is to
-select the newest verified `fpl-live` capture by `captured_at_utc` and pass that one
-to `build_site(snapshot=...)`; missing live payloads in it must remain unavailable.
-The application cannot repair the caller's selection by mixing captures. This
-operational dependency must be resolved before #251 is closed for that workflow.
+The operational caller's selection is source-aware. `scripts/build_site.py` asks for
+`list_snapshot_ids(root, source=FPL_LIVE_SOURCE)` and reads the last of those, which is
+the newest live capture: an identifier is `{source}-{stamp}-{digest}` and the stamp is a
+fixed-width rendering of `captured_at_utc`, so a lexical sort orders one source by time.
+Without the filter it ordered by collector name first, and four collectors default to this
+root — `fpl-live`, `fpl-top100`, `fpl-top200`, `fpl-elite-picks` — so `fpl-top200` won on
+its name however old it was. A root holding no live capture passes no snapshot at all and
+every live view reads unavailable; the application cannot repair a caller's selection by
+mixing captures, and a missing payload is never backfilled from another one.
+
+One selection on this path is still unfiltered: `squadopt.application.season._read_state`
+lists the same root without a source for the season tick, so on a mixed root the tick
+raises before the site is built. That call site belongs to the application owner and is
+not changed here.
 
 The document uses the separate, closed `live_score_v1` contract. `ui_view_v1` is
 unchanged. The site includes both schemas. Older publications without `live.json`

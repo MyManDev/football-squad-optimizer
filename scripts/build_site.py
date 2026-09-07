@@ -23,6 +23,7 @@ from squadopt.application import (
 )
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.live import LedgerError
 from squadopt.live.tick import TickConfig
 
@@ -87,7 +88,13 @@ def main() -> int:
             return 1
         snapshot = None
         if not arguments.no_league:
-            identifiers = list_snapshot_ids(arguments.snapshot_root)
+            # By source, because this root is shared. The cohort collectors write here too
+            # and their identifiers sort after the live ones whatever their timestamps say,
+            # so an unfiltered listing handed the league and the provisional score a capture
+            # carrying neither's payloads. A root with no live capture stays None: the
+            # provisional view reads one capture and is never backfilled from another, so
+            # the honest answer there is unavailable.
+            identifiers = list_snapshot_ids(arguments.snapshot_root, source=FPL_LIVE_SOURCE)
             if identifiers:
                 snapshot = read_snapshot(arguments.snapshot_root, identifiers[-1])
         report = build_site(
