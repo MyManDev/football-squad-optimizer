@@ -30,22 +30,30 @@ Steps, each skippable by naming its output:
                    (``--snapshot-id`` reuses one — then the Top-100 captures must be reused
                    or skipped too, for the same reason; the capture's open deadline must be
                    the requested gameweek)
-3. handoff         the projection handoff for this capture: the Phase C component base
+3. rotation        optional: the rotation_evidence_v1 export for this capture
+                   (``--rotation``; an export already on disk for that capture is reused).
+                   **Opt-in, and deliberately so**: the only club-news source today is a
+                   committed *synthetic* fixture, and a step that ran by default would
+                   write fixture-derived claims into a real week's artifact. After the
+                   capture rather than before it, because the table is one row per roster
+                   player *of the decision capture*; the ordering constraint that binds the
+                   model call belongs to the step that makes it, which does not exist yet.
+4. handoff         the projection handoff for this capture: the Phase C component base
                    with the bounded Top-100 uplift on top when the evidence was exported
                    (``--projection component-only`` leaves the uplift out)
-4. decide          optional: our own squad for this gameweek, frozen into the ledger
+5. decide          optional: our own squad for this gameweek, frozen into the ledger
                    (``--decide``, with ``--chip`` as ``squadopt gameweek decide`` takes
                    it). Before anything is captured, the ledger is checked: it must hold
                    the previous gameweek's decision and not yet this one, so no capture is
                    spent on a run that would refuse an hour later.
-5. league          the league tree: every member's baseline and the rival menu
+6. league          the league tree: every member's baseline and the rival menu
                    (``--workers``); a local preview, so it writes no advice record —
-                   step 8's rebuild emits the bytes that ship and records those
-6. site            the season views (they read the ledger, so after the decision)
-7. scoreboard      the weekly scoreboard beside the league tree: our paper ledger, the
+                   step 9's rebuild emits the bytes that ship and records those
+7. site            the season views (they read the ledger, so after the decision)
+8. scoreboard      the weekly scoreboard beside the league tree: our paper ledger, the
                    members' net, the Top-100 mean when a cohort capture is known, the
                    game's average and highest
-8. publish         optional: worktree, commit, push, PR (``--publish``)
+9. publish         optional: worktree, commit, push, PR (``--publish``)
 
 Timing rules the scripts enforce and this one states up front: the Top-100 captures
 must happen before the deadline and after the previous gameweek's picks are public; the
@@ -88,6 +96,7 @@ REGISTRY_PATH = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
 HANDOFF_ROOT = REPOSITORY_ROOT / "data" / "handoffs"
 LEDGER_ROOT = REPOSITORY_ROOT / "data" / "ledger"
 EVIDENCE_ROOT = REPOSITORY_ROOT / "artifacts" / "phase_b"
+ROTATION_ROOT = REPOSITORY_ROOT / "artifacts" / "rotation"
 SITE_OUT = REPOSITORY_ROOT / "web" / "public"
 
 # The cohort and elite steps find the capture they just wrote by name difference, which
@@ -96,7 +105,17 @@ SITE_OUT = REPOSITORY_ROOT / "web" / "public"
 COHORT_PREFIX = "fpl-top100-"
 ELITE_PREFIX = "fpl-elite-picks-"
 
-STEPS = ("top100", "capture", "handoff", "decide", "league", "site", "scoreboard", "publish")
+STEPS = (
+    "top100",
+    "capture",
+    "rotation",
+    "handoff",
+    "decide",
+    "league",
+    "site",
+    "scoreboard",
+    "publish",
+)
 #: The chips ``--decide`` may play: the ones the season rules name that the planner models,
 #: exactly the choices ``squadopt gameweek decide --chip`` offers.
 CHIP_CHOICES = tuple(sorted(set(CHIP_NAMES) & set(PLANNER_CHIP_NAMES)))
@@ -136,6 +155,7 @@ def plan_week(
     publish: bool,
     decide: bool = False,
     chip: str | None = None,
+    rotation: bool = False,
 ) -> WeekPlan:
     """Decide the steps from what the caller already has; pure, so it can be tested."""
 
@@ -169,6 +189,17 @@ def plan_week(
         reasons["capture"] = f"reusing {snapshot_id}"
     else:
         steps.append("capture")
+    if rotation:
+        # After the capture, not before it: the table is one row per roster player of the
+        # decision capture. The lane's "before the capture" constraint binds the model call,
+        # which is a step of its own and does not exist yet; this export is pure and offline
+        # over bytes already frozen, so it can introduce nothing the capture could have shown.
+        steps.append("rotation")
+    else:
+        reasons["rotation"] = (
+            "pass --rotation to export this week's club-news evidence; the only source "
+            "today is the committed synthetic fixture"
+        )
     steps.append("handoff")
     if decide:
         steps.append("decide")
@@ -195,6 +226,52 @@ def evidence_artifact(
 
     name = f"player_evidence_v1_{season}_gw{gameweek:02d}_top100_{elite_snapshot[-12:]}"
     return root / f"{name}.csv", root / f"{name}.manifest.json"
+
+
+def rotation_artifact(
+    root: Path, season: str, gameweek: int, snapshot_id: str
+) -> tuple[Path, Path]:
+    """The rotation table and manifest one capture's export writes.
+
+    The sibling of :func:`evidence_artifact`, and the name is built here rather than parsed
+    out of the export's output for two reasons. The export prints its paths with a trailing
+    ``(written)`` or ``(replay)``, which :func:`_wrote_paths` does not match; and a name
+    constructed from the capture is stable whatever the export decides to print. It mirrors
+    ``scripts.export_rotation_evidence._artifact_name``, including the twelve characters of
+    the capture's own digest, so a rehearsal earlier in the week is a different artifact from
+    Friday's and an export already on disk for that capture is the same one.
+    """
+
+    name = f"rotation_evidence_v1_{season}_gw{gameweek:02d}_{snapshot_id[-12:]}"
+    return root / f"{name}.csv", root / f"{name}.manifest.json"
+
+
+def check_rotation_for_reused_capture(
+    rotation_root: Path, *, season: str, gameweek: int, snapshot_id: str
+) -> None:
+    """Refuse a reused live capture whose rotation export is not already on disk.
+
+    The same shape as :func:`check_evidence_for_reused_capture` and the same argument, from
+    this artifact's own contract rather than from Phase B's. ``rotation_evidence_v1`` records
+    ``generated_at_utc``, and the lane's ordering constraint is that the claim chain is frozen
+    before the decision capture: re-exporting now for a capture already taken stamps the
+    artifact after it, always, and no amount of promptness escapes that. Said here, before
+    anything is spent.
+
+    A pair with only one half on disk does not count as reusable. A table without its manifest
+    is not a readable artifact, and treating it as one would take the "already exported" branch
+    and then fail at the read.
+    """
+
+    table, manifest = rotation_artifact(rotation_root, season, gameweek, snapshot_id)
+    if table.is_file() and manifest.is_file():
+        return
+    raise WeekError(
+        f"Reusing {snapshot_id} with --rotation needs its rotation export already on disk; "
+        f"{table.name} is not under {rotation_root}. Exporting it now would stamp the artifact "
+        f"after that capture was taken, which the claim chain does not allow. Export it for "
+        "that capture first, or run without --rotation."
+    )
 
 
 def check_evidence_for_reused_capture(
@@ -392,6 +469,7 @@ def run_week(arguments: argparse.Namespace) -> int:
         publish=arguments.publish,
         decide=arguments.decide,
         chip=arguments.chip,
+        rotation=arguments.rotation,
     )
     print(plan.describe(), flush=True)
     now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -417,6 +495,14 @@ def run_week(arguments: argparse.Namespace) -> int:
             season=plan.season,
             gameweek=plan.gameweek,
             elite_snapshot=arguments.elite_snapshot,
+            snapshot_id=arguments.snapshot_id,
+        )
+    if arguments.snapshot_id and "rotation" in plan.steps:
+        # The same half of the same rule, for this lane's own artifact.
+        check_rotation_for_reused_capture(
+            ROTATION_ROOT,
+            season=plan.season,
+            gameweek=plan.gameweek,
             snapshot_id=arguments.snapshot_id,
         )
     decide_step = "decide" in plan.steps
@@ -529,7 +615,43 @@ def run_week(arguments: argparse.Namespace) -> int:
         f"capture {snapshot_id}: gameweek {target}, deadline {deadline_utc}, captured {captured_at}"
     )
 
-    # 3. handoff: the component base, with the Top-100 uplift on top when the evidence
+    # 3. rotation: this capture's club-news evidence, exported once per capture. Opt-in
+    # while the only source is the committed synthetic fixture.
+    if "rotation" in plan.steps:
+        rotation_table, rotation_manifest = rotation_artifact(
+            ROTATION_ROOT, plan.season, plan.gameweek, snapshot_id
+        )
+        if rotation_table.is_file() and rotation_manifest.is_file():
+            print(f"rotation {rotation_table.name} already exported for {snapshot_id}; reused")
+        else:
+            _python(
+                "scripts.export_rotation_evidence",
+                "--season",
+                plan.season,
+                "--target-gameweek",
+                str(plan.gameweek),
+                "--deadline-utc",
+                deadline_utc,
+                "--snapshot",
+                snapshot_id,
+                "--snapshot-root",
+                str(SNAPSHOT_ROOT),
+                "--output-dir",
+                str(ROTATION_ROOT),
+                "--table-name",
+                rotation_table.stem,
+            )
+            # The export's own create-once writer decides whether it wrote or replayed; what
+            # this step owes the run is that the pair is there afterwards, under the name the
+            # capture gives it.
+            if not (rotation_table.is_file() and rotation_manifest.is_file()):
+                raise WeekError(
+                    f"The rotation export reported success but {rotation_table.name} and its "
+                    f"manifest are not both under {ROTATION_ROOT}."
+                )
+            print(f"rotation {rotation_table.name} / {rotation_manifest.name}", flush=True)
+
+    # 4. handoff: the component base, with the Top-100 uplift on top when the evidence
     # was exported this run and the caller did not ask for the bare projection
     handoff_arguments = ["--snapshot-id", snapshot_id, "--snapshot-root", str(SNAPSHOT_ROOT)]
     if arguments.projection == "component" and evidence_table is not None and evidence_manifest:
@@ -544,7 +666,7 @@ def run_week(arguments: argparse.Namespace) -> int:
     if not handoff.is_file():
         raise WeekError(f"The handoff {handoff} was not written.")
 
-    # 4. our own decision, in-process: this capture, this handoff, and the mode the two
+    # 5. our own decision, in-process: this capture, this handoff, and the mode the two
     # of them earn — never an asserted "live"
     if decide_step:
         mode = decision_mode_for(
@@ -572,7 +694,7 @@ def run_week(arguments: argparse.Namespace) -> int:
             flush=True,
         )
 
-    # 5. league tree, 6. site views — into the checkout's web/public
+    # 6. league tree, 7. site views — into the checkout's web/public
     out = Path(arguments.out)
     _python(
         "scripts.build_league_site",
@@ -601,7 +723,7 @@ def run_week(arguments: argparse.Namespace) -> int:
     )
     _python("scripts.build_site", "--season", plan.season, "--out", str(out))
 
-    # 7. scoreboard — after the site, because it reads the ledger the decision just wrote.
+    # 8. scoreboard — after the site, because it reads the ledger the decision just wrote.
     # The elite-picks capture travels with the cohort: without it the Top-100 mean can
     # only be published gross of transfer costs, which is not the members' basis.
     cohort_arguments = ["--cohort-snapshot", cohort] if cohort else []
@@ -626,7 +748,7 @@ def run_week(arguments: argparse.Namespace) -> int:
         *cohort_arguments,
     )
 
-    # 8. publish
+    # 9. publish
     publish_arguments = [
         "--kind",
         "decision",
@@ -682,6 +804,12 @@ def main() -> int:
         choices=CHIP_CHOICES,
         help="the chip our decision plays (needs --decide); the choices squadopt gameweek "
         "decide offers",
+    )
+    parser.add_argument(
+        "--rotation",
+        action="store_true",
+        help="also export this week's rotation_evidence_v1 pair; opt-in because the only "
+        "club-news source today is the committed synthetic fixture",
     )
     parser.add_argument("--workers", type=int, default=8, help="league tree solver processes")
     parser.add_argument("--out", default=str(SITE_OUT), help="site output root (web/public)")

@@ -13,11 +13,13 @@ from scripts.run_week import (
     WeekError,
     _wrote_paths,
     check_evidence_for_reused_capture,
+    check_rotation_for_reused_capture,
     decision_mode_for,
     evidence_artifact,
     new_snapshot,
     plan_week,
     preflight_decide,
+    rotation_artifact,
 )
 
 from squadopt.live import LedgerError
@@ -35,6 +37,7 @@ def _plan(**overrides: object):  # type: ignore[no-untyped-def]
         "publish": False,
         "decide": False,
         "chip": None,
+        "rotation": False,
     }
     fields.update(overrides)
     return plan_week(**fields)  # type: ignore[arg-type]
@@ -155,7 +158,102 @@ def test_deciding_our_squad_sits_between_the_handoff_and_the_league_tree() -> No
     assert steps.index("handoff") < steps.index("decide") < steps.index("league")
     assert steps.index("site") < steps.index("scoreboard")
     assert "decide" not in plan.reasons
-    assert plan.steps == tuple(step for step in STEPS if step != "publish")
+    # Every step in ``STEPS`` order except the ones a flag has to ask for. Naming them
+    # rather than subtracting one keeps this assertion honest as opt-in steps are added.
+    opt_in = {"rotation", "publish"}
+    assert plan.steps == tuple(step for step in STEPS if step not in opt_in)
+
+
+# --- the rotation step ------------------------------------------------------------------
+
+
+def test_the_rotation_step_is_planned_only_when_it_is_asked_for() -> None:
+    """Opt-in, and the reason is safety rather than taste.
+
+    The only club-news source today is a committed *synthetic* fixture. A step that ran by
+    default would write fixture-derived claims into a real week's artifact, which is why this
+    one is the mirror image of ``top100`` — asked for rather than skipped.
+    """
+
+    assert "rotation" not in _plan().steps
+    assert "synthetic fixture" in _plan().reasons["rotation"]
+    assert "rotation" in _plan(rotation=True).steps
+    assert "rotation" not in _plan(rotation=True).reasons
+
+
+def test_the_rotation_step_runs_after_the_capture_and_before_the_handoff() -> None:
+    """The table is one row per roster player *of the decision capture*, so it cannot run
+    before that capture exists. The lane's "before the capture" constraint binds the model
+    call, which is a step of its own and does not exist yet; this export is pure and offline
+    over bytes already frozen, so it can introduce nothing the capture could have shown."""
+
+    steps = list(_plan(rotation=True).steps)
+
+    assert steps.index("capture") < steps.index("rotation") < steps.index("handoff")
+
+
+def test_the_rotation_artifact_is_named_for_the_capture_it_covers() -> None:
+    """Mirrors the export's own name, so a rehearsal is a different artifact from Friday's."""
+
+    table, manifest = rotation_artifact(
+        Path("artifacts/rotation"),
+        "2026-27",
+        4,
+        "fpl-live-20260911T100000Z-abc123def456",
+    )
+
+    assert table.name == "rotation_evidence_v1_2026-27_gw04_abc123def456.csv"
+    assert manifest.name == "rotation_evidence_v1_2026-27_gw04_abc123def456.manifest.json"
+
+
+def test_a_reused_capture_refuses_when_its_rotation_export_is_not_on_disk(
+    tmp_path: Path,
+) -> None:
+    """The artifact records when it was generated, and the claim chain has to be frozen
+    before the decision capture. Re-exporting now for a capture already taken stamps it
+    after that capture, always — so this is said before anything is spent, not an hour in."""
+
+    with pytest.raises(WeekError, match="already on disk"):
+        check_rotation_for_reused_capture(
+            tmp_path,
+            season="2026-27",
+            gameweek=4,
+            snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        )
+
+
+def test_a_reused_capture_with_its_rotation_export_already_on_disk_is_allowed(
+    tmp_path: Path,
+) -> None:
+    snapshot_id = "fpl-live-20260911T100000Z-abc123def456"
+    table, manifest = rotation_artifact(tmp_path, "2026-27", 4, snapshot_id)
+    table.write_text("contract_version\n", encoding="utf-8")
+    manifest.write_text("{}", encoding="utf-8")
+
+    check_rotation_for_reused_capture(
+        tmp_path, season="2026-27", gameweek=4, snapshot_id=snapshot_id
+    )
+
+
+def test_a_half_written_rotation_export_does_not_count_as_reusable(tmp_path: Path) -> None:
+    """A table without its manifest is not a readable artifact. Treating it as one would
+    take the "already exported" branch and then fail at the read."""
+
+    snapshot_id = "fpl-live-20260911T100000Z-abc123def456"
+    table, _ = rotation_artifact(tmp_path, "2026-27", 4, snapshot_id)
+    table.write_text("contract_version\n", encoding="utf-8")
+
+    with pytest.raises(WeekError, match="already on disk"):
+        check_rotation_for_reused_capture(
+            tmp_path, season="2026-27", gameweek=4, snapshot_id=snapshot_id
+        )
+
+
+def test_the_rotation_step_fits_the_plan_report_column() -> None:
+    """``describe`` pads a step name to eight characters, and "rotation" is exactly eight."""
+
+    assert len("rotation") == 8
+    assert "rotation run" in _plan(rotation=True).describe()
 
 
 def test_a_chip_needs_the_decision_it_would_be_played_in() -> None:
@@ -381,6 +479,146 @@ def test_the_evidence_paths_are_read_from_the_producers_own_lines() -> None:
     assert _wrote_paths("  contract   x.json\n") == []
 
 
+# --- the rotation step, as the run actually invokes it ---------------------------------
+
+
+def _week_arguments(tmp_path: Path, **overrides: object) -> SimpleNamespace:
+    """The namespace ``run_week`` reads, with every attribute it touches."""
+
+    fields: dict[str, object] = {
+        "season": "2026-27",
+        "gameweek": 4,
+        "league": 352490,
+        "snapshot_id": None,
+        "cohort_snapshot": None,
+        "elite_snapshot": None,
+        "skip_top100": True,
+        "projection": "component-only",
+        "decide": False,
+        "chip": None,
+        "rotation": True,
+        "workers": 8,
+        "out": str(tmp_path / "web" / "public"),
+        "publish": False,
+        "dry_run": False,
+    }
+    fields.update(overrides)
+    return SimpleNamespace(**fields)
+
+
+def _wire_a_week(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, deadline: str
+) -> list[list[str]]:
+    """Stand every subprocess and every disk root aside, keeping the ordering under test."""
+
+    registry = tmp_path / "registry.json"
+    registry.write_text("{}", encoding="utf-8")
+    handoff = tmp_path / "2026-27-gw04.json"
+    handoff.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(run_week, "REGISTRY_PATH", registry)
+    monkeypatch.setattr(run_week, "ROTATION_ROOT", tmp_path / "rotation")
+    monkeypatch.setattr(run_week, "handoff_path_for", lambda root, season, gameweek: handoff)
+    monkeypatch.setattr(
+        run_week,
+        "capture_deadline",
+        lambda root, snapshot_id: (4, deadline, "2026-09-11T09:00:00Z"),
+    )
+    monkeypatch.setattr(
+        run_week,
+        "capture",
+        lambda root, **kwargs: SimpleNamespace(
+            snapshot_id="fpl-live-20260911T100000Z-abc123def456"
+        ),
+    )
+    calls: list[list[str]] = []
+
+    def collect(arguments: list[str], **kwargs: object) -> str:
+        calls.append(list(arguments))
+        # The export is create-once, so the run checks the pair is there afterwards rather
+        # than trusting the exit code. Stand in for the bytes it would have written.
+        if any("export_rotation_evidence" in argument for argument in arguments):
+            name = arguments[arguments.index("--table-name") + 1]
+            root = Path(arguments[arguments.index("--output-dir") + 1])
+            root.mkdir(parents=True, exist_ok=True)
+            (root / f"{name}.csv").write_text("contract_version\n", encoding="utf-8")
+            (root / f"{name}.manifest.json").write_text("{}", encoding="utf-8")
+        return ""
+
+    monkeypatch.setattr(run_week, "_run", collect)
+    return calls
+
+
+def test_the_rotation_step_exports_for_the_capture_with_that_capture_s_deadline(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Running after the capture is what lets the deadline come from the capture itself.
+
+    Before it there is no decision capture to read one from, and a wrong deadline would pass
+    silently: every timing check in the artifact is made against it.
+    """
+
+    deadline = "2026-09-12T10:00:00Z"
+    calls = _wire_a_week(monkeypatch, tmp_path, deadline=deadline)
+
+    assert run_week.run_week(_week_arguments(tmp_path)) == 0
+
+    export = next(
+        call for call in calls if any("export_rotation_evidence" in part for part in call)
+    )
+    assert export[export.index("--deadline-utc") + 1] == deadline
+    assert export[export.index("--snapshot") + 1] == "fpl-live-20260911T100000Z-abc123def456"
+    assert (
+        export[export.index("--table-name") + 1] == "rotation_evidence_v1_2026-27_gw04_abc123def456"
+    )
+    assert "rotation rotation_evidence_v1_2026-27_gw04_abc123def456.csv" in capsys.readouterr().out
+
+
+def test_an_export_already_on_disk_for_that_capture_is_reused_not_remade(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls = _wire_a_week(monkeypatch, tmp_path, deadline="2026-09-12T10:00:00Z")
+    table, manifest = rotation_artifact(
+        tmp_path / "rotation", "2026-27", 4, "fpl-live-20260911T100000Z-abc123def456"
+    )
+    table.parent.mkdir(parents=True, exist_ok=True)
+    table.write_text("contract_version\n", encoding="utf-8")
+    manifest.write_text("{}", encoding="utf-8")
+
+    assert run_week.run_week(_week_arguments(tmp_path)) == 0
+
+    assert not [call for call in calls if any("export_rotation_evidence" in p for p in call)]
+    assert "already exported" in capsys.readouterr().out
+
+
+def test_without_the_flag_the_export_is_never_invoked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls = _wire_a_week(monkeypatch, tmp_path, deadline="2026-09-12T10:00:00Z")
+
+    assert run_week.run_week(_week_arguments(tmp_path, rotation=False)) == 0
+
+    assert not [call for call in calls if any("export_rotation_evidence" in p for p in call)]
+
+
+def test_a_reused_capture_without_its_rotation_export_stops_before_anything_is_spent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Nothing runs at all: not a subprocess, not the export, not the handoff.
+
+    That the refusal comes before the work is the whole point of putting it beside the
+    Top-100 one rather than inside the step it guards.
+    """
+
+    calls = _wire_a_week(monkeypatch, tmp_path, deadline="2026-09-12T10:00:00Z")
+
+    with pytest.raises(WeekError, match="already on disk"):
+        run_week.run_week(
+            _week_arguments(tmp_path, snapshot_id="fpl-live-20260911T100000Z-abc123def456")
+        )
+
+    assert calls == []
+
+
 # --- the two builds of the same tree, and which of them records ------------------------
 
 
@@ -428,6 +666,7 @@ def test_the_league_preview_records_nothing_and_leaves_the_record_to_the_publish
                 projection="component",
                 decide=False,
                 chip=None,
+                rotation=False,
                 workers=8,
                 out=str(tmp_path / "web" / "public"),
                 publish=False,
