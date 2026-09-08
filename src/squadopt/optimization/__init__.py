@@ -18,7 +18,7 @@ from squadopt.optimization.models import (
     SolverStatus,
     SquadOptimizationError,
 )
-from squadopt.optimization.optimizer import optimize_squad
+from squadopt.optimization.optimizer import optimize_squad, wall_clock_stopped_the_search
 
 __all__ = [
     "DecisionSignature",
@@ -37,4 +37,5 @@ __all__ = [
     "generate_squad_candidates",
     "objective_coefficient_fingerprint",
     "optimize_squad",
+    "wall_clock_stopped_the_search",
 ]

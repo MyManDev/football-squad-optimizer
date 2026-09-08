@@ -43,7 +43,12 @@ from squadopt.live import (
 )
 from squadopt.live.recommendation import InSeasonProjection
 from squadopt.live.transfers import HeldSquad, TransferDecision
-from squadopt.optimization import OptimizationConfig, SolverStatus
+from squadopt.optimization import (
+    OptimizationConfig,
+    SolverExecutionError,
+    SolverStatus,
+    wall_clock_stopped_the_search,
+)
 from squadopt.planning import (
     FirstWeekOverlap,
     PlanningWeekResult,
@@ -64,7 +69,22 @@ MEMBER_WINDOWS: tuple[int, ...] = (1, 3, 5)
 #: deterministic units per gameweek, under one wall-clock ceiling. A plan the budget
 #: cannot prove is published FEASIBLE with its gap, never dropped.
 WINDOW_DETERMINISTIC_UNITS_PER_WEEK = 20.0
-WINDOW_WALL_CEILING_SECONDS = 300.0
+#: The wall-clock ceiling is a safety stop, never a budget. Only the deterministic budget
+#: above may decide where a truncated search stops, because only it is a function of the
+#: inputs; ``build_window_payload`` refuses a plan this ceiling cut short rather than
+#: publishing one build's answer as though a second build would find it.
+#:
+#: 300.0 was the previous value and it was too close to the work to be a safety stop. On
+#: the GW4 capture ``fpl-live-20260907T131414Z-db9314d00961``, the fifteen registered
+#: members' five-week windows spend their full hundred deterministic units in 191.7s to
+#: 295.8s of wall clock when the site builder runs them across its own fifteen-worker
+#: pool -- the hardest member finished 4.2s inside the ceiling, before the rival menu's
+#: own solves are added to the same pool. Any load beyond that measurement and the clock
+#: stopped the search instead, which is how two builds of one capture came to publish two
+#: different five-week plans. 1800.0 is six times the measured worst case: it cannot bind
+#: on work this machine has been seen to do, and still ends a run that is twelve times
+#: slower than any measured one.
+WINDOW_WALL_CEILING_SECONDS = 1800.0
 
 #: Builds the projection horizon for the requested consecutive gameweeks from the one
 #: capture the advice is answered from. Bound by the caller (``member_horizon_builder``)
@@ -622,6 +642,13 @@ def build_window_payload(
     solver's proof resolution, so the later weeks are the first week's numbers by
     design and the limits say so. A plan the budget found but could not prove is
     published FEASIBLE with its gap, as the one-week path publishes its own.
+
+    Publishing an unproven plan is honest only while it is the *same* unproven plan on
+    every build, and that holds exactly while the deterministic budget is what stopped
+    the search. A plan the wall-clock safety cap cut short instead is refused here rather
+    than published: where a clock stops a search is a function of the machine, so two
+    builds of one capture would publish two different plans and the advice record could
+    describe neither.
     """
 
     if window not in MEMBER_WINDOWS or window == COMPUTED_WINDOW:
@@ -650,6 +677,16 @@ def build_window_payload(
             solver_deterministic_time_limit=WINDOW_DETERMINISTIC_UNITS_PER_WEEK * window,
         ),
     )
+    if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
+        raise SolverExecutionError(
+            f"The {window}-week window for entry {picks.entry_id} was stopped by the "
+            f"{WINDOW_WALL_CEILING_SECONDS}s wall-clock safety cap after "
+            f"{plan.diagnostics.get('deterministic_time_used')!r} of its "
+            f"{plan.diagnostics.get('solver_deterministic_time_limit')!r} deterministic "
+            "units. Where the clock stops a search is a function of the machine, not of "
+            "the inputs, so this plan is not the plan a second build would find and may "
+            "not be published."
+        )
     first = plan.weeks[0]
     pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
     by_id = {int(str(row["player_id"])): row for _, row in first.selected_squad.iterrows()}

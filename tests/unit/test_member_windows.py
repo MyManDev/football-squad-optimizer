@@ -6,6 +6,7 @@ fixtures, so it cannot carry a window; these tests build a capture whose calenda
 gameweek six, the way the horizon planning tests do, and hold the GW1 replay squad in it.
 """
 
+import dataclasses
 import datetime
 import json
 import re
@@ -25,6 +26,7 @@ from tests.unit.test_live_recommendation import (
 from tests.unit.test_projection_horizon_builder import _in_season_handoff
 from tests.unit.test_public_probability_guards import _FORBIDDEN_TEXT
 
+from squadopt.application import advice as advice_module
 from squadopt.application.advice import (
     MEMBER_WINDOWS,
     WINDOW_STATED_LIMITS,
@@ -40,6 +42,7 @@ from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live.recommendation import project
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY
+from squadopt.optimization import SolverExecutionError, SolverStatus
 from squadopt.planning import CHIP_NAMES
 
 ENTRY = 101
@@ -286,6 +289,83 @@ def test_the_batch_publishes_the_windows_without_moving_the_baseline_bytes(
     assert index["unavailable"] == []
 
 
+def test_two_builds_of_one_capture_publish_the_same_window_bytes(
+    window_world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The published requirement: the same capture, handoff and registry, built twice,
+    are the same files with the same bytes.
+
+    A window is published as the best plan the search found rather than a proven one,
+    which is honest only while "the best found" is the same on both builds. Otherwise a
+    member is shown whichever answer their build happened to reach, and the immutable
+    advice record describes an answer rather than the answer.
+    """
+
+    when = datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC)
+    registrations = (EntryRegistration(ENTRY, "member-a", "2026-08-23T00:00:00Z"),)
+    published = []
+    for name in ("first", "second"):
+        report = build_league_views(
+            window_world["provider"],
+            registrations,
+            window_world["inputs"],
+            window_world["projection"],
+            window_world["rules"],
+            league_id=LEAGUE,
+            league_name="Test League",
+            out_dir=tmp_path / name,
+            now=when,
+            rival_menu=False,
+            horizon_builder=window_world["builder"],
+        )
+        published.append(sorted(report.files))
+
+    assert published[0] == published[1]
+    assert f"advice/{ENTRY}/saf-puan/5.json" in published[0]
+    for relative in published[0]:
+        assert (tmp_path / "first" / relative).read_bytes() == (
+            tmp_path / "second" / relative
+        ).read_bytes(), relative
+
+
+def test_a_window_the_clock_cut_short_is_refused_rather_than_published(
+    window_world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A search the wall-clock safety cap stopped is not published.
+
+    The deterministic budget stops a truncated search at a point that is a function of
+    the inputs; the wall clock stops it at a point that is a function of the machine. On
+    the GW4 capture the fifteen members' five-week windows spend their whole hundred
+    deterministic units in 191.7s to 295.8s of wall clock across the site builder's own
+    fifteen-worker pool, so the ceiling that used to sit at 300.0s bound under any load
+    beyond that measurement and two builds published two different plans. The ceiling is
+    now far above that work, and a plan it did cut short is refused here: the planner
+    already refuses a clock-cut search that reached no plan at all, and this closes the
+    other half, where the clock cut a search that had one.
+    """
+
+    solved = advice_module.plan_transfer_horizon
+
+    def clock_stopped(*args: Any, **kwargs: Any) -> Any:
+        plan, config = solved(*args, **kwargs)
+        cut = dataclasses.replace(
+            plan,
+            solver_status=SolverStatus.FEASIBLE,
+            diagnostics={
+                **dict(plan.diagnostics),
+                "deterministic_time_used": 21.5,
+                "solver_deterministic_time_limit": 60.0,
+                "deterministic_time_budget_exhausted": False,
+            },
+        )
+        return cut, config
+
+    monkeypatch.setattr(advice_module, "plan_transfer_horizon", clock_stopped)
+
+    with pytest.raises(SolverExecutionError, match="wall-clock safety cap"):
+        _advise(window_world, window=3)
+
+
 def test_the_top100_sentence_is_published_only_when_the_projection_carries_it(
     window_world: dict[str, Any],
 ) -> None:
@@ -299,8 +379,6 @@ def test_the_top100_sentence_is_published_only_when_the_projection_carries_it(
     versions are forbidden from carrying one — so the sentence is derived from the
     projection rather than assumed.
     """
-
-    import dataclasses
 
     projection = window_world["projection"]
     assert projection.diagnostics.get("projection_evidence_fingerprint") is None
