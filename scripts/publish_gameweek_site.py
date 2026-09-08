@@ -16,6 +16,12 @@ to remove it; an existing branch is reused only with ``--force-branch``; a build
 changes nothing stops before creating an empty commit; a PR that already exists is
 reported, not duplicated. Nothing here touches ``data/ledger`` — settle itself is
 ``squadopt gameweek settle`` and stays a separate, deliberate act.
+
+The one thing this does write outside the worktree is the immutable advice record: the
+rebuild is the process that emits the bytes that ship, so it is the process that records
+them, into *this* checkout's ``data/advice_records`` rather than into the worktree it is
+about to delete. A week already recorded is therefore refused when the rebuild disagrees,
+with the difference named; ``--no-advice-record`` is the deadline escape.
 """
 
 import argparse
@@ -45,6 +51,14 @@ class LeaguePublish:
     registry: Path = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
     archive_root: Path = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
     ledger_root: Path = REPOSITORY_ROOT / "data" / "ledger"
+    #: Where the rebuild's immutable advice record lands. Absolute and rooted in *this*
+    #: checkout for the same reason as the roots above: the build runs in a throwaway
+    #: worktree, so a record left at the build's own default would be deleted with it.
+    advice_record_root: Path = REPOSITORY_ROOT / "data" / "advice_records"
+    #: False passes ``--no-advice-record`` through: the escape when a re-publish differs
+    #: from the recorded week and the deadline will not wait for the difference to be
+    #: reconciled. The first record is kept; this publish adds none.
+    record_advice: bool = True
 
     def __post_init__(self) -> None:
         if self.league_id < 1:
@@ -120,6 +134,8 @@ class LeaguePublish:
             str(self.registry),
             "--archive-root",
             str(self.archive_root),
+            "--advice-record-root",
+            str(self.advice_record_root),
             "--out",
             str(out),
             "--workers",
@@ -127,6 +143,8 @@ class LeaguePublish:
         ]
         if self.in_season_projection is not None:
             arguments += ["--in-season-projection", str(self.in_season_projection)]
+        if not self.record_advice:
+            arguments.append("--no-advice-record")
         return arguments
 
 
@@ -327,6 +345,13 @@ def main() -> int:
         help="the fpl-elite-picks capture that nets that cohort's week; without it the "
         "Top-100 mean is published gross of transfer costs and labelled gross",
     )
+    parser.add_argument(
+        "--no-advice-record",
+        action="store_true",
+        help="publish without recording what was published; the escape when a re-publish "
+        "of an already recorded week is refused and the deadline will not wait — the first "
+        "record is kept and the difference stays to be reconciled afterwards",
+    )
     arguments = parser.parse_args()
     try:
         names = PublishNames(
@@ -343,6 +368,7 @@ def main() -> int:
                 workers=arguments.workers,
                 cohort_snapshot=arguments.cohort_snapshot,
                 elite_snapshot=arguments.elite_snapshot,
+                record_advice=not arguments.no_advice_record,
             )
         return publish(
             names, force_branch=arguments.force_branch, dry_run=arguments.dry_run, league=league

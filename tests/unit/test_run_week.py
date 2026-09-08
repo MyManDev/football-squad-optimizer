@@ -379,3 +379,68 @@ def test_the_evidence_paths_are_read_from_the_producers_own_lines() -> None:
         Path("artifacts/phase_b/player_evidence_v1_2026-27_gw04_top100.manifest.json"),
     ]
     assert _wrote_paths("  contract   x.json\n") == []
+
+
+# --- the two builds of the same tree, and which of them records ------------------------
+
+
+def test_the_league_preview_records_nothing_and_leaves_the_record_to_the_publish(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An ordinary week builds the league tree twice, and only one build may record it.
+
+    Step 5 builds into the checkout's ``web/public``; those bytes are never committed. Step
+    8 rebuilds the same tree in a throwaway worktree and *those* bytes are the ones pushed,
+    released and served. The advice record carries the digest of the bytes that were
+    published, so it belongs to the second build; a record written by the first would
+    describe a tree nobody saw, and would then refuse the real publish an hour later at the
+    worst possible moment.
+    """
+
+    registry = tmp_path / "registry.json"
+    registry.write_text("{}", encoding="utf-8")
+    handoff = tmp_path / "2026-27-gw04.json"
+    handoff.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(run_week, "REGISTRY_PATH", registry)
+    monkeypatch.setattr(run_week, "handoff_path_for", lambda root, season, gameweek: handoff)
+    monkeypatch.setattr(
+        run_week,
+        "capture_deadline",
+        lambda root, snapshot_id: (4, "2026-09-12T10:00:00Z", "2026-09-11T09:00:00Z"),
+    )
+    calls: list[list[str]] = []
+
+    def collect(arguments: list[str], *, cwd: Path = run_week.REPOSITORY_ROOT) -> str:
+        calls.append(list(arguments))
+        return ""
+
+    monkeypatch.setattr(run_week, "_run", collect)
+    assert (
+        run_week.run_week(
+            SimpleNamespace(
+                season="2026-27",
+                gameweek=4,
+                league=352490,
+                snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+                cohort_snapshot=None,
+                elite_snapshot=None,
+                skip_top100=True,
+                projection="component",
+                decide=False,
+                chip=None,
+                workers=8,
+                out=str(tmp_path / "web" / "public"),
+                publish=False,
+                dry_run=False,
+            )
+        )
+        == 0
+    )
+
+    league = next(call for call in calls if "scripts.build_league_site" in call)
+    assert "--no-advice-record" in league
+    assert "--advice-record-root" not in league
+    # The publish command the run prints is the one that does record, so the week is not
+    # merely unrecorded: it is recorded by the build whose bytes ship.
+    printed = capsys.readouterr().out
+    assert "scripts.publish_gameweek_site" in printed

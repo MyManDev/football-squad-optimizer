@@ -39,7 +39,8 @@ Steps, each skippable by naming its output:
                    the previous gameweek's decision and not yet this one, so no capture is
                    spent on a run that would refuse an hour later.
 5. league          the league tree: every member's baseline and the rival menu
-                   (``--workers``)
+                   (``--workers``); a local preview, so it writes no advice record —
+                   step 8's rebuild emits the bytes that ship and records those
 6. site            the season views (they read the ledger, so after the decision)
 7. scoreboard      the weekly scoreboard beside the league tree: our paper ledger, the
                    members' net, the Top-100 mean when a cohort capture is known, the
@@ -591,6 +592,12 @@ def run_week(arguments: argparse.Namespace) -> int:
         str(out),
         "--workers",
         str(arguments.workers),
+        # This build is the local preview: its bytes stay in the checkout and are never
+        # committed. The publish step rebuilds the same tree in a fresh worktree and *that*
+        # rebuild's bytes are what ship, so the record — whose digests exist to prove which
+        # bytes were published — is written there and only there. Recording here would
+        # freeze a tree nobody ever saw, and would then refuse the real publish.
+        "--no-advice-record",
     )
     _python("scripts.build_site", "--season", plan.season, "--out", str(out))
 

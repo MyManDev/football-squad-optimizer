@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from squadopt.application.advice import member_horizon_builder
+from squadopt.application.advice_record import AdviceRecordConflictError
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import (
     MemberRender,
@@ -384,6 +385,19 @@ def main() -> int:
             f"{window_files} of them multi-week windows"
         )
         return 0
+    except AdviceRecordConflictError as error:
+        # The published files are already on disk; only the record refused. Name the
+        # escape, because the alternative to naming it is an operator improvising one
+        # against a deadline — and every improvisation here loses evidence.
+        print(
+            f"build_league_site refused:\n  {error}\n"
+            "  If this week must be published before its deadline, re-run with "
+            "--no-advice-record (scripts.publish_gameweek_site takes the same flag and "
+            "passes it through): the recorded week is kept as it stands and the "
+            "difference above is what to reconcile afterwards.",
+            file=sys.stderr,
+        )
+        return 1
     except (DataError, OSError, ValueError) as error:
         print(f"build_league_site failed:\n  {error}", file=sys.stderr)
         return 1
