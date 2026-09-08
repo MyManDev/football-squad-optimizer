@@ -53,6 +53,11 @@ ROSTER: Final[tuple[tuple[int, str, str], ...]] = (
     (900013, "A.Fernandes", "Man Utd"),
     # Case: his club published nothing we read. Never asked is not asked-and-silent.
     (900014, "Branthwaite", "Everton"),
+    # Case: a short name carrying a diacritic. A club page and a payload can spell the same
+    # player differently -- one composed, one decomposed, one stripped of the accent -- so
+    # the join has to fold before it compares, and this row makes that testable rather than
+    # assumed. Nothing else in the fixture folds to the same key.
+    (900015, "Mart\u00ednez", "Arsenal"),
 )
 
 
@@ -85,6 +90,8 @@ ARSENAL_TEXT, ARSENAL_SPANS = _document(
         ("odegaard", 'Asked about the captain, he said: "Odegaard is at 80% and we will see."'),
         ("martinelli", "Martinelli has trained twice since the international break."),
         ("white", "White is in contention after a light knock."),
+        # Spelled without the accent, as an English-language page often writes it.
+        ("martinez", "Martinez has trained all week and will start."),
         ("ghost", "One name on the sheet does not match any registered player."),
     ),
 )
@@ -203,6 +210,17 @@ CLAIMS: Final[tuple[dict[str, Any], ...]] = (
         ARSENAL_URL,
         _span(ARSENAL_SPANS, "white"),
         "He is likely to start after a light knock.",
+    ),
+    # Case: the claim drops a diacritic the roster carries. Folding is what makes this
+    # resolve; without it a real capture would silently lose the player.
+    _claim(
+        "Martinez",
+        "Arsenal",
+        "stated_expected_to_start",
+        "manager",
+        ARSENAL_URL,
+        _span(ARSENAL_SPANS, "martinez"),
+        "He has trained all week and will start.",
     ),
     # Case: a name that matches no registered player at all.
     _claim(

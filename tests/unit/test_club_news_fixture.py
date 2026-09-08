@@ -190,6 +190,22 @@ def test_a_surname_two_players_in_one_club_share_is_present() -> None:
     assert any(claim["player_name"] in colliding for claim in CLAIMS)
 
 
+def test_a_short_name_carrying_a_diacritic_is_present() -> None:
+    """A club page and a payload can spell one player differently, so folding is testable."""
+
+    document = make_club_news_fixture()
+    accented = [
+        entry["web_name"]
+        for entry in document["roster"]
+        if any(ord(character) > 127 for character in entry["web_name"])
+    ]
+
+    assert accented
+    # And a claim spells one of them without its accent, which is the case that matters.
+    stripped = {claim["player_name"] for claim in CLAIMS}
+    assert any(name not in stripped for name in accented)
+
+
 def test_a_claim_naming_nobody_on_the_roster_is_present() -> None:
     document = make_club_news_fixture()
     names = {entry["web_name"] for entry in document["roster"]}
@@ -321,11 +337,14 @@ def test_coding_against_an_empty_roster_is_refused(provider: FixtureClubNewsProv
 
 
 def test_the_roster_keys_on_the_persistent_code(provider: FixtureClubNewsProvider) -> None:
-    roster = provider.roster()
+    """Derived from the generator rather than a written count, which would rot on a new row."""
 
-    assert len(roster) == 14
+    roster = provider.roster()
+    declared = make_club_news_fixture()["roster"]
+
+    assert len(roster) == len(declared)
     assert all(isinstance(player, RosterPlayer) for player in roster)
-    assert len({player.player_id for player in roster}) == 14
+    assert len({player.player_id for player in roster}) == len(declared)
 
 
 def test_a_fixture_of_another_contract_is_refused(tmp_path: Path) -> None:
