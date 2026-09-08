@@ -15,10 +15,12 @@ Honesty is structural here, not editorial:
   rival-relative window probabilities fell three pre-registered calibrations and the
   line's stop-rule binds (``measurements_index.md:87-89``).
 - ``publishes`` must be a subset of ``PUBLISHABLE_FIELDS``, checked at construction.
-  The envelope carries expected points, expected gap, overlap, the price tag and the
-  solver's own account; it carries no probability and no spread of the gap — shared
-  players cancel in the gap's *mean*, not in its spread, so the spread was never
-  honestly publishable from this machinery.
+  The envelope carries expected points, expected gap, overlap, the price tag with the
+  ceiling that bounds it when a proof is missing, and the solver's own account; it
+  carries no probability and no spread of the gap — shared players cancel in the gap's
+  *mean*, not in its spread, so the spread was never honestly publishable from this
+  machinery. A solver bound is not a spread: it is a deterministic statement about a
+  search that stopped, and it is published as one end, never as an interval.
 - A strategy whose ``evidence`` is not ``GATED_PASS`` cannot carry safety language in
   its tagline: until the pre-registered bench (``docs/strategy_bench_prereg.md``)
   passes for its bands, a name may describe the constraint, never the outcome.
@@ -44,10 +46,10 @@ class StrategyConfigurationError(ValueError):
 
 
 #: Everything a strategy may publish. The honesty envelope, closed: expected points,
-#: expected gap, set arithmetic, the price tag, the solver's own account, and the
-#: decision itself — captain, vice-captain, eleven, bench order, chip. No probability,
-#: no quantile, no spread — the stop-rule that closed those lines is a measurement,
-#: and this list is where it is enforced structurally.
+#: expected gap, set arithmetic, the price tag and its ceiling, the solver's own account,
+#: and the decision itself — captain, vice-captain, eleven, bench order, chip. No
+#: probability, no quantile, no spread — the stop-rule that closed those lines is a
+#: measurement, and this list is where it is enforced structurally.
 PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
     {
         "moves",
@@ -58,6 +60,12 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         "expected_own_points",
         "expected_gap_vs_rival",
         "expected_points_cost",
+        # The most that price can be, from the solver's own bound on the control it is
+        # measured against. A deterministic ceiling on a difference of two solved plans
+        # — not a spread, not an interval around an estimate: under a proof it *is* the
+        # price, and without one it is the only end of the range that can be stated
+        # without reading as a confidence claim.
+        "expected_points_cost_ceiling",
         "overlap_count",
         "captain_agreement",
         "difference_makers",
@@ -277,6 +285,9 @@ _BASELINE_PUBLISHES: Final = frozenset(
 _RIVAL_PUBLISHES: Final = _BASELINE_PUBLISHES | frozenset(
     {
         "expected_gap_vs_rival",
+        # A rival plan is priced against a control this member's own solve produced, so
+        # it is the one path that knows how far that control's proof got.
+        "expected_points_cost_ceiling",
         "overlap_count",
         "captain_agreement",
         "difference_makers",

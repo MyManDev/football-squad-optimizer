@@ -43,7 +43,7 @@ from squadopt.live import (
 )
 from squadopt.live.recommendation import InSeasonProjection
 from squadopt.live.transfers import HeldSquad, TransferDecision
-from squadopt.optimization import OptimizationConfig
+from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import (
     FirstWeekOverlap,
     PlanningWeekResult,
@@ -383,6 +383,31 @@ def net_expected_points(plan: TransferPlanResult) -> float:
     return float(score) - float(hits)
 
 
+def bound_slack(plan: TransferPlanResult) -> float:
+    """How far above this plan's own value the solver's own bound still stands.
+
+    ``OPTIMAL`` is a proof: the bound and the value meet, so the slack is zero and every
+    reading taken from this plan is exact. Any other status is a plan the search found
+    without finishing the proof, and the planner records the measured distance to its
+    bound beside it (``absolute_optimality_gap``, in expected points). A solve that
+    reached no plan at all never gets this far — the rival path refuses it first.
+
+    An unproven plan whose bound was not recorded is refused rather than read as zero:
+    "the proof did not finish" and "the proof finished at zero" are different facts, and
+    only one of them can be published as a bound.
+    """
+
+    if plan.solver_status is SolverStatus.OPTIMAL:
+        return 0.0
+    raw = plan.diagnostics.get("absolute_optimality_gap")
+    if raw is None:
+        raise EntryError(
+            f"A {plan.solver_status.name} plan carries no measured bound gap; its distance "
+            "from the best possible plan is unknown and may not be read as zero."
+        )
+    return max(0.0, float(str(raw)))
+
+
 def _control_for(
     picks: EntryPicks,
     control: MemberControl | None,
@@ -502,7 +527,11 @@ def build_advice_payload(
         # any one move, so no move row carries it.
         "transfer_hit_points": transfer_hit_points,
         # The mode's whole-plan price against the pure-points pick, in expected points —
-        # the only cross-mode number the site may show (no probability ships, ever).
+        # the only cross-mode number the site may show (no probability ships, ever). It
+        # is the measured difference between two solved plans, which is the cost itself
+        # only when both were proved; the rival path publishes the bound beside it
+        # (``expected_points_cost_ceiling``) and the page reads that one when a proof is
+        # missing.
         "expected_points_cost": float(expected_points_cost),
         "rival_label": rival_label,
         # The solver's own account of the plan: OPTIMAL is a proof, FEASIBLE is a found
@@ -883,11 +912,17 @@ def _advise_against_rival(
     net of the hits each plan pays and both from this member's own solves. A control the
     solver found but could not prove is used as it is and published beside the tag as
     ``control_solver_status`` with its measured gap; only a control with no solution
-    refuses. Beyond ``rival_entry_id`` — the identity field naming whose squad the tag
-    was priced against, which the request itself carries and the reader's client checks
-    the answer against — everything added to the payload here is in the strategy's
-    declared ``publishes`` set: the mean gap, the overlap count, captain agreement; no
-    spread, no probability, ever.
+    refuses. Because that tag is then a difference of two values the solver could not
+    prove, it is published together with ``expected_points_cost_ceiling`` — the most the
+    band can cost, carrying the control's own bound — and the page states the ceiling
+    rather than the difference whenever a proof is missing. Under a proof the two are
+    the same number and nothing a member reads moves.
+
+    Beyond ``rival_entry_id`` — the identity field naming whose squad the tag was priced
+    against, which the request itself carries and the reader's client checks the answer
+    against — everything added to the payload here is in the strategy's declared
+    ``publishes`` set: the mean gap, the overlap count, captain agreement; no spread, no
+    probability, ever.
     """
 
     picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
@@ -980,14 +1015,40 @@ def _advise_against_rival(
     raw_control_gap = pricing_plan.diagnostics.get("absolute_optimality_gap")
     # Net of hits on both sides: a band that forces paid transfers costs those hits.
     strategy_net = net_expected_points(plan)
+    pricing_net = net_expected_points(pricing_plan)
     # The solver's bench weight and its own bound gap sit outside that arithmetic, so
     # the anchor is floored at the best plan solved here: a banded candidate is itself a
     # plan with no strategy constraint required, so a member could always play it. The
     # tag is then a price and can never be published as a discount.
-    solved_nets = [net_expected_points(pricing_plan), strategy_net]
+    solved_nets = [pricing_net, strategy_net]
     if other is not None:
         solved_nets.append(net_expected_points(other[0]))
     control_net = max(solved_nets)
+    # --- what the tag may be claimed to be, once a proof is missing ------------------
+    #
+    # Write C* for the best plan with no strategy constraint and S* for the best plan
+    # inside the band. The true cost is C* - S*, and it is never below zero: the band
+    # only removes plans, so C* >= S*. Neither is known here. What is known is what the
+    # solver returned and how far its own bound still stands above it:
+    #
+    #     control_net <= C* <= pricing_net + control_slack
+    #     strategy_net <= S* <= strategy_net + bound_slack(plan)
+    #
+    # Subtracting, the true cost lies between (tag - the band plan's slack) and
+    # (control_ceiling - strategy_net), and never below zero. Under a proof both slacks
+    # are zero, both ends meet the tag, and the tag *is* the cost — which is why nothing
+    # a proven plan publishes moves.
+    #
+    # Only the ceiling is published. The floor is max(0, tag - the band plan's slack),
+    # which collapses to zero exactly when the band plan is the unproven one, so the
+    # pair would usually read "between 0 and X" — and a floor printed beside a ceiling
+    # reads as an interval around a central estimate, which is the one thing the
+    # envelope may never look like. The member's question is whether the constraint is
+    # affordable, and the most it can cost answers it in one deterministic number.
+    control_slack = bound_slack(pricing_plan)
+    # The bound belongs to the pricing solve, so it is carried from that plan's own
+    # value; the anchor above may already stand higher, and C* cannot be below it.
+    control_ceiling = max(control_net, pricing_net + control_slack)
     payload = build_advice_payload(
         picks,
         inputs,
@@ -1016,6 +1077,11 @@ def _advise_against_rival(
     hits = plan.total_transfer_hit_points
     my_hits = float(hits) if hits is not None and math.isfinite(hits) else 0.0
     payload["rival_entry_id"] = rival_entry_id
+    # The most this band can cost, from the solver's own bound (see the arithmetic
+    # above). Equal to ``expected_points_cost`` under a proof, never below it, and never
+    # below zero, so a reader who reads only this number is never told a constrained
+    # plan hands them points.
+    payload["expected_points_cost_ceiling"] = control_ceiling - strategy_net
     payload["overlap_count"] = len(squad_ids & rival_eleven)
     # What the strategy asked for, what the free transfers could reach, and the cap
     # itself: a target a member cannot afford without hits is stated, never bought.
@@ -1034,6 +1100,9 @@ def _advise_against_rival(
             "overlap_applied": other[2],
             "transfer_hit_points": float(other_hits) if other_hits is not None else None,
             "expected_points_cost": control_net - net_expected_points(other[0]),
+            # The same ceiling arithmetic: the candidate the member did not get is
+            # priced against the same control, so it carries the same bound.
+            "expected_points_cost_ceiling": control_ceiling - net_expected_points(other[0]),
         }
     )
     # A mean and only a mean: shared players cancel exactly in the fixed-decision
@@ -1062,6 +1131,7 @@ __all__: tuple[str, ...] = (
     "HorizonBuilder",
     "MemberControl",
     "advise_entry",
+    "bound_slack",
     "build_advice_payload",
     "build_window_payload",
     "lineup_fields",
