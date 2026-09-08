@@ -7,9 +7,9 @@ nothing on disk says what the previous week's advice was. A page that wants to r
 we advised has nothing to read, and no amount of re-solving recovers it: the capture, the
 handoff and the code all moved on.
 
-So the publish writes a second thing, once, and never again: for each member and gameweek,
-a record of the advice documents it just emitted. Three properties make it usable as
-evidence rather than as a note:
+So the publish writes a second thing, once per publish and never twice for the same one:
+for each member, gameweek **and capture**, a record of the advice documents it just
+emitted. Three properties make it usable as evidence rather than as a note:
 
 - **It is written by the call that writes the published bytes.** ``build_league_views``
   writes both, from the same picks, the same projection and the same payloads. A runner
@@ -22,9 +22,24 @@ evidence rather than as a note:
   advice was computed from, so "ignored our advice" and "could not afford it" stay
   different answers; and the provenance that says which model, which planner policy and
   which commit produced it. Nothing has to be re-solved, and nothing may be inferred.
-- **It refuses to change.** A second publish of the same week either writes exactly the
+- **It refuses to change.** A second build *of the same capture* either writes exactly the
   same document — a no-op — or is refused with the difference named. It is never mutated
   silently, because a record that can be rewritten proves nothing about what was published.
+  That refusal is also the divergence detector: the same capture must solve to the same
+  bytes, and when it did not, this is what surfaced it.
+
+A gameweek is normally published more than once — a mid-week publish so members see
+something, then another shortly before the deadline with fresh availability — and each of
+those is a *different capture*. Keying the record by season, gameweek and entry alone made
+the first publish win: the second was refused as a rewrite, so the advice that actually
+stood at the deadline, the advice a member acted on, never reached the record while the
+record held an earlier version nobody used. The capture is therefore part of the key, one
+path segment of its own, and each publish writes its own record without blocking any other.
+Create-once still holds within a capture, which is where it was ever earning anything.
+
+The reader that answers the review page's question — which record was the last one written
+from a capture preceding the deadline — is :func:`load_member_advice_record_for_deadline`,
+and :func:`recorded_captures` lists what a week holds.
 
 What it deliberately does not do: score anything, compare anything, or read the season
 ledger. It records; a review page is a separate piece of work reading these documents.
@@ -38,11 +53,13 @@ import shutil
 import subprocess
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Final
 
 from squadopt.application.entries import EntryPicks
 from squadopt.data.errors import DataError
+from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live.ledger import (
     prune_stale_staging,
     record_lock,
@@ -53,7 +70,11 @@ from squadopt.live.ledger import (
 from squadopt.live.recommendation import Projection
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY, MEMBER_PLANNING_POLICY_ID
 
-MEMBER_ADVICE_RECORD_CONTRACT_VERSION: Final = "member_advice_record_v1"
+#: ``v2`` keys a record by its capture as well, and carries the capture in the document.
+#: ``v1`` was one record per season, gameweek and entry, addressed at ``entry-<id>/`` with
+#: no capture anywhere in it, so the two shapes cannot be read as one — see
+#: ``LEGACY_LAYOUT_NOTE`` for why no migration is written.
+MEMBER_ADVICE_RECORD_CONTRACT_VERSION: Final = "member_advice_record_v2"
 
 #: What the record's player ids are. Everything the projection, the prices and the picks
 #: provider publish is the FPL **element code** — the identifier that survives a transfer
@@ -68,6 +89,33 @@ RECORD_FILE: Final = "advice.json"
 _COMMIT_PATTERN: Final = re.compile(r"[0-9a-f]{40}")
 #: How many differing fields a refusal names before it stops listing them.
 _DIFFERENCE_LIMIT: Final = 12
+#: What may be a capture's path segment. A snapshot identifier is
+#: ``{source}-{stamp}-{digest}`` (``data/snapshots.py``) and so is already safe, but this is
+#: the segment of a path that is written to, so it is checked rather than trusted: no
+#: separator, no ``.``/``..``, and a length bound because the whole record path has to stay
+#: inside Windows' limit with a staging sibling's name on top of it.
+_CAPTURE_SEGMENT: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,95}")
+
+#: What happens to a record written under the pre-capture key. Nothing: none exists.
+#:
+#: ``v1`` wrote ``<season>/gw<NN>/entry-<id>/advice.json``; ``v2`` writes
+#: ``<season>/gw<NN>/entry-<id>/<snapshot id>/advice.json``. No ``v1`` record existed on any
+#: disk when the key changed — the record had never been written by a real publish — so a
+#: migration would be code with nothing to migrate, and it is deliberately not written.
+#: What *is* written is the refusal below, because the failure mode of ignoring the question
+#: is the bad one: a reader that listed capture directories would simply not see a ``v1``
+#: file sitting beside them, and would answer "we told them nothing" while the evidence lay
+#: unread in the same directory. So both the reader and the writer refuse and name the file.
+#: Moving one by hand is mechanical where its ``state.source_snapshot_id`` names a capture —
+#: that field is the same identifier the new segment uses — and impossible where it is null,
+#: which is exactly why the choice is a person's and not a silent rename.
+LEGACY_LAYOUT_NOTE: Final = (
+    "It was written under the pre-capture key (contract member_advice_record_v1), which "
+    "addressed one record per week rather than one per publish. There is no migration: no "
+    "such record existed when the key changed, and the two shapes are never read as one. "
+    "Move it under the directory named by the capture its own state.source_snapshot_id "
+    "states, or delete it, before this week can be read or written again."
+)
 
 
 class AdviceRecordError(DataError):
@@ -75,7 +123,49 @@ class AdviceRecordError(DataError):
 
 
 class AdviceRecordConflictError(AdviceRecordError):
-    """A week already recorded was published again with different bytes."""
+    """A capture already recorded was built again with different bytes."""
+
+
+@dataclass(frozen=True, slots=True)
+class RecordCapture:
+    """The capture one record was built from: which capture, and when it was taken.
+
+    Both halves are load-bearing and neither is derivable from the other here. The
+    identifier is the record's key — it is the path segment that lets two publishes of one
+    gameweek coexist. The instant is what the review page's question is asked in terms of:
+    a record counts as "what we told them" only if its capture preceded the deadline, and
+    parsing that instant back out of the identifier's stamp would be reading a display
+    format as data.
+    """
+
+    snapshot_id: str
+    captured_at_utc: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.snapshot_id, str) or not _CAPTURE_SEGMENT.fullmatch(
+            self.snapshot_id
+        ):
+            raise AdviceRecordError(
+                f"snapshot_id must be one safe path segment of at most 96 characters, got "
+                f"{self.snapshot_id!r}."
+            )
+        try:
+            object.__setattr__(
+                self,
+                "captured_at_utc",
+                normalize_utc_timestamp(self.captured_at_utc, label="captured_at_utc"),
+            )
+        except DataError as error:
+            raise AdviceRecordError(str(error)) from error
+
+    @property
+    def instant(self) -> datetime:
+        """The capture instant, for comparison with a deadline."""
+
+        return as_instant(self.captured_at_utc)
+
+    def to_document(self) -> dict[str, object]:
+        return {"snapshot_id": self.snapshot_id, "captured_at_utc": self.captured_at_utc}
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,11 +215,12 @@ def repository_commit() -> str | None:
     return value if _COMMIT_PATTERN.fullmatch(value) else None
 
 
-def record_directory(root: Path, season: str, gameweek: int, entry_id: int) -> Path:
-    """``<root>/<season>/gw<NN>/entry-<id>`` — one document per season, week and member.
+def entry_directory(root: Path, season: str, gameweek: int, entry_id: int) -> Path:
+    """``<root>/<season>/gw<NN>/entry-<id>`` — every record this member has for this week.
 
     The gameweek is in the path, which is the whole point: the published tree's addresses
-    have no week in them and are overwritten, and these are neither.
+    have no week in them and are overwritten, and these are neither. What is *below* this
+    is one directory per capture, because a week is published more than once.
     """
 
     if not isinstance(season, str) or not season.strip():
@@ -138,6 +229,42 @@ def record_directory(root: Path, season: str, gameweek: int, entry_id: int) -> P
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             raise AdviceRecordError(f"{name} must be a positive integer.")
     return Path(root) / season.strip() / f"gw{gameweek:02d}" / f"entry-{entry_id}"
+
+
+def record_directory(
+    root: Path, season: str, gameweek: int, entry_id: int, snapshot_id: str
+) -> Path:
+    """``<root>/<season>/gw<NN>/entry-<id>/<snapshot id>`` — one publish's record.
+
+    A path segment per capture, rather than a capture field inside a single week's file or
+    a suffix on its name, for three reasons. Each publish's write is then an ordinary
+    create-once of a fresh directory, so the existing lock, staging and manifest primitives
+    keep working unchanged and no writer ever edits another's bytes. The week's directory
+    lists its publishes by listing itself, which is what the reader below needs. And the
+    key is visible in the path, so an operator looking at the tree can see which capture a
+    record came from without opening it.
+    """
+
+    directory = entry_directory(root, season, gameweek, entry_id)
+    if not isinstance(snapshot_id, str) or not _CAPTURE_SEGMENT.fullmatch(snapshot_id):
+        raise AdviceRecordError(
+            f"snapshot_id must be one safe path segment of at most 96 characters, got "
+            f"{snapshot_id!r}."
+        )
+    return directory / snapshot_id
+
+
+def _refuse_legacy_layout(directory: Path) -> None:
+    """Refuse a member-week directory that holds a record in the pre-capture shape.
+
+    ``v1`` put ``advice.json`` directly here; ``v2`` puts a capture directory here. Reading
+    on would silently ignore the ``v1`` file, and writing on would leave it unreadable
+    beside the new records, so both stop and name it.
+    """
+
+    legacy = directory / RECORD_FILE
+    if legacy.is_file():
+        raise AdviceRecordError(f"{legacy} is not a capture directory. {LEGACY_LAYOUT_NOTE}")
 
 
 def _player_ids(document: Mapping[str, object]) -> set[int]:
@@ -300,6 +427,7 @@ def build_member_advice_record(
     projection: Projection,
     published: Sequence[PublishedAdvice],
     *,
+    capture: RecordCapture,
     league_id: int,
     generated_at_utc: str,
     league_view_contract_version: str,
@@ -308,6 +436,9 @@ def build_member_advice_record(
     commit: str | None = None,
 ) -> dict[str, object]:
     """Assemble one member's record for one gameweek from what was just published.
+
+    ``capture`` is the capture this publish read, and it is the record's key: a week
+    published twice from two captures is two records, not a rewrite of one.
 
     ``generated_at_utc`` is the timestamp the published envelopes carry, not the moment
     this runs: the record describes a publication, and stamping it with its own clock
@@ -322,6 +453,13 @@ def build_member_advice_record(
             f"Entry {picks.entry_id} published no advice documents; a record of nothing "
             "would say a member was advised when they were not."
         )
+    if picks.source_snapshot_id is not None and picks.source_snapshot_id != capture.snapshot_id:
+        raise AdviceRecordError(
+            f"Entry {picks.entry_id}'s picks were read from capture "
+            f"{picks.source_snapshot_id!r}, but this record would be keyed by "
+            f"{capture.snapshot_id!r}. The key has to name the capture the advice was built "
+            "from, or the record is filed under a publish that never happened."
+        )
     named: set[int] = set(int(player) for player in picks.squad)
     documents = [_advice_document(advice) for advice in published]
     for document in documents:
@@ -334,6 +472,10 @@ def build_member_advice_record(
         # The week the advice is *for*: the picks are the week before it.
         "gameweek": int(picks.gameweek) + 1,
         "entry_id": int(picks.entry_id),
+        # The capture this publish read: the fourth part of the record's key, in the
+        # document as well as in the path so a file that has been moved still says which
+        # publish it is, and so the reader can order publishes without parsing a path.
+        "capture": capture.to_document(),
         "league_id": int(league_id),
         "generated_at_utc": generated_at_utc,
         "league_view_contract_version": league_view_contract_version,
@@ -457,9 +599,10 @@ def _conflict(directory: Path, recorded: Mapping[str, object], record: Mapping[s
     shown = differences[:_DIFFERENCE_LIMIT]
     more = len(differences) - len(shown)
     lines = [
-        f"An advice record already exists at {directory} and this publish differs from it. "
-        "Recorded advice is immutable: it is the only evidence of what the member was "
-        "told, so it is refused rather than rewritten.",
+        f"An advice record already exists at {directory} and this build of the same capture "
+        "differs from it. Recorded advice is immutable: it is the only evidence of what the "
+        "member was told, so it is refused rather than rewritten. The capture is the whole "
+        "input, so a difference here is a difference our own code produced.",
     ]
     lines += [f"  {difference}" for difference in shown]
     if more > 0:
@@ -468,33 +611,164 @@ def _conflict(directory: Path, recorded: Mapping[str, object], record: Mapping[s
 
 
 def load_member_advice_record(
-    root: Path, season: str, gameweek: int, entry_id: int
+    root: Path, season: str, gameweek: int, entry_id: int, snapshot_id: str
 ) -> dict[str, object]:
-    """Read one recorded week, refusing a directory whose files fail their own digests."""
+    """Read one publish's record, refusing a directory whose files fail their own digests."""
 
-    directory = record_directory(root, season, gameweek, entry_id)
+    directory = record_directory(root, season, gameweek, entry_id, snapshot_id)
+    _refuse_legacy_layout(directory.parent)
     if not directory.is_dir():
         raise AdviceRecordError(f"No advice record at {directory}.")
+    return _read_record(directory)
+
+
+def _read_record(directory: Path) -> dict[str, object]:
     verify_manifest(directory)
     document: dict[str, object] = json.loads((directory / RECORD_FILE).read_text(encoding="utf-8"))
     return document
 
 
-def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
-    """Freeze one member's week. Identical bytes are a no-op; different bytes are refused.
+def _record_capture(record: Mapping[str, object]) -> RecordCapture:
+    """The capture a record states, which is the capture it is keyed by."""
 
-    Both cases are real. The same week has been deployed twice, so a re-publish that
-    reproduces the same document must not fail the run — there is nothing to disagree
-    about. A re-publish that produces *different* bytes is the case that matters: it means
-    the member was shown something else, or shown the same thing at a different moment,
-    and overwriting the first record would destroy the only evidence of either. So it is
-    refused, with the difference named.
+    block = record.get("capture")
+    if not isinstance(block, Mapping):
+        raise AdviceRecordError(
+            "An advice record must carry a capture block naming the capture it was built "
+            f"from; got {_short(block)}. {LEGACY_LAYOUT_NOTE}"
+        )
+    snapshot_id = block.get("snapshot_id")
+    captured_at = block.get("captured_at_utc")
+    if not isinstance(snapshot_id, str) or not isinstance(captured_at, str):
+        raise AdviceRecordError(
+            "An advice record's capture block must carry snapshot_id and captured_at_utc "
+            f"as text; got {_short(snapshot_id)} and {_short(captured_at)}."
+        )
+    return RecordCapture(snapshot_id, captured_at)
+
+
+def recorded_captures(
+    root: Path, season: str, gameweek: int, entry_id: int
+) -> tuple[RecordCapture, ...]:
+    """Every capture this member's week has a record from, oldest capture first.
+
+    Ordered by capture instant and then by identifier, so the order is a property of the
+    evidence rather than of the filesystem: file modification times order when a record was
+    *copied*, not when its capture was taken, and a record restored from a backup would
+    otherwise sort as the newest thing on disk.
+
+    An empty tuple means the week has no record at all — which is a different answer from
+    "it has records, but none from before the deadline", and the reader below keeps the two
+    apart.
+    """
+
+    directory = entry_directory(root, season, gameweek, entry_id)
+    _refuse_legacy_layout(directory)
+    if not directory.is_dir():
+        return ()
+    captures: list[RecordCapture] = []
+    for child in sorted(directory.iterdir()):
+        # A hidden sibling is a staging directory or a lock left by a writer, not a record.
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        capture = _record_capture(_read_record(child))
+        if capture.snapshot_id != child.name:
+            raise AdviceRecordError(
+                f"{child} holds a record that names capture {capture.snapshot_id!r}. A record "
+                "is addressed by the capture it states, so this directory cannot be trusted "
+                "to be the publish its name claims."
+            )
+        captures.append(capture)
+    return tuple(sorted(captures, key=lambda capture: (capture.instant, capture.snapshot_id)))
+
+
+def load_member_advice_record_for_deadline(
+    root: Path, season: str, gameweek: int, entry_id: int, *, deadline_utc: str
+) -> dict[str, object]:
+    """The record from the last capture *preceding* ``deadline_utc`` — what the member saw.
+
+    This is the question a review page asks, and the only one it may ask: its whole claim
+    is "this is what we told you", and a week is published more than once, so the record
+    that matters is the last one a member could still have acted on. Later captures are not
+    that; earlier ones were superseded before the deadline.
+
+    Strictly preceding: a capture taken at the deadline instant is not information the
+    member had before entries locked, and half a second either side of a lock is exactly
+    where a generous comparison would put words in our mouth.
+
+    The deadline is the caller's to supply rather than something the record carries. The
+    record is immutable and the fixture calendar is not — the game moves deadlines — so a
+    frozen copy of one would be an old answer that no correction could reach.
+
+    Two answers this deliberately refuses to invent:
+
+    - **No capture precedes the deadline.** Raises, and says whether the week has no record
+      at all or only records built after the deadline. The nearest later record is *not*
+      returned in its place: it says what we would have advised, not what we did.
+    - **Two records share the last capture instant before it.** Raises, naming both. Which
+      of them a member saw is not recorded anywhere, and neither the write order nor the
+      files' timestamps are evidence of it, so choosing would be a guess presented as fact.
+    """
+
+    deadline = _deadline_instant(deadline_utc)
+    captures = recorded_captures(root, season, gameweek, entry_id)
+    where = entry_directory(root, season, gameweek, entry_id)
+    if not captures:
+        raise AdviceRecordError(
+            f"No advice record for {season} gameweek {gameweek}, entry {entry_id}: nothing "
+            f"under {where}."
+        )
+    before = [capture for capture in captures if capture.instant < deadline]
+    if not before:
+        raise AdviceRecordError(
+            f"{season} gameweek {gameweek}, entry {entry_id} has {len(captures)} advice "
+            f"record(s) under {where}, and every one of them was built from a capture at or "
+            f"after the deadline {deadline_utc} (earliest {captures[0].captured_at_utc}). "
+            "None of them is what the member was told before the deadline, and the nearest "
+            "later one is not returned instead: it says what we would have advised, not "
+            "what we did."
+        )
+    latest = before[-1]
+    tied = [capture for capture in before if capture.instant == latest.instant]
+    if len(tied) > 1:
+        raise AdviceRecordError(
+            f"{season} gameweek {gameweek}, entry {entry_id} has {len(tied)} advice records "
+            f"sharing the last capture instant before {deadline_utc} "
+            f"({latest.captured_at_utc}): {', '.join(capture.snapshot_id for capture in tied)}. "
+            "Which of them a member saw is not recorded, and file timestamps are not "
+            "evidence of it, so one is not chosen for you."
+        )
+    return load_member_advice_record(root, season, gameweek, entry_id, latest.snapshot_id)
+
+
+def _deadline_instant(deadline_utc: str) -> datetime:
+    try:
+        return as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
+    except DataError as error:
+        raise AdviceRecordError(str(error)) from error
+
+
+def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
+    """Freeze one member's publish. Identical bytes are a no-op; different bytes are refused.
+
+    Both cases are real, and both are about *one capture*. The same capture has been built
+    twice, so a rebuild that reproduces the same document must not fail the run — there is
+    nothing to disagree about. A rebuild of that same capture that produces *different*
+    bytes is the case that matters: the capture is the whole input, so the same capture
+    solving to different advice is a non-determinism in our own code, and it has been. So
+    it is refused, with the difference named.
+
+    A *different* capture is not that. It is the next publish of the week — the mid-week
+    build and the one taken shortly before the deadline are both real advice — and it lands
+    at its own address rather than colliding with the earlier one.
     """
 
     season = str(record["season"])
     gameweek = int(str(record["gameweek"]))
     entry_id = int(str(record["entry_id"]))
-    directory = record_directory(root, season, gameweek, entry_id)
+    capture = _record_capture(record)
+    directory = record_directory(root, season, gameweek, entry_id, capture.snapshot_id)
+    _refuse_legacy_layout(directory.parent)
     payload = encode_record(record)
 
     def _settled() -> Path:
@@ -512,7 +786,9 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
         # check above and the lock, and the second writer must not overwrite the first.
         if directory.exists():
             return _settled()
-        prune_stale_staging(Path(root) / season, f"gw{gameweek:02d}")
+        # Staging siblings of a capture directory live in the member's week directory, so
+        # that is the directory swept for the ones a dead writer left behind.
+        prune_stale_staging(Path(root) / season / f"gw{gameweek:02d}", f"entry-{entry_id}")
         staging = staging_directory(directory)
         staging.mkdir(parents=True)
         try:
@@ -528,16 +804,21 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
 
 
 __all__: tuple[str, ...] = (
+    "LEGACY_LAYOUT_NOTE",
     "MEMBER_ADVICE_RECORD_CONTRACT_VERSION",
     "PLAYER_ID_SPACE",
     "RECORD_FILE",
     "AdviceRecordConflictError",
     "AdviceRecordError",
     "PublishedAdvice",
+    "RecordCapture",
     "build_member_advice_record",
     "encode_record",
+    "entry_directory",
     "load_member_advice_record",
+    "load_member_advice_record_for_deadline",
     "record_directory",
     "record_member_advice",
+    "recorded_captures",
     "repository_commit",
 )
