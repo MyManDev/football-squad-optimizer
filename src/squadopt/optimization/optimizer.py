@@ -233,6 +233,38 @@ def _remaining_deterministic_time(
     return max(0.0, configured_limit - consumed)
 
 
+def wall_clock_stopped_the_search(
+    status: SolverStatus,
+    diagnostics: Mapping[str, object],
+) -> bool:
+    """Did the wall-clock safety cap stop this solve before its deterministic budget?
+
+    The rule ``docs/optimization_spec.md`` already states: a deterministic budget makes a
+    truncated search stop at a point that is a function of the inputs, a wall clock makes
+    it stop at a point that is a function of the machine, so a result the clock cut is not
+    reproducible and may not be read as if it were. It lived only inside the production
+    benchmark's ``_non_deterministic_truncations``, where nothing that publishes could
+    reach it; it is here, beside the diagnostics it reads, so a publishing path can. That
+    benchmark still carries its own copy of the same condition and should be pointed at
+    this one, in a pull request that may touch ``backtest/``.
+
+    Unfinished means either half of the answer: a primary solve that never proved its
+    optimum (``FEASIBLE``/``UNKNOWN``), or a tie-break that was attempted and did not
+    finish — the tie-break chooses between plans of *equal* objective value, so a cut one
+    leaves that choice to the clock too. Either is reproducible only if the deterministic
+    budget is what ran out; anything else means the clock did.
+    """
+
+    unfinished_primary = status in {SolverStatus.FEASIBLE, SolverStatus.UNKNOWN}
+    unfinished_tiebreak = (
+        diagnostics.get("tiebreak_attempted") is True
+        and diagnostics.get("tiebreak_completed") is not True
+    )
+    if not (unfinished_primary or unfinished_tiebreak):
+        return False
+    return diagnostics.get("deterministic_time_budget_exhausted") is not True
+
+
 def _solve(model: cp_model.CpModel, solver: cp_model.CpSolver) -> int:
     validation_message = model.validate()
     if validation_message:
