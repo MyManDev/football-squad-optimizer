@@ -155,6 +155,28 @@ describe("SquadPage", () => {
     expect(screen.getByText("×2 C")).toBeInTheDocument();
   });
 
+  it.each(["tr", "en"] as const)(
+    "opens no risk block on a status with no metrics behind it, in %s",
+    async (language) => {
+      // The frozen ledger records the status and nulls every metric. Opening the block on
+      // the status alone printed an absent worst-case share as 0% and a P(...) label with
+      // a literal "?" for a threshold nobody measured.
+      const withStatus: RecommendationView = {
+        ...unsettledRecommendationFixture,
+        risk: { ...unsettledRecommendationFixture.risk, status: "available" },
+      };
+      const { container } = renderAt("/", { viewOverride: withStatus, language });
+
+      expect(
+        await screen.findByRole("heading", { level: 1, name: /Oyun haftası 1|Gameweek 1/ }),
+      ).toBeInTheDocument();
+      const text = container.textContent ?? "";
+      expect(text).not.toMatch(/P\(/);
+      expect(text).not.toMatch(/%/);
+      expect(text).not.toMatch(/0 Ortalaması|Mean Worst 0/);
+    },
+  );
+
   it("renders the contract captain multiplier instead of assuming two", async () => {
     const captain = settledRecommendationFixture.starting_xi.find((player) => player.is_captain)!;
     const tripleCaptain = {

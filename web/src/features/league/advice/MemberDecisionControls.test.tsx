@@ -102,6 +102,49 @@ describe("member decision controls", () => {
     expect(screen.getByText(/rakip stratejisi hafta hafta oynanır/)).toBeInTheDocument();
   });
 
+  it("lands a strategy change on a window the index lists, and says it moved", () => {
+    // Pure points solved five weeks, so the radio is clickable; every rival strategy is
+    // published at one week only. The window must not survive the change and leave the
+    // control showing a checked radio it has just disabled.
+    renderControls(`/league/members/${ENTRY}?window=5`);
+    expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeChecked();
+
+    fireEvent.click(screen.getByRole("radio", { name: /Ortak çekirdeği koru/ }));
+
+    expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /5 hafta/ })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeDisabled();
+    expect(
+      screen.getByText(/5 haftalık pencere bu strateji için yayınlanmadı/),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing about a moved window when the index lists the one asked for", () => {
+    renderControls(`/league/members/${ENTRY}?window=5`);
+    expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeChecked();
+    expect(screen.queryByText(/bu strateji için yayınlanmadı/)).toBeNull();
+  });
+
+  it("chooses no rival for the member when the producer named no default", () => {
+    // The select used to display the first candidate while the request named none, so the
+    // page demanded "a rival chosen" under a dropdown that appeared to show one.
+    const index = mockEntryAdviceIndex(ENTRY).payload;
+    renderControls(`/league/members/${ENTRY}?mode=ortak-koru`, {
+      ...index,
+      default_rival_entry_id: null,
+    });
+
+    const select = screen.getByRole("combobox", { name: "Karşısında oynadığın üye" });
+    expect(select).toHaveValue("");
+    expect(screen.getByRole("option", { name: "Bir rakip seç" })).toBeDisabled();
+    expect(screen.getByText(/sıralamada bir komşu belirlemedi/)).toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: String(index.rival_entry_ids[0]) } });
+    expect(screen.getByTestId("selection").textContent).toBe(
+      `ortak-koru/-/${index.rival_entry_ids[0]}`,
+    );
+  });
+
   it.each([
     ["no index", null],
     [
@@ -128,8 +171,14 @@ describe("member decision controls", () => {
     renderControls(`/league/members/${ENTRY}?mode=ortak-koru`, null, "en");
     const select = screen.getByRole("combobox", { name: "The member you are playing against" });
     const humans = MEMBERS.filter((m) => m.member_kind === "human" && m.entry_id !== ENTRY);
-    expect(screen.getAllByRole("option")).toHaveLength(humans.length);
-    expect(select).toHaveValue(String(humans[0]!.entry_id));
+    // Every other member is offered; none is presented as chosen, because without an index
+    // there is no producer default and the request would name nobody.
+    const values = screen
+      .getAllByRole("option")
+      .map((option) => (option as HTMLOptionElement).value);
+    expect(values).toEqual(["", ...humans.map((human) => String(human.entry_id))]);
+    expect(select).toHaveValue("");
+    expect(screen.getByRole("option", { name: "Choose a rival" })).toBeDisabled();
   });
 
   it("labels the declared rule's pick without preselecting it", () => {

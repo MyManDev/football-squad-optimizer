@@ -9,7 +9,11 @@ import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { createAdviceClient, type AdviceClient, type AdviceSource } from "../advice/adviceClient";
-import { canComputeAdvice, selectedAdviceRequest } from "../advice/adviceSelection";
+import {
+  canComputeAdvice,
+  publishedSelection,
+  selectedAdviceRequest,
+} from "../advice/adviceSelection";
 import { checkedAdvice } from "../advice/adviceResponse";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { sameAdviceRequest, useAdviceJob } from "../advice/useAdviceJob";
@@ -69,7 +73,7 @@ export function LeagueMemberPage() {
   const members = membersQuery.data?.payload.members ?? [];
   const index = indexQuery.data?.payload ?? null;
   const request = selectedAdviceRequest(
-    searchParams,
+    publishedSelection(searchParams, index),
     squad.data?.payload.league_id ?? 0,
     entryId,
     members,
@@ -187,7 +191,7 @@ function LeagueMemberContent({
   const leagueId = view.league_id;
   const entryId = view.entry.entry_id;
   const request = selectedAdviceRequest(
-    searchParams,
+    publishedSelection(searchParams, index),
     leagueId,
     entryId,
     members,
@@ -343,18 +347,22 @@ function LeagueMemberContent({
   );
 }
 
+/**
+ * Why no advice is shown, in the two states the page can tell apart. A combination the
+ * producer never solved is a normal outcome; a document that failed to load is a fault,
+ * and saying "not published yet" for it would tell the reader to wait for a publish that
+ * already happened — on a page whose squad, read from the same build, is above it.
+ */
 function MissingAdviceCard({ issue, canCompute }: { issue: AdviceIssue; canCompute: boolean }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   return (
     <Card title={copy.advice}>
       <p className={styles.honesty}>
-        <strong>
-          {issue === "not-computed" ? copy.adviceNotComputed : copy.entryNotAvailable}
-        </strong>
+        <strong>{issue === "not-computed" ? copy.adviceNotComputed : copy.adviceUnreadable}</strong>
       </p>
       <p className={styles.muted}>
-        {issue === "not-computed" ? copy.adviceNotComputedBody : copy.entryNotAvailableBody}
+        {issue === "not-computed" ? copy.adviceNotComputedBody : copy.adviceUnreadableBody}
       </p>
       {canCompute ? <p className={styles.muted}>{copy.adviceRequestHint}</p> : null}
     </Card>
