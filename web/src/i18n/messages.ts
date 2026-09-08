@@ -494,10 +494,10 @@ const en = {
     rank: "rank",
     member: "member",
     team: "team",
-    gameweekPoints: "GW points",
-    gameweekPointsFor: (gameweek: number) => `GW${gameweek} points`,
-    gameweekBasisNote:
-      "The gameweek column is not on one basis. Each member's figure is their week before their own transfer hits, as the FPL standings report it; SquadOpt's is after ours. The members' hit points are not published to this site, so they are not taken off here.",
+    gameweekNetPoints: "GW net points",
+    gameweekNetPointsFor: (gameweek: number) => `GW${gameweek} net points`,
+    gameweekNetNote:
+      "The gameweek column is net for every row, SquadOpt's included: the week's score after the transfer hits taken that week, which is the amount the season total moved by. The FPL site shows the week before hits, so a member who took a four-point hit reads four points lower here than there. A row whose hit is not in the published data shows a dash rather than a number on the other basis.",
     noScoredWeek:
       "No gameweek has been finalised yet, so no scores are published: points are only final once the platform has added bonus and checked the week.",
     total: "total",
@@ -1189,10 +1189,10 @@ const tr: MessageSchema<typeof en> = {
     rank: "sıra",
     member: "üye",
     team: "takım",
-    gameweekPoints: "OH puanı",
-    gameweekPointsFor: (gameweek) => `OH${gameweek} puanı`,
-    gameweekBasisNote:
-      "Oyun haftası sütunu tek bir temele oturmuyor. Her üyenin sayısı, FPL sıralamasının verdiği gibi kendi transfer cezalarından önceki haftasıdır; SquadOpt'unki ise cezadan sonrasıdır. Üyelerin ceza puanları bu siteye yayınlanmıyor, o yüzden burada düşülmüyor.",
+    gameweekNetPoints: "OH net puanı",
+    gameweekNetPointsFor: (gameweek) => `OH${gameweek} net puanı`,
+    gameweekNetNote:
+      "Oyun haftası sütunu, SquadOpt dahil her satır için nettir: o haftaki transfer cezaları düşüldükten sonraki puan, yani sezon toplamının arttığı miktarın ta kendisi. FPL sitesi haftayı cezalardan önce gösterir; bu yüzden 4 puan ceza alan bir üye burada oradakinden 4 puan düşük görünür. Cezası yayınlanan veride bulunmayan bir satırda, yanlış temeldeki bir sayı yerine tire gösterilir.",
     noScoredWeek:
       "Henüz kesinleşmiş oyun haftası yok, o yüzden puan yayınlanmıyor: puanlar ancak platform bonusu ekleyip haftayı kontrol edince kesinleşir.",
     total: "toplam",
