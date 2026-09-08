@@ -15,9 +15,11 @@ projection, and the invariance test in ``tests/unit/test_league_views.py`` pins 
 fact rather than as intention.
 
 It does record what it published. The site's advice paths carry no gameweek and are
-overwritten every week, so ``build_league_views`` also writes an immutable per-member,
-per-gameweek advice record under ``--advice-record-root``; without it, a week that has
-been published can never afterwards be reviewed.
+overwritten every week, so ``build_league_views`` also writes an immutable advice record
+under ``--advice-record-root``, one per member, gameweek and capture; without it, a week
+that has been published can never afterwards be reviewed. A week is published more than
+once — mid-week, then again with fresh availability before the deadline — and each of those
+captures records its own, so the advice that stood at the deadline is on disk too.
 
 Nothing personal is committed. The registry, the captures and the advice records stay
 local (``.gitignore`` excludes ``data/entries/``, ``data/snapshots/`` and
@@ -234,9 +236,10 @@ def main() -> int:
         "--advice-record-root",
         type=Path,
         default=ADVICE_RECORD_ROOT,
-        help="where the immutable per-member, per-gameweek advice record is written; the "
-        "published tree has no gameweek in its paths and is overwritten every week, so "
-        "without this nothing survives to say what a member was told for a given week",
+        help="where the immutable per-member, per-gameweek, per-capture advice record is "
+        "written; the published tree has no gameweek in its paths and is overwritten every "
+        "week, so without this nothing survives to say what a member was told for a given "
+        "week",
     )
     parser.add_argument(
         "--no-advice-record",
@@ -394,10 +397,13 @@ def main() -> int:
         # against a deadline — and every improvisation here loses evidence.
         print(
             f"build_league_site refused:\n  {error}\n"
-            "  If this week must be published before its deadline, re-run with "
-            "--no-advice-record (scripts.publish_gameweek_site takes the same flag and "
-            "passes it through): the recorded week is kept as it stands and the "
-            "difference above is what to reconcile afterwards.",
+            "  This is one capture rebuilt into different bytes, not a second publish: a "
+            "publish from a fresh capture writes its own record and is never refused. So "
+            "the difference above came from our own code, and it is worth a minute before "
+            "the deadline. If the deadline will not wait, re-run with --no-advice-record "
+            "(scripts.publish_gameweek_site takes the same flag and passes it through): the "
+            "recorded capture is kept as it stands and the difference above is what to "
+            "reconcile afterwards.",
             file=sys.stderr,
         )
         return 1

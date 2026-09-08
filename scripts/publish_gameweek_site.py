@@ -20,8 +20,10 @@ reported, not duplicated. Nothing here touches ``data/ledger`` — settle itself
 The one thing this does write outside the worktree is the immutable advice record: the
 rebuild is the process that emits the bytes that ship, so it is the process that records
 them, into *this* checkout's ``data/advice_records`` rather than into the worktree it is
-about to delete. A week already recorded is therefore refused when the rebuild disagrees,
-with the difference named; ``--no-advice-record`` is the deadline escape.
+about to delete. The record is keyed by the capture, so publishing a week twice — mid-week,
+then again before the deadline from a fresher capture — records both. What is refused is a
+rebuild of *one* capture that disagrees with its own record, with the difference named;
+``--no-advice-record`` is the deadline escape.
 """
 
 import argparse
@@ -55,9 +57,9 @@ class LeaguePublish:
     #: checkout for the same reason as the roots above: the build runs in a throwaway
     #: worktree, so a record left at the build's own default would be deleted with it.
     advice_record_root: Path = REPOSITORY_ROOT / "data" / "advice_records"
-    #: False passes ``--no-advice-record`` through: the escape when a re-publish differs
-    #: from the recorded week and the deadline will not wait for the difference to be
-    #: reconciled. The first record is kept; this publish adds none.
+    #: False passes ``--no-advice-record`` through: the escape when a rebuild of the same
+    #: capture differs from that capture's record and the deadline will not wait for the
+    #: difference to be reconciled. The first record is kept; this publish adds none.
     record_advice: bool = True
 
     def __post_init__(self) -> None:
@@ -348,8 +350,8 @@ def main() -> int:
     parser.add_argument(
         "--no-advice-record",
         action="store_true",
-        help="publish without recording what was published; the escape when a re-publish "
-        "of an already recorded week is refused and the deadline will not wait — the first "
+        help="publish without recording what was published; the escape when a rebuild of "
+        "an already recorded capture is refused and the deadline will not wait — the first "
         "record is kept and the difference stays to be reconciled afterwards",
     )
     arguments = parser.parse_args()
