@@ -913,6 +913,86 @@ def short_name_roster(bootstrap: bytes) -> pd.DataFrame:
     return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
 
 
+_SCOUT_FIELDS: Final = ("code", "element_type", "scout_risks", "scout_news_link")
+
+#: What :func:`scout_snapshot` returns. Its own tuple, so no existing contract moves.
+SCOUT_COLUMNS: Final = ("player_id", "scout_risk_count", "scout_news_link_present")
+
+
+def scout_snapshot(bootstrap: bytes) -> pd.DataFrame:
+    """Read the source's own forward-looking risk notes, as counts and a flag.
+
+    These two fields are structured, gameweek-stamped and currently thrown away, which is
+    the only reason to read them: they are the one part of the feed that looks *forward*
+    rather than recording what already happened, and they cost nothing to keep.
+
+    What is kept is deliberately thin. The count says how many risks the source published
+    for a player and the flag says whether it linked an article; neither carries a word of
+    the text. A member-facing surface may not be handed free text from this path, and a
+    column that held it would be one rename away from becoming a quote.
+
+    **Absent and empty are different, and the difference decides the export.** A player the
+    source published no risks for carries an empty list, and that is a real observation
+    worth a zero. A payload that does not carry the field *at all* is not an observation of
+    zero risks -- it is the source having renamed or dropped something -- so
+    :func:`_require_fields` refuses rather than letting a column of nulls through. That is
+    the same rule the evidence builder applies to its own bootstrap fields.
+
+    **These two field names are unverified.** No capture in this repository has been read to
+    confirm them; they come from the lane brief. The refusal above is what makes that
+    honest: if the source spells them differently, the first real capture stops with the
+    names it was looking for rather than quietly reporting that nobody has any risks.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _SCOUT_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        risks = record.get("scout_risks")
+        # A list is the documented-by-inspection shape and ``None`` is how a source usually
+        # spells "none of them"; both are observations. Any other type is an undocumented
+        # shape, and guessing at one is how a count starts meaning something else.
+        if risks is None:
+            risk_count = 0
+        elif isinstance(risks, list):
+            risk_count = len(risks)
+        else:
+            raise InvalidValueError(
+                f"scout_risks must be an array or absent, got {type(risks).__name__}. The "
+                "shape is undocumented, so it is surfaced rather than counted as one."
+            )
+        link = record.get("scout_news_link")
+        if link is not None and not isinstance(link, str):
+            raise InvalidValueError(
+                f"scout_news_link must be text or absent, got {type(link).__name__}."
+            )
+        rows.append(
+            {
+                "player_id": _integer(record, "code", "Element"),
+                "scout_risk_count": risk_count,
+                "scout_news_link_present": bool(link is not None and link.strip()),
+            }
+        )
+
+    if not rows:
+        raise DataSourceError("Bootstrap payload declares no squad-eligible players.")
+
+    frame = pd.DataFrame(rows, columns=list(SCOUT_COLUMNS))
+    duplicated = frame.loc[frame["player_id"].duplicated(), "player_id"].tolist()
+    if duplicated:
+        raise DuplicateRecordsError(
+            "Bootstrap payload declares the same persistent player code more than once: "
+            f"{format_examples(duplicated)}."
+        )
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["scout_risk_count"] = frame["scout_risk_count"].astype("Int64")
+    frame["scout_news_link_present"] = frame["scout_news_link_present"].astype("boolean")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
 # --- registered entries and their league ---------------------------------------------
 #
 # Paths, not URLs. This module never fetches; the platform adapter owns the base URL and
