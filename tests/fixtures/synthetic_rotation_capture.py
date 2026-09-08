@@ -21,6 +21,7 @@ from squadopt.data.snapshots import (
     SNAPSHOT_SCHEMA_VERSION,
     CapturedSnapshot,
     SnapshotMetadata,
+    build_snapshot_id,
     payload_checksum,
     snapshot_fingerprint,
 )
@@ -33,6 +34,9 @@ TARGET_GAMEWEEK: Final = 4
 DEADLINE: Final = "2026-09-12T17:30:00Z"
 #: After the documents were fetched (14:05) and before the deadline, as a real capture is.
 CAPTURED_AT: Final = "2026-09-12T15:00:00Z"
+#: Earlier than the club documents' own fetch instant, so the claim chain would not have been
+#: frozen before the decision. The one state the builder refuses on method rather than data.
+CAPTURED_BEFORE_THE_DOCUMENTS: Final = "2026-09-12T13:00:00Z"
 
 #: Inside the four days before the deadline, so this club's players read as midweek.
 MIDWEEK_KICKOFF: Final = "2026-09-09T19:00:00Z"
@@ -185,12 +189,18 @@ def fixtures_payload(*, kickoff_known: bool = True) -> bytes:
 DECISION_SOURCE: Final = "fpl-live"
 
 
-def decision_snapshot(*, kickoff_known: bool = True) -> CapturedSnapshot:
+def decision_snapshot(
+    *, kickoff_known: bool = True, captured_at: str = CAPTURED_AT
+) -> CapturedSnapshot:
     """The capture as the store would hand it back, id and fingerprint included.
 
     Built through the store's own fingerprint and id functions rather than with a made-up
     identifier, so the provenance a row records has the shape a real one does -- the
     artifact name is derived from the last twelve characters of it.
+
+    ``captured_at`` moves the capture instant. Passing one earlier than ``FETCHED_AT`` is how
+    a test reaches the state where the club documents were fetched after the decision was
+    captured, which the builder refuses.
     """
 
     payloads = {
@@ -200,15 +210,19 @@ def decision_snapshot(*, kickoff_known: bool = True) -> CapturedSnapshot:
     checksums = {name: payload_checksum(content) for name, content in payloads.items()}
     fingerprint = snapshot_fingerprint(
         source=DECISION_SOURCE,
-        captured_at_utc=CAPTURED_AT,
+        captured_at_utc=captured_at,
         schema_version=SNAPSHOT_SCHEMA_VERSION,
         checksums=checksums,
     )
     return CapturedSnapshot(
         metadata=SnapshotMetadata(
-            snapshot_id=f"{DECISION_SOURCE}-20260912T150000Z-{fingerprint[:12]}",
+            snapshot_id=build_snapshot_id(
+                source=DECISION_SOURCE,
+                captured_at_utc=captured_at,
+                fingerprint=fingerprint,
+            ),
             source=DECISION_SOURCE,
-            captured_at_utc=CAPTURED_AT,
+            captured_at_utc=captured_at,
             schema_version=SNAPSHOT_SCHEMA_VERSION,
             checksums=checksums,
             fingerprint=fingerprint,
