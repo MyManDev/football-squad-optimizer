@@ -125,3 +125,50 @@ def test_the_scoreboard_is_built_beside_the_tree_from_the_same_capture_and_the_l
             in_season_projection=None,
             elite_snapshot="fpl-elite-picks-y",
         )
+
+
+def test_the_advice_record_lands_in_the_checkout_not_the_worktree_it_builds_in() -> None:
+    """The build runs in a worktree that is deleted at the end of the publish.
+
+    Every other root the build reads is passed absolute for that reason; the advice record
+    is the one it *writes*, so a default rooted in the build's own tree is deleted with the
+    tree. Worse, the record's digests exist to prove which published bytes it describes, and
+    a record in a directory nobody else ever reads can never be compared with anything.
+    """
+
+    from pathlib import Path
+
+    from scripts.publish_gameweek_site import REPOSITORY_ROOT, LeaguePublish
+
+    league = LeaguePublish(
+        league_id=352490,
+        snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        in_season_projection=None,
+    )
+    worktree = Path("/tmp/squadopt-gw04-decision")
+    arguments = league.build_arguments(worktree / "web" / "public")
+    root = Path(arguments[arguments.index("--advice-record-root") + 1])
+    assert root.is_absolute()
+    assert root == REPOSITORY_ROOT / "data" / "advice_records"
+    assert worktree not in root.parents and root != worktree
+    # Recording is the default: a publish that quietly kept no record would be the defect
+    # with the paths tidied up.
+    assert "--no-advice-record" not in arguments
+
+
+def test_the_deadline_escape_publishes_without_recording() -> None:
+    """A rebuild that disagrees with the recorded week is refused, and a deadline may not
+    be able to wait for the disagreement to be understood. The escape publishes and leaves
+    the first record standing rather than overwriting it."""
+
+    from pathlib import Path
+
+    from scripts.publish_gameweek_site import LeaguePublish
+
+    league = LeaguePublish(
+        league_id=352490,
+        snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        in_season_projection=None,
+        record_advice=False,
+    )
+    assert "--no-advice-record" in league.build_arguments(Path("/tmp/site/web/public"))

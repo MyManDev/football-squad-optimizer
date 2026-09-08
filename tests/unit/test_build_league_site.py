@@ -144,3 +144,34 @@ def test_a_root_holding_no_live_capture_names_what_is_missing(tmp_path: Path) ->
 
     with pytest.raises(DataError, match="No fpl-live"):
         resolve_live_snapshot_id(tmp_path, None)
+
+
+def test_a_refused_advice_record_names_the_escape_a_deadline_needs(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The record refuses a week it already holds, and the refusal has to be actionable.
+
+    The published files are already on disk when this fires: only the record refused. An
+    operator reading it minutes before a deadline must be told what to do next, or they
+    will improvise — and every improvisation here (deleting the record, pointing the build
+    somewhere else) destroys the evidence the record exists to be.
+    """
+
+    import sys
+
+    import scripts.build_league_site as build_league_site
+
+    from squadopt.application.advice_record import AdviceRecordConflictError
+
+    def refuse(root: Path, requested: str | None) -> str:
+        raise AdviceRecordConflictError("advice/101/saf-puan/1.json: published_sha256 moved")
+
+    monkeypatch.setattr(build_league_site, "resolve_live_snapshot_id", refuse)
+    monkeypatch.setattr(sys, "argv", ["build_league_site", "--league", "352490"])
+
+    assert build_league_site.main() == 1
+
+    printed = capsys.readouterr().err
+    assert "published_sha256 moved" in printed
+    assert "--no-advice-record" in printed
+    assert "publish_gameweek_site" in printed
