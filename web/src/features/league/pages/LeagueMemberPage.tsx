@@ -381,6 +381,21 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
           (member) => member.member_kind === "human" && member.entry_id === view.rival_entry_id,
         ) ?? null);
   const rivalName = rival ? (rival.team_name ?? rival.manager_name ?? null) : null;
+  // A price tag is a difference between two solved plans. It is the cost itself only
+  // where both proofs finished; where one did not, the producer publishes the bound it
+  // measured as `expected_points_cost_ceiling` and this page states that — the most the
+  // strategy can cost — instead of a figure it cannot stand behind. A document that is
+  // unproven and carries no ceiling has no honest figure to print, so it prints none;
+  // and a price below zero is a giveaway no constrained plan can hand out, so no
+  // producer's number is rendered as one.
+  const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
+  const priceCeiling = view.expected_points_cost_ceiling;
+  const price = unproven ? priceCeiling : (priceCeiling ?? view.expected_points_cost);
+  const showsPrice = view.mode !== "saf-puan" && price != null && price >= 0;
+  const alternative = view.alternative_plan;
+  const alternativePrice = unproven
+    ? alternative?.expected_points_cost_ceiling
+    : (alternative?.expected_points_cost_ceiling ?? alternative?.expected_points_cost);
   return (
     <Card
       title={copy.advice}
@@ -405,10 +420,12 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
           {copy.unprovenPlanBody(points(view.optimality_gap ?? 0, 1, locale))}
         </p>
       ) : null}
-      {view.mode !== "saf-puan" && view.expected_points_cost != null ? (
+      {showsPrice && price != null ? (
         <p className={styles.planCost}>
           <strong className="num">
-            {copy.planCost(points(view.expected_points_cost, 1, locale))}
+            {unproven
+              ? copy.planCostAtMost(points(price, 1, locale))
+              : copy.planCost(points(price, 1, locale))}
           </strong>
           {(rivalName ?? view.rival_label) ? (
             <span> · {copy.planRival(rivalName ?? String(view.rival_label))}</span>
@@ -433,17 +450,17 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
           {view.plan_kind === "within_free_transfers"
             ? copy.planWithinFree(view.transfer_cap, view.overlap_target, view.overlap_applied ?? 0)
             : copy.planWithHits(view.transfer_cap, view.overlap_target)}
-          {view.alternative_plan
+          {alternative && alternativePrice != null && alternativePrice >= 0
             ? ` ${
-                view.alternative_plan.kind === "with_hits"
-                  ? copy.alternativeWithHits(
-                      view.alternative_plan.overlap_applied,
-                      points(view.alternative_plan.transfer_hit_points ?? 0, 0, locale),
-                      points(view.alternative_plan.expected_points_cost, 1, locale),
+                alternative.kind === "with_hits"
+                  ? (unproven ? copy.alternativeWithHitsAtMost : copy.alternativeWithHits)(
+                      alternative.overlap_applied,
+                      points(alternative.transfer_hit_points ?? 0, 0, locale),
+                      points(alternativePrice, 1, locale),
                     )
-                  : copy.alternativeWithinFree(
-                      view.alternative_plan.overlap_applied,
-                      points(view.alternative_plan.expected_points_cost, 1, locale),
+                  : (unproven ? copy.alternativeWithinFreeAtMost : copy.alternativeWithinFree)(
+                      alternative.overlap_applied,
+                      points(alternativePrice, 1, locale),
                     )
               }`
             : ""}
