@@ -19,6 +19,11 @@ contract. They do not redefine the data-zone dataclass.
   solve is an `unavailable` entry with `rival_entry_id: null`, the `window` and the reason. A
   multi-week document adds `plan_weeks` (one row per gameweek) and `stated_limits` (the
   producer's sentences on what the window assumes); its `moves` and lineup are the first week's.
+- A standings row carries `gameweek_points` **gross** of that week's transfer hit, as the source
+  states it, and `transfer_cost` beside it. The members page shows the difference — the net week,
+  which is the amount `total_points` advances by — for every row including SquadOpt's, and the
+  column heading and the note beneath say so in both languages. `transfer_cost: null` says
+  nothing proves the hit, not that none was taken, so such a row shows no gameweek score.
 - The index carries `suggested_strategy`: a declared rule's pick among the three strategies, with
   the two numbers it read — `points_ahead_of_rival` (signed, against `default_rival_entry_id`, as
   of `scored_gameweek`) and `gameweeks_remaining` — and the `band_edge_points` they were compared

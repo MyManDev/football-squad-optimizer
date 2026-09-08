@@ -64,12 +64,33 @@ function useSystemRow(season: string | undefined, scoredGameweek: number | null)
     manager_name: "SquadOpt",
     team_name: "SquadOpt",
     rank: 0,
-    gameweek_points: latest?.realized_net_score ?? null,
+    // Gross week plus the hit, the same two numbers every member's row carries, so the
+    // column nets all of them the same way instead of netting ours somewhere else.
+    gameweek_points: latest?.realized_score ?? null,
+    transfer_cost: latest?.transfer_hit_points ?? null,
     total_points: latest === null ? null : payload.total_realized_net_score,
     movement: "unknown",
     movement_places: null,
     data_quality: "complete",
   };
+}
+
+/**
+ * The week on the column's one basis: the score after the transfer hits taken that week.
+ *
+ * That is the number the league total actually advances by — the source's own arithmetic
+ * has `total_points` move by `points` minus `event_transfers_cost` — so it is the only
+ * basis on which our row and a member's row are the same measurement.
+ *
+ * Both halves must be known. A missing hit is not a hit of zero: the producer publishes
+ * null when nothing proves one, and a row like that shows no week rather than its gross
+ * score under a heading that says net.
+ */
+function netWeekPoints(member: EntryView): number | null {
+  const gross = member.gameweek_points;
+  const cost = member.transfer_cost;
+  if (gross === null || typeof cost !== "number") return null;
+  return gross - cost;
 }
 
 export function LeagueMembersView({
@@ -138,8 +159,8 @@ export function LeagueMembersView({
                 <th scope="col">{copy.team}</th>
                 <th scope="col" className={styles.right}>
                   {view.scored_gameweek === null
-                    ? copy.gameweekPoints
-                    : copy.gameweekPointsFor(view.scored_gameweek)}
+                    ? copy.gameweekNetPoints
+                    : copy.gameweekNetPointsFor(view.scored_gameweek)}
                 </th>
                 <th scope="col" className={styles.right}>
                   {copy.total}
@@ -162,15 +183,14 @@ export function LeagueMembersView({
         </div>
         {view.scored_gameweek === null ? (
           <p className={styles.notice}>{copy.noScoredWeek}</p>
-        ) : null}
+        ) : (
+          /* The column is netted for every row, ours included, so the basis belongs to
+             the column rather than to our presence in it — and it differs from what the
+             FPL site shows a manager, which is the surprise the note exists to remove. */
+          <p className={styles.notice}>{copy.gameweekNetNote}</p>
+        )}
         {rows.some((member) => member.member_kind === "system") && (
-          <>
-            {/* Two bases share the gameweek column: ours is net of our transfer hit, and
-                each member's is their week before their own. members.json carries no hit
-                for them, so the column cannot be netted — it can only say so. */}
-            <p className={styles.notice}>{copy.gameweekBasisNote}</p>
-            <p className={styles.notice}>{messages.league.note}</p>
-          </>
+          <p className={styles.notice}>{messages.league.note}</p>
         )}
       </Card>
     </div>
@@ -191,6 +211,7 @@ function MemberRow({
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const isViewer = member.member_kind === "human" && member.entry_id === viewerEntryId;
+  const net = netWeekPoints(member);
   const movement =
     member.movement === "unknown"
       ? copy.unknown
@@ -233,9 +254,7 @@ function MemberRow({
         ) : null}
       </td>
       <td>{member.team_name ?? "—"}</td>
-      <td className={`${styles.right} num`}>
-        {member.gameweek_points === null ? "—" : points(member.gameweek_points, 0, locale)}
-      </td>
+      <td className={`${styles.right} num`}>{net === null ? "—" : points(net, 0, locale)}</td>
       <td className={`${styles.right} num`}>
         {member.total_points === null ? "—" : points(member.total_points, 0, locale)}
       </td>
