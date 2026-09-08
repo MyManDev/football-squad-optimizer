@@ -27,7 +27,7 @@ The mechanism has grown without a home. Measured on `b031ef1`:
   | Literal | Sites |
   | --- | --- |
   | `single_gameweek_realized_squad_points_v1` | `backtest/candidate_residuals.py:33`, `backtest/production_benchmark.py:129`, `bayesopt/evaluation.py:27`, `experiments/policy_objective.py:43` (a fifth site, `backtest/policy_evaluation.py:46`, was removed with that dead module) |
-  | `linear_fixture_count_scaling_v1` | `backtest/horizon_decay.py:50`, `live/horizon.py:74` |
+  | `linear_fixture_count_scaling_v1` | `backtest/horizon_decay.py`, `live/horizon.py` — **this is the row that then went wrong.** #315 bumped only the live copy; the two constants shared a name and held different values, and nothing detected it. Resolved by naming them apart: the live rule keeps `FIXTURE_SCALING_RULE_VERSION`, the measurement's own treatment is `MEASURED_FIXTURE_SCALING_RULE_VERSION` and keeps the value it was recorded under. There is no shared identity left here to move into the registry |
   | `form_window_v1` | `prediction/factors.py:10` as `FEATURE_GENERATION_CONTRACT_VERSION`; the duplicate, `backtest/policy_evaluation.py:47` as `FORM_WINDOW_MAPPING_VERSION`, was removed with that dead module |
 
 The last row was the one that should worry us. The same contract identity was asserted under

@@ -45,7 +45,9 @@ Neither module is this side's to change, and neither of those measurements is mi
 
 This is not gate evidence for any prediction model, and it does not promote a horizon length. The frozen evaluation objective remains single-gameweek realized squad points. What a planner should do with this is a separate decision with its own owners.
 
-The measurement uses the deterministic control, so it describes the drift of the projection that is actually shipped. A different model would have a different curve, and this one says nothing about it.
+The measurement uses the deterministic control, so it describes the drift of the model that is actually shipped. A different model would have a different curve, and this one says nothing about it.
+
+The calendar treatment is this measurement's own: linear fixture-count scaling at every offset, including zero. The live horizon builder preserves the decision week and scales a later week relative to the decision week's fixture count, so the two treatments agree wherever the decision gameweek is a single fixture and part where it is not. Re-measuring under the shipped rule is a separate run.
 
 ## Reproduction
 

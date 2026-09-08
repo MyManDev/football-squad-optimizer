@@ -1097,8 +1097,8 @@ const tr: MessageSchema<typeof en> = {
     // The producer's sentences, keyed exactly as its payload carries them; a sentence
     // the site does not know falls through in the producer's own words.
     statedLimits: {
-      "The first week's projection is repeated over the later weeks, scaled by each club's fixture count from the captured calendar; the later weeks are not projected separately.":
-        "İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır, her kulübün capture'daki takvimdeki maç sayısıyla ölçeklenir; sonraki haftalar ayrıca projekte edilmez.",
+      "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
+        "İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır; her kulüp için capture'daki takvimde o haftanın maç sayısı, ilk haftanın maç sayısına oranlanarak ölçeklenir. İlk haftada maçı olmayan bir kulüp pencere boyunca sıfırda kalır ve sonraki haftalar ayrıca projekte edilmez.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
         "Oynayabilirlik bir kez, capture'dan uygulanır: sonrasındaki sakatlıklar, rotasyon ve cezalar görülmez.",
       "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.":

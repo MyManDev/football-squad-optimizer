@@ -384,7 +384,7 @@ function moveFor(mode: AdviceStrategy, window: WindowSize): AdviceMove[] {
  * list it is sent.
  */
 export const WINDOW_STATED_LIMITS: readonly string[] = [
-  "The first week's projection is repeated over the later weeks, scaled by each club's fixture count from the captured calendar; the later weeks are not projected separately.",
+  "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
   "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
   "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
   "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.",
