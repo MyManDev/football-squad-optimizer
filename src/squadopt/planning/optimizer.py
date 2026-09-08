@@ -837,6 +837,46 @@ def _bound_first_week_overlap(
         artifacts.model.add(held <= band.maximum)
 
 
+def _cap_later_week_transfers(
+    artifacts: _PlanArtifacts,
+    squad_size: int,
+    cap: int | None,
+) -> None:
+    """Cap every gameweek after the first at ``cap`` transfers, first week untouched.
+
+    The form is ``TransferPlanningConfig.max_transfers_per_gameweek``'s, applied to a
+    different set of weeks, so the two agree wherever they overlap:
+
+    * **A wildcard or free-hit week is exempt.** A rebuild week lifts the cap by the
+      squad size, exactly as the per-week cap does — those chips exist to rebuild, and a
+      cap that survived one would make the chip unplayable rather than disciplined.
+    * **A cap above the free transfers changes no hit accounting.** This bounds the
+      *count* of transfers in a week, never how they are paid for. A week may still
+      spend more than its free transfers and be charged, and a week under the cap may
+      still decline a move the hit cost does not justify: the cap is a ceiling the
+      objective works under, not a budget it is handed.
+    * **A cap at or above the squad size cannot bind.** ``transfer_count`` is already
+      bounded by the squad size — a week cannot replace more players than it holds — so
+      such a cap admits every plan the uncapped planner admits and the result is that
+      plan. It is not an error, and it is not reported as one.
+
+    A one-week horizon has no later week, so the cap is inert there by construction.
+    """
+
+    if cap is None:
+        return
+    for week_index in range(1, len(artifacts.transfer_count_vars)):
+        week_chips = artifacts.chip_vars[week_index]
+        rebuild_vars = [week_chips[name] for name in ("wildcard", "freehit") if name in week_chips]
+        transfer_count = artifacts.transfer_count_vars[week_index]
+        if rebuild_vars:
+            artifacts.model.add(
+                transfer_count <= cap + squad_size * cp_model.LinearExpr.sum(rebuild_vars)
+            )
+        else:
+            artifacts.model.add(transfer_count <= cap)
+
+
 def optimize_transfer_plan(
     horizon: PlanningHorizon,
     initial_state: InitialSquadState,
@@ -845,6 +885,7 @@ def optimize_transfer_plan(
     chips: ChipAvailability | None = None,
     excluded_squads: Sequence[frozenset[object]] = (),
     first_week_overlap: FirstWeekOverlap | None = None,
+    first_week_transfer_cap: int | None = None,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
 
@@ -863,6 +904,21 @@ def optimize_transfer_plan(
     ``first_week_overlap`` bounds how many of a named set of players — a rival's known
     eleven — the first-week fifteen holds. It is the strategy catalogue's overlap band
     in solver terms; ``None`` is today's unconstrained planner, bit for bit.
+
+    ``first_week_transfer_cap`` caps every gameweek **after** the first at that many
+    transfers and leaves the first week free to spend more. It is what a band over a
+    multi-week window needs: the band constrains the decided week, so the later weeks
+    must not be charged for it, while leaving every week uncapped reproduces the
+    transfer churn ``docs/transfer_discipline_note.md`` measured as losing.
+    ``TransferPlanningConfig.max_transfers_per_gameweek`` cannot express this — it is
+    one scalar applied to every week, this one deliberately is not.
+
+    It is a parameter here rather than a field on ``TransferPlanningConfig`` because a
+    field would enter ``configuration_fingerprint``, and that digest is recorded on
+    every plan — including the ledger's own ``transfer_config_fingerprint``. A new
+    field would move it for every caller, including the ones that never set the cap.
+    A parameter defaulting to ``None`` is invisible to all of them, and the cap that
+    was applied is still on the record, in this plan's ``diagnostics``.
     """
 
     if not isinstance(horizon, PlanningHorizon):
@@ -902,6 +958,18 @@ def optimize_transfer_plan(
     if first_week_overlap is not None and not isinstance(first_week_overlap, FirstWeekOverlap):
         raise TransferPlanningValidationError("first_week_overlap must be a FirstWeekOverlap.")
     _bound_first_week_overlap(artifacts, players_by_week[0], first_week_overlap)
+    # The admissible range is ``max_transfers_per_gameweek``'s: at least one transfer, or
+    # ``None`` for no cap. A second range for the same quantity would be a second
+    # contract to read.
+    if first_week_transfer_cap is not None and (
+        isinstance(first_week_transfer_cap, bool)
+        or not isinstance(first_week_transfer_cap, int)
+        or first_week_transfer_cap < 1
+    ):
+        raise TransferPlanningValidationError(
+            "first_week_transfer_cap must be None or an integer of at least 1."
+        )
+    _cap_later_week_transfers(artifacts, optimization_config.squad_size, first_week_transfer_cap)
     started_at = perf_counter()
     wall_limit = optimization_config.solver_time_limit_seconds
     deterministic_limit = optimization_config.solver_deterministic_time_limit
@@ -945,6 +1013,7 @@ def optimize_transfer_plan(
                 "maximum": first_week_overlap.maximum,
             }
         ),
+        "first_week_transfer_cap": first_week_transfer_cap,
         "chips_available": {name: sorted(weeks) for name, weeks in availability.available.items()},
         "expected_points_scale": optimization_config.expected_points_scale,
         "objective_weight_scale": settings.objective_weight_scale,

@@ -35,7 +35,11 @@ from squadopt.live import (
 )
 from squadopt.live import transfers as live_transfers
 from squadopt.optimization import SolverStatus
-from squadopt.planning import ProjectionHorizon, TransferPlanningValidationError
+from squadopt.planning import (
+    FirstWeekOverlap,
+    ProjectionHorizon,
+    TransferPlanningValidationError,
+)
 
 
 def _held(players: pd.DataFrame) -> HeldSquad:
@@ -356,3 +360,50 @@ def test_concurrent_identical_writers_publish_once_and_replay_the_same_bytes(
     assert outcomes.count(False) == 7
     assert json.loads(destination.read_text(encoding="utf-8")) == document
     assert not list(tmp_path.glob(".plan.json.*.tmp"))
+
+
+def test_the_horizon_path_passes_a_band_and_a_first_week_cap_to_the_planner(
+    tmp_path: Path,
+) -> None:
+    """Both seams reach the solver, and neither is on by default.
+
+    A rival-strategy band constrains the decided week; the cap keeps the later weeks
+    from being charged for it without uncapping them. They are handed straight through,
+    so what has to be shown here is that they arrive and that a caller naming neither
+    gets the planner it had.
+    """
+
+    inputs, horizon, held, rules = _inputs(tmp_path, (2, 3, 4))
+    # The default policy already caps every week of a multi-week horizon at one, so the
+    # first-week cap is only observable against a policy that caps no week.
+    uncapped = live_transfers._transfer_config(rules, transfer_cap=None)
+    band_players = frozenset(int(player) for player in held.squad_player_ids[:8])
+    band = FirstWeekOverlap(player_ids=band_players, minimum=8)
+
+    silent, _ = plan_transfer_horizon(inputs, horizon, held, rules, transfer_config=uncapped)
+    assert silent.diagnostics["first_week_overlap"] is None
+    assert silent.diagnostics["first_week_transfer_cap"] is None
+
+    plan, config = plan_transfer_horizon(
+        inputs,
+        horizon,
+        held,
+        rules,
+        transfer_config=uncapped,
+        first_week_overlap=band,
+        first_week_transfer_cap=1,
+    )
+
+    assert plan.diagnostics["first_week_overlap"] == {
+        "player_count": 8,
+        "minimum": 8,
+        "maximum": None,
+    }
+    assert plan.diagnostics["first_week_transfer_cap"] == 1
+    held_first_week = {int(value) for value in plan.weeks[0].selected_squad["player_id"].tolist()}
+    assert len(held_first_week & band_players) >= 8
+    assert all(week.transfer_count <= 1 for week in plan.weeks[1:])
+    # The cap is not a configuration control, so the digest the ledger records for this
+    # plan is the digest of the policy the caller handed in, unchanged.
+    assert config.configuration_fingerprint == uncapped.configuration_fingerprint
+    assert config.max_transfers_per_gameweek is None
