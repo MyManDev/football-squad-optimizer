@@ -18,6 +18,7 @@ from squadopt.data.errors import (
 )
 from squadopt.data.sources.fpl_live import (
     POSITION_CODES,
+    SCOUT_COLUMNS,
     SNAPSHOT_COLUMNS,
     EntryPicksRecord,
     GameweekDeadline,
@@ -41,9 +42,11 @@ from squadopt.data.sources.fpl_live import (
     league_standings_payload,
     live_endpoint_path,
     live_payload,
+    news_snapshot,
     next_open_deadline,
     player_codes,
     player_snapshot,
+    scout_snapshot,
     team_codes,
     team_names,
 )
@@ -741,6 +744,93 @@ def test_a_renamed_availability_field_stops_the_run(field: str) -> None:
 
     with pytest.raises(DataSourceError, match=field):
         availability_snapshot(_payload([record]))
+
+
+# --- the source's own editorial ----------------------------------------------
+#
+# A third table beside the snapshot and the availability one, for one reason: it carries
+# free text. The projection must never read it, so widening either existing table would
+# have been the wrong shape even though it is the same payload.
+
+
+def test_the_news_table_is_separate_and_carries_the_text_with_its_instant() -> None:
+    news = news_snapshot(_payload())
+
+    assert tuple(news.columns) == ("player_id", "status", "news", "news_added_utc")
+
+
+def test_the_news_table_keys_on_the_persistent_code() -> None:
+    news = news_snapshot(_payload([_element(code=118748)]))
+
+    assert news["player_id"].tolist() == [118748]
+
+
+def test_a_news_instant_is_normalised_to_utc() -> None:
+    news = news_snapshot(_payload([_element(news_added="2026-08-09T09:30:07.136250Z")]))
+
+    assert news["news_added_utc"].tolist() == ["2026-08-09T09:30:07.136250Z"]
+
+
+def test_a_player_never_flagged_carries_no_instant() -> None:
+    """Absent, not substituted with the capture's own clock: nothing was ever stamped."""
+
+    news = news_snapshot(_payload([_element(news_added=None)]))
+
+    assert news["news_added_utc"].isna().all()
+
+
+def test_a_cleared_flag_keeps_its_instant_with_empty_text() -> None:
+    """ "Was flagged, now cleared" is a third state, and it is not "never flagged".
+
+    The 2026-09-07 capture carries 62 of these. Folding them into the absent case would
+    lose exactly the transition a lead-time measurement is looking for.
+    """
+
+    news = news_snapshot(
+        _payload([_element(news="", news_added="2026-09-01T08:00:00Z", status="a")])
+    )
+
+    assert news["news"].tolist() == [""]
+    assert news["news_added_utc"].tolist() == ["2026-09-01T08:00:00Z"]
+
+
+def test_the_text_is_read_as_the_source_wrote_it() -> None:
+    news = news_snapshot(_payload([_element(news="Knee injury - 75% chance of playing")]))
+
+    assert news["news"].tolist() == ["Knee injury - 75% chance of playing"]
+
+
+def test_non_players_are_excluded_from_the_news_table_too() -> None:
+    news = news_snapshot(
+        _payload([_element(code=1, element_type=3), _element(code=2, element_type=5)])
+    )
+
+    assert news["player_id"].tolist() == [1]
+
+
+def test_the_news_table_is_sorted_by_player_id() -> None:
+    news = news_snapshot(_payload([_element(code=9, id=1), _element(code=2, id=2)]))
+
+    assert news["player_id"].tolist() == [2, 9]
+
+
+def test_a_payload_with_no_eligible_players_has_no_news_table() -> None:
+    with pytest.raises(DataSourceError, match="squad-eligible"):
+        news_snapshot(_payload([_element(element_type=5)]))
+
+
+def test_non_text_news_is_rejected_rather_than_coerced() -> None:
+    with pytest.raises(InvalidValueError, match="news"):
+        news_snapshot(_payload([_element(news=0)]))
+
+
+@pytest.mark.parametrize("field", ["status", "news", "news_added"])
+def test_a_renamed_news_field_stops_the_run(field: str) -> None:
+    record = _element()
+    record.pop(field, None)
+
+    with pytest.raises(DataSourceError, match=field):
+        news_snapshot(_payload([record]))
 
 
 # --- registered entries and their league ----------------------------------------------
@@ -1600,3 +1690,92 @@ def test_the_bench_is_the_squad_tail_in_substitution_order() -> None:
     assert record.starting_xi == tuple(shuffled[:11])
     assert record.squad[11:] == tuple(shuffled[11:])
     assert sorted(record.squad) != list(record.squad)  # the shuffle really was one
+
+
+# --- the scout risk notes ---------------------------------------------------
+#
+# `_element()` deliberately does not carry these two fields. Their names come from the lane
+# brief and no capture in this repository has been read to confirm them, so the shared
+# builder is not made to assert they exist; each test that needs them says so, and the test
+# below pins what happens to a payload that has never heard of them.
+
+
+def _scouted(**overrides: Any) -> dict[str, Any]:
+    record = _element(scout_risks=[], scout_news_link=None)
+    record.update(overrides)
+    return record
+
+
+def test_the_scout_snapshot_carries_exactly_its_own_columns() -> None:
+    frame = scout_snapshot(_payload([_scouted()]))
+
+    assert tuple(frame.columns) == SCOUT_COLUMNS
+
+
+def test_an_empty_risk_list_is_a_zero_because_it_was_observed() -> None:
+    frame = scout_snapshot(_payload([_scouted(scout_risks=[])]))
+
+    assert int(frame.loc[0, "scout_risk_count"]) == 0
+    assert bool(frame.loc[0, "scout_news_link_present"]) is False
+
+
+def test_a_payload_without_the_fields_is_refused_rather_than_counted_as_zero() -> None:
+    """The whole reason the count can be trusted.
+
+    A player with no published risks and a source that never published the field are
+    different facts, and a column of nulls cannot tell them apart afterwards. If the source
+    spells these names differently, this is where it stops.
+    """
+
+    with pytest.raises(DataSourceError, match="scout_risks"):
+        scout_snapshot(_payload([_element()]))
+
+
+def test_risks_are_counted_and_a_linked_article_is_flagged() -> None:
+    frame = scout_snapshot(
+        _payload(
+            [
+                _scouted(
+                    scout_risks=[{"type": "rotation"}, {"type": "knock"}],
+                    scout_news_link="https://example.invalid/scout/saka",
+                )
+            ]
+        )
+    )
+
+    assert int(frame.loc[0, "scout_risk_count"]) == 2
+    assert bool(frame.loc[0, "scout_news_link_present"]) is True
+
+
+def test_a_blank_link_is_not_a_link() -> None:
+    frame = scout_snapshot(_payload([_scouted(scout_news_link="   ")]))
+
+    assert bool(frame.loc[0, "scout_news_link_present"]) is False
+
+
+def test_a_null_risk_field_is_read_as_none_of_them() -> None:
+    frame = scout_snapshot(_payload([_scouted(scout_risks=None)]))
+
+    assert int(frame.loc[0, "scout_risk_count"]) == 0
+
+
+def test_an_undocumented_risk_shape_is_surfaced_rather_than_counted() -> None:
+    with pytest.raises(InvalidValueError, match="must be an array or absent"):
+        scout_snapshot(_payload([_scouted(scout_risks="two")]))
+
+
+def test_an_undocumented_link_shape_is_surfaced() -> None:
+    with pytest.raises(InvalidValueError, match="must be text or absent"):
+        scout_snapshot(_payload([_scouted(scout_news_link=7)]))
+
+
+def test_the_scout_snapshot_keeps_only_squad_eligible_positions() -> None:
+    manager = _scouted(code=999999, id=999, element_type=5)
+    frame = scout_snapshot(_payload([_scouted(), manager]))
+
+    assert frame["player_id"].tolist() == [118748]
+
+
+def test_a_repeated_persistent_code_is_refused() -> None:
+    with pytest.raises(DuplicateRecordsError, match="more than once"):
+        scout_snapshot(_payload([_scouted(), _scouted(id=6)]))

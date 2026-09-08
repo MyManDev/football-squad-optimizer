@@ -7,6 +7,7 @@ from pandas.testing import assert_frame_equal
 from squadopt.evaluation import evaluate_component_oof
 from squadopt.experiments import ExperimentExecutionError
 from squadopt.experiments.phase_c_ablation import (
+    PHASE_C_EVIDENCE_FAMILIES,
     PhaseCArmDeclaration,
     evaluate_phase_c_ablations,
     phase_c_evaluation_rows_sha256,
@@ -231,3 +232,29 @@ def test_inputs_are_not_mutated() -> None:
 
     assert_frame_equal(base, base_before)
     assert_frame_equal(candidate, candidate_before)
+
+
+def test_the_rotation_lane_added_exactly_one_family_and_moved_none() -> None:
+    """A family list is a contract: the four Phase C measured separately must stay put."""
+
+    assert PHASE_C_EVIDENCE_FAMILIES == (
+        "none",
+        "availability",
+        "ownership_transfer",
+        "elite",
+        "rotation",
+    )
+
+
+def test_an_unregistered_family_is_refused_by_name() -> None:
+    with pytest.raises(ExperimentExecutionError, match="evidence_family must be one of"):
+        PhaseCArmDeclaration(
+            arm_id="a",
+            # The measurement *kind* name, not the family name. The two now share a prefix,
+            # so passing one where the other belongs has to be refused rather than accepted.
+            evidence_family="rotation_evidence",
+            model_version="m",
+            feature_contract_version="f",
+            target_contract_version="t",
+            evaluation_rows_sha256="0" * 64,
+        )

@@ -60,6 +60,20 @@ MEASUREMENT_KINDS: Final[Mapping[str, tuple[str, ...]]] = {
         "calibration_seasons",
         "evaluation_season",
     ),
+    # The rotation lane's readings. `arms` and `comparator` are required because the whole
+    # protocol turns on which control a result was measured against -- a reading that does
+    # not name it cannot be checked against `rotation_evidence_prereg.md`. `eligible_rows`
+    # and `scored_rows` are separate fields for the same reason they are separate counts in
+    # the artifact: one "n" hides which of the two moved, and the protocol's coverage
+    # falsifier fires on exactly that difference.
+    "rotation_evidence": (
+        "contract_version",
+        "arms",
+        "comparator",
+        "target",
+        "eligible_rows",
+        "scored_rows",
+    ),
 }
 
 
