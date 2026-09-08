@@ -57,6 +57,16 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
       : total.ours_gameweeks.length === total.gameweeks.length
         ? null
         : copy.oursCovers(total.ours_gameweeks.join(", "));
+  // The members' figure is a running total, so it spans every week played up to the last
+  // finished one. That is the same set as the rest of the row until the finished weeks
+  // run with a gap; when it is not, the cell says which weeks it covers rather than
+  // sitting beside two narrower figures unmarked.
+  const membersGameweeks = total.members_gameweeks ?? [];
+  const membersCovers =
+    total.members_mean_total_points === null ||
+    membersGameweeks.join(",") === total.gameweeks.join(",")
+      ? null
+      : copy.membersCovers(membersGameweeks.join(", "));
   return (
     <Card title={copy.title} aside={copy.aside(view.source_snapshot_id)}>
       <p className={styles.notice}>{copy.paperLedger}</p>
@@ -103,7 +113,10 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
                     {total.members_mean_total_points === null
                       ? "—"
                       : points(total.members_mean_total_points, 1, locale)}
-                    <div className={styles.sub}>{copy.membersTotal(total.members_counted)}</div>
+                    <div className={styles.sub}>
+                      {copy.membersTotal(total.members_counted)}
+                      {membersCovers && ` · ${membersCovers}`}
+                    </div>
                   </td>
                   <td className={`${styles.right} num`}>—</td>
                   <td className={`${styles.right} num`}>

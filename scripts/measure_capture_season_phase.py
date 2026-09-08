@@ -9,8 +9,8 @@ the *previous* season's totals, and afterwards they hold this season's. Nothing 
 payload says which, and both readings are plausible integers, so the mistake does not
 announce itself.
 
-This script measures the claim rather than asserting it. For every stored capture it
-reports the phase the adapter derives, and for a pre-reset capture it checks the
+This script measures the claim rather than asserting it. For every stored *live* capture
+it reports the phase the adapter derives, and for a pre-reset capture it checks the
 counters against the archive's completed-season totals for the same players. An exact
 match across the roster is what makes "these are last season's numbers" a measurement.
 
@@ -27,7 +27,8 @@ from typing import Final
 import pandas as pd
 from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT, write_json, write_text
 
-from squadopt.data.snapshots import read_snapshot
+from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
@@ -148,12 +149,19 @@ def _reset_evidence(bootstrap: bytes, archive: pd.DataFrame) -> dict[str, object
 
 
 def measure(snapshot_root: Path, archive_root: Path) -> dict[str, object]:
-    """Report every stored capture's phase, and the archive agreement where it applies."""
+    """Report every stored live capture's phase, and the archive agreement where it applies.
+
+    Live captures only. Several collectors share this root, and only a live capture carries
+    both a bootstrap and a fixtures payload: a cohort capture holds standings pages and no
+    fixtures, and an elite-picks capture holds picks documents and no bootstrap at all.
+    ``list_snapshot_ids`` names the source it means, and skips a directory carrying no
+    metadata — the shape an interrupted capture leaves behind.
+    """
 
     archive = _archive_season_totals(archive_root, COMPARISON_SEASON)
     captures: list[dict[str, object]] = []
-    for directory in sorted(p for p in snapshot_root.iterdir() if p.is_dir()):
-        snapshot = read_snapshot(snapshot_root, directory.name)
+    for identifier in list_snapshot_ids(snapshot_root, source=FPL_LIVE_SOURCE):
+        snapshot = read_snapshot(snapshot_root, identifier)
         payloads = snapshot.payloads
         phase = capture_season_phase(
             payloads[BOOTSTRAP_PAYLOAD],
@@ -161,7 +169,7 @@ def measure(snapshot_root: Path, archive_root: Path) -> dict[str, object]:
             captured_at_utc=snapshot.metadata.captured_at_utc,
         )
         entry: dict[str, object] = {
-            "snapshot_id": directory.name,
+            "snapshot_id": identifier,
             "captured_at_utc": phase.captured_at_utc,
             "phase": phase.phase,
             "opening_deadline_utc": phase.opening_deadline_utc,

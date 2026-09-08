@@ -23,7 +23,9 @@ Steps, each skippable by naming its output:
                    reuse captures, and an export already on disk for that picks capture
                    is reused; ``--skip-top100`` leaves the evidence out entirely). First,
                    because the projection refuses evidence captured after the decision
-                   capture it is applied to.
+                   capture it is applied to — and, for the same reason, refuses an
+                   artifact *generated* after it, so with ``--snapshot-id`` the export
+                   must already be on disk rather than be remade.
 2. capture         one fpl-live snapshot with the registered entries and the league page
                    (``--snapshot-id`` reuses one — then the Top-100 captures must be reused
                    or skipped too, for the same reason; the capture's open deadline must be
@@ -149,7 +151,9 @@ def plan_week(
     if skip_top100:
         reasons["top100"] = "--skip-top100"
     elif cohort_snapshot and elite_snapshot:
-        reasons["top100"] = f"reusing {cohort_snapshot} and {elite_snapshot} (export reused)"
+        # The captures are reused; whether the export is reused too depends on what is on
+        # disk, which this function does not read. ``evidence_artifact`` reports that.
+        reasons["top100"] = f"reusing {cohort_snapshot} and {elite_snapshot}"
         steps.append("top100")
     elif snapshot_id:
         # The evidence must predate the decision capture it is applied to; a fresh
@@ -175,6 +179,49 @@ def plan_week(
     else:
         reasons["publish"] = "pass --publish to open the site PR"
     return WeekPlan(season, gameweek, league_id, tuple(steps), reasons)
+
+
+def evidence_artifact(
+    root: Path, season: str, gameweek: int, elite_snapshot: str
+) -> tuple[Path, Path]:
+    """The evidence table and manifest one picks capture's export writes.
+
+    The export never overwrites a different artifact at the same path, and a rehearsal
+    earlier in the week is a different artifact from Friday's; the picks capture's own hash
+    makes the name unique per capture, so an export already on disk for that capture is the
+    same artifact and is reused rather than remade.
+    """
+
+    name = f"player_evidence_v1_{season}_gw{gameweek:02d}_top100_{elite_snapshot[-12:]}"
+    return root / f"{name}.csv", root / f"{name}.manifest.json"
+
+
+def check_evidence_for_reused_capture(
+    evidence_root: Path, *, season: str, gameweek: int, elite_snapshot: str, snapshot_id: str
+) -> None:
+    """Refuse a reused live capture whose evidence export is not already on disk.
+
+    ``plan_week`` refuses a *fresh* Top-100 capture after a reused live capture, because
+    the projection refuses evidence captured after the decision capture. The artifact is
+    the second half of the same rule and was not covered: ``apply_elite_evidence`` checks
+    the artifact's ``generated_at_utc`` as well as the evidence's ``captured_at_utc``, and
+    ``export_player_evidence`` stamps the artifact with the wall clock. Re-exporting for a
+    capture already taken therefore stamps it after that capture, always — the refusal is
+    not a timing accident and no amount of promptness escapes it. Worse, the refused run
+    leaves the artifact behind, so every later run for that pair takes the "already
+    exported" branch and fails the same way. Said here, before anything is spent.
+    """
+
+    table, manifest = evidence_artifact(evidence_root, season, gameweek, elite_snapshot)
+    if table.is_file() and manifest.is_file():
+        return
+    raise WeekError(
+        f"Reusing {snapshot_id} needs the evidence export for {elite_snapshot} already on "
+        f"disk; {table.name} is not under {evidence_root}. Re-exporting it now would stamp "
+        "the artifact after that capture was taken, which the handoff refuses. Export it "
+        "for that picks capture first, or run with --skip-top100 or --projection "
+        "component-only to leave the Top-100 uplift out."
+    )
 
 
 def new_snapshot(before: Sequence[str], after: Sequence[str], prefix: str) -> str:
@@ -356,6 +403,21 @@ def run_week(arguments: argparse.Namespace) -> int:
             f"No entry registry at {REGISTRY_PATH}; seed it first with "
             "`python -m scripts.seed_entry_registry --league <id>`."
         )
+    if (
+        arguments.snapshot_id
+        and "top100" in plan.steps
+        and arguments.projection == "component"
+        and arguments.elite_snapshot
+    ):
+        # The other half of "the evidence must predate the decision capture": the artifact
+        # itself, which a re-export would stamp with the wall clock.
+        check_evidence_for_reused_capture(
+            EVIDENCE_ROOT,
+            season=plan.season,
+            gameweek=plan.gameweek,
+            elite_snapshot=arguments.elite_snapshot,
+            snapshot_id=arguments.snapshot_id,
+        )
     decide_step = "decide" in plan.steps
     if decide_step:
         # Before any capture: a ledger that cannot start this gameweek refuses now, and a
@@ -411,13 +473,10 @@ def run_week(arguments: argparse.Namespace) -> int:
             )
             elite = new_snapshot(before, list_snapshot_ids(SNAPSHOT_ROOT), ELITE_PREFIX)
         elite_snapshot = elite
-        # The export never overwrites a different artifact at the same path, and a
-        # rehearsal earlier in the week is a different artifact from Friday's; the picks
-        # capture's own hash makes the name unique per capture, and an export already on
-        # disk for that capture is the same artifact, so it is reused rather than remade.
-        table_name = f"player_evidence_v1_{plan.season}_gw{plan.gameweek:02d}_top100_{elite[-12:]}"
-        evidence_table = EVIDENCE_ROOT / f"{table_name}.csv"
-        evidence_manifest = EVIDENCE_ROOT / f"{table_name}.manifest.json"
+        evidence_table, evidence_manifest = evidence_artifact(
+            EVIDENCE_ROOT, plan.season, plan.gameweek, elite
+        )
+        table_name = evidence_table.stem
         if evidence_table.is_file() and evidence_manifest.is_file():
             print(f"evidence {evidence_table.name} already exported for {elite}; reused")
         else:

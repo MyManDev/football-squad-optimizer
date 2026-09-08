@@ -40,6 +40,7 @@ from pathlib import Path
 from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import AdviceJobSpecStore, FileAdviceJobSpecStore
 from squadopt.platform.advice_observability import AdviceLog, AdviceMetrics, readiness_report
@@ -301,7 +302,13 @@ class CaptureContextProvider:
 
         snapshot_id = latest_snapshot_id(self._config.snapshot_root)
         if snapshot_id is None:
-            self._report("advice_context_absent", reason="no capture under the snapshot root")
+            # Names the source, because the root is shared: it can hold cohort and
+            # elite-picks captures and still hold nothing this adapter can serve advice
+            # from. "No capture at all" would send an operator to look at the mount.
+            self._report(
+                "advice_context_absent",
+                reason=f"no {FPL_LIVE_SOURCE} capture under the snapshot root",
+            )
             return None
         with self._lock:
             held = self._identity

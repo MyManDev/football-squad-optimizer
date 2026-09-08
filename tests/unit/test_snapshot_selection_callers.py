@@ -1,8 +1,8 @@
 """How the remaining callers pick "the latest capture" out of a root three collectors share.
 
 The companion to ``test_snapshot_selection_cli.py``, which covers the operator shells. These
-are the callers inside the application and platform layers, plus the two scripts that the
-shells do not reach: the same defect, found in the same sweep.
+are the callers inside the application and platform layers, plus the scripts the shells do
+not reach: the same defect, found in the same sweep.
 
 A snapshot identifier is ``{source}-{stamp}-{digest}``, so a lexical listing orders by
 collector name before it orders by capture time. ``fpl-top100`` sorts *after* every
@@ -19,7 +19,10 @@ took one.
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
+import scripts.build_scoreboard as scoreboard_cli
+import scripts.measure_capture_season_phase as measure_cli
 import scripts.record_preseason_difficulty as record_cli
 import scripts.run_week as run_week
 import scripts.seed_entry_registry as seed_cli
@@ -333,3 +336,82 @@ def test_the_weekly_loop_reports_no_live_capture_as_none(tmp_path: Path) -> None
     _cohort(tmp_path)
 
     assert run_week.latest_live_snapshot(tmp_path) is None
+
+
+# --- scripts.build_scoreboard ---------------------------------------------------------
+
+
+def test_the_scoreboard_resolves_the_latest_live_capture(tmp_path: Path) -> None:
+    """Like ``run_week``'s, this one was already right and passes before the change too.
+
+    ``build_scoreboard`` was merged between the two passes of the sweep and kept its own
+    copy of the ``fpl-live-`` prefix, hand-filtering an unfiltered listing. The change is a
+    dedupe onto ``FPL_LIVE_SOURCE`` and ``list_snapshot_ids(source=...)``; this holds it to
+    the behaviour it replaced, so dropping the ``source=`` argument fails it.
+    """
+
+    live = _live(tmp_path)
+    _cohort(tmp_path)
+    _elite(tmp_path)
+
+    assert scoreboard_cli.resolve_live_snapshot_id(tmp_path, None) == live
+
+
+def test_the_scoreboard_still_reads_a_capture_named_outright(tmp_path: Path) -> None:
+    _live(tmp_path)
+    cohort = _cohort(tmp_path)
+
+    assert scoreboard_cli.resolve_live_snapshot_id(tmp_path, cohort) == cohort
+    with pytest.raises(DataError, match="No snapshot"):
+        scoreboard_cli.resolve_live_snapshot_id(tmp_path, "fpl-live-20260101T000000Z-000000000000")
+
+
+def test_the_scoreboard_reports_a_root_holding_no_live_capture(tmp_path: Path) -> None:
+    _cohort(tmp_path)
+
+    with pytest.raises(DataError, match="No fpl-live-\\* snapshots"):
+        scoreboard_cli.resolve_live_snapshot_id(tmp_path, None)
+
+
+# --- scripts.measure_capture_season_phase ---------------------------------------------
+
+
+def test_the_phase_measurement_reads_live_captures_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The last ``iterdir`` reader of a snapshot root, and the one the sweep missed.
+
+    It indexes ``bootstrap-static.json`` and ``fixtures.json`` on every directory it finds,
+    and only a live capture carries both: an elite-picks capture holds picks documents and
+    no bootstrap, a cohort capture a bootstrap and no fixtures. Since the weekly loop began
+    writing both into this root, the documented invocation died on a bare ``KeyError``
+    before a single capture was measured.
+    """
+
+    live = _live(tmp_path)
+    _cohort(tmp_path)
+    _elite(tmp_path)
+    read: list[str] = []
+
+    def _phase(bootstrap: bytes, fixtures: bytes, *, captured_at_utc: str) -> object:
+        raise ExperimentError("read no further; this test is about the selection")
+
+    def _snapshot(root: Path, identifier: str) -> object:
+        read.append(identifier)
+        return original(root, identifier)
+
+    original = measure_cli.read_snapshot
+    monkeypatch.setattr(measure_cli, "read_snapshot", _snapshot)
+    monkeypatch.setattr(measure_cli, "capture_season_phase", _phase)
+    monkeypatch.setattr(
+        measure_cli,
+        "_archive_season_totals",
+        lambda *_arguments, **_keywords: pd.DataFrame(
+            {"player_id": [], "archive_total_points": [], "archive_minutes": []}
+        ),
+    )
+
+    with pytest.raises(ExperimentError):
+        measure_cli.measure(tmp_path, tmp_path / "archive")
+
+    assert read == [live], read

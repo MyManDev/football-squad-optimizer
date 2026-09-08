@@ -337,8 +337,10 @@ The ops process does not move. Captures, decisions, settles and site builds stay
 machine that owns the ledger; this is only how the bytes reach the backend's read-only mount.
 
 **Order matters, and getting it wrong takes the whole backend down.** The context is the most
-recent capture that has a handoff — the newest snapshot directory holding `metadata.json`,
-projected through the handoff addressed by *that capture's* season and gameweek. A capture
+recent **live** capture that has a handoff — the newest `fpl-live-` snapshot directory holding
+`metadata.json`, projected through the handoff addressed by *that capture's* season and
+gameweek. Captures from the other collectors are ignored here, so a root holding only those
+reads as not ready and logs `advice_context_absent` naming the source it wanted. A capture
 published without its handoff is therefore not a partial upgrade: it is the newest capture,
 it has no projection anyone can name, `capture_context` goes false, and **every** advice route
 answers 503 until the handoff lands.

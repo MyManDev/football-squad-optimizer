@@ -22,7 +22,8 @@ Where each number comes from, and what it is:
   which is what makes the two columns comparable.
 - ``ours``: the ledger entry for the gameweek, when one exists: the settled net and named-
   eleven score, the hit points, the projection, and the mode the decision was made in
-  (``live`` before the deadline, ``replay`` from a pre-deadline capture afterwards). Its
+  (``live`` decided before its deadline from a capture that run took; ``replay`` recorded
+  after that deadline, or from a capture the run did not take but named). Its
   ``scoring_basis`` is ``named_eleven_no_autosubs``, and that is not FPL's own net: the
   eleven the decision named is scored as named, the game's automatic substitutions are
   not applied, and the ledger's decision carries no vice-captain to recover a captain who
@@ -61,6 +62,7 @@ from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     EntryGameweekPoints,
@@ -69,7 +71,14 @@ from squadopt.data.sources.fpl_live import (
     scored_gameweeks,
 )
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
-from squadopt.live import LedgerEntry, LedgerError, decision_mode, infer_season, load_ledger
+from squadopt.live import (
+    LedgerEntry,
+    LedgerError,
+    decision_mode,
+    infer_season,
+    load_ledger,
+    season_from_bootstrap,
+)
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
@@ -77,7 +86,6 @@ REGISTRY_PATH = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
 LEDGER_ROOT = REPOSITORY_ROOT / "data" / "ledger"
 SITE_OUT = REPOSITORY_ROOT / "web" / "public"
 
-LIVE_SNAPSHOT_PREFIX: Final = "fpl-live-"
 SCOREBOARD_FILE: Final = "scoreboard.json"
 TOP100_SIZE: Final = 100
 #: What our own row's numbers are, and are not: see the module docstring.
@@ -283,6 +291,16 @@ def scoreboard_payload(
         for entry_id, payload in histories.items()
     }
     ledger = {entry.gameweek: entry for entry in ledger_entries}
+    if cohort is not None:
+        # A gameweek number repeats every season, so the week check below proves the two
+        # captures are from the same week only once they are known to be from the same
+        # season. Both seasons come from the captures' own published deadlines.
+        cohort_season = season_from_bootstrap(cohort.bootstrap)
+        if cohort_season != season:
+            raise DataError(
+                f"The cohort capture {cohort.snapshot_id} describes season {cohort_season}, "
+                f"not {season}; its mean would sit in another season's row unmarked."
+            )
     top100 = top100_week(cohort, cohort_picks) if cohort is not None else None
     if top100 is not None and top100["gameweek"] not in played:
         raise DataError(
@@ -322,10 +340,13 @@ def scoreboard_payload(
             }
         )
 
-    # Cumulative figures cover the finished gameweeks only, and each names what it covers:
-    # our net is summed over the weeks the ledger has settled, the members' figure is their
-    # own running total at the last finished week, and the field's average is summed only
-    # when every finished week published one.
+    # Each cumulative figure names the weeks it covers, because they are not the same
+    # weeks: our net is summed over the finished weeks the ledger has settled, the field's
+    # average is summed over the finished weeks that published one, and the members'
+    # figure is their own running total at the last finished week — which spans every week
+    # they have played through it, finished or not. Those coincide while the finished
+    # weeks run without a gap, and a gap (a week left unfinished by a postponed fixture,
+    # with later weeks finished) is exactly when they do not.
     finished_rows = [row for row in rows if row["finished"]]
     finished_gameweeks = [int(str(row["gameweek"])) for row in finished_rows]
     ours_nets: dict[int, float] = {}
@@ -348,6 +369,9 @@ def scoreboard_payload(
         "ours_net": sum(ours_nets.values()) if ours_nets else None,
         "ours_gameweeks": sorted(ours_nets),
         "members_mean_total_points": _mean(totals),
+        "members_gameweeks": (
+            [] if through is None else [week for week in played if week <= through]
+        ),
         "members_counted": len(totals),
         "average_entry_score": (
             sum(averages) if averages and len(averages) == len(finished_rows) else None
@@ -373,16 +397,23 @@ def scoreboard_payload(
 
 
 def resolve_live_snapshot_id(root: Path, requested: str | None) -> str:
-    """The capture to read: the one named, or the most recent live one held."""
+    """The capture to read: the one named, or the most recent live one held.
 
-    identifiers = list_snapshot_ids(root)
+    Only the automatic pick is filtered. Several collectors share this root and an
+    identifier begins with its source, so a lexical listing orders by collector before
+    capture time; ``list_snapshot_ids`` takes the source as a filter rather than this
+    module keeping a copy of the prefix. A capture an operator names outright is still
+    looked for in everything held, so any capture on disk stays replayable and a
+    misspelling still reports against what is really there.
+    """
+
     if requested:
-        if requested not in identifiers:
+        if requested not in list_snapshot_ids(root):
             raise DataError(f"No snapshot {requested!r} under {root}.")
         return requested
-    live = [name for name in identifiers if name.startswith(LIVE_SNAPSHOT_PREFIX)]
+    live = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
     if not live:
-        raise DataError(f"No {LIVE_SNAPSHOT_PREFIX}* snapshots under {root}; capture one first.")
+        raise DataError(f"No {FPL_LIVE_SOURCE}-* snapshots under {root}; capture one first.")
     return live[-1]
 
 

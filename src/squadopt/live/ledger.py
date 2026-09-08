@@ -19,7 +19,9 @@ process that dies mid-write leaves only a staging directory that readers ignore 
 the next writer prunes. One writer per gameweek is enforced with an exclusive lock
 file, so two ticks cannot race the immutability check. An outcome is written the same
 way (temporary file, rename), and a manifest that was not rewritten after the outcome
-landed is completed on the next call rather than refused.
+landed is completed on the next call rather than refused — after the digests it already
+records are verified, because completing it is a rewrite and a rewrite over drifted bytes
+would bless them.
 """
 
 import contextlib
@@ -393,7 +395,12 @@ def record_outcome(
     if outcome_path.exists():
         if _OUTCOME_FILE not in _manifest_files(directory):
             # A writer landed the outcome but died before rewriting the manifest:
-            # finish its work instead of refusing forever.
+            # finish its work instead of refusing forever. Verify first — rewriting the
+            # manifest re-derives every digest from the bytes now on disk, so completing
+            # it unverified would bless any drift that happened while the entry sat in
+            # this state. The files the manifest already records must still match it;
+            # outcome.json is not among them, which is what is being completed.
+            _verify_manifest(directory)
             with _gameweek_lock(directory):
                 _write_manifest(directory)
             return outcome_path
@@ -670,8 +677,9 @@ def summary_markdown(root: Path, season: str) -> str:
         f"- Contract: `{SEASON_LEDGER_CONTRACT_VERSION}`",
         "- One row per recorded decision; raw entries (decision, projections, report, "
         "outcome) live locally under `data/ledger/` with per-file checksums.",
-        "- Mode: `live` was decided before its deadline; `replay` was recorded afterwards "
-        "from a capture taken before that deadline.",
+        "- Mode: `live` was decided before its deadline, from a capture that run took; "
+        "`replay` was recorded after that deadline, or from a capture the run did not "
+        "take but named.",
         "",
         "| GW | Snapshot | Mode | Solver | Projected | Realized | Error | Transfers | Hits "
         "| Chip | Net | Unavailable |",

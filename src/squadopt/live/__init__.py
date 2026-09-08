@@ -53,6 +53,7 @@ from squadopt.live.recommendation import (
     project,
     read_inputs,
     read_projection_handoff,
+    season_from_bootstrap,
     write_projection_handoff,
 )
 from squadopt.live.report import (
@@ -191,6 +192,7 @@ __all__ = [
     "risk_not_requested",
     "rules_to_dict",
     "score_named_eleven",
+    "season_from_bootstrap",
     "summary_markdown",
     "write_projection_handoff",
 ]
