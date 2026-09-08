@@ -146,6 +146,18 @@
       "model_identifier": "synthetic-stub",
       "model_version": "fixture-1",
       "text": "{\"contract_version\": \"rotation_claim_response_v1\", \"documents\": [], \"claims\": \"Saka is fine\"}"
+    },
+    {
+      "case": "uncited_source",
+      "model_identifier": "synthetic-stub",
+      "model_version": "fixture-1",
+      "text": "{\n  \"claims\": [\n    {\n      \"disposition\": \"stated_expected_to_start\",\n      \"paraphrase\": \"He is available.\",\n      \"player_name\": \"Saka\",\n      \"source_url\": \"https://club.example/arsenal/never-read\",\n      \"span_end\": 10,\n      \"span_start\": 0,\n      \"speaker\": \"manager\",\n      \"team_name\": \"Arsenal\"\n    }\n  ],\n  \"contract_version\": \"rotation_claim_response_v1\",\n  \"documents\": [\n    {\n      \"published_at_utc\": \"2026-09-11T14:00:00Z\",\n      \"published_precision\": \"instant\",\n      \"url\": \"https://club.example/arsenal/team-news-gw4\"\n    },\n    {\n      \"published_at_utc\": \"2026-09-11\",\n      \"published_precision\": \"day\",\n      \"url\": \"https://club.example/united/press-conference-gw4\"\n    },\n    {\n      \"published_at_utc\": null,\n      \"published_precision\": \"unknown\",\n      \"url\": \"https://club.example/united/squad-update\"\n    }\n  ]\n}"
+    },
+    {
+      "case": "span_past_the_end",
+      "model_identifier": "synthetic-stub",
+      "model_version": "fixture-1",
+      "text": "{\n  \"claims\": [\n    {\n      \"disposition\": \"stated_expected_to_start\",\n      \"paraphrase\": \"He is available.\",\n      \"player_name\": \"Saka\",\n      \"source_url\": \"https://club.example/arsenal/team-news-gw4\",\n      \"span_end\": 524,\n      \"span_start\": 0,\n      \"speaker\": \"manager\",\n      \"team_name\": \"Arsenal\"\n    }\n  ],\n  \"contract_version\": \"rotation_claim_response_v1\",\n  \"documents\": [\n    {\n      \"published_at_utc\": \"2026-09-11T14:00:00Z\",\n      \"published_precision\": \"instant\",\n      \"url\": \"https://club.example/arsenal/team-news-gw4\"\n    },\n    {\n      \"published_at_utc\": \"2026-09-11\",\n      \"published_precision\": \"day\",\n      \"url\": \"https://club.example/united/press-conference-gw4\"\n    },\n    {\n      \"published_at_utc\": null,\n      \"published_precision\": \"unknown\",\n      \"url\": \"https://club.example/united/squad-update\"\n    }\n  ]\n}"
     }
   ]
 }

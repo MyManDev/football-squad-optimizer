@@ -304,6 +304,36 @@ def make_response_text() -> str:
     )
 
 
+def _one_claim_response(*, source_url: str, span_start: int, span_end: int) -> str:
+    """One well-formed response carrying a single claim, for the citation-breaking cases.
+
+    Built with ``json.dumps`` rather than by string concatenation because these two cases
+    vary a *number*, and a hand-quoted integer inside a hand-quoted object is how a fixture
+    meant to violate one rule ends up violating a different one by accident.
+    """
+
+    return json.dumps(
+        {
+            "contract_version": ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+            "documents": [dict(document) for document in RESPONSE_DOCUMENTS],
+            "claims": [
+                {
+                    "player_name": "Saka",
+                    "team_name": "Arsenal",
+                    "disposition": "stated_expected_to_start",
+                    "speaker": "manager",
+                    "source_url": source_url,
+                    "span_start": span_start,
+                    "span_end": span_end,
+                    "paraphrase": "He is available.",
+                }
+            ],
+        },
+        indent=2,
+        sort_keys=True,
+    )
+
+
 #: Responses a parser must refuse rather than coerce. Each breaks the format in one way,
 #: because a parser that guesses at one of these would guess at a real malformed answer.
 UNPARSEABLE_RESPONSES: Final[tuple[tuple[str, str], ...]] = (
@@ -321,6 +351,25 @@ UNPARSEABLE_RESPONSES: Final[tuple[tuple[str, str], ...]] = (
         "claims_not_an_array",
         '{"contract_version": "' + ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION + '", '
         '"documents": [], "claims": "Saka is fine"}',
+    ),
+    # The two below break the *citation* rather than the syntax, and they are the ones that
+    # matter most: a claim whose span cannot be resolved against captured bytes is
+    # indistinguishable from an invented one, however well-formed the JSON around it is.
+    (
+        "uncited_source",
+        _one_claim_response(
+            source_url="https://club.example/arsenal/never-read",
+            span_start=0,
+            span_end=10,
+        ),
+    ),
+    (
+        "span_past_the_end",
+        _one_claim_response(
+            source_url=ARSENAL_URL,
+            span_start=0,
+            span_end=len(ARSENAL_TEXT.encode("utf-8")) + 1,
+        ),
     ),
 )
 

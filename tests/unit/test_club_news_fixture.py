@@ -223,15 +223,23 @@ def test_every_span_points_at_the_sentence_it_claims(provider: FixtureClubNewsPr
         assert span == span.strip()
 
 
-def test_the_unparseable_responses_break_the_format_four_different_ways(
+def test_every_unparseable_response_breaks_the_format_its_own_way(
     provider: FixtureClubNewsProvider,
 ) -> None:
-    """A parser that guessed at one of these would guess at a real malformed answer."""
+    """A parser that guessed at one of these would guess at a real malformed answer.
+
+    The count comes from the generator rather than a literal. This assertion said "four"
+    while the generator grew to six, which is the way a test stops describing the thing it
+    is meant to pin.
+    """
 
     responses = provider.unparseable_responses()
+    declared = make_club_news_fixture()["unparseable_responses"]
 
-    assert len(responses) == 4
-    assert len({response.text for response in responses}) == 4
+    assert len(responses) == len(declared)
+    assert len({response.text for response in responses}) == len(declared)
+    # Each case is labelled, and the labels are what make "one way each" checkable.
+    assert len({str(entry["case"]) for entry in declared}) == len(declared)
 
 
 # --- the shapes -------------------------------------------------------------

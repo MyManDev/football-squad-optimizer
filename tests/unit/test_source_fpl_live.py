@@ -18,6 +18,7 @@ from squadopt.data.errors import (
 )
 from squadopt.data.sources.fpl_live import (
     POSITION_CODES,
+    SCOUT_COLUMNS,
     SNAPSHOT_COLUMNS,
     EntryPicksRecord,
     GameweekDeadline,
@@ -45,6 +46,7 @@ from squadopt.data.sources.fpl_live import (
     next_open_deadline,
     player_codes,
     player_snapshot,
+    scout_snapshot,
     team_codes,
     team_names,
 )
@@ -1688,3 +1690,92 @@ def test_the_bench_is_the_squad_tail_in_substitution_order() -> None:
     assert record.starting_xi == tuple(shuffled[:11])
     assert record.squad[11:] == tuple(shuffled[11:])
     assert sorted(record.squad) != list(record.squad)  # the shuffle really was one
+
+
+# --- the scout risk notes ---------------------------------------------------
+#
+# `_element()` deliberately does not carry these two fields. Their names come from the lane
+# brief and no capture in this repository has been read to confirm them, so the shared
+# builder is not made to assert they exist; each test that needs them says so, and the test
+# below pins what happens to a payload that has never heard of them.
+
+
+def _scouted(**overrides: Any) -> dict[str, Any]:
+    record = _element(scout_risks=[], scout_news_link=None)
+    record.update(overrides)
+    return record
+
+
+def test_the_scout_snapshot_carries_exactly_its_own_columns() -> None:
+    frame = scout_snapshot(_payload([_scouted()]))
+
+    assert tuple(frame.columns) == SCOUT_COLUMNS
+
+
+def test_an_empty_risk_list_is_a_zero_because_it_was_observed() -> None:
+    frame = scout_snapshot(_payload([_scouted(scout_risks=[])]))
+
+    assert int(frame.loc[0, "scout_risk_count"]) == 0
+    assert bool(frame.loc[0, "scout_news_link_present"]) is False
+
+
+def test_a_payload_without_the_fields_is_refused_rather_than_counted_as_zero() -> None:
+    """The whole reason the count can be trusted.
+
+    A player with no published risks and a source that never published the field are
+    different facts, and a column of nulls cannot tell them apart afterwards. If the source
+    spells these names differently, this is where it stops.
+    """
+
+    with pytest.raises(DataSourceError, match="scout_risks"):
+        scout_snapshot(_payload([_element()]))
+
+
+def test_risks_are_counted_and_a_linked_article_is_flagged() -> None:
+    frame = scout_snapshot(
+        _payload(
+            [
+                _scouted(
+                    scout_risks=[{"type": "rotation"}, {"type": "knock"}],
+                    scout_news_link="https://example.invalid/scout/saka",
+                )
+            ]
+        )
+    )
+
+    assert int(frame.loc[0, "scout_risk_count"]) == 2
+    assert bool(frame.loc[0, "scout_news_link_present"]) is True
+
+
+def test_a_blank_link_is_not_a_link() -> None:
+    frame = scout_snapshot(_payload([_scouted(scout_news_link="   ")]))
+
+    assert bool(frame.loc[0, "scout_news_link_present"]) is False
+
+
+def test_a_null_risk_field_is_read_as_none_of_them() -> None:
+    frame = scout_snapshot(_payload([_scouted(scout_risks=None)]))
+
+    assert int(frame.loc[0, "scout_risk_count"]) == 0
+
+
+def test_an_undocumented_risk_shape_is_surfaced_rather_than_counted() -> None:
+    with pytest.raises(InvalidValueError, match="must be an array or absent"):
+        scout_snapshot(_payload([_scouted(scout_risks="two")]))
+
+
+def test_an_undocumented_link_shape_is_surfaced() -> None:
+    with pytest.raises(InvalidValueError, match="must be text or absent"):
+        scout_snapshot(_payload([_scouted(scout_news_link=7)]))
+
+
+def test_the_scout_snapshot_keeps_only_squad_eligible_positions() -> None:
+    manager = _scouted(code=999999, id=999, element_type=5)
+    frame = scout_snapshot(_payload([_scouted(), manager]))
+
+    assert frame["player_id"].tolist() == [118748]
+
+
+def test_a_repeated_persistent_code_is_refused() -> None:
+    with pytest.raises(DuplicateRecordsError, match="more than once"):
+        scout_snapshot(_payload([_scouted(), _scouted(id=6)]))
