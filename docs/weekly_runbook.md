@@ -9,7 +9,8 @@ python -m scripts.run_week --season 2026-27 --gameweek 4 --league 352490 --worke
 ```
 
 Run it from the checkout you mean to publish from, with that checkout's `src` on
-`PYTHONPATH`, after the previous gameweek's picks are public and before the deadline.
+`PYTHONPATH`, after the previous gameweek's picks are public and inside the lead-time
+window below — "before the deadline" is a floor, not the policy.
 `--dry-run` prints the plan and runs nothing. Without `--decide` the ledger is not
 touched and the loop is the members' loop alone.
 
@@ -45,9 +46,26 @@ net columns beside it.
 
 ## Timing
 
-- The capture must be open for the requested gameweek; the command reads the deadline
-  back from the capture and refuses a mismatch, so a Thursday run for Saturday's
-  gameweek is fine and a Sunday run for a Saturday deadline is not.
+- **Take the capture two to three hours before the deadline, not the night before.**
+  The capture must be open for the requested gameweek — the command reads the deadline
+  back from it and refuses a mismatch — but "open" is a floor, not the policy. The week
+  is decided from that one capture and availability is applied once from it, so a note
+  the platform adds afterwards is not late, it is absent, and no later step recovers it.
+  Running a day or more ahead leaves that whole span unseen.
+- The size of what is unseen is measured, not argued.
+  `python -m scripts.measure_capture_lead_time` reads the stored captures and writes
+  `docs/capture_lead_time.json`: per gameweek, each capture's lead time and how many of
+  the source's own notes were stamped inside the window between the earliest and the
+  latest capture. Take a second capture inside the window and the week's own numbers
+  appear there. A gameweek captured once reports **not measured**, never zero.
+- Two to three hours, rather than as late as possible, for one reason: everything the
+  week needs has to fit **before** the deadline, in order — capture, handoff, decide,
+  and the league tree's twenty minutes for fifteen members. A capture at thirty minutes
+  leaves no room for a step that fails and has to be run again.
+- Do not read the feed's own `news` as cover for capturing early. The rotation-lane
+  brief (2026-09-08) measured its items on the 2026-09-07 capture at a median of 22.9
+  days behind it, with 3 of 71 added since the previous deadline; no artifact in this
+  repository carries that measurement yet, so it is cited here rather than claimed.
 - The Top-100 captures refuse at or after the deadline, and read the cohort's picks for
   the gameweek that just closed — so they need those picks to be public (after the
   previous deadline) and the coming deadline still open.
