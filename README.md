@@ -117,10 +117,18 @@ history use the existing in-season estimate row by row. Old captures without the
 payloads fall back to the legacy model with a recorded reason; `--control-only` is the explicit
 rollback. See [`docs/phase_c_operational_component.md`](docs/phase_c_operational_component.md).
 
-The earlier Top-100 five-per-cent uplift remains reproducible only as an explicit legacy
-candidate. It is not combined with the component base and is no longer the default; its frozen
-definition remains in
-[`docs/phase_c_operational_elite_policy.md`](docs/phase_c_operational_elite_policy.md).
+The Top-100 five-per-cent uplift is applied **on top of** that component base whenever the
+producer is given both evidence artifact paths, which on an ordinary mid-season capture is the
+default weekly path. This paragraph used to say the uplift was not combined with the component
+base; that stopped being true when #395 shipped, and it is corrected here rather than quietly.
+The composition is its own promoted model version, `phase-c-component-elite-top100-v1`, and
+`--control-only` on the producer or `--projection component-only` on the weekly runner leaves
+it out. It has never been measured as a candidate on that base: on 8 September 2026 the owner
+amended the promotion boundary to admit a bounded, fitted-nothing uplift without one, under
+stated conditions. The frozen rule is in
+[`docs/phase_c_operational_elite_policy.md`](docs/phase_c_operational_elite_policy.md); the
+amendment is in
+[`docs/phase_c_operational_component.md`](docs/phase_c_operational_component.md).
 
 Recorded component-base result:
 

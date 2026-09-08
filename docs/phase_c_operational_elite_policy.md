@@ -7,8 +7,9 @@ unchanged and stays reproducible and explicit; what changed is what it multiplie
 base carries its own model version so a handoff always says which one produced it. The
 record used to say the rule "is not combined with the component model"; that stopped being
 true when #395 shipped and this document did not move with it. See "Identity and rollback"
-below for both identities and for the boundary in `phase_c_operational_component.md` that
-this combination does not satisfy.
+below for both identities, and for the boundary in `phase_c_operational_component.md` — which
+this combination did not satisfy as that boundary was originally written, and which the owner
+amended on 8 September 2026 rather than withdrawing the version.
 
 ## Purpose and boundary
 
@@ -105,6 +106,31 @@ operational multiplier of the same governance class as the legacy one, extended 
 base by a reviewed pin, with the "separately measured candidate" clause **unmet**. That is a
 disagreement between two operational records, and it is written down here rather than
 resolved by this change.
+
+**How that disagreement was resolved, 8 September 2026.** The owner amended the clause rather
+than withdrawing the version. `phase_c_operational_component.md` now carries a second route
+into production — a bounded, fitted-nothing multiplier applied after a promoted base — and
+the clause requiring a separately measured candidate binds only the fitted route. So the
+sentence above is history, not the current rule: as of that date the clause is **amended, not
+met**, and the paragraph is kept because the version in production was promoted before the
+amendment existed.
+
+This policy is the layered uplift the amendment describes, and the amendment's ten conditions
+are read off the mechanism recorded in this document. Nine of them are carried by that
+mechanism and are enforced or exercised in code: the composition's own version and feature
+contract, both refused at construction unless the evidence fingerprint is present; the uplift
+and its digests written into the handoff; the five per cent bound
+(`MAXIMUM_RELATIVE_UPLIFT = 0.05`); the never-below-one multiplier; the two capture-time
+refusals; the decision binding and the complete-cohort fail-closed list above; the two
+opt-outs; the decision report's own wording; and the promotion membership test — with the one
+qualification the amendment states under its condition 2, that the handoff's diagnostics block
+sits outside the fingerprint. The tenth — that the base is itself promoted — is true of both
+bases here but is **not checked anywhere**: `apply_elite_evidence` multiplies whatever base it
+is handed, and the producer's `version_is_promoted` tests the composed version, not the base.
+Nothing in this change makes that a check.
+
+What the amendment does not give this policy is a measurement. No artifact says what the
+uplift does to squad points on the component base, and none is implied by the amendment.
 
 Rollback is the existing `in-season-carry-over-v1` producer path selected explicitly with
 `--control-only`, and `--projection component-only` on `scripts.run_week` for the composed

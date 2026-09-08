@@ -171,6 +171,19 @@ Evidence families are introduced one at a time:
 The Phase A frozen Top-100 cohort remains the primary prospective cohort. Top-50 and Top-200
 are sensitivity cohorts and cannot silently replace it.
 
+**Note added 8 September 2026 — this note relaxes nothing above.** Everything in this section
+still binds the research route it was written for: an evidence family that enters the model
+still enters one at a time, as a separately measured candidate, and family 3 (lagged
+elite-cohort evidence) has never been run as one. What has happened outside this document is
+that a *layered* uplift — a fixed owner-approved multiplier applied after the promoted base,
+fitting nothing into the model — reached production as `phase-c-component-elite-top100-v1`
+without a candidate measurement, and on this date the owner amended the operational boundary
+in `phase_c_operational_component.md` to admit that route under stated conditions rather than
+withdraw the version. Read that amendment for what a layered uplift must satisfy and what it
+still forbids. The distinction that keeps the two consistent: nothing is fitted, so the
+component model this document pre-registers is untouched, and the candidate this section
+describes remains owed and unrun.
+
 ## Chronological evaluation protocol
 
 Every candidate and control use identical chronological folds, target rows, player pools,
