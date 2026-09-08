@@ -580,6 +580,9 @@ function rivalFields(
     captain_agreement: mode === "ortak-koru",
     control_solver_status: "OPTIMAL",
     control_optimality_gap: 0,
+    // Both plans proved here, so the ceiling is the price: the producer publishes them
+    // together and they are the same number until a proof is missing.
+    expected_points_cost_ceiling: 0.8,
     transfer_cap: 1,
     overlap_target: mode === "ortak-koru" ? 9 : 5,
     overlap_applied: mode === "ortak-koru" ? 7 : 5,
@@ -591,6 +594,7 @@ function rivalFields(
             overlap_applied: 9,
             transfer_hit_points: 8,
             expected_points_cost: 6.4,
+            expected_points_cost_ceiling: 6.4,
           }
         : null,
   };

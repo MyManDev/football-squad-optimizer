@@ -204,6 +204,15 @@ export interface EntryAdvice {
    * published before the competitive modes were computed.
    */
   expected_points_cost?: number;
+  /**
+   * The most that price can be. A price tag is a difference between two solved plans,
+   * and it is the cost itself only when both proofs finished; when one did not, the
+   * producer carries its solver's own bound onto the difference and publishes the
+   * result here. Equal to `expected_points_cost` under a proof, never below it, never
+   * below zero. Published on the rival strategies; absent on documents published before
+   * the producer carried it, and on the modes priced by the scenario menu.
+   */
+  expected_points_cost_ceiling?: number;
   /** The league neighbour the competitive modes were priced against; null for saf-puan. */
   rival_label?: string | null;
   /**
@@ -237,6 +246,8 @@ export interface EntryAdvice {
     overlap_applied: number;
     transfer_hit_points: number | null;
     expected_points_cost: number;
+    /** The same ceiling, for the candidate that was not taken. */
+    expected_points_cost_ceiling?: number;
   } | null;
   /**
    * The rest of the decision, published since the producer carried the plan's first

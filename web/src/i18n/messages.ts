@@ -443,7 +443,7 @@ const en = {
     // written, so nothing is listed here and every sentence falls through unchanged.
     statedLimits: {} as Record<string, string>,
     controlUnprovenBody: (gap: string) =>
-      `The pure-points plan behind this price was not proven optimal (gap ≤ ${gap} pts): the tag is a reading with that bound, not a proof.`,
+      `The pure-points plan this price is measured against was not proven optimal (gap ≤ ${gap} pts), so the price is published as a ceiling — the most this strategy can cost — and not as an exact figure.`,
     overlapLine: (count: number) => `${count} of the rival's eleven in your fifteen`,
     gapLine: (points: string) => `expected gap vs rival ${points}`,
     captainShared: "same captain",
@@ -455,6 +455,12 @@ const en = {
       `Not taken: reaching ${applied} with hits would have cost ${hits} hit points, ${cost} expected points against pure points.`,
     alternativeWithinFree: (applied: number, cost: string) =>
       `Not taken: staying within the free transfers reached ${applied} at ${cost} expected points against pure points.`,
+    // The same two sentences where a proof is missing: the figure is the most the
+    // candidate could have cost, never a claimed exact cost.
+    alternativeWithHitsAtMost: (applied: number, hits: string, cost: string) =>
+      `Not taken: reaching ${applied} with hits would have cost ${hits} hit points and at most ${cost} expected points against pure points.`,
+    alternativeWithinFreeAtMost: (applied: number, cost: string) =>
+      `Not taken: staying within the free transfers reached ${applied} at a cost of at most ${cost} expected points against pure points.`,
     templatesTitle: "Game templates",
     templatesBody:
       "A template is a named strategy-and-window pair. Applying one sets the same shareable selection the controls read; your own templates live in this browser.",
@@ -535,7 +541,7 @@ const en = {
       "Two squads are compared under one projection. Players you both own cancel out; the players you do not share decide the gap. We publish expected points, never a chance of winning — that claim fell three times in its own measurement, and the line is closed.",
     unprovenPlanBadge: "Proof incomplete",
     unprovenPlanBody: (gap: string) =>
-      `The solver found this plan but could not prove nothing better exists (gap ≤ ${gap} pts). The plan is real; the missing part is the proof.`,
+      `The solver could not finish the proof for this plan (gap ≤ ${gap} pts). It is the best plan the search found, not a plan shown to be the best one.`,
     out: "Out",
     in: "In",
     projectedGain: (points: string) => `${points} projected gain`,
@@ -547,6 +553,11 @@ const en = {
       "The mode changes the point trade-off, never a claimed chance of beating a rival.",
     planCost: (points: string) =>
       `This strategy gives up ~${points} expected points against the pure-points pick, hits included.`,
+    // The same price where a proof is missing. A bound is not a range around a guess:
+    // the figure is the largest the cost can be, and the true cost is somewhere at or
+    // under it — which is a fact about a search that stopped, never a chance of anything.
+    planCostAtMost: (points: string) =>
+      `This strategy gives up at most ${points} expected points against the pure-points pick, hits included.`,
     planRival: (name: string) => `priced against ${name}'s squad`,
     lineupTitle: "Your gameweek",
     lineupRule:
@@ -1128,7 +1139,7 @@ const tr: MessageSchema<typeof en> = {
         "Pencere içinde çip önerilmez. Sonlu bir pencere, bir çipi elde tutmaya değer biçmez; ulaşabilse harcardı. Çip zamanlaması sezonluk bir karardır ve bu pencere onu fiyatlayamaz.",
     },
     controlUnprovenBody: (gap: string) =>
-      `Bu fiyatın arkasındaki saf puan planı en iyi diye kanıtlanamadı (fark ≤ ${gap} puan): etiket o sınırla bir okuma, kanıt değil.`,
+      `Bu fiyatın ölçüldüğü saf puan planı en iyi diye kanıtlanamadı (fark ≤ ${gap} puan); bu yüzden fiyat kesin bir değer olarak değil, tavan olarak yayımlanıyor: bu stratejinin mal olabileceği en fazla değer.`,
     overlapLine: (count: number) => `rakibin on birinden ${count} tanesi senin on beşinde`,
     gapLine: (pointsValue: string) => `rakibe karşı beklenen fark ${pointsValue}`,
     captainShared: "aynı kaptan",
@@ -1140,6 +1151,10 @@ const tr: MessageSchema<typeof en> = {
       `Tercih edilmedi: hit'lerle ${applied} tanesine ulaşmak ${hits} hit puanı, saf puana göre ${cost} beklenen puan mal olurdu.`,
     alternativeWithinFree: (applied: number, cost: string) =>
       `Tercih edilmedi: ücretsiz transferlerde kalmak ${applied} tanesine ulaşırdı, saf puana göre ${cost} beklenen puana.`,
+    alternativeWithHitsAtMost: (applied: number, hits: string, cost: string) =>
+      `Tercih edilmedi: hit'lerle ${applied} tanesine ulaşmak ${hits} hit puanı ve saf puana göre en fazla ${cost} beklenen puan mal olurdu.`,
+    alternativeWithinFreeAtMost: (applied: number, cost: string) =>
+      `Tercih edilmedi: ücretsiz transferlerde kalmak ${applied} tanesine ulaşırdı, saf puana göre en fazla ${cost} beklenen puana.`,
     templatesTitle: "Oyun şablonları",
     templatesBody:
       "Şablon, adlandırılmış bir strateji-pencere çiftidir. Uygulamak, kontrollerin okuduğu paylaşılabilir seçimi kurar; kendi şablonların bu tarayıcıda durur.",
@@ -1221,7 +1236,7 @@ const tr: MessageSchema<typeof en> = {
       "İki kadro aynı projeksiyonla karşılaştırılır. İkinizde de olan oyuncular sadeleşir; farkı paylaşmadığınız oyuncular belirler. Beklenen puan yayınlıyoruz, kazanma ihtimali değil — o iddia kendi ölçümünde üç kez düştü ve hat kapandı.",
     unprovenPlanBadge: "Kanıt tamamlanamadı",
     unprovenPlanBody: (gap: string) =>
-      `Çözücü bu planı buldu ama daha iyisinin olmadığını kanıtlayamadı (fark ≤ ${gap} puan). Plan gerçek; eksik olan kanıt.`,
+      `Çözücü bu plan için kanıtı tamamlayamadı (fark ≤ ${gap} puan). Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.`,
     out: "Çıkan",
     in: "Giren",
     projectedGain: (pointsValue) => `${pointsValue} tahmini kazanç`,
@@ -1234,6 +1249,8 @@ const tr: MessageSchema<typeof en> = {
       "Mod, rakibi geçme olasılığı iddia etmek yerine puan ödünleşimini değiştirir.",
     planCost: (pointsValue) =>
       `Bu strateji, saf puan seçimine göre ~${pointsValue} beklenen puandan vazgeçiyor (hit'ler dahil).`,
+    planCostAtMost: (pointsValue) =>
+      `Bu strateji, saf puan seçimine göre en fazla ${pointsValue} beklenen puandan vazgeçiyor (hit'ler dahil).`,
     planRival: (name) => `${name} kadrosuna göre fiyatlandı`,
     lineupTitle: "Bu haftaki kadron",
     lineupRule:
