@@ -685,6 +685,8 @@ def plan_transfer_horizon(
     optimization: OptimizationConfig | None = None,
     transfer_config: TransferPlanningConfig | None = None,
     chips: ChipAvailability | None = None,
+    first_week_overlap: FirstWeekOverlap | None = None,
+    first_week_transfer_cap: int | None = None,
 ) -> tuple[TransferPlanResult, TransferPlanningConfig]:
     """Plan several gameweeks from the held squad and one projection horizon.
 
@@ -704,6 +706,13 @@ def plan_transfer_horizon(
     values a chip inside the horizon only — its option value after the last week is
     unknown to the planner — so a caller who offers chips takes on stating that limit,
     as the member window path does; the system's own horizon path offers none.
+
+    ``first_week_overlap`` and ``first_week_transfer_cap`` are handed straight to
+    ``optimize_transfer_plan``: an overlap band against a rival's known players in the
+    decided week, and a cap on every week after it. They go together — a rival-strategy
+    band constrains the decided week, and the later weeks should not be charged for it —
+    but each stands alone. Both default to ``None``, which is this function exactly as it
+    was for every caller that does not name them.
     """
 
     if not isinstance(projection_horizon, ProjectionHorizon):
@@ -793,6 +802,8 @@ def plan_transfer_horizon(
         settings,
         planning_policy,
         chips=chips,
+        first_week_overlap=first_week_overlap,
+        first_week_transfer_cap=first_week_transfer_cap,
     )
     if not plan.has_solution or not plan.weeks:
         used = plan.diagnostics.get("deterministic_time_used")

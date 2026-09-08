@@ -17,6 +17,7 @@ from squadopt.planning import (
     TransferPlanningConfig,
     TransferPlanningConfigurationError,
     TransferPlanningValidationError,
+    TransferPlanResult,
     optimize_transfer_plan,
 )
 
@@ -1005,3 +1006,215 @@ def test_a_stale_exclusion_naming_absent_players_is_ignored(
 
     assert stale.solver_status is SolverStatus.OPTIMAL
     assert stale.objective_value == plain.objective_value
+
+
+# --- the first-week transfer cap ------------------------------------------------------
+
+_STAGED_CONFIG = OptimizationConfig(
+    budget_tenths=300,
+    squad_size=6,
+    squad_position_limits={"GK": 1, "DEF": 2, "MID": 2, "FWD": 1},
+    starting_size=5,
+    starting_position_min={"GK": 1, "DEF": 1, "MID": 1, "FWD": 1},
+    starting_position_max={"GK": 1, "DEF": 2, "MID": 2, "FWD": 1},
+    max_players_per_team=2,
+)
+
+# A three-gameweek world staged so the churn has one honest place to be. GK and DEF1 pay
+# from GW1, so the optimum upgrades both at once. DEF2, MID1 and MID2 score nothing in
+# GW1 and only pay from GW2, while the players they replace are worth 100 in GW1 against
+# upgrades worth at most 10 a week — so the optimum defers all three to GW2, and pulling
+# any of them into the uncapped first week to dodge a cap on the later weeks loses an
+# order of magnitude more than it gains. That separation is what lets this world tell
+# "the later weeks fell to the cap" apart from "the churn moved into the first week".
+_STAGED_POINTS: dict[str, tuple[float, float, float]] = {
+    "GK_A": (10.0, 10.0, 10.0),
+    "GK_B": (0.0, 0.0, 0.0),
+    "DEF1_A": (10.0, 10.0, 10.0),
+    "DEF1_B": (0.0, 0.0, 0.0),
+    "DEF2_A": (0.0, 10.0, 10.0),
+    "DEF2_B": (100.0, 0.0, 0.0),
+    "MID1_A": (0.0, 9.0, 9.0),
+    "MID1_B": (100.0, 0.0, 0.0),
+    "MID2_A": (0.0, 8.0, 8.0),
+    "MID2_B": (100.0, 0.0, 0.0),
+    "FWD_A": (0.0, 0.0, 0.0),
+    "FWD_B": (10.0, 10.0, 10.0),
+}
+_STAGED_HELD = ("GK_B", "DEF1_B", "DEF2_B", "MID1_B", "MID2_B", "FWD_B")
+
+
+def _staged_horizon() -> PlanningHorizon:
+    records: list[dict[str, object]] = []
+    for index, gameweek in enumerate((1, 2, 3)):
+        for team, (player_id, points) in enumerate(sorted(_STAGED_POINTS.items())):
+            records.append(
+                {
+                    "gameweek": gameweek,
+                    "player_id": player_id,
+                    "name": f"Synthetic {player_id}",
+                    "team_id": f"T{team}",
+                    "position": player_id.split("_")[0].rstrip("12"),
+                    "buy_price_tenths": 50,
+                    "sell_price_tenths": 50,
+                    "expected_points": points[index],
+                }
+            )
+    return PlanningHorizon(pd.DataFrame.from_records(records))
+
+
+def _counts(result: TransferPlanResult) -> list[int]:
+    return [int(week.transfer_count) for week in result.weeks]
+
+
+def _squads(result: TransferPlanResult) -> list[list[str]]:
+    return [
+        sorted(str(value) for value in week.selected_squad["player_id"].tolist())
+        for week in result.weeks
+    ]
+
+
+def test_the_first_week_transfer_cap_binds_only_after_the_first_week() -> None:
+    """The point of the seam: later weeks fall to the cap, the first week is untouched.
+
+    A rival-strategy band constrains the decided week, so the later weeks must not be
+    charged for it — but leaving every week uncapped is the churn
+    ``docs/transfer_discipline_note.md`` measured as losing. One scalar cap over the
+    whole horizon cannot say that.
+    """
+
+    horizon = _staged_horizon()
+    initial = _initial(*_STAGED_HELD, free_transfers=5)
+
+    free = optimize_transfer_plan(horizon, initial, _STAGED_CONFIG)
+    capped = optimize_transfer_plan(horizon, initial, _STAGED_CONFIG, first_week_transfer_cap=1)
+
+    assert free.solver_status is SolverStatus.OPTIMAL
+    assert capped.solver_status is SolverStatus.OPTIMAL
+    # Unconstrained, the second week makes three transfers; capped, no later week may
+    # make more than one, and the first week keeps the two it wanted.
+    assert _counts(free) == [2, 3, 0]
+    assert _counts(capped) == [2, 1, 1]
+    assert _squads(capped)[0] == _squads(free)[0]
+    assert capped.diagnostics["first_week_transfer_cap"] == 1
+    assert free.diagnostics["first_week_transfer_cap"] is None
+    # The cap only removes plans, so it cannot be worth more than the free plan.
+    assert capped.objective_value is not None
+    assert free.objective_value is not None
+    assert capped.objective_value <= free.objective_value
+
+
+def test_omitting_the_first_week_transfer_cap_is_todays_planner(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """Every existing caller names no cap, so the plan they get may not move.
+
+    The parameter is deliberately not a ``TransferPlanningConfig`` field: a field would
+    enter ``configuration_fingerprint``, which every plan records and which the ledger
+    records as ``transfer_config_fingerprint``, so adding one would move that digest for
+    callers that never cap anything.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1, 2)))
+    initial = _initial("GK_B", "DEF_B", "MID_B", "FWD_B", free_transfers=2)
+    settings = TransferPlanningConfig()
+    before = settings.configuration_fingerprint
+
+    plain = optimize_transfer_plan(horizon, initial, small_config, settings)
+    with_none = optimize_transfer_plan(
+        horizon, initial, small_config, settings, first_week_transfer_cap=None
+    )
+
+    assert plain.objective_value == with_none.objective_value
+    assert _squads(plain) == _squads(with_none)
+    assert _counts(plain) == _counts(with_none)
+    for left, right in zip(plain.weeks, with_none.weeks, strict=True):
+        assert_frame_equal(left.selected_squad, right.selected_squad)
+        assert_frame_equal(left.starting_xi, right.starting_xi)
+        assert_frame_equal(left.transfers_in, right.transfers_in)
+        assert_frame_equal(left.transfers_out, right.transfers_out)
+    # The digest the ledger records is untouched by the presence of the parameter.
+    assert settings.configuration_fingerprint == before
+    assert plain.diagnostics["configuration_fingerprint"] == before
+    assert with_none.diagnostics["configuration_fingerprint"] == before
+
+
+@pytest.mark.parametrize("chip", ["wildcard", "freehit"])
+def test_a_rebuild_chip_in_a_later_week_lifts_the_first_week_transfer_cap(chip: str) -> None:
+    """A wildcard or free-hit week is exempt, exactly as it is from the per-week cap.
+
+    Those chips exist to rebuild a squad; a cap that survived one would make the chip
+    unplayable rather than the plan disciplined.
+    """
+
+    horizon = _staged_horizon()
+    initial = _initial(*_STAGED_HELD, free_transfers=5)
+
+    without = optimize_transfer_plan(horizon, initial, _STAGED_CONFIG, first_week_transfer_cap=1)
+    with_chip = optimize_transfer_plan(
+        horizon,
+        initial,
+        _STAGED_CONFIG,
+        first_week_transfer_cap=1,
+        chips=ChipAvailability({chip: {2}}, forced={2: chip}),
+    )
+
+    assert without.weeks[1].transfer_count == 1
+    assert with_chip.chips_played == {2: chip}
+    assert with_chip.weeks[1].transfer_count > 1
+
+
+def test_a_first_week_transfer_cap_at_the_squad_size_cannot_bind() -> None:
+    """A week can never replace more players than it holds, so such a cap is inert."""
+
+    horizon = _staged_horizon()
+    initial = _initial(*_STAGED_HELD, free_transfers=5)
+
+    free = optimize_transfer_plan(horizon, initial, _STAGED_CONFIG)
+    wide = optimize_transfer_plan(
+        horizon,
+        initial,
+        _STAGED_CONFIG,
+        first_week_transfer_cap=_STAGED_CONFIG.squad_size,
+    )
+
+    assert wide.solver_status is SolverStatus.OPTIMAL
+    assert _counts(wide) == _counts(free)
+    assert _squads(wide) == _squads(free)
+    assert wide.objective_value == free.objective_value
+
+
+def test_a_first_week_transfer_cap_bounds_the_count_not_the_payment() -> None:
+    """The cap is a ceiling the objective works under, not a budget it is handed.
+
+    A cap above the free transfers a week holds does not make the extra move free: the
+    week is still charged for it, exactly as an uncapped week would be.
+    """
+
+    horizon = _staged_horizon()
+    initial = _initial(*_STAGED_HELD, free_transfers=1)
+
+    capped = optimize_transfer_plan(horizon, initial, _STAGED_CONFIG, first_week_transfer_cap=2)
+
+    second = capped.weeks[1]
+    assert second.free_transfers_before == 1
+    assert second.transfer_count == 2
+    assert second.paid_transfer_count == 1
+    assert second.transfer_hit_points == 4.0
+
+
+@pytest.mark.parametrize("cap", [0, -1, 1.0, True, "1"])
+def test_an_invalid_first_week_transfer_cap_is_rejected(cap: object) -> None:
+    """The admissible range is ``max_transfers_per_gameweek``'s: ``None``, or at least 1."""
+
+    horizon = _staged_horizon()
+    initial = _initial(*_STAGED_HELD, free_transfers=5)
+
+    with pytest.raises(TransferPlanningValidationError, match="first_week_transfer_cap"):
+        optimize_transfer_plan(
+            horizon,
+            initial,
+            _STAGED_CONFIG,
+            first_week_transfer_cap=cap,  # type: ignore[arg-type]
+        )
