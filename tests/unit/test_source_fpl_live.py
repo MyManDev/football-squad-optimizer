@@ -42,6 +42,7 @@ from squadopt.data.sources.fpl_live import (
     league_standings_payload,
     live_endpoint_path,
     live_payload,
+    news_snapshot,
     next_open_deadline,
     player_codes,
     player_snapshot,
@@ -743,6 +744,93 @@ def test_a_renamed_availability_field_stops_the_run(field: str) -> None:
 
     with pytest.raises(DataSourceError, match=field):
         availability_snapshot(_payload([record]))
+
+
+# --- the source's own editorial ----------------------------------------------
+#
+# A third table beside the snapshot and the availability one, for one reason: it carries
+# free text. The projection must never read it, so widening either existing table would
+# have been the wrong shape even though it is the same payload.
+
+
+def test_the_news_table_is_separate_and_carries_the_text_with_its_instant() -> None:
+    news = news_snapshot(_payload())
+
+    assert tuple(news.columns) == ("player_id", "status", "news", "news_added_utc")
+
+
+def test_the_news_table_keys_on_the_persistent_code() -> None:
+    news = news_snapshot(_payload([_element(code=118748)]))
+
+    assert news["player_id"].tolist() == [118748]
+
+
+def test_a_news_instant_is_normalised_to_utc() -> None:
+    news = news_snapshot(_payload([_element(news_added="2026-08-09T09:30:07.136250Z")]))
+
+    assert news["news_added_utc"].tolist() == ["2026-08-09T09:30:07.136250Z"]
+
+
+def test_a_player_never_flagged_carries_no_instant() -> None:
+    """Absent, not substituted with the capture's own clock: nothing was ever stamped."""
+
+    news = news_snapshot(_payload([_element(news_added=None)]))
+
+    assert news["news_added_utc"].isna().all()
+
+
+def test_a_cleared_flag_keeps_its_instant_with_empty_text() -> None:
+    """ "Was flagged, now cleared" is a third state, and it is not "never flagged".
+
+    The 2026-09-07 capture carries 62 of these. Folding them into the absent case would
+    lose exactly the transition a lead-time measurement is looking for.
+    """
+
+    news = news_snapshot(
+        _payload([_element(news="", news_added="2026-09-01T08:00:00Z", status="a")])
+    )
+
+    assert news["news"].tolist() == [""]
+    assert news["news_added_utc"].tolist() == ["2026-09-01T08:00:00Z"]
+
+
+def test_the_text_is_read_as_the_source_wrote_it() -> None:
+    news = news_snapshot(_payload([_element(news="Knee injury - 75% chance of playing")]))
+
+    assert news["news"].tolist() == ["Knee injury - 75% chance of playing"]
+
+
+def test_non_players_are_excluded_from_the_news_table_too() -> None:
+    news = news_snapshot(
+        _payload([_element(code=1, element_type=3), _element(code=2, element_type=5)])
+    )
+
+    assert news["player_id"].tolist() == [1]
+
+
+def test_the_news_table_is_sorted_by_player_id() -> None:
+    news = news_snapshot(_payload([_element(code=9, id=1), _element(code=2, id=2)]))
+
+    assert news["player_id"].tolist() == [2, 9]
+
+
+def test_a_payload_with_no_eligible_players_has_no_news_table() -> None:
+    with pytest.raises(DataSourceError, match="squad-eligible"):
+        news_snapshot(_payload([_element(element_type=5)]))
+
+
+def test_non_text_news_is_rejected_rather_than_coerced() -> None:
+    with pytest.raises(InvalidValueError, match="news"):
+        news_snapshot(_payload([_element(news=0)]))
+
+
+@pytest.mark.parametrize("field", ["status", "news", "news_added"])
+def test_a_renamed_news_field_stops_the_run(field: str) -> None:
+    record = _element()
+    record.pop(field, None)
+
+    with pytest.raises(DataSourceError, match=field):
+        news_snapshot(_payload([record]))
 
 
 # --- registered entries and their league ----------------------------------------------
