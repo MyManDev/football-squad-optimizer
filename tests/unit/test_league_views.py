@@ -410,6 +410,67 @@ def test_member_points_travel_with_the_week_they_were_scored_in(
     assert entry["payload"]["scored_gameweek"] == 1
 
 
+def test_the_week_s_transfer_cost_travels_beside_the_week_s_score(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The published week is gross; without the hit beside it no reader can net it.
+
+    The page puts our net week and every member's week in one column, so the cost has to
+    reach the page or the two numbers are on different bases. An absent cost stays absent:
+    a member whose hit the capture does not carry is not a member who took no hit, and a
+    published zero would say exactly that.
+    """
+
+    import json
+
+    from squadopt.application.league_views import MemberStanding
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        (
+            EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),
+            EntryRegistration(202, "member-b", "2026-08-23T00:00:00Z"),
+        ),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+        standings={
+            101: MemberStanding(
+                entry_id=101,
+                team_name="Ada FC",
+                manager_name="Ada A",
+                rank=1,
+                gameweek_points=78,
+                total_points=190,
+                transfer_cost=4,
+            ),
+            202: MemberStanding(
+                entry_id=202,
+                team_name="Bea FC",
+                manager_name="Bea B",
+                rank=2,
+                gameweek_points=51,
+                total_points=211,
+            ),
+        },
+        scored_gameweek=3,
+    )
+    rows = {
+        int(row["entry_id"]): row
+        for row in json.loads((tmp_path / "league" / "members.json").read_text(encoding="utf-8"))[
+            "payload"
+        ]["members"]
+    }
+    assert rows[101]["gameweek_points"] == 78, "the published week stays the source's gross"
+    assert rows[101]["transfer_cost"] == 4
+    assert rows[202]["transfer_cost"] is None, "an unproven hit is absent, never a zero"
+
+
 def test_points_without_their_gameweek_are_refused(world: dict[str, Any], tmp_path: Path) -> None:
     from squadopt.application.league_views import MemberStanding
 

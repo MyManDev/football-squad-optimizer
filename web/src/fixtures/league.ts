@@ -37,6 +37,7 @@ export const mockMembers: EntryView[] = [
     team_name: "North Stand Notes",
     rank: 1,
     gameweek_points: 74,
+    transfer_cost: 0,
     total_points: 132,
     movement: "up",
     movement_places: 2,
@@ -49,6 +50,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Half Space",
     rank: 2,
     gameweek_points: 68,
+    transfer_cost: 0,
     total_points: 127,
     movement: "same",
     movement_places: 0,
@@ -61,6 +63,7 @@ export const mockMembers: EntryView[] = [
     team_name: "SquadOpt",
     rank: 3,
     gameweek_points: 65,
+    transfer_cost: 0,
     total_points: 124,
     movement: "up",
     movement_places: 2,
@@ -73,6 +76,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Late Flag FC",
     rank: 4,
     gameweek_points: 61,
+    transfer_cost: 4,
     total_points: 119,
     movement: "down",
     movement_places: 1,
@@ -85,6 +89,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Expected Threat",
     rank: 5,
     gameweek_points: 59,
+    transfer_cost: 0,
     total_points: 113,
     movement: "up",
     movement_places: 1,
@@ -97,6 +102,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Bench Order",
     rank: 6,
     gameweek_points: 55,
+    transfer_cost: 0,
     total_points: 109,
     movement: "down",
     movement_places: 1,
@@ -109,6 +115,7 @@ export const mockMembers: EntryView[] = [
     team_name: "One More Fixture",
     rank: 7,
     gameweek_points: 52,
+    transfer_cost: 0,
     total_points: 104,
     movement: "same",
     movement_places: 0,
@@ -121,6 +128,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Low Block",
     rank: 8,
     gameweek_points: 49,
+    transfer_cost: 8,
     total_points: 97,
     movement: "new",
     movement_places: null,
@@ -133,6 +141,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Clean Sheet Pending",
     rank: 9,
     gameweek_points: 44,
+    transfer_cost: 0,
     total_points: 91,
     movement: "down",
     movement_places: 2,
@@ -145,6 +154,7 @@ export const mockMembers: EntryView[] = [
     team_name: null,
     rank: 10,
     gameweek_points: null,
+    transfer_cost: null,
     total_points: 86,
     movement: "unknown",
     movement_places: null,
@@ -157,6 +167,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Awaiting Picks",
     rank: 11,
     gameweek_points: null,
+    transfer_cost: null,
     total_points: null,
     movement: "unknown",
     movement_places: null,
@@ -266,17 +277,25 @@ function squadPlayers(entryOffset: number): { starting: PlayerView[]; bench: Pla
   };
 }
 
+/** The week net of that week's transfer hit, or null while either half is unproven. */
+function netWeek(member: EntryView): number | null {
+  if (member.gameweek_points === null || member.transfer_cost === null) return null;
+  return member.gameweek_points - member.transfer_cost;
+}
+
 function squadEnvelope(entry: HumanEntryView, index: number): LeagueViewEnvelope<EntrySquad> {
-  const squadoptPoints = mockMembers.find(
-    (member) => member.member_kind === "system",
-  )?.gameweek_points;
+  const systemRow = mockMembers.find((member) => member.member_kind === "system") ?? null;
+  const squadoptPoints = systemRow === null ? null : netWeek(systemRow);
+  const memberPoints = netWeek(entry);
+  // Both sides netted, or no comparison: subtracting a gross week from a net one would
+  // report a difference nobody scored.
   const squadoptComparison =
-    entry.gameweek_points === null || squadoptPoints === null || squadoptPoints === undefined
+    memberPoints === null || squadoptPoints === null
       ? null
       : {
-          member_gameweek_points: entry.gameweek_points,
+          member_gameweek_points: memberPoints,
           squadopt_gameweek_points: squadoptPoints,
-          difference_points: entry.gameweek_points - squadoptPoints,
+          difference_points: memberPoints - squadoptPoints,
         };
   if (entry.data_quality === "empty") {
     return envelope({
