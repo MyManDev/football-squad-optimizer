@@ -227,6 +227,37 @@ class FixtureClubNewsProvider:
             for entry in _require_list(self._document, "documents", str(self._path))
         )
 
+    def clubs_declared(self) -> tuple[str, ...]:
+        """Every club the week set out to read, whether or not a document arrived.
+
+        Exposed because the difference between this and :meth:`clubs_covered` is what makes
+        "no source was read for this player's club" a recordable fact rather than a silence.
+        The fixture has always declared both; only the accessors were missing.
+        """
+
+        return self._club_names("clubs_declared")
+
+    def clubs_covered(self) -> tuple[str, ...]:
+        """The clubs a document was actually read for.
+
+        A club here whose document mentioned nobody is still covered: it published and said
+        nothing about our players, which is a different statement from never having been
+        read. Collapsing the two is exactly what the evidence column exists to prevent.
+        """
+
+        return self._club_names("clubs_covered")
+
+    def _club_names(self, key: str) -> tuple[str, ...]:
+        value = self._document.get(key)
+        if not isinstance(value, list) or not value:
+            raise ClubNewsError(f"{self._path} must carry a non-empty {key!r} array.")
+        names: list[str] = []
+        for entry in value:
+            if not isinstance(entry, str) or not entry.strip():
+                raise ClubNewsError(f"{self._path} lists {entry!r} in {key!r}; a club is a name.")
+            names.append(entry.strip())
+        return tuple(names)
+
     def roster(self) -> tuple[RosterPlayer, ...]:
         """The fixture's own roster, so the identity join can be tested against it alone."""
 
