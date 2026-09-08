@@ -40,8 +40,11 @@ nearest row here, `phase_c_component_evaluation`, measured the **bare** base and
 evidence about the uplift.
 
 Regenerated artifacts must keep passing `scripts.run_measurement_preflight`, for the kinds
-that runner covers — `MEASUREMENT_KINDS` names eight, and an artifact outside them has no
-gate to keep passing rather than a gate it fails.
+that runner covers — the covered set is whatever
+`squadopt.preflight.measurement.MEASUREMENT_KINDS` names, and an artifact outside it has no
+gate to keep passing rather than a gate it fails. The count is deliberately not written here:
+this line said "eight" while the code named seven, and a number copied into prose drifts the
+next time a kind is added. Read the constant.
 `tests/unit/test_measurements_index.py` holds the rule that every committed artifact appears
 here (ADR 0003, rule 1).
 
@@ -200,4 +203,5 @@ belong to, and this section is again the two rows its first sentence describes.
 
 `handoff_acceptance_checklist.md` · `candidate_declaration_review.md` ·
 `gw1_blocker_report_template.md` · `fw10_holdout_plan.md` · `opening_week_runbook.md` ·
-`artifact_preflight_spec.md` · `projection_horizon_contract.md`
+`artifact_preflight_spec.md` · `projection_horizon_contract.md` ·
+`rotation_evidence_prereg.md`
