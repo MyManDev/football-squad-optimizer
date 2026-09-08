@@ -245,6 +245,10 @@ data/runtime/
 # captures. data/sample/entry_registry_v1.example.json carries the shape, and
 # scripts/seed_entry_registry.py rebuilds the real file from a captured standings page.
 data/entries/
+# The immutable record of what each member was told, per gameweek. It names the same
+# identifiable people's squads the registry and the captures do, so it stays local for
+# the same reason; it is written once by the publish and never rewritten.
+data/advice_records/
 
 # Reproducible local experiment outputs (reports are generated, not source data)
 artifacts/

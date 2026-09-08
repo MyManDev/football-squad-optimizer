@@ -9,14 +9,20 @@ writes the registry that names them. This shell reads those payloads, hands them
 ``build_league_views`` through the ``EntryPicksProvider`` seam, and writes
 ``<out>/data/league/**``.
 
-What it does not do is decide anything of ours: no ledger is read, no decision recorded.
-A member's advice is computed from that member's own squad and the shared projection, and
-the invariance test in ``tests/unit/test_league_views.py`` pins that as fact rather than
-as intention.
+What it does not do is decide anything of ours: our season ledger is neither read nor
+written here. A member's advice is computed from that member's own squad and the shared
+projection, and the invariance test in ``tests/unit/test_league_views.py`` pins that as
+fact rather than as intention.
 
-Nothing personal is committed. The registry and the captures stay local (``.gitignore``
-excludes ``data/entries/`` and ``data/snapshots/``); what this writes under ``web/public``
-is the public post-deadline picture the league's own standings page already shows.
+It does record what it published. The site's advice paths carry no gameweek and are
+overwritten every week, so ``build_league_views`` also writes an immutable per-member,
+per-gameweek advice record under ``--advice-record-root``; without it, a week that has
+been published can never afterwards be reviewed.
+
+Nothing personal is committed. The registry, the captures and the advice records stay
+local (``.gitignore`` excludes ``data/entries/``, ``data/snapshots/`` and
+``data/advice_records/``); what this writes under ``web/public`` is the public
+post-deadline picture the league's own standings page already shows.
 """
 
 import argparse
@@ -98,6 +104,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
 ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
 REGISTRY_PATH = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
+#: Where the immutable per-member, per-gameweek advice record lands. Local like the
+#: captures and the registry: it names identifiable people's squads, so ``.gitignore``
+#: keeps it out of the repository for the same reason ``data/entries/`` is out.
+ADVICE_RECORD_ROOT = REPOSITORY_ROOT / "data" / "advice_records"
 
 
 def resolve_live_snapshot_id(root: Path, requested: str | None) -> str:
@@ -218,6 +228,20 @@ def main() -> int:
         action="store_true",
         help="write the saf-puan baseline only; skip the rival strategies against every "
         "other member",
+    )
+    parser.add_argument(
+        "--advice-record-root",
+        type=Path,
+        default=ADVICE_RECORD_ROOT,
+        help="where the immutable per-member, per-gameweek advice record is written; the "
+        "published tree has no gameweek in its paths and is overwritten every week, so "
+        "without this nothing survives to say what a member was told for a given week",
+    )
+    parser.add_argument(
+        "--no-advice-record",
+        action="store_true",
+        help="publish without recording what was published; a week built this way can "
+        "never be reviewed",
     )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     arguments = parser.parse_args()
@@ -341,6 +365,12 @@ def main() -> int:
                 # handoff the one-week advice reads.
                 horizon_builder=member_horizon_builder(
                     snapshot, season=season, panel=panel, in_season=in_season
+                ),
+                # Written by the same call that writes the published bytes, because this
+                # publish re-solves in a fresh worktree at whatever code is on develop:
+                # only the process that emitted the advice can record what it emitted.
+                advice_record_root=(
+                    None if arguments.no_advice_record else Path(arguments.advice_record_root)
                 ),
             )
         print(f"Rendered {report.rendered_count} of {len(report.members)} members into {out_dir}")

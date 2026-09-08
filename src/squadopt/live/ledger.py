@@ -149,8 +149,15 @@ def _entry_directory(root: Path, season: str, gameweek: int) -> Path:
     return Path(root) / season.strip() / f"gw{gameweek:02d}"
 
 
-def _write_manifest(directory: Path) -> None:
-    """Re-derive the manifest from every present, individually immutable file."""
+def _write_manifest(
+    directory: Path, *, contract_version: str = SEASON_LEDGER_CONTRACT_VERSION
+) -> None:
+    """Re-derive the manifest from every present, individually immutable file.
+
+    ``contract_version`` names the record kind the manifest belongs to; it defaults to
+    the season ledger's, and another immutable record built on these primitives states
+    its own, so a reader never has to guess which contract the digests were taken under.
+    """
 
     entries = {
         path.name: _digest(path.read_bytes())
@@ -158,7 +165,7 @@ def _write_manifest(directory: Path) -> None:
         if path.name != _MANIFEST_FILE and path.is_file()
     }
     manifest = {
-        "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
+        "contract_version": contract_version,
         "files": entries,
     }
     _write_atomic(
@@ -193,6 +200,30 @@ def _verify_manifest(directory: Path) -> None:
                 f"Ledger file {name!r} in {directory} does not match its recorded "
                 "digest; the entry cannot be trusted."
             )
+
+
+# --- the immutable-write primitives, public ------------------------------------------
+#
+# The crash-safe write above is not specific to a gameweek decision: assemble in a hidden
+# staging directory, verify against a manifest of per-file digests, land with one rename,
+# and hold an exclusive lock while doing it. Any other record that must be provable after
+# the fact needs exactly these four steps, and a second hand-rolled copy of them would
+# drift from this one — a record written by a slightly different rule is a record that
+# cannot be compared with this one. They are exported here so another record reuses the
+# implementation rather than the idea. The private names stay because this module's own
+# call sites read better with them.
+digest_bytes = _digest
+"""SHA-256 of some bytes, lowercase hex — the digest every manifest here records."""
+write_atomic = _write_atomic
+"""Write bytes through a sibling temporary file and one rename."""
+staging_directory = _staging_directory
+"""The hidden sibling a record is assembled in before it lands."""
+write_manifest = _write_manifest
+"""Re-derive a directory's manifest from the files now in it."""
+verify_manifest = _verify_manifest
+"""Refuse a directory whose files no longer match their recorded digests."""
+record_lock = _gameweek_lock
+"""Hold a directory's exclusive writer lock, so two writers cannot race."""
 
 
 def record_decision(
