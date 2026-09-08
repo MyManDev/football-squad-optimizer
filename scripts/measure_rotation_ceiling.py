@@ -153,6 +153,14 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--markdown-output", type=Path, default=DEFAULT_MARKDOWN_OUTPUT)
     parser.add_argument("--evidence-output", type=Path, default=DEFAULT_EVIDENCE_OUTPUT)
     parser.add_argument(
+        "--render-only",
+        action="store_true",
+        help=(
+            "re-render the markdown twin from the committed JSON record and measure "
+            "nothing, so the twin is provably a function of the record"
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help=(
@@ -376,6 +384,86 @@ def _limits(flags: OracleFlags) -> list[dict[str, object]]:
     ]
 
 
+def _interval_reading(comparison: Mapping[str, object], verdict: Mapping[str, object]) -> str:
+    """State what the interval does and does not settle, whichever way it came out.
+
+    The pre-registered claim is about the *mean*, so the verdict is read off the mean. An
+    interval that still contains the threshold does not overturn that verdict and is not
+    quietly allowed to: it is a separate fact, and a reader who takes the mean without it
+    would be taking a number more certain than the measurement is.
+    """
+
+    lower = cast(float, comparison["interval_lower"])
+    upper = cast(float, comparison["interval_upper"])
+    threshold = cast(float, verdict["threshold_points_per_decision"])
+    if lower >= threshold:
+        return (
+            f"**Reading the interval.** The whole interval sits at or above the {threshold} "
+            "threshold, so the ceiling clears it on the mean and on its lower bound alike."
+        )
+    if upper < threshold:
+        return (
+            f"**Reading the interval.** The whole interval sits below the {threshold} "
+            "threshold. The ceiling does not reach it under any reading here."
+        )
+    excludes_zero = "excludes" if lower > 0.0 else "includes"
+    return (
+        f"**Reading the interval.** The mean clears the {threshold} threshold but the "
+        f"interval does not: it runs from {lower:+.4f} to {upper:+.4f}, so a ceiling below "
+        "the threshold is not ruled out by this measurement. The interval "
+        f"{excludes_zero} zero, which is a weaker statement than clearing the gate, and the "
+        "pre-registered claim is about the mean rather than the bound. A ceiling this wide "
+        "is a reason to treat the number as an order of magnitude, not as a target."
+    )
+
+
+def _concentration_reading(comparison: Mapping[str, object]) -> str:
+    """Say where the difference lives, because a mean hides both of these."""
+
+    folds = cast(int, comparison["comparable_folds"])
+    ties = cast(int, comparison["ties"])
+    median = cast(float, comparison["median_difference"])
+    seasons = cast(Mapping[str, float], comparison["season_mean_differences"])
+    negative = sorted(season for season, value in seasons.items() if value < 0.0)
+    sentence = (
+        f"**Where the difference lives.** The oracle changes nothing in {ties} of {folds} "
+        f"decisions and the median difference is {median:+.4f}, so the mean is carried by a "
+        f"minority of folds rather than by a broad shift."
+    )
+    if negative:
+        sentence += (
+            f" It is also not consistent across seasons: {', '.join(negative)} "
+            f"{'go' if len(negative) > 1 else 'goes'} the other way."
+        )
+    return sentence
+
+
+def _autosub_reading(comparison: Mapping[str, object]) -> str:
+    """Quantify what rejecting the season-chain path was worth.
+
+    The design note above says the chain would have inflated the gain. This turns that
+    claim into arithmetic over the committed numbers, so the choice is auditable rather
+    than merely argued.
+    """
+
+    folds = cast(int, comparison["comparable_folds"])
+    control = cast(float, comparison["control_autosub_points"])
+    oracle = cast(float, comparison["oracle_autosub_points"])
+    mean = cast(float, comparison["mean_difference"])
+    surrendered = (control - oracle) / folds
+    return (
+        f"**What that choice was worth.** Autosubs recover {control / folds:.2f} points per "
+        f"decision for the control and only {oracle / folds:.2f} for the oracle arm: "
+        "excluding a rested regular removes the very non-appearance an autosub would have "
+        f"repaired. So the arm surrenders {surrendered:.2f} points per decision of recovery "
+        f"to gain {mean:+.4f} net. A scoring path with no automatic substitutions would not "
+        f"have charged that {surrendered:.2f} back, and would have reported a ceiling near "
+        f"{mean + surrendered:.2f} — roughly {(mean + surrendered) / mean:.1f} times the "
+        "measured one. That is why the path is named in the record rather than left to the "
+        "code."
+    )
+
+
 def _markdown(document: Mapping[str, object]) -> str:
     comparison = cast(Mapping[str, object], document["comparison"])
     verdict = cast(Mapping[str, object], document["verdict"])
@@ -397,6 +485,10 @@ def _markdown(document: Mapping[str, object]) -> str:
         f"{comparison['comparable_folds']}/{comparison['attempted_folds']} paired folds.",
         "",
         f"**Claim tested:** {verdict['claim']}",
+        "",
+        _interval_reading(comparison, verdict),
+        "",
+        _concentration_reading(comparison),
         "",
         f"**What it does not license:** {verdict['licenses']}",
         "",
@@ -437,6 +529,8 @@ def _markdown(document: Mapping[str, object]) -> str:
         "keeps only the recent regulars.",
         "",
         f"{SCORING_PATH_NOTE}",
+        "",
+        _autosub_reading(comparison),
         "",
         "The exclusion zeroes expected points after the projection and before the solve — "
         "the availability rule's own position and direction — and keeps every row, because "
@@ -610,6 +704,14 @@ def _recorded_warnings(caught: Sequence[warnings.WarningMessage]) -> list[str]:
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parse_arguments(argv)
+    if arguments.render_only:
+        if not arguments.json_output.exists():
+            print(f"Refused: {arguments.json_output} does not exist; there is nothing to render.")
+            return 1
+        published = json.loads(arguments.json_output.read_text(encoding="utf-8"))
+        write_text(arguments.markdown_output, _markdown(published))
+        print(f"Rendered  {arguments.markdown_output} from {arguments.json_output}")
+        return 0
     if arguments.dry_run:
         try:
             return _dry_run(arguments)

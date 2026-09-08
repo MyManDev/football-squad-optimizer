@@ -1,13 +1,24 @@
-"""The oracle's flagging rule, the exclusion's shape, and what the ceiling refuses to do.
+"""The oracle's flagging rule, the exclusion's shape, and how the record reads its own number.
 
 The panels here are written by hand rather than taken from ``synthetic_gameweeks``, because
 the rule under test is about *specific* histories: a rate of exactly 1.0, a rate one
 appearance short of it, and a player without enough history to have a rate at all. A shared
 fixture chosen for other properties cannot be relied on to contain those three side by side.
+
+The last group covers the runner's three readings of the finished numbers. They exist because
+a mean alone would be read as more certain and more general than the measurement is, and each
+has a branch that the one real run did not exercise -- an interval wholly above the threshold,
+one wholly below, a set of seasons that all agree. A branch no run reaches is a branch a test
+has to reach.
 """
 
 import pandas as pd
 import pytest
+from scripts.measure_rotation_ceiling import (
+    _autosub_reading,
+    _concentration_reading,
+    _interval_reading,
+)
 from tests.fixtures.synthetic_players import make_baseline_players
 
 from squadopt.evaluation.evaluator import evaluate_prepared_folds
@@ -352,3 +363,76 @@ def test_the_comparison_reaches_no_verdict_of_its_own() -> None:
     assert not fields & {"gate_evidence", "verdict", "promoted", "passes", "licensed"}
     assert comparison.mean_difference is None
     assert comparison.comparable_folds == 0
+
+
+def _comparison_record(**overrides: object) -> dict[str, object]:
+    record: dict[str, object] = {
+        "comparable_folds": 147,
+        "ties": 93,
+        "median_difference": 0.0,
+        "mean_difference": 0.9659863945578231,
+        "interval_lower": 0.027210884353741496,
+        "interval_upper": 1.6326530612244898,
+        "control_autosub_points": 186.0,
+        "oracle_autosub_points": 75.0,
+        "season_mean_differences": {"2021-22": -0.378, "2023-24": 2.892},
+    }
+    record.update(overrides)
+    return record
+
+
+_VERDICT_RECORD: dict[str, object] = {"threshold_points_per_decision": 0.5}
+
+
+def test_an_interval_that_still_contains_the_threshold_says_so() -> None:
+    """The measured case. The mean decides the verdict; the interval qualifies it."""
+
+    reading = _interval_reading(_comparison_record(), _VERDICT_RECORD)
+
+    assert "the interval does not" in reading
+    assert "not ruled out" in reading
+
+
+def test_an_interval_wholly_above_the_threshold_says_that_instead() -> None:
+    reading = _interval_reading(
+        _comparison_record(interval_lower=0.8, interval_upper=1.6), _VERDICT_RECORD
+    )
+
+    assert "at or above" in reading
+    assert "not ruled out" not in reading
+
+
+def test_an_interval_wholly_below_the_threshold_says_that_instead() -> None:
+    reading = _interval_reading(
+        _comparison_record(interval_lower=-0.4, interval_upper=0.2), _VERDICT_RECORD
+    )
+
+    assert "below the 0.5" in reading
+    assert "does not reach it" in reading
+
+
+def test_the_concentration_reading_names_a_season_that_goes_the_other_way() -> None:
+    reading = _concentration_reading(_comparison_record())
+
+    assert "93 of 147" in reading
+    assert "2021-22 goes the other way" in reading
+
+
+def test_the_concentration_reading_stays_silent_when_every_season_agrees() -> None:
+    reading = _concentration_reading(
+        _comparison_record(season_mean_differences={"2021-22": 0.4, "2023-24": 2.892})
+    )
+
+    assert "the other way" not in reading
+
+
+def test_the_autosub_reading_charges_the_surrendered_recovery_back() -> None:
+    """The arithmetic that makes the rejected scoring path auditable rather than argued."""
+
+    reading = _autosub_reading(_comparison_record())
+
+    # 186/147 = 1.27 recovered by the control, 75/147 = 0.51 by the oracle arm, so the arm
+    # surrenders 0.76 to gain 0.97 -- and a path without autosubs would have reported 1.72.
+    assert "1.27 points per decision for the control" in reading
+    assert "surrenders 0.76" in reading
+    assert "ceiling near 1.72" in reading
