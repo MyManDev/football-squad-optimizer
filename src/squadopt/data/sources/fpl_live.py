@@ -140,6 +140,13 @@ _AVAILABILITY_FIELDS: Final = (
     "chance_of_playing_next_round",
     "news_added",
 )
+_NEWS_FIELDS: Final = (
+    "code",
+    "element_type",
+    "status",
+    "news",
+    "news_added",
+)
 _EVENT_FIELDS: Final = ("id", "deadline_time", "finished")
 _FIXTURE_FIELDS: Final = (
     "id",
@@ -400,6 +407,59 @@ def availability_snapshot(bootstrap: bytes) -> pd.DataFrame:
     frame["player_id"] = frame["player_id"].astype("int64")
     frame["status"] = frame["status"].astype("string")
     frame["chance_of_playing"] = frame["chance_of_playing"].astype("Int64")
+    frame["news_added_utc"] = frame["news_added_utc"].astype("string")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
+def news_snapshot(bootstrap: bytes) -> pd.DataFrame:
+    """Read the source's own note about each player, with the instant it was added.
+
+    Deliberately separate from :func:`availability_snapshot` rather than a column on it.
+    That table is consumed by the projection path, and widening it would move every
+    caller's shape for a field the projection must never read: this one carries **free
+    text**, and free text is not a feature, not a column of an artifact and not
+    something a member-facing surface may be handed.
+
+    What it is for is measurement. ``news_added`` is the only instant the source stamps
+    on its own editorial, so it is the only way to ask *when* the platform learned
+    something — and therefore whether a capture taken earlier would have missed it. The
+    caller reads the text to classify a note and keeps the count, never the words.
+
+    Two states have to stay apart and both are real in a capture: a player who has never
+    been flagged carries no ``news_added`` at all, and a player who was flagged and has
+    since been cleared carries an empty ``news`` with the stamp still on it. Neither is
+    "nothing happened", so ``news_added_utc`` is absent only for the first.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _NEWS_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        rows.append(
+            {
+                "player_id": _integer(record, "code", "Element"),
+                "status": _text(record, "status", "Element"),
+                "news": _text(record, "news", "Element"),
+                "news_added_utc": (
+                    pd.NA
+                    if record.get("news_added") is None
+                    else normalize_utc_timestamp(
+                        record.get("news_added"), label="Element news_added"
+                    )
+                ),
+            }
+        )
+
+    if not rows:
+        raise DataSourceError("Bootstrap payload declares no squad-eligible players.")
+
+    frame = pd.DataFrame(rows, columns=["player_id", "status", "news", "news_added_utc"])
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["status"] = frame["status"].astype("string")
+    frame["news"] = frame["news"].astype("string")
     frame["news_added_utc"] = frame["news_added_utc"].astype("string")
     return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
 
