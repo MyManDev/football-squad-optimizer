@@ -846,6 +846,73 @@ def player_snapshot(bootstrap: bytes) -> pd.DataFrame:
     return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
 
 
+#: The short name the platform publishes, plus what a name has to be resolved *within*.
+#: A separate field tuple from :data:`_ELEMENT_FIELDS` on purpose: adding ``web_name``
+#: there would make :func:`player_snapshot` refuse every capture whose payload does not
+#: carry it, which is a change to a contract this needs nothing from.
+_SHORT_NAME_FIELDS: Final = ("code", "element_type", "team", "web_name")
+
+SHORT_NAME_COLUMNS: Final = ("player_id", "web_name", "team_name")
+
+
+def short_name_roster(bootstrap: bytes) -> pd.DataFrame:
+    """Read the roster as the short names a club's own words would use.
+
+    :func:`player_snapshot` joins ``first_name`` and ``second_name`` into one full name,
+    which is what a projection wants and not what a press conference says. The platform
+    also publishes ``web_name`` -- ``Saka``, ``B.Fernandes`` -- and nothing in this
+    repository reads it. That is the form a claim about a player has to be matched
+    against, so it is read here, in its own table, keyed on the persistent ``code``.
+
+    The club travels with the name because it is the only thing that makes the match
+    tractable: across a whole roster a bare surname is ambiguous for dozens of players,
+    and inside one squad it is almost always unique.
+    """
+
+    names = team_names(bootstrap)
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _SHORT_NAME_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    unknown_teams: list[int] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        team = _integer(record, "team", "Element")
+        if team not in names:
+            unknown_teams.append(team)
+            continue
+        code = _integer(record, "code", "Element")
+        web_name = _text(record, "web_name", "Element")
+        if not web_name:
+            raise InvalidValueError(f"Element with code {code} publishes an empty web_name.")
+        rows.append({"player_id": code, "web_name": web_name, "team_name": names[team]})
+
+    if unknown_teams:
+        raise InvalidValueError(
+            "Bootstrap payload has players on teams it does not declare: "
+            f"{format_examples(sorted(set(unknown_teams)))}. A claim about a player whose "
+            "club is unknown cannot be resolved within that club."
+        )
+    if not rows:
+        raise DataSourceError(
+            "Bootstrap payload declares no squad-eligible players, so there is no roster "
+            "to resolve a claim against."
+        )
+
+    frame = pd.DataFrame(rows, columns=list(SHORT_NAME_COLUMNS))
+    duplicated = frame.loc[frame["player_id"].duplicated(), "player_id"].tolist()
+    if duplicated:
+        raise DuplicateRecordsError(
+            "Bootstrap payload declares the same persistent player code more than once: "
+            f"{format_examples(duplicated)}."
+        )
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["web_name"] = frame["web_name"].astype("string")
+    frame["team_name"] = frame["team_name"].astype("string")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
 # --- registered entries and their league ---------------------------------------------
 #
 # Paths, not URLs. This module never fetches; the platform adapter owns the base URL and
