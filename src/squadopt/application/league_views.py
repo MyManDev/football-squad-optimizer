@@ -43,6 +43,13 @@ from squadopt.application.advice import (
     build_advice_payload,
     solve_member_control,
 )
+from squadopt.application.advice_record import (
+    AdviceRecordConflictError,
+    PublishedAdvice,
+    build_member_advice_record,
+    record_member_advice,
+    repository_commit,
+)
 from squadopt.application.entries import (
     EntryError,
     EntryPicks,
@@ -119,6 +126,10 @@ class MemberRender:
     #: The saf-puan windows that solved, and the ones that did not, with the reason.
     window_payloads: tuple[tuple[int, dict[str, object]], ...] = ()
     window_unavailable: tuple[tuple[int, str], ...] = ()
+    #: The digest of every transfer-planning control this member's own plan was solved
+    #: under, carried out of the task because the advice record has to state it and the
+    #: control it comes from does not cross a process pool. Empty when the baseline failed.
+    transfer_config_fingerprint: str = ""
 
 
 def render_member(
@@ -215,6 +226,7 @@ def render_member(
         tuple(unavailable),
         tuple(window_payloads),
         tuple(window_unavailable),
+        control.transfer_config.configuration_fingerprint,
     )
 
 
@@ -428,6 +440,7 @@ def build_league_views(
     rival_menu: bool = True,
     mapper: MemberMapper = map,
     horizon_builder: HorizonBuilder | None = None,
+    advice_record_root: Path | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
@@ -462,6 +475,18 @@ def build_league_views(
     baseline saf-puan file stays byte-identical either way: it is always the
     deterministic planner's answer, never a scenario-scored re-pick. A member whose
     menu or selection fails keeps their baseline advice, with the reason recorded.
+
+    ``advice_record_root`` turns on the immutable per-member, per-gameweek advice record
+    (``application/advice_record.py``). The published tree has no gameweek in its paths and
+    is overwritten every week, so without this nothing on disk survives to say what a
+    member was told for a given week. The record is written here, by the same call that
+    writes the published bytes, from the same picks, projection and payloads — a runner
+    around this could only guess, because the weekly publish re-solves in a fresh worktree.
+
+    The records are written after every member's files are on disk, so a refusal can never
+    stop the advice being published; a record that already exists and disagrees raises
+    ``AdviceRecordConflictError`` naming the difference, once, after every writable record
+    has been written. The published bytes are identical with and without this argument.
     """
 
     placings = dict(standings or {})
@@ -584,15 +609,21 @@ def build_league_views(
         )
     }
 
-    def _write(relative: str, payload: Mapping[str, object]) -> None:
+    def _write(relative: str, payload: Mapping[str, object]) -> bytes:
+        """Write one published file and return the exact bytes that landed at that path."""
+
         path = out / relative
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(_envelope(payload, generated_at_utc=generated), indent=2),
-            encoding="utf-8",
-            newline="\n",
-        )
+        text = json.dumps(_envelope(payload, generated_at_utc=generated), indent=2)
+        path.write_text(text, encoding="utf-8", newline="\n")
         written.append(relative)
+        # ``newline="\n"`` writes the text untranslated, so these are the file's bytes.
+        return text.encode("utf-8")
+
+    # Per rendered member: the picks the advice was computed from, the transfer-planning
+    # digest it was solved under, and every advice document with the bytes that landed.
+    # Records are written from this after the whole tree is on disk.
+    publications: list[tuple[EntryPicks, str, list[PublishedAdvice], dict[str, object]]] = []
 
     for registration, task in zip(registrations, tasks, strict=True):
         entry_id = int(registration.entry_id)
@@ -632,21 +663,57 @@ def build_league_views(
         )
         written.append(f"entries/{entry_id}.json")
 
-        _write(f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json", advice)
+        # Every advice document this member gets, kept with the bytes that landed so the
+        # record digests what was published rather than a re-rendering of the payload.
+        emitted: list[PublishedAdvice] = []
+
+        relative = f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json"
+        emitted.append(
+            PublishedAdvice(
+                COMPUTED_MODE, COMPUTED_WINDOW, None, relative, advice, _write(relative, advice)
+            )
+        )
 
         # The saf-puan windows beyond one week, beside the baseline at their own paths.
         for window, payload in render.window_payloads:
-            _write(f"advice/{entry_id}/{COMPUTED_MODE}/{window}.json", payload)
+            relative = f"advice/{entry_id}/{COMPUTED_MODE}/{window}.json"
+            emitted.append(
+                PublishedAdvice(
+                    COMPUTED_MODE, window, None, relative, payload, _write(relative, payload)
+                )
+            )
 
         # The rival menu: one file per (strategy, rival), the standings neighbour's copy
         # at the strategy's plain path, and an index that says what exists and why not.
         computed: list[dict[str, object]] = []
         for strategy, rival_id, payload in render.rival_payloads:
             relative = f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}/vs-{rival_id}.json"
-            _write(relative, payload)
+            emitted.append(
+                PublishedAdvice(
+                    strategy,
+                    COMPUTED_WINDOW,
+                    rival_id,
+                    relative,
+                    payload,
+                    _write(relative, payload),
+                )
+            )
             computed.append({"strategy": strategy, "rival_entry_id": rival_id, "path": relative})
             if rival_id == task.default_rival_id:
-                _write(f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}.json", payload)
+                default_relative = f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}.json"
+                emitted.append(
+                    PublishedAdvice(
+                        strategy,
+                        COMPUTED_WINDOW,
+                        rival_id,
+                        default_relative,
+                        payload,
+                        _write(default_relative, payload),
+                    )
+                )
+        suggested = _suggested_strategy(
+            task, placings=placings, gameweek=gameweek, scored_gameweek=scored_gameweek
+        )
         if rival_menu or task.windows:
             unavailable: list[dict[str, object]] = [
                 {"strategy": strategy, "rival_entry_id": rival_id, "reason": reason}
@@ -685,12 +752,7 @@ def build_league_views(
                     "default_rival_entry_id": task.default_rival_id,
                     # The declared rule's pick among the three, with the gap and the
                     # weeks remaining it read; null when either input is unproven.
-                    "suggested_strategy": _suggested_strategy(
-                        task,
-                        placings=placings,
-                        gameweek=gameweek,
-                        scored_gameweek=scored_gameweek,
-                    ),
+                    "suggested_strategy": suggested,
                     "computed": computed,
                     "unavailable": unavailable,
                 },
@@ -736,21 +798,57 @@ def build_league_views(
                         solver_status=chosen_plan.solver_status.name,
                         optimality_gap=(float(str(chosen_gap)) if chosen_gap is not None else None),
                     )
-                    mode_path = (
-                        out / "advice" / str(entry_id) / item.mode / f"{COMPUTED_WINDOW}.json"
+                    mode_relative = f"advice/{entry_id}/{item.mode}/{COMPUTED_WINDOW}.json"
+                    emitted.append(
+                        PublishedAdvice(
+                            item.mode,
+                            COMPUTED_WINDOW,
+                            None,
+                            mode_relative,
+                            mode_payload,
+                            _write(mode_relative, mode_payload),
+                        )
                     )
-                    mode_path.parent.mkdir(parents=True, exist_ok=True)
-                    mode_path.write_text(
-                        json.dumps(_envelope(mode_payload, generated_at_utc=generated), indent=2),
-                        encoding="utf-8",
-                        newline="\n",
-                    )
-                    written.append(f"advice/{entry_id}/{item.mode}/{COMPUTED_WINDOW}.json")
             except (EntryError, DataError, ModeSelectionError, ExperimentError, KeyError) as error:
                 # One member's modes failing must not sink their baseline, or the batch.
                 # KeyError is the scenario scorer meeting a player the paths do not
                 # carry — a data gap for this member, not a reason the league fails.
                 mode_note = f"competitive modes unavailable: {error}"
+
+        # Which of the member's documents is the one we told them. The page points at the
+        # declared rule's pick when there is one and its file was actually written; when
+        # the rule could not be stated, or its file did not solve, the page shows the
+        # pure-points baseline, and the record says which of the two it was rather than
+        # leaving a later reader to re-apply a rule from inputs that have since moved.
+        emitted_paths = {item.relative_path for item in emitted}
+        suggested_slug = str(suggested["strategy"]) if suggested is not None else None
+        suggested_path = (
+            f"advice/{entry_id}/{suggested_slug}/{COMPUTED_WINDOW}.json"
+            if suggested_slug is not None
+            else None
+        )
+        told: dict[str, object] = (
+            {
+                "strategy": suggested_slug,
+                "window": COMPUTED_WINDOW,
+                # The rival of the document pointed at, not the rival the rule compared
+                # against: the pure-points file is rival-free whoever suggested it.
+                "rival_entry_id": (
+                    None if suggested_slug == COMPUTED_MODE else task.default_rival_id
+                ),
+                "published_path": suggested_path,
+                "source": "suggested_strategy",
+            }
+            if suggested_path is not None and suggested_path in emitted_paths
+            else {
+                "strategy": COMPUTED_MODE,
+                "window": COMPUTED_WINDOW,
+                "rival_entry_id": None,
+                "published_path": f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json",
+                "source": "baseline",
+            }
+        )
+        publications.append((picks, render.transfer_config_fingerprint, emitted, told))
 
         results.append(MemberViewResult(entry_id, registration.label, True, reason=mode_note))
         member_rows.append(member_row)
@@ -775,6 +873,33 @@ def build_league_views(
         newline="\n",
     )
     written.append(members_path.name)
+
+    # The record comes last, after every published file is on disk: a refusal here must
+    # never be able to stop a member's advice reaching them. Every member is attempted
+    # even after one refuses, so a second deploy names every disagreement it found rather
+    # than the first one, and every week that *can* be recorded still is.
+    if advice_record_root is not None:
+        commit = repository_commit()
+        conflicts: list[str] = []
+        for picks, fingerprint, emitted, told in publications:
+            record = build_member_advice_record(
+                picks,
+                projection,
+                emitted,
+                league_id=league_id,
+                generated_at_utc=generated,
+                league_view_contract_version=LEAGUE_VIEW_CONTRACT_VERSION,
+                told=told,
+                transfer_config_fingerprint=fingerprint or None,
+                commit=commit,
+            )
+            try:
+                record_member_advice(Path(advice_record_root), record)
+            except AdviceRecordConflictError as error:
+                conflicts.append(str(error))
+        if conflicts:
+            raise AdviceRecordConflictError("\n".join(conflicts))
+
     return LeagueViewsReport(
         league_id=int(league_id),
         season=season,
