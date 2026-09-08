@@ -37,7 +37,54 @@ describe("league member points", () => {
     // column headed only "GW points" would sit under the wrong number.
     renderPage(<LeagueMembersView envelope={membersWith({ scored_gameweek: 1 })} />);
 
-    expect(screen.getByRole("columnheader", { name: "OH1 puanı" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "OH1 net puanı" })).toBeInTheDocument();
+  });
+
+  it("nets every row's week by that row's own transfer hit", () => {
+    // The defect this pins: our row was net of our hit and each member's was gross of
+    // theirs, in one column. A member who took a four-point hit read four points better
+    // than they scored — the source's own total advances by points minus the hit.
+    const hit = membersWith({
+      scored_gameweek: 3,
+      members: [
+        {
+          ...mockLeagueMembersEnvelope.payload.members[0],
+          gameweek_points: 78,
+          transfer_cost: 4,
+        },
+        {
+          ...mockLeagueMembersEnvelope.payload.members[1],
+          gameweek_points: 51,
+          transfer_cost: 0,
+        },
+      ],
+    });
+    renderPage(<LeagueMembersView envelope={hit} />);
+
+    const cells = screen.getAllByRole("row").slice(1);
+    expect(cells[0].textContent).toContain("74");
+    expect(cells[0].textContent).not.toContain("78");
+    expect(cells[1].textContent).toContain("51");
+  });
+
+  it("shows no week at all when the hit that week is unproven", () => {
+    // An absent hit is not a hit of zero. Publishing the gross score under a heading
+    // that says net would be the same wrong claim on a different row.
+    const unknownHit = membersWith({
+      scored_gameweek: 3,
+      members: [
+        {
+          ...mockLeagueMembersEnvelope.payload.members[0],
+          gameweek_points: 78,
+          transfer_cost: null,
+        },
+      ],
+    });
+    renderPage(<LeagueMembersView envelope={unknownHit} />);
+
+    const cells = screen.getAllByRole("row").slice(1);
+    expect(cells[0].textContent).not.toContain("78");
+    expect(cells[0].textContent).toContain("—");
   });
 
   it("says why the column is empty rather than leaving it blank", () => {
@@ -135,6 +182,7 @@ describe("league member surfaces", () => {
           team_name: "SquadOpt",
           rank: 0,
           gameweek_points: 26,
+          transfer_cost: 0,
           total_points: 26,
           movement: "unknown",
           movement_places: null,
@@ -151,18 +199,18 @@ describe("league member surfaces", () => {
   });
 
   it.each(["tr", "en"] as const)(
-    "says the gameweek column is not on one basis while our net row sits in it, in %s",
+    "names the column's basis, because it is not the one the FPL site shows, in %s",
     (language) => {
-      // Our number is net of our transfer hit; every member's is their week before their
-      // own hits, and the site publishes no hit for them, so the column cannot be netted.
       const copy = MESSAGES[language];
       renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
 
-      expect(screen.getByText(copy.leagueMembers.gameweekBasisNote)).toBeInTheDocument();
+      expect(screen.getByText(copy.leagueMembers.gameweekNetNote)).toBeInTheDocument();
     },
   );
 
-  it("omits the basis note when no row of ours is in the column", () => {
+  it("keeps the basis note when no row of ours is in the column", () => {
+    // The basis belongs to the column, not to our presence in it: a member reading only
+    // other members still sees numbers that differ from the ones on the FPL site.
     renderPage(
       <LeagueMembersView
         envelope={membersWith({
@@ -172,7 +220,7 @@ describe("league member surfaces", () => {
         })}
       />,
     );
-    expect(screen.queryByText(MESSAGES.tr.leagueMembers.gameweekBasisNote)).not.toBeInTheDocument();
+    expect(screen.getByText(MESSAGES.tr.leagueMembers.gameweekNetNote)).toBeInTheDocument();
   });
 
   it("does not double our row when the envelope already carries one", () => {
@@ -186,6 +234,7 @@ describe("league member surfaces", () => {
           team_name: "SquadOpt",
           rank: 0,
           gameweek_points: 26,
+          transfer_cost: 0,
           total_points: 26,
           movement: "unknown",
           movement_places: null,

@@ -270,6 +270,13 @@ class MemberStanding:
     row for it, or the week not yet final. A zero would say the member scored nothing,
     which is a different and possibly untrue statement. Both must survive to the page, so
     the renderer distinguishes them rather than collapsing both to falsy.
+
+    ``gameweek_points`` is the week **gross** of the transfer hit, because that is what
+    the source states; ``transfer_cost`` is the hit taken that week, so a reader of this
+    can state the net week — the amount ``total_points`` actually advanced by. It is
+    optional under the same rule as the points beside it: an absent cost says the capture
+    does not carry this member's hit, not that the member took none, and a zero would be
+    the untrue half of that pair.
     """
 
     entry_id: int
@@ -278,6 +285,7 @@ class MemberStanding:
     rank: int
     gameweek_points: int | None = None
     total_points: int | None = None
+    transfer_cost: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -501,7 +509,9 @@ def build_league_views(
     # the *upcoming* gameweek, so points travelling without their own week would be read
     # under the wrong heading — publish both or neither.
     if scored_gameweek is None and any(
-        placing.gameweek_points is not None or placing.total_points is not None
+        placing.gameweek_points is not None
+        or placing.total_points is not None
+        or placing.transfer_cost is not None
         for placing in placings.values()
     ):
         raise ValueError(
@@ -518,6 +528,9 @@ def build_league_views(
             "team_name": placing.team_name if placing else None,
             "rank": placing.rank if placing else 0,
             "gameweek_points": placing.gameweek_points if placing else None,
+            # The week's hit travels beside the week's gross score so the page can show
+            # one basis for everyone. Null stays null: no hit was proven, not no hit.
+            "transfer_cost": placing.transfer_cost if placing else None,
             "total_points": placing.total_points if placing else None,
             "movement": "unknown",
             "movement_places": None,

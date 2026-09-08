@@ -285,6 +285,9 @@ def main() -> int:
                     total_points=(
                         scores[row.entry_id].total_points if row.entry_id in scores else None
                     ),
+                    transfer_cost=(
+                        scores[row.entry_id].transfer_cost if row.entry_id in scores else None
+                    ),
                 )
                 for row in rows
             }

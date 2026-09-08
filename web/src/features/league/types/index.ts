@@ -36,7 +36,16 @@ interface EntryStanding {
   manager_name: string | null;
   team_name: string | null;
   rank: number;
+  /** The week **gross** of the transfer hit, as the source states it. */
   gameweek_points: number | null;
+  /**
+   * The hit taken that week, so the gross week above can be netted.
+   *
+   * Null is a claim, not a zero: it says nothing proves this row's hit. A row whose hit
+   * is null therefore shows no gameweek score at all, rather than a gross number in a
+   * column that reads as net.
+   */
+  transfer_cost: number | null;
   total_points: number | null;
   movement: RankMovement;
   movement_places: number | null;
