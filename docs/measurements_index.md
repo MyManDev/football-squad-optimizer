@@ -25,6 +25,20 @@ that moved the member planner's own planning hit cost, a caution margin inside t
 planner's objective; the game's charge and every hit a member is shown stayed where they
 were, and the point model was untouched. The row says so in full.
 
+**This index is not the list of everything in production.** ADR 0003 rule 1 runs one way —
+every committed artifact has a row — and the converse has never been true. One promoted model
+version has no row here and never will under the current rules: `phase-c-component-elite-top100-v1`,
+the Phase C component base with the bounded Top-100 uplift multiplied on top, pinned into
+`IN_SEASON_CONTROL_MODEL_VERSIONS` by #395 and deciding live squads. It reached production
+with no measurement of its own. That was a breach of the boundary in
+`phase_c_operational_component.md` as that document was originally written; on **8 September
+2026** the owner amended that boundary to admit a bounded, fitted-nothing multiplier on a
+promoted base without a candidate measurement, rather than withdraw the version. The
+conditions such an uplift must satisfy, what the amended rule still forbids, and what the
+missing measurement would have told us are all in that document's amendment section. The
+nearest row here, `phase_c_component_evaluation`, measured the **bare** base and is not
+evidence about the uplift.
+
 Regenerated artifacts must keep passing `scripts.run_measurement_preflight`, for the kinds
 that runner covers — `MEASUREMENT_KINDS` names eight, and an artifact outside them has no
 gate to keep passing rather than a gate it fails.
