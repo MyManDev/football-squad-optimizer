@@ -40,7 +40,12 @@ test("league shows the season and the cumulative chart", async ({ page }) => {
   // Turkish because the payload now carries a stable code the page translates.
   await expect(page.getByText(/oyun ortalamasına karşı/)).toBeVisible();
   await expect(page.getByText(/Bu kadronun ne kadarı şablon/)).toBeVisible();
-  await expect(page.getByRole("table")).toBeVisible();
+  // Named rather than taken by role alone, for the same reason the comment above gives. A
+  // bare `getByRole("table")` assumed the page had exactly one, which was true only while
+  // the scoreboard had nothing to publish; a week with a scoreboard renders a second table
+  // and the locator fails on strict mode rather than on anything being wrong. The season
+  // ledger is the table that is there in every season state, so that is the one asserted.
+  await expect(page.getByRole("table", { name: /sezon ledger/i })).toBeVisible();
 });
 
 test("status is reachable from the footer", async ({ page }) => {
