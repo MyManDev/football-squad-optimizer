@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
@@ -49,6 +49,7 @@ export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<L
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { viewer, select, clear } = useViewerEntry();
+  const navigate = useNavigate();
   const view = envelope.payload;
   const viewerRow =
     viewer === null
@@ -78,12 +79,19 @@ export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<L
 
       <Card tone="muted" title={copy.viewerTitle}>
         <p className={styles.notice}>{copy.viewerBody}</p>
-        {viewerRow ? (
+        {viewer ? (
           <p className={styles.notice}>
-            <strong>
-              {copy.viewerSelected(viewerRow.manager_name ?? `#${viewerRow.entry_id}`)}
-            </strong>{" "}
-            <Link to={`/league/members/${viewerRow.entry_id}`}>{copy.viewerOpenMine}</Link>{" "}
+            {viewerRow ? (
+              <>
+                <strong>
+                  {copy.viewerSelected(viewerRow.manager_name ?? `#${viewerRow.entry_id}`)}
+                </strong>{" "}
+                <Link to={`/league/members/${viewerRow.entry_id}`}>{copy.viewerOpenMine}</Link>{" "}
+              </>
+            ) : (
+              <>{copy.viewerMissing} </>
+            )}
+            <a href="#league-member-list">{copy.viewerChange}</a>{" "}
             <button type="button" className={styles.viewerClear} onClick={clear}>
               {copy.viewerClear}
             </button>
@@ -93,7 +101,7 @@ export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<L
 
       <Card title={copy.members} aside={copy.memberCount(rows.length)}>
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
+          <table id="league-member-list" className={styles.table}>
             <caption className="visually-hidden">{copy.caption(view.league_name)}</caption>
             <thead>
               <tr>
@@ -118,7 +126,10 @@ export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<L
                   member={member}
                   locale={locale}
                   viewerEntryId={viewer?.entryId ?? null}
-                  onSelectViewer={select}
+                  onSelectViewer={(entryId) => {
+                    select(entryId);
+                    navigate(`/league/members/${entryId}`);
+                  }}
                 />
               ))}
             </tbody>

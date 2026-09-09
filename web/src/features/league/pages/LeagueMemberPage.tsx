@@ -185,7 +185,7 @@ function LeagueMemberContent({
   const copy = messages.leagueMembers;
   const view = squad.payload;
   const [searchParams] = useSearchParams();
-  const { viewer } = useViewerEntry();
+  const { viewer, clear } = useViewerEntry();
   const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
   const job = useAdviceJob(adviceClient);
   const leagueId = view.league_id;
@@ -258,6 +258,25 @@ function LeagueMemberContent({
       <Card tone="muted" title={copy.publicDataTitle}>
         <p className={styles.notice}>{copy.publicDataBody}</p>
       </Card>
+
+      {viewer ? (
+        <Card tone="muted" title={copy.viewerTitle}>
+          <p className={styles.notice}>{copy.viewerBody}</p>
+          <p className={styles.notice}>
+            <strong>
+              {copy.viewerSelected(
+                viewer.entryId === entryId
+                  ? (view.entry.manager_name ?? `#${viewer.entryId}`)
+                  : `#${viewer.entryId}`,
+              )}
+            </strong>{" "}
+            <Link to="/league/members">{copy.viewerChange}</Link>{" "}
+            <button type="button" className={styles.viewerClear} onClick={clear}>
+              {copy.viewerClear}
+            </button>
+          </p>
+        </Card>
+      ) : null}
 
       {view.data_quality !== "complete" ? (
         <Card tone="muted" title={copy.incompleteTitle}>
