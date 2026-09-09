@@ -399,6 +399,9 @@ const en = {
     viewerSelected: (name: string) =>
       `Viewing as ${name}. Advice pages will start from this squad.`,
     viewerClear: "Clear selection",
+    viewerChange: "Change member",
+    viewerMissing:
+      "Your saved selection is not in the published member list. Choose another member or clear it.",
     viewerOpenMine: "Open my squad →",
     notYourPageTitle: "Not your page",
     notYourPageBody: "You picked another row as yourself; this page advises this member.",
@@ -1093,6 +1096,9 @@ const tr: MessageSchema<typeof en> = {
     viewerSelected: (name: string) =>
       `${name} olarak bakıyorsun. Tavsiye sayfaları bu kadrodan başlayacak.`,
     viewerClear: "Seçimi kaldır",
+    viewerChange: "Üyeyi değiştir",
+    viewerMissing:
+      "Kayıtlı seçimin yayımlanan üye listesinde yok. Başka bir üye seç veya seçimi kaldır.",
     viewerOpenMine: "Kadromu aç →",
     notYourPageTitle: "Bu senin sayfan değil",
     notYourPageBody: "Kendin olarak başka bir satırı seçtin; bu sayfa bu üyeye öneri verir.",
