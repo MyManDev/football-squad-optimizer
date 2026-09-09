@@ -123,9 +123,20 @@ def test_real_worker_capacity(tmp_path: Path, users: int, replicas: int) -> None
                     time.sleep(0.1)
             else:
                 pytest.fail((store / "api.log").read_text(encoding="utf-8"))
+
+            def require_live_roles(api=api, workers=workers, store=store):
+                for name, process in [
+                    ("api", api),
+                    *[(f"worker-{i}", w) for i, w in enumerate(workers)],
+                ]:
+                    assert process.poll() is None, f"{name} exited with {process.returncode}:\n" + (
+                        store / f"{name}.log"
+                    ).read_text(encoding="utf-8")
+
             if scenario == "cache-hit":
                 warmup = run_burst(origin, requests, scenario="distinct", users=users)
                 assert warmup["failed"] == 0
+            require_live_roles()
             processes = [psutil.Process(process.pid) for process in [api, *workers]]
             peak_rss: dict[int, int] = {}
             stop = threading.Event()
@@ -156,6 +167,7 @@ def test_real_worker_capacity(tmp_path: Path, users: int, replicas: int) -> None
             finally:
                 stop.set()
                 observer.join(timeout=3)
+            require_live_roles()
             report["replicas"] = replicas
             report["cpu_seconds"] = [
                 cpu_seconds(process) - before[process.pid] for process in processes
