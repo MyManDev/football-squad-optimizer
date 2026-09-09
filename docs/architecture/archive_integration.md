@@ -44,12 +44,29 @@ so clock-only differences do not hide an actual state or payload disagreement.
 
 ## Quote integration dependency
 
-The archived `locate_quote` helper in `club_news_coding.py:336` is pure and can locate a
-unique exact UTF-8 quote without the Anthropic SDK. The SDK is not a technical
+The archived `locate_quote` helper in `club_news_coding.py:336` is pure and is intended to
+locate a unique exact UTF-8 quote without the Anthropic SDK. Its overlapping-match defect
+is recorded below. The SDK is not a technical
 prerequisite for that helper. However, the current baseline has no quote-producing
 coding caller to consume it. Copying the helper alone would create an unused second
 contract; changing the existing bound-offset parser to accept quotes would change a
 different established contract.
+
+The remote delivery was rechecked at 2026-09-09 21:01 UTC with `git ls-remote`; no ref was
+changed. `feat/club-news-model-call` remains at `e6c3b40b9cdeec535c58a2616ef67a22a650002c`
+and `feat/per-club-model-provenance` at `40584600b4f1337f94279140d7c7ce49d10359dc`.
+The coding/SDK modules and per-club provenance are delivered source, but are not integrated
+into this transition. Both the remote exporter and current installed exporter still use a
+fixture provider. The delivery does not demonstrate production document/club association,
+durable raw-document/model-response capture, or offline replay from that capture.
+
+Before integration, fix the locator's use of `content.count(needle)` at line 352: Python
+counts non-overlapping occurrences, so `b'aaa'.count(b'aa') == 1` despite valid starts at
+0 and 1. A unique-match claim must reject this ambiguity. The current offset parser is
+unchanged; this finding concerns the delivered quote-conversion helper. Adapt the topic's
+old script exporter to `application.rotation_export` when integrating, preserving the
+frozen coding contract, requested/served model identity and club-to-response provenance.
+Existing in-memory synthetic replay tests do not establish a persisted real capture.
 
 Integrate the quote response schema, frozen coding prompt, unique-match conversion,
 unlocatable-response rejection and offline tests together with the data lane's coding
