@@ -4,12 +4,12 @@
 
 - [x] Tek geçiş branch'ini oluştur; güncel develop ve aktif işleri doğrula.
 - [x] Kuyruk kurtarma, iş sahipliği ve bozuk kayıt izolasyonu (R02); odaklı testler geçti.
-- [ ] **Şimdi:** API/web veri doğrulaması, istek iptali ve süre sınırları (R03).
-- [ ] Yedekleme, geri yükleme ve haftalık koşu takibi (R04/R05).
-- [ ] Ortak sözleşmeler ve katman bağımlılıkları (R11).
+- [x] API/web veri doğrulaması, istek iptali ve süre sınırları (R03); tarayıcı kabulü geçti.
+- [ ] **Şimdi:** Yedekleme ve geri yükleme hazır (R04); haftalık koşu takibi sürüyor (R05).
+- [x] Ortak sözleşmeler ve katman bağımlılıkları (R11); 5 istisna kaldırıldı, 163 test geçti.
 - [ ] Solver, yayın üretimi ve üye sayfası sorumlulukları (R12).
 - [ ] Arşiv düzeltmeleri ve İbo'nun teslimatını uzlaştırma (R01/R07).
-- [ ] Bilimsel kontrol hataları, CI ve tarayıcı testleri (R08/R13).
+- [ ] Bilimsel kontrol hataları tamam (R08: 54 test); CI ve tarayıcı kabulü sürüyor (R13).
 - [ ] Backend kabulü, gözlemlenebilirlik ve yük ölçümü (R06/R14).
 - [ ] Son klasör düzeni, tam doğrulama ve commit'ler (R15).
 
@@ -29,17 +29,17 @@ prospective scientific evidence have separate completion criteria.
 
 | Work | Scope and acceptance | State |
 | --- | --- | --- |
-| R01 | Reconcile archived #440/#442 and prerequisite fixes against this baseline; preserve Ibo's active LLM work | Pending |
+| R01 | Reconcile archived #440/#442 and prerequisite fixes against this baseline; preserve Ibo's active LLM work | Implemented; 71 Python and 19 strategy-control tests passed; active Ibo dependencies documented |
 | R02 | Recover interrupted queue writes; fence stale attempts; isolate corrupt records; exercise process crashes and concurrent recovery | Implemented; 66 focused tests passed on Windows; full/CI acceptance pending |
-| R03 | Shared API cache validation and request capabilities; strict nested web payloads; request cancellation and deadlines | Pending |
-| R04 | Capture-addressed projection retention; verifiable backup and empty-target restore; inventory existing external backup | Pending |
-| R05 | Durable weekly stage/results, interrupted-run visibility and safe resume; installed application seams | Pending |
+| R03 | Shared API cache validation and request capabilities; strict nested web payloads; request cancellation and deadlines | Implemented; 59 Python and 143 web focused tests passed; offline Python-to-TypeScript publication and browser/API/worker/cache acceptance passed |
+| R04 | Capture-addressed projection retention; verifiable backup and empty-target restore; inventory existing external backup | Implemented; 59 focused tests passed including synthetic domain restore; real independent destination remains unverified |
+| R05 | Durable weekly stage/results, interrupted-run visibility and safe resume; installed application seams | In progress |
 | R06 | Browser/API/worker/cache acceptance and independent process observability; real host/storage acceptance recorded separately | Pending |
 | R07 | Integrate delivered, replayable club evidence without duplicating Ibo's adapter or activating an unmeasured model | Pending contributor integration |
-| R08 | Artifact-specific evidence declarations and matched strategy comparison populations, with unchanged historical evidence | Pending |
+| R08 | Artifact-specific evidence declarations and matched strategy comparison populations, with unchanged historical evidence | Implemented; 54 focused tests passed; historical evidence unchanged |
 | R09 | Prospective component versus component+Top100 decisions and settled comparison | Requires future captures/outcomes |
 | R10 | Preserve Phase D/E admission gates; never infer calibration or promotion from source integration | Existing scientific gates retained |
-| R11 | Extract shared vocabulary and evaluation policy/statistics; remove all five import exemptions; compatibility re-exports | Pending |
+| R11 | Extract shared vocabulary and evaluation policy/statistics; remove all five import exemptions; compatibility re-exports | Implemented; 163 tests passed, zero import exemptions; seeded outputs and fingerprints unchanged |
 | R12 | Extract actually shared solver support and focused publication/member-page responsibilities | Pending |
 | R13 | Browser/backend CI smoke, loaded member accessibility coverage, failure traces and current documentation entry points | Pending |
 | R14 | Reproducible cache/dedup/distinct-job load scenarios; measured latency/resource report; deployed replica decision separately | Pending R02/R06 |

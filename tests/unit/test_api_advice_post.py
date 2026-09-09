@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from squadopt.api.app import create_app
@@ -82,7 +83,10 @@ def _world(tmp_path: Path, **app_kwargs: object):
     cache = FileAdviceCache(tmp_path / "cache")
     queue = FileJobQueue(tmp_path / "jobs")
     reader = AdviceReadStore(
-        FileLeagueDirectory(tmp_path / "site"), cache, _Context(), {"saf-puan": False}
+        FileLeagueDirectory(tmp_path / "site"),
+        cache,
+        _Context(),
+        {"saf-puan": False, "fark-yarat": True},
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
     application = create_app(
@@ -301,3 +305,54 @@ def test_the_public_job_view_carries_no_private_fields(tmp_path: Path) -> None:
     assert "idempotency_key" not in view
     assert "secret-ish" not in json.dumps(view)
     assert "ertug" not in json.dumps(view)  # no raw worker text, no host paths
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"strategy": "saf-puan", "window": 1, "rival_entry_id": 2199732},
+        {"strategy": "fark-yarat", "window": 1},
+        {"strategy": "fark-yarat", "window": 3, "rival_entry_id": 2199732},
+        {"strategy": "fark-yarat", "window": 1, "rival_entry_id": 313686},
+    ],
+)
+def test_unsupported_computations_never_enter_the_queue(tmp_path: Path, body: dict) -> None:
+    client, _cache, queue = _world(tmp_path)
+    posted = client.post(ADVICE_URL, json=body)
+    params = {"strategy": body["strategy"], "window": body["window"]}
+    if "rival_entry_id" in body:
+        params["rival"] = body["rival_entry_id"]
+    read = client.get(ADVICE_URL, params=params)
+    for response in (posted, read):
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+    assert queue.jobs() == ()
+
+
+@pytest.mark.parametrize("broken", [b'{"private":"corrupt"}', b"null"])
+def test_get_and_post_refuse_identical_corrupt_cache_without_new_job(
+    tmp_path: Path,
+    broken: bytes,
+) -> None:
+    client, cache, queue = _world(tmp_path)
+    posted = client.post(ADVICE_URL, json=BODY)
+    job = queue.load(posted.json()["job_id"])
+    cache.put(job.cache_key, broken)
+    for response in (
+        client.get(ADVICE_URL, params=BODY),
+        client.post(ADVICE_URL, json=BODY),
+    ):
+        assert response.status_code == 500
+        assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+        assert "corrupt" not in response.text
+    assert len(queue.jobs()) == 1
+
+
+def test_corrupt_job_is_unavailable_not_missing(tmp_path: Path) -> None:
+    client, _cache, _queue = _world(tmp_path)
+    posted = client.post(ADVICE_URL, json=BODY)
+    identifier = posted.json()["job_id"]
+    (tmp_path / "jobs" / f"{identifier}.json").write_bytes(b"bad json")
+    response = client.get(f"/api/v1/advice-jobs/{identifier}")
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "QUEUE_INTEGRITY_ERROR"

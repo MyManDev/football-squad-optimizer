@@ -37,7 +37,11 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW
+from squadopt.application.advice_capabilities import (
+    COMPUTED_MODE,
+    COMPUTED_WINDOW,
+    advice_capabilities,
+)
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -89,13 +93,7 @@ def computable_strategies() -> dict[str, bool]:
     a strategy the writer refuses would accept requests nobody can ever answer.
     """
 
-    strategies = {COMPUTED_MODE: False}
-    for slug, strategy in STRATEGY_CATALOG.items():
-        constraints = strategy.constraints
-        if constraints.overlap_floor is None and constraints.overlap_ceiling is None:
-            continue
-        strategies[slug] = True
-    return strategies
+    return {slug: value.requires_rival for slug, value in advice_capabilities().items()}
 
 
 def configuration_fingerprint() -> str:
@@ -462,7 +460,7 @@ class AdviceBackend:
 
         return readiness_report(
             context_loaded=self.contexts.current() is not None,
-            league_tree_readable=(self.config.site_data_root / "league" / "members.json").is_file(),
+            league_tree_readable=FileLeagueDirectory(self.config.site_data_root).readable(),
             cache_writable=self.probe.passed(),
         )
 

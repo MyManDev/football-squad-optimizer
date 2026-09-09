@@ -106,8 +106,10 @@ export function LeagueMemberPage() {
       request.gameweek,
       squad.data?.payload.source_snapshot_id,
     ],
-    queryFn: () =>
-      loadEntryAdvice(entryId, request.strategy, request.window, request.rivalEntryId ?? null),
+    queryFn: ({ signal }) =>
+      loadEntryAdvice(entryId, request.strategy, request.window, request.rivalEntryId ?? null, {
+        signal,
+      }),
     enabled: adviceEnabled,
     staleTime: 60_000,
   });

@@ -1,3 +1,4 @@
+import { withRequestDeadline, type RequestOptions } from "../../data/request";
 import type { WindowSize } from "../moves/modePrices";
 import type {
   EntryAdvice,
@@ -142,23 +143,26 @@ function assertSquad(
   return envelope;
 }
 
-async function read<T>(relative: string): Promise<LeagueViewEnvelope<T>> {
-  const response = await fetch(`${BASE}${relative}`, { cache: "no-cache" });
-  if (response.status === 404) throw new LeagueDataMissing(relative);
-  if (!response.ok) throw new LeagueDataError(`League data is not available (${response.status}).`);
-  // Static hosts can return their HTML app shell for an unpublished JSON path.
-  // A broken JSON publication is unreadable and must not become an example fallback.
-  const body = await response.text();
-  let parsed: LeagueViewEnvelope<T>;
-  try {
-    parsed = JSON.parse(body) as LeagueViewEnvelope<T>;
-  } catch {
-    if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(body)) {
-      throw new LeagueDataMissing(relative);
+async function read<T>(relative: string, options?: RequestOptions): Promise<LeagueViewEnvelope<T>> {
+  return withRequestDeadline(async (signal) => {
+    const response = await fetch(`${BASE}${relative}`, { cache: "no-cache", signal });
+    if (response.status === 404) throw new LeagueDataMissing(relative);
+    if (!response.ok)
+      throw new LeagueDataError(`League data is not available (${response.status}).`);
+    // Static hosts can return their HTML app shell for an unpublished JSON path.
+    // A broken JSON publication is unreadable and must not become an example fallback.
+    const body = await response.text();
+    let parsed: LeagueViewEnvelope<T>;
+    try {
+      parsed = JSON.parse(body) as LeagueViewEnvelope<T>;
+    } catch {
+      if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(body)) {
+        throw new LeagueDataMissing(relative);
+      }
+      throw new LeagueDataError(`The published league document at ${relative} is not valid JSON.`);
     }
-    throw new LeagueDataError(`The published league document at ${relative} is not valid JSON.`);
-  }
-  return assertEnvelope(parsed);
+    return assertEnvelope(parsed);
+  }, options);
 }
 
 /**
@@ -192,11 +196,13 @@ async function mockModule() {
 async function readOrExample<T>(
   relative: string,
   example: () => Promise<LeagueViewEnvelope<T>>,
+  options?: RequestOptions,
 ): Promise<LeagueViewEnvelope<T>> {
+  options?.signal?.throwIfAborted();
   if (import.meta.env.MODE === "test") return example();
-  if (!import.meta.env.DEV) return read<T>(relative);
+  if (!import.meta.env.DEV) return read<T>(relative, options);
   try {
-    return await read<T>(relative);
+    return await read<T>(relative, options);
   } catch (error) {
     if (error instanceof LeagueDataMissing) return example();
     throw error;
@@ -228,6 +234,7 @@ export async function loadEntryAdvice(
   mode: AdviceStrategy,
   window: WindowSize,
   rivalEntryId: number | null = null,
+  options?: RequestOptions,
 ): Promise<LeagueViewEnvelope<EntryAdvice>> {
   // A named rival reads the producer's per-rival file; without one, the plain path —
   // the baseline for saf-puan, the standings neighbour's copy for a rival strategy.
@@ -235,17 +242,75 @@ export async function loadEntryAdvice(
     rivalEntryId === null
       ? `advice/${entryId}/${mode}/${window}.json`
       : `advice/${entryId}/${mode}/${window}/vs-${rivalEntryId}.json`;
-  return readOrExample<EntryAdvice>(relative, async () =>
-    (await mockModule()).mockEntryAdviceEnvelope(entryId, mode, window, rivalEntryId),
+  return readOrExample<EntryAdvice>(
+    relative,
+    async () => (await mockModule()).mockEntryAdviceEnvelope(entryId, mode, window, rivalEntryId),
+    options,
   );
 }
 
 export async function loadEntryAdviceIndex(
   entryId: number,
 ): Promise<LeagueViewEnvelope<EntryAdviceIndex>> {
-  return readOrExample<EntryAdviceIndex>(`advice/${entryId}/index.json`, async () =>
+  const envelope = await readOrExample<EntryAdviceIndex>(`advice/${entryId}/index.json`, async () =>
     (await mockModule()).mockEntryAdviceIndex(entryId),
   );
+  const index = envelope.payload;
+  const positive = (value: unknown) => Number.isSafeInteger(value) && Number(value) > 0;
+  const window = (value: unknown) => [1, 3, 5].includes(Number(value)) && typeof value === "number";
+  if (
+    !record(index) ||
+    index.entry_id !== entryId ||
+    !positive(index.league_id) ||
+    !positive(index.gameweek) ||
+    typeof index.season !== "string" ||
+    !window(index.window) ||
+    !Array.isArray(index.strategies) ||
+    !index.strategies.every((item) => typeof item === "string") ||
+    !Array.isArray(index.rival_entry_ids) ||
+    !index.rival_entry_ids.every(positive) ||
+    !(index.default_rival_entry_id === null || positive(index.default_rival_entry_id)) ||
+    !Array.isArray(index.computed) ||
+    !index.computed.every(
+      (item) =>
+        record(item) &&
+        typeof item.strategy === "string" &&
+        positive(item.rival_entry_id) &&
+        item.path === `advice/${entryId}/${item.strategy}/1/vs-${item.rival_entry_id}.json`,
+    ) ||
+    !Array.isArray(index.unavailable) ||
+    !index.unavailable.every(
+      (item) =>
+        record(item) &&
+        typeof item.strategy === "string" &&
+        typeof item.reason === "string" &&
+        (item.rival_entry_id === null || positive(item.rival_entry_id)) &&
+        (item.window === undefined || window(item.window)),
+    ) ||
+    (index.windows !== undefined &&
+      (!record(index.windows) ||
+        !Object.values(index.windows).every(
+          (items) => Array.isArray(items) && items.every(window),
+        )))
+  ) {
+    throw new LeagueDataError("The published advice index is invalid or belongs to another entry.");
+  }
+  const suggestion = index.suggested_strategy;
+  if (
+    suggestion != null &&
+    (!record(suggestion) ||
+      !["saf-puan", "ortak-koru", "fark-yarat"].includes(String(suggestion.strategy)) ||
+      typeof suggestion.rule_id !== "string" ||
+      !["behind", "level", "ahead"].includes(String(suggestion.band)) ||
+      !positive(suggestion.rival_entry_id) ||
+      !finite(suggestion.points_ahead_of_rival) ||
+      !positive(suggestion.scored_gameweek) ||
+      !finite(suggestion.gameweeks_remaining) ||
+      !finite(suggestion.band_edge_points))
+  ) {
+    throw new LeagueDataError("The published strategy suggestion is invalid.");
+  }
+  return envelope;
 }
 
 /**

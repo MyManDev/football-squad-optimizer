@@ -11,6 +11,7 @@
  * here in the boundary, not in page-by-page error handling.
  */
 
+import { isAbortError, withRequestDeadline, type RequestOptions } from "../../../data/request";
 import type { WindowSize } from "../../moves/modePrices";
 import { LeagueDataError, LeagueDataMissing, loadEntryAdvice } from "../data";
 import type { AdviceStrategy, EntryAdvice, LeagueViewEnvelope } from "../types";
@@ -41,11 +42,11 @@ export type AdviceRequestResult =
 
 export interface AdviceClient {
   /** Read an already-computed answer; never triggers computation. */
-  readAdvice(request: AdviceRequest): Promise<AdviceReadResult>;
+  readAdvice(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult>;
   /** Ask for the answer, computing it if needed (202 + job when it will take time). */
-  requestAdvice(request: AdviceRequest): Promise<AdviceRequestResult>;
+  requestAdvice(request: AdviceRequest, options?: RequestOptions): Promise<AdviceRequestResult>;
   /** Poll one job. */
-  readJob(jobId: string): Promise<AdviceJobStatus>;
+  readJob(jobId: string, options?: RequestOptions): Promise<AdviceJobStatus>;
 }
 
 export interface AdviceJobStatus {
@@ -58,6 +59,7 @@ type AdviceLoader = (
   mode: AdviceStrategy,
   window: WindowSize,
   rivalEntryId?: number | null,
+  options?: RequestOptions,
 ) => Promise<LeagueViewEnvelope<EntryAdvice>>;
 
 /** Serves the published static tree — today's site, byte for byte. */
@@ -68,14 +70,19 @@ export class StaticOnlyAdviceClient implements AdviceClient {
     this.loader = loader;
   }
 
-  async readAdvice(request: AdviceRequest): Promise<AdviceReadResult> {
+  async readAdvice(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
     try {
       const envelope = checkedAdvice(
-        await this.loader(
-          request.entryId,
-          request.strategy,
-          request.window,
-          request.rivalEntryId ?? null,
+        await withRequestDeadline(
+          (signal) =>
+            this.loader(
+              request.entryId,
+              request.strategy,
+              request.window,
+              request.rivalEntryId ?? null,
+              { ...options, signal },
+            ),
+          options,
         ),
         request,
       );
@@ -86,13 +93,17 @@ export class StaticOnlyAdviceClient implements AdviceClient {
     }
   }
 
-  async requestAdvice(request: AdviceRequest): Promise<AdviceRequestResult> {
+  async requestAdvice(
+    request: AdviceRequest,
+    options?: RequestOptions,
+  ): Promise<AdviceRequestResult> {
     // The static tree cannot compute; the published answer is the whole menu.
-    const read = await this.readAdvice(request);
+    const read = await this.readAdvice(request, options);
     return read.kind === "advice" ? read : { kind: "unavailable" };
   }
 
-  async readJob(jobId: string): Promise<AdviceJobStatus> {
+  async readJob(jobId: string, options?: RequestOptions): Promise<AdviceJobStatus> {
+    options?.signal?.throwIfAborted();
     // No backend, no jobs: a job id in hand means the configuration changed under us.
     return { jobId, status: "failed" };
   }
@@ -134,53 +145,63 @@ export class HttpAdviceClient implements AdviceClient {
     );
   }
 
-  async readAdvice(request: AdviceRequest): Promise<AdviceReadResult> {
-    const response = await this.fetcher(this.adviceUrl(request), { cache: "no-cache" });
-    if (response.status === 404) {
-      const body = (await response.json()) as { error?: { code?: string } };
-      if (body?.error?.code === "NOT_COMPUTED") return { kind: "not-computed" };
-    }
-    if (!response.ok) throw new AdviceApiError(response.status);
-    const envelope = checkedAdvice(await response.json(), request);
-    return { kind: "advice", envelope, source: "api-cache" };
-  }
-
-  async requestAdvice(request: AdviceRequest): Promise<AdviceRequestResult> {
-    const response = await this.fetcher(this.adviceUrl(request), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        strategy: request.strategy,
-        window: request.window,
-        rival_entry_id: request.rivalEntryId ?? null,
-      }),
-    });
-    if (response.status === 202) {
-      const body = (await response.json()) as { job_id: string };
-      if (typeof body?.job_id !== "string" || !body.job_id.trim()) {
-        throw new AdviceResponseError("Accepted advice request has no job identity.");
+  async readAdvice(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
+    return withRequestDeadline(async (signal) => {
+      const response = await this.fetcher(this.adviceUrl(request), { cache: "no-cache", signal });
+      if (response.status === 404) {
+        const body = (await response.json()) as { error?: { code?: string } };
+        if (body?.error?.code === "NOT_COMPUTED") return { kind: "not-computed" };
       }
-      return { kind: "job", jobId: body.job_id };
-    }
-    if (!response.ok) throw new AdviceApiError(response.status);
-    const envelope = checkedAdvice(await response.json(), request);
-    return { kind: "advice", envelope, source: "api-cache" };
+      if (!response.ok) throw new AdviceApiError(response.status);
+      const envelope = checkedAdvice(await response.json(), request);
+      return { kind: "advice", envelope, source: "api-cache" };
+    }, options);
   }
 
-  async readJob(jobId: string): Promise<AdviceJobStatus> {
-    const response = await this.fetcher(
-      `${this.origin}/api/v1/advice-jobs/${encodeURIComponent(jobId)}`,
-      { cache: "no-cache" },
-    );
-    if (!response.ok) throw new AdviceApiError(response.status);
-    const body = (await response.json()) as { job_id: string; status: AdviceJobStatus["status"] };
-    if (
-      body?.job_id !== jobId ||
-      !["queued", "running", "completed", "failed"].includes(body?.status)
-    ) {
-      throw new AdviceResponseError("Advice job response has an invalid identity or status.");
-    }
-    return { jobId: body.job_id, status: body.status };
+  async requestAdvice(
+    request: AdviceRequest,
+    options?: RequestOptions,
+  ): Promise<AdviceRequestResult> {
+    return withRequestDeadline(async (signal) => {
+      const response = await this.fetcher(this.adviceUrl(request), {
+        signal,
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          strategy: request.strategy,
+          window: request.window,
+          rival_entry_id: request.rivalEntryId ?? null,
+        }),
+      });
+      if (response.status === 202) {
+        const body = (await response.json()) as { job_id: string };
+        if (typeof body?.job_id !== "string" || !body.job_id.trim()) {
+          throw new AdviceResponseError("Accepted advice request has no job identity.");
+        }
+        return { kind: "job", jobId: body.job_id };
+      }
+      if (!response.ok) throw new AdviceApiError(response.status);
+      const envelope = checkedAdvice(await response.json(), request);
+      return { kind: "advice", envelope, source: "api-cache" };
+    }, options);
+  }
+
+  async readJob(jobId: string, options?: RequestOptions): Promise<AdviceJobStatus> {
+    return withRequestDeadline(async (signal) => {
+      const response = await this.fetcher(
+        `${this.origin}/api/v1/advice-jobs/${encodeURIComponent(jobId)}`,
+        { cache: "no-cache", signal },
+      );
+      if (!response.ok) throw new AdviceApiError(response.status);
+      const body = (await response.json()) as { job_id: string; status: AdviceJobStatus["status"] };
+      if (
+        body?.job_id !== jobId ||
+        !["queued", "running", "completed", "failed"].includes(body?.status)
+      ) {
+        throw new AdviceResponseError("Advice job response has an invalid identity or status.");
+      }
+      return { jobId: body.job_id, status: body.status };
+    }, options);
   }
 }
 
@@ -199,16 +220,16 @@ export class FallbackAdviceClient implements AdviceClient {
     this.fallback = fallback;
   }
 
-  async readAdvice(request: AdviceRequest): Promise<AdviceReadResult> {
+  async readAdvice(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
     let primaryResult: AdviceReadResult | null = null;
     try {
-      primaryResult = await this.primary.readAdvice(request);
+      primaryResult = await this.primary.readAdvice(request, options);
     } catch (error) {
-      if (isRequestRejection(error)) throw error;
+      if (isRequestRejection(error) || isAbortError(error) || options?.signal?.aborted) throw error;
       primaryResult = null;
     }
     if (primaryResult && primaryResult.kind === "advice") return primaryResult;
-    const fallbackResult = await this.fallback.readAdvice(request);
+    const fallbackResult = await this.fallback.readAdvice(request, options);
     if (fallbackResult.kind === "advice") {
       return primaryResult === null
         ? { ...fallbackResult, source: "static-fallback" }
@@ -217,20 +238,23 @@ export class FallbackAdviceClient implements AdviceClient {
     return primaryResult ?? fallbackResult;
   }
 
-  async requestAdvice(request: AdviceRequest): Promise<AdviceRequestResult> {
+  async requestAdvice(
+    request: AdviceRequest,
+    options?: RequestOptions,
+  ): Promise<AdviceRequestResult> {
     try {
-      return await this.primary.requestAdvice(request);
+      return await this.primary.requestAdvice(request, options);
     } catch (error) {
-      if (isRequestRejection(error)) throw error;
-      const read = await this.fallback.readAdvice(request);
+      if (isRequestRejection(error) || isAbortError(error) || options?.signal?.aborted) throw error;
+      const read = await this.fallback.readAdvice(request, options);
       return read.kind === "advice"
         ? { ...read, source: "static-fallback" }
         : { kind: "unavailable" };
     }
   }
 
-  async readJob(jobId: string): Promise<AdviceJobStatus> {
-    return this.primary.readJob(jobId);
+  async readJob(jobId: string, options?: RequestOptions): Promise<AdviceJobStatus> {
+    return this.primary.readJob(jobId, options);
   }
 }
 
