@@ -126,7 +126,7 @@ describe("league member points", () => {
 
 describe("league member surfaces", () => {
   it.each(["tr", "en"] as const)(
-    "keeps the visitor list free of the system team and preserves member differences in %s",
+    "keeps member surfaces free of the system squad and its comparisons in %s",
     (language) => {
       const copy = MESSAGES[language];
       renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
@@ -143,11 +143,14 @@ describe("league member surfaces", () => {
         `/league/members/${entryId}`,
         language,
       );
-      expect(screen.getAllByText(copy.league.note)).toHaveLength(1);
+      expect(screen.queryByText(copy.league.note)).not.toBeInTheDocument();
       expect(
-        screen.getByRole("heading", { name: copy.leagueMembers.squadoptComparisonTitle }),
-      ).toBeInTheDocument();
-      expect(screen.getByText(copy.leagueMembers.squadoptComparison("+9"))).toBeInTheDocument();
+        screen.queryByRole("heading", { name: copy.leagueMembers.squadoptComparisonTitle }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(copy.leagueMembers.squadoptComparison("+9")),
+      ).not.toBeInTheDocument();
+      expect(mockEntrySquadEnvelopes[entryId]!.payload.squadopt_comparison).not.toBeNull();
     },
   );
 
@@ -250,7 +253,6 @@ describe("league member surfaces", () => {
     expect(screen.getByText(/yalnızca senin kadrondan/)).toBeInTheDocument();
     expect(screen.getByText(/banka edilmiş ikinci transfer/)).toBeInTheDocument();
     expect(screen.getByText(/Satın alma fiyatları public değildir/)).toBeInTheDocument();
-    expect(screen.getByText(/puan farkın: \+9/)).toBeInTheDocument();
     expect(container.textContent).not.toContain("%");
   });
 
