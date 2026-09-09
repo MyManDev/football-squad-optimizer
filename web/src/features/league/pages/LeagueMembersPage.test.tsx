@@ -126,11 +126,13 @@ describe("league member points", () => {
 
 describe("league member surfaces", () => {
   it.each(["tr", "en"] as const)(
-    "explains the system score and preserves member differences in %s",
+    "keeps the visitor list free of the system team and preserves member differences in %s",
     (language) => {
       const copy = MESSAGES[language];
       renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
-      expect(screen.getAllByText(copy.league.note)).toHaveLength(1);
+      expect(screen.queryByText(copy.league.note)).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
+      expect(screen.queryByText(copy.leagueMembers.systemTeamBadge)).not.toBeInTheDocument();
       cleanup();
       const entryId = 35249001;
       renderPage(
@@ -162,7 +164,7 @@ describe("league member surfaces", () => {
     expect(screen.queryByText(MESSAGES.tr.league.note)).not.toBeInTheDocument();
   });
 
-  it("appends our own row when the live envelope has none, and claims no rank for it", () => {
+  it("lists only the published human members when the live envelope has no system row", () => {
     const live = {
       ...mockLeagueMembersEnvelope,
       payload: {
@@ -172,30 +174,13 @@ describe("league member surfaces", () => {
         ),
       },
     };
-    renderPage(
-      <LeagueMembersView
-        envelope={live}
-        systemRow={{
-          member_kind: "system",
-          entry_id: null,
-          manager_name: "SquadOpt",
-          team_name: "SquadOpt",
-          rank: 0,
-          gameweek_points: 26,
-          transfer_cost: 0,
-          total_points: 26,
-          movement: "unknown",
-          movement_places: null,
-          data_quality: "complete",
-        }}
-      />,
-    );
+    renderPage(<LeagueMembersView envelope={live} />);
 
-    expect(screen.getByText("SquadOpt · sistem takımı")).toBeInTheDocument();
-    // Placing ourselves among the members needs their points, which the standings view
-    // does not carry; an invented rank would be the page's one unmeasured number.
-    const systemCells = screen.getByRole("link", { name: "SquadOpt" }).closest("tr")!;
-    expect(systemCells.querySelector("td")!.textContent).toBe("—");
+    expect(screen.getAllByRole("row")).toHaveLength(live.payload.members.length + 1);
+    expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(MESSAGES.tr.leagueMembers.memberCount(live.payload.members.length)),
+    ).toBeInTheDocument();
   });
 
   it.each(["tr", "en"] as const)(
@@ -223,27 +208,17 @@ describe("league member surfaces", () => {
     expect(screen.getByText(MESSAGES.tr.leagueMembers.gameweekNetNote)).toBeInTheDocument();
   });
 
-  it("does not double our row when the envelope already carries one", () => {
-    renderPage(
-      <LeagueMembersView
-        envelope={mockLeagueMembersEnvelope}
-        systemRow={{
-          member_kind: "system",
-          entry_id: null,
-          manager_name: "SquadOpt",
-          team_name: "SquadOpt",
-          rank: 0,
-          gameweek_points: 26,
-          transfer_cost: 0,
-          total_points: 26,
-          movement: "unknown",
-          movement_places: null,
-          data_quality: "complete",
-        }}
-      />,
-    );
+  it("excludes a published virtual system row from both the visitor list and its count", () => {
+    renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />);
 
-    expect(screen.getAllByText("SquadOpt · sistem takımı")).toHaveLength(1);
+    const humans = mockLeagueMembersEnvelope.payload.members.filter(
+      (member) => member.member_kind === "human",
+    );
+    expect(screen.getAllByRole("row")).toHaveLength(humans.length + 1);
+    expect(
+      screen.getByText(MESSAGES.tr.leagueMembers.memberCount(humans.length)),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("SquadOpt · sistem takımı")).not.toBeInTheDocument();
   });
 
   it("renders member standings, the public-data notice and an example badge", () => {
@@ -252,16 +227,12 @@ describe("league member surfaces", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Lig Üyeleri" })).toBeInTheDocument();
     expect(screen.getByText("örnek veri")).toBeInTheDocument();
     expect(screen.getByText(/son tarihinden sonra herkese açık FPL verisidir/)).toBeInTheDocument();
-    expect(screen.getAllByRole("row")).toHaveLength(12);
+    expect(screen.getAllByRole("row")).toHaveLength(11);
     expect(screen.getByRole("link", { name: "Deniz Aral" })).toHaveAttribute(
       "href",
       "/league/members/35249001",
     );
-    expect(screen.getByText("SquadOpt · sistem takımı")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "SquadOpt" })).toHaveAttribute(
-      "href",
-      "/league/members/squadopt",
-    );
+    expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
   });
 
   it("shows point-cost labels and no probability percentage on member advice", () => {

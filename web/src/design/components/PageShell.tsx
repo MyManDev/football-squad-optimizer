@@ -7,10 +7,7 @@ import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
 const NAV = [
-  { to: "/", key: "squad", end: true },
-  { to: "/moves", key: "moves", end: false },
-  { to: "/rivals", key: "rivals", end: false },
-  { to: "/league", key: "league", end: false },
+  { to: "/league/members", key: "league", end: false },
   { to: "/analysis", key: "analysis", end: false },
 ] as const;
 

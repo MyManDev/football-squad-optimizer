@@ -5,6 +5,7 @@ import { installLeagueMocks } from "./leagueMocks";
 
 const ROUTES = [
   "/",
+  "/gw/2026-27/1",
   "/moves",
   "/rivals",
   "/league",
@@ -75,10 +76,10 @@ test("skip link and primary navigation expose visible keyboard focus", async ({ 
   await expect(skip).toHaveCSS("outline-style", "solid");
 
   await page.keyboard.press("Tab");
-  const squad = page.getByRole("link", { name: "Kadro", exact: true });
-  await expect(squad).toBeFocused();
-  await expect(squad).toHaveCSS("outline-style", "solid");
+  const league = page.getByRole("link", { name: "Lig", exact: true });
+  await expect(league).toBeFocused();
+  await expect(league).toHaveCSS("outline-style", "solid");
 
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Önerilen Hamleler" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Analiz", exact: true })).toBeFocused();
 });
