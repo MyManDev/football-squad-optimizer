@@ -384,6 +384,11 @@ def main() -> int:
         for member in report.members:
             if not member.rendered:
                 print(f"  not rendered  {member.entry_id}  {member.reason}")
+        # A member this run did not render must not keep the last publish's document: the
+        # tree is checked out of origin/develop and committed as a union, so leaving it
+        # would serve a finished gameweek's advice under this week's league.
+        for path in report.removed:
+            print(f"  removed       {path}  (not produced by this run)")
         menu_files = sum(1 for name in report.files if "/vs-" in name)
         window_files = sum(1 for name in report.files if name.endswith(("/3.json", "/5.json")))
         print(

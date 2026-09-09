@@ -38,6 +38,7 @@ from typing import Final
 import pandas as pd
 from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT
 
+from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
@@ -510,18 +511,28 @@ def main() -> int:
         )
         return 1
 
-    _, written, report = build(
-        arguments.snapshot_root,
-        arguments.archive_root,
-        arguments.handoff_root,
-        snapshot_id=arguments.snapshot_id,
-        gameweek=arguments.gameweek,
-        evidence_table_path=arguments.evidence_table,
-        evidence_manifest_path=arguments.evidence_manifest,
-        control_only=arguments.control_only,
-        development_only=arguments.development_only,
-        dry_run=arguments.dry_run,
-    )
+    try:
+        _, written, report = build(
+            arguments.snapshot_root,
+            arguments.archive_root,
+            arguments.handoff_root,
+            snapshot_id=arguments.snapshot_id,
+            gameweek=arguments.gameweek,
+            evidence_table_path=arguments.evidence_table,
+            evidence_manifest_path=arguments.evidence_manifest,
+            control_only=arguments.control_only,
+            development_only=arguments.development_only,
+            dry_run=arguments.dry_run,
+        )
+    except DataError as error:
+        # The rest of the weekly loop states its refusals in one line and returns a code:
+        # "Evidence export refused: …", "build_league_site failed: …", "run_week stopped: …".
+        # The timing rule this script is built around — evidence, or the artifact carrying
+        # it, newer than the decision capture — reached the operator as a stack trace, and
+        # through ``run_week`` as a stack trace followed by a generic "failed (1)" that named
+        # no cause. Nothing has been written when this fires; only the reading was expensive.
+        print(f"Handoff refused: {error}")
+        return 1
 
     print(f"Capture   {report['snapshot_id']}  ({report['captured_at_utc']})")
     print(f"Target    {report['season']} gameweek {report['gameweek']}")

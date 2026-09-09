@@ -1282,3 +1282,119 @@ def test_an_unknown_rival_strategy_is_refused(world: dict[str, Any], tmp_path: P
             out_dir=tmp_path / "bad",
             rival_strategies=("kaptan-ayris",),
         )
+
+
+# --- a publish is this week's whole picture, not an overlay on last week's --------------
+
+
+def test_a_member_who_fails_to_render_does_not_keep_last_weeks_documents(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The live surface defect: last week's advice served as this week's.
+
+    ``publish_gameweek_site`` builds into a worktree checked out of ``origin/develop``, which
+    carries the previous publish's tree, and commits ``git add web/public/data`` — the union.
+    Nothing here removed anything, so a member whose picks could not be read kept last
+    week's ``entries/{id}.json`` and ``advice/{id}/**`` while ``members.json`` was rewritten
+    to this gameweek. Their row still linked, and the page rendered a finished gameweek's
+    transfer recommendation under the current week's league.
+
+    The publish is not refused over it: one member's data gap must not withhold the other
+    members' advice, which is this module's stated rule. The absence is made honest instead —
+    the row already says ``data_quality`` "empty", and now the document is genuinely not
+    there rather than stale.
+    """
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    out = tmp_path / "league"
+    registrations = (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),)
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, squad)}),
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=out,
+    )
+    assert (out / "entries" / "101.json").is_file()
+    assert (out / "advice" / "101" / "saf-puan" / "1.json").is_file()
+
+    # The next week's publish, into the tree the last one left, with this member's picks
+    # no longer readable from the capture.
+    report = build_league_views(
+        _Provider({}),
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=out,
+    )
+
+    assert report.rendered_count == 0
+    assert not (out / "entries" / "101.json").exists(), "last week's squad is still served"
+    assert not (out / "advice" / "101").exists(), "last week's advice is still served"
+    assert report.removed == ("entries/101.json", "advice/101/")
+    # The members list is still published, and still names the member as empty rather than
+    # dropping them: absent advice is not an absent member.
+    members = json.loads((out / "members.json").read_text(encoding="utf-8"))["payload"]["members"]
+    assert [row["entry_id"] for row in members] == [101]
+    assert members[0]["data_quality"] == "empty"
+
+
+def test_a_rendered_member_keeps_every_document_the_run_wrote(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The pruning may only reach documents this run did not produce."""
+
+    inputs, projection, rules = _world_context(world)
+    out = tmp_path / "league"
+    picks = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    registrations = (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),)
+    for _ in range(2):
+        report = build_league_views(
+            picks,
+            registrations,
+            inputs,
+            projection,
+            rules,
+            league_id=352490,
+            league_name="Test League",
+            out_dir=out,
+        )
+
+    assert report.removed == ()
+    assert (out / "entries" / "101.json").is_file()
+    assert (out / "advice" / "101" / "saf-puan" / "1.json").is_file()
+
+
+def test_files_the_rule_does_not_understand_are_left_alone(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """``scoreboard.json`` is written into this same directory by a different script, after
+    this one runs. A rule that deletes what it did not anticipate is a worse failure than
+    the one it fixes, so only entry-shaped names are touched."""
+
+    inputs, projection, rules = _world_context(world)
+    out = tmp_path / "league"
+    (out / "entries").mkdir(parents=True)
+    (out / "scoreboard.json").write_text("{}", encoding="utf-8")
+    (out / "entries" / "README.json").write_text("{}", encoding="utf-8")
+
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, _legal_squad(world))}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=out,
+    )
+
+    assert (out / "scoreboard.json").is_file()
+    assert (out / "entries" / "README.json").is_file()
