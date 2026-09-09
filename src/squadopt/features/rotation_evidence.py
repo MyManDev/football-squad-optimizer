@@ -35,6 +35,7 @@ observation of nothing.
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from types import MappingProxyType
 from typing import Final
 
 import pandas as pd
@@ -211,9 +212,11 @@ if _MISSING_DTYPES:
 class ModelProvenance:
     """Which model said it, from which prompt, and which response the rows came from.
 
-    One response here, because the stub produces one. In production a model is called once
-    per club, so this becomes one of these per club; the manifest already spells its response
-    digests as a list so that change does not move the manifest's shape.
+    **One of these per club**, collected in :class:`ClubModelProvenance`. That was written
+    here as a prediction before the model call existed -- "in production a model is called
+    once per club, so this becomes one of these per club" -- and it is now what the table
+    takes: a row's ``model_response_sha256`` is the digest of *that player's club's*
+    response, not of whichever response happened to be the only one.
     """
 
     identifier: str
@@ -228,6 +231,95 @@ class ModelProvenance:
                     f"Model provenance {name} must be non-empty; without it a claim cannot "
                     "be replayed."
                 )
+
+
+@dataclass(frozen=True, slots=True)
+class ClubModelProvenance:
+    """One :class:`ModelProvenance` per club, and the week held to a single instrument.
+
+    A model is called once per club, so a week has as many responses as clubs it read. The
+    table needs to say which of them a given row came from: two players from different clubs
+    have their dispositions from two different responses, and a single digest written across
+    every row would make one of those claims point at bytes it was never coded from.
+
+    **The identity is checked for agreement rather than recorded per club.** The manifest
+    carries one ``model_identifier``, one ``model_version`` and one ``prompt_sha256``, so a
+    week answered by two different models -- or asked two different questions -- is a mixture
+    the manifest cannot express. That is refused here rather than averaged, for the same
+    reason the coding call declares no fallback model: a week whose claims came from
+    somewhere other than the model the manifest names is not a week anyone can check.
+
+    The mapping is copied on construction. A caller that kept a reference to its own dict and
+    edited it afterwards would be editing a manifest that has already been written.
+    """
+
+    by_club: Mapping[str, ModelProvenance]
+
+    def __post_init__(self) -> None:
+        if not self.by_club:
+            raise InvalidValueError(
+                "Model provenance must name at least one club; a week in which no club was "
+                "coded carries no provenance rather than an empty one."
+            )
+        for club, provenance in self.by_club.items():
+            if not club.strip():
+                raise InvalidValueError(
+                    f"A club must be named; {club!r} keys provenance {provenance.identifier!r}."
+                )
+        for field_name in ("identifier", "version", "prompt_sha256"):
+            values = {getattr(entry, field_name) for entry in self.by_club.values()}
+            if len(values) > 1:
+                raise InvalidValueError(
+                    f"The clubs disagree about {field_name}: {sorted(values)!r}. The manifest "
+                    "states one of each, so a week coded by more than one model, or under "
+                    "more than one prompt, is refused rather than recorded as if it were one."
+                )
+        object.__setattr__(self, "by_club", MappingProxyType(dict(self.by_club)))
+
+    @property
+    def identifier(self) -> str:
+        """The model every club was coded by."""
+
+        return next(iter(self.by_club.values())).identifier
+
+    @property
+    def version(self) -> str:
+        """The model version that answered every club."""
+
+        return next(iter(self.by_club.values())).version
+
+    @property
+    def prompt_sha256(self) -> str:
+        """The one question, digested. The instrument, not the sample."""
+
+        return next(iter(self.by_club.values())).prompt_sha256
+
+    @property
+    def response_sha256s(self) -> tuple[str, ...]:
+        """Every response digest the week holds, sorted and without repeats.
+
+        Deduplicated because one response can legitimately cover several clubs -- the fixture
+        provider answers once for all of them -- and a manifest listing the same digest twice
+        would imply two calls where there was one.
+        """
+
+        return tuple(sorted({entry.response_sha256 for entry in self.by_club.values()}))
+
+    def response_sha256_for(self, club: str) -> str:
+        """The digest of the response that coded ``club``, or refuse.
+
+        Refusing is the point. A claim attributed to a club nobody called is a claim with no
+        bytes behind it, and writing some other club's digest beside it would give it a
+        citation to a response that never mentioned him.
+        """
+
+        provenance = self.by_club.get(club)
+        if provenance is None:
+            raise DataSourceError(
+                f"No model response is recorded for {club!r}, yet a claim was placed on one "
+                f"of its players. The week coded {sorted(self.by_club)!r}."
+            )
+        return provenance.response_sha256
 
 
 def _news_state(news: object, news_added: object) -> str:
@@ -413,6 +505,35 @@ def _require_documents_precede_the_capture(
         )
 
 
+def _require_provenance_covers_claimed_clubs(
+    model: ClubModelProvenance, roster: pd.DataFrame, placed: Mapping[int, _ClaimRow]
+) -> None:
+    """Name every club that has a claim but no response, at once.
+
+    Before the rows rather than inside them, in the house style of the configuration reader:
+    a caller that wired the provenance up wrongly wants the whole list, not the first club
+    the loop happens to reach.
+    """
+
+    club_by_player = {
+        int(player_id): str(team_name)
+        for player_id, _web_name, team_name in roster.itertuples(index=False, name=None)
+    }
+    missing = sorted(
+        {
+            club_by_player[identifier]
+            for identifier in placed
+            if identifier in club_by_player and club_by_player[identifier] not in model.by_club
+        }
+    )
+    if missing:
+        raise DataSourceError(
+            f"Claims were placed on players of {missing!r}, but no model response is recorded "
+            f"for those clubs; the week coded {sorted(model.by_club)!r}. A disposition whose "
+            "response cannot be named is not traceable to any bytes."
+        )
+
+
 def build_rotation_evidence_table(
     *,
     season: str,
@@ -423,7 +544,7 @@ def build_rotation_evidence_table(
     documents: Sequence[RawDocument],
     clubs_declared: Sequence[str],
     clubs_covered: Sequence[str],
-    model: ModelProvenance | None,
+    model: ClubModelProvenance | None,
     club_news_snapshot_id: str | None = None,
 ) -> pd.DataFrame:
     """Build one week's rotation evidence: one row per roster player, always.
@@ -493,6 +614,8 @@ def build_rotation_evidence_table(
     )
     code_by_name = _team_code_by_name(bootstrap)
     placed, unresolved = _resolved_claims(claims, roster)
+    if model is not None:
+        _require_provenance_covers_claimed_clubs(model, roster, placed)
 
     captured_at_utc = decision_snapshot.metadata.captured_at_utc
     decision_id = decision_snapshot.metadata.snapshot_id
@@ -568,8 +691,11 @@ def build_rotation_evidence_table(
                 "rotation_claim_speaker": pd.NA if claim is None else claim.speaker,
                 "model_identifier": pd.NA if model is None else model.identifier,
                 "prompt_sha256": pd.NA if model is None else model.prompt_sha256,
+                # This player's club's response, not the week's only one. Two players from
+                # two clubs were coded by two calls, and a single digest across every row
+                # would give one of them a citation to bytes he never appeared in.
                 "model_response_sha256": (
-                    pd.NA if model is None or claim is None else model.response_sha256
+                    pd.NA if model is None or claim is None else model.response_sha256_for(club)
                 ),
                 # Computed from the model's own coverage rather than aliased to the column
                 # above. Today the model is the only claim source, so the two agree on every
@@ -606,7 +732,7 @@ def build_rotation_evidence_table(
             "model_identifier": None if model is None else model.identifier,
             "model_version": None if model is None else model.version,
             "prompt_sha256": None if model is None else model.prompt_sha256,
-            "response_sha256s": () if model is None else (model.response_sha256,),
+            "response_sha256s": () if model is None else model.response_sha256s,
             "deadline_timestamp_utc": deadline_timestamp_utc,
         }
     )
@@ -651,6 +777,7 @@ __all__ = [
     "MIDWEEK_WINDOW_DAYS",
     "MIN_TARGET_GAMEWEEK",
     "ROTATION_EVIDENCE_COLUMNS",
+    "ClubModelProvenance",
     "ModelProvenance",
     "build_rotation_evidence_table",
 ]
