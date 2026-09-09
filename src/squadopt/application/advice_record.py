@@ -22,11 +22,12 @@ emitted. Three properties make it usable as evidence rather than as a note:
   advice was computed from, so "ignored our advice" and "could not afford it" stay
   different answers; and the provenance that says which model, which planner policy and
   which commit produced it. Nothing has to be re-solved, and nothing may be inferred.
-- **It refuses to change.** A second build *of the same capture* either writes exactly the
-  same document — a no-op — or is refused with the difference named. It is never mutated
-  silently, because a record that can be rewritten proves nothing about what was published.
-  That refusal is also the divergence detector: the same capture must solve to the same
-  bytes, and when it did not, this is what surfaced it.
+- **It refuses to change.** A second build *of the same capture* either says exactly what
+  the first said — a no-op, including when only the publication clock has moved — or is
+  refused with the difference named. It is never mutated silently, because a record that
+  can be rewritten proves nothing about what was published. That refusal is also the
+  divergence detector: the same capture must solve to the same advice, and when it did
+  not, this is what surfaced it.
 
 A gameweek is normally published more than once — a mid-week publish so members see
 something, then another shortly before the deadline with fresh availability — and each of
@@ -350,7 +351,8 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
     exact bytes at that address, envelope and generation timestamp included, so the record
     can prove which file it describes. ``advice_sha256`` is of the payload alone,
     canonically encoded, so a second publish that changed only *when* it ran can be told
-    apart from one that changed *what it said*.
+    apart from one that changed *what it said* — the distinction
+    :func:`record_member_advice` makes to tell a replay from a disagreement.
     """
 
     payload = advice.payload
@@ -443,6 +445,9 @@ def build_member_advice_record(
     ``generated_at_utc`` is the timestamp the published envelopes carry, not the moment
     this runs: the record describes a publication, and stamping it with its own clock
     would make every re-publish differ for a reason that has nothing to do with the advice.
+    The envelopes' own clock still moves — nothing in the site's build fixes it — so a
+    re-publish of one capture moves this field and every ``published_sha256`` computed
+    over bytes carrying it; :func:`record_member_advice` is where that is read as a replay.
 
     ``told`` names the document the member's page points at, so a later page can tell what
     we told them from what we merely also computed.
@@ -563,8 +568,8 @@ def _differences(recorded: object, incoming: object, *, path: str = "") -> list[
     """Every field where the recorded document and the incoming one disagree.
 
     A refusal that only says "these differ" sends a reader back to diffing two files by
-    hand at the worst possible moment. This names the fields, so the operator can see at a
-    glance whether a re-publish changed the advice or only the minute it ran at.
+    hand at the worst possible moment. This names the fields instead, so the operator can
+    see at a glance what a re-publish changed about the advice.
     """
 
     where = path or "<record>"
@@ -594,15 +599,77 @@ def _differences(recorded: object, incoming: object, *, path: str = "") -> list[
     return []
 
 
+#: What a clock-derived field is blanked to before two records are compared. A constant
+#: rather than ``None`` so that a field *missing* on one side stays missing, and is still
+#: reported as a difference instead of matching a blanked one.
+_REPLAYED: Final = "<moved by the publication clock>"
+
+
+def _without_publication_clock(record: Mapping[str, object]) -> dict[str, object]:
+    """The record with the fields a re-publish moves for no reason blanked out.
+
+    Two of them, and only two. ``generated_at_utc`` is the clock the published envelopes
+    carry, and every ``published_sha256`` is a digest of bytes that carry it, so all of
+    them move when one capture is published again and not a word of the advice changes.
+
+    Every other field is left alone and compared — ``advice_sha256`` above all, the digest
+    of the payload alone, which is precisely the field that says whether what the member
+    was told changed. Blanking two named fields rather than comparing a list of allowed
+    ones means a field added to the record later is compared by default: a new way for two
+    builds to disagree is refused until someone decides otherwise, not forgiven by silence.
+    """
+
+    stripped = dict(record)
+    if "generated_at_utc" in stripped:
+        stripped["generated_at_utc"] = _REPLAYED
+    advice = stripped.get("advice")
+    if isinstance(advice, list):
+        stripped["advice"] = [_document_without_publication_clock(item) for item in advice]
+    return stripped
+
+
+def _document_without_publication_clock(document: object) -> object:
+    if not isinstance(document, Mapping) or "published_sha256" not in document:
+        return document
+    return {**document, "published_sha256": _REPLAYED}
+
+
+def _is_replay(recorded: Mapping[str, object], incoming: Mapping[str, object]) -> bool:
+    """Whether the incoming record says exactly what the recorded one says.
+
+    The same comparison the refusal message is built from, run over both records with the
+    publication clock blanked, so the predicate and the message can never drift apart: if
+    nothing else differs, one capture was published twice and said the same thing both
+    times, which is a replay rather than a disagreement.
+    """
+
+    return not _differences(
+        _without_publication_clock(recorded), _without_publication_clock(incoming)
+    )
+
+
 def _conflict(directory: Path, recorded: Mapping[str, object], record: Mapping[str, object]) -> str:
-    differences = _differences(recorded, record)
+    """The refusal, naming what disagreed — which is never the publication clock.
+
+    The clock is blanked on both sides before the comparison, exactly as :func:`_is_replay`
+    blanks it. A refusal getting this far means something other than the clock moved, so
+    listing the clock would be worse than useless: it always moves on a re-publish, it is
+    never the reason, and at four fields on a three-document member it displaces the fields
+    that *are* the reason out of a message that only names the first ``_DIFFERENCE_LIMIT``.
+    """
+
+    differences = _differences(
+        _without_publication_clock(recorded), _without_publication_clock(record)
+    )
     shown = differences[:_DIFFERENCE_LIMIT]
     more = len(differences) - len(shown)
     lines = [
         f"An advice record already exists at {directory} and this build of the same capture "
-        "differs from it. Recorded advice is immutable: it is the only evidence of what the "
-        "member was told, so it is refused rather than rewritten. The capture is the whole "
-        "input, so a difference here is a difference our own code produced.",
+        "advises something different. Recorded advice is immutable: it is the only evidence "
+        "of what the member was told, so it is refused rather than rewritten. The capture is "
+        "the whole input, so a difference here is a difference our own code produced. The "
+        "publication's own clock is not listed; a re-publish that moved only that is a replay "
+        "and would not have been refused.",
     ]
     lines += [f"  {difference}" for difference in shown]
     if more > 0:
@@ -749,14 +816,30 @@ def _deadline_instant(deadline_utc: str) -> datetime:
 
 
 def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
-    """Freeze one member's publish. Identical bytes are a no-op; different bytes are refused.
+    """Freeze one member's publish. The same advice is a no-op; different advice is refused.
 
     Both cases are real, and both are about *one capture*. The same capture has been built
-    twice, so a rebuild that reproduces the same document must not fail the run — there is
-    nothing to disagree about. A rebuild of that same capture that produces *different*
-    bytes is the case that matters: the capture is the whole input, so the same capture
-    solving to different advice is a non-determinism in our own code, and it has been. So
-    it is refused, with the difference named.
+    twice, so a rebuild that reproduces the same advice must not fail the run — there is
+    nothing to disagree about.
+
+    The same advice is not the same bytes, and the difference is the whole of this. The
+    published envelopes are stamped with the moment the publish ran, and nothing in the
+    site's build fixes that clock, so re-publishing one capture — which
+    ``scripts.publish_gameweek_site`` does whenever it is re-run for a snapshot id — moves
+    ``generated_at_utc`` and every ``published_sha256`` taken over bytes carrying it, while
+    every payload stays byte-identical. That is a replay, and the first record stands.
+
+    What a replay costs is worth stating rather than burying. The kept record's
+    ``published_sha256`` names the bytes of the *first* publish, and the file now at that
+    address carries the later stamp, so that digest no longer matches what is on disk.
+    ``advice_sha256`` still does, and it is the digest that answers what the member was
+    told. The alternative is rewriting a record so it carries a newer clock, and a record
+    that can be rewritten proves nothing about what was published.
+
+    A rebuild of that same capture that produces *different advice* is the case that
+    matters: the capture is the whole input, so the same capture solving to different
+    advice is a non-determinism in our own code, and it has been. So it is refused, with
+    the difference named — and a clock that moved alongside it does not soften that.
 
     A *different* capture is not that. It is the next publish of the week — the mid-week
     build and the one taken shortly before the deadline are both real advice — and it lands
@@ -777,6 +860,11 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
         if existing == payload:
             return directory
         recorded = json.loads(existing.decode("utf-8"))
+        if _is_replay(recorded, record):
+            # The same advice, published again from the same capture at a later minute.
+            # The first record stands: keeping it is what create-once means, and rewriting
+            # it to carry the newer clock is the mutation this module exists to prevent.
+            return directory
         raise AdviceRecordConflictError(_conflict(directory, recorded, record))
 
     if directory.exists():

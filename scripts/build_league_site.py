@@ -384,6 +384,12 @@ def main() -> int:
         for member in report.members:
             if not member.rendered:
                 print(f"  not rendered  {member.entry_id}  {member.reason}")
+            elif member.reason:
+                # A rendered member can still carry a note — competitive modes that did
+                # not price, or a name the publisher had to normalise, truncate or refuse.
+                # Printing it is the only place an operator learns that a published name
+                # is not byte-for-byte what the capture held.
+                print(f"  note          {member.entry_id}  {member.reason}")
         menu_files = sum(1 for name in report.files if "/vs-" in name)
         window_files = sum(1 for name in report.files if name.endswith(("/3.json", "/5.json")))
         print(
@@ -397,9 +403,11 @@ def main() -> int:
         # against a deadline — and every improvisation here loses evidence.
         print(
             f"build_league_site refused:\n  {error}\n"
-            "  This is one capture rebuilt into different bytes, not a second publish: a "
-            "publish from a fresh capture writes its own record and is never refused. So "
-            "the difference above came from our own code, and it is worth a minute before "
+            "  This is one capture rebuilt into different advice, not a second publish and "
+            "not a re-run at a later minute: a publish from a fresh capture writes its own "
+            "record, and a re-publish of this one that says the same thing is a replay. "
+            "Both are accepted. So the difference above came from our own code, and it is "
+            "worth a minute before "
             "the deadline. If the deadline will not wait, re-run with --no-advice-record "
             "(scripts.publish_gameweek_site takes the same flag and passes it through): the "
             "recorded capture is kept as it stands and the difference above is what to "

@@ -104,6 +104,26 @@ _SAFETY_LANGUAGE: Final = re.compile(r"g[üu]venli|riskli?|safe|daha az riskli",
 #: the overlap fields, which are set arithmetic and publishable.
 FORBIDDEN_FIELD_PATTERN: Final = re.compile(r"probab|olas.l.k|quantile|spread|\bp_")
 
+#: The same rule applied to *text* rather than to field names, in both languages the
+#: site publishes. A field name is ours; a string may not be — a team name or a manager
+#: name is typed by a member and travels into ``members.json``, ``entries/{id}.json``
+#: and the page's own heading. The envelope is a property of what we publish, not of who
+#: wrote it, so this is what the producer refuses a name for and what the published
+#: sweep applies to every string in the tree.
+#:
+#: This is the web guard's ``AS_A_CHANCE`` set (``MemberDecisionControls.test.tsx``)
+#: with the repository's own ``P(`` and ``quantile`` beside it. The English words carry
+#: word boundaries because ``odds`` and ``chance`` are substrings of real surnames; the
+#: Turkish stems do not need them. The stem written ``olas\u0131l`` here — with the
+#: dotless i, which is why it is escaped — covers both the noun and the inflected form
+#: the narrower ``olas.l.k`` missed, and a Latin-alphabet name that merely contains
+#: "olas" cannot match it.
+FORBIDDEN_TEXT_PATTERN: Final = re.compile(
+    r"%|\bP\(|probabilit|quantile|\bchances?\b|\blikelihood\b|\bodds\b"
+    "|\\bihtimal|\\b\u015fans|\\by\u00fczde|olas\u0131l",
+    re.IGNORECASE,
+)
+
 
 class RankingCriterion(StrEnum):
     """The closed list of things a strategy may rank its candidates by.
@@ -312,7 +332,17 @@ def _catalog() -> Mapping[str, Strategy]:
             # windows publish the per-week plan and the window's stated limits.
             publishes=_BASELINE_PUBLISHES | frozenset({"plan_weeks", "stated_limits"}),
             evidence=EvidenceStatus.PREREG_OPEN,
-            tagline="Unconstrained: the highest expected points.",
+            # Not "the highest expected points". The solve maximises the eleven, the
+            # captain and the bench together (``planning/optimizer.py``: ``projected_score
+            # + bench_weight * projected_bench - hits``, bench_weight 0.1), while
+            # ``expected_own_points`` — the number this publishes and the member reads —
+            # is the eleven and the captain only. The two have different maximisers, and
+            # on the 2026-27 GW4 capture they disagree: entry 3832237's plan scores 46.5454
+            # on the published figure with a 7.1846 bench, and its ortak-koru plan scores
+            # 46.7016 with a 4.3379 bench — the banded plan reads higher on the figure and
+            # lower on the objective. Nothing enforces a maximum over the published figure,
+            # so nothing may claim one.
+            tagline="Unconstrained: chosen on the eleven, the captain and the bench together.",
         ),
         Strategy(
             slug="ortak-koru",
