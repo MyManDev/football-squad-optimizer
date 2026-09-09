@@ -20,7 +20,18 @@ from squadopt.experiments.config import ExperimentExecutionError
 
 PHASE_C_ABLATION_CONTRACT_VERSION: Final = "phase_c_evidence_ablation_v1"
 COMPONENT_BASE_ARM: Final = "component_base"
-PHASE_C_EVIDENCE_FAMILIES: Final = ("none", "availability", "ownership_transfer", "elite")
+# A fifth family, `rotation`, joins the four Phase C measured separately. Adding the name is
+# all it needs: `_pair_exactly` below already refuses an arm that changes a paired key, a
+# target or the eligibility mask, and already requires the candidate to reproduce
+# `component_base` exactly on rows whose evidence status is `missing`. Its protocol is
+# `docs/rotation_evidence_prereg.md`.
+PHASE_C_EVIDENCE_FAMILIES: Final = (
+    "none",
+    "availability",
+    "ownership_transfer",
+    "elite",
+    "rotation",
+)
 _PAIR_COLUMNS: Final = (
     "contract_version",
     "dataset_contract_version",

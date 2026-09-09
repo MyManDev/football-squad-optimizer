@@ -216,6 +216,7 @@ def run_advice_worker(
             cache,
             compute,
             at_utc=_stamp(now()),
+            terminal_at_utc=lambda: _stamp(now()),
             heartbeat_seconds=heartbeat_seconds,
             metrics=metrics,
             log=log,
