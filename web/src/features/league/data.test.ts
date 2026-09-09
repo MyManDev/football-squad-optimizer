@@ -14,11 +14,15 @@ import {
   loadEntryAdvice,
   loadEntryAdviceIndex,
   loadScoreboard,
+  lookupPublishedLeague,
 } from "./data";
 
 const ENTRY = 35249001;
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 describe("league advice loaders", () => {
   it.each([1, 3, 5] as const)("loads the pure-points document for window %i", async (window) => {
@@ -90,5 +94,76 @@ describe("loadScoreboard", () => {
     // missing state is what tests and the development server both see.
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 404 })));
     await expect(loadScoreboard()).rejects.toThrow("No published league document");
+  });
+});
+
+const publishedMembers = {
+  contract_version: "provisional_league_ui_v1",
+  generated_at_utc: "2026-09-09T06:00:00Z",
+  source_kind: "live",
+  payload: {
+    league_id: 352490,
+    league_name: "Published league",
+    season: "2026-27",
+    gameweek: 4,
+    public_after_deadline: true,
+    scored_gameweek: 3,
+    members: [],
+  },
+};
+
+describe("published league lookup", () => {
+  it("uses the fixed publication URL and treats an empty connected league as connected", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(publishedMembers)));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(lookupPublishedLeague(352490)).resolves.toBe("connected");
+    expect(fetcher).toHaveBeenCalledWith("/data/league/members.json", { cache: "no-cache" });
+  });
+
+  it("rejects any other ID without requesting a document or upstream API", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    await expect(lookupPublishedLeague(123)).resolves.toBe("unsupported");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each(["test", "development"])("never falls back to an example in %s", async (mode) => {
+    vi.stubEnv("MODE", mode);
+    vi.stubEnv("DEV", true);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 404 })));
+    await expect(lookupPublishedLeague(352490)).rejects.toBeInstanceOf(LeagueDataMissing);
+  });
+
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    "refuses invalid ID %s without a fetch",
+    async (id) => {
+      const fetcher = vi.fn();
+      vi.stubGlobal("fetch", fetcher);
+      await expect(lookupPublishedLeague(id)).rejects.toBeInstanceOf(LeagueDataError);
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { ...publishedMembers, source_kind: "example" },
+    { ...publishedMembers, contract_version: "other" },
+    { ...publishedMembers, payload: null },
+    { ...publishedMembers, payload: { ...publishedMembers.payload, public_after_deadline: false } },
+    { ...publishedMembers, payload: { ...publishedMembers.payload, league_id: "352490" } },
+    { ...publishedMembers, payload: { ...publishedMembers.payload, league_id: 123 } },
+    { ...publishedMembers, payload: { ...publishedMembers.payload, members: [null] } },
+  ])(
+    "does not classify an incompatible or invalid publication as a league result",
+    async (value) => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(value))));
+      await expect(lookupPublishedLeague(352490)).rejects.toBeInstanceOf(LeagueDataError);
+    },
+  );
+
+  it("keeps transport failure distinct from missing publication", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 503 })));
+    const request = lookupPublishedLeague(352490);
+    await expect(request).rejects.toBeInstanceOf(LeagueDataError);
+    await expect(request).rejects.not.toBeInstanceOf(LeagueDataMissing);
   });
 });

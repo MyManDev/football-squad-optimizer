@@ -147,3 +147,41 @@ export async function loadEntryAdviceIndex(
 export async function loadScoreboard(): Promise<LeagueViewEnvelope<Scoreboard>> {
   return read<Scoreboard>("scoreboard.json");
 }
+
+export const SUPPORTED_LEAGUE_ID = 352490;
+
+/** Lookup uses only the allowed publication, including in development and tests. */
+export async function lookupPublishedLeague(
+  leagueId: number,
+): Promise<"connected" | "unsupported"> {
+  if (!Number.isSafeInteger(leagueId) || leagueId <= 0) {
+    throw new LeagueDataError("A positive league ID is required.");
+  }
+  if (leagueId !== SUPPORTED_LEAGUE_ID) return "unsupported";
+  const envelope = await read<LeagueMembers>("members.json");
+  const payload = envelope.payload;
+  if (
+    envelope.source_kind !== "live" ||
+    !payload ||
+    payload.league_id !== SUPPORTED_LEAGUE_ID ||
+    typeof payload.league_name !== "string" ||
+    !payload.league_name.trim() ||
+    typeof payload.season !== "string" ||
+    !payload.season.trim() ||
+    !Number.isSafeInteger(payload.gameweek) ||
+    payload.gameweek <= 0 ||
+    payload.public_after_deadline !== true ||
+    !Array.isArray(payload.members) ||
+    !payload.members.every(
+      (member) =>
+        member &&
+        ((member.member_kind === "human" &&
+          Number.isSafeInteger(member.entry_id) &&
+          member.entry_id > 0) ||
+          (member.member_kind === "system" && member.entry_id === null)),
+    )
+  ) {
+    throw new LeagueDataError("The published public league record is invalid.");
+  }
+  return "connected";
+}
