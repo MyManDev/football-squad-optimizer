@@ -6,7 +6,10 @@ without a decision, settling twice, and realized points read from a capture that
 not actually finished the gameweek.
 """
 
+import errno
 import json
+import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -334,6 +337,122 @@ def test_completing_a_lost_manifest_refuses_an_entry_that_drifted_meanwhile(
         record_outcome(root, SEASON, 1, points, source_snapshot_id=recommendation.snapshot_id)
     still = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
     assert still["files"]["decision.json"] == recorded
+
+
+def _refuse_rename(
+    monkeypatch: pytest.MonkeyPatch, *, when: Callable[[Path], bool], times: int
+) -> list[float]:
+    """Refuse the matching rename ``times`` times; return the pauses the retry asks for.
+
+    The Windows handle race cannot be provoked on demand, so the ``PermissionError`` it
+    produces is injected instead — at the one rename under test, with every other rename
+    left to the real call. The pauses are recorded rather than slept, so proving the
+    retry costs the suite no wall-clock time.
+    """
+
+    from squadopt.live import ledger as ledger_module
+
+    real_replace = os.replace
+    refused = 0
+    pauses: list[float] = []
+
+    def flaky(source: Any, destination: Any) -> None:
+        nonlocal refused
+        if when(Path(source)) and refused < times:
+            refused += 1
+            raise PermissionError(errno.EACCES, "Access is denied")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(ledger_module.os, "replace", flaky)
+    monkeypatch.setattr(ledger_module.time, "sleep", pauses.append)
+    return pauses
+
+
+def test_a_landing_rename_the_system_refuses_is_retried_until_it_lands(
+    decision_world: tuple[Recommendation, Projection, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A refusal here is a held handle, not a refusal to overwrite, so it is waited out.
+
+    The entry is complete and verified, and the existence check under the lock has just
+    proved the target absent, so the only thing left to refuse the rename is the system
+    still holding bytes written a moment ago. Failing the run for that loses the entry.
+    """
+
+    from squadopt.live import ledger as ledger_module
+
+    recommendation, projection, root = decision_world
+    within_budget = ledger_module.RENAME_RETRY_ATTEMPTS - 1
+    pauses = _refuse_rename(monkeypatch, when=lambda source: source.is_dir(), times=within_budget)
+
+    directory = record_decision(root, recommendation, projection, report_text="report")
+
+    assert len(pauses) == within_budget
+    assert directory.is_dir()
+    assert load_entry(root, SEASON, 1).decision["gameweek"] == 1
+
+
+def test_a_landing_rename_refused_past_the_budget_says_it_retried_and_for_how_long(
+    decision_world: tuple[Recommendation, Projection, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from squadopt.live import ledger as ledger_module
+
+    recommendation, projection, root = decision_world
+    attempts = ledger_module.RENAME_RETRY_ATTEMPTS
+    pauses = _refuse_rename(monkeypatch, when=lambda source: source.is_dir(), times=attempts)
+
+    with pytest.raises(LedgerError) as refusal:
+        record_decision(root, recommendation, projection, report_text="report")
+
+    assert f"refused on all {attempts} attempts" in str(refusal.value)
+    assert f"over {sum(pauses):.2f} s" in str(refusal.value)
+    assert len(pauses) == attempts - 1
+    # The refusal is raised, not swallowed, and nothing half-written is left behind.
+    assert not (root / SEASON / "gw01").exists()
+    assert [path.name for path in (root / SEASON).iterdir()] == []
+
+
+def test_the_file_rename_is_retried_the_same_way(
+    decision_world: tuple[Recommendation, Projection, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The manifest's rename never refuses an existing target, so it retries for one reason."""
+
+    from squadopt.live import ledger as ledger_module
+
+    recommendation, projection, root = decision_world
+    pauses = _refuse_rename(
+        monkeypatch, when=lambda source: "manifest.json" in source.name, times=2
+    )
+
+    directory = record_decision(root, recommendation, projection, report_text="report")
+
+    first = ledger_module.RENAME_RETRY_INITIAL_SECONDS
+    assert pauses == [first, first * 2]
+    assert load_entry(root, SEASON, 1).decision["gameweek"] == 1
+    assert (directory / "manifest.json").is_file()
+
+
+def test_a_rename_onto_a_directory_that_exists_is_refused_without_retrying(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows reports an occupied destination with the same error as a held handle.
+
+    Retrying that would answer a real refusal slowly instead of at once, so the retry
+    stops the moment the destination is there. Create-once is still the caller's
+    existence check under the lock; this only keeps the retry from blurring it.
+    """
+
+    from squadopt.live import ledger as ledger_module
+
+    source = tmp_path / "staging"
+    source.mkdir()
+    destination = tmp_path / "entry"
+    destination.mkdir()
+    pauses = _refuse_rename(monkeypatch, when=lambda _path: True, times=99)
+
+    with pytest.raises(PermissionError):
+        ledger_module._replace_retrying(source, destination)
+
+    assert pauses == []
 
 
 # --- settling outcomes ------------------------------------------------------
