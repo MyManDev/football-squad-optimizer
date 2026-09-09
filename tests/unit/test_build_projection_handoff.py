@@ -12,6 +12,7 @@ reads fields those tests do not need: the cumulative counters, and a kick-off ti
 which the capture's season phase cannot be established.
 """
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -200,6 +201,13 @@ def test_the_handoff_reads_back_through_the_consumers_own_reader(
     reread = read_projection_handoff(written)
     assert reread.fingerprint == projection.fingerprint
     assert reread.expected_points == projection.expected_points
+    retained = (
+        written.parent
+        / "by-capture"
+        / projection.source_snapshot_id
+        / f"{hashlib.sha256(written.read_bytes()).hexdigest()}.json"
+    )
+    assert retained.read_bytes() == written.read_bytes()
 
 
 def test_the_handoff_lands_on_the_path_the_tick_waits_at(world: dict[str, Any]) -> None:

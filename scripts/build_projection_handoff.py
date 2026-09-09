@@ -64,8 +64,8 @@ from squadopt.live import (
     handoff_path_for,
     infer_season,
     read_projection_handoff,
-    write_projection_handoff,
 )
+from squadopt.platform.projection_retention import publish_retained_handoff
 from squadopt.prediction.component_dataset import (
     COMPONENT_FEATURE_CONFIG,
     COMPONENT_HISTORY_WINDOW,
@@ -433,7 +433,7 @@ def build(
     path = handoff_path_for(handoff_root, season, target)
     written: Path | None = None
     if not dry_run:
-        written = write_projection_handoff(path, projection)
+        written = publish_retained_handoff(path, projection)
         # Read it back through the consumer's own reader. The fingerprint check makes this
         # a measurement of producer-consumer agreement rather than a claim about it.
         reread = read_projection_handoff(written)
