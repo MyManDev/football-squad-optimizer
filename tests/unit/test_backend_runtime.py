@@ -25,7 +25,6 @@ from squadopt.live.tick import handoff_path_for
 from squadopt.platform import backend_runtime
 from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.backend_runtime import (
-    SITE_ORIGINS,
     BackendConfig,
     BackendConfigError,
     CaptureContextProvider,
@@ -117,7 +116,7 @@ def _deployment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, An
         site_data_root=site_root,
         snapshot_root=snapshot_root,
         handoff_root=handoff_root,
-        allowed_origins=SITE_ORIGINS,
+        allowed_origins=("https://squadopt.pages.dev",),
     )
     return {
         "config": config,

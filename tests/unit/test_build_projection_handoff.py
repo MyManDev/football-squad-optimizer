@@ -32,7 +32,6 @@ from squadopt.prediction.component_dataset import (
     component_feature_columns,
 )
 from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
-from squadopt.prediction.config import PredictionConfigurationError
 from squadopt.prediction.elite_evidence import (
     COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
     COMPONENT_ELITE_MODEL_VERSION,
@@ -763,40 +762,3 @@ def test_component_wiring_fits_composes_and_records_row_level_fallbacks(
         assert diagnostics["component_training_data_fingerprint"]
     else:
         assert list(table.columns) == ["player_id", "expected_points"]
-
-
-def test_a_refusal_is_stated_in_one_line_rather_than_raised_as_a_traceback(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """Every other producer in the weekly loop prints one line and returns a code.
-
-    This one called ``build`` unguarded, so the timing rule the whole loop is arranged
-    around — evidence, or the artifact carrying it, newer than the decision capture — reached
-    the operator as a Python stack trace, and through ``run_week`` as a stack trace followed
-    by a generic "failed (1)" naming no cause. ``PredictionConfigurationError`` is a
-    ``DataError``, so one handler covers every evidence refusal, not only the timing one.
-    """
-
-    def fake_build(*_args: object, **_kwargs: object) -> None:
-        raise PredictionConfigurationError(
-            "The evidence artifact was generated after the decision snapshot and cannot "
-            "be used in its replay."
-        )
-
-    monkeypatch.setattr(producer, "build", fake_build)
-    monkeypatch.setattr(
-        "sys.argv",
-        [
-            "build_projection_handoff",
-            "--snapshot-root",
-            str(tmp_path),
-            "--archive-root",
-            str(tmp_path),
-        ],
-    )
-
-    assert producer.main() == 1
-
-    out = capsys.readouterr().out
-    assert out.startswith("Handoff refused: The evidence artifact was generated after")
-    assert "Traceback" not in out

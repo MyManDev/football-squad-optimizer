@@ -16,11 +16,8 @@ Writes are crash-safe. A decision is assembled in a hidden staging directory nex
 its final place, verified against its own manifest, and then moved into place with one
 rename, so a gameweek directory either exists complete or does not exist at all; a
 process that dies mid-write leaves only a staging directory that readers ignore and
-the next writer prunes. A rename the operating system refuses only because it still
-holds a handle on what was just written is retried briefly; a rename onto a destination
-that already exists is not, because that is a refusal rather than a delay. One writer
-per gameweek is enforced with an exclusive lock file, so two ticks cannot race the
-immutability check. An outcome is written the same
+the next writer prunes. One writer per gameweek is enforced with an exclusive lock
+file, so two ticks cannot race the immutability check. An outcome is written the same
 way (temporary file, rename), and a manifest that was not rewritten after the outcome
 landed is completed on the next call rather than refused — after the digests it already
 records are verified, because completing it is a rewrite and a rewrite over drifted bytes
@@ -35,7 +32,6 @@ import math
 import os
 import secrets
 import shutil
-import time
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -64,65 +60,19 @@ STALE_STAGING_SECONDS: Final = 3600.0
 """A staging directory older than this belongs to a writer that died; it is pruned."""
 STALE_LOCK_SECONDS: Final = 900.0
 """A lock older than this belongs to a writer that died; it is broken, once."""
-RENAME_RETRY_ATTEMPTS: Final = 5
-"""How many times a rename refused with ``PermissionError`` is attempted in all."""
-RENAME_RETRY_INITIAL_SECONDS: Final = 0.05
-"""The first pause before a retry; it doubles, so five attempts span 0.75 s of waiting."""
 
 
 def _digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _replace_retrying(source: Path, destination: Path) -> None:
-    """``os.replace``, retried for a moment while the operating system refuses it.
-
-    Windows refuses a rename with ``PermissionError`` while any process still holds a
-    handle on a path involved — a scanner or an indexer reading bytes that were written
-    a moment ago, which is likelier when the suite runs many workers at once. The same
-    rename then succeeds, so that error alone is retried, ``RENAME_RETRY_ATTEMPTS``
-    times with a doubling pause, and the last refusal is reported rather than swallowed.
-
-    One case that is not transient arrives as the very same error: Windows refuses a
-    rename onto a destination that already exists as a directory. Retrying that would
-    turn a real refusal into a slow one, so it is re-raised at once. That is a backstop
-    only — create-once is enforced by the existence check the caller makes under the
-    lock, and this function never decides whether a record may be written.
-    """
-
-    delay = RENAME_RETRY_INITIAL_SECONDS
-    waited = 0.0
-    for attempt in range(1, RENAME_RETRY_ATTEMPTS + 1):
-        try:
-            os.replace(source, destination)
-            return
-        except PermissionError as error:
-            if destination.is_dir():
-                raise
-            if attempt == RENAME_RETRY_ATTEMPTS:
-                raise LedgerError(
-                    f"Renaming {source} onto {destination} was refused on all "
-                    f"{RENAME_RETRY_ATTEMPTS} attempts over {waited:.2f} s; something "
-                    "still holds a handle on it."
-                ) from error
-        time.sleep(delay)
-        waited += delay
-        delay *= 2
-
-
 def _write_atomic(path: Path, data: bytes) -> None:
-    """Write bytes to ``path`` through a sibling temporary file and one rename.
-
-    The rename is retried on a refusal for the reason ``_replace_retrying`` gives: it
-    never refuses an existing ``path`` — a manifest is deliberately rewritten in place,
-    and an outcome's immutability is decided by the caller's check under the lock — so
-    a ``PermissionError`` here is a held handle and nothing else.
-    """
+    """Write bytes to ``path`` through a sibling temporary file and one rename."""
 
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
     try:
         temporary.write_bytes(data)
-        _replace_retrying(temporary, path)
+        os.replace(temporary, path)
     finally:
         with contextlib.suppress(FileNotFoundError):
             temporary.unlink()
@@ -343,10 +293,8 @@ def record_decision(
             (staging / _REPORT_FILE).write_text(report_text, encoding="utf-8")
             _write_manifest(staging)
             _verify_manifest(staging)
-            # One rename: the entry exists complete or not at all. The check above
-            # under the lock has already refused an existing entry, so a refusal here
-            # is the operating system still holding what was just written.
-            _replace_retrying(staging, directory)
+            # One rename: the entry exists complete or not at all.
+            os.replace(staging, directory)
         except BaseException:
             shutil.rmtree(staging, ignore_errors=True)
             raise
