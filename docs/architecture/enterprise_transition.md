@@ -18,7 +18,9 @@
 - [x] Ayrı işçi metrikleri ve depolama kilidi kontrolü (45 test); süreçler ayrı tutuldu.
 - [x] Yük testinde iki eşzamanlılık hatası doğrulandı ve düzeltildi; 70 odaklı test geçti.
 - [x] Kilit öncesi saat okuma hatası düzeltildi (88 test); son 18 yük senaryosu ve gerçek CPU/bellek ölçümü geçti.
-- [ ] **Şimdi:** Son Python testleri, Linux container/Compose ve güncel tarayıcı/backend kabulü.
+- [x] Güncel tarayıcı/backend ve Python–web sözleşmesi: 2 test geçti; Linux container/Compose: 4 test geçti.
+- [x] Tam Python koşusunu incele: 4.755 geçti; 14 hata düzeltildi (101 odaklı test geçti), 2 uzun yol hatası kısa kökle doğrulandı. Bilinen 3 Windows izin hatası tekrar koşulmadan kaydedildi.
+- [ ] **Şimdi:** Commit/PR ve uzak CI doğrulaması. [Son kabul kaydı](enterprise_acceptance.md).
 - [ ] Hedef sunucu, bağımsız dış yedek ve canlı scheduler kabulü; mevcut altyapı henüz doğrulanmadı.
 - [ ] Son klasör düzeni, tam doğrulama ve commit'ler (R15).
 
@@ -43,7 +45,7 @@ prospective scientific evidence have separate completion criteria.
 | R03 | Shared API cache validation and request capabilities; strict nested web payloads; request cancellation and deadlines | Implemented; 59 Python and 143 web focused tests passed; offline Python-to-TypeScript publication and browser/API/worker/cache acceptance passed |
 | R04 | Capture-addressed projection retention; verifiable backup and empty-target restore; inventory existing external backup | Implemented; 59 focused tests passed including synthetic domain restore; real independent destination remains unverified |
 | R05 | Durable weekly stage/results, interrupted-run visibility and safe resume; installed application seams | Implemented; 239 tests, real process crash/read locking, Git-backed resume and isolated wheel run/resume/status passed; no live scheduler installed |
-| R06 | Browser/API/worker/cache acceptance and independent process observability; real host/storage acceptance recorded separately | Browser acceptance passed; independent worker metrics and mount-lock probe implemented, 45 focused tests passed; Compose acceptance pending |
+| R06 | Browser/API/worker/cache acceptance and independent process observability; real host/storage acceptance recorded separately | Final browser/backend and cross-language acceptance: 2 passed; independent metrics/mount-lock probe: 45 passed; Linux image/Compose persistence and deployment acceptance: 4 passed (48.02 s). Real host/storage remains unverified |
 | R07 | Integrate delivered, replayable club evidence without duplicating Ibo's adapter or activating an unmeasured model | Pending contributor integration |
 | R08 | Artifact-specific evidence declarations and matched strategy comparison populations, with unchanged historical evidence | Implemented; 54 focused tests passed; historical evidence unchanged |
 | R09 | Prospective component versus component+Top100 decisions and settled comparison | Requires future captures/outcomes |

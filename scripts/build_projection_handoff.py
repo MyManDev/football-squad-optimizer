@@ -7,6 +7,18 @@ from pathlib import Path
 from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT
 
 from squadopt.application.projection_handoff import (
+    COMPONENT_FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
+)
+from squadopt.application.projection_handoff import (
+    COMPONENT_HISTORY_WINDOW as COMPONENT_HISTORY_WINDOW,
+)
+from squadopt.application.projection_handoff import (
+    COMPONENT_MODEL_VERSION as COMPONENT_MODEL_VERSION,
+)
+from squadopt.application.projection_handoff import (
+    CONTROL_MODEL_NAME as CONTROL_MODEL_NAME,
+)
+from squadopt.application.projection_handoff import (
     DEFAULT_HANDOFF_ROOT as DEFAULT_HANDOFF_ROOT,
 )
 from squadopt.application.projection_handoff import (

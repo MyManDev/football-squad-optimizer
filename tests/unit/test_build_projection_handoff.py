@@ -54,6 +54,21 @@ FIRST_KICKOFF = "2026-08-21T19:00:00Z"
 GW2_CAPTURED_AT = "2026-08-28T15:30:00Z"
 BEFORE_ANY_KICKOFF = "2026-08-20T17:00:00Z"
 
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "COMPONENT_FEATURE_CONTRACT_VERSION",
+        "COMPONENT_HISTORY_WINDOW",
+        "COMPONENT_MODEL_VERSION",
+        "CONTROL_MODEL_NAME",
+        "_component_table",
+    ],
+)
+def test_legacy_live_caller_symbols_reexport_the_installed_owner(name: str) -> None:
+    assert getattr(command, name) is getattr(producer, name)
+
+
 COUNTERS = (
     "minutes",
     "total_points",

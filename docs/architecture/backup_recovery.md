@@ -6,6 +6,12 @@ manifest, and restores only into an absent or empty destination. It neither dele
 source data nor selects a retention policy. An immutable file or a checksum is not
 itself an independent backup.
 
+On Windows hosts with the legacy path limit, choose short source and destination roots:
+the destination includes the original relative hierarchy and content-addressed filenames.
+Acceptance on this host found file creation fails at 260 total characters; a short-root
+domain backup/restore drill passed. Extended-length path support is not implemented or
+verified here. A path failure leaves an incomplete backup, not a verified recovery set.
+
 ## Existing configuration and boundaries
 
 The repository baseline inspected for this change is

@@ -6,6 +6,11 @@ domain planning, preflight, handoff, player evidence, rotation export and settle
 export live in `application`; HTTP capture, process pools, Git publication and execution
 journals live in `platform`. The installed path does not import `scripts`.
 
+Use short Windows workspace and handoff roots on hosts with the legacy path limit.
+Retained content-addressed paths add directories and a 69-character filename; a
+263-character target failed on the acceptance host while the unchanged resume test
+passed under a shorter root. This implementation does not enable Windows long paths.
+
 The [weekly runbook](../weekly_runbook.md) remains the authority for the capture target:
 **2–3 hours before the deadline**, after previous picks become public. This change does
 not invent a recurring clock time. A run records the capture's measured deadline lead and

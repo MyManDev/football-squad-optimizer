@@ -122,7 +122,17 @@ jobs:
         env:
           SQUADOPT_CONTAINER_SMOKE: "1"
           SQUADOPT_CONTAINER_IMAGE: squadopt-backend:ci
-        run: python -m pytest tests/integration/test_backend_container.py -q -p no:cacheprovider -rA
+        run: >-
+          python -m pytest tests/integration/test_backend_container.py -q -p no:cacheprovider
+          --basetemp .pt/ci-container -rA
+
+      - name: Retain container failure evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: container-failure
+          path: .pt/ci-container
+          retention-days: 7
 
   web:
     name: web (node 22)
