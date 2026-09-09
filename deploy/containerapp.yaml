@@ -30,7 +30,7 @@ properties:
   configuration:
     activeRevisionsMode: Single
     ingress:
-      # Only the api is reachable. The worker has no listener at all, and naming the target
+      # Only the api is reachable. Worker metrics stay on the private port, and naming the target
       # container is what keeps ingress from being offered to whichever container binds a
       # port first.
       external: true
@@ -130,7 +130,7 @@ properties:
       - name: worker
         image: <REGISTRY_LOGIN_SERVER>/squadopt-backend@<IMAGE_DIGEST>
         command: ["python"]
-        args: ["-m", "squadopt.platform.advice_worker"]
+        args: ["-m", "squadopt.platform.advice_worker", "--metrics-port", "9091"]
         resources:
           # The solve is single-threaded by design (CP-SAT runs one search worker), so a
           # worker scales by replication and not by cores. One vCPU is the decided start.
@@ -142,5 +142,5 @@ properties:
           - volumeName: inputs
             mountPath: /mnt/squadopt-inputs
         env: *backend_environment
-        # No probes. The worker has no listener, and it already fails loudly the only way
-        # that matters: a store it cannot reach exits the process non-zero at startup.
+        # Worker metrics/liveness bind to loopback port 9091 within the replica; the
+        # public ingress stays on API port 8000. Scrape independently from API counters.

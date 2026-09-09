@@ -506,17 +506,10 @@ def test_an_abandoned_job_is_walked_back_rather_than_lost(running: dict[str, Any
     assert backend.queue.jobs()[0].attempt == 2  # the retry is visible, not hidden
 
 
-def test_an_ignored_rival_cannot_split_the_answer_or_the_spec(running: dict[str, Any]) -> None:
-    """The api admits a rival on a rival-free strategy; the cache key drops it.
-
-    So both requests address one answer, and the spec beside that address must drop the
-    rival the same way. Without that normalization the second POST would meet a
-    write-once store holding a different description of the same key — a 500 for a
-    request the contract says is the first one again.
-
-    One job, not two: the open-job index is keyed on the answer's address, so a parameter
-    the strategy ignores cannot buy a second solve of the same plan.
-    """
+def test_a_rival_free_request_refuses_a_rival_without_changing_the_spec(
+    running: dict[str, Any],
+) -> None:
+    """Reader and worker agree; an unsupported rival cannot create another job/spec."""
 
     backend = running["backend"]
     client = TestClient(app_for_backend(backend))
@@ -532,7 +525,8 @@ def test_an_ignored_rival_cannot_split_the_answer_or_the_spec(running: dict[str,
         },
     )
     assert plain.status_code == 202, plain.text
-    assert with_rival.status_code == 202, with_rival.text
+    assert with_rival.status_code == 422, with_rival.text
+    assert with_rival.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
 
     jobs = backend.queue.jobs()
     assert len(jobs) == 1

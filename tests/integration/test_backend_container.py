@@ -446,6 +446,77 @@ def _baked_commit() -> str:
     )
 
 
+def test_compose_runs_the_documented_services_and_preserves_cache(
+    deployment: dict[str, Any], tmp_path: Path
+) -> None:
+    """Exercise the checked-in Compose file, including read-only roots and metrics."""
+    store = tmp_path / "compose-store"
+    store.mkdir(mode=0o777)
+    store.chmod(0o777)
+    inputs = deployment["inputs"]
+    config = tmp_path / "compose.env"
+    values = {
+        "SQUADOPT_BACKEND_IMAGE": IMAGE,
+        "SQUADOPT_BACKEND_ALLOWED_ORIGINS": "https://example.invalid",
+        "SQUADOPT_STORE_PATH": store.as_posix(),
+        "SQUADOPT_SITE_PATH": (inputs / "site").as_posix(),
+        "SQUADOPT_SNAPSHOT_PATH": (inputs / "snapshots").as_posix(),
+        "SQUADOPT_HANDOFF_PATH": (inputs / "handoffs").as_posix(),
+        "SQUADOPT_API_PORT": "0",
+        "SQUADOPT_WORKER_METRICS_PORT": "0",
+    }
+    config.write_text(
+        "".join(f"{key}={value}\n" for key, value in values.items()), encoding="utf-8"
+    )
+    command = (
+        "compose",
+        "--project-name",
+        f"squadopt-accept-{deployment['suffix']}",
+        "--env-file",
+        str(config),
+        "--file",
+        str(REPOSITORY / "deploy/compose.yaml"),
+    )
+    try:
+        _docker(*command, "up", "--detach", "--wait", "--wait-timeout", "90")
+        api = _docker(*command, "ps", "--quiet", "api")
+        worker = _docker(*command, "ps", "--quiet", "worker")
+        deployment["containers"].extend([api, worker])
+        origin = _origin(api)
+        _get(origin + "/ready", READY_DEADLINE, deployment)
+        status, accepted = _post(origin, deployment)
+        assert status == 202
+        deadline = time.monotonic() + JOB_DEADLINE
+        while time.monotonic() < deadline:
+            job = _get(f"{origin}/api/v1/advice-jobs/{accepted['job_id']}", 10, deployment)
+            if job["status"] in {"completed", "failed"}:
+                break
+            time.sleep(0.25)
+        assert job["status"] == "completed", (job, _logs(deployment))
+        cached_status, answer = _post(origin, deployment)
+        assert cached_status == 200
+        metrics_port = _docker("port", worker, "9091/tcp").rsplit(":", 1)[-1]
+        with urllib.request.urlopen(f"http://127.0.0.1:{metrics_port}/metrics", timeout=5) as reply:
+            metrics = reply.read().decode()
+        assert 'advice_jobs_total{outcome="completed"} 1' in metrics
+        assert "advice_solve_seconds_count 1" in metrics
+        for container in (api, worker):
+            assert (
+                _docker("inspect", "--format", "{{.HostConfig.ReadonlyRootfs}}", container)
+                == "true"
+            )
+        _docker(*command, "up", "--detach", "--force-recreate", "--no-deps", "api")
+        replacement = _docker(*command, "ps", "--quiet", "api")
+        deployment["containers"].append(replacement)
+        origin = _origin(replacement)
+        _get(origin + "/ready", READY_DEADLINE, deployment)
+        assert _post(origin, deployment) == (200, answer)
+    finally:
+        output, error = _run_docker(*command, "logs", "--no-color", check=False)
+        (tmp_path / "compose.log").write_text(output + "\n" + error, encoding="utf-8")
+        _docker(*command, "down", "--timeout", "180", check=False, timeout=240)
+
+
 def _spec_context(state: dict[str, Any]) -> dict[str, str]:
     """The one spec on the store, read as root because the host user is not 10001."""
 
