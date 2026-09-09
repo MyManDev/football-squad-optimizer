@@ -535,12 +535,12 @@ const en = {
     currentPriceFallback:
       "Purchase prices are not public. Current prices are used as selling prices, which may overstate the available budget after a price rise.",
     memberSquad: "Member Squad",
+    heldViceCaptainUnavailable: "The published squad does not name the vice-captain.",
     starterCount: (count: number) => `${count} starters`,
     bench: "Bench",
     benchCount: (count: number) => `${count} substitutes`,
     emptySquad: "No squad is available for this member.",
-    emptySquadBody:
-      "The empty example fixes the UI behaviour for an entry whose public picks have not arrived.",
+    emptySquadBody: "The published member record does not contain squad data.",
     advice: "Suggested Moves",
     honestyRule:
       "Advice is labelled only with a point trade-off. Crowd-relative window diagnostics are never dressed up as a chance of winning.",
@@ -1244,12 +1244,12 @@ const tr: MessageSchema<typeof en> = {
     currentPriceFallback:
       "Satın alma fiyatları public değildir. Satış fiyatı olarak mevcut fiyat kullanılır; fiyatı yükselen bir oyuncu için kullanılabilir bütçe olduğundan yüksek görünebilir.",
     memberSquad: "Üye kadrosu",
+    heldViceCaptainUnavailable: "Yayımlanan kadroda yedek kaptan belirtilmiyor.",
     starterCount: (count) => `${count} ilk 11 oyuncusu`,
     bench: "Yedekler",
     benchCount: (count) => `${count} yedek`,
     emptySquad: "Bu üye için kadro bulunmuyor.",
-    emptySquadBody:
-      "Boş örnek, public seçimleri henüz gelmeyen bir entry için arayüz davranışını sabitler.",
+    emptySquadBody: "Yayımlanan üye kaydında kadro bilgisi bulunmuyor.",
     advice: "Önerilen Hamleler",
     honestyRule:
       "Öneriler yalnızca puan ödünleşimi etiketi taşır. Kalabalık-göreli pencere diagnostikleri kazanma ihtimali gibi sunulmaz.",
