@@ -20,13 +20,21 @@ import { canComputeAdvice } from "./adviceSelection";
 import type { AdviceJob } from "./useAdviceJob";
 import styles from "./AdviceRequestPanel.module.css";
 
-export function AdviceRequestPanel({ request, job }: { request: AdviceRequest; job: AdviceJob }) {
+export function AdviceRequestPanel({
+  request,
+  job,
+  selectionAvailable = true,
+}: {
+  request: AdviceRequest;
+  job: AdviceJob;
+  selectionAvailable?: boolean;
+}) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { viewer } = useViewerEntry();
   const { state, compute } = job;
   const isSelf = viewer !== null && viewer.entryId === request.entryId;
-  const supported = canComputeAdvice(request);
+  const supported = selectionAvailable && canComputeAdvice(request);
 
   return (
     <Card tone="muted" title={copy.computeTitle}>

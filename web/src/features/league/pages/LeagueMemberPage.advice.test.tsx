@@ -250,30 +250,21 @@ describe("league member advice flow", () => {
     ["ortak-koru", 3],
     ["fark-yarat", 5],
   ] as const)(
-    "answers %s carried in on a %i-week window at the week the producer published",
+    "does not read or compute an unlisted %s/%i restored selection",
     async (mode, window) => {
-      // The index lists every rival strategy at one week only. A window carried over from
-      // pure points must not send the page after a file nobody wrote: it lands on the
-      // published week, and the plan that exists is the one shown.
       const requests: AdviceRequest[] = [];
-      const rival = mockEntryAdviceIndex(ENTRY).payload.default_rival_entry_id;
       renderView({
-        advice: mockEntryAdviceEnvelope(ENTRY, mode, 1, rival),
+        advice: mockEntryAdviceEnvelope(ENTRY, mode, 1),
         initialEntry: `/league/members/${ENTRY}?mode=${mode}&window=${window}`,
         client: new FakeClient(async (request) => {
           requests.push(request);
           return { kind: "unavailable" };
         }),
       });
-
-      expect(screen.getByDisplayValue(mode)).toBeChecked();
-      expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
-      expect(screen.getByRole("radio", { name: new RegExp(`${window} hafta`) })).not.toBeChecked();
-      expect(screen.queryByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeNull();
-      expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled();
+      expect(screen.getByText("Bu seçim bu yayında listelenmiyor.")).toBeInTheDocument();
       await compute();
-      expect(requests).toHaveLength(1);
-      expect(requests[0]).toMatchObject({ strategy: mode, window: 1, rivalEntryId: rival });
+      expect(requests).toEqual([]);
     },
   );
 
@@ -344,10 +335,10 @@ describe("league member advice flow", () => {
         return { kind: "unavailable" };
       }),
     });
-    // Without an index the members list still offers rivals; strip them to prove the gate.
-    expect(screen.getByDisplayValue("ortak-koru")).toBeChecked();
+    expect(screen.queryByDisplayValue("ortak-koru")).toBeNull();
+    expect(screen.getByRole("button", { name: "Hesapla" })).toBeDisabled();
     await compute();
-    expect(requests.every((request) => request.rivalEntryId !== null)).toBe(true);
+    expect(requests).toEqual([]);
   });
 
   it("submits a rival strategy with the producer's default rival", async () => {

@@ -4,8 +4,8 @@ import { mockEntryAdviceIndex, mockLeagueMembersEnvelope } from "../../../fixtur
 import {
   availableWindows,
   canComputeAdvice,
-  publishedSelection,
   selectedAdviceRequest,
+  resolvePublishedAdvice,
 } from "./adviceSelection";
 
 const MEMBERS = mockLeagueMembersEnvelope.payload.members;
@@ -108,45 +108,99 @@ describe("advice selection", () => {
     }
   });
 
-  it("answers a carried-over window at a week the index lists for the strategy", () => {
-    // A five-week window chosen under pure points, then a rival strategy: the producer
-    // writes every rival strategy at one week, so the request must name that file rather
-    // than one nobody wrote.
-    const index = mockEntryAdviceIndex(ENTRY).payload;
-    const request = selectedAdviceRequest(
-      publishedSelection(new URLSearchParams("mode=ortak-koru&window=5"), index),
-      352490,
-      ENTRY,
-      MEMBERS,
-      undefined,
-      RIVAL,
-    );
-
-    expect(request).toMatchObject({ strategy: "ortak-koru", window: 1, rivalEntryId: RIVAL });
-    expect(canComputeAdvice(request)).toBe(true);
-  });
-
-  it("leaves a listed window, and a strategy the index says nothing about, as asked", () => {
-    const index = mockEntryAdviceIndex(ENTRY).payload;
-    expect(publishedSelection(new URLSearchParams("window=5"), index).get("window")).toBe("5");
-    // A legacy play mode is shown from the published tree; the index does not govern it.
-    expect(
-      publishedSelection(new URLSearchParams("mode=garantici&window=3"), index).get("window"),
-    ).toBe("3");
-    // Nothing published means nothing to clamp against: the URL stands.
-    expect(
-      publishedSelection(new URLSearchParams("mode=ortak-koru&window=3"), null).get("window"),
-    ).toBe("3");
-  });
-
-  it("offers the windows the index lists, and one week without an index", () => {
+  it("offers no windows without an index and honors the explicit legacy index window", () => {
     const index = mockEntryAdviceIndex(ENTRY).payload;
     expect(availableWindows(index, "saf-puan")).toEqual([1, 3, 5]);
     expect(availableWindows(index, "ortak-koru")).toEqual([1]);
-    expect(availableWindows(null, "saf-puan")).toEqual([1]);
+    expect(availableWindows(null, "saf-puan")).toEqual([]);
     expect(availableWindows({ ...index, windows: undefined }, "saf-puan")).toEqual([1]);
     expect(availableWindows({ ...index, windows: { "saf-puan": [1, 3] } }, "saf-puan")).toEqual([
       1, 3,
     ]);
+  });
+});
+
+describe("index-authoritative advice selection", () => {
+  const index = mockEntryAdviceIndex(ENTRY).payload;
+  const resolve = (params: string, publication = index) =>
+    resolvePublishedAdvice(
+      new URLSearchParams(params),
+      index.league_id,
+      ENTRY,
+      MEMBERS,
+      publication,
+      { season: index.season, gameweek: index.gameweek },
+    );
+
+  it("resolves only listed standard pure-points windows and strips rival", () => {
+    for (const window of [1, 3, 5]) {
+      expect(resolve(`window=${window}&rival=${RIVAL}`)).toMatchObject({
+        status: "ready",
+        path: `advice/${ENTRY}/saf-puan/${window}.json`,
+        request: { rivalEntryId: null },
+      });
+    }
+  });
+  it.each([
+    "mode=garantici",
+    "mode=made-up",
+    "window=9",
+    "mode=ortak-koru&window=3",
+    "mode=fark-yarat&rival=99999999",
+    `mode=fark-yarat&rival=${ENTRY}`,
+  ])("rejects unsupported URL/template %s", (params) => {
+    expect(resolve(params)).toMatchObject({ status: "not-listed", path: null });
+  });
+  it("requires a computed pair with the exact member, strategy, week and rival path", () => {
+    const row = index.computed[0]!;
+    const params = `mode=${row.strategy}&rival=${row.rival_entry_id}`;
+    expect(resolve(params)).toMatchObject({ status: "ready", path: row.path });
+    for (const path of [
+      "https://other.example/plan.json",
+      "../plan.json",
+      `advice/${ENTRY}/fark-yarat/1/vs-999999.json`,
+    ]) {
+      expect(resolve(params, { ...index, computed: [{ ...row, path }] })).toMatchObject({
+        status: "not-listed",
+        path: null,
+      });
+    }
+    expect(resolve(params, { ...index, computed: [] }).path).toBeNull();
+    expect(resolve(params, { ...index, rival_entry_ids: [] }).path).toBeNull();
+  });
+  it("distinguishes no index, empty index, wrong context and a declared failure", () => {
+    expect(resolvePublishedAdvice(new URLSearchParams(), 352490, ENTRY, MEMBERS, null).status).toBe(
+      "index-missing",
+    );
+    expect(resolve("", { ...index, strategies: [], computed: [], windows: {} })).toMatchObject({
+      status: "not-listed",
+      path: null,
+    });
+    expect(resolve("", { ...index, entry_id: ENTRY + 1 }).status).toBe("index-error");
+    const unavailable = index.unavailable[0]!;
+    expect(
+      resolve(`mode=${unavailable.strategy}&rival=${unavailable.rival_entry_id}`),
+    ).toMatchObject({
+      status: "declared-unavailable",
+      reason: unavailable.reason,
+      path: null,
+    });
+  });
+  it("keeps each declared window when one rival pair has multiple exact computed paths", () => {
+    const pair = index.computed[0]!;
+    const three = `advice/${ENTRY}/${pair.strategy}/3/vs-${pair.rival_entry_id}.json`;
+    const publication = {
+      ...index,
+      windows: { ...index.windows, [pair.strategy]: [1, 3] as (1 | 3)[] },
+      computed: [...index.computed, { ...pair, path: three }],
+    };
+    for (const window of [1, 3]) {
+      const selection = resolve(
+        `mode=${pair.strategy}&rival=${pair.rival_entry_id}&window=${window}`,
+        publication,
+      );
+      expect(selection).toMatchObject({ status: "ready", path: window === 1 ? pair.path : three });
+      expect(canComputeAdvice(selection.request)).toBe(window === 1);
+    }
   });
 });

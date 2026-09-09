@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   mockEntryAdviceEnvelope,
+  mockEntryAdviceIndex,
   mockEntrySquadEnvelopes,
   mockLeagueMembersEnvelope,
 } from "../../../fixtures/league";
@@ -137,6 +138,7 @@ describe("league member surfaces", () => {
       const entryId = 35249001;
       renderPage(
         <LeagueMemberView
+          index={mockEntryAdviceIndex(entryId).payload}
           squad={mockEntrySquadEnvelopes[entryId]!}
           advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
         />,
@@ -242,7 +244,11 @@ describe("league member surfaces", () => {
     const entryId = 35249001;
     const advice = mockEntryAdviceEnvelope(entryId, "ortak-koru", 1);
     const { container } = renderPage(
-      <LeagueMemberView squad={mockEntrySquadEnvelopes[entryId]!} advice={advice} />,
+      <LeagueMemberView
+        index={mockEntryAdviceIndex(entryId).payload}
+        squad={mockEntrySquadEnvelopes[entryId]!}
+        advice={advice}
+      />,
       `/league/members/${entryId}?mode=ortak-koru&window=1`,
     );
 
@@ -252,7 +258,7 @@ describe("league member surfaces", () => {
     expect(screen.getAllByText(/beklenen puan maliyeti/).length).toBeGreaterThan(0);
     expect(screen.getByText(/yalnızca senin kadrondan/)).toBeInTheDocument();
     expect(screen.getByText(/banka edilmiş ikinci transfer/)).toBeInTheDocument();
-    expect(screen.getByText(/Satın alma fiyatları public değildir/)).toBeInTheDocument();
+    expect(screen.getByText(/Satın alma fiyatları herkese açık değildir/)).toBeInTheDocument();
     expect(container.textContent).not.toContain("%");
   });
 
@@ -260,17 +266,19 @@ describe("league member surfaces", () => {
     const entryId = 35249001;
     renderPage(
       <LeagueMemberView
+        index={mockEntryAdviceIndex(entryId).payload}
         squad={mockEntrySquadEnvelopes[entryId]!}
-        advice={mockEntryAdviceEnvelope(entryId, "garantici", 1)}
+        advice={mockEntryAdviceEnvelope(entryId, "ortak-koru", 1)}
       />,
-      `/league/members/${entryId}?mode=garantici`,
+      `/league/members/${entryId}?mode=ortak-koru`,
     );
     expect(screen.getByText(/beklenen puandan vazgeçiyor/)).toBeInTheDocument();
-    expect(screen.getByText(/Harbor Rovers kadrosuna göre fiyatlandı/)).toBeInTheDocument();
+    expect(screen.getByText(/kadrosuna göre fiyatlandı/)).toBeInTheDocument();
 
     cleanup();
     renderPage(
       <LeagueMemberView
+        index={mockEntryAdviceIndex(entryId).payload}
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
       />,
@@ -283,6 +291,7 @@ describe("league member surfaces", () => {
     const entryId = 35249010;
     renderPage(
       <LeagueMemberView
+        index={mockEntryAdviceIndex(entryId).payload}
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
       />,
@@ -296,5 +305,75 @@ describe("league member surfaces", () => {
     expect(
       screen.queryByRole("list", { name: "Pozisyona göre ilk on bir" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe.each(["tr", "en"] as const)("published overlap bounds in %s", (language) => {
+  it.each([
+    ["within_free_transfers", "OPTIMAL"],
+    ["within_free_transfers", "FEASIBLE"],
+    ["with_hits", "OPTIMAL"],
+    ["with_hits", "FEASIBLE"],
+  ] as const)("keeps %s / %s bounds separate from the measured player count", (kind, solver) => {
+    // Published GW4 member 313686 vs 5662073: the recommended 15 share four IDs
+    // with the rival XI, while fark-yarat's applied maximum remains five.
+    const recommendedIds = [
+      154561, 466075, 522047, 106760, 141746, 446008, 466052, 424876, 219168, 475168, 177815,
+      489639, 60307, 487676, 472769,
+    ];
+    const rivalXiIds = new Set([
+      116535, 106760, 606702, 465730, 441302, 141746, 176297, 466052, 209244, 219168, 223094,
+    ]);
+    const measuredOverlap = recommendedIds.filter((id) => rivalXiIds.has(id)).length;
+    expect(new Set(recommendedIds).size).toBe(15);
+    expect(rivalXiIds.size).toBe(11);
+    expect(measuredOverlap).toBe(4);
+    const entryId = 35249001;
+    const index = mockEntryAdviceIndex(entryId).payload;
+    const rivalId = index.default_rival_entry_id!;
+    const advice = mockEntryAdviceEnvelope(entryId, "fark-yarat", 1, rivalId);
+    advice.payload.overlap_count = measuredOverlap;
+    advice.payload.overlap_target = 5;
+    advice.payload.overlap_applied = 5;
+    advice.payload.transfer_cap = 1;
+    advice.payload.transfer_hit_points = 0;
+    advice.payload.expected_points_cost = 0;
+    advice.payload.expected_points_cost_ceiling = 0;
+    advice.payload.solver_status = solver;
+    advice.payload.plan_kind = kind;
+    advice.payload.alternative_plan = {
+      kind: kind === "with_hits" ? "within_free_transfers" : "with_hits",
+      overlap_applied: 5,
+      transfer_hit_points: 0,
+      expected_points_cost: 0,
+      expected_points_cost_ceiling: 0,
+    };
+    renderPage(
+      <LeagueMemberView squad={mockEntrySquadEnvelopes[entryId]!} advice={advice} index={index} />,
+      `/league/members/${entryId}?mode=fark-yarat&rival=${rivalId}`,
+      language,
+    );
+    const copy = MESSAGES[language].leagueMembers;
+    expect(screen.getByText((text) => text.includes(copy.overlapLine(4)))).toBeInTheDocument();
+    expect(
+      screen.queryByText((text) => text.includes(copy.overlapLine(5))),
+    ).not.toBeInTheDocument();
+    const paragraph = screen.getByText(
+      language === "tr" ? /istenen ortak oyuncu sınırı 5/ : /requested overlap bound 5/,
+    );
+    expect(paragraph).toHaveTextContent(
+      language === "tr" ? "uygulanan ortak oyuncu sınırı 5" : "applied overlap bound 5",
+    );
+    expect(paragraph).not.toHaveTextContent(
+      /reached|reachable|ulaş|still came out ahead|önde çıktı/i,
+    );
+    if (kind === "within_free_transfers")
+      expect(paragraph).toHaveTextContent(
+        language === "tr"
+          ? "yayımlanan transfer cezası 0 puan"
+          : "published transfer penalties 0 points",
+      );
+    if (solver === "FEASIBLE")
+      expect(paragraph).toHaveTextContent(language === "tr" ? "maliyet en fazla" : "cost at most");
   });
 });

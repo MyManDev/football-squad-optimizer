@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   WINDOW_STATED_LIMITS,
   mockEntryAdviceEnvelope,
+  mockEntryAdviceIndex,
   mockEntrySquadEnvelopes,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
@@ -26,7 +27,11 @@ function renderAdvice(advice: LeagueViewEnvelope<EntryAdvice>, language: "tr" | 
   return render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[`/league/members/${ENTRY}?window=${advice.payload.window}`]}>
-        <LeagueMemberView squad={mockEntrySquadEnvelopes[ENTRY]} advice={advice} />
+        <LeagueMemberView
+          index={mockEntryAdviceIndex(ENTRY).payload}
+          squad={mockEntrySquadEnvelopes[ENTRY]}
+          advice={advice}
+        />
       </MemoryRouter>
     </LanguageProvider>,
   );

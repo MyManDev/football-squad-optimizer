@@ -11,9 +11,10 @@ import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { createAdviceClient, type AdviceClient, type AdviceSource } from "../advice/adviceClient";
 import {
   canComputeAdvice,
-  publishedSelection,
-  selectedAdviceRequest,
+  resolvePublishedAdvice,
+  type PublishedAdviceStatus,
 } from "../advice/adviceSelection";
+import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { checkedAdvice } from "../advice/adviceResponse";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { sameAdviceRequest, useAdviceJob } from "../advice/useAdviceJob";
@@ -41,7 +42,7 @@ import type {
 import styles from "./LeagueMemberPage.module.css";
 
 /** Why no published advice is on hand for the selection: never published, or not loadable. */
-export type AdviceIssue = "not-computed" | "unavailable";
+export type AdviceIssue = "not-computed" | "unavailable" | Exclude<PublishedAdviceStatus, "ready">;
 
 export function LeagueMemberPage() {
   const { messages } = useLanguage();
@@ -62,7 +63,7 @@ export function LeagueMemberPage() {
     staleTime: 60_000,
   });
   // The index says which (strategy, rival) files the producer wrote for this member; a
-  // tree from before the menu has none, and the page then offers the baseline only.
+  // missing or unreadable index cannot authorize a guessed baseline read.
   const indexQuery = useQuery({
     queryKey: ["provisional-entry-advice-index", entryId],
     queryFn: () => loadEntryAdviceIndex(entryId),
@@ -71,15 +72,23 @@ export function LeagueMemberPage() {
     retry: false,
   });
   const members = membersQuery.data?.payload.members ?? [];
-  const index = indexQuery.data?.payload ?? null;
-  const request = selectedAdviceRequest(
-    publishedSelection(searchParams, index),
+  const index = indexQuery.isError ? null : (indexQuery.data?.payload ?? null);
+  const selection = resolvePublishedAdvice(
+    searchParams,
     squad.data?.payload.league_id ?? 0,
     entryId,
     members,
-    undefined,
-    index?.default_rival_entry_id ?? null,
+    index,
+    squad.data
+      ? {
+          season: squad.data.payload.season,
+          gameweek: squad.data.payload.gameweek,
+        }
+      : undefined,
   );
+  const { request } = selection;
+  const adviceEnabled = validEntryId && !!squad.data && selection.status === "ready";
+
   const advice = useQuery({
     queryKey: [
       "provisional-entry-advice",
@@ -87,16 +96,29 @@ export function LeagueMemberPage() {
       request.strategy,
       request.window,
       request.rivalEntryId,
+      selection.path,
+      request.season,
+      request.gameweek,
+      squad.data?.payload.source_snapshot_id,
     ],
     queryFn: () =>
       loadEntryAdvice(entryId, request.strategy, request.window, request.rivalEntryId ?? null),
-    enabled: validEntryId && !membersQuery.isPending && !indexQuery.isPending,
+    enabled: adviceEnabled,
     staleTime: 60_000,
+  });
+
+  const rival = useQuery({
+    queryKey: ["provisional-entry-squad", request.rivalEntryId],
+    queryFn: () => loadEntrySquad(request.rivalEntryId!),
+    enabled: adviceEnabled && request.rivalEntryId != null,
+    staleTime: 60_000,
+    retry: false,
   });
 
   if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
-  if (squad.isPending || advice.isPending) return <EmptyState title={copy.loadingEntry} />;
+  if (squad.isPending || indexQuery.isPending || (adviceEnabled && advice.isPending))
+    return <EmptyState title={copy.loadingEntry} />;
   if (squad.isError) {
     return <EmptyState title={copy.entryNotAvailable}>{copy.entryNotAvailableBody}</EmptyState>;
   }
@@ -104,15 +126,22 @@ export function LeagueMemberPage() {
   // context is valid, so the squad and the compute control stay, and the advice card says
   // what is missing. Only this pair is solved per member, so an unpublished combination
   // is a normal outcome rather than a fault the reader should report.
-  const adviceIssue: AdviceIssue | undefined = advice.isError
-    ? advice.error instanceof LeagueDataMissing
-      ? "not-computed"
-      : "unavailable"
-    : undefined;
+  const adviceIssue: AdviceIssue | undefined = indexQuery.isError
+    ? indexQuery.error instanceof LeagueDataMissing
+      ? "index-missing"
+      : "index-error"
+    : selection.status !== "ready"
+      ? selection.status
+      : advice.isError
+        ? advice.error instanceof LeagueDataMissing
+          ? "not-computed"
+          : "unavailable"
+        : undefined;
   return (
     <LeagueMemberView
       squad={squad.data}
-      advice={advice.isError ? null : advice.data}
+      advice={adviceEnabled && !advice.isError ? (advice.data ?? null) : null}
+      rivalSquad={rival.data ?? null}
       adviceIssue={adviceIssue}
       members={members}
       index={index}
@@ -157,6 +186,7 @@ interface LeagueMemberViewProps {
   members?: EntryView[];
   index?: EntryAdviceIndex | null;
   client?: AdviceClient;
+  rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
 }
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
@@ -180,6 +210,7 @@ function LeagueMemberContent({
   members = [],
   index = null,
   client,
+  rivalSquad = null,
 }: LeagueMemberViewProps) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -187,23 +218,27 @@ function LeagueMemberContent({
   const [searchParams] = useSearchParams();
   const { viewer, clear } = useViewerEntry();
   const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
-  const job = useAdviceJob(adviceClient);
   const leagueId = view.league_id;
   const entryId = view.entry.entry_id;
-  const request = selectedAdviceRequest(
-    publishedSelection(searchParams, index),
-    leagueId,
-    entryId,
-    members,
-    { season: view.season, gameweek: view.gameweek },
-    index?.default_rival_entry_id ?? null,
-  );
+  const resolve = (params: URLSearchParams) =>
+    resolvePublishedAdvice(params, leagueId, entryId, members, index, {
+      season: view.season,
+      gameweek: view.gameweek,
+    });
+  const selection = resolve(searchParams);
+  const { request } = selection;
+  const selectionAvailable = selection.status === "ready";
+  const baselineAvailable =
+    resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
+  const job = useAdviceJob(adviceClient, baselineAvailable);
   const requestKey = [
     request.leagueId,
     request.entryId,
     request.strategy,
     request.window,
     request.rivalEntryId ?? "",
+    selection.status,
+    selection.path,
   ].join(":");
 
   // A new selection starts clean: an earlier request's answer, wait or failure must not
@@ -214,11 +249,15 @@ function LeagueMemberContent({
   }, [requestKey, reset]);
 
   const current =
-    job.state.phase !== "idle" && sameAdviceRequest(job.state.request, request) ? job.state : null;
+    selectionAvailable &&
+    job.state.phase !== "idle" &&
+    sameAdviceRequest(job.state.request, request)
+      ? job.state
+      : null;
   const computed = current?.phase === "done" ? current : null;
   const waiting = current?.phase === "waiting" ? current : null;
   let published: LeagueViewEnvelope<EntryAdvice> | null = null;
-  if (advice) {
+  if (advice && selectionAvailable) {
     try {
       published = checkedAdvice(advice, request);
     } catch {
@@ -346,15 +385,21 @@ function LeagueMemberContent({
             </p>
           </Card>
         ) : null}
-        <TemplatePicker />
-        <MemberDecisionControls entryId={entryId} members={members} index={index} />
-        <AdviceRequestPanel request={request} job={job} />
+        <TemplatePicker canApply={(params) => resolve(params).status === "ready"} />
+        <MemberDecisionControls
+          entryId={entryId}
+          members={members}
+          index={selection.status === "index-error" ? null : index}
+        />
+        <AdviceRequestPanel request={request} job={job} selectionAvailable={selectionAvailable} />
         {shown ? (
-          <AdviceCard shown={shown} members={members} />
+          <AdviceCard shown={shown} members={members} squad={squad} rivalSquad={rivalSquad} />
         ) : (
           <MissingAdviceCard
-            issue={advice && !published ? "not-computed" : (adviceIssue ?? "not-computed")}
-            canCompute={canComputeAdvice(request)}
+            issue={
+              adviceIssue ?? (selection.status !== "ready" ? selection.status : "not-computed")
+            }
+            canCompute={selectionAvailable && canComputeAdvice(request)}
           />
         )}
       </section>
@@ -371,20 +416,34 @@ function LeagueMemberContent({
 function MissingAdviceCard({ issue, canCompute }: { issue: AdviceIssue; canCompute: boolean }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
+  const issueCopy =
+    issue === "not-computed"
+      ? [copy.adviceNotComputed, copy.adviceNotComputedBody]
+      : issue === "unavailable"
+        ? [copy.adviceUnreadable, copy.adviceUnreadableBody]
+        : [copy.publicationStates[issue].title, copy.publicationStates[issue].body];
   return (
     <Card title={copy.advice}>
       <p className={styles.honesty}>
-        <strong>{issue === "not-computed" ? copy.adviceNotComputed : copy.adviceUnreadable}</strong>
+        <strong>{issueCopy[0]}</strong>
       </p>
-      <p className={styles.muted}>
-        {issue === "not-computed" ? copy.adviceNotComputedBody : copy.adviceUnreadableBody}
-      </p>
+      <p className={styles.muted}>{issueCopy[1]}</p>
       {canCompute ? <p className={styles.muted}>{copy.adviceRequestHint}</p> : null}
     </Card>
   );
 }
 
-function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: EntryView[] }) {
+function AdviceCard({
+  shown,
+  members = [],
+  squad,
+  rivalSquad,
+}: {
+  shown: ShownAdvice;
+  members?: EntryView[];
+  squad: LeagueViewEnvelope<EntrySquad>;
+  rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
+}) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
@@ -501,10 +560,45 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
           ) : null}
         </>
       )}
+      <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
       <LineupSection view={view} />
       <WindowSection view={view} />
       <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
     </Card>
+  );
+}
+
+function RivalPlayers({
+  advice,
+  squad,
+  rivalSquad,
+}: {
+  advice: LeagueViewEnvelope<EntryAdvice>;
+  squad: LeagueViewEnvelope<EntrySquad>;
+  rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
+}) {
+  const copy = useLanguage().messages.leagueMembers;
+  if (advice.payload.rival_entry_id == null) return null;
+  const comparison = comparedRivalPlayers(advice, squad, rivalSquad);
+  return (
+    <section className={styles.lineup} aria-label={copy.rivalPlayersTitle}>
+      <h3 className={styles.lineupTitle}>{copy.rivalPlayersTitle}</h3>
+      <p className={styles.honesty}>{copy.rivalPlayersBasis}</p>
+      {comparison ? (
+        <dl>
+          {(["shared", "recommendedOnly", "rivalOnly"] as const).map((kind) => (
+            <div key={kind}>
+              <dt>{copy.rivalPlayerGroups[kind]}</dt>
+              <dd>
+                {comparison[kind].map((player) => player.name).join(", ") || copy.rivalPlayersNone}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className={styles.muted}>{copy.rivalPlayersUnavailable}</p>
+      )}
+    </section>
   );
 }
 
