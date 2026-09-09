@@ -11,8 +11,8 @@ re-decided here.
 
 The definition of that topology now exists, as
 [`deploy/containerapp.yaml`](../deploy/containerapp.yaml), and **applying it creates paid
-resources**. It has not been applied: no Azure resource exists, and every Azure claim below is
-a parameter awaiting confirmation rather than a measured fact.
+resources**. This repository does not establish that these Azure prerequisites exist. No deployment or
+cloud mount acceptance is claimed by the local preparation command below.
 
 ## The two commands
 
@@ -141,12 +141,14 @@ mount and must never be reported as one.
 | `league_tree` | ops has published no `league/members.json` under the site data root |
 | `cache_store` | the store probe has not passed on this path — a root that does not exist counts, which is the common shape of a forgotten volume, though not proof of one |
 
-An unready backend answers advice routes with a coded 503. It does not present an empty cache as
-a computed absence.
+Store and capture-context failures produce coded 503 responses on their applicable advice
+paths. Missing league membership instead returns `404 LEAGUE_NOT_CONNECTED` on POST while
+`league_tree` is false. Readiness is a combined dependency report, not a promise that every
+unready state has the same HTTP response.
 
 ## A local two-process run
 
-Genuinely two processes against one store — this is how to see the whole path work without
+Two processes against one store — this is how to see the whole path work without
 deploying anything.
 
 ```bash
@@ -198,14 +200,18 @@ docker run --rm --user 0:0 --volume squadopt-store:/mnt/squadopt-store squadopt-
   sh -c 'mkdir -p /mnt/squadopt-store/store && chown 10001:10001 /mnt/squadopt-store/store'
 ```
 
-On Azure this is the same `mkdir` and `chown`, and where it runs from depends on one thing
-nobody here could check: whether the NFS share's root is writable by the mounted identity. If
-it is, `az containerapp exec` into the api container does it and **no extra resource exists at
-all**. If it is not, it takes a one-off root mount of the share from inside the VNet — a
-short-lived container instance or a jumpbox — deleted afterwards, and that in turn needs the
-share's root-squash setting to permit root. Container Apps cannot express the step itself: an
-init container carries the image's own `USER`, and the container spec has no way to override
-it. Confirm the share's default root mode before choosing, and record which route was taken.
+For Azure, an operator-owned Linux preparation host inside the VNet must already mount the
+store share read-write. Before the first worker revision, an authorized administrator runs:
+
+```bash
+sudo install -d -o 10001 -g 10001 -m 0755 /mnt/squadopt-store/store
+```
+
+The mounted share must permit that ownership operation under its root-squash and access
+configuration. If it does not, resolve the storage permission prerequisite before applying.
+The API and worker run as uid 10001; do not assume an exec session in either can perform a
+root-only bootstrap. Provisioning that preparation host or changing storage policy is outside
+the release helper's scope.
 
 Whatever the platform, the check afterwards is the same, and a broken mount is one command to
 diagnose:
@@ -254,7 +260,8 @@ Then the same two commands, in two containers, over one volume and read-only inp
 
 ```bash
 docker volume create squadopt-store
-# ... the prepare step above ...
+docker run --rm --user 0:0 --volume squadopt-store:/mnt/squadopt-store squadopt-backend \
+  sh -c 'mkdir -p /mnt/squadopt-store/store && chown 10001:10001 /mnt/squadopt-store/store'
 docker run -d --name squadopt-api --publish 127.0.0.1:8000:8000 \
   --volume squadopt-store:/mnt/squadopt-store \
   --volume "$PWD/.local/inputs:/mnt/squadopt-inputs:ro" \
@@ -263,7 +270,13 @@ docker run -d --name squadopt-api --publish 127.0.0.1:8000:8000 \
   --env SQUADOPT_BACKEND_SNAPSHOT_ROOT=/mnt/squadopt-inputs/snapshots \
   --env SQUADOPT_BACKEND_HANDOFF_ROOT=/mnt/squadopt-inputs/handoffs \
   squadopt-backend
-docker run -d --name squadopt-worker ...same volumes and environment... \
+docker run -d --name squadopt-worker \
+  --volume squadopt-store:/mnt/squadopt-store \
+  --volume "$PWD/.local/inputs:/mnt/squadopt-inputs:ro" \
+  --env SQUADOPT_BACKEND_STORE_ROOT=/mnt/squadopt-store/store \
+  --env SQUADOPT_BACKEND_SITE_DATA_ROOT=/mnt/squadopt-inputs/site/data \
+  --env SQUADOPT_BACKEND_SNAPSHOT_ROOT=/mnt/squadopt-inputs/snapshots \
+  --env SQUADOPT_BACKEND_HANDOFF_ROOT=/mnt/squadopt-inputs/handoffs \
   squadopt-backend python -m squadopt.platform.advice_worker
 ```
 
@@ -281,58 +294,131 @@ container, the answer surviving the api container's replacement, `docker stop` l
 worker exit 0, and a forgotten volume refused rather than served from ephemeral disk. It is
 evidence about a local volume and says nothing about a cloud filesystem.
 
-## Azure Container Apps
+## Prepare a release for Azure Container Apps
 
-ADR 0006's topology, as [`deploy/containerapp.yaml`](../deploy/containerapp.yaml): one
-replica, two containers from the same image digest, only the api with ingress, both mounting
-the shared store. **Applying it creates paid resources** (see the note at the top of this
-file); nothing below has been applied.
+ADR 0006 remains one replica with two separate processes from one linux/amd64 image. The
+canonical `deploy/containerapp.yaml` is JSON-compatible YAML: one template defines both
+containers. The initial ingress is internal on port 8000. API/worker commands and persistence
+boundaries do not change. The helper performs no login, image push, registry pull, Azure
+query or deployment. Its local checks do not prove cloud readiness.
 
-The two mounts of [Configuration](#configuration) are two shares, because they differ in
-access mode: `squadopt-store` ReadWrite and `squadopt-inputs` ReadOnly. Both are
-environment-level storage entries and are created before the app — one
-`az containerapp env storage set` each, and the YAML's header carries both commands.
+### Required operator infrastructure and inputs
 
-| Resource | Parameter | Why it is this and not simpler |
-| --- | --- | --- |
-| subscription / resource group / region | `<SUBSCRIPTION_ID>` `<RESOURCE_GROUP>` `<REGION>` | region decides both latency and price |
-| image registry + pull identity | `<REGISTRY_LOGIN_SERVER>` | CI never pushes and holds no cloud credential; whoever pushes records the digest |
-| Container Apps environment, VNet-integrated | `<CONTAINER_APPS_ENVIRONMENT>` `<VNET>` `<SUBNET>` | an NFS mount requires a custom VNet |
-| storage account, premium `FileStorage` | `<STORAGE_ACCOUNT>` | NFS shares need the premium file tier |
-| share `squadopt-store` (ReadWrite) | 100 GiB floor | the queue, the cache and the specs |
-| share `squadopt-inputs` (ReadOnly) | 100 GiB floor | snapshots, handoffs, site data |
-| NSG rules on the subnet | ports 445 and 2049 | NFS and its mount traffic |
-| Log Analytics workspace | `<WORKSPACE>` | the advice events are the only log that matters |
-| allowed frontend origins | `<PAGES_ORIGIN>` | `SQUADOPT_BACKEND_ALLOWED_ORIGINS`; a wildcard is refused at startup |
+Before apply, the owner must provide an existing Container Apps environment with custom VNet
+access to Azure Files NFS, environment storage entries named `squadopt-store` (ReadWrite) and
+`squadopt-inputs` (ReadOnly), a prepared store directory owned by 10001:10001, and published
+inputs. Supply a pre-existing user-assigned managed identity with ACR pull access; the same
+identity is attached to the app and referenced in its registry configuration. The helper does
+not provision these resources, grant access, set up mounts, or price the deployment.
 
-**Every row above is unconfirmed against current Azure documentation.** The environment this
-was written in cannot reach `learn.microsoft.com`, so the requirements were assembled from
-secondary sources: that an NFS mount needs a custom VNet, that the account must be premium
-`FileStorage`, that Container Apps does not support encryption in transit for NFS (so the
-account's secure-transfer requirement must be off), that ports 445 and 2049 must be open on
-the subnet's NSG, and that a premium share has a 100 GiB provisioned floor. Confirm each
-against the official documentation before spending, and correct this table and the YAML in the
-same change. The YAML marks the individual fields it could not confirm — the
-`terminationGracePeriodSeconds` field and the allowed cpu/memory pairs among them.
+The operator workstation needs Python, Git, PowerShell 7 and a Linux/amd64 Docker daemon.
+Fresh verification also needs the project's dev dependencies. Apply needs Docker, the Azure
+CLI with its Container Apps extension, and the owner's existing authenticated Azure context.
+The exact published `repository@sha256:digest` must already be present in local Docker
+metadata. Publication/pull and authentication are separate owner actions; neither the helper
+nor its generated apply script performs them.
 
-**Cost is parameterised on purpose.** The Azure retail pricing API is also unreachable from
-here, so no monthly figure is asserted. The standing charges to price are: the two premium
-shares at their provisioned floor (this is a floor, not usage — it is billed whether the store
-holds anything or not), the replica's compute at `minReplicas: 1` for every hour of the month
-(scale-to-zero is deliberately off, because it would stop the worker with a queue behind it),
-the environment's own base charge, log ingestion and retention, and egress. Price them for
-`<REGION>` and the sizes in the YAML before the first apply.
+Copy `deploy/backend-release.example.json` to `.pt/operator.json`, replace synthetic values,
+and keep credentials out of it. The input contract is:
 
-**Readiness is not the platform's probe.** The YAML probes `/health`, which touches no
-dependency. `/ready` is data-dependent by design — false until ops has published a capture,
-its handoff and the league tree — so wiring it as the platform's probe would keep a correctly
-deployed revision from ever going healthy, and with one replica the platform's own 503 would
-hide which of the three checks failed. `/ready` stays the operator's own `curl`.
+| Field | Required value |
+| --- | --- |
+| `resource_group`, `app_name`, `location` | Existing target group, valid app name and Azure region |
+| `environment_id` | Full `Microsoft.App/managedEnvironments` resource ID |
+| `registry_identity_id` | Full `Microsoft.ManagedIdentity/userAssignedIdentities` resource ID |
+| `image` | Full ACR repository reference with a lowercase SHA256 manifest digest; tags are rejected |
+| `allowed_origins` | Nonempty list of exact HTTPS origins, no path, credentials or wildcard |
+| `operation` | `create` by default, or `update` for an existing app |
 
-**Bootstrap order.** [Preparing the shared mount](#preparing-the-shared-mount) is the same
-`mkdir` and `chown` here as locally, and it runs **before** the first revision that contains
-the worker: the worker exits non-zero when it cannot reach the store, and a container that
-keeps exiting recycles the replica — which can leave no way in to create the directory.
+Unknown fields are rejected without printing their values. A digest is an operator input;
+syntax validation does not prove the referenced image exists or belongs to this release.
+
+### One local preparation command
+
+From the clean worktree, with its dev environment installed:
+
+```powershell
+python deploy/prepare_backend_release.py --source-root . --config .pt/operator.json --output .pt/releases/build --verify-container
+```
+
+The helper stamps the actual clean checkout's HEAD into the Docker build, records its tree
+and SHA256 of included source bytes, builds for linux/amd64, checks the image's baked commit
+environment and revision label, and runs all three existing container smoke tests against
+the immutable local image ID. Inherited pytest selection options and automatic plugin
+loading cannot weaken this gate; all three expected node IDs must pass exactly once. Source
+identity is checked again afterwards. Logs and temporary paths stay beneath `.pt`.
+
+The command writes `containerapp.yaml`, `release.json`, image inspection, JUnit and build/test
+logs. With passed local evidence it also writes a guarded `apply.ps1`. Omitting both
+verification options renders YAML and a receipt marked `not_requested`, with no apply script.
+Output must be a new directory below `.pt`; previous evidence is never overwritten.
+
+The local image ID is a Docker image/config identity. It is not the ACR manifest digest.
+The owner publishes the tested immutable image separately and records the resulting registry
+reference. Once `.pt/operator.json` contains that reference, finalize without rebuilding:
+
+```powershell
+python deploy/prepare_backend_release.py --source-root . --config .pt/operator.json --output .pt/releases/candidate --verified-receipt .pt/releases/build/release.json
+```
+
+Retain the previous receipt with its sibling `container-smoke.xml` and `image-inspection.json`.
+Reuse verifies the actual JUnit node IDs, image identity and commit stamp, checks recorded
+artifact hashes when available, and copies the evidence. `source` records the current clean
+preparer checkout; `container_verification.tested_source` and `tested_commit` continue to name
+the checkout used for the tested image. This separation also permits a truthful rollback.
+These local receipts are operator-retained evidence, not signed supply-chain attestations.
+
+### Owner preflight and apply
+
+Review the resolved YAML, receipt, image digest, target and origins, then verify association
+without contacting Azure:
+
+```powershell
+pwsh -NoProfile -File .pt/releases/candidate/apply.ps1 -PreflightOnly
+```
+
+Before any Azure command, the script checks receipt/YAML hashes and inspects the exact registry
+reference locally. Its image ID must equal the tested ID, its `RepoDigests` must contain that
+exact reference, and its architecture, OS, baked commit environment and revision label must
+match the tested evidence. Missing local metadata fails; it never silently pulls an image.
+After this passes, the owner applies the reviewed target using:
+
+```powershell
+pwsh -NoProfile -File .pt/releases/candidate/apply.ps1
+```
+
+Apply repeats those checks before `az containerapp create` or `update`. Applying creates or
+changes paid resources. Azure CLI/provider validation still occurs at that time: local
+rendering and local Docker success are not Azure deployment acceptance.
+
+### Cloud acceptance and current platform constraints
+
+`/health` is process health and is used for startup/liveness probes; `/ready` is the separate
+operator dependency check. The template uses `Liveness`/`Startup`, targetPort without the
+unsupported targetContainerName field, aggregate 1.5 vCPU/3 GiB, min=max one replica and a
+180-second graceful termination budget. Startup uses ten attempts at 15-second intervals;
+that configuration is not a measured cold-start guarantee.
+
+Keep public ingress disabled until the owner proves the store primitives from both deployed
+containers, cross-container visibility, and persistence across replica replacement. A green
+local Docker volume test does not prove any of those Azure Files properties. If the real
+mount cannot pass, ADR 0005's managed-store-adapter trigger applies. Public ingress is a
+separate acceptance action; the helper has no option that pretends to satisfy it.
+
+Microsoft's [Container Apps schema](https://learn.microsoft.com/en-us/azure/templates/microsoft.app/2026-01-01/containerapps)
+documents the app identity, ingress and probe fields; the [container sizing reference](https://learn.microsoft.com/en-us/azure/container-apps/containers)
+covers aggregate resource pairs. [Managed identity image pull](https://learn.microsoft.com/en-us/azure/container-apps/managed-identity-image-pull)
+documents the user-assigned identity path. [NFS mounts](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts)
+require VNet reachability and appropriate ports (445/2049), and Container Apps does not support
+NFS encryption in transit. The owner must confirm the account's applicable NFS/secure-transfer
+settings rather than disabling security settings by assumption. The [environment storage CLI](https://learn.microsoft.com/en-us/cli/azure/containerapp/env/storage?view=azure-cli-latest)
+documents the two named access-mode definitions.
+
+No price is asserted. Before provisioning, price the selected region's two SSD NFS shares,
+always-on replica, environment/networking, logging and egress. The [storage scale targets](https://learn.microsoft.com/en-us/azure/storage/files/storage-files-scale-targets)
+distinguish a 100 GiB provisioned-v1 floor from a 32 GiB provisioned-v2 floor; do not treat
+100 GiB as a universal minimum. Infrastructure availability and cloud filesystem behavior
+remain operator prerequisites and acceptance work.
 
 ## Publishing what ops owns
 
@@ -371,11 +457,66 @@ capture id is part of every cache key: answers computed under the older capture 
 under the older capture, and the rolled-back week's entries stay addressable if it is
 republished.
 
-This transport is deliberately not scripted yet. How the bytes cross from a Windows ops
-machine to an Azure Files NFS share — `azcopy`, an SMB sibling share, a jumpbox inside the
-VNet — is exactly what could not be confirmed from here, and a helper encoding a guess would
-be worse than four commands whose order is written down. Script it once the transport is
-decided.
+### Concrete publication transport
+
+Use an existing operator-owned Linux host inside the VNet with the inputs share mounted
+ReadWrite at `/mnt/squadopt-inputs`; the application's mount remains ReadOnly. That host must
+have OpenSSH, rsync, sha256sum and an authorized writer account. Windows-native AzCopy cannot
+upload local files to NFS; Microsoft's [AzCopy NFS limits](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azcopy-files)
+require Linux for local NFS upload/download. Provisioning the Linux host, mounts and SSH
+access is a prerequisite, not an action of this helper.
+
+On the Windows ops machine, set these paths to the actual published site, handoff and complete
+live snapshot. Use a fresh staging directory per publication; it is outside the mounted tree.
+
+```powershell
+$PublishHost = 'publisher@linux-host-in-vnet'
+$SiteData = 'C:/ops/squadopt/web/public/data'
+$Handoff = 'C:/ops/squadopt/data/handoffs/2026-27-gw04.json'
+$Snapshot = 'C:/ops/squadopt/data/snapshots/fpl-live-20260909T060000Z'
+ssh $PublishHost 'mkdir -p ~/squadopt-stage/release-gw04'
+scp -r $SiteData "${PublishHost}:squadopt-stage/release-gw04/site-data"
+scp $Handoff "${PublishHost}:squadopt-stage/release-gw04/handoff.json"
+scp -r $Snapshot "${PublishHost}:squadopt-stage/release-gw04/snapshot"
+```
+
+On the Linux preparation host, use the matching names below. Refuse an already-published
+snapshot directory, copy/check payloads, and expose metadata only as the final rename:
+
+```bash
+set -euo pipefail
+STAGE="$HOME/squadopt-stage/release-gw04"
+INPUTS=/mnt/squadopt-inputs
+SNAPSHOT_ID=fpl-live-20260909T060000Z
+HANDOFF_NAME=2026-27-gw04.json
+test -f "$STAGE/snapshot/metadata.json"
+test -f "$STAGE/handoff.json"
+test ! -e "$INPUTS/snapshots/$SNAPSHOT_ID"
+mkdir -p "$INPUTS/site/data" "$INPUTS/handoffs" "$INPUTS/snapshots"
+rsync -a "$STAGE/site-data/" "$INPUTS/site/data/"
+cp "$STAGE/handoff.json" "$INPUTS/handoffs/$HANDOFF_NAME.pending"
+cmp "$STAGE/handoff.json" "$INPUTS/handoffs/$HANDOFF_NAME.pending"
+mv "$INPUTS/handoffs/$HANDOFF_NAME.pending" "$INPUTS/handoffs/$HANDOFF_NAME"
+mkdir "$INPUTS/snapshots/$SNAPSHOT_ID"
+rsync -a --exclude=/metadata.json "$STAGE/snapshot/" "$INPUTS/snapshots/$SNAPSHOT_ID/"
+(cd "$STAGE/snapshot"; find . -type f ! -path ./metadata.json -print0 | sort -z | xargs -0 sha256sum) > "$STAGE/payloads.sha256"
+(cd "$INPUTS/snapshots/$SNAPSHOT_ID"; sha256sum -c "$STAGE/payloads.sha256")
+cp "$STAGE/snapshot/metadata.json" "$INPUTS/snapshots/$SNAPSHOT_ID/metadata.json.pending"
+cmp "$STAGE/snapshot/metadata.json" "$INPUTS/snapshots/$SNAPSHOT_ID/metadata.json.pending"
+mv "$INPUTS/snapshots/$SNAPSHOT_ID/metadata.json.pending" "$INPUTS/snapshots/$SNAPSHOT_ID/metadata.json"
+```
+
+Source names above are examples, not evidence of an available GW4 capture. The handoff's
+season/gameweek and snapshot identity must agree with the actual ops output. After publication,
+check `/ready` and one connected member request through the internal endpoint. If readiness
+regresses, withdraw only the new capture marker on that same mounted host:
+
+```bash
+mv "$INPUTS/snapshots/$SNAPSHOT_ID/metadata.json" "$INPUTS/snapshots/$SNAPSHOT_ID/metadata.json.withdrawn"
+```
+
+This preserves the marker for diagnosis while making the previous valid capture selectable.
+Never withdraw the previous good capture or its handoff while recovering the new publication.
 
 ## Rollback
 
@@ -384,19 +525,22 @@ site is the static site again, exactly as before. The backend container can be d
 it owns no data the ledger needs: the cache recomputes, and pending jobs are recomputable
 requests by construction.
 
-Rolling back the *image* is a re-apply of the previous digest: put it back in
-`deploy/containerapp.yaml` and apply the same file.
+Rolling back the *image* reuses the prior verified image's evidence. Keep its receipt, JUnit,
+inspection and resolved YAML. Set `.pt/rollback.json` to the intended target, `operation:
+"update"`, and the previously deployed immutable registry reference. Then prepare and apply:
 
-```bash
-az containerapp update --resource-group <RESOURCE_GROUP> --name squadopt-backend \
-  --yaml deploy/containerapp.yaml
+```powershell
+python deploy/prepare_backend_release.py --source-root . --config .pt/rollback.json --output .pt/releases/rollback --verified-receipt .pt/releases/previous/release.json
+pwsh -NoProfile -File .pt/releases/rollback/apply.ps1 -PreflightOnly
+pwsh -NoProfile -File .pt/releases/rollback/apply.ps1
 ```
 
-One file, so both containers move together — two containers on different commits would answer
-at two different cache keys. (`az containerapp update --image` is shorter, but which of the two
-containers it means is UNVERIFIED here; the file is unambiguous.) Answers computed by the older
-code stay addressable because `repository_commit` is part of the cache key: the rollback does
-not read the newer code's entries and does not overwrite them.
+The prior registry reference must still exist in local Docker metadata and bind to the prior
+tested image. Do not rebuild the current HEAD and assign its commit to the older digest.
+The new receipt keeps the prior tested commit separate from the preparer checkout. One
+resolved YAML moves both containers together. Answers computed by the older code stay
+addressable because `repository_commit` is part of the cache key; rollback does not read the
+newer code's entries or overwrite them.
 
 Image and data roll back independently, and that is why they are kept separate: a bad image is
 the command above, a bad data release is the `metadata.json` deletion under
@@ -406,7 +550,8 @@ the command above, a bad data release is the `metadata.json` deletion under
 
 | Symptom | Where to look |
 | --- | --- |
-| every advice route 503 | `/ready` — one of the three checks is false, and it names which |
+| advice routes return 503 | `/ready` and the coded response — inspect the failing store/context check |
+| POST returns `404 LEAGUE_NOT_CONNECTED` | the requested league is absent from the published membership tree; `league_tree` may be false |
 | jobs queue but never finish | is a worker process running, and is it mounting the same `SQUADOPT_BACKEND_STORE_ROOT`? A worker that exited 1 at startup could not reach the store |
 | POST answers `503 NOT_READY` | the store probe is failing; `/ready` names the check, and a missing volume shows up as `cache_store` |
 | job `failed` with `CONTEXT_UNAVAILABLE` | the capture moved on between accepting and computing; asking again is the fix |
