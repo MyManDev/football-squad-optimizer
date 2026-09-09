@@ -68,7 +68,7 @@ test("language selection switches the full frame and persists across routes", as
   await page.reload();
   await expect(page.getByRole("link", { name: "League", exact: true })).toHaveAttribute(
     "href",
-    "/league/members",
+    "/",
   );
   await expect(page.getByRole("link", { name: "Suggested Moves" })).toHaveCount(0);
 });
