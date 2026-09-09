@@ -1,6 +1,9 @@
 """The weekly command's pure half: the plan, the decide pre-flight, the mode the decision
 is stamped with, the snapshot-by-difference rule, the parser."""
 
+import functools
+import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -109,6 +112,7 @@ def test_a_reused_capture_refuses_when_its_evidence_export_is_not_on_disk(
             gameweek=4,
             elite_snapshot="fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb",
             snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+            captured_at_utc="2026-09-11T10:00:00Z",
         )
 
 
@@ -118,7 +122,7 @@ def test_a_reused_capture_with_its_export_already_on_disk_is_allowed(tmp_path: P
     )
     assert table.name == "player_evidence_v1_2026-27_gw04_top100_bbbbbbbbbbbb.csv"
     table.write_text("player_id\n1\n", encoding="utf-8")
-    manifest.write_text("{}", encoding="utf-8")
+    manifest.write_text(json.dumps({"generated_at_utc": "2026-09-11T09:15:00Z"}), encoding="utf-8")
 
     check_evidence_for_reused_capture(
         tmp_path,
@@ -126,6 +130,7 @@ def test_a_reused_capture_with_its_export_already_on_disk_is_allowed(tmp_path: P
         gameweek=4,
         elite_snapshot="fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb",
         snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        captured_at_utc="2026-09-11T10:00:00Z",
     )
 
 
@@ -142,7 +147,212 @@ def test_a_half_written_export_does_not_count_as_reusable(tmp_path: Path) -> Non
             gameweek=4,
             elite_snapshot="fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb",
             snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+            captured_at_utc="2026-09-11T10:00:00Z",
         )
+
+
+def test_a_reused_capture_refuses_an_artifact_generated_after_it(tmp_path: Path) -> None:
+    """On disk is not the question; older than the capture is.
+
+    A run refused at the handoff leaves its artifact behind, and a ``--projection
+    component-only`` run writes one without ever consulting this guard. Either way the pair
+    is on disk and stamped after the capture, so an existence test passes it and the run
+    dies ninety seconds later inside ``apply_elite_evidence`` instead — with the same rule,
+    at the point where the work has already been done.
+    """
+
+    table, manifest = evidence_artifact(
+        tmp_path, "2026-27", 4, "fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb"
+    )
+    table.write_text("player_id\n1\n", encoding="utf-8")
+    manifest.write_text(json.dumps({"generated_at_utc": "2026-09-11T10:30:00Z"}), encoding="utf-8")
+
+    with pytest.raises(WeekError, match="generated at 2026-09-11T10:30:00Z, after"):
+        check_evidence_for_reused_capture(
+            tmp_path,
+            season="2026-27",
+            gameweek=4,
+            elite_snapshot="fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb",
+            snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+            captured_at_utc="2026-09-11T10:00:00Z",
+        )
+
+
+def test_the_guard_does_not_offer_a_remedy_that_cannot_be_carried_out(tmp_path: Path) -> None:
+    """The old message told the operator to export it for that picks capture first.
+
+    ``export_player_evidence`` stamps the manifest with the wall clock and its CLI has no
+    override, so an export made now is always after a capture already taken. The two
+    remedies named are the two that exist.
+    """
+
+    with pytest.raises(WeekError) as refusal:
+        check_evidence_for_reused_capture(
+            tmp_path,
+            season="2026-27",
+            gameweek=4,
+            elite_snapshot="fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb",
+            snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+            captured_at_utc="2026-09-11T10:00:00Z",
+        )
+
+    message = str(refusal.value)
+    assert "Export it for that picks capture first" not in message
+    assert "--skip-top100" in message and "--projection component-only" in message
+
+
+def test_an_artifact_generated_before_the_capture_is_allowed(tmp_path: Path) -> None:
+    table, manifest = evidence_artifact(
+        tmp_path, "2026-27", 4, "fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb"
+    )
+    table.write_text("player_id\n1\n", encoding="utf-8")
+    manifest.write_text(json.dumps({"generated_at_utc": "2026-09-11T09:30:00Z"}), encoding="utf-8")
+
+    check_evidence_for_reused_capture(
+        tmp_path,
+        season="2026-27",
+        gameweek=4,
+        elite_snapshot="fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb",
+        snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        captured_at_utc="2026-09-11T10:00:00Z",
+    )
+
+
+def test_an_artifact_that_cannot_say_when_it_was_generated_is_refused(tmp_path: Path) -> None:
+    table, manifest = evidence_artifact(
+        tmp_path, "2026-27", 4, "fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb"
+    )
+    table.write_text("player_id\n1\n", encoding="utf-8")
+    manifest.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(WeekError, match="carries no generated_at_utc"):
+        check_evidence_for_reused_capture(
+            tmp_path,
+            season="2026-27",
+            gameweek=4,
+            elite_snapshot="fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb",
+            snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+            captured_at_utc="2026-09-11T10:00:00Z",
+        )
+
+
+# --- the working tree, asked before the week's captures are spent ----------------------
+
+
+def _repository(tmp_path: Path) -> Path:
+    """A committed git repository shaped like this one, so the guard is tested for real."""
+
+    root = tmp_path / "checkout"
+    (root / "scripts").mkdir(parents=True)
+    (root / "web" / "public" / "data" / "2026-27").mkdir(parents=True)
+    (root / "scripts" / "run_week.py").write_text("# source\n", encoding="utf-8")
+    (root / "web" / "public" / "data" / "2026-27" / "status.json").write_text(
+        '{"hours_to_deadline": 48}\n', encoding="utf-8"
+    )
+    run = functools.partial(subprocess.run, cwd=root, check=True, capture_output=True, text=True)
+    run(["git", "init", "-q"])
+    run(["git", "add", "-A"])
+    run(
+        [
+            "git",
+            "-c",
+            "user.email=test@example.com",
+            "-c",
+            "user.name=test",
+            "commit",
+            "-qm",
+            "seed",
+        ]
+    )
+    return root
+
+
+def test_a_committed_tree_lets_the_week_start(tmp_path: Path) -> None:
+    run_week.check_working_tree(cwd=_repository(tmp_path))
+
+
+def test_the_loops_own_site_output_does_not_stop_the_week(tmp_path: Path) -> None:
+    """The self-inflicted case, and the one that blocks a second run of a real week.
+
+    Steps 6 to 8 rewrite ``web/public/data`` in the publishing checkout, and ``status.json``
+    carries the hours left to the deadline, so it differs a second later. Counting that as a
+    reason the evidence artifact could not be rebuilt from its commit made the loop the
+    commonest cause of its own refusal — after two live captures had been spent.
+    """
+
+    root = _repository(tmp_path)
+    status = root / "web" / "public" / "data" / "2026-27" / "status.json"
+    status.write_text('{"hours_to_deadline": 47}\n', encoding="utf-8")
+    (root / "web" / "public" / "data" / "2026-27" / "live.json").write_text("{}", encoding="utf-8")
+
+    assert run_week.reproducibility_blockers(root) == ()
+    run_week.check_working_tree(cwd=root)
+
+
+def test_a_modified_source_file_still_refuses_and_names_the_recovery(tmp_path: Path) -> None:
+    root = _repository(tmp_path)
+    (root / "scripts" / "run_week.py").write_text("# changed\n", encoding="utf-8")
+
+    with pytest.raises(WeekError) as refusal:
+        run_week.check_working_tree(cwd=root)
+
+    message = str(refusal.value)
+    assert "scripts/run_week.py" in message
+    assert "git checkout --" in message
+    assert "nothing spent" in message
+
+
+def test_an_untracked_source_file_still_refuses(tmp_path: Path) -> None:
+    """An untracked module beside an exporter can be imported and is in no commit at all,
+    so nothing could reproduce what it changed. Widening the rule to tracked-only would
+    have made the guard pass and the artifact unreproducible."""
+
+    root = _repository(tmp_path)
+    (root / "scripts" / "patch_me.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    with pytest.raises(WeekError, match=r"patch_me\.py"):
+        run_week.check_working_tree(cwd=root)
+
+
+def test_the_working_tree_is_asked_only_when_an_artifact_will_be_written(tmp_path: Path) -> None:
+    """A reused export is bytes written at some other commit; this tree cannot change them,
+    so a run that writes no artifact is not held to the rule."""
+
+    reused = "fpl-elite-picks-20260911T091000Z-bbbbbbbbbbbb"
+    table, manifest = evidence_artifact(tmp_path, "2026-27", 4, reused)
+    table.write_text("player_id\n1\n", encoding="utf-8")
+    manifest.write_text("{}", encoding="utf-8")
+    asks = functools.partial(
+        run_week.will_export_provenance_artifact,
+        evidence_root=tmp_path,
+        rotation_root=tmp_path / "rotation",
+    )
+
+    assert asks(_plan(), elite_snapshot=None, snapshot_id=None) is True
+    assert asks(_plan(skip_top100=True), elite_snapshot=None, snapshot_id=None) is False
+    reusing = _plan(
+        snapshot_id="fpl-live-20260911T100000Z-abc123def456",
+        cohort_snapshot="fpl-top100-x",
+        elite_snapshot=reused,
+    )
+    assert asks(reusing, elite_snapshot=reused, snapshot_id=None) is False
+    assert asks(reusing, elite_snapshot="fpl-elite-picks-other", snapshot_id=None) is True
+
+
+def test_the_working_tree_is_refused_before_a_single_capture_is_taken(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The whole point of moving it: the export said this after two captures were spent."""
+
+    calls = _wire_a_week(monkeypatch, tmp_path, deadline="2026-09-12T10:00:00Z")
+    captured: list[str] = []
+    monkeypatch.setattr(run_week, "capture", lambda root, **kwargs: captured.append("live") or None)
+    monkeypatch.setattr(run_week, "reproducibility_blockers", lambda *_args: (" M scripts/x.py",))
+
+    with pytest.raises(WeekError, match=r"scripts/x\.py"):
+        run_week.run_week(_week_arguments(tmp_path, skip_top100=False, rotation=False))
+
+    assert calls == [] and captured == []
 
 
 def test_publish_is_the_last_step_when_asked() -> None:
@@ -530,6 +740,11 @@ def _wire_a_week(
             snapshot_id="fpl-live-20260911T100000Z-abc123def456"
         ),
     )
+    # The checkout these tests run in is ambient state like the roots above: pytest's own
+    # basetemp is an untracked path in it, so the pre-flight would read the test runner's
+    # leftovers as this week's refusal. A clean answer here; the guard itself is under test
+    # against a repository of its own further down.
+    monkeypatch.setattr(run_week, "reproducibility_blockers", lambda *_args: ())
     calls: list[list[str]] = []
 
     def collect(arguments: list[str], **kwargs: object) -> str:
