@@ -332,7 +332,17 @@ def _catalog() -> Mapping[str, Strategy]:
             # windows publish the per-week plan and the window's stated limits.
             publishes=_BASELINE_PUBLISHES | frozenset({"plan_weeks", "stated_limits"}),
             evidence=EvidenceStatus.PREREG_OPEN,
-            tagline="Unconstrained: the highest expected points.",
+            # Not "the highest expected points". The solve maximises the eleven, the
+            # captain and the bench together (``planning/optimizer.py``: ``projected_score
+            # + bench_weight * projected_bench - hits``, bench_weight 0.1), while
+            # ``expected_own_points`` — the number this publishes and the member reads —
+            # is the eleven and the captain only. The two have different maximisers, and
+            # on the 2026-27 GW4 capture they disagree: entry 3832237's plan scores 46.5454
+            # on the published figure with a 7.1846 bench, and its ortak-koru plan scores
+            # 46.7016 with a 4.3379 bench — the banded plan reads higher on the figure and
+            # lower on the objective. Nothing enforces a maximum over the published figure,
+            # so nothing may claim one.
+            tagline="Unconstrained: chosen on the eleven, the captain and the bench together.",
         ),
         Strategy(
             slug="ortak-koru",
