@@ -1,0 +1,410 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-09-09T06:31:36Z",
+  "payload": {
+    "captured_at_utc": "2026-09-09T05:50:21.952665Z",
+    "cohort_picks_snapshot_id": "fpl-elite-picks-20260909T053428Z-5679674b5954",
+    "cohort_snapshot_id": "fpl-top100-20260909T053412Z-33a08d17a8fd",
+    "cumulative": {
+      "average_entry_score": 182.0,
+      "gameweeks": [
+        1,
+        2,
+        3
+      ],
+      "members_counted": 15,
+      "members_gameweeks": [
+        1,
+        2,
+        3
+      ],
+      "members_mean_total_points": 199.2,
+      "ours_gameweeks": [
+        1
+      ],
+      "ours_net": 26.0,
+      "through_gameweek": 3
+    },
+    "gameweeks": [
+      {
+        "average_entry_score": 50.0,
+        "data_checked": true,
+        "deadline_utc": "2026-08-21T17:30:00Z",
+        "finished": true,
+        "gameweek": 1,
+        "highest_score": 131.0,
+        "members": [
+          {
+            "entry_id": 313686,
+            "hit_cost": 0,
+            "net": 73,
+            "points": 73,
+            "total_points": 73
+          },
+          {
+            "entry_id": 2199732,
+            "hit_cost": 0,
+            "net": 64,
+            "points": 64,
+            "total_points": 64
+          },
+          {
+            "entry_id": 2281624,
+            "hit_cost": 0,
+            "net": 66,
+            "points": 66,
+            "total_points": 66
+          },
+          {
+            "entry_id": 3832237,
+            "hit_cost": 0,
+            "net": 53,
+            "points": 53,
+            "total_points": 53
+          },
+          {
+            "entry_id": 4287206,
+            "hit_cost": 0,
+            "net": 67,
+            "points": 67,
+            "total_points": 67
+          },
+          {
+            "entry_id": 5081114,
+            "hit_cost": 0,
+            "net": 26,
+            "points": 26,
+            "total_points": 26
+          },
+          {
+            "entry_id": 5349883,
+            "hit_cost": 0,
+            "net": 68,
+            "points": 68,
+            "total_points": 68
+          },
+          {
+            "entry_id": 5662073,
+            "hit_cost": 0,
+            "net": 45,
+            "points": 45,
+            "total_points": 45
+          },
+          {
+            "entry_id": 6654210,
+            "hit_cost": 0,
+            "net": 46,
+            "points": 46,
+            "total_points": 46
+          },
+          {
+            "entry_id": 6879786,
+            "hit_cost": 0,
+            "net": 63,
+            "points": 63,
+            "total_points": 63
+          },
+          {
+            "entry_id": 6880255,
+            "hit_cost": 0,
+            "net": 33,
+            "points": 33,
+            "total_points": 33
+          },
+          {
+            "entry_id": 7018833,
+            "hit_cost": 0,
+            "net": 59,
+            "points": 59,
+            "total_points": 59
+          },
+          {
+            "entry_id": 7252721,
+            "hit_cost": 0,
+            "net": 54,
+            "points": 54,
+            "total_points": 54
+          },
+          {
+            "entry_id": 8548384,
+            "hit_cost": 0,
+            "net": 51,
+            "points": 51,
+            "total_points": 51
+          },
+          {
+            "entry_id": 8883467,
+            "hit_cost": 0,
+            "net": 46,
+            "points": 46,
+            "total_points": 46
+          }
+        ],
+        "members_counted": 15,
+        "members_mean_net": 54.266666666666666,
+        "ours": {
+          "hits": 0.0,
+          "mode": "live",
+          "net": 26.0,
+          "projected": 56.077499304365105,
+          "scoring_basis": "named_eleven_no_autosubs",
+          "vice_captain_named": false,
+          "xi": 26.0
+        },
+        "top100": null
+      },
+      {
+        "average_entry_score": 81.0,
+        "data_checked": true,
+        "deadline_utc": "2026-08-28T17:30:00Z",
+        "finished": true,
+        "gameweek": 2,
+        "highest_score": 161.0,
+        "members": [
+          {
+            "entry_id": 313686,
+            "hit_cost": 0,
+            "net": 106,
+            "points": 106,
+            "total_points": 179
+          },
+          {
+            "entry_id": 2199732,
+            "hit_cost": 0,
+            "net": 96,
+            "points": 96,
+            "total_points": 160
+          },
+          {
+            "entry_id": 2281624,
+            "hit_cost": 0,
+            "net": 96,
+            "points": 96,
+            "total_points": 162
+          },
+          {
+            "entry_id": 3832237,
+            "hit_cost": 0,
+            "net": 59,
+            "points": 59,
+            "total_points": 112
+          },
+          {
+            "entry_id": 4287206,
+            "hit_cost": 0,
+            "net": 97,
+            "points": 97,
+            "total_points": 164
+          },
+          {
+            "entry_id": 5081114,
+            "hit_cost": 0,
+            "net": 96,
+            "points": 96,
+            "total_points": 122
+          },
+          {
+            "entry_id": 5349883,
+            "hit_cost": 0,
+            "net": 78,
+            "points": 78,
+            "total_points": 146
+          },
+          {
+            "entry_id": 5662073,
+            "hit_cost": 0,
+            "net": 100,
+            "points": 100,
+            "total_points": 145
+          },
+          {
+            "entry_id": 6654210,
+            "hit_cost": 0,
+            "net": 97,
+            "points": 97,
+            "total_points": 143
+          },
+          {
+            "entry_id": 6879786,
+            "hit_cost": 0,
+            "net": 115,
+            "points": 115,
+            "total_points": 178
+          },
+          {
+            "entry_id": 6880255,
+            "hit_cost": 0,
+            "net": 69,
+            "points": 69,
+            "total_points": 102
+          },
+          {
+            "entry_id": 7018833,
+            "hit_cost": 0,
+            "net": 57,
+            "points": 57,
+            "total_points": 116
+          },
+          {
+            "entry_id": 7252721,
+            "hit_cost": 0,
+            "net": 86,
+            "points": 86,
+            "total_points": 140
+          },
+          {
+            "entry_id": 8548384,
+            "hit_cost": 4,
+            "net": 71,
+            "points": 75,
+            "total_points": 122
+          },
+          {
+            "entry_id": 8883467,
+            "hit_cost": 0,
+            "net": 71,
+            "points": 71,
+            "total_points": 117
+          }
+        ],
+        "members_counted": 15,
+        "members_mean_net": 86.26666666666667,
+        "ours": null,
+        "top100": null
+      },
+      {
+        "average_entry_score": 51.0,
+        "data_checked": true,
+        "deadline_utc": "2026-09-04T17:30:00Z",
+        "finished": true,
+        "gameweek": 3,
+        "highest_score": 119.0,
+        "members": [
+          {
+            "entry_id": 313686,
+            "hit_cost": 0,
+            "net": 33,
+            "points": 33,
+            "total_points": 212
+          },
+          {
+            "entry_id": 2199732,
+            "hit_cost": 0,
+            "net": 51,
+            "points": 51,
+            "total_points": 211
+          },
+          {
+            "entry_id": 2281624,
+            "hit_cost": 0,
+            "net": 52,
+            "points": 52,
+            "total_points": 214
+          },
+          {
+            "entry_id": 3832237,
+            "hit_cost": 0,
+            "net": 44,
+            "points": 44,
+            "total_points": 156
+          },
+          {
+            "entry_id": 4287206,
+            "hit_cost": 0,
+            "net": 54,
+            "points": 54,
+            "total_points": 218
+          },
+          {
+            "entry_id": 5081114,
+            "hit_cost": 0,
+            "net": 52,
+            "points": 52,
+            "total_points": 174
+          },
+          {
+            "entry_id": 5349883,
+            "hit_cost": 0,
+            "net": 59,
+            "points": 59,
+            "total_points": 205
+          },
+          {
+            "entry_id": 5662073,
+            "hit_cost": 0,
+            "net": 68,
+            "points": 68,
+            "total_points": 213
+          },
+          {
+            "entry_id": 6654210,
+            "hit_cost": 0,
+            "net": 57,
+            "points": 57,
+            "total_points": 200
+          },
+          {
+            "entry_id": 6879786,
+            "hit_cost": 0,
+            "net": 44,
+            "points": 44,
+            "total_points": 222
+          },
+          {
+            "entry_id": 6880255,
+            "hit_cost": 0,
+            "net": 68,
+            "points": 68,
+            "total_points": 170
+          },
+          {
+            "entry_id": 7018833,
+            "hit_cost": 4,
+            "net": 74,
+            "points": 78,
+            "total_points": 190
+          },
+          {
+            "entry_id": 7252721,
+            "hit_cost": 0,
+            "net": 71,
+            "points": 71,
+            "total_points": 211
+          },
+          {
+            "entry_id": 8548384,
+            "hit_cost": 0,
+            "net": 84,
+            "points": 84,
+            "total_points": 206
+          },
+          {
+            "entry_id": 8883467,
+            "hit_cost": 0,
+            "net": 69,
+            "points": 69,
+            "total_points": 186
+          }
+        ],
+        "members_counted": 15,
+        "members_mean_net": 58.666666666666664,
+        "ours": null,
+        "top100": {
+          "basis": "net",
+          "cohort_size": 100,
+          "final": true,
+          "gameweek": 3,
+          "hit_points": 4.0,
+          "mean_score": 68.83,
+          "picks_snapshot_id": "fpl-elite-picks-20260909T053428Z-5679674b5954"
+        }
+      }
+    ],
+    "histories_held": 15,
+    "league_id": 352490,
+    "registered_members": 15,
+    "season": "2026-27",
+    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+  },
+  "source_kind": "live"
+}

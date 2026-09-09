@@ -1,8 +1,8 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-25T12:32:57Z",
+  "generated_at_utc": "2026-09-09T06:31:32Z",
   "payload": {
-    "captured_at_utc": "2026-08-25T12:32:00.119993Z",
+    "captured_at_utc": "2026-09-09T05:50:21.952665Z",
     "league_total_average_score": 50.0,
     "our_total_realized_net_score": 26.0,
     "ownership": {
@@ -15,27 +15,27 @@
         484420,
         178301
       ],
-      "effective_ownership": 281.1,
+      "effective_ownership": 255.60000000000002,
       "gameweek": 1,
-      "least_owned_starter": 200834,
-      "mean_starter_ownership": 19.318181818181817,
+      "least_owned_starter": 499604,
+      "mean_starter_ownership": 16.763636363636365,
       "most_owned_starter": 223094,
       "ownership_percent": {
-        "178301": 9.3,
-        "200834": 2.7,
-        "204936": 8.3,
-        "216616": 3.5,
-        "223094": 68.6,
-        "244723": 5.9,
-        "244850": 25.3,
-        "437730": 25.2,
-        "446008": 37.0,
-        "484420": 9.4,
-        "490145": 1.7,
-        "494521": 4.3,
-        "499604": 2.8,
-        "67089": 19.0,
-        "97032": 19.6
+        "178301": 3.4,
+        "200834": 2.3,
+        "204936": 7.7,
+        "216616": 3.1,
+        "223094": 71.2,
+        "244723": 5.7,
+        "244850": 28.4,
+        "437730": 18.0,
+        "446008": 25.5,
+        "484420": 5.1,
+        "490145": 1.5,
+        "494521": 3.5,
+        "499604": 2.0,
+        "67089": 17.8,
+        "97032": 17.3
       },
       "squad": [
         {
@@ -237,14 +237,14 @@
     },
     "scored_gameweeks": 1,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20260825T123200Z-120a15c72afe",
+    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
     "total_difference_to_average": -24.0,
-    "verdict": "-24 points against the game's average over 1 scored gameweek — one gameweek is noise, not evidence; the starting eleven averages 19% ownership.",
+    "verdict": "-24 points against the game's average over 1 scored gameweek — one gameweek is noise, not evidence; the starting eleven averages 17% ownership.",
     "verdict_code": "standing",
     "verdict_params": {
       "caveat": "noise",
       "difference": -24.0,
-      "mean_starter_ownership": 19.3,
+      "mean_starter_ownership": 16.8,
       "scored": 1
     },
     "weeks": [
@@ -260,23 +260,23 @@
         "our_realized_score": 26.0
       },
       {
-        "average_entry_score": null,
+        "average_entry_score": 81.0,
         "deadline_utc": "2026-08-28T17:30:00Z",
         "difference_to_average": null,
-        "finished": false,
+        "finished": true,
         "gameweek": 2,
-        "highest_score": null,
+        "highest_score": 161.0,
         "our_projected_score": null,
         "our_realized_net_score": null,
         "our_realized_score": null
       },
       {
-        "average_entry_score": null,
+        "average_entry_score": 51.0,
         "deadline_utc": "2026-09-04T17:30:00Z",
         "difference_to_average": null,
-        "finished": false,
+        "finished": true,
         "gameweek": 3,
-        "highest_score": null,
+        "highest_score": 119.0,
         "our_projected_score": null,
         "our_realized_net_score": null,
         "our_realized_score": null
