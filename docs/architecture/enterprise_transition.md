@@ -3,8 +3,8 @@
 ## Adım adım ilerleme
 
 - [x] Tek geçiş branch'ini oluştur; güncel develop ve aktif işleri doğrula.
-- [ ] **Şimdi:** kuyruk kurtarma, iş sahipliği ve bozuk kayıt izolasyonu (R02).
-- [ ] API/web veri doğrulaması, istek iptali ve süre sınırları (R03).
+- [x] Kuyruk kurtarma, iş sahipliği ve bozuk kayıt izolasyonu (R02); odaklı testler geçti.
+- [ ] **Şimdi:** API/web veri doğrulaması, istek iptali ve süre sınırları (R03).
 - [ ] Yedekleme, geri yükleme ve haftalık koşu takibi (R04/R05).
 - [ ] Ortak sözleşmeler ve katman bağımlılıkları (R11).
 - [ ] Solver, yayın üretimi ve üye sayfası sorumlulukları (R12).
@@ -30,7 +30,7 @@ prospective scientific evidence have separate completion criteria.
 | Work | Scope and acceptance | State |
 | --- | --- | --- |
 | R01 | Reconcile archived #440/#442 and prerequisite fixes against this baseline; preserve Ibo's active LLM work | Pending |
-| R02 | Recover interrupted queue writes; fence stale attempts; isolate corrupt records; exercise process crashes and concurrent recovery | In progress |
+| R02 | Recover interrupted queue writes; fence stale attempts; isolate corrupt records; exercise process crashes and concurrent recovery | Implemented; 66 focused tests passed on Windows; full/CI acceptance pending |
 | R03 | Shared API cache validation and request capabilities; strict nested web payloads; request cancellation and deadlines | Pending |
 | R04 | Capture-addressed projection retention; verifiable backup and empty-target restore; inventory existing external backup | Pending |
 | R05 | Durable weekly stage/results, interrupted-run visibility and safe resume; installed application seams | Pending |
