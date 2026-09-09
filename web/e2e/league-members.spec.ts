@@ -35,7 +35,7 @@ test("member list links to point-labelled advice and preserves its URL state", a
   await expect(page).toHaveURL(/rival=\d+/);
   await expect(page.getByText(/beklenen puan maliyeti/).first()).toBeVisible();
   await expect(page.getByText(/yalnızca senin kadrondan/)).toBeVisible();
-  await expect(page.getByText(/puan farkın: \+9/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kaydedilen puan farkı" })).toHaveCount(0);
   await expect(page.getByText(/rakibe karşı beklenen fark/)).toBeVisible();
   await expect(page.locator('[aria-labelledby="entry-advice-title"]')).not.toContainText("%");
 

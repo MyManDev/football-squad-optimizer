@@ -297,17 +297,6 @@ function LeagueMemberContent({
         </Card>
       ) : null}
 
-      {view.squadopt_comparison ? (
-        <Card title={copy.squadoptComparisonTitle}>
-          <p className={styles.notice}>{messages.league.note}</p>
-          <p className={`${styles.comparison} num`}>
-            {copy.squadoptComparison(
-              signedPoints(view.squadopt_comparison.difference_points, 0, locale),
-            )}
-          </p>
-        </Card>
-      ) : null}
-
       {view.starting_xi.length > 0 ? (
         <>
           <Card
@@ -316,21 +305,28 @@ function LeagueMemberContent({
             aside={copy.starterCount(view.starting_xi.length)}
           >
             <Pitch starters={view.starting_xi} />
+            <p className={styles.notice}>{copy.heldViceCaptainUnavailable}</p>
           </Card>
           <Card title={copy.bench} aside={copy.benchCount(view.bench.length)}>
             <div className={styles.bench}>
-              {view.bench.map((player) => (
-                <div className={styles.benchRow} key={player.player_id}>
-                  <span className="num">{player.bench_order}</span>
-                  <strong>{player.name}</strong>
-                  <span className={styles.muted}>
-                    {player.team} · {player.position}
-                  </span>
-                  <span className={`${styles.benchPoints} num`}>
-                    {points(player.expected_points, 1, locale)} xP
-                  </span>
-                </div>
-              ))}
+              {[...view.bench]
+                .sort(
+                  (left, right) =>
+                    (left.bench_order ?? Number.MAX_SAFE_INTEGER) -
+                    (right.bench_order ?? Number.MAX_SAFE_INTEGER),
+                )
+                .map((player) => (
+                  <div className={styles.benchRow} key={player.player_id}>
+                    <span className="num">{player.bench_order ?? "—"}</span>
+                    <strong>{player.name}</strong>
+                    <span className={styles.muted}>
+                      {player.team} · {player.position}
+                    </span>
+                    <span className={`${styles.benchPoints} num`}>
+                      {points(player.expected_points, 1, locale)} xP
+                    </span>
+                  </div>
+                ))}
             </div>
           </Card>
         </>
