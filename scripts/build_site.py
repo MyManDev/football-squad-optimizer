@@ -23,6 +23,7 @@ from squadopt.application import (
 )
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.live import LedgerError
 from squadopt.live.tick import TickConfig
 
@@ -41,6 +42,11 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--handoff-root", type=Path, default=DEFAULT_HANDOFF_ROOT)
     parser.add_argument("--log-root", type=Path, default=DEFAULT_LOG_ROOT)
     parser.add_argument("--out", type=Path, default=REPOSITORY_ROOT / "web" / "public")
+    parser.add_argument(
+        "--horizon-manifest",
+        type=Path,
+        help="verified H1/H3/H5 batch manifest to attach as non-decision evidence",
+    )
     parser.add_argument("--now", help="pretend it is this UTC instant (replay / tests)")
     parser.add_argument("--no-status", action="store_true", help="skip the tick plan / status.json")
     parser.add_argument(
@@ -82,7 +88,13 @@ def main() -> int:
             return 1
         snapshot = None
         if not arguments.no_league:
-            identifiers = list_snapshot_ids(arguments.snapshot_root)
+            # By source, because this root is shared. The cohort collectors write here too
+            # and their identifiers sort after the live ones whatever their timestamps say,
+            # so an unfiltered listing handed the league and the provisional score a capture
+            # carrying neither's payloads. A root with no live capture stays None: the
+            # provisional view reads one capture and is never backfilled from another, so
+            # the honest answer there is unavailable.
+            identifiers = list_snapshot_ids(arguments.snapshot_root, source=FPL_LIVE_SOURCE)
             if identifiers:
                 snapshot = read_snapshot(arguments.snapshot_root, identifiers[-1])
         report = build_site(
@@ -92,16 +104,23 @@ def main() -> int:
             plan=plan,
             runlog_root=arguments.log_root,
             snapshot=snapshot,
+            horizon_manifest=arguments.horizon_manifest,
             now=datetime.fromisoformat(now_utc.replace("Z", "+00:00")),
         )
     except (DataError, LedgerError) as error:
         print(f"Could not build the site:\n  {error}")
         return 1
+    horizon_note = (
+        f"; horizon evidence GW{report.horizon_evidence_gameweek}"
+        if report.horizon_evidence_gameweek is not None
+        else ""
+    )
     print(
         f"Wrote {len(report.files)} files under {report.out_dir / 'data'} for {report.season}: "
         f"gameweeks {list(report.decided_gameweeks)} (settled {list(report.settled_gameweeks)})"
         f"{'; status.json' if report.status_written else ''}"
         f"{'; league.json' if report.league_written else ''}"
+        f"{horizon_note}"
     )
     write_ui_view_schema()
     return 0

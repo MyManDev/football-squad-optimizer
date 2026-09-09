@@ -91,8 +91,10 @@ def test_a_capture_without_the_league_payload_says_so_rather_than_seeding_nothin
 ) -> None:
     import scripts.seed_entry_registry as seed
 
+    # The automatic pick now names the source it means, so the refusal does too: an
+    # empty root and a root of cohort captures are the same answer, "capture a live one".
     monkeypatch.setattr(seed, "SNAPSHOT_ROOT", tmp_path)
-    with pytest.raises(DataError, match="No snapshots"):
+    with pytest.raises(DataError, match="No fpl-live snapshots"):
         seed._standings_bytes(league_id=LEAGUE, snapshot_id=None, standings_file=None)
 
 

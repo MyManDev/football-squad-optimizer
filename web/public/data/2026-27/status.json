@@ -1,17 +1,29 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-25T12:32:57Z",
+  "generated_at_utc": "2026-09-09T06:31:41Z",
   "payload": {
     "actions": [
       {
-        "gameweek": 2,
+        "gameweek": 3,
         "handoff_path": null,
         "kind": "wait",
-        "reason": "gameweek 2 deadline in 77.0 h; capture opens 3 h before it",
+        "reason": "gameweek 3 deadline 2026-09-04T17:30:00Z closed with no decision recorded (missed); nothing can be decided for it now",
+        "reason_code": "deadline_missed",
+        "reason_params": {
+          "deadline_utc": "2026-09-04T17:30:00Z",
+          "gameweek": 3
+        },
+        "snapshot_id": null
+      },
+      {
+        "gameweek": 4,
+        "handoff_path": null,
+        "kind": "wait",
+        "reason": "gameweek 4 deadline in 78.0 h; capture opens 3 h before it",
         "reason_code": "before_window",
         "reason_params": {
-          "gameweek": 2,
-          "hours_left": 77.0,
+          "gameweek": 4,
+          "hours_left": 78.0,
           "window_hours": 3.0
         },
         "snapshot_id": null
@@ -20,12 +32,12 @@
     "decided_gameweeks": [
       1
     ],
-    "hours_to_deadline": 76.95,
+    "hours_to_deadline": 77.97,
     "is_idle": true,
-    "latest_capture": "fpl-live-20260825T123200Z-120a15c72afe",
-    "next_deadline_utc": "2026-08-28T17:30:00Z",
-    "next_gameweek": 2,
-    "now_utc": "2026-08-25T12:32:57Z",
+    "latest_capture": "fpl-live-20260909T055021Z-94238cf346c5",
+    "next_deadline_utc": "2026-09-12T12:30:00Z",
+    "next_gameweek": 4,
+    "now_utc": "2026-09-09T06:31:41Z",
     "recent_events": [],
     "season": "2026-27",
     "settled_gameweeks": [

@@ -15,6 +15,7 @@ import type {
   SiteIndex,
   StatusView,
 } from "./schema";
+import { readLiveScore, type LiveScoreView } from "./liveScore";
 
 export const UI_VIEW_CONTRACT_VERSION = "ui_view_v1";
 
@@ -30,6 +31,7 @@ export interface Loaded<T> {
 }
 
 export interface DataClient {
+  getLiveScore?(season: string, gameweek: number): Promise<Loaded<LiveScoreView>>;
   getIndex(): Promise<Loaded<SiteIndex>>;
   getRecommendation(season: string, gameweek: number): Promise<Loaded<RecommendationView>>;
   getPool(season: string, gameweek: number): Promise<Loaded<PoolView>>;
@@ -85,6 +87,14 @@ export class StaticDataClient implements DataClient {
 
   getIndex(): Promise<Loaded<SiteIndex>> {
     return this.read<SiteIndex>("index.json");
+  }
+
+  async getLiveScore(season: string, gameweek: number): Promise<Loaded<LiveScoreView>> {
+    const relative = gameweekPath(season, gameweek, "live");
+    const response = await fetch(`${this.baseUrl}${relative}`, { cache: "no-cache" });
+    if (response.status === 404) throw new NotFoundError(relative);
+    if (!response.ok) throw new Error(`Could not load ${relative} (${response.status}).`);
+    return readLiveScore(await response.json(), season, gameweek);
   }
 
   getRecommendation(season: string, gameweek: number): Promise<Loaded<RecommendationView>> {

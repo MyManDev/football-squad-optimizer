@@ -110,3 +110,29 @@ def test_the_committed_artifacts_pass_their_own_gate(kind: str, relative_path: s
 def test_every_registered_kind_names_at_least_three_required_fields() -> None:
     for kind, required in MEASUREMENT_KINDS.items():
         assert len(required) >= 3, kind
+
+
+def test_the_rotation_lane_has_a_kind_the_runner_covers() -> None:
+    """An artifact outside the covered set has no gate to keep passing, so it needs one."""
+
+    required = MEASUREMENT_KINDS["rotation_evidence"]
+
+    # The two that make a reading checkable against its protocol: which control it was
+    # measured against, and which comparator decided.
+    assert "arms" in required
+    assert "comparator" in required
+    # Eligible and scored are separate counts because one "n" would hide which of the two
+    # moved, and the protocol's coverage falsifier fires on exactly that difference.
+    assert {"eligible_rows", "scored_rows"} <= set(required)
+
+
+def test_the_evidence_family_name_is_not_also_a_measurement_kind() -> None:
+    """Two `rotation`-ish names now exist and they name different things.
+
+    `rotation` is an evidence *family* in the ablation; `rotation_evidence` is the artifact
+    *kind* this runner covers. Passing one where the other belongs must be refused rather
+    than half-checked, which is the failure a shared prefix invites.
+    """
+
+    with pytest.raises(PreflightError, match="Unknown measurement kind"):
+        run_measurement_preflight(_document(), "rotation")

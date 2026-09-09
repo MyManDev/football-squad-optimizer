@@ -308,3 +308,68 @@ def test_a_search_over_a_space_with_a_fixed_factor_runs_and_finds_the_optimum() 
     assert [record.candidate.candidate_id for record in first.evaluations] == [
         record.candidate.candidate_id for record in second.evaluations
     ]
+
+
+# --- the three recorded warnings, closed -------------------------------------------
+
+
+def test_observation_noise_is_estimated_from_the_folds_not_defaulted() -> None:
+    from squadopt.bayesopt import estimate_observation_noise
+
+    # A season spread like the measured 46-98 points: the estimator returns the
+    # squared standard error, orders of magnitude above the interpolation default.
+    folds = (120.0, 74.0, 168.0, 96.0)
+    noise = estimate_observation_noise(folds)
+    assert noise == pytest.approx(np.var(np.asarray(folds), ddof=1) / 4)
+    assert noise > 1.0  # nowhere near 1e-6
+
+    with pytest.raises(BayesianOptimizationExecutionError, match="two finite"):
+        estimate_observation_noise((1.0,))
+    with pytest.raises(BayesianOptimizationExecutionError, match="two finite"):
+        estimate_observation_noise((1.0, float("nan")))
+
+
+def test_a_recommendation_on_the_grid_edge_is_flagged() -> None:
+    """13 of 20 wildcard-hold evaluations sat on a grid edge and a human had to
+    notice; the diagnostics say it now."""
+
+    def edge_objective(candidate: BayesianCandidate, folds: tuple[str, ...]) -> float:
+        return float(candidate.values["form_window"])  # optimum at the upper bound
+
+    result = run_bayesian_optimization(edge_objective, DEVELOPMENT_FOLDS, _small_config())
+    assert result.recommended_candidate.values["form_window"] == 5
+    assert result.diagnostics["recommended_on_grid_edge"] is True
+    assert "form_window" in result.diagnostics["grid_edge_factors"]  # type: ignore[operator]
+
+    interior = run_bayesian_optimization(_objective, DEVELOPMENT_FOLDS, _small_config())
+    assert interior.recommended_candidate.values["form_window"] == 4
+    edge_factors = interior.diagnostics["grid_edge_factors"]
+    assert "form_window" not in edge_factors  # type: ignore[operator]
+
+
+def test_a_batch_spreads_its_picks_and_respects_the_budget() -> None:
+    config = _small_config(batch_size=3, evaluation_budget=11)
+
+    result = run_bayesian_optimization(_objective, DEVELOPMENT_FOLDS, config)
+
+    assert len(result.evaluations) <= 11
+    ids = [item.candidate.candidate_id for item in result.evaluations]
+    assert len(set(ids)) == len(ids)  # the liar's picks are distinct candidates
+    again = run_bayesian_optimization(_objective, DEVELOPMENT_FOLDS, config)
+    assert result.run_fingerprint == again.run_fingerprint  # batching stays deterministic
+    assert result.diagnostics["batch_size"] == 3
+
+
+def test_batch_size_one_is_the_sequential_loop() -> None:
+    """The default keeps the historical trace: same candidates, same order."""
+
+    sequential = run_bayesian_optimization(_objective, DEVELOPMENT_FOLDS, _small_config())
+    explicit = run_bayesian_optimization(_objective, DEVELOPMENT_FOLDS, _small_config(batch_size=1))
+    assert [e.candidate.candidate_id for e in sequential.evaluations] == [
+        e.candidate.candidate_id for e in explicit.evaluations
+    ]
+
+
+def test_a_batch_larger_than_the_post_design_budget_is_refused() -> None:
+    with pytest.raises(BayesianOptimizationConfigurationError, match="batch_size"):
+        _small_config(batch_size=9, evaluation_budget=10, initial_design_size=4)

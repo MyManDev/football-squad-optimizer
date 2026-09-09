@@ -2,6 +2,8 @@
 
     python -m scripts.build_projection_horizon
     python -m scripts.build_projection_horizon --from-gameweek 1 --gameweeks 4
+    python -m scripts.build_projection_horizon --from-gameweek 2 --gameweeks 5 \
+        --in-season-projection data/handoffs/2026-27-gw02.json
 
 Reads a captured decision snapshot, projects every requested gameweek from that single
 information state, and writes a summary the transfer planner's inputs can be checked
@@ -11,9 +13,10 @@ The table itself stays local: it is derived from a third-party payload and from 
 archive, and the repository is not a data store. What is committed is the summary.
 
 This produces planning input, **not gate evidence.** The frozen evaluation objective is
-single-gameweek realized squad points; nothing measures how far a multi-gameweek
-projection drifts, and it will drift, because expected minutes for a later gameweek are
-computed from what was known at the decision point.
+single-gameweek realized squad points. The projection will drift, because expected minutes
+for a later gameweek are computed from what was known at the decision point;
+`docs/horizon_decay` measures that drift on development folds, under the earlier
+`linear_fixture_count_scaling_v1` treatment rather than the rule the builder now ships.
 """
 
 import argparse
@@ -27,6 +30,7 @@ from squadopt.backtest.export_precision import write_export_table
 from squadopt.data.errors import DataError
 from squadopt.data.fixtures import aggregate_team_gameweek
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
@@ -37,6 +41,7 @@ from squadopt.live import (
     build_projection_horizon,
     gameweek_fixture_fingerprints,
     infer_season,
+    read_projection_handoff,
 )
 
 SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
@@ -45,10 +50,16 @@ ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
 
 def _parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--snapshot-root", type=Path, default=SNAPSHOT_ROOT)
     parser.add_argument("--snapshot-id", help="replay a named capture; omitted, the latest")
     parser.add_argument("--from-gameweek", type=int, default=1)
     parser.add_argument("--gameweeks", type=int, default=4, help="how many consecutive weeks")
     parser.add_argument("--archive-root", type=Path, default=ARCHIVE_ROOT)
+    parser.add_argument(
+        "--in-season-projection",
+        type=Path,
+        help="projection_handoff_v1 for a horizon beginning after gameweek 1",
+    )
     parser.add_argument("--season", help="override; omitted, derived from the capture")
     parser.add_argument(
         "--output-dir", type=Path, default=REPOSITORY_ROOT / "artifacts" / "horizon"
@@ -64,20 +75,38 @@ def _parse_arguments() -> argparse.Namespace:
 def main() -> int:
     arguments = _parse_arguments()
     try:
-        identifiers = list_snapshot_ids(SNAPSHOT_ROOT)
-        if not identifiers:
-            print(f"No snapshots under {SNAPSHOT_ROOT}. Capture one first.")
-            return 1
-        snapshot_id = arguments.snapshot_id or identifiers[-1]
-        snapshot = read_snapshot(SNAPSHOT_ROOT, snapshot_id)
+        # Cohort collectors share the snapshot root and their identifiers sort after
+        # every `fpl-live` one, so "the latest" has to name the source it means.
+        snapshot_id = arguments.snapshot_id
+        if snapshot_id is None:
+            identifiers = list_snapshot_ids(arguments.snapshot_root, source=FPL_LIVE_SOURCE)
+            if not identifiers:
+                print(
+                    f"No {FPL_LIVE_SOURCE} snapshots under {arguments.snapshot_root}. "
+                    "Capture one first."
+                )
+                return 1
+            snapshot_id = identifiers[-1]
+        snapshot = read_snapshot(arguments.snapshot_root, snapshot_id)
         season = arguments.season or infer_season(snapshot)
 
         first = int(arguments.from_gameweek)
         targets = tuple(range(first, first + int(arguments.gameweeks)))
         print(f"snapshot {snapshot_id}, season {season}, gameweeks {targets}")
 
-        panel = build_panel(arguments.archive_root)
-        horizon = build_projection_horizon(snapshot, targets, panel=panel, season=season)
+        handoff = (
+            read_projection_handoff(arguments.in_season_projection)
+            if arguments.in_season_projection is not None
+            else None
+        )
+        panel = None if handoff is not None else build_panel(arguments.archive_root)
+        horizon = build_projection_horizon(
+            snapshot,
+            targets,
+            panel=panel,
+            season=season,
+            in_season=handoff,
+        )
 
         calendar = aggregate_team_gameweek(
             fixture_snapshot(
@@ -173,8 +202,10 @@ def main() -> int:
     else:
         lines += [
             "The calendar is uneven across this horizon, so the per-gameweek totals differ. "
-            "Blank rows project exactly zero; double rows scale linearly with fixture count "
-            "under `linear_fixture_count_scaling_v1`.",
+            "Blank rows project exactly zero; a later week scales linearly with its fixture "
+            "count relative to the decision week's, under "
+            "`first_week_control_relative_fixture_scaling_v3`. A club blank in the decision "
+            "week has no per-fixture value to rescale and stays at zero throughout.",
         ]
     lines += [
         "",
@@ -186,8 +217,9 @@ def main() -> int:
         "",
         "It will drift. Expected minutes for a later gameweek are computed from what was "
         "known at the decision point, so injuries, rotation and suspensions in between are "
-        "unseen and the projection grows overconfident as the horizon lengthens — by an "
-        "amount nobody has measured yet.",
+        "unseen and the projection grows overconfident as the horizon lengthens. "
+        "`docs/horizon_decay` measures that drift on development folds, under the earlier "
+        "`linear_fixture_count_scaling_v1` treatment rather than the rule this run applies.",
         "",
         "The table is local and not committed; it derives from a third-party payload and "
         "the pinned archive.",

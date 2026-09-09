@@ -4,9 +4,12 @@
     python -m scripts.run_horizon_decay --max-offset 5
 
 Projects once at every chronological development decision point and scores that same
-projection against the decision gameweek and each of the following ones, applying the same
-fixture-count scaling the horizon builder ships. The result is the number that replaces the
-"nobody has measured this" disclaimer the horizon has been carrying.
+projection against the decision gameweek and each of the following ones, applying linear
+fixture-count scaling at every offset (`linear_fixture_count_scaling_v1`). That is not the
+rule the live horizon builder ships today, which preserves the decision week and scales a
+later week relative to it; the two agree wherever the decision gameweek is a single
+fixture. The result is the number that replaces the "nobody has measured this" disclaimer
+the horizon had been carrying.
 
 Development seasons only; the locked holdout is never read. The residual table stays
 local — it derives from third-party data — and the committed record is the summary.
@@ -33,7 +36,7 @@ from scripts._experiment_cli import (
 from squadopt.backtest.export_precision import write_export_table
 from squadopt.backtest.horizon_decay import (
     FIXTURE_GROUPS,
-    FIXTURE_SCALING_RULE_VERSION,
+    MEASURED_FIXTURE_SCALING_RULE_VERSION,
     measure_horizon_decay,
 )
 from squadopt.data.errors import DataError
@@ -100,7 +103,7 @@ def main() -> int:
         **metadata,
         "artifact_type": "horizon_decay",
         "contract_version": result.contract_version,
-        "fixture_scaling_rule": FIXTURE_SCALING_RULE_VERSION,
+        "fixture_scaling_rule": MEASURED_FIXTURE_SCALING_RULE_VERSION,
         "dataset_snapshot_id": f"vaastav-fpl@{ARCHIVE_COMMIT}",
         "development_seasons": list(result.seasons),
         "form_window": result.form_window,
@@ -135,7 +138,7 @@ def main() -> int:
         "# Horizon Decay",
         "",
         f"- Contract: `{result.contract_version}`",
-        f"- Scaling rule: `{FIXTURE_SCALING_RULE_VERSION}`",
+        f"- Scaling rule: `{MEASURED_FIXTURE_SCALING_RULE_VERSION}`",
         f"- Seasons: {', '.join(result.seasons)} — "
         f"{int(result.residuals['fold_id'].nunique())} decision points",
         f"- Form window: {result.form_window}",
@@ -225,8 +228,14 @@ def main() -> int:
         "own owners.",
         "",
         "The measurement uses the deterministic control, so it describes the drift of the "
-        "projection that is actually shipped. A different model would have a different "
-        "curve, and this one says nothing about it.",
+        "model that is actually shipped. A different model would have a different curve, "
+        "and this one says nothing about it.",
+        "",
+        "The calendar treatment is this measurement's own: linear fixture-count scaling at "
+        "every offset, including zero. The live horizon builder preserves the decision "
+        "week and scales a later week relative to the decision week's fixture count, so "
+        "the two treatments agree wherever the decision gameweek is a single fixture and "
+        "part where it is not. Re-measuring under the shipped rule is a separate run.",
         "",
         "## Reproduction",
         "",

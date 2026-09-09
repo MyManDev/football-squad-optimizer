@@ -275,6 +275,40 @@ class InitialSquadState:
 
 
 @dataclass(frozen=True, slots=True)
+class FirstWeekOverlap:
+    """Bound the decided week's squad overlap with a rival's known players.
+
+    ``player_ids`` names the rival's known players in the horizon's own id vocabulary;
+    ``minimum`` / ``maximum`` bound how many of them the first-week fifteen must / may
+    hold. Players the horizon does not carry cannot be held, so a floor above the
+    carried count is structurally unsatisfiable — the solver reports that as INFEASIBLE
+    rather than this object guessing, and a caller building a menu drops the band.
+    """
+
+    player_ids: frozenset[object]
+    minimum: int | None = None
+    maximum: int | None = None
+
+    def __post_init__(self) -> None:
+        players = frozenset(self.player_ids)
+        if not players:
+            raise TransferPlanningValidationError("player_ids must name at least one player.")
+        object.__setattr__(self, "player_ids", players)
+        if self.minimum is None and self.maximum is None:
+            raise TransferPlanningValidationError("An overlap band needs at least one bound.")
+        for name in ("minimum", "maximum"):
+            value = getattr(self, name)
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+            ):
+                raise TransferPlanningValidationError(
+                    f"{name} must be None or a non-negative integer."
+                )
+        if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
+            raise TransferPlanningValidationError("minimum may not exceed maximum.")
+
+
+@dataclass(frozen=True, slots=True)
 class ChipAvailability:
     """Which chips the planner may play in which gameweeks of one horizon.
 
@@ -313,10 +347,6 @@ class ChipAvailability:
         object.__setattr__(self, "available", MappingProxyType(available))
         object.__setattr__(self, "forced", MappingProxyType(forced))
 
-    @property
-    def is_empty(self) -> bool:
-        return not self.available
-
     def gameweeks_for(self, name: str) -> frozenset[int]:
         return self.available.get(name, frozenset())
 
@@ -346,6 +376,16 @@ class TransferPlanningConfig:
     max_free_transfers: int = 5
     free_transfer_accrual: int = 1
     transfer_hit_cost_points: float = 4.0
+    """What a paid transfer costs **the objective**, in points. It is the only hit
+    number the solve sees: raised above ``hit_points_charged`` it is a caution margin
+    that makes the planner decline transfers whose projected gain is marginal. It never
+    reaches a reported total, so no number a member reads is ever this one."""
+    hit_points_charged: float = 4.0
+    """What the game **charges** for a paid transfer, in points. It is the only hit
+    number that leaves a plan: ``PlanningWeekResult.transfer_hit_points`` and
+    ``TransferPlanResult.total_transfer_hit_points`` are counted at it, so every
+    reported, published and compared hit is the real charge. The default equals
+    ``transfer_hit_cost_points``, which is the game's own rule with no margin."""
     horizon_discount_factor: float = 1.0
     objective_weight_scale: int = 1_000
     wildcard_preserves_free_transfers: bool = True
@@ -406,6 +446,11 @@ class TransferPlanningConfig:
         )
         object.__setattr__(
             self,
+            "hit_points_charged",
+            _finite(self.hit_points_charged, "hit_points_charged", minimum=0.0),
+        )
+        object.__setattr__(
+            self,
             "horizon_discount_factor",
             _finite(
                 self.horizon_discount_factor,
@@ -433,6 +478,7 @@ class TransferPlanningConfig:
             "max_free_transfers": self.max_free_transfers,
             "free_transfer_accrual": self.free_transfer_accrual,
             "transfer_hit_cost_points": float(self.transfer_hit_cost_points).hex(),
+            "hit_points_charged": float(self.hit_points_charged).hex(),
             "horizon_discount_factor": float(self.horizon_discount_factor).hex(),
             "objective_weight_scale": self.objective_weight_scale,
             "wildcard_preserves_free_transfers": self.wildcard_preserves_free_transfers,

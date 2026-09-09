@@ -6,6 +6,7 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { loadLeagueMembers } from "../../league/data";
 import { useDecisionSelection } from "../decisionSelection";
+import { readHorizonEvidence } from "../horizonEvidence";
 import { MODE_PRICE_FOLDS, WINDOWS, getPlayModes } from "../modePrices";
 import styles from "./DecisionControls.module.css";
 
@@ -24,17 +25,13 @@ type LeagueFieldState =
   | { kind: "unavailable" }
   | { kind: "mismatch"; publishedId: number };
 
-export function DecisionControls({ variant = "default" }: { variant?: "default" | "entry" }) {
+export function DecisionControls({ horizonEvidence }: { horizonEvidence?: unknown }) {
   const { locale, messages } = useLanguage();
   const copy = messages.decision;
   const navigate = useNavigate();
   const [leagueInput, setLeagueInput] = useState("");
   const [leagueState, setLeagueState] = useState<LeagueFieldState>({ kind: "idle" });
-  const playModes = getPlayModes(
-    copy.modes,
-    locale,
-    variant === "entry" ? "point-cost" : "measured",
-  );
+  const playModes = getPlayModes(copy.modes, locale);
   const { mode, windowSize, update } = useDecisionSelection();
 
   async function connectLeague() {
@@ -56,10 +53,20 @@ export function DecisionControls({ variant = "default" }: { variant?: "default" 
   }
 
   const competitive = mode !== "saf-puan";
+  const liveControl = windowSize === 1;
+  const evidence = readHorizonEvidence(horizonEvidence);
+  const evidenceRow = evidence?.horizons.find((row) => row.horizon === windowSize);
+  const horizonBody = liveControl
+    ? evidenceRow && evidence?.ledger_control_verified
+      ? copy.liveEvidenceBody
+      : copy.liveControlBody
+    : evidenceRow
+      ? copy.shadowEvidenceBody(evidenceRow.solver_status, evidenceRow.solver_proof_status)
+      : copy.researchShadowBody;
 
   return (
     <Card title={copy.title} aside={<Badge tone="accent">{copy.shareable}</Badge>}>
-      <p className={styles.intro}>{variant === "entry" ? copy.entryIntro : copy.intro}</p>
+      <p className={styles.intro}>{copy.intro}</p>
 
       <div className={styles.controls}>
         <fieldset className={styles.fieldset}>
@@ -104,43 +111,59 @@ export function DecisionControls({ variant = "default" }: { variant?: "default" 
           </div>
         </fieldset>
 
-        {variant === "default" ? (
-          <form
-            className={styles.leagueField}
-            onSubmit={(event) => {
-              event.preventDefault();
-              void connectLeague();
-            }}
-          >
-            <label>
-              <span>{copy.leagueId}</span>
-              <div className={styles.leagueRow}>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder={copy.leaguePlaceholder}
-                  value={leagueInput}
-                  onChange={(event) => {
-                    setLeagueInput(event.target.value);
-                    setLeagueState({ kind: "idle" });
-                  }}
-                />
-                <button type="submit" disabled={leagueState.kind === "checking"}>
-                  {copy.leagueConnect}
-                </button>
-              </div>
-            </label>
-            {leagueState.kind === "invalid" ? (
-              <small role="alert">{copy.leagueInvalid}</small>
-            ) : leagueState.kind === "unavailable" ? (
-              <small role="alert">{copy.leagueUnavailable}</small>
-            ) : leagueState.kind === "mismatch" ? (
-              <small role="alert">{copy.leagueMismatch(leagueState.publishedId)}</small>
-            ) : (
-              <small>{copy.leagueHelp}</small>
-            )}
-          </form>
-        ) : null}
+        <form
+          className={styles.leagueField}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void connectLeague();
+          }}
+        >
+          <label>
+            <span>{copy.leagueId}</span>
+            <div className={styles.leagueRow}>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder={copy.leaguePlaceholder}
+                value={leagueInput}
+                onChange={(event) => {
+                  setLeagueInput(event.target.value);
+                  setLeagueState({ kind: "idle" });
+                }}
+              />
+              <button type="submit" disabled={leagueState.kind === "checking"}>
+                {copy.leagueConnect}
+              </button>
+            </div>
+          </label>
+          {leagueState.kind === "invalid" ? (
+            <small role="alert">{copy.leagueInvalid}</small>
+          ) : leagueState.kind === "unavailable" ? (
+            <small role="alert">{copy.leagueUnavailable}</small>
+          ) : leagueState.kind === "mismatch" ? (
+            <small role="alert">{copy.leagueMismatch(leagueState.publishedId)}</small>
+          ) : (
+            <small>{copy.leagueHelp}</small>
+          )}
+        </form>
+      </div>
+
+      <div
+        className={`${styles.horizonStatus} ${
+          liveControl ? styles.horizonControl : styles.horizonShadow
+        }`}
+        role="note"
+        aria-live="polite"
+      >
+        <Badge tone={liveControl ? "good" : "warn"}>
+          {liveControl ? copy.liveControl : copy.researchShadow}
+        </Badge>
+        <span>
+          <strong>
+            {liveControl ? copy.liveControlTitle : copy.researchShadowTitle(windowSize)}
+          </strong>{" "}
+          {horizonBody}
+        </span>
       </div>
 
       {competitive ? (

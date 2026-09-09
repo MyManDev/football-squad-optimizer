@@ -16,6 +16,11 @@
   stroke-width: 1;
 }
 
+.zero {
+  stroke: var(--color-text-muted);
+  stroke-width: 1;
+}
+
 .tick {
   fill: var(--color-text-muted);
   font-family: var(--font-mono);

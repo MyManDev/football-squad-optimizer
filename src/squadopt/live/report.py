@@ -31,6 +31,11 @@ from squadopt.live.rules import SeasonRules
 from squadopt.live.transfers import HeldSquad, TransferDecision, plan_transfers
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
 from squadopt.optimization.models import OptimizationResult
+from squadopt.prediction.elite_evidence import (
+    COMPONENT_ELITE_MODEL_VERSION,
+    ELITE_EVIDENCE_MODEL_VERSION,
+    ELITE_EVIDENCE_POLICY_VERSION,
+)
 from squadopt.scenarios import RivalSquad, ScenarioConfig, ScenarioEvaluationConfig
 
 REPORT_CONTRACT_VERSION: Final = "live_recommendation_v3"
@@ -402,6 +407,28 @@ def render(recommendation: Recommendation) -> str:
     ]
 
     diagnostics = recommendation.diagnostics
+    if recommendation.model_version in (
+        ELITE_EVIDENCE_MODEL_VERSION,
+        COMPONENT_ELITE_MODEL_VERSION,
+    ):
+        base = (
+            "Phase C component projection"
+            if recommendation.model_version == COMPONENT_ELITE_MODEL_VERSION
+            else "operational control projection"
+        )
+        model_explanation = [
+            "  This decision uses the bounded Top-100 XI-support adjustment on the",
+            f"  {base}. It is an owner-approved evidence rule,",
+            "  not a calibrated superiority or probability claim. Live availability is",
+            "  applied once after the handoff.",
+            f"  policy                     {ELITE_EVIDENCE_POLICY_VERSION}",
+        ]
+    else:
+        model_explanation = [
+            "  The projection is the operational control, the deterministic baseline. The",
+            "  two-stage production candidate was measured against the pre-registered gates",
+            "  and did not clear them, so it does not decide a real squad.",
+        ]
     lines += [
         "",
         "Projection provenance",
@@ -412,8 +439,6 @@ def render(recommendation: Recommendation) -> str:
         f"  ruled out by availability {diagnostics.get('availability_unavailable')}",
         f"  reduced by availability   {diagnostics.get('availability_reduced')}",
         "",
-        "  The projection is the operational control, the deterministic baseline. The",
-        "  two-stage production candidate was measured against the pre-registered gates",
-        "  and did not clear them, so it does not decide a real squad.",
+        *model_explanation,
     ]
     return "\n".join(lines) + "\n"

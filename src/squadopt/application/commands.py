@@ -6,6 +6,7 @@ callers supply typed requests, domain failures are raised before an invalid reco
 published, and successful calls return typed descriptions of the files they wrote.
 """
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +16,7 @@ import pandas as pd
 
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
     CONTROL_MODEL_NAME,
@@ -144,21 +146,33 @@ class SettleResult:
 
 
 def _resolve_snapshot(root: Path, requested: str | None) -> tuple[str, CapturedSnapshot]:
-    identifiers = list_snapshot_ids(root)
+    """The capture a decide or settle runs against, named or chosen.
+
+    Several collectors share this root and an identifier begins with its source, so a
+    lexical listing orders by collector before capture time: a ``fpl-top100`` capture
+    sorts after every ``fpl-live`` one however old it is. Deciding and settling are about
+    the live game state, so the automatic pick says which source it means.
+
+    Naming a capture skips that pick and is checked against everything held, because
+    which capture to replay is the operator's choice, not this function's.
+    """
+
     if requested:
+        identifiers = list_snapshot_ids(root)
         if requested not in identifiers:
             raise DataError(
                 f"No snapshot {requested!r} under {root}. Held: "
                 f"{identifiers[-3:] if identifiers else 'none'}."
             )
         snapshot_id = requested
-    elif identifiers:
-        snapshot_id = identifiers[-1]
     else:
-        raise DataError(
-            f"No snapshots under {root}. Capture one first with "
-            "'python -m scripts.capture_deadline_snapshot'."
-        )
+        live = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
+        if not live:
+            raise DataError(
+                f"No {FPL_LIVE_SOURCE} snapshots under {root}. Capture one first with "
+                "'python -m scripts.capture_deadline_snapshot'."
+            )
+        snapshot_id = live[-1]
     return snapshot_id, read_snapshot(root, snapshot_id)
 
 
@@ -238,11 +252,13 @@ def verify_decision(
         )
 
     unavailable = {int(player) for player in projection.unavailable_players}
-    selected_unavailable = sorted(squad_ids & unavailable)
-    if selected_unavailable:
+    bench_ids = {int(value) for value in recommendation.bench["player_id"]}
+    held_bench = (set(held.squad_player_ids) & bench_ids) if held is not None else set()
+    disallowed_unavailable = sorted((squad_ids & unavailable) - held_bench)
+    if disallowed_unavailable:
         failures.append(
-            f"Availability rule violated: unavailable players {selected_unavailable!r} "
-            "were selected."
+            f"Availability rule violated: unavailable players {disallowed_unavailable!r} "
+            "were selected outside the held bench."
         )
     if risk_requested:
         if recommendation.risk.status is LiveRiskStatus.NOT_REQUESTED:
@@ -317,6 +333,7 @@ def decide(
     *,
     panel_builder: PanelBuilder = build_panel,
     verifier: DecisionVerifier = verify_decision,
+    phase_e_shadow: Callable[[CapturedSnapshot, Projection], dict[str, object]] | None = None,
 ) -> DecideResult:
     """Calculate, verify, and immutably record one gameweek decision."""
 
@@ -372,6 +389,8 @@ def decide(
         )
         metadata["projection_handoff_fingerprint"] = handoff.fingerprint
         metadata["projection_handoff_path"] = str(request.in_season_projection)
+        if handoff.evidence_fingerprint is not None:
+            metadata["projection_evidence_fingerprint"] = handoff.evidence_fingerprint
         metadata["held_squad_decided_gameweek"] = held.decided_gameweek
 
     failures = verifier(
@@ -379,6 +398,28 @@ def decide(
     )
     if failures:
         raise DecisionVerificationError(failures)
+
+    if phase_e_shadow is not None:
+        # The experiment receives its own pool; it cannot change the published control.
+        shadow_projection = Projection(
+            table=projection.table.copy(deep=True),
+            unavailable_players=projection.unavailable_players,
+            diagnostics=dict(projection.diagnostics),
+            unprojected_players=projection.unprojected_players,
+        )
+        try:
+            diagnostic = phase_e_shadow(snapshot, shadow_projection)
+            if not isinstance(diagnostic, dict):
+                raise ValueError("Shadow diagnostics must be a JSON object.")
+            metadata["phase_e_shadow"] = json.loads(json.dumps(diagnostic, allow_nan=False))
+        except Exception as error:
+            # An optional shadow failure must never prevent a verified control publication.
+            metadata["phase_e_shadow"] = {
+                "status": "ERROR",
+                "internal_only": True,
+                "published_decision_changed": False,
+                "error": f"{type(error).__name__}: {error}",
+            }
 
     report = render(recommendation) + "\n" + render_rules(rules)
     directory = record_decision(

@@ -19,7 +19,9 @@ process that dies mid-write leaves only a staging directory that readers ignore 
 the next writer prunes. One writer per gameweek is enforced with an exclusive lock
 file, so two ticks cannot race the immutability check. An outcome is written the same
 way (temporary file, rename), and a manifest that was not rewritten after the outcome
-landed is completed on the next call rather than refused.
+landed is completed on the next call rather than refused — after the digests it already
+records are verified, because completing it is a rewrite and a rewrite over drifted bytes
+would bless them.
 """
 
 import contextlib
@@ -147,8 +149,15 @@ def _entry_directory(root: Path, season: str, gameweek: int) -> Path:
     return Path(root) / season.strip() / f"gw{gameweek:02d}"
 
 
-def _write_manifest(directory: Path) -> None:
-    """Re-derive the manifest from every present, individually immutable file."""
+def _write_manifest(
+    directory: Path, *, contract_version: str = SEASON_LEDGER_CONTRACT_VERSION
+) -> None:
+    """Re-derive the manifest from every present, individually immutable file.
+
+    ``contract_version`` names the record kind the manifest belongs to; it defaults to
+    the season ledger's, and another immutable record built on these primitives states
+    its own, so a reader never has to guess which contract the digests were taken under.
+    """
 
     entries = {
         path.name: _digest(path.read_bytes())
@@ -156,7 +165,7 @@ def _write_manifest(directory: Path) -> None:
         if path.name != _MANIFEST_FILE and path.is_file()
     }
     manifest = {
-        "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
+        "contract_version": contract_version,
         "files": entries,
     }
     _write_atomic(
@@ -191,6 +200,30 @@ def _verify_manifest(directory: Path) -> None:
                 f"Ledger file {name!r} in {directory} does not match its recorded "
                 "digest; the entry cannot be trusted."
             )
+
+
+# --- the immutable-write primitives, public ------------------------------------------
+#
+# The crash-safe write above is not specific to a gameweek decision: assemble in a hidden
+# staging directory, verify against a manifest of per-file digests, land with one rename,
+# and hold an exclusive lock while doing it. Any other record that must be provable after
+# the fact needs exactly these four steps, and a second hand-rolled copy of them would
+# drift from this one — a record written by a slightly different rule is a record that
+# cannot be compared with this one. They are exported here so another record reuses the
+# implementation rather than the idea. The private names stay because this module's own
+# call sites read better with them.
+digest_bytes = _digest
+"""SHA-256 of some bytes, lowercase hex — the digest every manifest here records."""
+write_atomic = _write_atomic
+"""Write bytes through a sibling temporary file and one rename."""
+staging_directory = _staging_directory
+"""The hidden sibling a record is assembled in before it lands."""
+write_manifest = _write_manifest
+"""Re-derive a directory's manifest from the files now in it."""
+verify_manifest = _verify_manifest
+"""Refuse a directory whose files no longer match their recorded digests."""
+record_lock = _gameweek_lock
+"""Hold a directory's exclusive writer lock, so two writers cannot race."""
 
 
 def record_decision(
@@ -393,7 +426,12 @@ def record_outcome(
     if outcome_path.exists():
         if _OUTCOME_FILE not in _manifest_files(directory):
             # A writer landed the outcome but died before rewriting the manifest:
-            # finish its work instead of refusing forever.
+            # finish its work instead of refusing forever. Verify first — rewriting the
+            # manifest re-derives every digest from the bytes now on disk, so completing
+            # it unverified would bless any drift that happened while the entry sat in
+            # this state. The files the manifest already records must still match it;
+            # outcome.json is not among them, which is what is being completed.
+            _verify_manifest(directory)
             with _gameweek_lock(directory):
                 _write_manifest(directory)
             return outcome_path
@@ -604,8 +642,17 @@ def held_squad_from_ledger(
     )
 
 
+def decision_mode(decision: Mapping[str, object]) -> str | None:
+    """The mode a decision was made in: ``live`` before the deadline, ``replay`` from a
+    pre-deadline capture afterwards; ``None`` on an entry recorded before it was stamped."""
+
+    metadata = decision.get("metadata")
+    mode = metadata.get("mode") if isinstance(metadata, Mapping) else None
+    return None if mode is None else str(mode)
+
+
 def ledger_summary(root: Path, season: str) -> pd.DataFrame:
-    """Return one row per recorded gameweek: projected, realized, hits, and the gap."""
+    """Return one row per recorded gameweek: mode, projected, realized, hits, and the gap."""
 
     rows: list[dict[str, object]] = []
     for entry in load_ledger(root, season):
@@ -618,6 +665,7 @@ def ledger_summary(root: Path, season: str) -> pd.DataFrame:
             {
                 "gameweek": entry.gameweek,
                 "snapshot_id": entry.decision["snapshot_id"],
+                "mode": decision_mode(entry.decision),
                 "solver_status": entry.decision["solver_status"],
                 "projected_score": projected,
                 "realized_score": realized,
@@ -635,6 +683,7 @@ def ledger_summary(root: Path, season: str) -> pd.DataFrame:
         columns=[
             "gameweek",
             "snapshot_id",
+            "mode",
             "solver_status",
             "projected_score",
             "realized_score",
@@ -657,12 +706,15 @@ def summary_markdown(root: Path, season: str) -> str:
         f"# Season Ledger {season}",
         "",
         f"- Contract: `{SEASON_LEDGER_CONTRACT_VERSION}`",
-        "- One row per live decision; raw entries (decision, projections, report, "
+        "- One row per recorded decision; raw entries (decision, projections, report, "
         "outcome) live locally under `data/ledger/` with per-file checksums.",
+        "- Mode: `live` was decided before its deadline, from a capture that run took; "
+        "`replay` was recorded after that deadline, or from a capture the run did not "
+        "take but named.",
         "",
-        "| GW | Snapshot | Solver | Projected | Realized | Error | Transfers | Hits | Chip "
-        "| Net | Unavailable |",
-        "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
+        "| GW | Snapshot | Mode | Solver | Projected | Realized | Error | Transfers | Hits "
+        "| Chip | Net | Unavailable |",
+        "| ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
     ]
     for record in table.to_dict(orient="records"):
         realized_value = record["realized_score"]
@@ -672,8 +724,9 @@ def summary_markdown(root: Path, season: str) -> str:
         error = "-" if error_value is None else f"{float(str(error_value)):+.1f}"
         net = "-" if net_value is None else f"{float(str(net_value)):.0f}"
         chip = record["chip"] if record["chip"] is not None else "-"
+        mode = record["mode"] if record["mode"] is not None else "-"
         lines.append(
-            f"| {record['gameweek']} | `{record['snapshot_id']}` "
+            f"| {record['gameweek']} | `{record['snapshot_id']}` | {mode} "
             f"| {record['solver_status']} "
             f"| {float(str(record['projected_score'])):.1f} | {realized} | {error} "
             f"| {record['transfers']} | {float(str(record['transfer_hit_points'])):.0f} "

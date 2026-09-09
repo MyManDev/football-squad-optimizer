@@ -14,6 +14,23 @@ contract. They do not redefine the data-zone dataclass.
 - `purchase_prices_known` is false when the source cannot publish purchase prices. The UI says
   explicitly that current prices are then used as selling prices and may overstate the budget.
 - `source_snapshot_id` identifies the post-deadline capture used for the entry view and advice.
+- `saf-puan` is published at windows 1, 3 and 5; a rival strategy at window 1 only. The index's
+  `windows` map names, per strategy, the windows whose file exists, and a window that did not
+  solve is an `unavailable` entry with `rival_entry_id: null`, the `window` and the reason. A
+  multi-week document adds `plan_weeks` (one row per gameweek) and `stated_limits` (the
+  producer's sentences on what the window assumes); its `moves` and lineup are the first week's.
+- A standings row carries `gameweek_points` **gross** of that week's transfer hit, as the source
+  states it, and `transfer_cost` beside it. The members page shows the difference — the net week,
+  which is the amount `total_points` advances by — for every row including SquadOpt's, and the
+  column heading and the note beneath say so in both languages. `transfer_cost: null` says
+  nothing proves the hit, not that none was taken, so such a row shows no gameweek score.
+- The index carries `suggested_strategy`: a declared rule's pick among the three strategies, with
+  the two numbers it read — `points_ahead_of_rival` (signed, against `default_rival_entry_id`, as
+  of `scored_gameweek`) and `gameweeks_remaining` — and the `band_edge_points` they were compared
+  against, so a reader can re-apply the rule. It is a band on points and carries no probability
+  wording; `null` when the standings do not prove both totals, and absent on an index published
+  before the rule existed. The rule is declared, not measured: the page labels it as such, and
+  the per-strategy advice documents are unchanged by it.
 
 ## Fields awaiting Issue #127 confirmation
 

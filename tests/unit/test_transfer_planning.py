@@ -17,6 +17,7 @@ from squadopt.planning import (
     TransferPlanningConfig,
     TransferPlanningConfigurationError,
     TransferPlanningValidationError,
+    TransferPlanResult,
     optimize_transfer_plan,
 )
 
@@ -64,6 +65,7 @@ OPTIMAL_INITIAL = _initial("GK_A", "DEF_A", "MID_A", "FWD_A")
             "may not exceed",
         ),
         ({"transfer_hit_cost_points": -1.0}, "at least 0"),
+        ({"hit_points_charged": -1.0}, "at least 0"),
         ({"horizon_discount_factor": 0.0}, "strictly positive"),
         ({"horizon_discount_factor": 1.1}, "at most 1"),
         ({"objective_weight_scale": 0}, "at least 1"),
@@ -88,6 +90,15 @@ def test_transfer_config_fingerprint_is_stable_and_complete() -> None:
             baseline,
             horizon_discount_factor=0.99,
         ).configuration_fingerprint
+    )
+    # The two hit numbers are separate controls, so each moves the digest on its own.
+    assert (
+        replace(baseline, transfer_hit_cost_points=8.0).configuration_fingerprint
+        != replace(baseline, hit_points_charged=8.0).configuration_fingerprint
+    )
+    assert (
+        baseline.configuration_fingerprint
+        != replace(baseline, hit_points_charged=8.0).configuration_fingerprint
     )
 
 
@@ -259,6 +270,62 @@ def test_a_second_same_week_transfer_pays_the_declared_hit(
     assert result.total_transfer_hit_points == 4.0
 
 
+def _one_week_swap(
+    players: pd.DataFrame,
+    *,
+    mid_a_points: float,
+) -> PlanningHorizon:
+    """One week where the only worthwhile move is MID_B -> MID_A, priced by that value."""
+
+    table = _horizon_table(players, (1,))
+    table.loc[table["player_id"] == "MID_A", "expected_points"] = mid_a_points
+    return PlanningHorizon(table)
+
+
+def test_a_planning_margin_filters_transfers_without_changing_the_hit_reported(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The separation this policy rests on: the margin prices the solve, the game prices
+    the sheet.
+
+    ``transfer_hit_cost_points`` is what the objective pays for a paid transfer;
+    ``hit_points_charged`` is what the game takes. Raising the first declines transfers
+    whose projected gain is marginal; it must never move a reported number, because those
+    are shown to members and compared between plans.
+    """
+
+    held = _initial("GK_A", "DEF_A", "MID_B", "FWD_A", free_transfers=0)
+    margin = TransferPlanningConfig(transfer_hit_cost_points=8.0, hit_points_charged=4.0)
+
+    # MID_B (1.0) -> MID_A (8.0) is worth about 6.3 weighted points: more than the game's
+    # 4, less than the margin's 8.
+    marginal = _one_week_swap(known_optimum_players, mid_a_points=8.0)
+    taken = optimize_transfer_plan(marginal, held, small_config)
+    declined = optimize_transfer_plan(marginal, held, small_config, margin)
+
+    assert taken.weeks[0].paid_transfer_count == 1
+    assert taken.weeks[0].transfer_hit_points == 4.0
+    assert declined.weeks[0].transfer_count == 0
+    assert declined.weeks[0].transfer_hit_points == 0.0
+
+    # A transfer worth more than the margin is still made, and it is still charged 4.
+    worthwhile = _one_week_swap(known_optimum_players, mid_a_points=16.0)
+    result = optimize_transfer_plan(worthwhile, held, small_config, margin)
+
+    week = result.weeks[0]
+    assert week.transfers_in["player_id"].tolist() == ["MID_A"]
+    assert week.paid_transfer_count == 1
+    assert week.transfer_hit_points == 4.0
+    assert result.total_transfer_hit_points == 4.0
+    # The objective still paid the margin: the week's contribution reconstructs
+    # ``objective_value``, so it is charged 8 where the reported hit is 4.
+    assert week.discounted_objective_contribution == pytest.approx(
+        week.projected_score + small_config.bench_weight * week.projected_bench_points - 8.0
+    )
+    assert result.objective_value == pytest.approx(week.discounted_objective_contribution)
+
+
 def test_unused_free_transfers_carry_to_the_configured_cap(
     known_optimum_players: pd.DataFrame,
     small_config: OptimizationConfig,
@@ -337,6 +404,65 @@ def test_result_is_deterministic_and_inputs_are_not_mutated(
         week.selected_squad["player_id"].tolist() for week in second.weeks
     ]
     assert first.objective_value == second.objective_value
+
+
+def test_wall_clock_limits_do_not_choose_the_plan(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """Two calls that differ only in their wall clock agree squad for squad.
+
+    A wall-clock limit only decides anything when it is what stops the search -- and then
+    the answer is a function of the CPU share the process happened to receive (#247).
+    When the caller brings no deterministic budget the planner supplies one and raises
+    the wall to a ceiling that does not bind, so the caller's wall figure stops deciding
+    which members prove their plan optimal.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    tight = replace(small_config, solver_time_limit_seconds=0.05)
+    loose = replace(small_config, solver_time_limit_seconds=60.0)
+
+    first = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, tight)
+    second = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, loose)
+
+    assert [week.selected_squad["player_id"].tolist() for week in first.weeks] == [
+        week.selected_squad["player_id"].tolist() for week in second.weeks
+    ]
+    assert (
+        first.diagnostics["deterministic_time_used"]
+        == second.diagnostics["deterministic_time_used"]
+    )
+    for result in (first, second):
+        assert result.diagnostics["deterministic_budget_source"] == "planner_default"
+        assert (
+            result.diagnostics["solver_deterministic_time_limit"]
+            == planning_optimizer.PLAN_DETERMINISTIC_TIME_LIMIT
+        )
+        assert (
+            float(str(result.diagnostics["wall_time_limit_seconds"]))
+            >= planning_optimizer.PLAN_WALL_CEILING_SECONDS
+        )
+
+
+def test_a_caller_that_brings_its_own_deterministic_budget_keeps_it(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The planner default fills a gap; it does not overrule a choice already made."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players))
+    chosen = replace(
+        small_config,
+        solver_time_limit_seconds=30.0,
+        solver_deterministic_time_limit=2.0,
+    )
+
+    result = optimize_transfer_plan(horizon, OPTIMAL_INITIAL, chosen)
+
+    assert result.diagnostics["deterministic_budget_source"] == "caller"
+    assert result.diagnostics["solver_deterministic_time_limit"] == 2.0
+    assert result.diagnostics["wall_time_limit_seconds"] == 30.0
 
 
 def test_unknown_solver_status_is_structured(
@@ -810,3 +936,285 @@ def test_chip_plans_are_deterministic_and_fingerprinted(
         ChipAvailability(available={"bboost": {1}}).availability_fingerprint
         != ChipAvailability(available={"bboost": {2}}).availability_fingerprint
     )
+
+
+# --- alternative plans, so a mode has something to choose between ----------------------
+
+
+def test_an_excluded_squad_is_not_returned_again(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The planner returns one answer; a menu needs the next-best ones too.
+
+    Without this, every play mode re-ranks a list of one and returns the same transfers
+    under four different names — a computation the reader would reasonably assume differs.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    initial = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    best = optimize_transfer_plan(horizon, initial, small_config)
+    best_squad = frozenset(best.weeks[0].selected_squad["player_id"].tolist())
+
+    second = optimize_transfer_plan(horizon, initial, small_config, excluded_squads=(best_squad,))
+
+    assert second.solver_status is SolverStatus.OPTIMAL
+    second_squad = frozenset(second.weeks[0].selected_squad["player_id"].tolist())
+    assert second_squad != best_squad
+    # Still a legal squad, not merely a different one.
+    assert len(second_squad) == small_config.squad_size
+    # And it is worse or equal on the objective, which is what "next best" means.
+    assert second.objective_value <= best.objective_value
+
+
+def test_excluding_nothing_leaves_the_plan_untouched(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """The default path must be byte-identical to the planner before this parameter."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    initial = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    without = optimize_transfer_plan(horizon, initial, small_config)
+    with_empty = optimize_transfer_plan(horizon, initial, small_config, excluded_squads=())
+
+    assert without.objective_value == with_empty.objective_value
+    assert (
+        without.weeks[0].selected_squad["player_id"].tolist()
+        == with_empty.weeks[0].selected_squad["player_id"].tolist()
+    )
+
+
+def test_a_stale_exclusion_naming_absent_players_is_ignored(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """An exclusion from an older capture must not turn into a failed plan."""
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1,)))
+    initial = _initial("GK_A", "DEF_B", "MID_A", "FWD_A")
+
+    plain = optimize_transfer_plan(horizon, initial, small_config)
+    stale = optimize_transfer_plan(
+        horizon,
+        initial,
+        small_config,
+        excluded_squads=(frozenset({"GONE_A", "GONE_B"}),),
+    )
+
+    assert stale.solver_status is SolverStatus.OPTIMAL
+    assert stale.objective_value == plain.objective_value
+
+
+# --- the first-week transfer cap ------------------------------------------------------
+
+_STAGED_CONFIG = OptimizationConfig(
+    budget_tenths=300,
+    squad_size=6,
+    squad_position_limits={"GK": 1, "DEF": 2, "MID": 2, "FWD": 1},
+    starting_size=5,
+    starting_position_min={"GK": 1, "DEF": 1, "MID": 1, "FWD": 1},
+    starting_position_max={"GK": 1, "DEF": 2, "MID": 2, "FWD": 1},
+    max_players_per_team=2,
+)
+
+# A three-gameweek world staged so the churn has one honest place to be. GK and DEF1 pay
+# from GW1, so the optimum upgrades both at once. DEF2, MID1 and MID2 score nothing in
+# GW1 and only pay from GW2, while the players they replace are worth 100 in GW1 against
+# upgrades worth at most 10 a week — so the optimum defers all three to GW2, and pulling
+# any of them into the uncapped first week to dodge a cap on the later weeks loses an
+# order of magnitude more than it gains. That separation is what lets this world tell
+# "the later weeks fell to the cap" apart from "the churn moved into the first week".
+_STAGED_POINTS: dict[str, tuple[float, float, float]] = {
+    "GK_A": (10.0, 10.0, 10.0),
+    "GK_B": (0.0, 0.0, 0.0),
+    "DEF1_A": (10.0, 10.0, 10.0),
+    "DEF1_B": (0.0, 0.0, 0.0),
+    "DEF2_A": (0.0, 10.0, 10.0),
+    "DEF2_B": (100.0, 0.0, 0.0),
+    "MID1_A": (0.0, 9.0, 9.0),
+    "MID1_B": (100.0, 0.0, 0.0),
+    "MID2_A": (0.0, 8.0, 8.0),
+    "MID2_B": (100.0, 0.0, 0.0),
+    "FWD_A": (0.0, 0.0, 0.0),
+    "FWD_B": (10.0, 10.0, 10.0),
+}
+_STAGED_HELD = ("GK_B", "DEF1_B", "DEF2_B", "MID1_B", "MID2_B", "FWD_B")
+
+
+def _staged_horizon() -> PlanningHorizon:
+    records: list[dict[str, object]] = []
+    for index, gameweek in enumerate((1, 2, 3)):
+        for team, (player_id, points) in enumerate(sorted(_STAGED_POINTS.items())):
+            records.append(
+                {
+                    "gameweek": gameweek,
+                    "player_id": player_id,
+                    "name": f"Synthetic {player_id}",
+                    "team_id": f"T{team}",
+                    "position": player_id.split("_")[0].rstrip("12"),
+                    "buy_price_tenths": 50,
+                    "sell_price_tenths": 50,
+                    "expected_points": points[index],
+                }
+            )
+    return PlanningHorizon(pd.DataFrame.from_records(records))
+
+
+def _counts(result: TransferPlanResult) -> list[int]:
+    return [int(week.transfer_count) for week in result.weeks]
+
+
+def _squads(result: TransferPlanResult) -> list[list[str]]:
+    return [
+        sorted(str(value) for value in week.selected_squad["player_id"].tolist())
+        for week in result.weeks
+    ]
+
+
+def test_the_first_week_transfer_cap_binds_only_after_the_first_week() -> None:
+    """The point of the seam: later weeks fall to the cap, the first week is untouched.
+
+    A rival-strategy band constrains the decided week, so the later weeks must not be
+    charged for it — but leaving every week uncapped is the churn
+    ``docs/transfer_discipline_note.md`` measured as losing. One scalar cap over the
+    whole horizon cannot say that.
+    """
+
+    horizon = _staged_horizon()
+    initial = _initial(*_STAGED_HELD, free_transfers=5)
+
+    free = optimize_transfer_plan(horizon, initial, _STAGED_CONFIG)
+    capped = optimize_transfer_plan(horizon, initial, _STAGED_CONFIG, first_week_transfer_cap=1)
+
+    assert free.solver_status is SolverStatus.OPTIMAL
+    assert capped.solver_status is SolverStatus.OPTIMAL
+    # Unconstrained, the second week makes three transfers; capped, no later week may
+    # make more than one, and the first week keeps the two it wanted.
+    assert _counts(free) == [2, 3, 0]
+    assert _counts(capped) == [2, 1, 1]
+    assert _squads(capped)[0] == _squads(free)[0]
+    assert capped.diagnostics["first_week_transfer_cap"] == 1
+    assert free.diagnostics["first_week_transfer_cap"] is None
+    # The cap only removes plans, so it cannot be worth more than the free plan.
+    assert capped.objective_value is not None
+    assert free.objective_value is not None
+    assert capped.objective_value <= free.objective_value
+
+
+def test_omitting_the_first_week_transfer_cap_is_todays_planner(
+    known_optimum_players: pd.DataFrame,
+    small_config: OptimizationConfig,
+) -> None:
+    """Every existing caller names no cap, so the plan they get may not move.
+
+    The parameter is deliberately not a ``TransferPlanningConfig`` field: a field would
+    enter ``configuration_fingerprint``, which every plan records and which the ledger
+    records as ``transfer_config_fingerprint``, so adding one would move that digest for
+    callers that never cap anything.
+    """
+
+    horizon = PlanningHorizon(_horizon_table(known_optimum_players, (1, 2)))
+    initial = _initial("GK_B", "DEF_B", "MID_B", "FWD_B", free_transfers=2)
+    settings = TransferPlanningConfig()
+    before = settings.configuration_fingerprint
+
+    plain = optimize_transfer_plan(horizon, initial, small_config, settings)
+    with_none = optimize_transfer_plan(
+        horizon, initial, small_config, settings, first_week_transfer_cap=None
+    )
+
+    assert plain.objective_value == with_none.objective_value
+    assert _squads(plain) == _squads(with_none)
+    assert _counts(plain) == _counts(with_none)
+    for left, right in zip(plain.weeks, with_none.weeks, strict=True):
+        assert_frame_equal(left.selected_squad, right.selected_squad)
+        assert_frame_equal(left.starting_xi, right.starting_xi)
+        assert_frame_equal(left.transfers_in, right.transfers_in)
+        assert_frame_equal(left.transfers_out, right.transfers_out)
+    # The digest the ledger records is untouched by the presence of the parameter.
+    assert settings.configuration_fingerprint == before
+    assert plain.diagnostics["configuration_fingerprint"] == before
+    assert with_none.diagnostics["configuration_fingerprint"] == before
+
+
+@pytest.mark.parametrize("chip", ["wildcard", "freehit"])
+def test_a_rebuild_chip_in_a_later_week_lifts_the_first_week_transfer_cap(chip: str) -> None:
+    """A wildcard or free-hit week is exempt, exactly as it is from the per-week cap.
+
+    Those chips exist to rebuild a squad; a cap that survived one would make the chip
+    unplayable rather than the plan disciplined.
+    """
+
+    horizon = _staged_horizon()
+    initial = _initial(*_STAGED_HELD, free_transfers=5)
+
+    without = optimize_transfer_plan(horizon, initial, _STAGED_CONFIG, first_week_transfer_cap=1)
+    with_chip = optimize_transfer_plan(
+        horizon,
+        initial,
+        _STAGED_CONFIG,
+        first_week_transfer_cap=1,
+        chips=ChipAvailability({chip: {2}}, forced={2: chip}),
+    )
+
+    assert without.weeks[1].transfer_count == 1
+    assert with_chip.chips_played == {2: chip}
+    assert with_chip.weeks[1].transfer_count > 1
+
+
+def test_a_first_week_transfer_cap_at_the_squad_size_cannot_bind() -> None:
+    """A week can never replace more players than it holds, so such a cap is inert."""
+
+    horizon = _staged_horizon()
+    initial = _initial(*_STAGED_HELD, free_transfers=5)
+
+    free = optimize_transfer_plan(horizon, initial, _STAGED_CONFIG)
+    wide = optimize_transfer_plan(
+        horizon,
+        initial,
+        _STAGED_CONFIG,
+        first_week_transfer_cap=_STAGED_CONFIG.squad_size,
+    )
+
+    assert wide.solver_status is SolverStatus.OPTIMAL
+    assert _counts(wide) == _counts(free)
+    assert _squads(wide) == _squads(free)
+    assert wide.objective_value == free.objective_value
+
+
+def test_a_first_week_transfer_cap_bounds_the_count_not_the_payment() -> None:
+    """The cap is a ceiling the objective works under, not a budget it is handed.
+
+    A cap above the free transfers a week holds does not make the extra move free: the
+    week is still charged for it, exactly as an uncapped week would be.
+    """
+
+    horizon = _staged_horizon()
+    initial = _initial(*_STAGED_HELD, free_transfers=1)
+
+    capped = optimize_transfer_plan(horizon, initial, _STAGED_CONFIG, first_week_transfer_cap=2)
+
+    second = capped.weeks[1]
+    assert second.free_transfers_before == 1
+    assert second.transfer_count == 2
+    assert second.paid_transfer_count == 1
+    assert second.transfer_hit_points == 4.0
+
+
+@pytest.mark.parametrize("cap", [0, -1, 1.0, True, "1"])
+def test_an_invalid_first_week_transfer_cap_is_rejected(cap: object) -> None:
+    """The admissible range is ``max_transfers_per_gameweek``'s: ``None``, or at least 1."""
+
+    horizon = _staged_horizon()
+    initial = _initial(*_STAGED_HELD, free_transfers=5)
+
+    with pytest.raises(TransferPlanningValidationError, match="first_week_transfer_cap"):
+        optimize_transfer_plan(
+            horizon,
+            initial,
+            _STAGED_CONFIG,
+            first_week_transfer_cap=cap,  # type: ignore[arg-type]
+        )

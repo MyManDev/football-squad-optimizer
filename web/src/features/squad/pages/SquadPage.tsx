@@ -21,6 +21,7 @@ import {
   utcShort,
 } from "../../../lib/format";
 import { Pitch } from "../components/Pitch";
+import { LiveScoreCard } from "../components/LiveScoreCard";
 import styles from "./SquadPage.module.css";
 
 /** A clock that ticks; the countdown text is derived during render. */
@@ -184,9 +185,11 @@ function Squad({
           label={copy.projectedScore}
           value={points(view.projected_score, 1, locale)}
           note={
-            risk.status === "available" && risk.lower_quantile_score !== null
+            risk.status === "available" &&
+            risk.lower_quantile_score !== null &&
+            risk.lower_quantile_probability !== null
               ? copy.lowerTail(
-                  percent(risk.lower_quantile_probability ?? 0, 0, locale),
+                  percent(risk.lower_quantile_probability, 0, locale),
                   points(risk.lower_quantile_score, 1, locale),
                 )
               : copy.lowerTailUnavailable
@@ -213,6 +216,8 @@ function Squad({
       </StatRow>
 
       {ledger && ledger.settled_gameweeks > 0 ? <SeasonStanding ledger={ledger} /> : null}
+
+      <LiveScoreCard view={view} now={now} />
 
       {view.settled && view.outcome_realized_score !== null ? (
         <Card title={copy.settledTitle} aside={<Badge tone="good">{copy.settledAside}</Badge>}>
@@ -288,7 +293,11 @@ function Squad({
         <p className={styles.limit}>
           {riskText(messages, risk.status, risk.blockers, risk.reason)}
         </p>
-        {risk.status === "available" && (
+        {/* The metrics, not the status, open this block. A frozen ledger entry records the
+            status and nulls every metric, and a block opened on the status alone labelled
+            itself with a threshold nobody measured and printed an absent worst-case share
+            as a percentage of zero. */}
+        {risk.status === "available" && risk.probability_below_threshold !== null && (
           <StatRow>
             <Stat
               label={`P(${copy.score} < ${risk.points_threshold ?? "?"})`}
@@ -313,7 +322,9 @@ function Squad({
               }
             />
             <Stat
-              label={copy.meanWorst(percent(risk.worst_fraction ?? 0, 0, locale))}
+              label={copy.meanWorst(
+                risk.worst_fraction === null ? "—" : percent(risk.worst_fraction, 0, locale),
+              )}
               value={
                 risk.mean_worst_fraction_score !== null
                   ? points(risk.mean_worst_fraction_score, 1, locale)

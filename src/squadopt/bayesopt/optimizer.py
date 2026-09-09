@@ -108,6 +108,46 @@ def _fit_surrogate(
     return surrogate
 
 
+def estimate_observation_noise(per_fold_values: object) -> float:
+    """The variance of a fold-mean objective, measured from its own folds.
+
+    The chip search ran at ``observation_noise = 1e-6`` — near interpolation — while
+    the objective's season spread was 46-98 points; the surrogate treated one noisy
+    fold-mean as exact and could not tell small differences apart, which is the
+    recorded reason no candidate separated. A fold-paired objective knows its own
+    uncertainty: the squared standard error of the mean. Set ``observation_noise``
+    from this, per search, instead of inheriting the interpolation default.
+    """
+
+    values = np.asarray(per_fold_values, dtype=np.float64)
+    if values.ndim != 1 or values.size < 2 or not bool(np.isfinite(values).all()):
+        raise BayesianOptimizationExecutionError(
+            "estimate_observation_noise needs at least two finite fold values."
+        )
+    return float(values.var(ddof=1) / values.size)
+
+
+def _grid_edge_factors(
+    candidate: BayesianCandidate, config: BayesianOptimizationConfig
+) -> tuple[str, ...]:
+    """Factors on which the candidate sits at the boundary of its declared grid.
+
+    The wildcard-hold search put 13 of 20 evaluations on a grid edge and a human had
+    to notice; the diagnostics say it now. A fixed factor (one level) is never an
+    edge — there is nowhere else to be.
+    """
+
+    edges: list[str] = []
+    for factor in config.factors:
+        levels = factor.levels
+        if len(levels) < 2:
+            continue
+        value = candidate.values[factor.name]
+        if value == levels[0] or value == levels[-1]:
+            edges.append(factor.name)
+    return tuple(edges)
+
+
 def _expected_improvement(
     means: np.ndarray,
     standard_deviations: np.ndarray,
@@ -271,74 +311,119 @@ def run_bayesian_optimization(
         surrogate = _fit_surrogate(x_train, y_train, settings)
         surrogate_fit_count += 1
         last_kernel = str(surrogate.kernel_)
-        x_remaining = candidate_matrix[remaining_indices]
-        try:
-            raw_means, raw_standard_deviations = surrogate.predict(
-                x_remaining,
-                return_std=True,
-            )
-        except Exception as error:
-            raise BayesianOptimizationExecutionError(
-                "Gaussian-process surrogate prediction failed."
-            ) from error
-        means = np.asarray(raw_means, dtype=np.float64)
-        standard_deviations = np.asarray(raw_standard_deviations, dtype=np.float64)
-        expected_shape = (len(remaining_indices),)
-        if (
-            means.shape != expected_shape
-            or standard_deviations.shape != expected_shape
-            or not bool(np.isfinite(means).all())
-            or not bool(np.isfinite(standard_deviations).all())
-            or bool((standard_deviations < 0.0).any())
-        ):
-            raise BayesianOptimizationExecutionError(
-                "Gaussian-process surrogate returned invalid predictive statistics."
-            )
-        acquisition = _expected_improvement(
-            means,
-            standard_deviations,
-            best_observed=float(y_train.max()),
-            exploration_xi=settings.exploration_xi,
+
+        # Constant-liar batch: this fit proposes up to ``batch_size`` candidates. Each
+        # pick after the first is made as if the earlier picks had come back at the
+        # incumbent best (the "constant liar"), which pushes the batch apart instead
+        # of proposing one neighbourhood twice; the lies never enter the cache. With
+        # ``batch_size=1`` this is the historical sequential loop, bit for bit — the
+        # first pick's surrogate, tie-break and stop rule are unchanged.
+        batch_limit = min(
+            settings.batch_size,
+            settings.evaluation_budget - len(evaluations),
+            len(remaining_indices),
         )
-        if not bool(np.isfinite(acquisition).all()):
-            raise BayesianOptimizationExecutionError(
-                "Expected Improvement produced a non-finite acquisition value."
+        liar_surrogate = surrogate
+        liar_x = x_train
+        liar_y = y_train
+        liar_remaining = list(remaining_indices)
+        picks: list[tuple[int, float, float, float]] = []
+        minimum_reached = False
+        for pick_number in range(batch_limit):
+            if pick_number > 0:
+                liar_surrogate = _fit_surrogate(liar_x, liar_y, settings)
+                surrogate_fit_count += 1
+            x_remaining = candidate_matrix[liar_remaining]
+            try:
+                raw_means, raw_standard_deviations = liar_surrogate.predict(
+                    x_remaining,
+                    return_std=True,
+                )
+            except Exception as error:
+                raise BayesianOptimizationExecutionError(
+                    "Gaussian-process surrogate prediction failed."
+                ) from error
+            means = np.asarray(raw_means, dtype=np.float64)
+            standard_deviations = np.asarray(raw_standard_deviations, dtype=np.float64)
+            expected_shape = (len(liar_remaining),)
+            if (
+                means.shape != expected_shape
+                or standard_deviations.shape != expected_shape
+                or not bool(np.isfinite(means).all())
+                or not bool(np.isfinite(standard_deviations).all())
+                or bool((standard_deviations < 0.0).any())
+            ):
+                raise BayesianOptimizationExecutionError(
+                    "Gaussian-process surrogate returned invalid predictive statistics."
+                )
+            best_observed = float(liar_y.max())
+            acquisition = _expected_improvement(
+                means,
+                standard_deviations,
+                best_observed=best_observed,
+                exploration_xi=settings.exploration_xi,
             )
-        largest_ei = float(acquisition.max())
-        if largest_ei <= settings.min_expected_improvement:
+            if not bool(np.isfinite(acquisition).all()):
+                raise BayesianOptimizationExecutionError(
+                    "Expected Improvement produced a non-finite acquisition value."
+                )
+            largest_ei = float(acquisition.max())
+            if largest_ei <= settings.min_expected_improvement:
+                # On the first pick this is the run's stop rule, exactly as before; on
+                # a later pick it only ends the batch — the lie-shrunken EI is not the
+                # true model's verdict on the run.
+                if pick_number == 0:
+                    minimum_reached = True
+                    last_selected_ei = largest_ei
+                break
+            tied_positions = [
+                position
+                for position, value in enumerate(acquisition)
+                if math.isclose(float(value), largest_ei, rel_tol=1.0e-12, abs_tol=1.0e-15)
+            ]
+            selected_position = min(
+                tied_positions,
+                key=lambda position: candidates[liar_remaining[position]].candidate_id,
+            )
+            candidate_index = liar_remaining[selected_position]
+            picks.append(
+                (
+                    candidate_index,
+                    float(means[selected_position]),
+                    float(standard_deviations[selected_position]),
+                    float(acquisition[selected_position]),
+                )
+            )
+            liar_x = np.vstack([liar_x, candidate_matrix[candidate_index : candidate_index + 1]])
+            liar_y = np.append(liar_y, best_observed)
+            del liar_remaining[selected_position]
+
+        if minimum_reached:
             stopped_reason = "minimum_expected_improvement_reached"
-            last_selected_ei = largest_ei
             break
-        tied_positions = [
-            position
-            for position, value in enumerate(acquisition)
-            if math.isclose(float(value), largest_ei, rel_tol=1.0e-12, abs_tol=1.0e-15)
-        ]
-        selected_position = min(
-            tied_positions,
-            key=lambda position: candidates[remaining_indices[position]].candidate_id,
-        )
-        candidate_index = remaining_indices[selected_position]
-        candidate = candidates[candidate_index]
-        score = _evaluate_candidate(evaluator, candidate, development)
-        if candidate.candidate_id in cache:
-            raise BayesianOptimizationExecutionError(
-                "Bayesian optimizer attempted to evaluate a duplicate candidate."
+        for candidate_index, predicted_mean, predicted_sd, selected_ei in picks:
+            candidate = candidates[candidate_index]
+            score = _evaluate_candidate(evaluator, candidate, development)
+            if candidate.candidate_id in cache:
+                raise BayesianOptimizationExecutionError(
+                    "Bayesian optimizer attempted to evaluate a duplicate candidate."
+                )
+            cache[candidate.candidate_id] = score
+            evaluated_indices.append(candidate_index)
+            last_selected_ei = selected_ei
+            evaluations.append(
+                BayesianEvaluation(
+                    iteration=len(evaluations),
+                    phase="expected_improvement",
+                    candidate=candidate,
+                    objective_value=score,
+                    predicted_mean=predicted_mean,
+                    predicted_standard_deviation=predicted_sd,
+                    expected_improvement=selected_ei,
+                )
             )
-        cache[candidate.candidate_id] = score
-        evaluated_indices.append(candidate_index)
-        last_selected_ei = float(acquisition[selected_position])
-        evaluations.append(
-            BayesianEvaluation(
-                iteration=len(evaluations),
-                phase="expected_improvement",
-                candidate=candidate,
-                objective_value=score,
-                predicted_mean=float(means[selected_position]),
-                predicted_standard_deviation=float(standard_deviations[selected_position]),
-                expected_improvement=last_selected_ei,
-            )
-        )
+        if not picks:
+            break
 
     if len(cache) == len(candidates):
         stopped_reason = "search_space_exhausted"
@@ -366,6 +451,11 @@ def run_bayesian_optimization(
         run_fingerprint=fingerprint,
         diagnostics={
             "search_space_size": len(candidates),
+            "batch_size": settings.batch_size,
+            # The wildcard-hold search sat 13 of 20 evaluations on a grid edge and a
+            # human had to notice; the record says it now, per recommendation.
+            "recommended_on_grid_edge": bool(_grid_edge_factors(recommended.candidate, settings)),
+            "grid_edge_factors": list(_grid_edge_factors(recommended.candidate, settings)),
             "evaluation_budget": settings.evaluation_budget,
             "evaluated_candidate_count": len(trace),
             "evaluation_cache_entries": len(cache),

@@ -1,14 +1,19 @@
 import type { PlayerView } from "../data/schema";
 import type {
   AdviceMove,
+  AdvicePlanWeek,
+  AdvicePlayer,
+  AdviceStrategy,
   EntryAdvice,
+  EntryAdviceIndex,
   EntrySquad,
   EntryView,
   HumanEntryView,
   LeagueMembers,
   LeagueViewEnvelope,
 } from "../features/league/types";
-import type { PlayMode, WindowSize } from "../features/moves/modePrices";
+import { isMemberStrategy, strategyNeedsRival } from "../features/league/types";
+import type { WindowSize } from "../features/moves/modePrices";
 
 const GENERATED_AT = "2026-08-22T04:00:00Z";
 const LEAGUE_ID = 352490;
@@ -32,6 +37,7 @@ export const mockMembers: EntryView[] = [
     team_name: "North Stand Notes",
     rank: 1,
     gameweek_points: 74,
+    transfer_cost: 0,
     total_points: 132,
     movement: "up",
     movement_places: 2,
@@ -44,6 +50,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Half Space",
     rank: 2,
     gameweek_points: 68,
+    transfer_cost: 0,
     total_points: 127,
     movement: "same",
     movement_places: 0,
@@ -56,6 +63,7 @@ export const mockMembers: EntryView[] = [
     team_name: "SquadOpt",
     rank: 3,
     gameweek_points: 65,
+    transfer_cost: 0,
     total_points: 124,
     movement: "up",
     movement_places: 2,
@@ -68,6 +76,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Late Flag FC",
     rank: 4,
     gameweek_points: 61,
+    transfer_cost: 4,
     total_points: 119,
     movement: "down",
     movement_places: 1,
@@ -80,6 +89,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Expected Threat",
     rank: 5,
     gameweek_points: 59,
+    transfer_cost: 0,
     total_points: 113,
     movement: "up",
     movement_places: 1,
@@ -92,6 +102,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Bench Order",
     rank: 6,
     gameweek_points: 55,
+    transfer_cost: 0,
     total_points: 109,
     movement: "down",
     movement_places: 1,
@@ -104,6 +115,7 @@ export const mockMembers: EntryView[] = [
     team_name: "One More Fixture",
     rank: 7,
     gameweek_points: 52,
+    transfer_cost: 0,
     total_points: 104,
     movement: "same",
     movement_places: 0,
@@ -116,6 +128,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Low Block",
     rank: 8,
     gameweek_points: 49,
+    transfer_cost: 8,
     total_points: 97,
     movement: "new",
     movement_places: null,
@@ -128,6 +141,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Clean Sheet Pending",
     rank: 9,
     gameweek_points: 44,
+    transfer_cost: 0,
     total_points: 91,
     movement: "down",
     movement_places: 2,
@@ -140,6 +154,7 @@ export const mockMembers: EntryView[] = [
     team_name: null,
     rank: 10,
     gameweek_points: null,
+    transfer_cost: null,
     total_points: 86,
     movement: "unknown",
     movement_places: null,
@@ -152,6 +167,7 @@ export const mockMembers: EntryView[] = [
     team_name: "Awaiting Picks",
     rank: 11,
     gameweek_points: null,
+    transfer_cost: null,
     total_points: null,
     movement: "unknown",
     movement_places: null,
@@ -261,17 +277,25 @@ function squadPlayers(entryOffset: number): { starting: PlayerView[]; bench: Pla
   };
 }
 
+/** The week net of that week's transfer hit, or null while either half is unproven. */
+function netWeek(member: EntryView): number | null {
+  if (member.gameweek_points === null || member.transfer_cost === null) return null;
+  return member.gameweek_points - member.transfer_cost;
+}
+
 function squadEnvelope(entry: HumanEntryView, index: number): LeagueViewEnvelope<EntrySquad> {
-  const squadoptPoints = mockMembers.find(
-    (member) => member.member_kind === "system",
-  )?.gameweek_points;
+  const systemRow = mockMembers.find((member) => member.member_kind === "system") ?? null;
+  const squadoptPoints = systemRow === null ? null : netWeek(systemRow);
+  const memberPoints = netWeek(entry);
+  // Both sides netted, or no comparison: subtracting a gross week from a net one would
+  // report a difference nobody scored.
   const squadoptComparison =
-    entry.gameweek_points === null || squadoptPoints === null || squadoptPoints === undefined
+    memberPoints === null || squadoptPoints === null
       ? null
       : {
-          member_gameweek_points: entry.gameweek_points,
+          member_gameweek_points: memberPoints,
           squadopt_gameweek_points: squadoptPoints,
-          difference_points: entry.gameweek_points - squadoptPoints,
+          difference_points: memberPoints - squadoptPoints,
         };
   if (entry.data_quality === "empty") {
     return envelope({
@@ -346,31 +370,260 @@ const advicePlayers = {
   },
 } satisfies Record<string, import("../features/league/types").AdvicePlayer>;
 
-function moveFor(mode: PlayMode, window: WindowSize): AdviceMove[] {
+function moveFor(mode: AdviceStrategy, window: WindowSize): AdviceMove[] {
   if (mode === "saf-puan" && window === 1) return [];
   const incoming =
-    mode === "garantici"
+    mode === "garantici" || mode === "ortak-koru"
       ? advicePlayers.safe
-      : mode === "asiri-agresif"
+      : mode === "asiri-agresif" || mode === "fark-yarat"
         ? advicePlayers.extreme
         : advicePlayers.aggressive;
-  const cost = mode === "garantici" ? 1.6 : mode === "asiri-agresif" ? 1.5 : 1.8;
   return [
     {
       move_id: `${mode}-${window}-reed`,
       player_out: advicePlayers.out,
       player_in: incoming,
       expected_points_delta: Number((0.7 + window * 0.4).toFixed(1)),
-      expected_points_cost: cost,
-      reason_code: mode === "saf-puan" ? "window_value" : "mode_tradeoff",
+      // Only a multi-week window may claim a longer window; a one-week pure-points plan
+      // says what it is, and a competitive mode names its trade-off.
+      reason_code:
+        mode === "saf-puan" ? (window === 1 ? "points_gain" : "window_value") : "mode_tradeoff",
     },
   ];
 }
 
+/**
+ * The producer's limit sentences for a three- or five-week window, as its payload
+ * carries them (`WINDOW_STATED_LIMITS` in the application layer). The site's Turkish
+ * copy is keyed by these exact strings, and a test pins that every one is known there.
+ *
+ * The Top-100 sentence is the one the producer publishes conditionally — only when the
+ * projection actually carries the uplift — so a real payload may arrive with the other
+ * five and no gap where it was. The example keeps all six, and the page renders whatever
+ * list it is sent.
+ */
+export const WINDOW_STATED_LIMITS: readonly string[] = [
+  "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
+  "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
+  "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
+  "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.",
+  "Prices are held at the captured values; no price change is modelled.",
+  "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+];
+
+/** One row per gameweek of a pure-points window: the first week's move, one paid
+ * transfer in the second week, a bench boost in the last. */
+function planWeeksFor(window: WindowSize): AdvicePlanWeek[] {
+  const first = moveFor("saf-puan", window);
+  return Array.from({ length: window }, (_, index) => {
+    const paid = index === 1;
+    return {
+      gameweek: GAMEWEEK + index,
+      transfers_in:
+        index === 0 ? first.map((move) => move.player_in!) : paid ? [advicePlayers.safe] : [],
+      transfers_out:
+        index === 0 ? first.map((move) => move.player_out!) : paid ? [advicePlayers.extreme] : [],
+      transfer_hit_points: paid ? 4 : 0,
+      chip: index === window - 1 ? "bboost" : null,
+      free_transfers_before: index === 0 ? 1 : 1,
+      free_transfers_after: paid ? 1 : index === 0 ? 1 : 2,
+      expected_points: Number((52.4 + index * 0.6).toFixed(1)),
+    };
+  });
+}
+
+function lineupFor(
+  squad: EntrySquad | undefined,
+): Pick<
+  EntryAdvice,
+  "expected_own_points" | "captain" | "vice_captain" | "starting_xi" | "bench" | "chip"
+> {
+  if (!squad || squad.starting_xi.length === 0) {
+    return {
+      expected_own_points: null,
+      captain: null,
+      vice_captain: null,
+      starting_xi: null,
+      bench: null,
+      chip: null,
+    };
+  }
+  const toAdvice = (player: PlayerView): AdvicePlayer => ({
+    player_id: player.player_id,
+    name: player.name,
+    short_name: player.short_name,
+    position: player.position,
+    team: player.team,
+    expected_points: player.expected_points,
+  });
+  // The producer's completion rule: captain as decided, vice-captain the eleven's
+  // next-highest expected points, the bench goalkeeper first then outfield by points.
+  const eleven = squad.starting_xi.map(toAdvice);
+  const captain =
+    eleven.find((p) =>
+      squad.starting_xi.some((s) => s.player_id === p.player_id && s.is_captain),
+    ) ?? eleven[0]!;
+  const vice = eleven
+    .filter((p) => p.player_id !== captain.player_id)
+    .sort((a, b) => (b.expected_points ?? 0) - (a.expected_points ?? 0))[0]!;
+  const benchAll = squad.bench.map(toAdvice);
+  const bench = [
+    ...benchAll.filter((p) => p.position === "GK"),
+    ...benchAll
+      .filter((p) => p.position !== "GK")
+      .sort((a, b) => (b.expected_points ?? 0) - (a.expected_points ?? 0)),
+  ];
+  const own =
+    eleven.reduce((sum, p) => sum + (p.expected_points ?? 0), 0) + (captain.expected_points ?? 0);
+  return {
+    expected_own_points: Number(own.toFixed(2)),
+    captain,
+    vice_captain: vice,
+    starting_xi: eleven,
+    bench,
+    chip: null,
+  };
+}
+
+const humanMembers = mockMembers.filter(
+  (member): member is HumanEntryView => member.member_kind === "human",
+);
+
+/** The producer's default rival: the member just above in the standings; the leader
+ * defends against the member just below. */
+export function mockDefaultRival(entryId: number): number | null {
+  const own = humanMembers.find((member) => member.entry_id === entryId);
+  if (!own) return null;
+  const others = humanMembers
+    .filter((member) => member.entry_id !== entryId)
+    .sort((a, b) => a.rank - b.rank);
+  const above = others.filter((member) => member.rank < own.rank);
+  const chosen = above.length > 0 ? above[above.length - 1] : others[0];
+  return chosen?.entry_id ?? null;
+}
+
+/**
+ * The producer's declared rule as it publishes it: the pick, the two numbers it read —
+ * the member's league points against their default rival and the gameweeks left — and
+ * the band edge those met. Recorded here, not re-derived: the rule lives in the producer
+ * (`application/strategies/rule.py`) and this is one document it could have written.
+ *
+ * These mock standings sit a handful of points apart with most of a season to play, so
+ * every gap is inside the band and the rule names pure points — which is the answer a
+ * short gap and a long season should get. A member whose total is not published gets no
+ * suggestion at all.
+ */
+export function mockSuggestedStrategy(entryId: number): EntryAdviceIndex["suggested_strategy"] {
+  const rivalId = mockDefaultRival(entryId);
+  const own = humanMembers.find((member) => member.entry_id === entryId);
+  const rival = humanMembers.find((member) => member.entry_id === rivalId);
+  if (rivalId === null || own === undefined || rival === undefined) return null;
+  if (own.total_points === null || rival.total_points === null) return null;
+  const gap = own.total_points - rival.total_points;
+  // The producer's edge for the 37 gameweeks left after this one: one measured
+  // week-to-week points differential between two members, carried over those weeks.
+  const edge = 128.9;
+  const band = gap < -edge ? "behind" : gap > edge ? "ahead" : "level";
+  return {
+    strategy: band === "behind" ? "fark-yarat" : band === "ahead" ? "ortak-koru" : "saf-puan",
+    rule_id: "gap_and_weeks_strategy_rule_v1",
+    band,
+    rival_entry_id: rivalId,
+    points_ahead_of_rival: gap,
+    scored_gameweek: GAMEWEEK - 1,
+    gameweeks_remaining: 38 - GAMEWEEK + 1,
+    band_edge_points: edge,
+  };
+}
+
+/**
+ * What the producer wrote for this member: every rival strategy against every other
+ * member, except one pair recorded as unavailable so the page's "not computed" path
+ * renders in development and tests too.
+ */
+export function mockEntryAdviceIndex(entryId: number): LeagueViewEnvelope<EntryAdviceIndex> {
+  const rivals = humanMembers
+    .filter((member) => member.entry_id !== entryId)
+    .map((member) => member.entry_id);
+  const strategies: AdviceStrategy[] = ["ortak-koru", "fark-yarat"];
+  const unavailableRival = rivals[rivals.length - 1] ?? null;
+  const computed: EntryAdviceIndex["computed"] = [];
+  const unavailable: EntryAdviceIndex["unavailable"] = [];
+  for (const strategy of strategies) {
+    for (const rival of rivals) {
+      if (strategy === "fark-yarat" && rival === unavailableRival) {
+        unavailable.push({
+          strategy,
+          rival_entry_id: rival,
+          reason: "The 'fark-yarat' band cannot be satisfied from this squad: no plan exists.",
+        });
+      } else {
+        computed.push({
+          strategy,
+          rival_entry_id: rival,
+          path: `advice/${entryId}/${strategy}/1/vs-${rival}.json`,
+        });
+      }
+    }
+  }
+  return envelope({
+    league_id: LEAGUE_ID,
+    season: SEASON,
+    gameweek: GAMEWEEK,
+    entry_id: entryId,
+    window: 1,
+    // Pure points solved at every window in this publish; a rival strategy is one week.
+    windows: { "saf-puan": [1, 3, 5], "ortak-koru": [1], "fark-yarat": [1] },
+    strategies: ["saf-puan", ...strategies],
+    rival_entry_ids: rivals,
+    default_rival_entry_id: mockDefaultRival(entryId),
+    suggested_strategy: mockSuggestedStrategy(entryId),
+    computed,
+    unavailable,
+  });
+}
+
+function rivalFields(
+  entryId: number,
+  mode: AdviceStrategy,
+  rivalEntryId: number | null,
+): Partial<EntryAdvice> {
+  if (!isMemberStrategy(mode) || !strategyNeedsRival(mode)) return {};
+  const rival = rivalEntryId ?? mockDefaultRival(entryId);
+  if (rival === null) return {};
+  return {
+    rival_entry_id: rival,
+    rival_label: `entry-${rival}`,
+    overlap_count: mode === "ortak-koru" ? 9 : 4,
+    expected_gap_vs_rival: mode === "ortak-koru" ? 1.2 : -0.4,
+    captain_agreement: mode === "ortak-koru",
+    control_solver_status: "OPTIMAL",
+    control_optimality_gap: 0,
+    // Both plans proved here, so the ceiling is the price: the producer publishes them
+    // together and they are the same number until a proof is missing.
+    expected_points_cost_ceiling: 0.8,
+    transfer_cap: 1,
+    overlap_target: mode === "ortak-koru" ? 9 : 5,
+    overlap_applied: mode === "ortak-koru" ? 7 : 5,
+    plan_kind: "within_free_transfers",
+    alternative_plan:
+      mode === "ortak-koru"
+        ? {
+            kind: "with_hits",
+            overlap_applied: 9,
+            transfer_hit_points: 8,
+            expected_points_cost: 6.4,
+            expected_points_cost_ceiling: 6.4,
+          }
+        : null,
+  };
+}
+
 export function mockEntryAdviceEnvelope(
   entryId: number,
-  mode: PlayMode,
+  mode: AdviceStrategy,
   window: WindowSize,
+  rivalEntryId: number | null = null,
 ): LeagueViewEnvelope<EntryAdvice> {
   const squad = mockEntrySquadEnvelopes[entryId]?.payload;
   const quality = squad?.data_quality ?? "empty";
@@ -383,6 +636,25 @@ export function mockEntryAdviceEnvelope(
     window,
     source_snapshot_id: "example-post-deadline-gw02",
     moves: quality === "complete" ? moveFor(mode, window) : [],
+    // The week's hit charge, once, as the producer publishes it: this example week is
+    // played inside the free transfers, so the game charges nothing for it.
+    transfer_hit_points: 0,
+    // The producer prices the whole plan against the pure-points pick, in expected
+    // points only; the example mirrors that shape so the page renders it in dev/test.
+    expected_points_cost: mode === "saf-puan" ? 0 : 0.8,
+    rival_label: mode === "saf-puan" ? null : "Harbor Rovers",
+    ...lineupFor(squad),
+    ...rivalFields(entryId, mode, rivalEntryId),
+    // A pure-points window carries the whole plan and its stated limits; the producer's
+    // multi-week solve is typically found rather than proven, so the example says so.
+    ...(mode === "saf-puan" && window !== 1 && quality === "complete"
+      ? {
+          solver_status: "FEASIBLE",
+          optimality_gap: 1.3,
+          plan_weeks: planWeeksFor(window),
+          stated_limits: [...WINDOW_STATED_LIMITS],
+        }
+      : {}),
     data_quality: quality,
     missing_fields: quality === "complete" ? [] : (squad?.missing_fields ?? ["entry"]),
   });

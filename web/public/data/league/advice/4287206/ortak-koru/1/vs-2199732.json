@@ -1,0 +1,205 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 4,
+    "entry_id": 4287206,
+    "league_id": 352490,
+    "mode": "ortak-koru",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "moves": [
+      {
+        "move_id": "gw04-1",
+        "player_out": {
+          "player_id": 494595,
+          "name": "Florian Wirtz",
+          "short_name": "Wirtz",
+          "position": "MID",
+          "team": "Liverpool"
+        },
+        "player_in": {
+          "player_id": 424876,
+          "name": "Dominik Szoboszlai",
+          "short_name": "Szoboszlai",
+          "position": "MID",
+          "team": "Liverpool"
+        },
+        "expected_points_delta": 0.32622289579164576,
+        "reason_code": "mode_tradeoff"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_points_cost": 0.7541083207815831,
+    "rival_label": "entry-2199732",
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
+    "expected_own_points": 54.49769774504013,
+    "captain": {
+      "player_id": 223094,
+      "name": "Erling Haaland",
+      "short_name": "Haaland",
+      "position": "FWD",
+      "team": "Man City",
+      "expected_points": 8.360382282553875
+    },
+    "vice_captain": {
+      "player_id": 219168,
+      "name": "Alexander Isak",
+      "short_name": "Isak",
+      "position": "FWD",
+      "team": "Liverpool",
+      "expected_points": 5.621733713745486
+    },
+    "starting_xi": [
+      {
+        "player_id": 200720,
+        "name": "Caoimh\u00edn Kelleher",
+        "short_name": "Kelleher",
+        "position": "GK",
+        "team": "Brentford",
+        "expected_points": 2.846900765526145
+      },
+      {
+        "player_id": 97032,
+        "name": "Virgil van Dijk",
+        "short_name": "Dijk",
+        "position": "DEF",
+        "team": "Liverpool",
+        "expected_points": 3.668738526053537
+      },
+      {
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 3.5661358939542867
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.2356844156410305
+      },
+      {
+        "player_id": 466052,
+        "name": "Rayan Cherki",
+        "short_name": "Cherki",
+        "position": "MID",
+        "team": "Man City",
+        "expected_points": 4.391694024990014
+      },
+      {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 4.232677554424536
+      },
+      {
+        "player_id": 449434,
+        "name": "Anthony Elanga",
+        "short_name": "Elanga",
+        "position": "MID",
+        "team": "Newcastle",
+        "expected_points": 3.4735053102667206
+      },
+      {
+        "player_id": 209244,
+        "name": "Phil Foden",
+        "short_name": "Foden",
+        "position": "MID",
+        "team": "Man City",
+        "expected_points": 3.34397088815176
+      },
+      {
+        "player_id": 223094,
+        "name": "Erling Haaland",
+        "short_name": "Haaland",
+        "position": "FWD",
+        "team": "Man City",
+        "expected_points": 8.360382282553875
+      },
+      {
+        "player_id": 219168,
+        "name": "Alexander Isak",
+        "short_name": "Isak",
+        "position": "FWD",
+        "team": "Liverpool",
+        "expected_points": 5.621733713745486
+      },
+      {
+        "player_id": 216646,
+        "name": "Yoane Wissa",
+        "short_name": "Wissa",
+        "position": "FWD",
+        "team": "Newcastle",
+        "expected_points": 3.395892087178864
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 457569,
+        "name": "\u0110or\u0111e Petrovi\u0107",
+        "short_name": "Petrovi\u0107",
+        "position": "GK",
+        "team": "Bournemouth",
+        "expected_points": 2.5966220059422467
+      },
+      {
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 3.296421745499964
+      },
+      {
+        "player_id": 191866,
+        "name": "Kristoffer Ajer",
+        "short_name": "Ajer",
+        "position": "DEF",
+        "team": "Brentford",
+        "expected_points": 2.727628454292313
+      },
+      {
+        "player_id": 434752,
+        "name": "Jaka Bijol",
+        "short_name": "Bijol",
+        "position": "DEF",
+        "team": "Leeds",
+        "expected_points": 2.615329960798637
+      }
+    ],
+    "chip": null,
+    "data_quality": "partial",
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ],
+    "rival_entry_id": 2199732,
+    "expected_points_cost_ceiling": 0.7541083207815831,
+    "overlap_count": 5,
+    "transfer_cap": 1,
+    "overlap_target": 9,
+    "overlap_applied": 5,
+    "plan_kind": "within_free_transfers",
+    "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 14.512597000586808,
+      "expected_points_cost_ceiling": 14.512597000586808
+    },
+    "expected_gap_vs_rival": -2.4878458248986703,
+    "captain_agreement": true,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0
+  }
+}

@@ -46,6 +46,10 @@ BOOTSTRAP_PAYLOAD: Final = "bootstrap-static.json"
 FIXTURES_PAYLOAD: Final = "fixtures.json"
 
 
+class IncompleteLiveHistoryError(DataSourceError):
+    """A prior gameweek is present but not yet a final component-model outcome."""
+
+
 def _positive(value: int, label: str) -> int:
     """An identifier the source only ever publishes as a positive integer."""
 
@@ -87,6 +91,15 @@ def league_standings_payload(league_id: int) -> str:
     return f"league-{_positive(league_id, 'league id')}-standings.json"
 
 
+def league_standings_page_payload(league_id: int, page: int) -> str:
+    """Payload name for one explicitly numbered classic-league standings page."""
+
+    return (
+        f"league-{_positive(league_id, 'league id')}-standings-"
+        f"page-{_positive(page, 'standings page'):02d}.json"
+    )
+
+
 def live_payload(gameweek: int) -> str:
     """Payload name for one gameweek's live scoring document."""
 
@@ -125,6 +138,13 @@ _AVAILABILITY_FIELDS: Final = (
     "element_type",
     "status",
     "chance_of_playing_next_round",
+    "news_added",
+)
+_NEWS_FIELDS: Final = (
+    "code",
+    "element_type",
+    "status",
+    "news",
     "news_added",
 )
 _EVENT_FIELDS: Final = ("id", "deadline_time", "finished")
@@ -391,6 +411,59 @@ def availability_snapshot(bootstrap: bytes) -> pd.DataFrame:
     return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
 
 
+def news_snapshot(bootstrap: bytes) -> pd.DataFrame:
+    """Read the source's own note about each player, with the instant it was added.
+
+    Deliberately separate from :func:`availability_snapshot` rather than a column on it.
+    That table is consumed by the projection path, and widening it would move every
+    caller's shape for a field the projection must never read: this one carries **free
+    text**, and free text is not a feature, not a column of an artifact and not
+    something a member-facing surface may be handed.
+
+    What it is for is measurement. ``news_added`` is the only instant the source stamps
+    on its own editorial, so it is the only way to ask *when* the platform learned
+    something — and therefore whether a capture taken earlier would have missed it. The
+    caller reads the text to classify a note and keeps the count, never the words.
+
+    Two states have to stay apart and both are real in a capture: a player who has never
+    been flagged carries no ``news_added`` at all, and a player who was flagged and has
+    since been cleared carries an empty ``news`` with the stamp still on it. Neither is
+    "nothing happened", so ``news_added_utc`` is absent only for the first.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _NEWS_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        rows.append(
+            {
+                "player_id": _integer(record, "code", "Element"),
+                "status": _text(record, "status", "Element"),
+                "news": _text(record, "news", "Element"),
+                "news_added_utc": (
+                    pd.NA
+                    if record.get("news_added") is None
+                    else normalize_utc_timestamp(
+                        record.get("news_added"), label="Element news_added"
+                    )
+                ),
+            }
+        )
+
+    if not rows:
+        raise DataSourceError("Bootstrap payload declares no squad-eligible players.")
+
+    frame = pd.DataFrame(rows, columns=["player_id", "status", "news", "news_added_utc"])
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["status"] = frame["status"].astype("string")
+    frame["news"] = frame["news"].astype("string")
+    frame["news_added_utc"] = frame["news_added_utc"].astype("string")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
 def team_codes(bootstrap: bytes) -> Mapping[int, int]:
     """Return the per-season team id to persistent team code mapping.
 
@@ -410,6 +483,57 @@ def team_codes(bootstrap: bytes) -> Mapping[int, int]:
                 f"Bootstrap payload declares team id {identifier} more than once."
             )
         mapping[identifier] = _integer(record, "code", "Team")
+    return MappingProxyType(mapping)
+
+
+def player_codes(bootstrap: bytes) -> Mapping[int, int]:
+    """Return the per-season element id to persistent player code mapping.
+
+    The same problem as :func:`team_codes` and the same shape, one level down. The
+    per-entry endpoints name a player by his **element** id, which is assigned per season;
+    the canonical panel, the prices, the projection and the ledger all name him by
+    ``code``, which survives a transfer window. Both are plain integers, so handing one
+    where the other is meant does not raise -- it **matches nothing**, and the caller sees
+    a full squad of players it cannot price. That is the failure
+    :func:`squadopt.data.identity.reconcile_player_identity` was written to turn into a
+    stated one, and its refusal message names this exact confusion.
+
+    Two things this deliberately is not.
+
+    It is **not a roster**. Unlike :func:`player_snapshot` it does not drop entries whose
+    ``element_type`` is outside :data:`POSITION_CODES`, because it is a translation table:
+    every element the payload names can appear in a document that needs translating, and
+    silently omitting one would surface downstream as "the capture does not name element
+    N" -- blaming a player for a filter applied here.
+
+    It is **not tolerant of a thinner payload**. A missing or renamed field stops the run
+    and names itself, rather than yielding a shorter mapping: a translation table that is
+    quietly incomplete is worse than none, because the lookups that survive it look
+    correct. For the same reason a repeated ``code`` is refused as well as a repeated
+    ``id`` -- a duplicate key makes the mapping ambiguous, and a duplicate value silently
+    merges two people into one identity, which is the more expensive half.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, ("id", "code"), "Element")
+
+    mapping: dict[int, int] = {}
+    owner: dict[int, int] = {}
+    for record in records:
+        identifier = _integer(record, "id", "Element")
+        if identifier in mapping:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload declares element id {identifier} more than once."
+            )
+        code = _integer(record, "code", "Element")
+        if code in owner:
+            raise DuplicateRecordsError(
+                f"Bootstrap payload gives player code {code} to element ids "
+                f"{owner[code]} and {identifier}; one code is one player, so a repeated "
+                "code would merge two of them into one identity."
+            )
+        mapping[identifier] = code
+        owner[code] = identifier
     return MappingProxyType(mapping)
 
 
@@ -782,6 +906,153 @@ def player_snapshot(bootstrap: bytes) -> pd.DataFrame:
     return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
 
 
+#: The short name the platform publishes, plus what a name has to be resolved *within*.
+#: A separate field tuple from :data:`_ELEMENT_FIELDS` on purpose: adding ``web_name``
+#: there would make :func:`player_snapshot` refuse every capture whose payload does not
+#: carry it, which is a change to a contract this needs nothing from.
+_SHORT_NAME_FIELDS: Final = ("code", "element_type", "team", "web_name")
+
+SHORT_NAME_COLUMNS: Final = ("player_id", "web_name", "team_name")
+
+
+def short_name_roster(bootstrap: bytes) -> pd.DataFrame:
+    """Read the roster as the short names a club's own words would use.
+
+    :func:`player_snapshot` joins ``first_name`` and ``second_name`` into one full name,
+    which is what a projection wants and not what a press conference says. The platform
+    also publishes ``web_name`` -- ``Saka``, ``B.Fernandes`` -- and nothing in this
+    repository reads it. That is the form a claim about a player has to be matched
+    against, so it is read here, in its own table, keyed on the persistent ``code``.
+
+    The club travels with the name because it is the only thing that makes the match
+    tractable: across a whole roster a bare surname is ambiguous for dozens of players,
+    and inside one squad it is almost always unique.
+    """
+
+    names = team_names(bootstrap)
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _SHORT_NAME_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    unknown_teams: list[int] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        team = _integer(record, "team", "Element")
+        if team not in names:
+            unknown_teams.append(team)
+            continue
+        code = _integer(record, "code", "Element")
+        web_name = _text(record, "web_name", "Element")
+        if not web_name:
+            raise InvalidValueError(f"Element with code {code} publishes an empty web_name.")
+        rows.append({"player_id": code, "web_name": web_name, "team_name": names[team]})
+
+    if unknown_teams:
+        raise InvalidValueError(
+            "Bootstrap payload has players on teams it does not declare: "
+            f"{format_examples(sorted(set(unknown_teams)))}. A claim about a player whose "
+            "club is unknown cannot be resolved within that club."
+        )
+    if not rows:
+        raise DataSourceError(
+            "Bootstrap payload declares no squad-eligible players, so there is no roster "
+            "to resolve a claim against."
+        )
+
+    frame = pd.DataFrame(rows, columns=list(SHORT_NAME_COLUMNS))
+    duplicated = frame.loc[frame["player_id"].duplicated(), "player_id"].tolist()
+    if duplicated:
+        raise DuplicateRecordsError(
+            "Bootstrap payload declares the same persistent player code more than once: "
+            f"{format_examples(duplicated)}."
+        )
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["web_name"] = frame["web_name"].astype("string")
+    frame["team_name"] = frame["team_name"].astype("string")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
+_SCOUT_FIELDS: Final = ("code", "element_type", "scout_risks", "scout_news_link")
+
+#: What :func:`scout_snapshot` returns. Its own tuple, so no existing contract moves.
+SCOUT_COLUMNS: Final = ("player_id", "scout_risk_count", "scout_news_link_present")
+
+
+def scout_snapshot(bootstrap: bytes) -> pd.DataFrame:
+    """Read the source's own forward-looking risk notes, as counts and a flag.
+
+    These two fields are structured, gameweek-stamped and currently thrown away, which is
+    the only reason to read them: they are the one part of the feed that looks *forward*
+    rather than recording what already happened, and they cost nothing to keep.
+
+    What is kept is deliberately thin. The count says how many risks the source published
+    for a player and the flag says whether it linked an article; neither carries a word of
+    the text. A member-facing surface may not be handed free text from this path, and a
+    column that held it would be one rename away from becoming a quote.
+
+    **Absent and empty are different, and the difference decides the export.** A player the
+    source published no risks for carries an empty list, and that is a real observation
+    worth a zero. A payload that does not carry the field *at all* is not an observation of
+    zero risks -- it is the source having renamed or dropped something -- so
+    :func:`_require_fields` refuses rather than letting a column of nulls through. That is
+    the same rule the evidence builder applies to its own bootstrap fields.
+
+    **These two field names are unverified.** No capture in this repository has been read to
+    confirm them; they come from the lane brief. The refusal above is what makes that
+    honest: if the source spells them differently, the first real capture stops with the
+    names it was looking for rather than quietly reporting that nobody has any risks.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _SCOUT_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        risks = record.get("scout_risks")
+        # A list is the documented-by-inspection shape and ``None`` is how a source usually
+        # spells "none of them"; both are observations. Any other type is an undocumented
+        # shape, and guessing at one is how a count starts meaning something else.
+        if risks is None:
+            risk_count = 0
+        elif isinstance(risks, list):
+            risk_count = len(risks)
+        else:
+            raise InvalidValueError(
+                f"scout_risks must be an array or absent, got {type(risks).__name__}. The "
+                "shape is undocumented, so it is surfaced rather than counted as one."
+            )
+        link = record.get("scout_news_link")
+        if link is not None and not isinstance(link, str):
+            raise InvalidValueError(
+                f"scout_news_link must be text or absent, got {type(link).__name__}."
+            )
+        rows.append(
+            {
+                "player_id": _integer(record, "code", "Element"),
+                "scout_risk_count": risk_count,
+                "scout_news_link_present": bool(link is not None and link.strip()),
+            }
+        )
+
+    if not rows:
+        raise DataSourceError("Bootstrap payload declares no squad-eligible players.")
+
+    frame = pd.DataFrame(rows, columns=list(SCOUT_COLUMNS))
+    duplicated = frame.loc[frame["player_id"].duplicated(), "player_id"].tolist()
+    if duplicated:
+        raise DuplicateRecordsError(
+            "Bootstrap payload declares the same persistent player code more than once: "
+            f"{format_examples(duplicated)}."
+        )
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["scout_risk_count"] = frame["scout_risk_count"].astype("Int64")
+    frame["scout_news_link_present"] = frame["scout_news_link_present"].astype("boolean")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
 # --- registered entries and their league ---------------------------------------------
 #
 # Paths, not URLs. This module never fetches; the platform adapter owns the base URL and
@@ -842,6 +1113,20 @@ def league_standings_endpoint_path(league_id: int) -> Mapping[str, str]:
     )
 
 
+def league_standings_page_endpoint_path(league_id: int, page: int) -> Mapping[str, str]:
+    """Payload name to API path for one numbered classic-league standings page."""
+
+    identifier = _positive(league_id, "league id")
+    page_number = _positive(page, "standings page")
+    return MappingProxyType(
+        {
+            league_standings_page_payload(identifier, page_number): (
+                f"leagues-classic/{identifier}/standings/?page_standings={page_number}"
+            )
+        }
+    )
+
+
 def live_endpoint_path(gameweek: int) -> Mapping[str, str]:
     """Payload name to API path for one gameweek's live scoring document."""
 
@@ -864,10 +1149,19 @@ class LiveEventPoints:
     - ``fixtures_finished`` against ``fixtures_total`` says how much of the gameweek is
       actually in the number, which is the difference between "your team scored 41" and
       "your team has scored 41 of what will be a larger figure".
+
+    ``minutes_by_player`` travels here rather than in an object of its own because the two
+    come out of one ``stats`` blob and because neither is sufficient alone: the platform's
+    own score replaces a starter who played no minutes with a bench player, so a caller
+    holding the points and not the minutes cannot say which eleven the points belong to.
+    Which is why the key sets must match exactly -- a player whose minutes were dropped
+    would read as "did not play", and the rule would field a substitute for a man who was
+    on the pitch. This object supplies that rule's inputs; it does not apply it.
     """
 
     gameweek: int
     points_by_player: Mapping[int, int]
+    minutes_by_player: Mapping[int, int]
     bonus_confirmed: bool
     fixtures_finished: int
     fixtures_total: int
@@ -877,6 +1171,22 @@ class LiveEventPoints:
         if not self.points_by_player:
             raise InvalidValueError(
                 f"Live payload for gameweek {self.gameweek} carries no player points."
+            )
+        if set(self.minutes_by_player) != set(self.points_by_player):
+            scored = set(self.points_by_player) - set(self.minutes_by_player)
+            timed = set(self.minutes_by_player) - set(self.points_by_player)
+            raise InvalidValueError(
+                f"Gameweek {self.gameweek} reports points and minutes for different "
+                f"players: {len(scored)} with points and no minutes "
+                f"({format_examples(sorted(scored))}), {len(timed)} the other way "
+                f"({format_examples(sorted(timed))}). A missing minute count reads as "
+                "'did not play', which is how a substitution gets fabricated."
+            )
+        negative = sorted(player for player, played in self.minutes_by_player.items() if played < 0)
+        if negative:
+            raise InvalidValueError(
+                f"Gameweek {self.gameweek} reports negative minutes for "
+                f"{format_examples(negative)}."
             )
         if self.fixtures_total < 1:
             raise InvalidValueError(
@@ -904,7 +1214,7 @@ def fpl_live_event_points(
     gameweek: int,
     source_snapshot_id: str | None = None,
 ) -> LiveEventPoints:
-    """Return one gameweek's running player points from its captured live document.
+    """Return one gameweek's running player points and minutes from its captured live document.
 
     Both documents are required, and the second one is the point. The live payload is a
     bare ``{"elements": [...]}`` with **no gameweek of its own** -- the platform identifies
@@ -913,9 +1223,17 @@ def fpl_live_event_points(
     than saying it. What the fixtures payload does give is the gameweek's own progress,
     which is the caveat a reader of these points actually needs.
 
-    Auto-substitutions are deliberately not modelled here. This returns points per player;
-    which eleven those points are counted for is a decision the ledger owns, and it scores
-    the eleven that were named because that is what the projection was for.
+    Auto-substitutions are deliberately not modelled here, and the minutes do not change
+    that. This returns points *and* minutes per player, which is what a substitution rule
+    needs; which eleven those points are counted for stays a decision the ledger owns.
+    Supplying an input is not the same as applying a rule, and keeping the two apart is
+    what lets one caller score the named eleven and another the platform's, from one
+    reading of one payload.
+
+    ``minutes`` comes from the live document rather than from ``bootstrap-static`` because
+    the bootstrap's counter is season-cumulative. It equals the gameweek's minutes for
+    gameweek one and for no other, and a rule built on that coincidence would be silently
+    wrong from gameweek two onward.
     """
 
     week = _positive(gameweek, "gameweek")
@@ -923,28 +1241,244 @@ def fpl_live_event_points(
     _require_fields(records, _LIVE_ELEMENT_FIELDS, "Live element")
 
     points: dict[int, int] = {}
+    minutes: dict[int, int] = {}
     for record in records:
         player = _integer(record, "id", "Live element")
         stats = record.get("stats")
         if not isinstance(stats, dict):
             raise DataSourceError(
                 f"Live element {player} carries a {type(stats).__name__} 'stats' section "
-                "rather than an object; the adapter reads its total_points."
+                "rather than an object; the adapter reads its total_points and minutes."
             )
         if player in points:
             raise DuplicateRecordsError(
                 f"Live payload for gameweek {week} declares player {player} more than once."
             )
         points[player] = _integer(stats, "total_points", f"Live element {player} stats")
+        # Read rather than defaulted when absent. A player silently given zero minutes
+        # reads as "did not play", and the substitution rule downstream would field a
+        # bench player for someone who was on the pitch -- a wrong eleven, not a gap.
+        minutes[player] = _integer(stats, "minutes", f"Live element {player} stats")
 
     finished, total = _gameweek_fixture_progress(fixtures, gameweek=week)
     return LiveEventPoints(
         gameweek=week,
         points_by_player=MappingProxyType(dict(sorted(points.items()))),
+        minutes_by_player=MappingProxyType(dict(sorted(minutes.items()))),
         bonus_confirmed=finished == total,
         fixtures_finished=finished,
         fixtures_total=total,
         source_snapshot_id=source_snapshot_id,
+    )
+
+
+#: What a settled outcome reads out of one live element's ``stats`` blob. A superset of
+#: what :func:`fpl_live_event_points` needs, because that function answers "what has this
+#: squad scored so far" while a settled outcome has to separate *appearing* from
+#: *starting* -- and only ``starts`` can do that. A payload missing any of the three stops
+#: the run and names the field, rather than yielding a column of nulls: a settled outcome
+#: table whose start column is empty is exactly the table nobody can measure rotation on.
+_LIVE_OUTCOME_STATS_FIELDS: Final = ("minutes", "starts", "total_points")
+
+#: What the live document alone can say about a player's gameweek. The artifact adds the
+#: pre-deadline availability columns on top; these are the outcome half.
+LIVE_OUTCOME_COLUMNS: Final = (
+    "player_id",
+    "appearance",
+    "start",
+    "minutes",
+    "total_points",
+)
+
+
+def live_event_outcomes(live: bytes, bootstrap: bytes, *, gameweek: int) -> pd.DataFrame:
+    """Return one settled gameweek's per-player outcome, keyed on the persistent code.
+
+    Deliberately separate from :func:`fpl_live_event_points`, which keys on the per-season
+    element ``id`` and reads points and minutes alone. Both differences matter here: an
+    outcome recorded this week is read again next season, so it has to name a player by the
+    identity that survives a transfer window; and rotation is a question about *starting*,
+    which minutes cannot answer -- a substitute who played sixty minutes and a starter who
+    played sixty are the same row without ``starts``.
+
+    ``appearance`` is derived from minutes rather than read, because that is the basis the
+    rest of this repository already uses and the payload publishes no separate flag this
+    adapter has been shown to carry. ``start`` is read, never derived: minutes above zero
+    is not a start, and inferring one would invent the very label the measurement is about.
+
+    Nothing here decides whether the gameweek is settled. :func:`scored_gameweeks` owns
+    that, from the bootstrap's own ``finished`` and ``data_checked`` flags, and a caller
+    that skips it would be recording a running total as a final one.
+    """
+
+    week = _positive(gameweek, "gameweek")
+    codes = player_codes(bootstrap)
+    records = _records(_document(live, "Live"), "elements", "Live element")
+    _require_fields(records, _LIVE_ELEMENT_FIELDS, "Live element")
+
+    rows: list[dict[str, object]] = []
+    for record in records:
+        element = _integer(record, "id", "Live element")
+        stats = record.get("stats")
+        if not isinstance(stats, dict):
+            raise DataSourceError(
+                f"Live element {element} carries a {type(stats).__name__} 'stats' section "
+                "rather than an object; the adapter reads its minutes, starts and points."
+            )
+        _require_fields((stats,), _LIVE_OUTCOME_STATS_FIELDS, f"Live element {element} stats")
+        if element not in codes:
+            raise DataSourceError(
+                f"The captured bootstrap names no element {element}, which the live payload "
+                f"for gameweek {week} scores. The two documents describe different squads, "
+                "so the code this row would be filed under is unknown rather than missing."
+            )
+        # No duplicate guard here: :func:`player_codes` refuses a repeated id *and* a
+        # repeated code, so the mapping it returns is injective and two elements cannot
+        # arrive at one code. A check that can never fire is a dead branch, not a safeguard.
+        player = codes[element]
+        minutes = _integer(stats, "minutes", f"Live element {element} stats")
+        if minutes < 0:
+            raise InvalidValueError(
+                f"Gameweek {week} reports {minutes} minutes for player {player}."
+            )
+        starts = _integer(stats, "starts", f"Live element {element} stats")
+        rows.append(
+            {
+                "player_id": player,
+                "appearance": minutes > 0,
+                "start": starts > 0,
+                "minutes": minutes,
+                "total_points": _integer(stats, "total_points", f"Live element {element} stats"),
+            }
+        )
+
+    if not rows:
+        raise DataSourceError(
+            f"Live payload for gameweek {week} scores no players, so it describes no outcome."
+        )
+
+    frame = pd.DataFrame(rows, columns=list(LIVE_OUTCOME_COLUMNS))
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["appearance"] = frame["appearance"].astype("boolean")
+    frame["start"] = frame["start"].astype("boolean")
+    frame["minutes"] = frame["minutes"].astype("int64")
+    frame["total_points"] = frame["total_points"].astype("int64")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
+def build_live_player_history(
+    bootstrap: bytes,
+    fixtures: bytes,
+    event_payloads: Mapping[int, bytes],
+    *,
+    season: str,
+    target_gameweek: int,
+    source_snapshot_id: str | None = None,
+) -> tuple[pd.DataFrame, tuple[int, ...]]:
+    """Build canonical prior-outcome rows plus an empty target row for live scoring.
+
+    Only players present in every supplied historical live payload receive history. If a
+    player is absent from one payload, their whole history is omitted and the prediction
+    layer must use its explicit fallback for that player; treating a missing row as zero
+    minutes would manufacture an appearance outcome. The target rows carry zeros solely
+    as placeholders: shifted feature builders cannot read a target row's own outcome.
+    """
+
+    target = _positive(target_gameweek, "target_gameweek")
+    declared_season = _require_season(season)
+    weeks = tuple(sorted(event_payloads))
+    if not weeks:
+        raise DataSourceError("Live component history requires at least one completed gameweek.")
+    if any(
+        isinstance(week, bool) or not isinstance(week, int) or not 1 <= week < target
+        for week in weeks
+    ):
+        raise InvalidValueError(
+            f"Live component history weeks must be positive and earlier than GW{target}: "
+            f"{list(weeks)!r}."
+        )
+
+    roster = player_snapshot(bootstrap)
+    roster_by_code = {int(record["player_id"]): record for record in roster.to_dict("records")}
+    element_to_code = player_codes(bootstrap)
+    live_by_week: dict[int, LiveEventPoints] = {}
+    complete_codes = set(int(value) for value in roster["player_id"].tolist())
+    for week in weeks:
+        live = fpl_live_event_points(
+            event_payloads[week],
+            fixtures,
+            gameweek=week,
+            source_snapshot_id=source_snapshot_id,
+        )
+        if not live.bonus_confirmed:
+            raise IncompleteLiveHistoryError(
+                f"Gameweek {week} is not fully settled in capture {source_snapshot_id!r}; "
+                "component history cannot treat provisional points as outcomes."
+            )
+        unknown = sorted(set(live.points_by_player) - set(element_to_code))
+        if unknown:
+            raise DataSourceError(
+                f"Gameweek {week} live points name element ids absent from bootstrap: "
+                f"{format_examples(unknown)}."
+            )
+        available = {
+            element_to_code[element]
+            for element in live.points_by_player
+            if element_to_code[element] in roster_by_code
+        }
+        complete_codes &= available
+        live_by_week[week] = live
+
+    roster_codes = set(int(value) for value in roster["player_id"].tolist())
+    incomplete = tuple(sorted(roster_codes - complete_codes))
+    rows: list[dict[str, object]] = []
+    code_to_element = {code: element for element, code in element_to_code.items()}
+    for week in weeks:
+        live = live_by_week[week]
+        for code in sorted(complete_codes):
+            player = roster_by_code[code]
+            element = code_to_element[code]
+            rows.append(
+                {
+                    "season": declared_season,
+                    "gameweek": week,
+                    "player_id": code,
+                    "name": player["name"],
+                    "team_id": player["team_id"],
+                    "position": player["position"],
+                    "price_tenths": int(player["price_tenths"]),
+                    "minutes": int(live.minutes_by_player[element]),
+                    "total_points": int(live.points_by_player[element]),
+                }
+            )
+    for player in roster.to_dict("records"):
+        rows.append(
+            {
+                "season": declared_season,
+                "gameweek": target,
+                "player_id": int(player["player_id"]),
+                "name": player["name"],
+                "team_id": player["team_id"],
+                "position": player["position"],
+                "price_tenths": int(player["price_tenths"]),
+                "minutes": 0,
+                "total_points": 0,
+            }
+        )
+    frame = pd.DataFrame(rows)
+    frame["season"] = frame["season"].astype("string")
+    frame["gameweek"] = frame["gameweek"].astype("int64")
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["name"] = frame["name"].astype("string")
+    frame["team_id"] = frame["team_id"].astype("string")
+    frame["position"] = frame["position"].astype("string")
+    for column in ("price_tenths", "minutes", "total_points"):
+        frame[column] = frame[column].astype("int64")
+    return (
+        frame.sort_values(["season", "gameweek", "player_id"], kind="stable").reset_index(
+            drop=True
+        ),
+        incomplete,
     )
 
 
@@ -966,6 +1500,81 @@ class LeagueStanding:
     entry_name: str
     player_name: str
     rank: int
+    rank_sort: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LeagueStandingsPage:
+    """One verified page of a classic league's ordered standings."""
+
+    page: int
+    has_next: bool
+    members: tuple[LeagueStanding, ...]
+    last_updated_data: str
+
+
+def fpl_league_standings_page(
+    standings: bytes,
+    *,
+    league_id: int,
+    expected_page: int,
+) -> LeagueStandingsPage:
+    """Read one numbered standings page while preserving the source's total order."""
+
+    identifier = _positive(league_id, "league id")
+    requested_page = _positive(expected_page, "standings page")
+    document = _document(standings, "League standings")
+    league = document.get("league")
+    if not isinstance(league, dict) or league.get("id") != identifier:
+        raise DataSourceError(f"League standings page must declare league {identifier}.")
+    section = document.get("standings")
+    if not isinstance(section, dict):
+        raise DataSourceError("League standings payload must carry a 'standings' object.")
+    page = _integer(section, "page", "League standings")
+    if page != requested_page:
+        raise DataSourceError(
+            f"League standings payload is page {page}, not requested page {requested_page}."
+        )
+    has_next = _boolean(section, "has_next", "League standings")
+    records = _records(section, "results", "League standing")
+    _require_fields(records, (*_STANDING_FIELDS, "rank_sort"), "League standing")
+
+    members: list[LeagueStanding] = []
+    seen_entries: set[int] = set()
+    seen_order: set[int] = set()
+    for record in records:
+        entry_id = _positive(_integer(record, "entry", "League standing"), "entry id")
+        rank_sort = _positive(_integer(record, "rank_sort", "League standing"), "rank_sort")
+        if entry_id in seen_entries:
+            raise DuplicateRecordsError(
+                f"League {identifier} page {page} lists entry {entry_id} more than once."
+            )
+        if rank_sort in seen_order:
+            raise DuplicateRecordsError(
+                f"League {identifier} page {page} repeats rank_sort {rank_sort}."
+            )
+        seen_entries.add(entry_id)
+        seen_order.add(rank_sort)
+        members.append(
+            LeagueStanding(
+                entry_id=entry_id,
+                entry_name=_text(record, "entry_name", "League standing"),
+                player_name=_text(record, "player_name", "League standing"),
+                rank=_positive(_integer(record, "rank", "League standing"), "rank"),
+                rank_sort=rank_sort,
+            )
+        )
+    updated = document.get("last_updated_data")
+    if not isinstance(updated, str) or not updated.strip():
+        raise DataSourceError(
+            "League standings payload must carry a non-empty last_updated_data timestamp."
+        )
+    return LeagueStandingsPage(
+        page=page,
+        has_next=has_next,
+        members=tuple(members),
+        last_updated_data=updated.strip(),
+    )
 
 
 def fpl_league_standings(standings: bytes, *, league_id: int) -> tuple[LeagueStanding, ...]:
@@ -1036,15 +1645,21 @@ class EntryGameweekPoints:
     capture this was built against was thirteen hours older than the capture itself; the
     entry documents are fetched in the same pass as the picks.
 
-    ``points`` is net of the week's transfer cost, as the source publishes it, and may be
-    negative after a hit — refusing a negative week would be the same class of error as
-    inventing a positive one.
+    ``points`` is the week's **gross** score: the transfer cost has not been taken off.
+    The source's own arithmetic says so — ``total_points`` advances by ``points`` minus
+    ``event_transfers_cost`` (in the 2026-09-07 capture a 78-point week with a 4-point
+    cost moved the total by 74, and every row of the fifteen histories held agrees). The
+    cost travels as ``transfer_cost`` so a caller can state the net week, the number our
+    ledger records; it is ``None`` only when the row carries no ``event_transfers_cost``
+    at all, which the live source never omits. A negative ``points`` is read rather than
+    refused — refusing it would be the same class of error as inventing a positive one.
     """
 
     entry_id: int
     gameweek: int
     points: int
     total_points: int
+    transfer_cost: int | None = None
 
 
 def fpl_entry_history_points(history: bytes, *, entry_id: int) -> tuple[EntryGameweekPoints, ...]:
@@ -1074,6 +1689,11 @@ def fpl_entry_history_points(history: bytes, *, entry_id: int) -> tuple[EntryGam
                 gameweek=gameweek,
                 points=_integer(record, "points", "Entry history"),
                 total_points=_integer(record, "total_points", "Entry history"),
+                transfer_cost=(
+                    _integer(record, "event_transfers_cost", "Entry history")
+                    if "event_transfers_cost" in record
+                    else None
+                ),
             )
         )
     return tuple(sorted(weeks, key=lambda week: week.gameweek))
@@ -1155,8 +1775,27 @@ class EntryPicksRecord:
     season: str
     gameweek: int
     squad: tuple[int, ...]
+    """The fifteen picks in the platform's own order: positions 1 to 15.
+
+    The order is load-bearing, not incidental. ``squad[:11]`` is the named eleven and
+    ``squad[11:]`` is the bench **in substitution order** — the sequence the platform walks
+    when it replaces a starter who played no minutes (#262). Sorting this tuple would keep
+    every member and destroy the rule.
+    """
     starting_xi: tuple[int, ...]
     captain: int
+    vice_captain: int
+    """Who inherits the multiplier when the captain plays no minutes.
+
+    Required rather than defaulted: there is no value that can stand in for it. Guessing
+    the vice would not fail loudly, it would hand the armband to the wrong player in exactly
+    the weeks the captain blanked, which is when it matters most.
+
+    The adapter requires the vice to be in the squad and to differ from the captain, and
+    deliberately does **not** require him to be in the starting eleven. Six real entries
+    were checked and all six named both inside the eleven, but six is not a rule, and an
+    adapter that refuses a real capture is worse than one that accepts a bench vice.
+    """
     bank_tenths: int
     free_transfers: int
     free_transfers_known: bool
@@ -1181,10 +1820,91 @@ class EntryPicksRecord:
                 f"Entry {self.entry_id} gameweek {self.gameweek} names a captain who is "
                 "not in the starting eleven."
             )
+        if self.vice_captain not in self.squad:
+            raise InvalidValueError(
+                f"Entry {self.entry_id} gameweek {self.gameweek} names a vice-captain who "
+                "is not in the squad."
+            )
+        if self.vice_captain == self.captain:
+            raise InvalidValueError(
+                f"Entry {self.entry_id} gameweek {self.gameweek} names the same player as "
+                "captain and vice-captain, which would leave the multiplier nowhere to go "
+                "when he plays no minutes."
+            )
         if self.bank_tenths < 0:
             raise InvalidValueError(
                 f"Entry {self.entry_id} reports a negative bank of {self.bank_tenths}."
             )
+
+
+@dataclass(frozen=True, slots=True)
+class EntrySquad:
+    """One entry's fifteen picks at one gameweek: who, in what order, and who wore what.
+
+    The part of a picks document that needs no season history. It exists so a consumer that
+    only wants squad membership -- counting how many of an elite cohort held a player -- does
+    not have to capture the history payload it will never read, and so that consumer and
+    ``fpl_entry_picks`` share one parser instead of two copies that drift.
+    """
+
+    entry_id: int
+    gameweek: int
+    squad: tuple[int, ...]
+    starting_xi: tuple[int, ...]
+    captain: int
+    vice_captain: int
+
+
+def entry_squad_from_picks(picks: bytes, *, entry_id: int, gameweek: int) -> EntrySquad:
+    """Parse one ``event/{gw}/picks`` document into its squad, order and armbands."""
+
+    identifier = _positive(entry_id, "entry id")
+    week = _positive(gameweek, "gameweek")
+    document = _document(picks, "Entry picks")
+    records = _records(document, "picks", "Entry pick")
+    _require_fields(records, _PICK_FIELDS, "Entry pick")
+
+    by_position: dict[int, int] = {}
+    captains: list[int] = []
+    vice_captains: list[int] = []
+    for record in records:
+        position = _integer(record, "position", "Entry pick")
+        element = _positive(_integer(record, "element", "Entry pick"), "element id")
+        if position in by_position:
+            raise DuplicateRecordsError(
+                f"Entry {identifier} gameweek {week} lists squad position {position} twice."
+            )
+        by_position[position] = element
+        if _boolean(record, "is_captain", "Entry pick"):
+            captains.append(element)
+        if _boolean(record, "is_vice_captain", "Entry pick"):
+            vice_captains.append(element)
+
+    if set(by_position) != set(range(1, _SQUAD_SIZE + 1)):
+        raise DataSourceError(
+            f"Entry {identifier} gameweek {week} must list squad positions 1 to "
+            f"{_SQUAD_SIZE}; got {sorted(by_position)}."
+        )
+    if len(captains) != 1:
+        raise DataSourceError(
+            f"Entry {identifier} gameweek {week} names {len(captains)} captains; the "
+            "platform names exactly one."
+        )
+    if len(vice_captains) != 1:
+        raise DataSourceError(
+            f"Entry {identifier} gameweek {week} names {len(vice_captains)} vice-captains; "
+            "the platform names exactly one."
+        )
+
+    squad = tuple(by_position[position] for position in sorted(by_position))
+    return EntrySquad(
+        entry_id=identifier,
+        gameweek=week,
+        squad=squad,
+        starting_xi=squad[:_STARTING_SIZE],
+        captain=captains[0],
+        vice_captain=vice_captains[0],
+    )
 
 
 def fpl_entry_picks(
@@ -1213,37 +1933,11 @@ def fpl_entry_picks(
     honest unknown instead of a plausible number.
     """
 
-    identifier = _positive(entry_id, "entry id")
-    week = _positive(gameweek, "gameweek")
+    named = entry_squad_from_picks(picks, entry_id=entry_id, gameweek=gameweek)
+    identifier = named.entry_id
+    week = named.gameweek
+    squad = named.squad
     document = _document(picks, "Entry picks")
-    records = _records(document, "picks", "Entry pick")
-    _require_fields(records, _PICK_FIELDS, "Entry pick")
-
-    by_position: dict[int, int] = {}
-    captains: list[int] = []
-    for record in records:
-        position = _integer(record, "position", "Entry pick")
-        element = _positive(_integer(record, "element", "Entry pick"), "element id")
-        if position in by_position:
-            raise DuplicateRecordsError(
-                f"Entry {identifier} gameweek {week} lists squad position {position} twice."
-            )
-        by_position[position] = element
-        if _boolean(record, "is_captain", "Entry pick"):
-            captains.append(element)
-
-    if set(by_position) != set(range(1, _SQUAD_SIZE + 1)):
-        raise DataSourceError(
-            f"Entry {identifier} gameweek {week} must list squad positions 1 to "
-            f"{_SQUAD_SIZE}; got {sorted(by_position)}."
-        )
-    if len(captains) != 1:
-        raise DataSourceError(
-            f"Entry {identifier} gameweek {week} names {len(captains)} captains; the "
-            "platform names exactly one."
-        )
-
-    squad = tuple(by_position[position] for position in sorted(by_position))
     entry_history = document.get("entry_history")
     if not isinstance(entry_history, dict):
         raise DataSourceError(
@@ -1256,8 +1950,9 @@ def fpl_entry_picks(
         season=_require_season(season),
         gameweek=week,
         squad=squad,
-        starting_xi=squad[:_STARTING_SIZE],
-        captain=captains[0],
+        starting_xi=named.starting_xi,
+        captain=named.captain,
+        vice_captain=named.vice_captain,
         bank_tenths=_integer(entry_history, "bank", "Entry history"),
         free_transfers=1,
         free_transfers_known=False,

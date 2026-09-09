@@ -306,6 +306,36 @@ def test_an_outcome_whose_manifest_rewrite_was_lost_is_completed_not_refused(
         record_outcome(root, SEASON, 1, points, source_snapshot_id=recommendation.snapshot_id)
 
 
+def test_completing_a_lost_manifest_refuses_an_entry_that_drifted_meanwhile(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """Completing the manifest is a rewrite, and a rewrite re-derives every digest.
+
+    Every other path into an entry verifies before trusting it. This one did not, so a
+    decision.json edited while the entry sat in the crash window had its recorded digest
+    replaced by the digest of the edited bytes, and every later read verified cleanly.
+    """
+
+    recommendation, projection, root = decision_world
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    points = _flat_points(recommendation, value=2.0)
+    record_outcome(root, SEASON, 1, points, source_snapshot_id=recommendation.snapshot_id)
+    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    recorded = manifest["files"]["decision.json"]
+    del manifest["files"]["outcome.json"]
+    (directory / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    decision_path = directory / "decision.json"
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    decision["projected_score"] = 999.0
+    decision_path.write_text(json.dumps(decision, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(LedgerError, match="does not match its recorded"):
+        record_outcome(root, SEASON, 1, points, source_snapshot_id=recommendation.snapshot_id)
+    still = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+    assert still["files"]["decision.json"] == recorded
+
+
 # --- settling outcomes ------------------------------------------------------
 
 
@@ -419,6 +449,42 @@ def test_the_summary_shows_settled_and_pending_gameweeks(
     markdown = summary_markdown(root, SEASON)
     assert SEASON_LEDGER_CONTRACT_VERSION in markdown
     assert "Settled gameweeks: 1" in markdown
+
+
+def test_the_summary_shows_the_mode_each_decision_was_made_in(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """A replayed catch-up is a different kind of record from a live decision, and the
+    committed summary says which is which rather than leaving it in the raw metadata.
+
+    The legend names **both** reasons a decision is a replay. ``decide`` stamps replay
+    whenever a capture is named rather than taken, and again whenever the decision is
+    recorded past the deadline; a legend giving only the second is false about an entry
+    recorded before its deadline from a capture the run reused.
+    """
+
+    recommendation, projection, root = decision_world
+    record_decision(
+        root, recommendation, projection, report_text="report", metadata={"mode": "replay"}
+    )
+
+    table = ledger_summary(root, SEASON)
+    assert table.loc[0, "mode"] == "replay"
+    markdown = summary_markdown(root, SEASON)
+    assert "| GW | Snapshot | Mode | Solver |" in markdown
+    assert "| replay | OPTIMAL |" in markdown
+    assert "`replay` was recorded after that deadline, or from a capture the run" in markdown
+    assert "did not take but named" in markdown
+
+
+def test_an_entry_recorded_before_the_mode_was_stamped_shows_a_dash(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    recommendation, projection, root = decision_world
+    record_decision(root, recommendation, projection, report_text="report")
+
+    assert ledger_summary(root, SEASON).loc[0, "mode"] is None
+    assert "| - | OPTIMAL |" in summary_markdown(root, SEASON)
 
 
 def test_an_empty_season_loads_as_empty(tmp_path: Path) -> None:

@@ -5,6 +5,17 @@ end-to-end pipeline reproducible and testable, not to claim predictive accuracy.
 """
 
 from squadopt.prediction.baseline import baseline_expected_points
+from squadopt.prediction.components import (
+    COMPONENT_EVIDENCE_STATUSES,
+    COMPONENT_MODEL_ROUTE,
+    COMPONENT_PREDICTION_CONTRACT_VERSION,
+    COMPONENT_PREDICTION_ROUTES,
+    DIRECT_CONTROL_ROUTE,
+    EVIDENCE_NOT_REQUESTED,
+    START_COMPONENT_UNAVAILABLE,
+    ComponentPredictionSnapshot,
+    prepare_component_prediction,
+)
 from squadopt.prediction.config import (
     DEFAULT_OPENING_EXPECTED_POINTS,
     DEFAULT_PROJECTION_CONFIG,
@@ -13,6 +24,15 @@ from squadopt.prediction.config import (
     PredictionConfigurationError,
     PredictionError,
     required_feature_columns,
+)
+from squadopt.prediction.elite_evidence import (
+    ELITE_COHORT_SIZE,
+    ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION,
+    ELITE_EVIDENCE_MODEL_VERSION,
+    ELITE_EVIDENCE_POLICY_VERSION,
+    MAXIMUM_RELATIVE_UPLIFT,
+    EliteEvidenceAdjustment,
+    apply_elite_evidence,
 )
 from squadopt.prediction.factors import (
     BASELINE_FORM_WINDOW,
@@ -38,6 +58,7 @@ from squadopt.prediction.learned import (
 from squadopt.prediction.minutes import (
     ExpectedMinutesConfig,
     MinutesProjection,
+    appearance_probability,
     expected_minutes,
 )
 from squadopt.prediction.opening import (
@@ -48,23 +69,38 @@ from squadopt.prediction.production import (
     ProductionProjection,
     ProductionProjectionConfig,
     expected_points_per_90,
+    production_component_prediction,
     production_projection,
 )
 from squadopt.prediction.projection import build_projection_table
 
 __all__ = [
     "BASELINE_FORM_WINDOW",
+    "COMPONENT_EVIDENCE_STATUSES",
+    "COMPONENT_MODEL_ROUTE",
+    "COMPONENT_PREDICTION_CONTRACT_VERSION",
+    "COMPONENT_PREDICTION_ROUTES",
     "DEFAULT_OPENING_EXPECTED_POINTS",
     "DEFAULT_PROJECTION_CONFIG",
+    "DIRECT_CONTROL_ROUTE",
+    "ELITE_COHORT_SIZE",
+    "ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION",
+    "ELITE_EVIDENCE_MODEL_VERSION",
+    "ELITE_EVIDENCE_POLICY_VERSION",
+    "EVIDENCE_NOT_REQUESTED",
     "FEATURE_GENERATION_CONTRACT_VERSION",
     "FITTED_OPENING_PRICE_COEFFICIENT",
+    "MAXIMUM_RELATIVE_UPLIFT",
     "PREDICTION_TO_OPTIMIZATION_CONTRACT_VERSION",
     "PREDICTION_VALUE_COLUMNS",
     "RIDGE_FEATURE_CONTRACT_VERSION",
     "RIDGE_MODEL_NAME",
     "RIDGE_MODEL_VERSION",
     "ROSTER_COLUMN_MAP",
+    "START_COMPONENT_UNAVAILABLE",
     "BaselineProjectionConfig",
+    "ComponentPredictionSnapshot",
+    "EliteEvidenceAdjustment",
     "ExpectedMinutesConfig",
     "FittedRidgePredictor",
     "FormWindowMapping",
@@ -76,6 +112,8 @@ __all__ = [
     "ProductionProjection",
     "ProductionProjectionConfig",
     "RidgeProjectionConfig",
+    "appearance_probability",
+    "apply_elite_evidence",
     "baseline_expected_points",
     "build_opening_projection_table",
     "build_projection_table",
@@ -83,7 +121,9 @@ __all__ = [
     "expected_points_per_90",
     "fit_ridge_predictor",
     "predict_ridge_expected_points",
+    "prepare_component_prediction",
     "prepare_optimizer_projection",
+    "production_component_prediction",
     "production_projection",
     "required_feature_columns",
 ]

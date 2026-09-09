@@ -6,10 +6,18 @@ machine that produced one and fail everywhere else.
 """
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
-from scripts.build_league_site import last_scored_gameweek, member_points
+from scripts.build_league_site import (
+    last_scored_gameweek,
+    member_points,
+    resolve_live_snapshot_id,
+)
+
+from squadopt.data.errors import DataError
+from squadopt.data.snapshots import write_snapshot
 
 
 def _history(rows: list[dict[str, Any]]) -> bytes:
@@ -77,3 +85,93 @@ def test_the_published_week_is_the_last_final_one_before_the_build(
     events: list[dict[str, Any]], before: int, expected: int | None
 ) -> None:
     assert last_scored_gameweek(_events(events), before=before) == expected
+
+
+def test_the_pool_mapper_runs_render_member_only() -> None:
+    """A pool worker rebuilds the batch's context itself, so the mapper must refuse any
+    function but ``render_member`` rather than silently running its own."""
+
+    import functools
+    from concurrent.futures import ThreadPoolExecutor
+
+    from scripts.build_league_site import pool_mapper
+
+    from squadopt.application.league_views import render_member
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        mapper = pool_mapper(executor)
+        with pytest.raises(ValueError, match="render_member only"):
+            mapper(len, [])  # type: ignore[arg-type]
+        bound = functools.partial(
+            render_member, provider=None, inputs=None, projection=None, rules=None
+        )
+        assert list(mapper(bound, [])) == []  # type: ignore[arg-type]
+
+
+def test_the_league_tree_is_built_from_the_latest_live_capture(tmp_path: Path) -> None:
+    """A cohort capture must not win the selection on the strength of its name.
+
+    Top-100 and elite-picks captures share the snapshot root and their identifiers sort
+    after every ``fpl-live`` one, so "the last directory" is not "the latest capture".
+    Only a live capture carries the entry histories and standings the tree is built from.
+    """
+
+    live = write_snapshot(
+        tmp_path,
+        source="fpl-live",
+        captured_at_utc="2026-08-21T15:00:00Z",
+        payloads={"bootstrap-static.json": b"{}"},
+    ).snapshot_id
+    cohort = write_snapshot(
+        tmp_path,
+        source="fpl-top100",
+        captured_at_utc="2026-01-01T12:00:00Z",
+        payloads={"league-352490-standings-page-1.json": b"{}"},
+    ).snapshot_id
+
+    assert resolve_live_snapshot_id(tmp_path, None) == live
+    # Naming a capture is the operator's own choice and is checked against them all.
+    assert resolve_live_snapshot_id(tmp_path, cohort) == cohort
+
+
+def test_a_root_holding_no_live_capture_names_what_is_missing(tmp_path: Path) -> None:
+    write_snapshot(
+        tmp_path,
+        source="fpl-elite-picks",
+        captured_at_utc="2026-08-21T15:00:00Z",
+        payloads={"league-352490-standings-page-1.json": b"{}"},
+    )
+
+    with pytest.raises(DataError, match="No fpl-live"):
+        resolve_live_snapshot_id(tmp_path, None)
+
+
+def test_a_refused_advice_record_names_the_escape_a_deadline_needs(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The record refuses a week it already holds, and the refusal has to be actionable.
+
+    The published files are already on disk when this fires: only the record refused. An
+    operator reading it minutes before a deadline must be told what to do next, or they
+    will improvise — and every improvisation here (deleting the record, pointing the build
+    somewhere else) destroys the evidence the record exists to be.
+    """
+
+    import sys
+
+    import scripts.build_league_site as build_league_site
+
+    from squadopt.application.advice_record import AdviceRecordConflictError
+
+    def refuse(root: Path, requested: str | None) -> str:
+        raise AdviceRecordConflictError("advice/101/saf-puan/1.json: published_sha256 moved")
+
+    monkeypatch.setattr(build_league_site, "resolve_live_snapshot_id", refuse)
+    monkeypatch.setattr(sys, "argv", ["build_league_site", "--league", "352490"])
+
+    assert build_league_site.main() == 1
+
+    printed = capsys.readouterr().err
+    assert "published_sha256 moved" in printed
+    assert "--no-advice-record" in printed
+    assert "publish_gameweek_site" in printed

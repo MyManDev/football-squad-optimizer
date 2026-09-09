@@ -11,6 +11,13 @@ test("suggested moves states the opening week honestly", async ({ page }) => {
   await page.goto("/moves");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Önerilen Hamleler");
   await expect(page.getByText(/Açılış kadrosu — yapılacak transfer yok/)).toBeVisible();
+  await expect(page.getByText("canlı kontrol")).toBeVisible();
+
+  await page.getByRole("radio", { name: "3 hafta" }).click();
+
+  await expect(page).toHaveURL(/window=3/);
+  await expect(page.getByText("araştırma gölgesi")).toBeVisible();
+  await expect(page.getByText(/H3 gölge kanıt için ayrılmıştır/)).toBeVisible();
 });
 
 test("rivals shows the projections and says why there is no rival yet", async ({ page }) => {
@@ -33,7 +40,12 @@ test("league shows the season and the cumulative chart", async ({ page }) => {
   // Turkish because the payload now carries a stable code the page translates.
   await expect(page.getByText(/oyun ortalamasına karşı/)).toBeVisible();
   await expect(page.getByText(/Bu kadronun ne kadarı şablon/)).toBeVisible();
-  await expect(page.getByRole("table")).toBeVisible();
+  // Named rather than taken by role alone, for the same reason the comment above gives. A
+  // bare `getByRole("table")` assumed the page had exactly one, which was true only while
+  // the scoreboard had nothing to publish; a week with a scoreboard renders a second table
+  // and the locator fails on strict mode rather than on anything being wrong. The season
+  // ledger is the table that is there in every season state, so that is the one asserted.
+  await expect(page.getByRole("table", { name: /sezon ledger/i })).toBeVisible();
 });
 
 test("status is reachable from the footer", async ({ page }) => {

@@ -25,6 +25,8 @@ import pandas as pd
 
 from squadopt.backtest.opening_prior import fit_opening_price_coefficient
 from squadopt.backtest.splits import BacktestConfigurationError, DecisionPoint, rows_before
+from squadopt.data.errors import DataSourceError
+from squadopt.data.timestamps import normalize_utc_timestamp
 from squadopt.features import (
     PRIOR_MINUTES_COLUMN,
     PRIOR_RATE_COLUMN,
@@ -35,12 +37,17 @@ from squadopt.features import (
 from squadopt.features.cross_season import carry_over_as_of
 from squadopt.features.fixtures import FIXTURE_FEATURE_COLUMNS, attach_fixture_features
 from squadopt.prediction import (
+    ComponentPredictionSnapshot,
     PredictionProvenance,
     PredictionSnapshot,
     prepare_optimizer_projection,
 )
 from squadopt.prediction.config import FITTED_OPENING_PRICE_COEFFICIENT
-from squadopt.prediction.production import ProductionProjectionConfig, production_projection
+from squadopt.prediction.production import (
+    ProductionProjectionConfig,
+    production_component_prediction,
+    production_projection,
+)
 
 PRODUCTION_MODEL_NAME: Final = "squadopt-two-stage"
 PRODUCTION_MODEL_VERSION: Final = "two-stage-v1"
@@ -160,6 +167,133 @@ def build_production_prediction_snapshot(
     if not isinstance(carry, CrossSeasonConfig):
         raise BacktestConfigurationError("cross_season must be a CrossSeasonConfig.")
 
+    features = _features_for_visible_panel(
+        visible,
+        fixtures=fixtures,
+        team_codes=team_codes,
+        settings=settings,
+        carry=carry,
+    )
+
+    return _snapshot_from_features(features, visible, decision, settings)
+
+
+def build_production_component_prediction_snapshot(
+    visible: pd.DataFrame,
+    decision: DecisionPoint,
+    *,
+    decision_timestamp_utc: str,
+    fixtures: pd.DataFrame,
+    team_codes: pd.DataFrame,
+    config: ProductionProjectionConfig | None = None,
+    cross_season: CrossSeasonConfig | None = None,
+) -> ComponentPredictionSnapshot:
+    """Expose the same walk-forward control through the private component contract."""
+
+    settings = ProductionProjectionConfig() if config is None else config
+    carry = CrossSeasonConfig() if cross_season is None else cross_season
+    if not isinstance(settings, ProductionProjectionConfig):
+        raise BacktestConfigurationError("config must be a ProductionProjectionConfig.")
+    if not isinstance(carry, CrossSeasonConfig):
+        raise BacktestConfigurationError("cross_season must be a CrossSeasonConfig.")
+
+    fixture_timing = _verified_fixture_timing(
+        fixtures,
+        decision,
+        decision_timestamp_utc=decision_timestamp_utc,
+    )
+    features = _features_for_visible_panel(
+        visible,
+        fixtures=fixtures,
+        team_codes=team_codes,
+        settings=settings,
+        carry=carry,
+    )
+    target, fold_settings, provenance, diagnostics = _fold_projection_context(
+        features, visible, decision, settings
+    )
+    snapshot = production_component_prediction(
+        target,
+        provenance,
+        decision_timestamp_utc=decision_timestamp_utc,
+        config=fold_settings,
+        decision_context=fixture_timing,
+    )
+    return ComponentPredictionSnapshot(
+        table=snapshot.table,
+        provenance=snapshot.provenance,
+        decision_timestamp_utc=snapshot.decision_timestamp_utc,
+        component_fingerprint=snapshot.component_fingerprint,
+        diagnostics={**dict(snapshot.diagnostics), **diagnostics, **fixture_timing},
+        decision_context=snapshot.decision_context,
+    )
+
+
+def _verified_fixture_timing(
+    fixtures: pd.DataFrame,
+    decision: DecisionPoint,
+    *,
+    decision_timestamp_utc: str,
+) -> Mapping[str, str]:
+    """Require fixture context captured before a pre-deadline component decision."""
+
+    if not isinstance(fixtures, pd.DataFrame):
+        raise BacktestConfigurationError("fixtures must be a pandas DataFrame.")
+    required = ("season", "gameweek", "snapshot_id", "captured_at_utc", "deadline_timestamp_utc")
+    missing = [column for column in required if column not in fixtures.columns]
+    if missing:
+        raise BacktestConfigurationError(
+            f"Component backtests require fixture timing columns: {missing!r}."
+        )
+    target = fixtures.loc[
+        (fixtures["season"].astype("string") == decision.season)
+        & (fixtures["gameweek"] == decision.gameweek)
+    ]
+    if target.empty:
+        raise BacktestConfigurationError(
+            f"No as-of fixture rows prove the calendar at {decision.fold_id}."
+        )
+
+    values: dict[str, str] = {}
+    for column in ("snapshot_id", "captured_at_utc", "deadline_timestamp_utc"):
+        raw = target[column]
+        observed = {str(value).strip() for value in raw.tolist() if not pd.isna(value)}
+        if bool(raw.isna().any()) or len(observed) != 1 or not next(iter(observed), ""):
+            raise BacktestConfigurationError(
+                f"Component backtests require one complete {column} for {decision.fold_id}."
+            )
+        values[column] = observed.pop()
+    try:
+        decision_time = normalize_utc_timestamp(
+            decision_timestamp_utc, label="decision_timestamp_utc"
+        )
+        captured = normalize_utc_timestamp(values["captured_at_utc"], label="captured_at_utc")
+        deadline = normalize_utc_timestamp(
+            values["deadline_timestamp_utc"], label="deadline_timestamp_utc"
+        )
+    except DataSourceError as error:
+        raise BacktestConfigurationError(str(error)) from error
+    if not pd.Timestamp(captured) <= pd.Timestamp(decision_time) <= pd.Timestamp(deadline):
+        raise BacktestConfigurationError(
+            "Component fixture context must satisfy captured_at_utc <= "
+            "decision_timestamp_utc <= deadline_timestamp_utc."
+        )
+    return {
+        "fixture_timing_status": "verified_as_of",
+        "fixture_snapshot_id": values["snapshot_id"],
+        "fixture_captured_at_utc": captured,
+        "fixture_deadline_timestamp_utc": deadline,
+    }
+
+
+def _features_for_visible_panel(
+    visible: pd.DataFrame,
+    *,
+    fixtures: pd.DataFrame,
+    team_codes: pd.DataFrame,
+    settings: ProductionProjectionConfig,
+    carry: CrossSeasonConfig,
+) -> pd.DataFrame:
     feature_config = production_feature_config(settings)
     seasons = sorted({str(value) for value in visible["season"].tolist()})
     frames = [
@@ -173,17 +307,20 @@ def build_production_prediction_snapshot(
         )
         for season in seasons
     ]
-    features = pd.concat(frames, ignore_index=True)
-
-    return _snapshot_from_features(features, visible, decision, settings)
+    return pd.concat(frames, ignore_index=True)
 
 
-def _snapshot_from_features(
+def _fold_projection_context(
     features: pd.DataFrame,
     visible: pd.DataFrame,
     decision: DecisionPoint,
     settings: ProductionProjectionConfig,
-) -> PredictionSnapshot:
+) -> tuple[
+    pd.DataFrame,
+    ProductionProjectionConfig,
+    PredictionProvenance,
+    Mapping[str, object],
+]:
     training = rows_before(features, decision)
     if training.empty:
         raise BacktestConfigurationError(f"No training rows before {decision.fold_id}.")
@@ -200,6 +337,36 @@ def _snapshot_from_features(
         opening_price_coefficient=coefficient,
         minutes=settings.minutes,
     )
+    provenance = PredictionProvenance(
+        model_name=PRODUCTION_MODEL_NAME,
+        model_version=PRODUCTION_MODEL_VERSION,
+        feature_contract_version=PRODUCTION_FEATURE_CONTRACT_VERSION,
+        training_cutoff=_training_cutoff(training),
+        training_data_fingerprint=_fingerprint(training),
+    )
+    diagnostics: Mapping[str, object] = {
+        "training_rows": len(training),
+        "appearance_window": settings.minutes.window,
+        "rate_window": settings.rate_window,
+        "carry_over_minutes_weight": settings.minutes.carry_over_weight,
+        "carry_over_rate_weight": settings.carry_over_rate_weight,
+        "opening_price_coefficient": coefficient,
+        "opening_price_prior_origin": prior_origin,
+        "double_gameweek_players": int((target["fixture_count"] > 1).sum()),
+        "blank_gameweek_players": int((target["fixture_count"] == 0).sum()),
+    }
+    return target, fold_settings, provenance, diagnostics
+
+
+def _snapshot_from_features(
+    features: pd.DataFrame,
+    visible: pd.DataFrame,
+    decision: DecisionPoint,
+    settings: ProductionProjectionConfig,
+) -> PredictionSnapshot:
+    target, fold_settings, provenance, diagnostics = _fold_projection_context(
+        features, visible, decision, settings
+    )
     projection = production_projection(target, config=fold_settings)
 
     predictions = pd.DataFrame(
@@ -207,13 +374,6 @@ def _snapshot_from_features(
             "player_id": target["player_id"].to_numpy(),
             "expected_points": projection.expected_points.to_numpy(),
         }
-    )
-    provenance = PredictionProvenance(
-        model_name=PRODUCTION_MODEL_NAME,
-        model_version=PRODUCTION_MODEL_VERSION,
-        feature_contract_version=PRODUCTION_FEATURE_CONTRACT_VERSION,
-        training_cutoff=_training_cutoff(training),
-        training_data_fingerprint=_fingerprint(training),
     )
     snapshot = prepare_optimizer_projection(
         target.loc[:, list(_SNAPSHOT_COLUMNS)],
@@ -229,15 +389,7 @@ def _snapshot_from_features(
             **_route_counts(projection.minutes_source, "minutes_source"),
             **_route_counts(projection.rate_source, "rate_source"),
             **_route_counts(projection.points_source, "points_source"),
-            "training_rows": len(training),
-            "appearance_window": settings.minutes.window,
-            "rate_window": settings.rate_window,
-            "carry_over_minutes_weight": settings.minutes.carry_over_weight,
-            "carry_over_rate_weight": settings.carry_over_rate_weight,
-            "opening_price_coefficient": coefficient,
-            "opening_price_prior_origin": prior_origin,
-            "double_gameweek_players": int((target["fixture_count"] > 1).sum()),
-            "blank_gameweek_players": int((target["fixture_count"] == 0).sum()),
+            **diagnostics,
         },
     )
 
@@ -300,6 +452,7 @@ __all__ = [
     "PRODUCTION_FEATURE_CONTRACT_VERSION",
     "PRODUCTION_MODEL_NAME",
     "PRODUCTION_MODEL_VERSION",
+    "build_production_component_prediction_snapshot",
     "build_production_prediction_snapshot",
     "make_production_projection_builder",
     "production_feature_config",

@@ -5,6 +5,7 @@ recorded decision, its ledger row and its site file all come from one world.
 """
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ from squadopt.application import (
     write_ui_view_schema,
 )
 from squadopt.application.views import ViewError, jsonable, short_name
+from squadopt.data.snapshots import CapturedSnapshot, payload_checksum
 from squadopt.live import (
     Recommendation,
     build_recommendation,
@@ -111,6 +113,46 @@ def test_a_recommendation_view_matches_the_ledger_view_of_the_same_decision(
     assert from_ledger.risk.stated_limits and in_memory.risk.reason
 
 
+def test_the_public_recommendation_only_exposes_allowlisted_ledger_metadata(
+    world: tuple[Recommendation, Projection, Path, Any], tmp_path: Path
+) -> None:
+    recommendation, projection, root, _ = world
+    fingerprint = "a" * 64
+    windows_handoff = r"C:\Users\alice\private\handoff.json"
+    posix_residuals = "/home/alice/private/residuals.csv"
+    record_decision(
+        root,
+        recommendation,
+        projection,
+        report_text="report",
+        metadata={
+            "mode": "replay",
+            "projection_handoff_fingerprint": fingerprint,
+            "projection_handoff_path": windows_handoff,
+            "risk_residuals_source": posix_residuals,
+            "risk_residuals_path": posix_residuals,
+            "unreviewed_future_key": {"private_path": "/Users/alice/private/secret.csv"},
+        },
+    )
+
+    entry = load_entry(root, SEASON, 1)
+    raw_metadata = entry.decision["metadata"]
+    assert isinstance(raw_metadata, dict)
+    assert raw_metadata["projection_handoff_path"] == windows_handoff
+    assert raw_metadata["risk_residuals_path"] == posix_residuals
+
+    metadata = recommendation_view_from_ledger(entry).metadata
+
+    assert metadata == {
+        "mode": "replay",
+        "projection_handoff_fingerprint": fingerprint,
+        "risk_residuals_source": ".../private/residuals.csv",
+    }
+    assert "projection_handoff_path" not in metadata
+    assert "risk_residuals_path" not in metadata
+    assert "unreviewed_future_key" not in metadata
+
+
 def test_the_ledger_view_totals_settled_and_unsettled_rows_separately(
     world: tuple[Recommendation, Projection, Path, Any],
 ) -> None:
@@ -194,7 +236,18 @@ def test_build_site_writes_a_deterministic_validated_tree(
     world: tuple[Recommendation, Projection, Path, Any], tmp_path: Path
 ) -> None:
     recommendation, projection, root, snapshot = world
-    record_decision(root, recommendation, projection, report_text="report")
+    record_decision(
+        root,
+        recommendation,
+        projection,
+        report_text="report",
+        metadata={
+            "mode": "replay",
+            "projection_handoff_path": r"C:\Users\alice\private\handoff.json",
+            "risk_residuals_path": "/home/alice/private/residuals.csv",
+            "future": {"private_path": "/Users/alice/private/secret.csv"},
+        },
+    )
     held = [HeldSnapshot(snapshot.metadata.snapshot_id, snapshot.metadata.captured_at_utc)]
     plan = plan_tick(
         now_utc="2026-08-21T15:30:00Z",
@@ -228,10 +281,12 @@ def test_build_site_writes_a_deterministic_validated_tree(
         "index.json",
         f"{SEASON}/gw01/recommendation.json",
         f"{SEASON}/gw01/pool.json",
+        f"{SEASON}/gw01/live.json",
         f"{SEASON}/ledger.json",
         f"{SEASON}/league.json",
         f"{SEASON}/status.json",
         f"schema/{UI_VIEW_CONTRACT_VERSION}.schema.json",
+        "schema/live_score_v1.schema.json",
     }
     for relative in first.files:
         a = (tmp_path / "one" / "data" / relative).read_bytes()
@@ -247,6 +302,13 @@ def test_build_site_writes_a_deterministic_validated_tree(
         if relative.startswith("schema/"):
             continue
         document = json.loads((tmp_path / "one" / "data" / relative).read_text("utf-8"))
+        if relative.endswith("/live.json"):
+            live_schema = json.loads(
+                (tmp_path / "one/data/schema/live_score_v1.schema.json").read_text("utf-8")
+            )
+            jsonschema.validate(document, live_schema)
+            assert document["payload"]["status"] == "unavailable"
+            continue
         jsonschema.validate(document, schema)
         assert document["contract_version"] == UI_VIEW_CONTRACT_VERSION
     index = json.loads((tmp_path / "one" / "data" / "index.json").read_text("utf-8"))["payload"]
@@ -256,10 +318,76 @@ def test_build_site_writes_a_deterministic_validated_tree(
         "path": f"{SEASON}/gw01/recommendation.json",
     }
     assert index["gameweeks"] == {SEASON: [1]}
+    public_recommendation = json.loads(
+        (tmp_path / "one" / "data" / SEASON / "gw01" / "recommendation.json").read_text("utf-8")
+    )["payload"]
+    assert public_recommendation["metadata"] == {"mode": "replay"}
+    public_text = json.dumps(public_recommendation)
+    assert "alice" not in public_text
+    assert "projection_handoff_path" not in public_text
+    assert "risk_residuals_path" not in public_text
     assert first.status_written is True and first.decided_gameweeks == (1,)
     assert first.league_written is True
     # No leftover temporary files from the atomic writes.
     assert not [p for p in (tmp_path / "one").rglob(".*.tmp-*")]
+
+
+def test_live_site_publication_is_read_only_and_replaces_missing_or_settled_scores(
+    world: tuple[Recommendation, Projection, Path, Any], tmp_path: Path
+) -> None:
+    recommendation, projection, root, snapshot = world
+    record_decision(root, recommendation, projection, report_text="synthetic preview")
+    payloads = dict(snapshot.payloads)
+    payloads["event-gw01-live.json"] = json.dumps(
+        {
+            "elements": [
+                {"id": p["id"], "stats": {"total_points": 3, "minutes": 45}}
+                for p in ledger_world._elements()
+            ]
+        }
+    ).encode()
+    payloads["fixtures.json"] = json.dumps(
+        [{"event": 1, "finished": True}, {"event": 1, "finished": False}]
+    ).encode()
+    now = datetime(2026, 8, 23, 18, tzinfo=UTC)
+    snapshot = CapturedSnapshot(
+        replace(
+            snapshot.metadata,
+            snapshot_id="synthetic-live-preview",
+            captured_at_utc="2026-08-23T17:30:00Z",
+            checksums={k: payload_checksum(v) for k, v in payloads.items()},
+        ),
+        payloads,
+    )
+    before = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    report = build_site(
+        ledger_root=root, season=SEASON, out_dir=tmp_path / "live", snapshot=snapshot, now=now
+    )
+    relative = f"data/{SEASON}/gw01/live.json"
+    live = json.loads((tmp_path / "live" / relative).read_text("utf-8"))
+    assert live["payload"]["named_score"] == 36
+    assert live["payload"]["status"] == "available"
+    assert "2026-27/gw01/live.json" in report.files
+    assert before == {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    # A missing capture replaces a previously available document, never retaining its score.
+    build_site(ledger_root=root, season=SEASON, out_dir=tmp_path / "missing", now=now)
+    build_site(
+        ledger_root=root, season=SEASON, out_dir=tmp_path / "replace", snapshot=snapshot, now=now
+    )
+    build_site(ledger_root=root, season=SEASON, out_dir=tmp_path / "replace", now=now)
+    missing = json.loads((tmp_path / "replace" / relative).read_text("utf-8"))
+    assert missing["payload"]["reason"] == "missing_capture"
+    assert missing["payload"]["named_score"] is None
+    assert before == {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    record_outcome(
+        root, SEASON, 1, _flat_points(recommendation), source_snapshot_id="synthetic-settled"
+    )
+    build_site(
+        ledger_root=root, season=SEASON, out_dir=tmp_path / "settled", snapshot=snapshot, now=now
+    )
+    settled = json.loads((tmp_path / "settled" / relative).read_text("utf-8"))
+    assert settled["payload"]["reason"] == "settled"
+    assert settled["payload"]["named_score"] is None
 
 
 def test_the_pool_view_ranks_the_projected_pool_and_marks_the_squad(

@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "live_score_v1"
+    },
+    "generated_at_utc": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "bonus_confirmed": {
+                "type": "null"
+              },
+              "fixtures_finished": {
+                "type": "null"
+              },
+              "fixtures_total": {
+                "type": "null"
+              },
+              "named_score": {
+                "type": "null"
+              },
+              "net_score": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "transfer_hit_points": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "status": {
+                "const": "available"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bonus_confirmed": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "captured_at_utc": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "fixtures_finished": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "fixtures_total": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "named_score": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "net_score": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "reason": {
+                "type": "null"
+              },
+              "source_snapshot_id": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "transfer_hit_points": {
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "bonus_confirmed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "captured_at_utc": {
+          "format": "date-time",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "decision_snapshot_id": {
+          "type": "string"
+        },
+        "fixtures_finished": {
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fixtures_total": {
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "gameweek": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "named_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "net_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "prediction_fingerprint": {
+          "type": "string"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "season": {
+          "pattern": "^\\d{4}-\\d{2}$",
+          "type": "string"
+        },
+        "source_snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "available",
+            "unavailable"
+          ]
+        },
+        "transfer_hit_points": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "season",
+        "gameweek",
+        "decision_snapshot_id",
+        "prediction_fingerprint",
+        "status",
+        "reason",
+        "source_snapshot_id",
+        "captured_at_utc",
+        "named_score",
+        "transfer_hit_points",
+        "net_score",
+        "fixtures_finished",
+        "fixtures_total",
+        "bonus_confirmed"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "contract_version",
+    "generated_at_utc",
+    "payload"
+  ],
+  "title": "live_score_v1",
+  "type": "object"
+}

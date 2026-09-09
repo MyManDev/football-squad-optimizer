@@ -33,6 +33,7 @@ import pandas as pd
 
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
     LiveResidualHistory,
@@ -66,25 +67,29 @@ def _read_residuals(path: Path) -> pd.DataFrame:
 def resolve_snapshot_id(requested: str | None) -> str:
     """Pick the capture to read: the one named, or the most recent one held.
 
-    Live mode takes the latest because that is the freshest picture of prices and
-    availability. Replay names one explicitly, which is the difference between asking what
-    to do now and asking what a past capture supported.
+    Live mode takes the latest *live* capture because that is the freshest picture of
+    prices and availability. Cohort collectors share this root and their identifiers sort
+    after every ``fpl-live`` one, so the last directory is not the latest picture of the
+    game. Replay names a capture explicitly, which is the difference between asking what
+    to do now and asking what a past capture supported; it is checked against everything
+    held, because naming a capture is the operator's choice of which one to rebuild.
     """
 
-    identifiers = list_snapshot_ids(SNAPSHOT_ROOT)
     if requested:
+        identifiers = list_snapshot_ids(SNAPSHOT_ROOT)
         if requested not in identifiers:
             raise DataError(
                 f"No snapshot {requested!r} under {SNAPSHOT_ROOT}. Held: "
                 f"{identifiers[-3:] if identifiers else 'none'}."
             )
         return requested
-    if not identifiers:
+    live = list_snapshot_ids(SNAPSHOT_ROOT, source=FPL_LIVE_SOURCE)
+    if not live:
         raise DataError(
-            f"No snapshots under {SNAPSHOT_ROOT}. Capture one first with "
+            f"No {FPL_LIVE_SOURCE} snapshots under {SNAPSHOT_ROOT}. Capture one first with "
             "'python -m scripts.capture_deadline_snapshot'."
         )
-    return identifiers[-1]
+    return live[-1]
 
 
 def main() -> int:

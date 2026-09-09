@@ -43,7 +43,18 @@ from squadopt.prediction.availability import (
     AvailabilityRuleConfig,
     apply_availability,
 )
+from squadopt.prediction.component_dataset import (
+    FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
+)
+from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 from squadopt.prediction.config import BaselineProjectionConfig
+from squadopt.prediction.elite_evidence import (
+    COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
+    COMPONENT_ELITE_MODEL_VERSION,
+    ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION,
+    ELITE_EVIDENCE_MODEL_VERSION,
+)
+from squadopt.prediction.in_season import IN_SEASON_MODEL_VERSION
 from squadopt.prediction.opening import build_opening_projection_from_snapshot
 
 # Named so a report cannot describe itself as coming from a model that was never promoted.
@@ -61,7 +72,12 @@ PROJECTION_HANDOFF_CONTRACT_VERSION: Final = "projection_handoff_v1"
 # until an in-season control clears its gates: pinning a version here is the promotion
 # decision, made in a reviewed change, and until then a mid-season decision is refused at
 # verification rather than made from an unpromoted model.
-IN_SEASON_CONTROL_MODEL_VERSIONS: Final[tuple[str, ...]] = ("in-season-carry-over-v1",)
+IN_SEASON_CONTROL_MODEL_VERSIONS: Final[tuple[str, ...]] = (
+    COMPONENT_MODEL_VERSION,
+    IN_SEASON_MODEL_VERSION,
+    ELITE_EVIDENCE_MODEL_VERSION,
+    COMPONENT_ELITE_MODEL_VERSION,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +99,7 @@ class InSeasonProjection:
     model_version: str
     feature_contract_version: str
     expected_points: Mapping[int, float]
+    evidence_fingerprint: str | None = None
     diagnostics: Mapping[str, object] = field(default_factory=dict)
     contract_version: str = PROJECTION_HANDOFF_CONTRACT_VERSION
 
@@ -111,6 +128,41 @@ class InSeasonProjection:
             points[int(player)] = number
         if not points:
             raise DataSourceError("Projection handoff carries no rows.")
+        if self.evidence_fingerprint is not None and (
+            len(self.evidence_fingerprint) != 64
+            or any(character not in "0123456789abcdef" for character in self.evidence_fingerprint)
+        ):
+            raise DataSourceError(
+                "Projection handoff evidence_fingerprint must be a lowercase SHA-256 digest."
+            )
+        if self.model_version == ELITE_EVIDENCE_MODEL_VERSION and (
+            self.evidence_fingerprint is None
+            or self.feature_contract_version != ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION
+        ):
+            raise DataSourceError(
+                "The operational elite model requires its evidence fingerprint and exact "
+                f"feature contract {ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION!r}."
+            )
+        if self.model_version == COMPONENT_ELITE_MODEL_VERSION and (
+            self.evidence_fingerprint is None
+            or self.feature_contract_version != COMPONENT_ELITE_FEATURE_CONTRACT_VERSION
+        ):
+            raise DataSourceError(
+                "The component elite model requires its evidence fingerprint and exact "
+                f"feature contract {COMPONENT_ELITE_FEATURE_CONTRACT_VERSION!r}."
+            )
+        if self.model_version == IN_SEASON_MODEL_VERSION and self.evidence_fingerprint is not None:
+            raise DataSourceError(
+                "The legacy in-season control cannot claim an elite evidence fingerprint."
+            )
+        if self.model_version == COMPONENT_MODEL_VERSION and (
+            self.evidence_fingerprint is not None
+            or self.feature_contract_version != COMPONENT_FEATURE_CONTRACT_VERSION
+        ):
+            raise DataSourceError(
+                "The Phase C component model requires no external evidence fingerprint and "
+                f"the exact feature contract {COMPONENT_FEATURE_CONTRACT_VERSION!r}."
+            )
         object.__setattr__(self, "expected_points", MappingProxyType(points))
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
@@ -128,6 +180,8 @@ class InSeasonProjection:
                 for player, value in sorted(self.expected_points.items())
             },
         }
+        if self.evidence_fingerprint is not None:
+            payload["evidence_fingerprint"] = self.evidence_fingerprint
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
@@ -149,6 +203,8 @@ def write_projection_handoff(path: Path, projection: InSeasonProjection) -> Path
         "diagnostics": dict(projection.diagnostics),
         "fingerprint": projection.fingerprint,
     }
+    if projection.evidence_fingerprint is not None:
+        document["evidence_fingerprint"] = projection.evidence_fingerprint
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
@@ -174,6 +230,11 @@ def read_projection_handoff(path: Path) -> InSeasonProjection:
             model_version=str(document.get("model_version", "")),
             feature_contract_version=str(document.get("feature_contract_version", "")),
             expected_points={int(player): float(value) for player, value in rows.items()},
+            evidence_fingerprint=(
+                str(document["evidence_fingerprint"])
+                if document.get("evidence_fingerprint") is not None
+                else None
+            ),
             diagnostics=dict(document.get("diagnostics") or {}),
             contract_version=str(document.get("contract_version", "")),
         )
@@ -214,13 +275,26 @@ def _training_identity(panel: pd.DataFrame) -> tuple[str, str]:
     return cutoff, fingerprint
 
 
+def season_from_bootstrap(bootstrap: bytes) -> str:
+    """Name the season a bootstrap payload describes, from its own published deadlines.
+
+    A season is named for the calendar year it starts in, and its first deadline falls in
+    that year, so the earliest published deadline settles it. Taking bytes rather than a
+    whole capture is what lets a caller that already holds one collector's bootstrap — a
+    Top-100 cohort capture, say — name its season without a second home for the rule.
+    """
+
+    deadlines = gameweek_deadlines(bootstrap)
+    earliest = min(deadlines, key=lambda entry: entry.gameweek)
+    start = as_instant(earliest.deadline_utc).year
+    return f"{start}-{(start + 1) % 100:02d}"
+
+
 def infer_season(snapshot: CapturedSnapshot) -> str:
     """Name the season a capture describes, from its own published deadlines.
 
-    A season is named for the calendar year it starts in, and its first deadline falls in
-    that year, so the earliest published deadline settles it. Deriving it beats asking the
-    caller: a season passed by hand can be wrong, and a capture filed under the wrong
-    season would join the wrong history.
+    Deriving it beats asking the caller: a season passed by hand can be wrong, and a
+    capture filed under the wrong season would join the wrong history.
     """
 
     bootstrap = snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
@@ -229,10 +303,7 @@ def infer_season(snapshot: CapturedSnapshot) -> str:
             f"Snapshot {snapshot.metadata.snapshot_id!r} carries no {BOOTSTRAP_PAYLOAD!r} "
             "payload, so its season cannot be determined."
         )
-    deadlines = gameweek_deadlines(bootstrap)
-    earliest = min(deadlines, key=lambda entry: entry.gameweek)
-    start = as_instant(earliest.deadline_utc).year
-    return f"{start}-{(start + 1) % 100:02d}"
+    return season_from_bootstrap(bootstrap)
 
 
 @dataclass(frozen=True, slots=True)
@@ -425,6 +496,7 @@ def _project_in_season(
             "feature_contract_version": handoff.feature_contract_version,
             "projection_handoff_contract_version": handoff.contract_version,
             "projection_handoff_fingerprint": handoff.fingerprint,
+            "projection_evidence_fingerprint": handoff.evidence_fingerprint,
             "projection_source": "in_season_handoff",
             **{f"handoff_{key}": value for key, value in handoff.diagnostics.items()},
         },

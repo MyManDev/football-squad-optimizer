@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "live_score_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "generated_at_utc",
+    "payload"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "live_score_v1"
+    },
+    "generated_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "season",
+        "gameweek",
+        "decision_snapshot_id",
+        "prediction_fingerprint",
+        "status",
+        "reason",
+        "source_snapshot_id",
+        "captured_at_utc",
+        "named_score",
+        "transfer_hit_points",
+        "net_score",
+        "fixtures_finished",
+        "fixtures_total",
+        "bonus_confirmed"
+      ],
+      "properties": {
+        "season": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}$"
+        },
+        "gameweek": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "decision_snapshot_id": {
+          "type": "string"
+        },
+        "prediction_fingerprint": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "available",
+            "unavailable"
+          ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "captured_at_utc": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "named_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "transfer_hit_points": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "net_score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fixtures_finished": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "fixtures_total": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "bonus_confirmed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "available"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "named_score": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "transfer_hit_points": {
+                "minimum": 0
+              },
+              "net_score": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "fixtures_finished": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "fixtures_total": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "bonus_confirmed": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "source_snapshot_id": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "captured_at_utc": {
+                "not": {
+                  "type": "null"
+                }
+              },
+              "reason": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "named_score": {
+                "type": "null"
+              },
+              "transfer_hit_points": {
+                "type": "null"
+              },
+              "net_score": {
+                "type": "null"
+              },
+              "fixtures_finished": {
+                "type": "null"
+              },
+              "fixtures_total": {
+                "type": "null"
+              },
+              "bonus_confirmed": {
+                "type": "null"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

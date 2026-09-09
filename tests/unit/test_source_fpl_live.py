@@ -18,6 +18,7 @@ from squadopt.data.errors import (
 )
 from squadopt.data.sources.fpl_live import (
     POSITION_CODES,
+    SCOUT_COLUMNS,
     SNAPSHOT_COLUMNS,
     EntryPicksRecord,
     GameweekDeadline,
@@ -32,14 +33,20 @@ from squadopt.data.sources.fpl_live import (
     fixture_snapshot,
     fpl_entry_picks,
     fpl_league_standings,
+    fpl_league_standings_page,
     fpl_live_event_points,
     gameweek_deadlines,
     league_standings_endpoint_path,
+    league_standings_page_endpoint_path,
+    league_standings_page_payload,
     league_standings_payload,
     live_endpoint_path,
     live_payload,
+    news_snapshot,
     next_open_deadline,
+    player_codes,
     player_snapshot,
+    scout_snapshot,
     team_codes,
     team_names,
 )
@@ -594,6 +601,79 @@ def test_team_codes_map_the_per_season_integer_to_the_persistent_code() -> None:
     assert dict(team_codes(_payload())) == {1: 3, 14: 14}
 
 
+# --- player codes -----------------------------------------------------------
+#
+# The same problem one level down, and the one that actually bit: the entry endpoints
+# name a player by his per-season element id while everything downstream of a capture
+# names him by code. Both are integers, so a mismatch matches nothing instead of raising
+# (#265). What these tests pin is that the translation cannot be quietly incomplete —
+# every way of losing a row here produces lookups that still *look* correct.
+
+
+def test_player_codes_map_the_per_season_element_id_to_the_persistent_code() -> None:
+    payload = _payload([_element(id=5, code=118748), _element(id=9, code=154043)])
+
+    assert dict(player_codes(payload)) == {5: 118748, 9: 154043}
+
+
+def test_player_codes_agree_with_the_snapshot_on_the_same_payload() -> None:
+    """Two readings of one document must not drift into different identity spaces."""
+
+    payload = _payload([_element(id=5, code=118748), _element(id=9, code=154043)])
+
+    mapping = player_codes(payload)
+    snapshot = player_snapshot(payload)
+
+    assert sorted(mapping.values()) == sorted(snapshot["player_id"].tolist())
+
+
+def test_an_element_without_a_code_stops_the_run_rather_than_shrinking_the_map() -> None:
+    """The regression this function exists for.
+
+    A translation table built by skipping the rows it cannot read comes back shorter, and
+    the failure then surfaces as "the capture does not name element 9" — blaming one
+    player for a renamed field. A missing field is a changed payload and has to say so.
+    """
+
+    element = _element(id=9, code=154043)
+    del element["code"]
+
+    with pytest.raises(DataSourceError, match="missing fields"):
+        player_codes(_payload([_element(id=5, code=118748), element]))
+
+
+def test_a_repeated_element_id_is_refused_because_the_mapping_would_be_ambiguous() -> None:
+    payload = _payload([_element(id=5, code=118748), _element(id=5, code=154043)])
+
+    with pytest.raises(DuplicateRecordsError, match="element id 5"):
+        player_codes(payload)
+
+
+def test_a_repeated_code_is_refused_because_it_would_merge_two_players() -> None:
+    """The more expensive duplicate: the key stays unique and two people become one."""
+
+    payload = _payload([_element(id=5, code=118748), _element(id=9, code=118748)])
+
+    with pytest.raises(DuplicateRecordsError, match="merge two of them"):
+        player_codes(payload)
+
+
+def test_a_manager_element_is_translated_rather_than_filtered_out() -> None:
+    """A translation table, not a roster.
+
+    `player_snapshot` drops non-players deliberately. Doing the same here would surface
+    downstream as "the capture does not name element N" for a document that legitimately
+    contains one — blaming the payload for a filter applied on this side.
+    """
+
+    payload = _payload(
+        [_element(id=5, code=118748, element_type=3), _element(id=7, code=99, element_type=5)]
+    )
+
+    assert dict(player_codes(payload)) == {5: 118748, 7: 99}
+    assert 99 not in player_snapshot(payload)["player_id"].tolist()
+
+
 # --- availability -----------------------------------------------------------
 
 
@@ -666,6 +746,93 @@ def test_a_renamed_availability_field_stops_the_run(field: str) -> None:
         availability_snapshot(_payload([record]))
 
 
+# --- the source's own editorial ----------------------------------------------
+#
+# A third table beside the snapshot and the availability one, for one reason: it carries
+# free text. The projection must never read it, so widening either existing table would
+# have been the wrong shape even though it is the same payload.
+
+
+def test_the_news_table_is_separate_and_carries_the_text_with_its_instant() -> None:
+    news = news_snapshot(_payload())
+
+    assert tuple(news.columns) == ("player_id", "status", "news", "news_added_utc")
+
+
+def test_the_news_table_keys_on_the_persistent_code() -> None:
+    news = news_snapshot(_payload([_element(code=118748)]))
+
+    assert news["player_id"].tolist() == [118748]
+
+
+def test_a_news_instant_is_normalised_to_utc() -> None:
+    news = news_snapshot(_payload([_element(news_added="2026-08-09T09:30:07.136250Z")]))
+
+    assert news["news_added_utc"].tolist() == ["2026-08-09T09:30:07.136250Z"]
+
+
+def test_a_player_never_flagged_carries_no_instant() -> None:
+    """Absent, not substituted with the capture's own clock: nothing was ever stamped."""
+
+    news = news_snapshot(_payload([_element(news_added=None)]))
+
+    assert news["news_added_utc"].isna().all()
+
+
+def test_a_cleared_flag_keeps_its_instant_with_empty_text() -> None:
+    """ "Was flagged, now cleared" is a third state, and it is not "never flagged".
+
+    The 2026-09-07 capture carries 62 of these. Folding them into the absent case would
+    lose exactly the transition a lead-time measurement is looking for.
+    """
+
+    news = news_snapshot(
+        _payload([_element(news="", news_added="2026-09-01T08:00:00Z", status="a")])
+    )
+
+    assert news["news"].tolist() == [""]
+    assert news["news_added_utc"].tolist() == ["2026-09-01T08:00:00Z"]
+
+
+def test_the_text_is_read_as_the_source_wrote_it() -> None:
+    news = news_snapshot(_payload([_element(news="Knee injury - 75% chance of playing")]))
+
+    assert news["news"].tolist() == ["Knee injury - 75% chance of playing"]
+
+
+def test_non_players_are_excluded_from_the_news_table_too() -> None:
+    news = news_snapshot(
+        _payload([_element(code=1, element_type=3), _element(code=2, element_type=5)])
+    )
+
+    assert news["player_id"].tolist() == [1]
+
+
+def test_the_news_table_is_sorted_by_player_id() -> None:
+    news = news_snapshot(_payload([_element(code=9, id=1), _element(code=2, id=2)]))
+
+    assert news["player_id"].tolist() == [2, 9]
+
+
+def test_a_payload_with_no_eligible_players_has_no_news_table() -> None:
+    with pytest.raises(DataSourceError, match="squad-eligible"):
+        news_snapshot(_payload([_element(element_type=5)]))
+
+
+def test_non_text_news_is_rejected_rather_than_coerced() -> None:
+    with pytest.raises(InvalidValueError, match="news"):
+        news_snapshot(_payload([_element(news=0)]))
+
+
+@pytest.mark.parametrize("field", ["status", "news", "news_added"])
+def test_a_renamed_news_field_stops_the_run(field: str) -> None:
+    record = _element()
+    record.pop(field, None)
+
+    with pytest.raises(DataSourceError, match=field):
+        news_snapshot(_payload([record]))
+
+
 # --- registered entries and their league ----------------------------------------------
 #
 # Same rule as the rest of this file: every payload is hand-built, nothing reaches a
@@ -678,6 +845,7 @@ def _picks_payload(
     *,
     squad: list[int] | None = None,
     captain_position: int | None = 1,
+    vice_position: int | None = 2,
     bank: int = 5,
     positions: list[int] | None = None,
 ) -> bytes:
@@ -690,7 +858,7 @@ def _picks_payload(
             "element": element,
             "position": position,
             "is_captain": position == captain_position,
-            "is_vice_captain": position == 2,
+            "is_vice_captain": position == vice_position,
             "multiplier": 2 if position == captain_position else (1 if position <= 11 else 0),
         }
         for element, position in zip(elements, slots, strict=True)
@@ -749,6 +917,26 @@ def _standings_payload(
     return json.dumps(document).encode("utf-8")
 
 
+def _paged_standings_payload(*, page: int = 1, start_rank: int = 1, has_next: bool = True) -> bytes:
+    rows = [
+        {
+            "entry": 1000 + rank_sort,
+            "entry_name": f"Entry {rank_sort}",
+            "player_name": f"Manager {rank_sort}",
+            "rank": start_rank,
+            "rank_sort": rank_sort,
+        }
+        for rank_sort in range(start_rank, start_rank + 50)
+    ]
+    return json.dumps(
+        {
+            "league": {"id": 314, "name": "Overall"},
+            "standings": {"has_next": has_next, "page": page, "results": rows},
+            "last_updated_data": "2026-09-01T03:34:24Z",
+        }
+    ).encode("utf-8")
+
+
 def _entry_payload(*, entry_id: int = 11, name: str = "First XI") -> bytes:
     return json.dumps({"id": entry_id, "name": name, "current_event": 1}).encode("utf-8")
 
@@ -759,6 +947,7 @@ def test_every_built_payload_name_stays_inside_the_snapshot_grammar() -> None:
         entry_history_payload(11),
         entry_picks_payload(11, 2),
         league_standings_payload(352490),
+        league_standings_page_payload(314, 2),
         live_payload(2),
     ]
     assert names == [
@@ -766,6 +955,7 @@ def test_every_built_payload_name_stays_inside_the_snapshot_grammar() -> None:
         "entry-11-history.json",
         "entry-11-picks-gw02.json",
         "league-352490-standings.json",
+        "league-314-standings-page-02.json",
         "event-gw02-live.json",
     ]
     for name in names:
@@ -795,7 +985,39 @@ def test_the_endpoint_map_carries_paths_rather_than_urls() -> None:
 
     paths = list(entry_endpoint_paths([11], gameweek=2).values())
     paths += list(league_standings_endpoint_path(352490).values())
+    paths += list(league_standings_page_endpoint_path(314, 2).values())
     assert not any(path.startswith("http") for path in paths)
+
+
+def test_a_numbered_standings_page_preserves_the_sources_total_order() -> None:
+    page = fpl_league_standings_page(
+        _paged_standings_payload(page=2, start_rank=51),
+        league_id=314,
+        expected_page=2,
+    )
+
+    assert page.page == 2
+    assert page.has_next is True
+    assert page.last_updated_data == "2026-09-01T03:34:24Z"
+    assert [member.rank_sort for member in page.members] == list(range(51, 101))
+
+
+def test_a_numbered_standings_page_rejects_the_wrong_page_or_repeated_order() -> None:
+    with pytest.raises(DataSourceError, match="not requested page"):
+        fpl_league_standings_page(
+            _paged_standings_payload(page=2, start_rank=51),
+            league_id=314,
+            expected_page=1,
+        )
+
+    document = json.loads(_paged_standings_payload().decode("utf-8"))
+    document["standings"]["results"][1]["rank_sort"] = 1
+    with pytest.raises(DuplicateRecordsError, match="rank_sort 1"):
+        fpl_league_standings_page(
+            json.dumps(document).encode("utf-8"),
+            league_id=314,
+            expected_page=1,
+        )
 
 
 def test_a_registry_that_lists_an_entry_twice_is_rejected() -> None:
@@ -1060,6 +1282,7 @@ def test_points_are_read_per_player_with_the_gameweeks_progress_beside_them() ->
     )
 
     assert result.points_by_player == {1: 6, 2: 2}
+    assert result.minutes_by_player == {1: 90, 2: 90}
     assert (result.fixtures_finished, result.fixtures_total) == (6, 10)
     assert result.bonus_confirmed is False
     assert result.source_snapshot_id == "fpl-live-20260822T140000Z-abc"
@@ -1146,6 +1369,7 @@ def test_the_record_refuses_to_claim_confirmed_bonus_while_fixtures_are_unfinish
         LiveEventPoints(
             gameweek=1,
             points_by_player={1: 6},
+            minutes_by_player={1: 90},
             bonus_confirmed=True,
             fixtures_finished=9,
             fixtures_total=10,
@@ -1175,6 +1399,36 @@ def test_the_history_returns_each_played_gameweek_in_order() -> None:
         (2, 51, 115),
     ]
     assert {week.entry_id for week in weeks} == {11}
+
+
+def test_the_history_points_are_gross_and_the_transfer_cost_travels_beside_them() -> None:
+    """The source's own arithmetic: a 78-point week with a 4-point cost advances the total
+    by 74, so ``points`` is gross and the cost is read out separately rather than assumed."""
+
+    from squadopt.data.sources.fpl_live import fpl_entry_history_points
+
+    payload = _history_payload(
+        current=[
+            {"event": 1, "points": 64, "total_points": 64, "event_transfers_cost": 0},
+            {"event": 2, "points": 78, "total_points": 138, "event_transfers_cost": 4},
+        ]
+    )
+
+    weeks = fpl_entry_history_points(payload, entry_id=11)
+
+    assert [(week.points, week.transfer_cost, week.total_points) for week in weeks] == [
+        (64, 0, 64),
+        (78, 4, 138),
+    ]
+    assert weeks[1].points - weeks[1].transfer_cost == weeks[1].total_points - weeks[0].total_points
+
+
+def test_a_history_row_without_a_transfer_cost_reads_none_rather_than_zero() -> None:
+    from squadopt.data.sources.fpl_live import fpl_entry_history_points
+
+    weeks = fpl_entry_history_points(_history_payload(), entry_id=11)
+
+    assert weeks[0].transfer_cost is None
 
 
 def test_a_week_that_ended_negative_after_a_hit_is_read_rather_than_refused() -> None:
@@ -1261,3 +1515,267 @@ def test_a_bootstrap_without_the_checked_flag_is_refused_by_name() -> None:
 
     with pytest.raises(DataSourceError, match="data_checked"):
         scored_gameweeks(_events_payload([{"id": 1, "finished": True}]))
+
+
+# --- minutes, because points alone cannot say which eleven they belong to ------------
+#
+# The platform's own score replaces a starter who played no minutes with a bench player
+# (#262). That rule lives in the ledger; what these tests pin is that its input arrives
+# intact, because every way of losing it produces a *wrong eleven* rather than a gap.
+
+
+def test_minutes_are_read_beside_the_points_and_sorted_with_them() -> None:
+    payload = _live_payload([_live_element(2, 2, minutes=45), _live_element(1, 6, minutes=90)])
+
+    result = fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+    assert result.minutes_by_player == {1: 90, 2: 45}
+    assert list(result.minutes_by_player) == sorted(result.minutes_by_player)
+    assert set(result.minutes_by_player) == set(result.points_by_player)
+
+
+def test_a_stats_object_without_minutes_is_refused_rather_than_defaulted_to_zero() -> None:
+    """Zero is the one value that must never be guessed: it means 'substitute him'."""
+
+    element = _live_element(1, 6)
+    del element["stats"]["minutes"]
+
+    # Absent and non-integer land on the same guard as `total_points` does, and the
+    # message names the field rather than the record, so the payload change is legible.
+    with pytest.raises(InvalidValueError, match="'minutes' must be an integer"):
+        fpl_live_event_points(_live_payload([element]), _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_non_integer_minutes_are_refused() -> None:
+    payload = _live_payload([_live_element(1, 6), _live_element(2, 2, minutes="90")])
+
+    with pytest.raises(InvalidValueError, match="minutes"):
+        fpl_live_event_points(payload, _gameweek_fixtures(1, 1), gameweek=1)
+
+
+def test_a_double_gameweek_player_may_exceed_ninety_minutes() -> None:
+    """No upper bound, deliberately: 180 is legal and a cap would encode a false rule."""
+
+    payload = _live_payload([_live_element(1, 12, minutes=180)])
+
+    result = fpl_live_event_points(payload, _gameweek_fixtures(2, 2), gameweek=1)
+
+    assert result.minutes_by_player == {1: 180}
+
+
+def test_negative_minutes_are_refused() -> None:
+    with pytest.raises(InvalidValueError, match="negative minutes"):
+        LiveEventPoints(
+            gameweek=1,
+            points_by_player={1: 6},
+            minutes_by_player={1: -1},
+            bonus_confirmed=False,
+            fixtures_finished=0,
+            fixtures_total=1,
+        )
+
+
+def test_points_and_minutes_must_describe_the_same_players() -> None:
+    """A player with points and no minutes reads as 'did not play' downstream.
+
+    That is not a missing value a caller can route around: the substitution rule would
+    field a bench player for someone who was on the pitch, and the resulting eleven looks
+    entirely plausible. So the record refuses to exist rather than let a caller assemble it.
+    """
+
+    with pytest.raises(InvalidValueError, match="different players"):
+        LiveEventPoints(
+            gameweek=1,
+            points_by_player={1: 6, 2: 2},
+            minutes_by_player={1: 90},
+            bonus_confirmed=False,
+            fixtures_finished=0,
+            fixtures_total=1,
+        )
+
+
+# --- the vice-captain, and the order the bench is walked in ---------------------------
+#
+# Both exist for the same rule (#262): when a starter plays no minutes the platform fields
+# a bench player, and when the *captain* plays no minutes the multiplier moves to the vice.
+# The adapter's job is to deliver those two inputs unguessed.
+
+
+def test_the_vice_captain_is_read_beside_the_captain() -> None:
+    record = fpl_entry_picks(
+        _picks_payload(captain_position=1, vice_position=2),
+        _history_payload(),
+        entry_id=11,
+        season="2026-27",
+        gameweek=1,
+    )
+
+    assert record.captain == 101
+    assert record.vice_captain == 102
+
+
+def test_a_vice_captain_on_the_bench_is_accepted() -> None:
+    """Six real entries named theirs inside the eleven; six is not a rule.
+
+    Refusing a bench vice would reject a real capture, which is a worse failure for an
+    adapter than carrying one. The record only requires him to be in the squad.
+    """
+
+    record = fpl_entry_picks(
+        _picks_payload(captain_position=1, vice_position=13),
+        _history_payload(),
+        entry_id=11,
+        season="2026-27",
+        gameweek=1,
+    )
+
+    assert record.vice_captain == 113
+    assert record.vice_captain not in record.starting_xi
+
+
+@pytest.mark.parametrize("vice_position", [None, 1])
+def test_a_payload_without_exactly_one_vice_captain_is_refused(vice_position: int | None) -> None:
+    """None named, or the captain named twice: both leave the multiplier undecided."""
+
+    with pytest.raises((DataSourceError, InvalidValueError)):
+        fpl_entry_picks(
+            _picks_payload(captain_position=1, vice_position=vice_position),
+            _history_payload(),
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+        )
+
+
+def test_the_same_player_cannot_be_captain_and_vice() -> None:
+    """The one case the platform's own flags could express and the rule cannot use."""
+
+    with pytest.raises(InvalidValueError, match="captain and vice-captain"):
+        EntryPicksRecord(
+            entry_id=11,
+            season="2026-27",
+            gameweek=1,
+            squad=tuple(range(101, 116)),
+            starting_xi=tuple(range(101, 112)),
+            captain=101,
+            vice_captain=101,
+            bank_tenths=0,
+            free_transfers=1,
+            free_transfers_known=False,
+            chips_used={},
+            purchase_prices={},
+            purchase_prices_known=False,
+        )
+
+
+def test_the_bench_is_the_squad_tail_in_substitution_order() -> None:
+    """The property the substitution rule rests on, pinned because it is implicit.
+
+    ``squad`` is built from the platform's pick positions 1 to 15 in order, so the tail is
+    the bench in the sequence the platform walks. Nothing in the type says so, and sorting
+    the tuple would keep every member while destroying the rule -- a change that would pass
+    every other test in this module.
+    """
+
+    shuffled = [105, 101, 110, 103, 108, 102, 112, 104, 115, 106, 113, 107, 114, 109, 111]
+    record = fpl_entry_picks(
+        _picks_payload(squad=shuffled),
+        _history_payload(),
+        entry_id=11,
+        season="2026-27",
+        gameweek=1,
+    )
+
+    assert record.squad == tuple(shuffled)  # pick order, not sorted
+    assert record.starting_xi == tuple(shuffled[:11])
+    assert record.squad[11:] == tuple(shuffled[11:])
+    assert sorted(record.squad) != list(record.squad)  # the shuffle really was one
+
+
+# --- the scout risk notes ---------------------------------------------------
+#
+# `_element()` deliberately does not carry these two fields. Their names come from the lane
+# brief and no capture in this repository has been read to confirm them, so the shared
+# builder is not made to assert they exist; each test that needs them says so, and the test
+# below pins what happens to a payload that has never heard of them.
+
+
+def _scouted(**overrides: Any) -> dict[str, Any]:
+    record = _element(scout_risks=[], scout_news_link=None)
+    record.update(overrides)
+    return record
+
+
+def test_the_scout_snapshot_carries_exactly_its_own_columns() -> None:
+    frame = scout_snapshot(_payload([_scouted()]))
+
+    assert tuple(frame.columns) == SCOUT_COLUMNS
+
+
+def test_an_empty_risk_list_is_a_zero_because_it_was_observed() -> None:
+    frame = scout_snapshot(_payload([_scouted(scout_risks=[])]))
+
+    assert int(frame.loc[0, "scout_risk_count"]) == 0
+    assert bool(frame.loc[0, "scout_news_link_present"]) is False
+
+
+def test_a_payload_without_the_fields_is_refused_rather_than_counted_as_zero() -> None:
+    """The whole reason the count can be trusted.
+
+    A player with no published risks and a source that never published the field are
+    different facts, and a column of nulls cannot tell them apart afterwards. If the source
+    spells these names differently, this is where it stops.
+    """
+
+    with pytest.raises(DataSourceError, match="scout_risks"):
+        scout_snapshot(_payload([_element()]))
+
+
+def test_risks_are_counted_and_a_linked_article_is_flagged() -> None:
+    frame = scout_snapshot(
+        _payload(
+            [
+                _scouted(
+                    scout_risks=[{"type": "rotation"}, {"type": "knock"}],
+                    scout_news_link="https://example.invalid/scout/saka",
+                )
+            ]
+        )
+    )
+
+    assert int(frame.loc[0, "scout_risk_count"]) == 2
+    assert bool(frame.loc[0, "scout_news_link_present"]) is True
+
+
+def test_a_blank_link_is_not_a_link() -> None:
+    frame = scout_snapshot(_payload([_scouted(scout_news_link="   ")]))
+
+    assert bool(frame.loc[0, "scout_news_link_present"]) is False
+
+
+def test_a_null_risk_field_is_read_as_none_of_them() -> None:
+    frame = scout_snapshot(_payload([_scouted(scout_risks=None)]))
+
+    assert int(frame.loc[0, "scout_risk_count"]) == 0
+
+
+def test_an_undocumented_risk_shape_is_surfaced_rather_than_counted() -> None:
+    with pytest.raises(InvalidValueError, match="must be an array or absent"):
+        scout_snapshot(_payload([_scouted(scout_risks="two")]))
+
+
+def test_an_undocumented_link_shape_is_surfaced() -> None:
+    with pytest.raises(InvalidValueError, match="must be text or absent"):
+        scout_snapshot(_payload([_scouted(scout_news_link=7)]))
+
+
+def test_the_scout_snapshot_keeps_only_squad_eligible_positions() -> None:
+    manager = _scouted(code=999999, id=999, element_type=5)
+    frame = scout_snapshot(_payload([_scouted(), manager]))
+
+    assert frame["player_id"].tolist() == [118748]
+
+
+def test_a_repeated_persistent_code_is_refused() -> None:
+    with pytest.raises(DuplicateRecordsError, match="more than once"):
+        scout_snapshot(_payload([_scouted(), _scouted(id=6)]))

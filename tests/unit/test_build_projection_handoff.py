@@ -25,6 +25,19 @@ from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import CONTROL_MODEL_NAME, handoff_path_for, read_projection_handoff
+from squadopt.prediction.component_dataset import (
+    FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
+)
+from squadopt.prediction.component_dataset import (
+    component_feature_columns,
+)
+from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
+from squadopt.prediction.elite_evidence import (
+    COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
+    COMPONENT_ELITE_MODEL_VERSION,
+    ELITE_EVIDENCE_MODEL_VERSION,
+    ELITE_EVIDENCE_POLICY_VERSION,
+)
 from squadopt.prediction.in_season import (
     IN_SEASON_FEATURE_CONTRACT_VERSION,
     IN_SEASON_MODEL_VERSION,
@@ -254,6 +267,140 @@ def test_the_declared_weights_travel_with_the_handoff(world: dict[str, Any]) -> 
     assert projection.diagnostics["carry_over_weight"] == pytest.approx(6 / 7)
 
 
+def test_verified_elite_evidence_changes_identity_and_round_trips(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    control, _, _ = _build(world, snapshot_id=world["after"], dry_run=True)
+    rows = []
+    ordered_players = sorted(control.expected_points)
+    for offset, player_id in enumerate(ordered_players):
+        count = 100 if offset < 11 else 0
+        rows.append(
+            {
+                "season": SEASON,
+                "target_gameweek": 2,
+                "captured_at_utc": "2026-08-27T08:00:00Z",
+                "deadline_timestamp_utc": EVENTS[1]["deadline_time"],
+                "player_id": player_id,
+                "elite_cohort_size": 100,
+                "elite_members_observed": 100,
+                "elite_start_count_lag1": count,
+                "elite_start_share_lag1": count / 100,
+                "elite_evidence_observed": True,
+            }
+        )
+    evidence = pd.DataFrame(rows)
+    evidence.attrs.update(
+        {
+            "elite_members_missing_picks": 0,
+            "unmapped_picked_elements": (),
+            "table_sha256": "a" * 64,
+            "generated_at_utc": "2026-08-27T09:00:00Z",
+        }
+    )
+    monkeypatch.setattr(producer, "read_player_evidence_artifact", lambda *_: evidence)
+    table_path = tmp_path / "evidence.csv"
+    manifest_path = tmp_path / "evidence.json"
+    table_path.write_text("unused\n", encoding="utf-8")
+    manifest_path.write_text("{}\n", encoding="utf-8")
+
+    projection, written, report = _build(
+        world,
+        snapshot_id=world["after"],
+        evidence_table_path=table_path,
+        evidence_manifest_path=manifest_path,
+    )
+
+    assert written is not None
+    reread = read_projection_handoff(written)
+    assert reread.fingerprint == projection.fingerprint
+    assert projection.model_version == ELITE_EVIDENCE_MODEL_VERSION
+    assert projection.expected_points[1001] == pytest.approx(control.expected_points[1001] * 1.05)
+    last_player = ordered_players[-1]
+    assert projection.expected_points[last_player] == pytest.approx(
+        control.expected_points[last_player]
+    )
+    assert report["elite_evidence_policy_version"] == ELITE_EVIDENCE_POLICY_VERSION
+    assert report["elite_evidence_manifest_sha256"]
+    assert report["version_is_promoted"] is True
+
+
+def test_evidence_paths_are_an_explicit_pair(world: dict[str, Any], tmp_path: Path) -> None:
+    with pytest.raises(SystemExit, match="requires both"):
+        _build(
+            world,
+            snapshot_id=world["after"],
+            evidence_table_path=tmp_path / "evidence.csv",
+        )
+
+
+@pytest.mark.parametrize("development_only", [False, True])
+def test_the_command_uses_the_component_path_without_evidence_arguments(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    development_only: bool,
+) -> None:
+    class Called(Exception):
+        pass
+
+    def fake_build(*_args: object, **kwargs: object) -> None:
+        assert kwargs["control_only"] is False
+        assert kwargs["evidence_table_path"] is None
+        assert kwargs["evidence_manifest_path"] is None
+        assert kwargs["development_only"] is development_only
+        raise Called
+
+    monkeypatch.setattr(producer, "build", fake_build)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "build_projection_handoff",
+            "--snapshot-root",
+            str(tmp_path),
+            "--archive-root",
+            str(tmp_path),
+        ]
+        + (["--development-only"] if development_only else []),
+    )
+
+    with pytest.raises(Called):
+        producer.main()
+
+
+def test_the_command_forwards_the_verified_evidence_pair(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    table_path = tmp_path / "evidence.csv"
+    manifest_path = tmp_path / "evidence.json"
+
+    class Called(Exception):
+        pass
+
+    def fake_build(*_args: object, **kwargs: object) -> None:
+        assert kwargs["evidence_table_path"] == table_path
+        assert kwargs["evidence_manifest_path"] == manifest_path
+        raise Called
+
+    monkeypatch.setattr(producer, "build", fake_build)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "build_projection_handoff",
+            "--snapshot-root",
+            str(tmp_path),
+            "--archive-root",
+            str(tmp_path),
+            "--evidence-table",
+            str(table_path),
+            "--evidence-manifest",
+            str(manifest_path),
+        ],
+    )
+
+    with pytest.raises(Called):
+        producer.main()
+
+
 # --- refusals ---------------------------------------------------------------
 
 
@@ -280,6 +427,51 @@ def test_the_latest_capture_is_used_when_none_is_named(world: dict[str, Any]) ->
     assert projection.source_snapshot_id == world["after"]
 
 
+@pytest.mark.parametrize("development_only", [False, True])
+def test_development_only_restricts_the_outer_fallback_archive(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch, development_only: bool
+) -> None:
+    reads: list[dict[str, object]] = []
+
+    def panel(root: Path, **kwargs: object) -> pd.DataFrame:
+        assert root == world["archive_root"]
+        reads.append(kwargs)
+        return _panel().assign(season="2024-25")
+
+    monkeypatch.setattr(producer, "build_panel", panel)
+    projection, _, report = _build(
+        world, snapshot_id=world["after"], development_only=development_only, dry_run=True
+    )
+
+    assert reads == (
+        [{"seasons": producer.COMPONENT_TRAINING_SEASONS}] if development_only else [{}]
+    )
+    if development_only:
+        assert projection.diagnostics["fallback_training_seasons"] == list(
+            producer.COMPONENT_TRAINING_SEASONS
+        )
+    else:
+        assert "fallback_training_seasons" not in report
+
+
+@pytest.mark.parametrize("season,target", [("2026-27", 1), ("2025-26", 2)])
+def test_development_only_refuses_nonprospective_targets_before_archive_reads(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch, season: str, target: int
+) -> None:
+    monkeypatch.setattr(producer, "infer_season", lambda _snapshot: season)
+    monkeypatch.setattr(
+        producer, "build_panel", lambda *_args, **_kwargs: pytest.fail("archive read")
+    )
+    with pytest.raises(SystemExit, match="2026-27 in-season"):
+        _build(
+            world,
+            snapshot_id=world["after"],
+            gameweek=target,
+            development_only=True,
+            dry_run=True,
+        )
+
+
 def test_the_report_says_whether_the_version_is_promoted(world: dict[str, Any]) -> None:
     """A refusal at verification should be predictable from the producer's own output."""
 
@@ -287,3 +479,286 @@ def test_the_report_says_whether_the_version_is_promoted(world: dict[str, Any]) 
 
     assert "version_is_promoted" in report
     assert isinstance(report["version_is_promoted"], bool)
+
+
+def test_component_model_is_the_default_when_the_capture_has_settled_history(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshot = write_snapshot(
+        world["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-08-28T15:31:00Z",
+        payloads={
+            BOOTSTRAP_PAYLOAD: _bootstrap(
+                _elements(played={1001: (90, 6), 1004: (20, 4), 1013: (75, 5)})
+            ),
+            FIXTURES_PAYLOAD: _fixtures(),
+            "event-gw01-live.json": b"unused by the injected component builder",
+        },
+    )
+
+    def fake_component(*_args: object, fallback: pd.DataFrame, **_kwargs: object) -> object:
+        table = fallback.loc[:, ["player_id", "expected_points"]].copy(deep=True)
+        table["expected_points"] = table["expected_points"].add(1.0)
+        return table, {"component_fingerprint": "a" * 64}
+
+    monkeypatch.setattr(producer, "_component_table", fake_component)
+
+    projection, _, report = _build(world, snapshot_id=snapshot.snapshot_id, dry_run=True)
+
+    assert projection.model_version == COMPONENT_MODEL_VERSION
+    assert projection.feature_contract_version == COMPONENT_FEATURE_CONTRACT_VERSION
+    assert report["projection_selection"] == "phase_c_component_default"
+    assert report["version_is_promoted"] is True
+
+
+def _evidence_for(
+    control: Any, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[Path, Path, list[int]]:
+    """A verified-looking Top-100 evidence pair: the first eleven players at full support."""
+
+    rows = []
+    ordered_players = sorted(control.expected_points)
+    for offset, player_id in enumerate(ordered_players):
+        count = 100 if offset < 11 else 0
+        rows.append(
+            {
+                "season": SEASON,
+                "target_gameweek": 2,
+                "captured_at_utc": "2026-08-27T08:00:00Z",
+                "deadline_timestamp_utc": EVENTS[1]["deadline_time"],
+                "player_id": player_id,
+                "elite_cohort_size": 100,
+                "elite_members_observed": 100,
+                "elite_start_count_lag1": count,
+                "elite_start_share_lag1": count / 100,
+                "elite_evidence_observed": True,
+            }
+        )
+    evidence = pd.DataFrame(rows)
+    evidence.attrs.update(
+        {
+            "elite_members_missing_picks": 0,
+            "unmapped_picked_elements": (),
+            "table_sha256": "b" * 64,
+            "generated_at_utc": "2026-08-27T09:00:00Z",
+        }
+    )
+    monkeypatch.setattr(producer, "read_player_evidence_artifact", lambda *_: evidence)
+    table_path = tmp_path / "evidence.csv"
+    manifest_path = tmp_path / "evidence.json"
+    table_path.write_text("unused\n", encoding="utf-8")
+    manifest_path.write_text("{}\n", encoding="utf-8")
+    return table_path, manifest_path, ordered_players
+
+
+def test_evidence_on_the_component_base_is_its_own_promoted_identity(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Top-100 uplift and the component model are one policy on two bases: with
+    settled history the uplift sits on the component projection and the handoff names
+    that, round-trips through the consumer's reader, and is promoted."""
+
+    snapshot = write_snapshot(
+        world["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-08-28T15:31:00Z",
+        payloads={
+            BOOTSTRAP_PAYLOAD: _bootstrap(
+                _elements(played={1001: (90, 6), 1004: (20, 4), 1013: (75, 5)})
+            ),
+            FIXTURES_PAYLOAD: _fixtures(),
+            "event-gw01-live.json": b"unused by the injected component builder",
+        },
+    )
+
+    def fake_component(*_args: object, fallback: pd.DataFrame, **_kwargs: object) -> object:
+        table = fallback.loc[:, ["player_id", "expected_points"]].copy(deep=True)
+        table["expected_points"] = table["expected_points"].add(1.0)
+        return table, {"component_fingerprint": "a" * 64}
+
+    monkeypatch.setattr(producer, "_component_table", fake_component)
+    component, _, _ = _build(world, snapshot_id=snapshot.snapshot_id, dry_run=True)
+    assert component.model_version == COMPONENT_MODEL_VERSION
+    table_path, manifest_path, ordered_players = _evidence_for(component, tmp_path, monkeypatch)
+
+    projection, written, report = _build(
+        world,
+        snapshot_id=snapshot.snapshot_id,
+        evidence_table_path=table_path,
+        evidence_manifest_path=manifest_path,
+    )
+
+    assert written is not None
+    assert read_projection_handoff(written).fingerprint == projection.fingerprint
+    assert projection.model_version == COMPONENT_ELITE_MODEL_VERSION
+    assert projection.feature_contract_version == COMPONENT_ELITE_FEATURE_CONTRACT_VERSION
+    assert projection.evidence_fingerprint is not None
+    # The uplift sits on the component numbers, not on the legacy blend beneath them.
+    assert projection.expected_points[1001] == pytest.approx(component.expected_points[1001] * 1.05)
+    last_player = ordered_players[-1]
+    assert projection.expected_points[last_player] == pytest.approx(
+        component.expected_points[last_player]
+    )
+    assert report["projection_selection"] == "phase_c_component_elite"
+    assert report["elite_evidence_base_selection"] == "phase_c_component_default"
+    assert report["version_is_promoted"] is True
+
+
+def test_evidence_without_component_history_stays_the_legacy_elite_candidate(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    control, _, _ = _build(world, snapshot_id=world["after"], dry_run=True)
+    table_path, manifest_path, _ = _evidence_for(control, tmp_path, monkeypatch)
+    projection, _, report = _build(
+        world,
+        snapshot_id=world["after"],
+        evidence_table_path=table_path,
+        evidence_manifest_path=manifest_path,
+        dry_run=True,
+    )
+    assert projection.model_version == ELITE_EVIDENCE_MODEL_VERSION
+    assert report["projection_selection"] == "legacy_elite_candidate"
+    assert report["elite_evidence_base_selection"] == "legacy_control_fallback"
+
+
+def test_the_latest_capture_is_the_latest_live_one(world: dict[str, Any]) -> None:
+    """A Top-100 capture sharing the root sorts after every live one and is not a
+    projection input."""
+
+    write_snapshot(
+        world["snapshot_root"],
+        source="fpl-top100",
+        captured_at_utc="2099-01-01T00:00:00Z",
+        payloads={"league-352490-standings-page-1.json": b"{}"},
+    )
+
+    assert producer._latest_snapshot_id(world["snapshot_root"]).startswith("fpl-live-")
+
+
+def test_an_older_capture_records_the_legacy_fallback_reason(world: dict[str, Any]) -> None:
+    projection, _, report = _build(world, snapshot_id=world["after"], dry_run=True)
+
+    assert projection.model_version == IN_SEASON_MODEL_VERSION
+    assert report["projection_selection"] == "legacy_control_fallback"
+    assert report["component_fallback_reason"] == "missing_live_history_payloads"
+
+
+def test_control_only_is_an_explicit_rollback_even_with_component_history(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    snapshot = write_snapshot(
+        world["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-08-28T15:31:00Z",
+        payloads={
+            BOOTSTRAP_PAYLOAD: _bootstrap(),
+            FIXTURES_PAYLOAD: _fixtures(),
+            "event-gw01-live.json": b"unused",
+        },
+    )
+    monkeypatch.setattr(
+        producer,
+        "_component_table",
+        lambda *_args, **_kwargs: pytest.fail("component model must not run"),
+    )
+
+    projection, _, report = _build(
+        world, snapshot_id=snapshot.snapshot_id, control_only=True, dry_run=True
+    )
+
+    assert projection.model_version == IN_SEASON_MODEL_VERSION
+    assert report["projection_selection"] == "explicit_legacy_control"
+
+
+@pytest.mark.parametrize("include_components", [False, True])
+@pytest.mark.parametrize("conditional_points", [5, -5])
+def test_component_wiring_fits_composes_and_records_row_level_fallbacks(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    include_components: bool,
+    conditional_points: int,
+) -> None:
+    feature_columns = component_feature_columns()
+    training_rows = []
+    for index in range(360):
+        appeared = index % 3 != 0
+        training_rows.append(
+            {
+                "season": "2024-25",
+                "gameweek": index // 24 + 1,
+                "player_id": index + 1,
+                "appearance_target": int(appeared),
+                "minutes_target": 70 if appeared else pd.NA,
+                "points_target": conditional_points if appeared else pd.NA,
+                **{column: float(index % 7 + 1) for column in feature_columns},
+            }
+        )
+    training = pd.DataFrame(training_rows)
+    scoring = pd.DataFrame(
+        [
+            {"player_id": 1001, **{column: 2.0 for column in feature_columns}},
+            {
+                "player_id": 1002,
+                **{
+                    column: (pd.NA if column == feature_columns[0] else 2.0)
+                    for column in feature_columns
+                },
+            },
+        ]
+    )
+    scoring["fixture_count"] = [1, 1]
+
+    def development_only(*_args, seasons):
+        assert seasons == producer.COMPONENT_TRAINING_SEASONS
+        return pd.DataFrame()
+
+    monkeypatch.setattr(producer, "build_panel", development_only)
+    monkeypatch.setattr(producer, "build_fixture_panel", development_only)
+    monkeypatch.setattr(producer, "load_team_codes", lambda *_args: pd.DataFrame())
+    monkeypatch.setattr(
+        producer,
+        "build_component_modelling_frame",
+        lambda *_args, **_kwargs: training,
+    )
+    monkeypatch.setattr(
+        producer,
+        "build_live_player_history",
+        lambda *_args, **_kwargs: (pd.DataFrame(), (1002,)),
+    )
+    monkeypatch.setattr(producer, "fixture_snapshot", lambda *_args, **_kwargs: pd.DataFrame())
+    monkeypatch.setattr(producer, "_team_bridge", lambda *_args: pd.DataFrame())
+    monkeypatch.setattr(
+        producer,
+        "build_component_scoring_frame",
+        lambda *_args, **_kwargs: scoring,
+    )
+
+    table, diagnostics = producer._component_table(
+        tmp_path,
+        bootstrap=b"{}",
+        fixtures=b"[]",
+        event_payloads={1: b"{}"},
+        season=SEASON,
+        target=2,
+        source_snapshot_id="capture-v1",
+        captured_at_utc=GW2_CAPTURED_AT,
+        deadline_utc=EVENTS[1]["deadline_time"],
+        fallback=pd.DataFrame({"player_id": [1001, 1002], "expected_points": [3.0, 4.0]}),
+        include_components=include_components,
+    )
+
+    by_player = table.set_index("player_id")
+    assert by_player.loc[1001, "expected_points"] >= 0.0
+    assert by_player.loc[1002, "expected_points"] == 4.0
+    assert diagnostics["route:component_model"] == 1
+    assert diagnostics["route:direct_control"] == 1
+    assert diagnostics["component_history_incomplete_players"] == 1
+    if include_components:
+        assert by_player.loc[1001, "raw_expected_points_if_appearance"] == pytest.approx(
+            conditional_points
+        )
+        assert pd.isna(by_player.loc[1002, "raw_expected_points_if_appearance"])
+        assert diagnostics["component_training_data_fingerprint"]
+    else:
+        assert list(table.columns) == ["player_id", "expected_points"]

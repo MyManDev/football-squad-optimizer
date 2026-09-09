@@ -1,0 +1,11 @@
+.note {
+  margin: 0;
+  font-size: var(--step--1);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.provenance {
+  display: grid;
+  gap: var(--space-1);
+}

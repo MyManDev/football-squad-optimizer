@@ -38,6 +38,7 @@ limit is asserted by a test rather than left for a reader to assume, and the twi
 that matter are pinned by name.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -307,3 +308,27 @@ def test_the_header_does_not_deny_a_holdout_read_the_table_records() -> None:
             "The header should say plainly that one artifact read the holdout, rather than "
             "going silent about it."
         )
+
+
+def test_every_artifact_that_flags_a_holdout_read_is_named_in_the_header() -> None:
+    """The same rule, derived from the artifacts instead of from one remembered name.
+
+    The check above pattern-matches the ``fw10_holdout`` wording, so it kept passing while a
+    second artifact landed carrying ``locked_holdout_accessed: true`` and the header went on
+    enumerating the reads as one. Which artifacts read the locked season is a fact their own
+    committed JSON states; the header has to agree with it, whoever adds the next row.
+    """
+
+    header = INDEX.read_text(encoding="utf-8").split("## ", 1)[0]
+    flagged = sorted(
+        path.stem
+        for path in DOCS.glob("*.json")
+        if json.loads(path.read_text(encoding="utf-8")).get("locked_holdout_accessed") is True
+    )
+    unnamed = [stem for stem in flagged if f"`{stem}`" not in header]
+
+    assert not unnamed, (
+        "These committed artifacts record a read of the locked holdout and the index header "
+        f"does not name them: {unnamed!r}. The header states how many reads there have been, "
+        "so it has to name every artifact that says it made one."
+    )

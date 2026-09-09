@@ -245,6 +245,10 @@ data/runtime/
 # captures. data/sample/entry_registry_v1.example.json carries the shape, and
 # scripts/seed_entry_registry.py rebuilds the real file from a captured standings page.
 data/entries/
+# The immutable record of what each member was told, per gameweek. It names the same
+# identifiable people's squads the registry and the captures do, so it stays local for
+# the same reason; it is written once by the publish and never rewritten.
+data/advice_records/
 
 # Reproducible local experiment outputs (reports are generated, not source data)
 artifacts/
@@ -254,3 +258,16 @@ web/node_modules/
 web/dist/
 web/playwright-report/
 web/test-results/
+
+# Half-written shadow artifacts. The create-once writer completes and fsyncs a
+# sibling temporary before publishing it with a no-overwrite link, and removes it on
+# every path; a hard kill can still strand one, and an untracked file beside a report
+# makes every later run record a dirty tree.
+docs/.*.json.tmp-*
+
+# Agent tool directories. Neither is project content and neither can change what a run
+# produces, but `git status --porcelain` counts untracked paths, so their presence made
+# `export_player_evidence` refuse the whole weekly run for a dirty tree — the guard is
+# right to care about untracked files that could be imported, and wrong to count these.
+.claude/
+.codex-tmp/

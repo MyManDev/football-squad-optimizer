@@ -4,6 +4,7 @@ Feature values are supplied directly rather than built from a panel, so each run
 the precedence ladder can be exercised in isolation.
 """
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -17,6 +18,7 @@ from squadopt.prediction.minutes import (
     MINUTES_FROM_NO_APPEARANCE,
     MINUTES_UNKNOWN,
     ExpectedMinutesConfig,
+    appearance_probability,
     expected_minutes,
 )
 
@@ -45,6 +47,44 @@ def _row(
         CONFIG.minutes_per_appearance_column: per_appearance,
         PRIOR_MINUTES_COLUMN: prior,
     }
+
+
+# --- appearance probability -------------------------------------------------
+
+
+def test_appearance_probability_preserves_history_zero_and_missing() -> None:
+    frame = _features([_row(0.75), _row(0.0), _row()])
+    before = frame.copy(deep=True)
+
+    probability = appearance_probability(frame, config=CONFIG)
+
+    assert probability.iloc[:2].tolist() == [0.75, 0.0]
+    assert pd.isna(probability.iloc[2])
+    assert probability.index.equals(frame.index)
+    assert frame.equals(before)
+
+
+def test_appearance_probability_uses_the_calendar_only_as_a_blank_override() -> None:
+    probability = appearance_probability(
+        _with_fixtures([_row(0.75), _row(0.75)], [0, 2]),
+        config=CONFIG,
+    )
+
+    assert probability.tolist() == [0.0, 0.75]
+
+
+@pytest.mark.parametrize("value", [-0.01, 1.01, float("inf"), "unknown", True])
+def test_appearance_probability_rejects_values_outside_its_contract(value: object) -> None:
+    with pytest.raises(PredictionConfigurationError, match=r"probabilities in \[0, 1\]"):
+        appearance_probability(_features([_row(value)]), config=CONFIG)
+
+
+def test_appearance_probability_rejects_duplicate_source_columns() -> None:
+    frame = _features([_row(0.75)])
+    duplicated = pd.concat([frame, frame[[CONFIG.appearance_rate_column]]], axis="columns")
+
+    with pytest.raises(PredictionConfigurationError, match="duplicate"):
+        appearance_probability(duplicated, config=CONFIG)
 
 
 # --- the measured rung ------------------------------------------------------
@@ -276,6 +316,24 @@ def test_a_blank_gameweek_projects_to_zero_whatever_the_history_says() -> None:
 
     assert projection.expected_minutes.tolist() == [0.0]
     assert projection.source.tolist() == [MINUTES_BLANK_GAMEWEEK]
+
+
+def test_a_missing_fixture_count_uses_the_documented_single_fixture_default() -> None:
+    probability = appearance_probability(
+        _with_fixtures([_row(0.75)], [pd.NA]),
+        config=CONFIG,
+    )
+
+    assert probability.tolist() == [0.75]
+
+
+@pytest.mark.parametrize("count", ["unknown", True, np.bool_(False), 1.5, float("inf")])
+def test_an_invalid_fixture_count_is_rejected(count: object) -> None:
+    with pytest.raises(PredictionConfigurationError, match="integer fixture counts"):
+        appearance_probability(
+            _with_fixtures([_row(0.75)], [count]),
+            config=CONFIG,
+        )
 
 
 def test_a_blank_gameweek_overrides_even_a_missing_record() -> None:

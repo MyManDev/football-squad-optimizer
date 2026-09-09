@@ -9,53 +9,64 @@ writes the registry that names them. This shell reads those payloads, hands them
 ``build_league_views`` through the ``EntryPicksProvider`` seam, and writes
 ``<out>/data/league/**``.
 
-What it does not do is decide anything of ours: no ledger is read, no decision recorded.
-A member's advice is computed from that member's own squad and the shared projection, and
-the invariance test in ``tests/unit/test_league_views.py`` pins that as fact rather than
-as intention.
+What it does not do is decide anything of ours: our season ledger is neither read nor
+written here. A member's advice is computed from that member's own squad and the shared
+projection, and the invariance test in ``tests/unit/test_league_views.py`` pins that as
+fact rather than as intention.
 
-Nothing personal is committed. The registry and the captures stay local (``.gitignore``
-excludes ``data/entries/`` and ``data/snapshots/``); what this writes under ``web/public``
-is the public post-deadline picture the league's own standings page already shows.
+It does record what it published. The site's advice paths carry no gameweek and are
+overwritten every week, so ``build_league_views`` also writes an immutable advice record
+under ``--advice-record-root``, one per member, gameweek and capture; without it, a week
+that has been published can never afterwards be reviewed. A week is published more than
+once — mid-week, then again with fresh availability before the deadline — and each of those
+captures records its own, so the advice that stood at the deadline is on disk too.
+
+Nothing personal is committed. The registry, the captures and the advice records stay
+local (``.gitignore`` excludes ``data/entries/``, ``data/snapshots/`` and
+``data/advice_records/``); what this writes under ``web/public`` is the public
+post-deadline picture the league's own standings page already shows.
 """
 
 import argparse
-import json
+import functools
+import multiprocessing
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from concurrent.futures import Executor, ProcessPoolExecutor
+from contextlib import ExitStack
 from pathlib import Path
+from typing import Any
 
-from squadopt.application.entries import EntryPicks, EntryRegistry
+from squadopt.application.advice import member_horizon_builder
+from squadopt.application.advice_record import AdviceRecordConflictError
+from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import (
+    MemberRender,
+    MemberRenderTask,
     MemberStanding,
     build_league_views,
+    render_member,
 )
+from squadopt.application.mode_selection import build_mode_paths
 from squadopt.data.errors import DataError
-from squadopt.data.snapshots import read_snapshot
+from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
     EntryGameweekPoints,
     fpl_entry_history_points,
-    fpl_entry_picks,
     fpl_league_standings,
     scored_gameweeks,
 )
 from squadopt.data.sources.vaastav import build_panel
-from squadopt.live import project, read_inputs, read_projection_handoff, read_season_rules
+from squadopt.live import (
+    load_residual_history,
+    project,
+    read_inputs,
+    read_projection_handoff,
+    read_season_rules,
+)
 from squadopt.live.recommendation import infer_season
-
-
-def _element_to_code(payloads: object) -> dict[int, int]:
-    """Map the capture's per-season element ids onto the codes everything else uses."""
-
-    document = json.loads(payloads["bootstrap-static.json"].decode("utf-8"))  # type: ignore[index]
-    elements = document.get("elements")
-    if not isinstance(elements, list):
-        raise DataError("The capture's bootstrap payload carries no elements list.")
-    return {
-        int(element["id"]): int(element["code"])
-        for element in elements
-        if isinstance(element, dict) and "id" in element and "code" in element
-    }
+from squadopt.platform.capture_context import CapturePicksProvider
 
 
 def member_points(
@@ -92,76 +103,105 @@ def last_scored_gameweek(bootstrap: bytes, *, before: int) -> int | None:
     return max(scored) if scored else None
 
 
-SNAPSHOT_ROOT = Path("data/snapshots")
-ARCHIVE_ROOT = Path("data/raw/vaastav-fpl")
-REGISTRY_PATH = Path("data/entries/registry.json")
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+SNAPSHOT_ROOT = REPOSITORY_ROOT / "data" / "snapshots"
+ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
+REGISTRY_PATH = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
+#: Where the immutable per-member, per-gameweek advice record lands. Local like the
+#: captures and the registry: it names identifiable people's squads, so ``.gitignore``
+#: keeps it out of the repository for the same reason ``data/entries/`` is out.
+ADVICE_RECORD_ROOT = REPOSITORY_ROOT / "data" / "advice_records"
 
 
-class _CapturePicks:
-    """Serves each member's picks from the capture's own payloads.
+def resolve_live_snapshot_id(root: Path, requested: str | None) -> str:
+    """The capture to read: the one named, or the most recent *live* one held.
 
-    One translation happens here and it is load-bearing: the entry endpoints name players
-    by **element** id, which is a per-season number, while everything downstream of a
-    capture — the projection, the prices, the ledger — names them by **code**, the
-    identifier that survives a transfer window. Handing element ids to a consumer that
-    means codes does not fail loudly; it silently fails to find any of the squad, which
-    is exactly how this surfaced (fifteen members, "no current price", zero rendered).
+    Only a live capture can serve the league tree; Top-100 and elite-picks captures share
+    the snapshot root and sort after it by name, so "the latest snapshot" must not be
+    "the last directory".
     """
 
-    def __init__(self, snapshot: object, snapshot_id: str) -> None:
-        self._payloads = getattr(snapshot, "payloads", {})
-        self._snapshot_id = snapshot_id
-        self._code_by_element = _element_to_code(self._payloads)
+    if requested:
+        if requested not in list_snapshot_ids(root):
+            raise DataError(f"No snapshot {requested!r} under {root}.")
+        return requested
+    live = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
+    if not live:
+        raise DataError(f"No {FPL_LIVE_SOURCE}-* snapshots under {root}; capture one first.")
+    return live[-1]
 
-    def _code(self, element: int) -> int:
-        code = self._code_by_element.get(int(element))
-        if code is None:
-            raise DataError(
-                f"The capture's bootstrap does not name element {element}, so the squad "
-                "cannot be resolved to the ids the projection uses."
-            )
-        return code
 
-    def picks(self, entry_id: int, season: str, gameweek: int) -> EntryPicks:
-        picks_name = f"entry-{entry_id}-picks-gw{gameweek:02d}.json"
-        history_name = f"entry-{entry_id}-history.json"
-        for name in (picks_name, history_name):
-            if name not in self._payloads:
-                raise DataError(f"The capture holds no {name}; re-capture with --entries.")
-        record = fpl_entry_picks(
-            self._payloads[picks_name],
-            self._payloads[history_name],
-            entry_id=entry_id,
-            season=season,
-            gameweek=gameweek,
-            source_snapshot_id=self._snapshot_id,
-        )
-        # The data record and the application type are twins by design: same field names,
-        # no translation table, so a drift on either side is a type error rather than a
-        # silently wrong squad.
-        return EntryPicks(
-            entry_id=record.entry_id,
-            season=record.season,
-            gameweek=record.gameweek,
-            squad=tuple(self._code(player) for player in record.squad),
-            starting_xi=tuple(self._code(player) for player in record.starting_xi),
-            captain=self._code(record.captain),
-            bank_tenths=record.bank_tenths,
-            free_transfers=record.free_transfers,
-            free_transfers_known=record.free_transfers_known,
-            chips_used=record.chips_used,
-            purchase_prices={
-                self._code(player): price for player, price in record.purchase_prices.items()
-            },
-            purchase_prices_known=record.purchase_prices_known,
-            source_snapshot_id=record.source_snapshot_id,
-        )
+# --- the process pool ----------------------------------------------------------------
+#
+# The capture context (snapshot payloads, inputs, projection, season rules) holds
+# read-only mapping proxies and is not picklable, and it is large; so a worker does not
+# receive it — it rebuilds the same context from the same paths once, at start, and the
+# tasks that cross the process boundary are the primitive ``MemberRenderTask`` records.
+# The projection is a deterministic function of the capture and the handoff, so a
+# worker's context is the batch's context, and the bytes are the same (the in-process
+# mapper test pins the scheduler-only property; the real run is checked by hand).
+
+_WORKER_CONTEXT: dict[str, Any] = {}
+
+
+def _worker_init(
+    snapshot_root: str,
+    snapshot_id: str,
+    season: str,
+    handoff: str | None,
+    archive_root: str,
+) -> None:
+    snapshot = read_snapshot(Path(snapshot_root), snapshot_id)
+    inputs = read_inputs(snapshot, season=season, gameweek=None)
+    panel = build_panel(Path(archive_root))
+    in_season = read_projection_handoff(Path(handoff)) if handoff else None
+    _WORKER_CONTEXT.update(
+        provider=CapturePicksProvider(snapshot, snapshot_id),
+        inputs=inputs,
+        projection=project(inputs, panel, in_season=in_season),
+        rules=read_season_rules(snapshot, season=season),
+        # The multi-week horizon is built once per window in each worker and shared by
+        # every member the worker renders; it is the same bytes in every process.
+        horizon_builder=member_horizon_builder(
+            snapshot, season=season, panel=panel, in_season=in_season
+        ),
+    )
+
+
+def _render_in_worker(task: MemberRenderTask) -> MemberRender:
+    return render_member(task, **_WORKER_CONTEXT)
+
+
+def pool_mapper(
+    executor: Executor,
+) -> Callable[
+    [Callable[[MemberRenderTask], MemberRender], Iterable[MemberRenderTask]],
+    Iterable[MemberRender],
+]:
+    """A ``build_league_views`` mapper over a pool whose workers hold their own context.
+
+    The function the batch hands over is ``render_member`` bound to the batch's own
+    context; the pool cannot carry that context, so it runs the same ``render_member``
+    against the worker's — and refuses anything else, so a different function can never
+    be silently replaced by this one.
+    """
+
+    def mapper(
+        function: Callable[[MemberRenderTask], MemberRender],
+        tasks: Iterable[MemberRenderTask],
+    ) -> Iterable[MemberRender]:
+        if not (isinstance(function, functools.partial) and function.func is render_member):
+            raise ValueError("The pool mapper runs render_member only.")
+        return executor.map(_render_in_worker, list(tasks))
+
+    return mapper
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--league", type=int, required=True)
-    parser.add_argument("--snapshot-id", help="default: the most recent capture")
+    parser.add_argument("--snapshot-id", help="default: the most recent live capture")
+    parser.add_argument("--snapshot-root", type=Path, default=SNAPSHOT_ROOT)
     parser.add_argument("--out", default="web/public")
     parser.add_argument("--season")
     parser.add_argument("--archive-root", default=str(ARCHIVE_ROOT))
@@ -172,14 +212,50 @@ def main() -> int:
         help="projection handoff for this capture and gameweek; required from GW2 on, "
         "the same file the decision reads (projection_handoff_v1)",
     )
+    parser.add_argument(
+        "--mode-residuals",
+        type=Path,
+        help="residual export (csv/parquet beside its manifest) to build one-week scenario "
+        "paths from; turns on the competitive play modes. When given, a history that "
+        "cannot honestly support paths fails the run rather than silently downgrading.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="member tasks solved in parallel processes (each solver stays single-threaded); "
+        "the bytes do not depend on this",
+    )
+    parser.add_argument(
+        "--no-rival-menu",
+        action="store_true",
+        help="write the saf-puan baseline only; skip the rival strategies against every "
+        "other member",
+    )
+    parser.add_argument(
+        "--advice-record-root",
+        type=Path,
+        default=ADVICE_RECORD_ROOT,
+        help="where the immutable per-member, per-gameweek, per-capture advice record is "
+        "written; the published tree has no gameweek in its paths and is overwritten every "
+        "week, so without this nothing survives to say what a member was told for a given "
+        "week",
+    )
+    parser.add_argument(
+        "--no-advice-record",
+        action="store_true",
+        help="publish without recording what was published; a week built this way can "
+        "never be reviewed",
+    )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     arguments = parser.parse_args()
+    if arguments.workers < 1:
+        parser.error("--workers must be at least 1")
 
     try:
-        from scripts.recommend_current_squad import resolve_snapshot_id
-
-        snapshot_id = resolve_snapshot_id(arguments.snapshot_id)
-        snapshot = read_snapshot(SNAPSHOT_ROOT, snapshot_id)
+        snapshot_root = Path(arguments.snapshot_root)
+        snapshot_id = resolve_live_snapshot_id(snapshot_root, arguments.snapshot_id)
+        snapshot = read_snapshot(snapshot_root, snapshot_id)
         season = arguments.season or infer_season(snapshot)
         inputs = read_inputs(snapshot, season=season, gameweek=None)
         registry = EntryRegistry.load(Path(arguments.registry))
@@ -212,6 +288,9 @@ def main() -> int:
                     total_points=(
                         scores[row.entry_id].total_points if row.entry_id in scores else None
                     ),
+                    transfer_cost=(
+                        scores[row.entry_id].transfer_cost if row.entry_id in scores else None
+                    ),
                 )
                 for row in rows
             }
@@ -239,24 +318,95 @@ def main() -> int:
             else None
         )
         projection = project(inputs, panel, in_season=in_season)
+        mode_paths = None
+        if arguments.mode_residuals:
+            history = load_residual_history(arguments.mode_residuals)
+            mode_paths = build_mode_paths(
+                projection,
+                history,
+                season=season,
+                gameweek=int(inputs.deadline.gameweek),
+            )
+            print(
+                f"mode paths: {mode_paths.config.scenario_count} scenarios for gameweek "
+                f"{inputs.deadline.gameweek} from {history.source_id}"
+            )
         out_dir = Path(arguments.out) / "data" / "league"
-        report = build_league_views(
-            _CapturePicks(snapshot, snapshot_id),
-            registry.entries,
-            inputs,
-            projection,
-            read_season_rules(snapshot, season=season),
-            league_id=arguments.league,
-            league_name=league_name,
-            out_dir=out_dir,
-            standings=standings,
-            scored_gameweek=scored,
-        )
+        with ExitStack() as stack:
+            mapper: Callable[..., Iterable[MemberRender]] = map
+            if arguments.workers > 1:
+                executor = stack.enter_context(
+                    ProcessPoolExecutor(
+                        max_workers=arguments.workers,
+                        mp_context=multiprocessing.get_context("spawn"),
+                        initializer=_worker_init,
+                        initargs=(
+                            str(snapshot_root),
+                            snapshot_id,
+                            season,
+                            (
+                                str(arguments.in_season_projection)
+                                if arguments.in_season_projection
+                                else None
+                            ),
+                            str(arguments.archive_root),
+                        ),
+                    )
+                )
+                mapper = pool_mapper(executor)
+            report = build_league_views(
+                CapturePicksProvider(snapshot, snapshot_id),
+                registry.entries,
+                inputs,
+                projection,
+                read_season_rules(snapshot, season=season),
+                league_id=arguments.league,
+                league_name=league_name,
+                out_dir=out_dir,
+                standings=standings,
+                scored_gameweek=scored,
+                mode_paths=mode_paths,
+                rival_menu=not arguments.no_rival_menu,
+                mapper=mapper,
+                # The saf-puan three- and five-week windows, from the same capture and
+                # handoff the one-week advice reads.
+                horizon_builder=member_horizon_builder(
+                    snapshot, season=season, panel=panel, in_season=in_season
+                ),
+                # Written by the same call that writes the published bytes, because this
+                # publish re-solves in a fresh worktree at whatever code is on develop:
+                # only the process that emitted the advice can record what it emitted.
+                advice_record_root=(
+                    None if arguments.no_advice_record else Path(arguments.advice_record_root)
+                ),
+            )
         print(f"Rendered {report.rendered_count} of {len(report.members)} members into {out_dir}")
         for member in report.members:
             if not member.rendered:
                 print(f"  not rendered  {member.entry_id}  {member.reason}")
+        menu_files = sum(1 for name in report.files if "/vs-" in name)
+        window_files = sum(1 for name in report.files if name.endswith(("/3.json", "/5.json")))
+        print(
+            f"Wrote {len(report.files)} files, {menu_files} of them rival-menu entries and "
+            f"{window_files} of them multi-week windows"
+        )
         return 0
+    except AdviceRecordConflictError as error:
+        # The published files are already on disk; only the record refused. Name the
+        # escape, because the alternative to naming it is an operator improvising one
+        # against a deadline — and every improvisation here loses evidence.
+        print(
+            f"build_league_site refused:\n  {error}\n"
+            "  This is one capture rebuilt into different bytes, not a second publish: a "
+            "publish from a fresh capture writes its own record and is never refused. So "
+            "the difference above came from our own code, and it is worth a minute before "
+            "the deadline. If the deadline will not wait, re-run with --no-advice-record "
+            "(scripts.publish_gameweek_site takes the same flag and passes it through): the "
+            "recorded capture is kept as it stands and the difference above is what to "
+            "reconcile afterwards.",
+            file=sys.stderr,
+        )
+        return 1
     except (DataError, OSError, ValueError) as error:
         print(f"build_league_site failed:\n  {error}", file=sys.stderr)
         return 1

@@ -36,11 +36,20 @@ from squadopt.live.horizon import (
     gameweek_fixture_fingerprints,
     make_projection_horizon_builder,
 )
-from squadopt.live.recommendation import project, read_inputs
+from squadopt.live.recommendation import InSeasonProjection, project, read_inputs
 from squadopt.planning.horizon import PROJECTION_HORIZON_COLUMNS, to_planning_horizon
+from squadopt.prediction.in_season import (
+    IN_SEASON_FEATURE_CONTRACT_VERSION,
+    IN_SEASON_MODEL_VERSION,
+)
 
 CLUBS = tuple(range(1, 7))
 PLAYER_CODES = tuple(record["code"] for record in _elements())
+CLUB_OF_PLAYER = {int(record["code"]): int(record["team"]) for record in _elements()}
+THREE_EVENTS = [
+    {"id": week, "deadline_time": f"2026-08-{20 + week:02d}T17:30:00Z", "finished": False}
+    for week in (1, 2, 3)
+]
 
 
 def _fixture(identifier: int, gameweek: int, home: int, away: int) -> dict[str, Any]:
@@ -57,7 +66,12 @@ def _fixture(identifier: int, gameweek: int, home: int, away: int) -> dict[str, 
     }
 
 
-def _calendar(*, blank_club: int | None = None, double_club: int | None = None) -> bytes:
+def _calendar(
+    *,
+    blank_club: int | None = None,
+    double_club: int | None = None,
+    gameweeks: tuple[int, ...] = (1, 2),
+) -> bytes:
     """Two gameweeks of fixtures, with an optional blank and an optional double in GW2.
 
     GW1 pairs every club once. GW2 does the same, then drops the blank club's fixture and
@@ -67,7 +81,7 @@ def _calendar(*, blank_club: int | None = None, double_club: int | None = None) 
 
     records: list[dict[str, Any]] = []
     identifier = 0
-    for gameweek in (1, 2):
+    for gameweek in gameweeks:
         for home, away in ((1, 2), (3, 4), (5, 6)):
             if gameweek == 2 and blank_club in (home, away):
                 continue
@@ -101,6 +115,20 @@ def _capture(
 
 def _history() -> pd.DataFrame:
     return _panel(players=PLAYER_CODES)
+
+
+def _in_season_handoff(capture: Any, *, gameweek: int = 2) -> InSeasonProjection:
+    return InSeasonProjection(
+        season=SEASON,
+        gameweek=gameweek,
+        source_snapshot_id=capture.metadata.snapshot_id,
+        model_name="squadopt-deterministic-baseline",
+        model_version=IN_SEASON_MODEL_VERSION,
+        feature_contract_version=IN_SEASON_FEATURE_CONTRACT_VERSION,
+        expected_points={
+            int(player): 1.0 + index / 100.0 for index, player in enumerate(PLAYER_CODES)
+        },
+    )
 
 
 def _horizon(tmp_path: Path, gameweeks: tuple[int, ...] = (1, 2), **kwargs: Any) -> Any:
@@ -139,8 +167,9 @@ def test_the_post_processing_contract_names_the_scaling_rule(tmp_path: Path) -> 
 
     horizon = _horizon(tmp_path)
 
-    assert "captured_availability_rule_v1" in horizon.post_processing_contract_version
-    assert "linear_fixture_count_scaling_v1" in horizon.post_processing_contract_version
+    contract = horizon.post_processing_contract_version
+    assert "captured_availability_rule_v1" in contract
+    assert "first_week_control_relative_fixture_scaling_v3" in contract
 
 
 def test_the_horizon_converts_to_a_planning_horizon(tmp_path: Path) -> None:
@@ -348,17 +377,210 @@ def test_a_capture_without_a_fixtures_payload_is_refused(tmp_path: Path) -> None
         build_projection_horizon(capture, (1,), panel=_history(), season=SEASON)
 
 
-def test_a_horizon_starting_after_the_opening_gameweek_is_refused(tmp_path: Path) -> None:
-    """The calendar may vary ahead of the decision point; the decision point may not move.
+def test_a_horizon_starting_after_the_opening_gameweek_needs_a_handoff(tmp_path: Path) -> None:
+    """Moving the decision point without current-season history remains forbidden."""
 
-    The base projection carries completed seasons into a season with no played gameweeks.
-    Starting at gameweek two would apply that to a decision point where a gameweek had
-    already been played, silently ignoring it — the same defect the single-gameweek
-    recommendation refuses.
-    """
+    with pytest.raises(DataSourceError, match="needs the current season's played history"):
+        _horizon(tmp_path, (2,))
 
-    with pytest.raises(DataSourceError, match="must start at gameweek 1"):
-        _horizon(tmp_path, (2, 3))
+
+@pytest.mark.parametrize("fixtures", [_calendar(), _calendar(double_club=1)])
+def test_a_midseason_horizon_matches_the_live_projection_at_its_first_week(
+    tmp_path: Path,
+    fixtures: bytes,
+) -> None:
+    capture = _capture(tmp_path, fixtures=fixtures)
+    handoff = _in_season_handoff(capture)
+    live = project(
+        read_inputs(capture, season=SEASON, gameweek=2),
+        in_season=handoff,
+    ).table
+
+    horizon = build_projection_horizon(
+        capture,
+        (2,),
+        season=SEASON,
+        in_season=handoff,
+    )
+    merged = horizon.table.merge(
+        live.loc[:, ["player_id", "expected_points"]],
+        on="player_id",
+        suffixes=("_horizon", "_live"),
+    )
+
+    assert len(merged) == len(live)
+    difference = (merged["expected_points_horizon"] - merged["expected_points_live"]).abs()
+    assert float(difference.max()) == 0.0
+    assert horizon.model_version == IN_SEASON_MODEL_VERSION
+    assert horizon.feature_contract_version == IN_SEASON_FEATURE_CONTRACT_VERSION
+
+
+def test_a_blank_first_week_abstains_if_the_control_assigns_positive_points(
+    tmp_path: Path,
+) -> None:
+    capture = _capture(tmp_path, fixtures=_calendar(blank_club=1))
+
+    with pytest.raises(DataSourceError, match="no fixture"):
+        build_projection_horizon(
+            capture,
+            (2,),
+            season=SEASON,
+            in_season=_in_season_handoff(capture),
+        )
+
+
+# --- the decision week's own calendar ---------------------------------------
+#
+# The base the decision week hands over already has that week's calendar inside it: the
+# in-season control forces zero where a club has no fixture and reads fixture count as a
+# feature. Multiplying a later week by its raw fixture count would therefore charge the
+# decision week's fixtures a second time. These pin the relative rule and the zero case.
+
+
+def _three_week_capture(tmp_path: Path, **calendar: Any) -> Any:
+    return _capture(
+        tmp_path,
+        fixtures=_calendar(gameweeks=(1, 2, 3), **calendar),
+        bootstrap=_bootstrap(events=THREE_EVENTS),
+    )
+
+
+def _calendar_aware_handoff(
+    capture: Any, *, blank_clubs: tuple[int, ...] = ()
+) -> InSeasonProjection:
+    """A handoff shaped as the in-season control emits one: zero for a blank club."""
+
+    return InSeasonProjection(
+        season=SEASON,
+        gameweek=2,
+        source_snapshot_id=capture.metadata.snapshot_id,
+        model_name="squadopt-deterministic-baseline",
+        model_version=IN_SEASON_MODEL_VERSION,
+        feature_contract_version=IN_SEASON_FEATURE_CONTRACT_VERSION,
+        expected_points={
+            int(player): (0.0 if CLUB_OF_PLAYER[int(player)] in blank_clubs else 5.0)
+            for player in PLAYER_CODES
+        },
+    )
+
+
+def test_a_double_decision_week_does_not_carry_into_a_later_single_week(
+    tmp_path: Path,
+) -> None:
+    """The regression. Club 1 plays twice in the decision gameweek, so its handoff value
+    is a two-match value; a later single-fixture week is worth half of it, not all of it."""
+
+    capture = _three_week_capture(tmp_path, double_club=1)
+    horizon = build_projection_horizon(
+        capture, (2, 3), season=SEASON, in_season=_calendar_aware_handoff(capture)
+    )
+
+    table = horizon.table
+    doubled = table.loc[(table["gameweek"] == 2) & (table["fixture_count"] == 2)]
+    assert not doubled.empty
+    later = table.loc[(table["gameweek"] == 3) & table["player_id"].isin(doubled["player_id"])]
+    assert set(later["fixture_count"]) == {1}
+
+    pairs = doubled.merge(later, on="player_id", suffixes=("_first", "_later"))
+    ratio = pairs["expected_points_later"] / pairs["expected_points_first"]
+    assert float(ratio.min()) == pytest.approx(0.5)
+    assert float(ratio.max()) == pytest.approx(0.5)
+
+    # A club that is single in the decision week is untouched by the normalisation.
+    single = table.loc[(table["gameweek"] == 2) & (table["fixture_count"] == 1)]
+    single_later = table.loc[
+        (table["gameweek"] == 3) & table["player_id"].isin(single["player_id"])
+    ]
+    unchanged = single.merge(single_later, on="player_id", suffixes=("_first", "_later"))
+    assert float(
+        (unchanged["expected_points_later"] - unchanged["expected_points_first"]).abs().max()
+    ) == pytest.approx(0.0)
+
+
+def test_a_blank_decision_week_stays_at_zero_without_dividing_by_zero(
+    tmp_path: Path,
+) -> None:
+    """The zero case, stated. A club with no fixture in the decision week has a zero base
+    and therefore no per-fixture value to rescale, so it stays at zero for the whole
+    window. What must not happen is a division by zero, a dropped player or a NaN."""
+
+    capture = _three_week_capture(tmp_path, blank_club=1)
+    # Dropping the (1, 2) fixture blanks both clubs in it.
+    horizon = build_projection_horizon(
+        capture,
+        (2, 3),
+        season=SEASON,
+        in_season=_calendar_aware_handoff(capture, blank_clubs=(1, 2)),
+    )
+
+    table = horizon.table
+    blank_players = [player for player, club in CLUB_OF_PLAYER.items() if club in (1, 2)]
+    for gameweek in (2, 3):
+        rows = table.loc[(table["gameweek"] == gameweek) & table["player_id"].isin(blank_players)]
+        assert len(rows) == len(blank_players)
+        assert not bool(rows["expected_points"].isna().any())
+        assert float(rows["expected_points"].abs().max()) == 0.0
+    later = table.loc[(table["gameweek"] == 3) & table["player_id"].isin(blank_players)]
+    assert set(later["fixture_count"]) == {1}
+    # Every other club is projected normally across the same window.
+    playing = table.loc[(table["gameweek"] == 3) & ~table["player_id"].isin(blank_players)]
+    assert float(playing["expected_points"].min()) > 0.0
+
+
+# --- the module's own account of itself -------------------------------------
+
+
+def test_the_scaling_rule_identity_has_one_home() -> None:
+    """ADR 0002's hazard, pinned. The measurement's treatment and the shipped rule are
+    two different things and must not share a name that hides a divergence."""
+
+    from squadopt.backtest import horizon_decay
+    from squadopt.live import horizon as live_horizon
+
+    assert not hasattr(horizon_decay, "FIXTURE_SCALING_RULE_VERSION")
+    assert (
+        horizon_decay.MEASURED_FIXTURE_SCALING_RULE_VERSION
+        != live_horizon.FIXTURE_SCALING_RULE_VERSION
+    )
+
+
+def test_the_module_does_not_claim_the_drift_is_unmeasured() -> None:
+    """`docs/horizon_decay` measures it; the docstring may not say otherwise."""
+
+    from squadopt.live import horizon as live_horizon
+
+    assert live_horizon.__doc__ is not None
+    assert "nobody has measured" not in live_horizon.__doc__
+    assert "horizon_decay" in live_horizon.__doc__
+
+
+def test_a_horizon_refuses_gameweeks_absent_from_the_captured_season(tmp_path: Path) -> None:
+    with pytest.raises(DataSourceError, match="absent from the captured season"):
+        _horizon(tmp_path, (1, 2, 3))
+
+
+def test_a_midseason_horizon_refuses_a_handoff_for_another_capture(tmp_path: Path) -> None:
+    capture = _capture(tmp_path / "decision")
+    other = _capture(tmp_path / "other", captured_at="2026-08-20T20:11:43Z")
+
+    with pytest.raises(DataSourceError, match="another capture"):
+        build_projection_horizon(
+            capture,
+            (2,),
+            season=SEASON,
+            in_season=_in_season_handoff(other),
+        )
+
+
+def test_the_bound_builder_accepts_a_midseason_handoff(tmp_path: Path) -> None:
+    capture = _capture(tmp_path)
+    handoff = _in_season_handoff(capture)
+    builder = make_projection_horizon_builder(season=SEASON, in_season=handoff)
+
+    built = builder(capture, (2,))
+
+    assert built.target_gameweeks == (2,)
+    assert built.model_version == IN_SEASON_MODEL_VERSION
 
 
 def test_fixture_counts_by_player_read_the_capture_calendar(tmp_path: Path) -> None:

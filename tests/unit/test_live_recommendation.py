@@ -35,6 +35,10 @@ from squadopt.live import (
     render,
 )
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
+from squadopt.prediction.elite_evidence import (
+    ELITE_EVIDENCE_MODEL_VERSION,
+    ELITE_EVIDENCE_POLICY_VERSION,
+)
 from squadopt.scenarios import ScenarioConfig, ScenarioEvaluationConfig
 
 SEASON = "2026-27"
@@ -505,6 +509,22 @@ def test_the_report_says_which_model_decided_the_squad(tmp_path: Path) -> None:
 
     assert "operational control" in report
     assert "did not clear them" in report
+
+
+def test_the_report_describes_the_operational_elite_rule_without_a_probability_claim(
+    tmp_path: Path,
+) -> None:
+    recommendation = replace(
+        _recommend(tmp_path),
+        model_version=ELITE_EVIDENCE_MODEL_VERSION,
+    )
+
+    report = render(recommendation)
+
+    assert "bounded Top-100 XI-support adjustment" in report
+    assert ELITE_EVIDENCE_POLICY_VERSION in report
+    assert "not a calibrated superiority or probability claim" in report
+    assert "did not clear them" not in report
 
 
 def test_the_report_states_how_much_rests_on_the_prior(tmp_path: Path) -> None:

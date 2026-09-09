@@ -1,5 +1,57 @@
 """Public prepared-fold evaluation interface."""
 
+from squadopt.evaluation.appearance import (
+    APPEARANCE_DIAGNOSTICS_VERSION,
+    APPEARANCE_LOG_LOSS_EPSILON,
+    APPEARANCE_RELIABILITY_BIN_COUNT,
+    AppearanceDiagnostics,
+    AppearanceReliabilityBin,
+    evaluate_appearance_snapshot,
+)
+from squadopt.evaluation.benchmarks import (
+    OWNERSHIP_TEMPLATE_V2,
+    OwnershipTemplateResult,
+    audit_unconstrained_template_v1,
+    build_constrained_ownership_template,
+)
+from squadopt.evaluation.cohorts import (
+    TOP_MANAGER_COHORT_SIZE,
+    TOP_MANAGER_COHORT_VERSION,
+    TOP_MANAGER_MINIMUM_COVERAGE_COUNT,
+    AsOfTop100Cohort,
+    RankedManager,
+    Top100BenchmarkResult,
+    aggregate_top_100_scores,
+    select_as_of_top_100,
+)
+from squadopt.evaluation.component_decisions import (
+    PhaseCDecisionComparison,
+    PhaseCDecisionDiagnostics,
+    evaluate_phase_c_component_decisions,
+    prepare_phase_c_component_folds,
+)
+from squadopt.evaluation.component_handoff import (
+    DEVELOPMENT_OOF_CONTRACT_VERSION,
+    HANDOFF_KEY,
+    OOF_ARTIFACT_COLUMNS,
+    OOF_CONTRACT_VERSION,
+    ROSTER_ARTIFACT_COLUMNS,
+    ROSTER_CONTRACT_VERSION,
+    PhaseCComponentHandoff,
+    read_phase_c_component_handoff,
+)
+from squadopt.evaluation.component_metrics import (
+    PHASE_C_COMPONENT_METRICS_VERSION,
+    PHASE_C_EVIDENCE_STATUSES,
+    PHASE_C_LOCKED_HOLDOUT_SEASONS,
+    PHASE_C_OOF_KEY,
+    PHASE_C_OOF_REQUIRED_COLUMNS,
+    BinaryMetrics,
+    ComponentMetricSet,
+    ErrorMetrics,
+    PhaseCComponentEvaluation,
+    evaluate_component_oof,
+)
 from squadopt.evaluation.evaluator import evaluate_prepared_folds
 from squadopt.evaluation.models import (
     EvaluationConfig,
@@ -9,11 +61,41 @@ from squadopt.evaluation.models import (
     EvaluationSummary,
     EvaluationValidationError,
     FoldEvaluationResult,
+    FrozenSquadDecision,
+    RealizedSquadScore,
     ScoringPolicy,
 )
-from squadopt.evaluation.scoring import score_realized_squad_points
+from squadopt.evaluation.scoring import (
+    complete_optimization_decision,
+    score_frozen_squad_decision,
+    score_realized_squad_points,
+)
 
 __all__ = [
+    "APPEARANCE_DIAGNOSTICS_VERSION",
+    "APPEARANCE_LOG_LOSS_EPSILON",
+    "APPEARANCE_RELIABILITY_BIN_COUNT",
+    "DEVELOPMENT_OOF_CONTRACT_VERSION",
+    "HANDOFF_KEY",
+    "OOF_ARTIFACT_COLUMNS",
+    "OOF_CONTRACT_VERSION",
+    "OWNERSHIP_TEMPLATE_V2",
+    "PHASE_C_COMPONENT_METRICS_VERSION",
+    "PHASE_C_EVIDENCE_STATUSES",
+    "PHASE_C_LOCKED_HOLDOUT_SEASONS",
+    "PHASE_C_OOF_KEY",
+    "PHASE_C_OOF_REQUIRED_COLUMNS",
+    "ROSTER_ARTIFACT_COLUMNS",
+    "ROSTER_CONTRACT_VERSION",
+    "TOP_MANAGER_COHORT_SIZE",
+    "TOP_MANAGER_COHORT_VERSION",
+    "TOP_MANAGER_MINIMUM_COVERAGE_COUNT",
+    "AppearanceDiagnostics",
+    "AppearanceReliabilityBin",
+    "AsOfTop100Cohort",
+    "BinaryMetrics",
+    "ComponentMetricSet",
+    "ErrorMetrics",
     "EvaluationConfig",
     "EvaluationError",
     "EvaluationFold",
@@ -21,7 +103,27 @@ __all__ = [
     "EvaluationSummary",
     "EvaluationValidationError",
     "FoldEvaluationResult",
+    "FrozenSquadDecision",
+    "OwnershipTemplateResult",
+    "PhaseCComponentEvaluation",
+    "PhaseCComponentHandoff",
+    "PhaseCDecisionComparison",
+    "PhaseCDecisionDiagnostics",
+    "RankedManager",
+    "RealizedSquadScore",
     "ScoringPolicy",
+    "Top100BenchmarkResult",
+    "aggregate_top_100_scores",
+    "audit_unconstrained_template_v1",
+    "build_constrained_ownership_template",
+    "complete_optimization_decision",
+    "evaluate_appearance_snapshot",
+    "evaluate_component_oof",
+    "evaluate_phase_c_component_decisions",
     "evaluate_prepared_folds",
+    "prepare_phase_c_component_folds",
+    "read_phase_c_component_handoff",
+    "score_frozen_squad_decision",
     "score_realized_squad_points",
+    "select_as_of_top_100",
 ]

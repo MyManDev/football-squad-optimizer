@@ -1,0 +1,76 @@
+.hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.template,
+.templateActive {
+  border: 1px solid var(--border, currentColor);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+}
+
+.templateActive {
+  border-width: 2px;
+  font-weight: 600;
+}
+
+.meta {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.1rem;
+}
+
+.saveRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nameInput {
+  flex: 1;
+  min-width: 8rem;
+  border: 1px solid var(--border, currentColor);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+  padding: 0.3rem 0.5rem;
+}
+
+.save {
+  border: 1px solid var(--border, currentColor);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+}

@@ -169,6 +169,12 @@
         "gameweek": {
           "type": "integer"
         },
+        "mode": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "projected_score": {
           "type": "number"
         },

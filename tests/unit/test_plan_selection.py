@@ -142,13 +142,16 @@ def test_the_rival_scores_like_a_plain_squad() -> None:
     np.testing.assert_allclose(scores, expected)
 
 
-def test_each_mode_picks_the_candidate_its_name_promises() -> None:
-    """A safe squad, an aggressive one, and modes that must disagree about them.
+def test_no_mode_selects_on_a_win_share() -> None:
+    """A plan that never falls behind loses to a plan with the better expected gap.
 
-    The safe candidate matches the rival almost exactly (tiny constant edge); the
-    aggressive one is the rival plus noise with a small positive drift. Garantici must
-    prefer the safe one (never behind); Asiri Agresif must prefer the aggressive one
-    (only variance clears a five-point margin).
+    The safe candidate matches the rival almost exactly (tiny constant edge), so its
+    scenario win-share under Garantici's reading is a perfect 1.0; the aggressive one
+    is the rival plus noise with a positive drift, so its expected gap is higher. Under
+    the old selector Garantici picked the safe plan *because of the win-share* — a
+    probability choosing the plan. Every mode now picks on expected points, the
+    win-shares stay recorded as diagnostics, and what once made the modes disagree is
+    the structural constraints their strategies will declare, not a probability.
     """
 
     scenarios = 4000
@@ -170,13 +173,22 @@ def test_each_mode_picks_the_candidate_its_name_promises() -> None:
     safe = CandidatePlan(label="safe", plan=safe.plan)
     aggressive = CandidatePlan(label="aggressive", plan=aggressive.plan)
     selection = select_plan([safe, aggressive], paths, rival)  # type: ignore[arg-type]
-    assert selection.recommended["garantici"] == "safe"
-    assert selection.recommended["asiri_agresif"] == "aggressive"
+    # Every mode picks the expected-points winner; the safe plan's perfect win-share
+    # does not select it.
+    for mode in ("garantici", "agresif", "asiri_agresif", "saf_puan"):
+        assert selection.recommended[mode] == "aggressive"
     garantici_safe = next(
         v for v in selection.verdicts if v.mode == "garantici" and v.candidate == "safe"
     )
+    # The win-share is still measured and recorded — it just never chooses.
     assert garantici_safe.probability_success == pytest.approx(1.0)
     assert garantici_safe.probability_behind == pytest.approx(0.0)
+    garantici_aggressive = next(
+        v for v in selection.verdicts if v.mode == "garantici" and v.candidate == "aggressive"
+    )
+    assert garantici_aggressive.expected_rival_gap is not None
+    assert garantici_safe.expected_rival_gap is not None
+    assert garantici_aggressive.expected_rival_gap > garantici_safe.expected_rival_gap
 
 
 def test_saf_puan_ignores_the_rival_entirely() -> None:

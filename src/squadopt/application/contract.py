@@ -177,6 +177,7 @@ def ui_view_schema() -> dict[str, Any]:
             "gameweek": _INT,
             "snapshot_id": _STR,
             "deadline_utc": _STR,
+            "mode": _nullable(_STR),
             "solver_status": _STR,
             "decision_kind": {"type": "string", "enum": ["opening", "transfer"]},
             "captain_player_id": _INT,
@@ -191,7 +192,27 @@ def ui_view_schema() -> dict[str, Any]:
             "settled": _BOOL,
             "cumulative_projected_score": _NUM,
             "cumulative_realized_score": _nullable(_NUM),
-        }
+        },
+        # `mode` is additive: documents published before the ledger stamped it stay valid.
+        required=[
+            "captain_player_id",
+            "chip",
+            "cumulative_projected_score",
+            "cumulative_realized_score",
+            "deadline_utc",
+            "decision_kind",
+            "gameweek",
+            "projected_score",
+            "projection_error",
+            "realized_net_score",
+            "realized_score",
+            "settled",
+            "snapshot_id",
+            "solver_status",
+            "transfer_count",
+            "transfer_hit_points",
+            "unavailable_player_count",
+        ],
     )
     ledger = _obj(
         {

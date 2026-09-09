@@ -14,19 +14,23 @@ gameweek ahead.
 
 Two consequences are stated rather than buried.
 
-**Expected points scale linearly with fixture count.** A blank gameweek projects exactly
-zero, a double projects twice a single. That is not a new rule invented here — the
-expected-minutes stage already scales by fixture count and caps at that many full matches
-(`prediction/minutes.py`). Reusing it keeps one treatment of the calendar rather than two.
-But the operational control that produces the base projection is calendar-blind, so the
-scaling is post-processing applied on top of it, and it is named in the horizon's
-post-processing contract instead of hiding inside the number.
+**The first gameweek preserves the operational control exactly.** Calendar scaling is
+applied only to later shadow weeks. This keeps H1 bit-for-bit identical even when the
+captured calendar contains a blank or double gameweek; changing the decision week's
+numbers here would create a second, unpromoted live policy. Later weeks scale linearly
+with fixture count *relative to the decision week's own count*, because the control's
+number already has the decision week's calendar inside it — the base is calendar-aware, so
+multiplying by a later week's count alone would count the decision week's fixture load
+twice. That uncalibrated extrapolation remains explicit in the horizon's post-processing
+contract.
 
 **The horizon is not gate evidence.** The frozen evaluation objective is single-gameweek
-realized squad points. Nothing measures how far a multi-gameweek projection drifts, and it
-will drift: expected minutes for gameweek t+3 are computed from what was known at t, so
-injuries, rotation and suspensions in between are unseen. Expect the projection to grow
-overconfident as the horizon lengthens, by an amount nobody has measured yet.
+realized squad points, and this table does not measure a model. It will drift: expected
+minutes for gameweek t+3 are computed from what was known at t, so injuries, rotation and
+suspensions in between are unseen, and the projection grows overconfident as the horizon
+lengthens. `docs/horizon_decay` measures that drift over development folds — under the
+earlier `linear_fixture_count_scaling_v1` treatment, which scaled every offset including
+the decision week, rather than the relative rule shipped here.
 """
 
 import hashlib
@@ -43,17 +47,16 @@ from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
     fixture_snapshot,
+    gameweek_deadlines,
     player_snapshot,
     team_codes,
     team_names,
 )
 from squadopt.features.cross_season import CrossSeasonConfig
 from squadopt.live.recommendation import (
-    CONTROL_MODEL_NAME,
-    CONTROL_MODEL_VERSION,
-    OPENING_FEATURE_CONTRACT_VERSION,
-    SUPPORTED_TARGET_GAMEWEEK,
+    InSeasonProjection,
     infer_season,
+    project,
     read_inputs,
 )
 from squadopt.planning.horizon import (
@@ -63,15 +66,14 @@ from squadopt.planning.horizon import (
 from squadopt.prediction.availability import (
     AVAILABILITY_RULE_CONTRACT_VERSION,
     AvailabilityRuleConfig,
-    apply_availability,
 )
 from squadopt.prediction.config import BaselineProjectionConfig
-from squadopt.prediction.opening import build_opening_projection_from_snapshot
 
-# The calendar rule applied on top of the calendar-blind control. Named in the horizon's
-# post-processing contract so a consumer can tell that the scaling happened outside the
-# model rather than inside it.
-FIXTURE_SCALING_RULE_VERSION: Final = "linear_fixture_count_scaling_v1"
+# The calendar rule applied on top of the control. Named in the horizon's post-processing
+# contract so a consumer can tell that the scaling happened outside the model rather than
+# inside it. This is the only home for this identity: `backtest.horizon_decay` measures a
+# different, earlier rule and names it separately.
+FIXTURE_SCALING_RULE_VERSION: Final = "first_week_control_relative_fixture_scaling_v3"
 HORIZON_POST_PROCESSING_CONTRACT_VERSION: Final = (
     f"{AVAILABILITY_RULE_CONTRACT_VERSION}+{FIXTURE_SCALING_RULE_VERSION}"
 )
@@ -177,18 +179,25 @@ def build_projection_horizon(
     decision_snapshot: CapturedSnapshot,
     target_gameweeks: tuple[int, ...],
     *,
-    panel: pd.DataFrame,
+    panel: pd.DataFrame | None = None,
     season: str | None = None,
     projection_config: BaselineProjectionConfig | None = None,
     cross_season: CrossSeasonConfig | None = None,
     availability_config: AvailabilityRuleConfig | None = None,
+    in_season: InSeasonProjection | None = None,
 ) -> ProjectionHorizon:
-    """Project every requested gameweek from one capture and one completed history."""
+    """Project a consecutive horizon from one captured information state.
+
+    Gameweek one uses the completed-history ``panel``. A horizon beginning later in the
+    season uses an ``in_season`` handoff for the first target gameweek. The live
+    projection seam validates that handoff against the season, capture and gameweek
+    before its numbers are reused across the captured future calendar.
+    """
 
     if not isinstance(decision_snapshot, CapturedSnapshot):
         raise DataSourceError("decision_snapshot must be a CapturedSnapshot.")
-    if not isinstance(panel, pd.DataFrame):
-        raise DataSourceError("panel must be a pandas DataFrame.")
+    if panel is not None and not isinstance(panel, pd.DataFrame):
+        raise DataSourceError("panel must be a pandas DataFrame when supplied.")
     gameweeks = _require_consecutive(target_gameweeks)
 
     bootstrap = _payload(decision_snapshot, BOOTSTRAP_PAYLOAD)
@@ -199,27 +208,22 @@ def build_projection_horizon(
     # The information state. Read once, at the first target, and reused unchanged for
     # every later gameweek — which is the whole claim this module makes.
     inputs = read_inputs(decision_snapshot, season=resolved_season, gameweek=gameweeks[0])
-    if inputs.deadline.gameweek != SUPPORTED_TARGET_GAMEWEEK:
+    published_gameweeks = {deadline.gameweek for deadline in gameweek_deadlines(bootstrap)}
+    unavailable_gameweeks = sorted(set(gameweeks) - published_gameweeks)
+    if unavailable_gameweeks:
         raise DataSourceError(
-            f"A horizon must start at gameweek {SUPPORTED_TARGET_GAMEWEEK}, not "
-            f"{inputs.deadline.gameweek}. The base projection carries completed seasons "
-            "into a season with no played gameweeks; starting mid-season would silently "
-            "ignore everything that had happened that season, which is the same reason "
-            "the single-gameweek recommendation refuses a later target. Varying the "
-            "calendar ahead of an opening decision point is sound; moving the decision "
-            "point itself is not."
+            "Projection horizon targets gameweeks absent from the captured season: "
+            f"{unavailable_gameweeks!r}."
         )
-    projected = apply_availability(
-        build_opening_projection_from_snapshot(
-            panel,
-            inputs.players,
-            season=resolved_season,
-            config=projection_config,
-            cross_season=cross_season,
-        ),
-        inputs.availability,
-        config=availability_config,
-    ).table
+    projection = project(
+        inputs,
+        panel,
+        projection_config=projection_config,
+        cross_season=cross_season,
+        availability_config=availability_config,
+        in_season=in_season,
+    )
+    projected = projection.table
 
     calendar = aggregate_team_gameweek(
         fixture_snapshot(
@@ -239,24 +243,60 @@ def build_projection_horizon(
         )
     base["team_code"] = base["team_id"].astype("string").map(bridge).astype("int64")
 
-    frames = [_gameweek_rows(base, calendar, gameweek) for gameweek in gameweeks]
+    decision_counts = _fixture_counts_by_team_code(calendar, gameweeks[0])
+    frames = [
+        _gameweek_rows(
+            base,
+            calendar,
+            gameweek,
+            preserve_expected_points=gameweek == gameweeks[0],
+            decision_fixture_counts=decision_counts,
+        )
+        for gameweek in gameweeks
+    ]
     table = pd.concat(frames, ignore_index=True).loc[:, list(PROJECTION_HORIZON_COLUMNS)]
 
     return ProjectionHorizon(
         table=table,
         season=resolved_season,
         source_snapshot_id=snapshot_id,
-        model_name=CONTROL_MODEL_NAME,
-        model_version=CONTROL_MODEL_VERSION,
-        feature_contract_version=OPENING_FEATURE_CONTRACT_VERSION,
+        model_name=_projection_identity(projection.diagnostics, "model_name"),
+        model_version=_projection_identity(projection.diagnostics, "model_version"),
+        feature_contract_version=_projection_identity(
+            projection.diagnostics, "feature_contract_version"
+        ),
         post_processing_contract_version=HORIZON_POST_PROCESSING_CONTRACT_VERSION,
     )
+
+
+def _projection_identity(diagnostics: Mapping[str, object], name: str) -> str:
+    """Return one required provenance value from the shared projection seam."""
+
+    value = diagnostics.get(name)
+    if not isinstance(value, str) or not value.strip():
+        raise DataSourceError(f"Projection diagnostics carry no non-empty {name!r}.")
+    return value
+
+
+def _fixture_counts_by_team_code(calendar: pd.DataFrame, gameweek: int) -> Mapping[int, int]:
+    """The decision gameweek's fixture load per club, which later weeks are relative to."""
+
+    week = calendar.loc[calendar["gameweek"] == int(gameweek), ["team_id", "fixture_count"]]
+    return {
+        int(team): int(count)
+        for team, count in zip(
+            week["team_id"].tolist(), week["fixture_count"].tolist(), strict=True
+        )
+    }
 
 
 def _gameweek_rows(
     base: pd.DataFrame,
     calendar: pd.DataFrame,
     gameweek: int,
+    *,
+    preserve_expected_points: bool,
+    decision_fixture_counts: Mapping[int, int],
 ) -> pd.DataFrame:
     """Apply one gameweek's calendar to the shared information state.
 
@@ -278,11 +318,29 @@ def _gameweek_rows(
     rows["gameweek"] = int(gameweek)
     rows["fixture_count"] = fixture_count
     rows["home_fixture_count"] = home_count
+    points = rows["expected_points"].astype("float64")
+    if preserve_expected_points and bool(((fixture_count == 0) & (points > 0.0)).any()):
+        players = rows.loc[(fixture_count == 0) & (points > 0.0), "player_id"].tolist()
+        raise DataSourceError(
+            "The operational control assigns positive points to players with no fixture "
+            f"in the decision gameweek (players: {players[:5]!r}); refusing to create a "
+            "different H1 policy inside the horizon builder."
+        )
+    # The base already carries the decision week's own calendar: the control forces zero
+    # where a club has no fixture and reads fixture count as a feature. So a later week is
+    # this week's fixture load *relative to* the decision week's, not the raw count —
+    # multiplying by the raw count would charge the decision week's fixtures twice.
+    #
+    # A club blank in the decision week divides by one rather than by zero. Its base
+    # points are exactly zero there (the guard above refuses any other value), so the
+    # ratio never matters: every later week stays at zero, because a zero base carries no
+    # per-fixture value to rescale. Its players keep their rows, nothing is dropped, and
+    # no NaN can reach the table. That understates such a club for the whole window, and
+    # the window's stated limits say so.
+    decision_count = rows["team_code"].map(decision_fixture_counts).fillna(0).astype("int64")
+    scale = fixture_count.astype("float64").div(decision_count.clip(lower=1).astype("float64"))
     rows["expected_points"] = (
-        rows["expected_points"]
-        .astype("float64")
-        .mul(fixture_count.astype("float64"))
-        .clip(lower=0.0)
+        points.clip(lower=0.0) if preserve_expected_points else points.mul(scale).clip(lower=0.0)
     )
     return rows
 
@@ -332,18 +390,19 @@ def fixture_counts_by_player(
 
 
 def make_projection_horizon_builder(
-    panel: pd.DataFrame,
+    panel: pd.DataFrame | None = None,
     *,
     season: str | None = None,
     projection_config: BaselineProjectionConfig | None = None,
     cross_season: CrossSeasonConfig | None = None,
     availability_config: AvailabilityRuleConfig | None = None,
+    in_season: InSeasonProjection | None = None,
 ) -> Callable[[CapturedSnapshot, tuple[int, ...]], ProjectionHorizon]:
-    """Bind the completed history so the result satisfies ``ProjectionHorizonBuilder``.
+    """Bind projection inputs so the result satisfies ``ProjectionHorizonBuilder``.
 
-    The protocol takes only a snapshot and the target gameweeks, which is right: the
-    planner should not have to know that a projection needs a historical panel. Binding
-    it here keeps that detail on this side of the seam.
+    The planner should not know whether the decision point needs completed history or an
+    in-season handoff. Binding that producer-side detail here keeps the planning seam
+    unchanged.
     """
 
     def build(
@@ -358,6 +417,7 @@ def make_projection_horizon_builder(
             projection_config=projection_config,
             cross_season=cross_season,
             availability_config=availability_config,
+            in_season=in_season,
         )
 
     return build

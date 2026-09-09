@@ -21,11 +21,15 @@ export function AverageChart({ weeks }: { weeks: LeagueWeekView[] }) {
     w.average_entry_score as number,
     w.our_realized_net_score as number,
   ]);
-  const maxY = Math.max(1, ...values);
+  const minY = Math.min(0, ...values);
+  const maxY = Math.max(minY === 0 ? 1 : 0, ...values);
   const first = scored[0].gameweek;
   const last = Math.max(first + 1, scored[scored.length - 1].gameweek);
   const x = (gw: number) => PAD.left + ((gw - first) / (last - first)) * (W - PAD.left - PAD.right);
-  const y = (v: number) => H - PAD.bottom - (v / maxY) * (H - PAD.top - PAD.bottom);
+  const y = (v: number) =>
+    H - PAD.bottom - ((v - minY) / (maxY - minY)) * (H - PAD.top - PAD.bottom);
+  const zero = y(0);
+  const ticks = [...new Set([minY, minY < 0 ? 0 : Math.floor(maxY / 2), maxY])];
   const barWidth = Math.max(6, Math.min(28, (W - PAD.left - PAD.right) / (scored.length * 2.2)));
   const line = scored
     .map((w) => `${x(w.gameweek)},${y(w.average_entry_score as number)}`)
@@ -38,17 +42,17 @@ export function AverageChart({ weeks }: { weeks: LeagueWeekView[] }) {
         role="img"
         aria-label={messages.league.averageLabel(scored.length)}
       >
-        {[0, 0.5, 1].map((f) => (
-          <g key={f}>
+        {ticks.map((tick) => (
+          <g key={tick}>
             <line
               x1={PAD.left}
               x2={W - PAD.right}
-              y1={y(maxY * f)}
-              y2={y(maxY * f)}
-              className={styles.grid}
+              y1={y(tick)}
+              y2={y(tick)}
+              className={tick === 0 ? styles.zero : styles.grid}
             />
-            <text x={PAD.left - 6} y={y(maxY * f) + 4} className={styles.tick} textAnchor="end">
-              {Math.round(maxY * f)}
+            <text x={PAD.left - 20} y={y(tick) + 4} className={styles.tick} textAnchor="end">
+              {Math.round(tick)}
             </text>
           </g>
         ))}
@@ -59,9 +63,9 @@ export function AverageChart({ weeks }: { weeks: LeagueWeekView[] }) {
             <g key={w.gameweek}>
               <rect
                 x={x(w.gameweek) - barWidth / 2}
-                y={y(ours)}
+                y={Math.min(y(ours), zero)}
                 width={barWidth}
-                height={H - PAD.bottom - y(ours)}
+                height={Math.abs(y(ours) - zero)}
                 className={ahead ? styles.barAhead : styles.barBehind}
               />
               <text

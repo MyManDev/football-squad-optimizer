@@ -1,20 +1,11 @@
-"""The ownership template rival: legality, determinism, and the provider seam.
+"""The ownership template rival: legality and determinism.
 
-Synthetic pools and captures only — the point is the machinery, not the football.
+Synthetic pools only — the point is the machinery, not the football.
 """
-
-import json
-from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from squadopt.application.rivals import (
-    TEMPLATE_RIVAL_SOURCE,
-    TemplateRivalProvider,
-    iter_rivals,
-)
-from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.optimization import OptimizationConfig
 from squadopt.scenarios.models import ScenarioValidationError
 from squadopt.scenarios.rivals import (
@@ -127,67 +118,3 @@ def test_diagnostics_describe_the_eleven() -> None:
     assert diagnostics["captain_rule"] == "most_owned_starter"
     assert diagnostics["captaincy_share_available"] is False
     assert float(diagnostics["mean_ownership"]) > float(diagnostics["minimum_ownership"])
-
-
-# --- the provider seam ---------------------------------------------------------
-
-
-def _bootstrap_payload() -> bytes:
-    teams = [{"id": 1, "code": 10, "name": "Club A"}, {"id": 2, "code": 20, "name": "Club B"}]
-    elements = []
-    identifier = 0
-    for element_type, count in ((1, 3), (2, 6), (3, 6), (4, 4)):
-        for _ in range(count):
-            identifier += 1
-            elements.append(
-                {
-                    "id": identifier,
-                    "code": 1000 + identifier,
-                    "first_name": "P",
-                    "second_name": f"Player{identifier}",
-                    "team": 1 + identifier % 2,
-                    "element_type": element_type,
-                    "now_cost": 50,
-                    "selected_by_percent": str(100 - identifier),
-                }
-            )
-    document = {"teams": teams, "elements": elements, "events": []}
-    return json.dumps(document).encode("utf-8")
-
-
-def _capture(root: Path) -> str:
-    metadata = write_snapshot(
-        root,
-        source="fpl-live",
-        captured_at_utc="2026-08-16T08:00:00Z",
-        payloads={"bootstrap-static.json": _bootstrap_payload()},
-    )
-    return metadata.snapshot_id
-
-
-def test_the_template_provider_builds_one_rival_from_a_capture(tmp_path: Path) -> None:
-    snapshot = read_snapshot(tmp_path, _capture(tmp_path))
-    provider = TemplateRivalProvider(snapshot)
-    assert provider.source == TEMPLATE_RIVAL_SOURCE
-    rivals = provider.rivals()
-    assert len(rivals) == 1
-    assert len(rivals[0].starter_ids) == 11
-    # The pool keys players by their persistent code, and so must the rival.
-    assert all(int(str(player)) >= 1000 for player in rivals[0].starter_ids)
-
-
-def test_the_provider_is_deterministic_and_diagnosable(tmp_path: Path) -> None:
-    snapshot = read_snapshot(tmp_path, _capture(tmp_path))
-    provider = TemplateRivalProvider(snapshot)
-    assert provider.rivals() == provider.rivals()
-    diagnostics = provider.diagnostics()
-    assert diagnostics["snapshot_id"] == snapshot.metadata.snapshot_id
-    assert diagnostics["starters"] == 11
-
-
-def test_iter_rivals_flattens_providers(tmp_path: Path) -> None:
-    snapshot = read_snapshot(tmp_path, _capture(tmp_path))
-    provider = TemplateRivalProvider(snapshot)
-    rivals = list(iter_rivals(iter([provider, provider])))
-    assert len(rivals) == 2
-    assert rivals[0].starter_ids == rivals[1].starter_ids

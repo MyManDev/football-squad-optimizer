@@ -28,6 +28,7 @@ from squadopt.live.ledger import (
     SEASON_LEDGER_CONTRACT_VERSION,
     LedgerEntry,
     LedgerError,
+    decision_mode,
     extract_event_points,
     held_squad_from_ledger,
     ledger_summary,
@@ -52,6 +53,7 @@ from squadopt.live.recommendation import (
     project,
     read_inputs,
     read_projection_handoff,
+    season_from_bootstrap,
     write_projection_handoff,
 )
 from squadopt.live.report import (
@@ -102,7 +104,9 @@ from squadopt.live.transfers import (
     LEDGER_TRANSFERS_CONTRACT_VERSION,
     HeldSquad,
     TransferDecision,
+    plan_transfer_horizon,
     plan_transfers,
+    plan_transfers_with_overlap,
 )
 
 __all__ = [
@@ -158,6 +162,7 @@ __all__ = [
     "build_transfer_recommendation",
     "calibration_markdown",
     "chip_availability_for",
+    "decision_mode",
     "evaluate_live_risk",
     "extract_event_points",
     "fixture_counts_by_player",
@@ -172,7 +177,9 @@ __all__ = [
     "make_projection_horizon_builder",
     "measure_live_calibration",
     "plan_tick",
+    "plan_transfer_horizon",
     "plan_transfers",
+    "plan_transfers_with_overlap",
     "project",
     "projection_fingerprint",
     "read_inputs",
@@ -185,6 +192,7 @@ __all__ = [
     "risk_not_requested",
     "rules_to_dict",
     "score_named_eleven",
+    "season_from_bootstrap",
     "summary_markdown",
     "write_projection_handoff",
 ]

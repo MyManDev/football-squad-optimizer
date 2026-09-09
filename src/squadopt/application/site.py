@@ -7,8 +7,13 @@
     data/<season>/ledger.json                    LedgerView
     data/<season>/gw<NN>/recommendation.json     RecommendationView
     data/<season>/gw<NN>/pool.json               PoolView (why these players)
+    data/<season>/gw<NN>/live.json               live_score_v1 (replaceable score)
 
-Every file is a ``ViewEnvelope``; the tree is deterministic for a given ledger and clock
+An explicitly supplied horizon batch may add sanitized solver evidence to the matching
+recommendation's metadata. The ledger decision remains the rendered action.
+
+Views use ``ui_view_v1`` except the separate ``live_score_v1`` envelope. The tree is
+deterministic for a given ledger, capture and clock
 (sorted keys, fixed indent, LF line ends) and each file lands through a temporary file
 and one rename, so a reader never sees a half-written JSON.
 """
@@ -17,7 +22,7 @@ import contextlib
 import json
 import os
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
@@ -28,7 +33,13 @@ from squadopt.application.build import (
     status_view,
 )
 from squadopt.application.contract import UI_VIEW_CONTRACT_VERSION, ui_view_schema
+from squadopt.application.horizon_publish import load_public_horizon_evidence
 from squadopt.application.league import league_view, ownership_view
+from squadopt.application.live_score import (
+    LIVE_SCORE_CONTRACT_VERSION,
+    live_score_schema,
+    live_score_view,
+)
 from squadopt.application.views import (
     JsonValue,
     LedgerView,
@@ -37,6 +48,7 @@ from squadopt.application.views import (
     ViewEnvelope,
     utc_now_iso,
 )
+from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.live.ledger import LedgerEntry, load_ledger
 from squadopt.live.tick import LedgerState, TickPlan
@@ -55,6 +67,7 @@ class SiteBuildReport:
     settled_gameweeks: tuple[int, ...]
     status_written: bool
     league_written: bool
+    horizon_evidence_gameweek: int | None
 
 
 def _write_json(path: Path, payload: dict[str, JsonValue]) -> None:
@@ -81,6 +94,7 @@ def build_site(
     plan: TickPlan | None = None,
     runlog_root: Path | None = None,
     snapshot: CapturedSnapshot | None = None,
+    horizon_manifest: Path | None = None,
     now: datetime | None = None,
 ) -> SiteBuildReport:
     """Render the season's ledger (and, if given, a tick plan) as the site's data tree.
@@ -103,10 +117,37 @@ def build_site(
         written.append(relative)
 
     entries: tuple[LedgerEntry, ...] = load_ledger(Path(ledger_root), season)
+    evidence = (
+        load_public_horizon_evidence(Path(horizon_manifest), ledger_root=Path(ledger_root))
+        if horizon_manifest is not None
+        else None
+    )
+    if evidence is not None and evidence.season != season:
+        raise DataError(
+            f"Horizon evidence belongs to {evidence.season!r}, not requested season {season!r}."
+        )
     for entry in entries:
         view = recommendation_view_from_ledger(entry)
+        if evidence is not None and entry.gameweek == evidence.gameweek:
+            view = replace(
+                view,
+                metadata={
+                    **dict(view.metadata),
+                    "horizon_evidence": dict(evidence.payload),
+                },
+            )
         emit(f"{season}/gw{entry.gameweek:02d}/recommendation.json", view.to_dict())
         emit(f"{season}/gw{entry.gameweek:02d}/pool.json", pool_view(entry).to_dict())
+        live_path = f"{season}/gw{entry.gameweek:02d}/live.json"
+        _write_json(
+            data_dir / live_path,
+            {
+                "contract_version": LIVE_SCORE_CONTRACT_VERSION,
+                "generated_at_utc": generated,
+                "payload": live_score_view(entry, snapshot, generated_at_utc=generated).to_dict(),
+            },
+        )
+        written.append(live_path)
 
     ledger: LedgerView = ledger_view(Path(ledger_root), season)
     emit(f"{season}/ledger.json", ledger.to_dict())
@@ -140,6 +181,9 @@ def build_site(
     schema_path = data_dir / SCHEMA_RELATIVE_PATH
     _write_json(schema_path, ui_view_schema())
     written.append(SCHEMA_RELATIVE_PATH)
+    live_schema_path = f"schema/{LIVE_SCORE_CONTRACT_VERSION}.schema.json"
+    _write_json(data_dir / live_schema_path, live_score_schema())
+    written.append(live_schema_path)
 
     gameweeks = tuple(row.gameweek for row in ledger.rows)
     latest: dict[str, JsonValue] | None = None
@@ -168,4 +212,5 @@ def build_site(
         settled_gameweeks=tuple(row.gameweek for row in ledger.rows if row.settled),
         status_written=status_written,
         league_written=league_written,
+        horizon_evidence_gameweek=(evidence.gameweek if evidence is not None else None),
     )

@@ -1,6 +1,6 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-25T12:32:57Z",
+  "generated_at_utc": "2026-09-09T06:31:41Z",
   "payload": {
     "chips_played": [],
     "decided_gameweeks": 1,
@@ -13,6 +13,7 @@
         "deadline_utc": "2026-08-21T17:30:00Z",
         "decision_kind": "opening",
         "gameweek": 1,
+        "mode": "live",
         "projected_score": 56.077499304365105,
         "projection_error": -30.077499304365105,
         "realized_net_score": 26.0,

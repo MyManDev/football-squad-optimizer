@@ -16,18 +16,30 @@ test("member list links to point-labelled advice and preserves its URL state", a
   await expect(page).toHaveURL(/\/league\/members\/35249001$/);
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
 
+  // Pure points is published at three and five weeks; the window's limits are stated.
+  await expect(page.getByRole("radio", { name: /3 hafta/ })).toBeEnabled();
   await page.getByRole("radio", { name: /3 hafta/ }).click();
-  await page.getByRole("radio", { name: /^Agresif/ }).click();
-  await expect(page).toHaveURL(/mode=agresif/);
   await expect(page).toHaveURL(/window=3/);
+  await expect(page.getByRole("region", { name: "3 haftalık pencere" })).toBeVisible();
+  await expect(page.getByText(/Bu pencerenin varsaydıkları/)).toBeVisible();
+  await page.getByRole("radio", { name: /1 hafta/ }).click();
+  // A rival strategy stays at one week: the longer windows are shown disabled.
+  await page.getByRole("radio", { name: /^Ortak çekirdeği koru/ }).click();
+  await expect(page).toHaveURL(/mode=ortak-koru/);
+  await expect(page.getByRole("radio", { name: /3 hafta/ })).toBeDisabled();
+  const rival = page.getByRole("combobox", { name: "Karşısında oynadığın üye" });
+  await expect(rival).toBeVisible();
+  await rival.selectOption({ index: 1 });
+  await expect(page).toHaveURL(/rival=\d+/);
   await expect(page.getByText(/beklenen puan maliyeti/).first()).toBeVisible();
   await expect(page.getByText(/yalnızca senin kadrondan/)).toBeVisible();
   await expect(page.getByText(/puan farkın: \+9/)).toBeVisible();
+  await expect(page.getByText(/rakibe karşı beklenen fark/)).toBeVisible();
   await expect(page.locator('[aria-labelledby="entry-advice-title"]')).not.toContainText("%");
 
   await page.reload();
-  await expect(page.getByRole("radio", { name: /^Agresif/ })).toBeChecked();
-  await expect(page.getByRole("radio", { name: /3 hafta/ })).toBeChecked();
+  await expect(page.getByRole("radio", { name: /^Ortak çekirdeği koru/ })).toBeChecked();
+  await expect(page).toHaveURL(/rival=\d+/);
 });
 
 test("the virtual SquadOpt member reuses the existing squad view without probability claims", async ({
@@ -55,7 +67,7 @@ test("member navigation is keyboard operable with reduced motion", async ({ page
   await page.keyboard.press("Enter");
   await expect(page).toHaveURL(/\/league\/members\/35249001$/);
 
-  const mode = page.getByRole("radio", { name: /^Garantici/ });
+  const mode = page.getByRole("radio", { name: /^Fark yarat/ });
   await mode.focus();
   await page.keyboard.press("Space");
   await expect(mode).toBeChecked();

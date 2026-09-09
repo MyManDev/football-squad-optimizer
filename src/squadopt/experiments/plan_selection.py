@@ -11,7 +11,10 @@ the scenario count. This module deliberately does not. It generates a small menu
 candidate plans deterministically — the planner's own preferred plan, the chip-less plan,
 and one plan per forced chip placement in the window — and then scores every candidate on
 the same joint scenario paths, where a plan's week-by-week elevens, captaincy, bench boost
-and triple captain are all priced per scenario. The mode then picks from the menu.
+and triple captain are all priced per scenario. The mode then picks from the menu **by
+expected points alone** - expected window score without a rival, expected gap to the
+rival with one. Scenario win-shares are recorded per verdict as diagnostics; none of
+them selects, because a number that may not be published may not pick the plan either.
 
 Chips and the rest of the season: a chip played inside the window cannot be played after
 it. The planner's chip holding values price that option cost inside candidate generation,
@@ -45,8 +48,10 @@ from squadopt.scenarios.paths import ScenarioPathSet
 PLAN_SELECTION_CONTRACT_VERSION: Final = "mode_plan_selection_v1"
 
 #: The play modes. ``margin`` is the amount a scenario must be won by; ``level_counts``
-#: says whether finishing level is a success. Saf Puan carries no margin because it is
-#: rival-independent: it ranks candidates purely by expected window score.
+#: says whether finishing level is a success. Both shape the *recorded diagnostic*
+#: (``probability_success``) and nothing else: every mode's winner is chosen on expected
+#: points alone, so an unmeasured margin cannot decide anything. Saf Puan carries no
+#: margin because it is rival-independent.
 MODES: Final[Mapping[str, Mapping[str, object]]] = {
     "saf_puan": {"rival_aware": False},
     "garantici": {"rival_aware": True, "margin": 0.0, "level_counts": True},
@@ -276,10 +281,18 @@ def select_plan(
                 )
 
         def _key(verdict: ModeVerdict) -> tuple[float, int, str]:
+            # The selector reads expected points only: the expected window score for
+            # the rival-independent mode, the expected gap to the rival for the
+            # rival-aware ones. With the rival held fixed the two rank identically -
+            # stated rather than hidden - and the scenario win-shares stay in the
+            # verdict as diagnostics that never choose. A probability may not pick
+            # the plan for the same reason it may not be published: the rival-relative
+            # window probabilities fell three pre-registered calibrations in a row and
+            # the line's stop-rule binds (measurements_index.md:87-89).
             primary = (
                 verdict.expected_window_score
-                if verdict.probability_success is None
-                else verdict.probability_success
+                if verdict.expected_rival_gap is None
+                else verdict.expected_rival_gap
             )
             return (-primary, len(verdict.chips_consumed), verdict.candidate)
 

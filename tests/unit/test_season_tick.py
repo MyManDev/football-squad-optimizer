@@ -15,6 +15,7 @@ import pytest
 import scripts.run_season_tick as tick_script
 import tests.unit.test_live_transfers as world_module
 
+from squadopt.application.season import TickRequest, plan_season_tick
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import (
@@ -329,3 +330,82 @@ def test_the_runner_decides_the_second_gameweek_only_with_a_handoff(
         (world["ledger_root"] / SEASON / "gw02" / "decision.json").read_text(encoding="utf-8")
     )
     assert decision["transfers"]["previous_gameweek"] == 1
+
+
+# --- selecting the capture the tick reads -------------------------------------------
+#
+# Four collectors default to one snapshot root and an identifier is `{source}-{stamp}-
+# {digest}`, so a lexical listing orders by collector before capture time. The weekly
+# loop writes the Top-100 cohort and the elite picks into that root either side of the
+# live capture, which is what makes these two cases the ordinary weekly state.
+
+
+def _cohort_capture(root: Path, *, source: str, captured_at: str, bootstrap: bytes | None) -> str:
+    """A cohort collector's capture: the Overall standings pages, not the game state."""
+
+    payloads: dict[str, bytes] = {"league-352490-standings-page-1.json": b"{}"}
+    if bootstrap is not None:
+        payloads[BOOTSTRAP_PAYLOAD] = bootstrap
+        payloads[FIXTURES_PAYLOAD] = b"[]"
+    return write_snapshot(
+        root, source=source, captured_at_utc=captured_at, payloads=payloads
+    ).snapshot_id
+
+
+def _request(root: Path, tmp_path: Path, now: str) -> TickRequest:
+    return TickRequest(
+        snapshot_root=root,
+        ledger_root=tmp_path / "ledger",
+        archive_root=tmp_path / "archive",
+        handoff_root=tmp_path / "handoffs",
+        summary_root=tmp_path / "summaries",
+        now_utc=now,
+    )
+
+
+def test_the_tick_trusts_the_live_captures_calendar_not_whichever_name_sorts_last(
+    tmp_path: Path,
+) -> None:
+    """The calendar the tick plans against comes from a live capture or from nothing.
+
+    A cohort capture carries the Overall standings, not the game state, so reading one as
+    "the latest capture" plans the week from payloads nobody published a deadline in. It
+    won the selection only because `fpl-top100` sorts after `fpl-live`.
+    """
+
+    root = tmp_path / "snapshots"
+    live = _capture(root, "2026-08-21T15:00:00Z")
+    _cohort_capture(root, source="fpl-top100", captured_at="2026-08-21T12:00:00Z", bootstrap=None)
+
+    plan = plan_season_tick(_request(root, tmp_path, "2026-08-21T16:00:00Z"))
+
+    assert plan.diagnostics["latest_capture"] == live.metadata.snapshot_id
+    assert plan.season == SEASON
+
+
+def test_the_captures_the_tick_holds_are_the_live_ones_it_can_act_on(tmp_path: Path) -> None:
+    """The listing is filtered too, not only the selection made from it.
+
+    ``plan_tick`` re-sorts the captures held by capture time and takes the last one's
+    identifier for the decide and settle actions it emits. A cohort capture written after
+    the live one — which the weekly loop does — would therefore aim a decision at a
+    snapshot holding no game state, and at a different capture from the one whose calendar
+    the decision was planned against.
+    """
+
+    root = tmp_path / "snapshots"
+    live = _capture(root, "2026-08-21T15:00:00Z")
+    _cohort_capture(
+        root,
+        source="fpl-elite-picks",
+        captured_at="2026-08-21T15:30:00Z",
+        bootstrap=world_module._bootstrap(),
+    )
+
+    plan = plan_season_tick(_request(root, tmp_path, "2026-08-21T16:00:00Z"))
+
+    assert plan.diagnostics["captures_held"] == 1
+    assert plan.diagnostics["latest_capture"] == live.metadata.snapshot_id
+    assert {action.snapshot_id for action in plan.actions if action.snapshot_id is not None} <= {
+        live.metadata.snapshot_id
+    }

@@ -10,7 +10,9 @@ window, a tampered handoff.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import pandas as pd
@@ -18,6 +20,7 @@ import pytest
 import scripts.run_gameweek_ops as ops
 
 import squadopt.application.commands as command_services
+import squadopt.live.transfers as live_transfers
 from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
@@ -33,6 +36,21 @@ from squadopt.live import (
     write_projection_handoff,
 )
 from squadopt.live import recommendation as live_recommendation
+from squadopt.live.rules import read_season_rules
+from squadopt.live.transfers import (
+    MEMBER_PLANNING_POLICY,
+    MEMBER_PLANNING_POLICY_ID,
+    _transfer_config,
+)
+from squadopt.planning import TransferPlanningConfig
+from squadopt.prediction.component_dataset import (
+    FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
+)
+from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
+from squadopt.prediction.elite_evidence import (
+    ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION,
+    ELITE_EVIDENCE_MODEL_VERSION,
+)
 
 SEASON = "2026-27"
 HISTORY_SEASON = "2025-26"
@@ -233,6 +251,8 @@ def _handoff(
     exclude: tuple[int, ...] = (),
     version: str = IN_SEASON_VERSION,
     snapshot_id: str | None = None,
+    evidence_fingerprint: str | None = None,
+    feature_contract_version: str | None = None,
 ) -> Path:
     """A producer's GW2 handoff: every roster player projected unless excluded.
 
@@ -257,8 +277,17 @@ def _handoff(
         source_snapshot_id=snapshot_id or world["gw2_id"],
         model_name=live_recommendation.CONTROL_MODEL_NAME,
         model_version=version,
-        feature_contract_version="synthetic-in-season-features-v0",
+        feature_contract_version=(
+            ELITE_EVIDENCE_FEATURE_CONTRACT_VERSION
+            if feature_contract_version is None and version == ELITE_EVIDENCE_MODEL_VERSION
+            else (
+                COMPONENT_FEATURE_CONTRACT_VERSION
+                if feature_contract_version is None and version == COMPONENT_MODEL_VERSION
+                else feature_contract_version or "synthetic-in-season-features-v0"
+            )
+        ),
         expected_points=expected,
+        evidence_fingerprint=evidence_fingerprint,
         diagnostics={"producer": "test"},
     )
     return write_projection_handoff(world["handoffs"] / "gw02.json", projection)
@@ -280,6 +309,73 @@ def _decide_gw2(
         str(handoff),
         *extra,
     )
+
+
+# --- the planning policy ------------------------------------------------------------
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+# The artifacts MEMBER_PLANNING_POLICY's docstring cites as its provenance.
+POLICY_PROVENANCE_ARTIFACTS = (
+    "planner_doe.json",
+    "transfer_discipline.json",
+    "chip_bayesopt.json",
+    "season_chain_tuned.json",
+    "member_policy_hit_cost_grid.json",
+)
+
+
+def test_the_member_planning_policy_is_the_rule_and_its_provenance_exists(
+    world: dict[str, Any],
+) -> None:
+    """The member path plans under ``member_planning_policy_v2``: the rule values.
+
+    The policy is the planner's defaults but for the hit cost, which carries the caution
+    margin ``member_policy_hit_cost_grid`` measured; the charge stays the game's 4. The
+    fingerprint must therefore differ from the defaults' in exactly that one control, and
+    each artifact the policy's docstring cites as provenance must exist where it says.
+    """
+
+    snapshot = read_snapshot(world["snapshot_root"], world["gw1_id"])
+    rules = read_season_rules(snapshot, season=SEASON)
+
+    assert MEMBER_PLANNING_POLICY_ID == "member_planning_policy_v2"
+    assert isinstance(MEMBER_PLANNING_POLICY, MappingProxyType)
+    assert dict(MEMBER_PLANNING_POLICY) == {
+        "transfer_hit_cost_points": 8.0,
+        "hit_points_charged": 4.0,
+        "banked_transfer_value_points": 0.0,
+        "horizon_discount_factor": 1.0,
+        "chip_holding_value_points": {},
+    }
+
+    config = _transfer_config(rules)
+    defaults = TransferPlanningConfig(max_free_transfers=rules.transfers.max_free_transfers)
+    assert config.configuration_fingerprint != defaults.configuration_fingerprint
+    assert (
+        config.configuration_fingerprint
+        == replace(defaults, transfer_hit_cost_points=8.0).configuration_fingerprint
+    )
+    assert config.transfer_hit_cost_points == MEMBER_PLANNING_POLICY["transfer_hit_cost_points"]
+    assert config.hit_points_charged == MEMBER_PLANNING_POLICY["hit_points_charged"]
+    # The margin lives in the objective; the charge is the game's, and it did not move.
+    assert config.hit_points_charged == defaults.hit_points_charged == 4.0
+    assert (
+        config.banked_transfer_value_points
+        == MEMBER_PLANNING_POLICY["banked_transfer_value_points"]
+    )
+    assert config.horizon_discount_factor == MEMBER_PLANNING_POLICY["horizon_discount_factor"]
+    assert dict(config.chip_holding_value_points) == {}
+    capped = _transfer_config(rules, transfer_cap=1)
+    assert (
+        capped.configuration_fingerprint
+        == replace(config, max_transfers_per_gameweek=1).configuration_fingerprint
+    )
+
+    source = Path(live_transfers.__file__).read_text(encoding="utf-8")
+    for name in POLICY_PROVENANCE_ARTIFACTS:
+        assert f"docs/{name}" in source, name
+        assert (REPOSITORY_ROOT / "docs" / name).is_file(), name
 
 
 # --- the held squad -----------------------------------------------------------------
@@ -331,6 +427,88 @@ def test_a_handoff_round_trips_and_a_tampered_one_is_refused(
     path.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(DataSourceError, match="recorded fingerprint"):
         read_projection_handoff(path)
+
+
+def test_an_evidence_digest_is_bound_into_the_handoff_fingerprint(
+    world: dict[str, Any],
+) -> None:
+    path = _handoff(
+        world,
+        version=ELITE_EVIDENCE_MODEL_VERSION,
+        evidence_fingerprint="a" * 64,
+    )
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document["evidence_fingerprint"] = "b" * 64
+    path.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(DataSourceError, match="recorded fingerprint"):
+        read_projection_handoff(path)
+
+
+def test_the_component_elite_model_requires_its_evidence_identity(
+    world: dict[str, Any],
+) -> None:
+    from squadopt.live.recommendation import (
+        IN_SEASON_CONTROL_MODEL_VERSIONS,
+        read_projection_handoff,
+    )
+    from squadopt.prediction.elite_evidence import (
+        COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
+        COMPONENT_ELITE_MODEL_VERSION,
+    )
+
+    with pytest.raises(DataSourceError, match="component elite model requires"):
+        _handoff(world, version=COMPONENT_ELITE_MODEL_VERSION)
+    with pytest.raises(DataSourceError, match="component elite model requires"):
+        _handoff(
+            world,
+            version=COMPONENT_ELITE_MODEL_VERSION,
+            evidence_fingerprint="c" * 64,
+            feature_contract_version="phase_c_component_form_window_v1",
+        )
+    promoted = _handoff(
+        world,
+        version=COMPONENT_ELITE_MODEL_VERSION,
+        evidence_fingerprint="c" * 64,
+        feature_contract_version=COMPONENT_ELITE_FEATURE_CONTRACT_VERSION,
+    )
+    assert read_projection_handoff(promoted).model_version in IN_SEASON_CONTROL_MODEL_VERSIONS
+
+
+def test_the_elite_model_requires_its_evidence_identity(world: dict[str, Any]) -> None:
+    with pytest.raises(DataSourceError, match="requires its evidence fingerprint"):
+        _handoff(world, version=ELITE_EVIDENCE_MODEL_VERSION)
+
+    with pytest.raises(DataSourceError, match="exact feature contract"):
+        _handoff(
+            world,
+            version=ELITE_EVIDENCE_MODEL_VERSION,
+            evidence_fingerprint="a" * 64,
+            feature_contract_version="wrong-features-v1",
+        )
+
+    with pytest.raises(DataSourceError, match="legacy in-season control"):
+        _handoff(world, evidence_fingerprint="a" * 64)
+
+
+def test_the_component_model_requires_its_exact_identity_without_external_evidence(
+    world: dict[str, Any],
+) -> None:
+    projection = read_projection_handoff(_handoff(world, version=COMPONENT_MODEL_VERSION))
+    assert projection.model_version == COMPONENT_MODEL_VERSION
+
+    with pytest.raises(DataSourceError, match="requires no external evidence fingerprint"):
+        _handoff(
+            world,
+            version=COMPONENT_MODEL_VERSION,
+            evidence_fingerprint="a" * 64,
+        )
+    with pytest.raises(DataSourceError, match="exact feature contract"):
+        _handoff(
+            world,
+            version=COMPONENT_MODEL_VERSION,
+            feature_contract_version="wrong-features-v1",
+        )
 
 
 def test_a_handoff_for_another_capture_or_gameweek_is_refused(
@@ -405,6 +583,26 @@ def test_gameweek_two_is_decided_from_the_held_squad_and_frozen(
     assert decision["metadata"]["held_squad_decided_gameweek"] == 1
     report = (world["ledger_root"] / SEASON / "gw02" / "report.txt").read_text(encoding="utf-8")
     assert "Transfers" in report and "from gameweek       1 squad" in report
+
+
+def test_the_elite_evidence_identity_reaches_the_immutable_decision(
+    monkeypatch: pytest.MonkeyPatch, world: dict[str, Any]
+) -> None:
+    _decide_gw1(monkeypatch, world)
+    evidence_fingerprint = "a" * 64
+    handoff = _handoff(
+        world,
+        version=ELITE_EVIDENCE_MODEL_VERSION,
+        evidence_fingerprint=evidence_fingerprint,
+    )
+
+    assert _decide_gw2(monkeypatch, world, handoff) == 0
+
+    decision = json.loads(
+        (world["ledger_root"] / SEASON / "gw02" / "decision.json").read_text(encoding="utf-8")
+    )
+    assert decision["model_version"] == ELITE_EVIDENCE_MODEL_VERSION
+    assert decision["metadata"]["projection_evidence_fingerprint"] == evidence_fingerprint
 
 
 def test_the_sell_price_rule_is_applied_to_held_players(
@@ -595,8 +793,12 @@ def test_settling_a_transfer_week_nets_hits_and_counts_the_boosted_bench(
     assert table.loc[table["gameweek"] == 2, "chip"].iloc[0] == "bboost"
     assert table.loc[table["gameweek"] == 1, "transfers"].iloc[0] == 0
     markdown = summary_markdown(world["ledger_root"], SEASON)
+    assert "| GW | Snapshot | Mode | Solver |" in markdown
     assert "| Transfers | Hits | Chip | Net |" in markdown
     assert "bboost" in markdown
+    # The mode column says how each decision was made; the CLI's explicit-snapshot path
+    # stamps replay, and the summary shows it rather than hiding it in the metadata.
+    assert set(table["mode"]) <= {"live", "replay"}
 
 
 def _residual_export(root: Path, *, model_version: str, tamper: bool = False) -> Path:
