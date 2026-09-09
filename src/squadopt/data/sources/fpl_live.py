@@ -140,6 +140,13 @@ _AVAILABILITY_FIELDS: Final = (
     "chance_of_playing_next_round",
     "news_added",
 )
+_NEWS_FIELDS: Final = (
+    "code",
+    "element_type",
+    "status",
+    "news",
+    "news_added",
+)
 _EVENT_FIELDS: Final = ("id", "deadline_time", "finished")
 _FIXTURE_FIELDS: Final = (
     "id",
@@ -400,6 +407,59 @@ def availability_snapshot(bootstrap: bytes) -> pd.DataFrame:
     frame["player_id"] = frame["player_id"].astype("int64")
     frame["status"] = frame["status"].astype("string")
     frame["chance_of_playing"] = frame["chance_of_playing"].astype("Int64")
+    frame["news_added_utc"] = frame["news_added_utc"].astype("string")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
+def news_snapshot(bootstrap: bytes) -> pd.DataFrame:
+    """Read the source's own note about each player, with the instant it was added.
+
+    Deliberately separate from :func:`availability_snapshot` rather than a column on it.
+    That table is consumed by the projection path, and widening it would move every
+    caller's shape for a field the projection must never read: this one carries **free
+    text**, and free text is not a feature, not a column of an artifact and not
+    something a member-facing surface may be handed.
+
+    What it is for is measurement. ``news_added`` is the only instant the source stamps
+    on its own editorial, so it is the only way to ask *when* the platform learned
+    something — and therefore whether a capture taken earlier would have missed it. The
+    caller reads the text to classify a note and keeps the count, never the words.
+
+    Two states have to stay apart and both are real in a capture: a player who has never
+    been flagged carries no ``news_added`` at all, and a player who was flagged and has
+    since been cleared carries an empty ``news`` with the stamp still on it. Neither is
+    "nothing happened", so ``news_added_utc`` is absent only for the first.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _NEWS_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        rows.append(
+            {
+                "player_id": _integer(record, "code", "Element"),
+                "status": _text(record, "status", "Element"),
+                "news": _text(record, "news", "Element"),
+                "news_added_utc": (
+                    pd.NA
+                    if record.get("news_added") is None
+                    else normalize_utc_timestamp(
+                        record.get("news_added"), label="Element news_added"
+                    )
+                ),
+            }
+        )
+
+    if not rows:
+        raise DataSourceError("Bootstrap payload declares no squad-eligible players.")
+
+    frame = pd.DataFrame(rows, columns=["player_id", "status", "news", "news_added_utc"])
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["status"] = frame["status"].astype("string")
+    frame["news"] = frame["news"].astype("string")
     frame["news_added_utc"] = frame["news_added_utc"].astype("string")
     return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
 
@@ -843,6 +903,153 @@ def player_snapshot(bootstrap: bytes) -> pd.DataFrame:
     frame["price_tenths"] = to_price_tenths(frame["price_tenths"], unit="tenths")
     frame["name"] = frame["name"].astype("string")
     frame["team_id"] = frame["team_id"].astype("string")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
+#: The short name the platform publishes, plus what a name has to be resolved *within*.
+#: A separate field tuple from :data:`_ELEMENT_FIELDS` on purpose: adding ``web_name``
+#: there would make :func:`player_snapshot` refuse every capture whose payload does not
+#: carry it, which is a change to a contract this needs nothing from.
+_SHORT_NAME_FIELDS: Final = ("code", "element_type", "team", "web_name")
+
+SHORT_NAME_COLUMNS: Final = ("player_id", "web_name", "team_name")
+
+
+def short_name_roster(bootstrap: bytes) -> pd.DataFrame:
+    """Read the roster as the short names a club's own words would use.
+
+    :func:`player_snapshot` joins ``first_name`` and ``second_name`` into one full name,
+    which is what a projection wants and not what a press conference says. The platform
+    also publishes ``web_name`` -- ``Saka``, ``B.Fernandes`` -- and nothing in this
+    repository reads it. That is the form a claim about a player has to be matched
+    against, so it is read here, in its own table, keyed on the persistent ``code``.
+
+    The club travels with the name because it is the only thing that makes the match
+    tractable: across a whole roster a bare surname is ambiguous for dozens of players,
+    and inside one squad it is almost always unique.
+    """
+
+    names = team_names(bootstrap)
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _SHORT_NAME_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    unknown_teams: list[int] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        team = _integer(record, "team", "Element")
+        if team not in names:
+            unknown_teams.append(team)
+            continue
+        code = _integer(record, "code", "Element")
+        web_name = _text(record, "web_name", "Element")
+        if not web_name:
+            raise InvalidValueError(f"Element with code {code} publishes an empty web_name.")
+        rows.append({"player_id": code, "web_name": web_name, "team_name": names[team]})
+
+    if unknown_teams:
+        raise InvalidValueError(
+            "Bootstrap payload has players on teams it does not declare: "
+            f"{format_examples(sorted(set(unknown_teams)))}. A claim about a player whose "
+            "club is unknown cannot be resolved within that club."
+        )
+    if not rows:
+        raise DataSourceError(
+            "Bootstrap payload declares no squad-eligible players, so there is no roster "
+            "to resolve a claim against."
+        )
+
+    frame = pd.DataFrame(rows, columns=list(SHORT_NAME_COLUMNS))
+    duplicated = frame.loc[frame["player_id"].duplicated(), "player_id"].tolist()
+    if duplicated:
+        raise DuplicateRecordsError(
+            "Bootstrap payload declares the same persistent player code more than once: "
+            f"{format_examples(duplicated)}."
+        )
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["web_name"] = frame["web_name"].astype("string")
+    frame["team_name"] = frame["team_name"].astype("string")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
+_SCOUT_FIELDS: Final = ("code", "element_type", "scout_risks", "scout_news_link")
+
+#: What :func:`scout_snapshot` returns. Its own tuple, so no existing contract moves.
+SCOUT_COLUMNS: Final = ("player_id", "scout_risk_count", "scout_news_link_present")
+
+
+def scout_snapshot(bootstrap: bytes) -> pd.DataFrame:
+    """Read the source's own forward-looking risk notes, as counts and a flag.
+
+    These two fields are structured, gameweek-stamped and currently thrown away, which is
+    the only reason to read them: they are the one part of the feed that looks *forward*
+    rather than recording what already happened, and they cost nothing to keep.
+
+    What is kept is deliberately thin. The count says how many risks the source published
+    for a player and the flag says whether it linked an article; neither carries a word of
+    the text. A member-facing surface may not be handed free text from this path, and a
+    column that held it would be one rename away from becoming a quote.
+
+    **Absent and empty are different, and the difference decides the export.** A player the
+    source published no risks for carries an empty list, and that is a real observation
+    worth a zero. A payload that does not carry the field *at all* is not an observation of
+    zero risks -- it is the source having renamed or dropped something -- so
+    :func:`_require_fields` refuses rather than letting a column of nulls through. That is
+    the same rule the evidence builder applies to its own bootstrap fields.
+
+    **These two field names are unverified.** No capture in this repository has been read to
+    confirm them; they come from the lane brief. The refusal above is what makes that
+    honest: if the source spells them differently, the first real capture stops with the
+    names it was looking for rather than quietly reporting that nobody has any risks.
+    """
+
+    records = _records(_document(bootstrap, "Bootstrap"), "elements", "Element")
+    _require_fields(records, _SCOUT_FIELDS, "Element")
+
+    rows: list[dict[str, object]] = []
+    for record in records:
+        if _integer(record, "element_type", "Element") not in POSITION_CODES:
+            continue
+        risks = record.get("scout_risks")
+        # A list is the documented-by-inspection shape and ``None`` is how a source usually
+        # spells "none of them"; both are observations. Any other type is an undocumented
+        # shape, and guessing at one is how a count starts meaning something else.
+        if risks is None:
+            risk_count = 0
+        elif isinstance(risks, list):
+            risk_count = len(risks)
+        else:
+            raise InvalidValueError(
+                f"scout_risks must be an array or absent, got {type(risks).__name__}. The "
+                "shape is undocumented, so it is surfaced rather than counted as one."
+            )
+        link = record.get("scout_news_link")
+        if link is not None and not isinstance(link, str):
+            raise InvalidValueError(
+                f"scout_news_link must be text or absent, got {type(link).__name__}."
+            )
+        rows.append(
+            {
+                "player_id": _integer(record, "code", "Element"),
+                "scout_risk_count": risk_count,
+                "scout_news_link_present": bool(link is not None and link.strip()),
+            }
+        )
+
+    if not rows:
+        raise DataSourceError("Bootstrap payload declares no squad-eligible players.")
+
+    frame = pd.DataFrame(rows, columns=list(SCOUT_COLUMNS))
+    duplicated = frame.loc[frame["player_id"].duplicated(), "player_id"].tolist()
+    if duplicated:
+        raise DuplicateRecordsError(
+            "Bootstrap payload declares the same persistent player code more than once: "
+            f"{format_examples(duplicated)}."
+        )
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["scout_risk_count"] = frame["scout_risk_count"].astype("Int64")
+    frame["scout_news_link_present"] = frame["scout_news_link_present"].astype("boolean")
     return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
 
 

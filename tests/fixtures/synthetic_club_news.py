@@ -53,6 +53,11 @@ ROSTER: Final[tuple[tuple[int, str, str], ...]] = (
     (900013, "A.Fernandes", "Man Utd"),
     # Case: his club published nothing we read. Never asked is not asked-and-silent.
     (900014, "Branthwaite", "Everton"),
+    # Case: a short name carrying a diacritic. A club page and a payload can spell the same
+    # player differently -- one composed, one decomposed, one stripped of the accent -- so
+    # the join has to fold before it compares, and this row makes that testable rather than
+    # assumed. Nothing else in the fixture folds to the same key.
+    (900015, "Mart\u00ednez", "Arsenal"),
 )
 
 
@@ -85,6 +90,8 @@ ARSENAL_TEXT, ARSENAL_SPANS = _document(
         ("odegaard", 'Asked about the captain, he said: "Odegaard is at 80% and we will see."'),
         ("martinelli", "Martinelli has trained twice since the international break."),
         ("white", "White is in contention after a light knock."),
+        # Spelled without the accent, as an English-language page often writes it.
+        ("martinez", "Martinez has trained all week and will start."),
         ("ghost", "One name on the sheet does not match any registered player."),
     ),
 )
@@ -204,6 +211,17 @@ CLAIMS: Final[tuple[dict[str, Any], ...]] = (
         _span(ARSENAL_SPANS, "white"),
         "He is likely to start after a light knock.",
     ),
+    # Case: the claim drops a diacritic the roster carries. Folding is what makes this
+    # resolve; without it a real capture would silently lose the player.
+    _claim(
+        "Martinez",
+        "Arsenal",
+        "stated_expected_to_start",
+        "manager",
+        ARSENAL_URL,
+        _span(ARSENAL_SPANS, "martinez"),
+        "He has trained all week and will start.",
+    ),
     # Case: a name that matches no registered player at all.
     _claim(
         "Ghost Player",
@@ -286,6 +304,36 @@ def make_response_text() -> str:
     )
 
 
+def _one_claim_response(*, source_url: str, span_start: int, span_end: int) -> str:
+    """One well-formed response carrying a single claim, for the citation-breaking cases.
+
+    Built with ``json.dumps`` rather than by string concatenation because these two cases
+    vary a *number*, and a hand-quoted integer inside a hand-quoted object is how a fixture
+    meant to violate one rule ends up violating a different one by accident.
+    """
+
+    return json.dumps(
+        {
+            "contract_version": ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+            "documents": [dict(document) for document in RESPONSE_DOCUMENTS],
+            "claims": [
+                {
+                    "player_name": "Saka",
+                    "team_name": "Arsenal",
+                    "disposition": "stated_expected_to_start",
+                    "speaker": "manager",
+                    "source_url": source_url,
+                    "span_start": span_start,
+                    "span_end": span_end,
+                    "paraphrase": "He is available.",
+                }
+            ],
+        },
+        indent=2,
+        sort_keys=True,
+    )
+
+
 #: Responses a parser must refuse rather than coerce. Each breaks the format in one way,
 #: because a parser that guesses at one of these would guess at a real malformed answer.
 UNPARSEABLE_RESPONSES: Final[tuple[tuple[str, str], ...]] = (
@@ -303,6 +351,25 @@ UNPARSEABLE_RESPONSES: Final[tuple[tuple[str, str], ...]] = (
         "claims_not_an_array",
         '{"contract_version": "' + ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION + '", '
         '"documents": [], "claims": "Saka is fine"}',
+    ),
+    # The two below break the *citation* rather than the syntax, and they are the ones that
+    # matter most: a claim whose span cannot be resolved against captured bytes is
+    # indistinguishable from an invented one, however well-formed the JSON around it is.
+    (
+        "uncited_source",
+        _one_claim_response(
+            source_url="https://club.example/arsenal/never-read",
+            span_start=0,
+            span_end=10,
+        ),
+    ),
+    (
+        "span_past_the_end",
+        _one_claim_response(
+            source_url=ARSENAL_URL,
+            span_start=0,
+            span_end=len(ARSENAL_TEXT.encode("utf-8")) + 1,
+        ),
     ),
 )
 

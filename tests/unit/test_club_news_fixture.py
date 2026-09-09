@@ -190,6 +190,22 @@ def test_a_surname_two_players_in_one_club_share_is_present() -> None:
     assert any(claim["player_name"] in colliding for claim in CLAIMS)
 
 
+def test_a_short_name_carrying_a_diacritic_is_present() -> None:
+    """A club page and a payload can spell one player differently, so folding is testable."""
+
+    document = make_club_news_fixture()
+    accented = [
+        entry["web_name"]
+        for entry in document["roster"]
+        if any(ord(character) > 127 for character in entry["web_name"])
+    ]
+
+    assert accented
+    # And a claim spells one of them without its accent, which is the case that matters.
+    stripped = {claim["player_name"] for claim in CLAIMS}
+    assert any(name not in stripped for name in accented)
+
+
 def test_a_claim_naming_nobody_on_the_roster_is_present() -> None:
     document = make_club_news_fixture()
     names = {entry["web_name"] for entry in document["roster"]}
@@ -207,15 +223,23 @@ def test_every_span_points_at_the_sentence_it_claims(provider: FixtureClubNewsPr
         assert span == span.strip()
 
 
-def test_the_unparseable_responses_break_the_format_four_different_ways(
+def test_every_unparseable_response_breaks_the_format_its_own_way(
     provider: FixtureClubNewsProvider,
 ) -> None:
-    """A parser that guessed at one of these would guess at a real malformed answer."""
+    """A parser that guessed at one of these would guess at a real malformed answer.
+
+    The count comes from the generator rather than a literal. This assertion said "four"
+    while the generator grew to six, which is the way a test stops describing the thing it
+    is meant to pin.
+    """
 
     responses = provider.unparseable_responses()
+    declared = make_club_news_fixture()["unparseable_responses"]
 
-    assert len(responses) == 4
-    assert len({response.text for response in responses}) == 4
+    assert len(responses) == len(declared)
+    assert len({response.text for response in responses}) == len(declared)
+    # Each case is labelled, and the labels are what make "one way each" checkable.
+    assert len({str(entry["case"]) for entry in declared}) == len(declared)
 
 
 # --- the shapes -------------------------------------------------------------
@@ -321,11 +345,14 @@ def test_coding_against_an_empty_roster_is_refused(provider: FixtureClubNewsProv
 
 
 def test_the_roster_keys_on_the_persistent_code(provider: FixtureClubNewsProvider) -> None:
-    roster = provider.roster()
+    """Derived from the generator rather than a written count, which would rot on a new row."""
 
-    assert len(roster) == 14
+    roster = provider.roster()
+    declared = make_club_news_fixture()["roster"]
+
+    assert len(roster) == len(declared)
     assert all(isinstance(player, RosterPlayer) for player in roster)
-    assert len({player.player_id for player in roster}) == 14
+    assert len({player.player_id for player in roster}) == len(declared)
 
 
 def test_a_fixture_of_another_contract_is_refused(tmp_path: Path) -> None:

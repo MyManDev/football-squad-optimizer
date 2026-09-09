@@ -46,6 +46,7 @@ from squadopt.application.advice import (
 from squadopt.application.advice_record import (
     AdviceRecordConflictError,
     PublishedAdvice,
+    RecordCapture,
     build_member_advice_record,
     record_member_advice,
     repository_commit,
@@ -484,16 +485,21 @@ def build_league_views(
     deterministic planner's answer, never a scenario-scored re-pick. A member whose
     menu or selection fails keeps their baseline advice, with the reason recorded.
 
-    ``advice_record_root`` turns on the immutable per-member, per-gameweek advice record
-    (``application/advice_record.py``). The published tree has no gameweek in its paths and
-    is overwritten every week, so without this nothing on disk survives to say what a
-    member was told for a given week. The record is written here, by the same call that
-    writes the published bytes, from the same picks, projection and payloads — a runner
+    ``advice_record_root`` turns on the immutable per-member, per-gameweek, per-capture
+    advice record (``application/advice_record.py``). The published tree has no gameweek in
+    its paths and is overwritten every week, so without this nothing on disk survives to say
+    what a member was told for a given week. The record is written here, by the same call
+    that writes the published bytes, from the same picks, projection and payloads — a runner
     around this could only guess, because the weekly publish re-solves in a fresh worktree.
 
+    The record is keyed by ``inputs``' capture, so the mid-week publish and the one taken
+    shortly before the deadline each write their own and neither refuses the other. What is
+    still refused is a *rebuild of one capture* that produces different bytes: the capture
+    is the whole input, so that is our own non-determinism, and it raises
+    ``AdviceRecordConflictError`` naming the difference.
+
     The records are written after every member's files are on disk, so a refusal can never
-    stop the advice being published; a record that already exists and disagrees raises
-    ``AdviceRecordConflictError`` naming the difference, once, after every writable record
+    stop the advice being published; the refusal is raised once, after every writable record
     has been written. The published bytes are identical with and without this argument.
     """
 
@@ -893,12 +899,16 @@ def build_league_views(
     # than the first one, and every week that *can* be recorded still is.
     if advice_record_root is not None:
         commit = repository_commit()
+        # The capture this build read is part of the record's key: a week published twice
+        # from two captures leaves two records, and neither refuses the other.
+        capture = RecordCapture(inputs.snapshot_id, inputs.captured_at_utc)
         conflicts: list[str] = []
         for picks, fingerprint, emitted, told in publications:
             record = build_member_advice_record(
                 picks,
                 projection,
                 emitted,
+                capture=capture,
                 league_id=league_id,
                 generated_at_utc=generated,
                 league_view_contract_version=LEAGUE_VIEW_CONTRACT_VERSION,

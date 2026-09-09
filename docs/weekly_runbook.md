@@ -9,7 +9,8 @@ python -m scripts.run_week --season 2026-27 --gameweek 4 --league 352490 --worke
 ```
 
 Run it from the checkout you mean to publish from, with that checkout's `src` on
-`PYTHONPATH`, after the previous gameweek's picks are public and before the deadline.
+`PYTHONPATH`, after the previous gameweek's picks are public and inside the lead-time
+window below — "before the deadline" is a floor, not the policy.
 `--dry-run` prints the plan and runs nothing. Without `--decide` the ledger is not
 touched and the loop is the members' loop alone.
 
@@ -19,12 +20,13 @@ touched and the loop is the members' loop alone.
 | --- | --- | --- | --- |
 | top100 | `scripts.capture_top100_cohort`, `scripts.capture_elite_picks`, `scripts.export_player_evidence` | before the deadline; target gameweek ≥ 2 | `fpl-top100-*` and `fpl-elite-picks-*` snapshots; `artifacts/phase_b/player_evidence_v1_<season>_gw<NN>_top100.{csv,manifest.json}` |
 | capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league id | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, the last five event-live documents, every member's three documents and the standings page |
+| rotation | `scripts.export_rotation_evidence --snapshot <capture> --deadline-utc …` (only with `--rotation`) | the capture above, and a club-news source — **today that source is the committed synthetic fixture** | `artifacts/rotation/rotation_evidence_v1_<season>_gw<NN>_<capture hash>.{csv,manifest.json}` — one row per roster player in that capture, one categorical claim field, and the citation carried as a document digest plus a byte span rather than as text. Written exactly once per capture; a pair already on disk for it is reused rather than remade |
 | handoff | `scripts.build_projection_handoff --snapshot-id <capture> --evidence-table … --evidence-manifest …` | the capture above and the evidence | `data/handoffs/<season>-gw<NN>.json` — the Phase C component projection with the bounded Top-100 uplift on top (`phase-c-component-elite-top100-v1`); `--projection component-only` leaves the uplift out; without settled live history the producer falls back to the legacy blend and says so |
 | decide | `squadopt.application.commands.decide`, in-process (only with `--decide`; `--chip` as `squadopt gameweek decide` takes it) | the capture, the handoff, a ledger that holds the previous gameweek, and — with `--chip` — an open, unspent chip window: all checked **before** the first capture, so a week that cannot start refuses without spending one. The mode is derived, never asserted: `live` only when this run took the capture and the clock is still before its deadline; a reused `--snapshot-id`, or a run past the deadline, is recorded `replay`. A gameweek the ledger already holds is skipped rather than refused, so a run that died after the decision can rebuild the rest of the week | `data/ledger/<season>/gw<NN>/` — decision, projections, report, manifest; the report is printed |
 | league | `scripts.build_league_site --workers N` | the capture and the handoff | `web/public/data/league/**`: `members.json`, `entries/<id>.json`, `advice/<id>/saf-puan/1.json`, `advice/<id>/saf-puan/3.json` and `5.json` (the week-1 projection repeated over the calendar, published with its stated limits), `advice/<id>/<strategy>/1.json` (the standings neighbour), `advice/<id>/<strategy>/1/vs-<rival>.json`, `advice/<id>/index.json` (`windows` names what solved per strategy; a window that did not is in `unavailable` with its reason). A local preview: these bytes are never committed, so this step writes no advice record (`--no-advice-record`) and the publish step's rebuild records the bytes that actually ship |
 | site | `scripts.build_site` | the ledger and captures | `web/public/data/**` season views (they read the ledger, so after the decision) |
 | scoreboard | `scripts.build_scoreboard --cohort-snapshot <fpl-top100 id> --elite-snapshot <fpl-elite-picks id>` | the capture, the registry, the ledger, and the Top-100 captures when they were taken or reused | `web/public/data/league/scoreboard.json` — per played gameweek: the game's average and highest, every member's gross week, hit cost and net, our ledger row with its mode and its scoring basis, the Top-100 mean for the cohort capture's own week with the basis it is on; `null` wherever a file on disk does not say |
-| publish | `scripts.publish_gameweek_site --league … --snapshot-id … --in-season-projection … --cohort-snapshot … --elite-snapshot … --workers …` (only with `--publish`) | a clean `origin/develop` | a worktree, a commit of `web/public/data` (league tree and scoreboard rebuilt there from the same capture), a push, a pull request; then the printed human steps: merge, release, tag, dispatch. The rebuild also writes this checkout's `data/advice_records/<season>/gw<NN>/entry-<id>/` — the immutable record of what each member was told, digests included, so the week can be reviewed after the site has been overwritten. Re-publishing a week already recorded is **refused** with the differing fields named; if the deadline will not wait, `--no-advice-record` publishes without recording and leaves the first record and the difference to be reconciled afterwards |
+| publish | `scripts.publish_gameweek_site --league … --snapshot-id … --in-season-projection … --cohort-snapshot … --elite-snapshot … --workers …` (only with `--publish`) | a clean `origin/develop` | a worktree, a commit of `web/public/data` (league tree and scoreboard rebuilt there from the same capture), a push, a pull request; then the printed human steps: merge, release, tag, dispatch. The rebuild also writes this checkout's `data/advice_records/<season>/gw<NN>/entry-<id>/<snapshot id>/` — the immutable record of what each member was told, digests included, so the week can be reviewed after the site has been overwritten. One record per capture: publishing a week twice (mid-week, then again before the deadline from a fresher capture) records both, and the review page reads the last capture that preceded the deadline. What is **refused** is rebuilding *one* capture into different bytes — the capture is the whole input, so that difference is our own code's — with the differing fields named; if the deadline will not wait, `--no-advice-record` publishes without recording and leaves the first record and the difference to be reconciled afterwards |
 
 Every step is skippable by naming its output: `--cohort-snapshot` / `--elite-snapshot`
 reuse the Top-100 captures (an export already on disk for that picks capture is reused,
@@ -33,6 +35,17 @@ capture — then the Top-100 captures must be reused or skipped too, because the
 projection refuses evidence captured after the decision capture — and `--skip-top100`
 leaves the evidence out (the scoreboard's Top-100 column is then `null`). The command
 stops at the first refusal and prints what refused.
+
+**`rotation` is the one step that works the other way round: it is off unless `--rotation`
+asks for it.** That is deliberate and it is about honesty of the record, not convenience.
+The only club-news source wired up today is the committed *synthetic* fixture under
+`data/sample/`, so a step that ran by default would write fixture-derived claims into a real
+week's artifact — an artifact the member-facing card is meant to read. When a real source is
+connected the default can be turned over; until then the flag is the consent. Reusing a live
+capture with `--rotation` requires that capture's export **already on disk**, refused before
+anything is spent: the pair records when it was generated, the claim chain has to be frozen
+before the decision capture, and re-exporting now for a capture already taken stamps it
+afterwards however promptly it is done.
 
 The elite-picks capture travels with the cohort capture into the scoreboard, and it is
 what lets the Top-100 column be **net**: the Overall standings publish `event_total`
@@ -45,9 +58,33 @@ net columns beside it.
 
 ## Timing
 
-- The capture must be open for the requested gameweek; the command reads the deadline
-  back from the capture and refuses a mismatch, so a Thursday run for Saturday's
-  gameweek is fine and a Sunday run for a Saturday deadline is not.
+- **Take the capture two to three hours before the deadline, not the night before.**
+  The capture must be open for the requested gameweek — the command reads the deadline
+  back from it and refuses a mismatch — but "open" is a floor, not the policy. The week
+  is decided from that one capture and availability is applied once from it, so a note
+  the platform adds afterwards is not late, it is absent, and no later step recovers it.
+  Running a day or more ahead leaves that whole span unseen.
+- The size of what is unseen is measured, not argued.
+  `python -m scripts.measure_capture_lead_time` reads the stored captures and writes
+  `docs/capture_lead_time.json`: per gameweek, each capture's lead time and how many of
+  the source's own notes were stamped inside the window between the earliest and the
+  latest capture. Take a second capture inside the window and the week's own numbers
+  appear there. A gameweek captured once reports **not measured**, never zero.
+- Two to three hours, rather than as late as possible, for one reason: everything the
+  week needs has to fit **before** the deadline, in order — capture, handoff, decide,
+  and the league tree's twenty minutes for fifteen members. A capture at thirty minutes
+  leaves no room for a step that fails and has to be run again.
+- Do not read the feed's own `news` as cover for capturing early. The rotation-lane
+  brief (2026-09-08) measured its items on the 2026-09-07 capture at a median of 22.9
+  days behind it, with 3 of 71 added since the previous deadline; no artifact in this
+  repository carries that measurement yet, so it is cited here rather than claimed.
+- **`--rotation` runs after the capture, and the club documents must have been fetched
+  before it.** The export reads the capture's own roster and its own deadline, which is why
+  it cannot run earlier; and it refuses a week whose club documents carry a fetch instant at
+  or after the capture, because words fetched after a capture could have been chosen by
+  looking at it first. So the club-news fetch belongs in the same window as everything else,
+  ahead of the capture rather than after it. The model call, when there is one, is bound by
+  the same rule and more tightly — that is a step of its own and does not exist yet.
 - The Top-100 captures refuse at or after the deadline, and read the cohort's picks for
   the gameweek that just closed — so they need those picks to be public (after the
   previous deadline) and the coming deadline still open.
