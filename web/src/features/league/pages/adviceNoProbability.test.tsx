@@ -135,6 +135,49 @@ describe("no advice state shows a probability, in either language", () => {
   }
 });
 
+/**
+ * The same rule the producer applies to a bound it did not measure. `optimality_gap` and
+ * `control_optimality_gap` are `number | null` in the contract, and the producer emits
+ * null for one state only: the solver did not record a bound. `advice.py`'s `bound_slack`
+ * refuses to read that as zero — "the proof did not finish" and "the proof finished at
+ * zero" are different facts, and only one of them is a bound. The page used to default
+ * both to zero and print "gap ≤ 0.0 pts" inside the sentence that says the proof did not
+ * finish, which is the strongest optimality claim there is.
+ */
+describe("a bound that was not recorded is not rendered as a bound of zero", () => {
+  const unbounded = {
+    ...mockEntryAdviceEnvelope(35249001, "ortak-koru", 1),
+    payload: {
+      ...mockEntryAdviceEnvelope(35249001, "ortak-koru", 1).payload,
+      solver_status: "FEASIBLE" as const,
+      optimality_gap: null,
+      control_solver_status: "FEASIBLE" as const,
+      control_optimality_gap: null,
+    },
+  };
+  const A_BOUND = /gap ≤|fark ≤/;
+
+  for (const language of ["tr", "en"] as const) {
+    it(`${language}: prints no figure where none was measured`, () => {
+      const text = renderState(language, unbounded);
+      expect(text).toMatch(/Proof incomplete|Kanıt tamamlanamadı/);
+      expect(text.match(A_BOUND)).toBeNull();
+      // Absent is said out loud, not left to be read as zero.
+      expect(text).toMatch(/unknown, not zero|bilinmiyor, sıfır değil/);
+    });
+
+    it(`${language}: still prints the bound the solver did measure`, () => {
+      const measured = {
+        ...unbounded,
+        payload: { ...unbounded.payload, optimality_gap: 1.3, control_optimality_gap: 0.4 },
+      };
+      const text = renderState(language, measured);
+      expect(text).toMatch(A_BOUND);
+      expect(text).not.toMatch(/unknown, not zero|bilinmiyor, sıfır değil/);
+    });
+  }
+});
+
 /** One scoreboard, in the state named: a netted Top-100, a gross one, or nothing finished. */
 function mockScoreboardEnvelope(state: "net" | "gross" | "empty"): LeagueViewEnvelope<Scoreboard> {
   const week: ScoreboardGameweek = {

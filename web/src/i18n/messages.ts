@@ -444,6 +444,10 @@ const en = {
     statedLimits: {} as Record<string, string>,
     controlUnprovenBody: (gap: string) =>
       `The pure-points plan this price is measured against was not proven optimal (gap ≤ ${gap} pts), so the price is published as a ceiling — the most this strategy can cost — and not as an exact figure.`,
+    // The same sentence for a document that carries no bound at all. A missing bound is
+    // not a bound of zero, and the number it would have printed is one nobody measured.
+    controlUnprovenBodyNoGap:
+      "The pure-points plan this price is measured against was not proven optimal, and no bound was recorded: how far it is from the best possible plan is unknown, not zero. The price is published as a ceiling — the most this strategy can cost — and not as an exact figure.",
     overlapLine: (count: number) => `${count} of the rival's eleven in your fifteen`,
     gapLine: (points: string) => `expected gap vs rival ${points}`,
     captainShared: "same captain",
@@ -542,6 +546,8 @@ const en = {
     unprovenPlanBadge: "Proof incomplete",
     unprovenPlanBody: (gap: string) =>
       `The solver could not finish the proof for this plan (gap ≤ ${gap} pts). It is the best plan the search found, not a plan shown to be the best one.`,
+    unprovenPlanBodyNoGap:
+      "The solver could not finish the proof for this plan, and it recorded no bound: how far this plan is from the best possible one is unknown, not zero. It is the best plan the search found, not a plan shown to be the best one.",
     out: "Out",
     in: "In",
     projectedGain: (points: string) => `${points} projected gain`,
@@ -1140,6 +1146,8 @@ const tr: MessageSchema<typeof en> = {
     },
     controlUnprovenBody: (gap: string) =>
       `Bu fiyatın ölçüldüğü saf puan planı en iyi diye kanıtlanamadı (fark ≤ ${gap} puan); bu yüzden fiyat kesin bir değer olarak değil, tavan olarak yayımlanıyor: bu stratejinin mal olabileceği en fazla değer.`,
+    controlUnprovenBodyNoGap:
+      "Bu fiyatın ölçüldüğü saf puan planı en iyi diye kanıtlanamadı ve bir sınır da kaydedilmedi: mümkün olan en iyi plandan ne kadar uzak olduğu bilinmiyor, sıfır değil. Fiyat kesin bir değer olarak değil, tavan olarak yayımlanıyor: bu stratejinin mal olabileceği en fazla değer.",
     overlapLine: (count: number) => `rakibin on birinden ${count} tanesi senin on beşinde`,
     gapLine: (pointsValue: string) => `rakibe karşı beklenen fark ${pointsValue}`,
     captainShared: "aynı kaptan",
@@ -1237,6 +1245,8 @@ const tr: MessageSchema<typeof en> = {
     unprovenPlanBadge: "Kanıt tamamlanamadı",
     unprovenPlanBody: (gap: string) =>
       `Çözücü bu plan için kanıtı tamamlayamadı (fark ≤ ${gap} puan). Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.`,
+    unprovenPlanBodyNoGap:
+      "Çözücü bu plan için kanıtı tamamlayamadı ve bir sınır da kaydetmedi: bu planın mümkün olan en iyisinden ne kadar uzak olduğu bilinmiyor, sıfır değil. Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.",
     out: "Çıkan",
     in: "Giren",
     projectedGain: (pointsValue) => `${pointsValue} tahmini kazanç`,
