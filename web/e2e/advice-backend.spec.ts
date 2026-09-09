@@ -1,5 +1,6 @@
 import { cp } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 
@@ -24,7 +25,7 @@ test("a browser computes through the worker, then reads the same answer from cac
   await page.goto(`/league/members/${context.entryId}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
-  await expect(page.getByText("Bu mod ve ufuk bu yayın için hesaplanmadı.")).toBeVisible();
+  await expect(page.getByText("Listelenen öneri dosyası bulunamadı.")).toBeVisible();
   const compute = page.getByRole("button", { name: "Hesapla", exact: true });
   const accepted = page.waitForResponse(
     (response) => response.url().startsWith(route) && response.request().method() === "POST",
@@ -62,6 +63,7 @@ test("a browser computes through the worker, then reads the same answer from cac
   expect(await job.json()).toMatchObject({ job_id: jobId, status: "completed" });
   await expect(page.getByText("Plan hazır", { exact: true })).toBeVisible();
   await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await expect(page.getByText(context.snapshotId, { exact: false })).toBeVisible();
   const advice = page.locator('[aria-labelledby="entry-advice-title"]');
   expect(["OPTIMAL", "FEASIBLE"]).toContain(answer.payload.solver_status);
