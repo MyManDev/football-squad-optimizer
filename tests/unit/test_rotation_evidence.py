@@ -11,6 +11,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from tests.fixtures.synthetic_rotation_capture import (
+    CAPTURED_BEFORE_THE_DOCUMENTS,
     DEADLINE,
     MIDWEEK_CLUB,
     SEASON,
@@ -329,6 +330,34 @@ def test_only_the_club_that_played_midweek_is_flagged(table: pd.DataFrame) -> No
     midweek = table.loc[table["fixture_context_midweek"].astype("boolean"), "player_id"].tolist()
 
     assert sorted(midweek) == sorted(_players_of(MIDWEEK_CLUB))
+
+
+def test_documents_fetched_after_the_capture_refuse_the_whole_week(
+    provider: FixtureClubNewsProvider, claims: tuple[ParsedClaim, ...]
+) -> None:
+    """The half of the ordering constraint no column can express.
+
+    ``timing_verified`` is a fact about a claim: every instant it rests on is earlier than
+    the deadline. This is a fact about the *method*. If the club bytes were fetched after the
+    capture was taken, whoever fetched them could have looked at the capture first, noticed a
+    player who looked wrong, and gone hunting for words about him. That is not partially true
+    on some rows, so it refuses the build rather than publishing a table with a caveat.
+    """
+
+    late = decision_snapshot(captured_at=CAPTURED_BEFORE_THE_DOCUMENTS)
+
+    with pytest.raises(DataSourceError, match="frozen before the capture"):
+        _build(provider, claims, decision_snapshot=late)
+
+
+def test_the_capture_still_predates_the_deadline_in_that_refusal(
+    provider: FixtureClubNewsProvider, claims: tuple[ParsedClaim, ...]
+) -> None:
+    """So the refusal above is the ordering rule and not the deadline rule wearing its coat."""
+
+    late = decision_snapshot(captured_at=CAPTURED_BEFORE_THE_DOCUMENTS)
+
+    assert late.metadata.captured_at_utc < DEADLINE
 
 
 def test_a_calendar_that_cannot_answer_refuses_rather_than_saying_no(
