@@ -29,6 +29,7 @@ import re
 import threading
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Protocol
 
@@ -345,12 +346,17 @@ class FileJobQueue:
             raise
 
 
+def _utc_stamp() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def run_advice_worker_once(
     queue: JobQueue,
     cache: AdviceCacheRepository,
     compute: Callable[[AdviceJob], bytes],
     *,
     at_utc: str,
+    terminal_at_utc: Callable[[], str] = _utc_stamp,
     heartbeat_seconds: float | None = None,
     metrics: AdviceMetrics | None = None,
     log: AdviceLog | None = None,
@@ -362,6 +368,9 @@ def run_advice_worker_once(
     compute callable at all, which is how "the api imports no solver" stays a property
     of the composition rather than a hope. Returns the terminal record, or ``None``
     when the queue is empty.
+
+    ``at_utc`` timestamps the claim; ``terminal_at_utc`` reads the clock when the
+    computation's outcome is recorded, so completion or failure is not backdated.
 
     ``heartbeat_seconds`` refreshes the claim while ``compute`` runs. It belongs here
     because this function owns the claim's whole lifetime — from the ``O_EXCL`` marker to
@@ -415,7 +424,7 @@ def run_advice_worker_once(
         # exactly that — never retried, never papered over.
         failed = job.transition(
             "failed",
-            at_utc=at_utc,
+            at_utc=terminal_at_utc(),
             error=JobError(code="DETERMINISM_DEFECT", message=sanitize_error_message(str(error))),
         )
         queue.store(failed)
@@ -430,7 +439,7 @@ def run_advice_worker_once(
     except AdviceComputeRefused as refusal:
         failed = job.transition(
             "failed",
-            at_utc=at_utc,
+            at_utc=terminal_at_utc(),
             error=JobError(code=refusal.code, message=sanitize_error_message(str(refusal))),
         )
         queue.store(failed)
@@ -443,7 +452,7 @@ def run_advice_worker_once(
     except Exception as error:
         failed = job.transition(
             "failed",
-            at_utc=at_utc,
+            at_utc=terminal_at_utc(),
             error=JobError(
                 code="ADVICE_FAILED",
                 message=sanitize_error_message(str(error) or type(error).__name__),
@@ -464,7 +473,7 @@ def run_advice_worker_once(
         stop_beating.set()
         if beating is not None:
             beating.join(timeout=1.0)
-    completed = job.transition("completed", at_utc=at_utc, result_ref=job.cache_key)
+    completed = job.transition("completed", at_utc=terminal_at_utc(), result_ref=job.cache_key)
     queue.store(completed)
     if metrics is not None:
         metrics.solve_seconds(perf_counter() - started)
