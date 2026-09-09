@@ -19,13 +19,15 @@ from typing import Any
 
 import pandas as pd
 import pytest
-from scripts import build_projection_handoff as producer
+from scripts import build_projection_handoff as command
 from tests.unit.test_live_transfers import EVENTS, SHAPE, TEAMS
 
+from squadopt.application import projection_handoff as producer
 from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import CONTROL_MODEL_NAME, handoff_path_for, read_projection_handoff
+from squadopt.platform.projection_retention import publish_retained_handoff
 from squadopt.prediction.component_dataset import (
     FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
 )
@@ -179,7 +181,11 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
 def _build(world: dict[str, Any], **kwargs: Any) -> tuple[Any, Path | None, dict[str, object]]:
     return producer.build(
-        world["snapshot_root"], world["archive_root"], world["handoff_root"], **kwargs
+        world["snapshot_root"],
+        world["archive_root"],
+        world["handoff_root"],
+        writer=publish_retained_handoff,
+        **kwargs,
     )
 
 
@@ -358,7 +364,7 @@ def test_the_command_uses_the_component_path_without_evidence_arguments(
         assert kwargs["development_only"] is development_only
         raise Called
 
-    monkeypatch.setattr(producer, "build", fake_build)
+    monkeypatch.setattr(command, "build", fake_build)
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -372,7 +378,7 @@ def test_the_command_uses_the_component_path_without_evidence_arguments(
     )
 
     with pytest.raises(Called):
-        producer.main()
+        command.main()
 
 
 def test_the_command_forwards_the_verified_evidence_pair(
@@ -389,7 +395,7 @@ def test_the_command_forwards_the_verified_evidence_pair(
         assert kwargs["evidence_manifest_path"] == manifest_path
         raise Called
 
-    monkeypatch.setattr(producer, "build", fake_build)
+    monkeypatch.setattr(command, "build", fake_build)
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -406,7 +412,7 @@ def test_the_command_forwards_the_verified_evidence_pair(
     )
 
     with pytest.raises(Called):
-        producer.main()
+        command.main()
 
 
 # --- refusals ---------------------------------------------------------------

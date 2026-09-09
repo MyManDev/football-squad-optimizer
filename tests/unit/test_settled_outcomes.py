@@ -43,6 +43,45 @@ COMMIT = "b" * 40
 TEAMS: list[dict[str, Any]] = [{"id": 1, "code": 3, "name": "Arsenal", "short_name": "ARS"}]
 
 
+@pytest.mark.parametrize("anchor", ["pre", "settled"])
+def test_weekly_export_respects_capture_cutoff_and_never_exports_target_week(
+    root: Path, tmp_path: Path, anchor: str
+) -> None:
+    from squadopt.application.settled_outcomes import (
+        SettledOutcomesRequest,
+        export_settled_outcomes,
+    )
+    from squadopt.data.snapshots import list_snapshot_ids
+
+    identifiers = list_snapshot_ids(root, source=FPL_LIVE_SOURCE)
+    selected = identifiers[0 if anchor == "pre" else -1]
+    # A future capture is held too, but its unusable domain payload must not enter this run.
+    write_snapshot(
+        root,
+        source=FPL_LIVE_SOURCE,
+        captured_at_utc="2026-10-01T12:00:00Z",
+        payloads={BOOTSTRAP_PAYLOAD: b"{}"},
+    )
+    request = SettledOutcomesRequest(
+        SEASON,
+        root,
+        tmp_path / "exports",
+        tmp_path / "summary.json",
+        tmp_path / "summary.md",
+        COMMIT,
+        selected,
+        before_gameweek=GAMEWEEK,
+    )
+    same_week = export_settled_outcomes(request)
+    assert same_week.gameweeks_exported == ()
+    assert same_week.skipped and not (tmp_path / "exports").exists()
+    from dataclasses import replace
+
+    next_week = export_settled_outcomes(replace(request, before_gameweek=GAMEWEEK + 1))
+    assert next_week.gameweeks_exported == (() if anchor == "pre" else (GAMEWEEK,))
+    assert all(path.is_file() for path in next_week.output_paths)
+
+
 def _element(code: int, *, element_id: int | None = None, **overrides: Any) -> dict[str, Any]:
     record: dict[str, Any] = {
         "code": code,
