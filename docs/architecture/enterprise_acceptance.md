@@ -68,6 +68,26 @@ before pytest. Failure artifacts explicitly include files under the named hidden
 scratch directories. The first failed CI result remains evidence; a subsequent run
 must establish acceptance of this workflow correction.
 
+Both full Linux Python gates in that first run passed: Python 3.11 completed its gate
+in 9m31s (4,778 passed, 14 skipped); Python 3.13 completed its gate in 10m6s. No Python
+source was changed by the workflow-directory or subsequent link-contrast correction.
+
+## Final user-journey E2E
+
+The existing real-browser test was extended to begin at the entry page: unsupported
+league 123 is rejected without a fetch; entering 352490 loads the actual publisher's
+member list; selecting "Bu benim" stores the viewer and opens that member. The same
+session submits advice, observes HTTP 202 and worker completion, renders the result,
+then reloads and receives the cached HTTP 200 answer. No HTTP route is mocked in this
+test; captures are synthetic and API/worker are separate real processes.
+
+The first expanded run found insufficient light-theme contrast on the selected-member
+"Üyeyi değiştir" link (4.33:1). Its scoped style now uses the existing text color token.
+The corrected journey and axe check passed in 22.54 seconds. This adds no product
+feature or architectural layer. Rival and multi-week choices remain separately tested
+in UI, API and domain checks; this combined browser solve covers pure points, one week.
+Restore/resume drills are local and synthetic, not acceptance of a restored remote host.
+
 ## Unfulfilled operational and research prerequisites
 
 No independent backup destination, live backend host or running weekly scheduler was

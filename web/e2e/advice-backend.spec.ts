@@ -22,7 +22,27 @@ test("a browser computes through the worker, then reads the same answer from cac
   );
   expect(await absent.text()).not.toContain('"contract_version"');
 
-  await page.goto(`/league/members/${context.entryId}`);
+  await page.goto("/");
+  const leagueRequests: string[] = [];
+  page.on("request", (request) => {
+    if (["fetch", "xhr"].includes(request.resourceType())) leagueRequests.push(request.url());
+  });
+  const leagueField = page.getByLabel("Lig numarası");
+  const findLeague = page.getByRole("button", { name: "Ligi bul", exact: true });
+  await leagueField.fill("123");
+  await findLeague.click();
+  await expect(page.getByRole("status")).toHaveText(
+    "Şimdilik yalnız 352490 numaralı lig destekleniyor.",
+  );
+  expect(leagueRequests).toEqual([]);
+  await leagueField.fill(String(context.leagueId));
+  await findLeague.click();
+  await expect(page).toHaveURL("/league/members");
+  await page.getByRole("button", { name: "Bu benim", exact: true }).click();
+  await expect(page).toHaveURL(`/league/members/${context.entryId}`);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("squadopt.viewer")!))).toEqual({
+    entryId: context.entryId,
+  });
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText("Listelenen öneri dosyası bulunamadı.")).toBeVisible();
