@@ -894,11 +894,16 @@ def build_league_views(
                 # carry — a data gap for this member, not a reason the league fails.
                 mode_note = f"competitive modes unavailable: {error}"
 
-        # Which of the member's documents is the one we told them. The page points at the
-        # declared rule's pick when there is one and its file was actually written; when
-        # the rule could not be stated, or its file did not solve, the page shows the
-        # pure-points baseline, and the record says which of the two it was rather than
-        # leaving a later reader to re-apply a rule from inputs that have since moved.
+        # Which of the member's documents is the one we told them, and which one the rule
+        # merely suggested. These are two facts, and the record keeps them as two.
+        #
+        # The page selects its strategy from the URL and falls back to pure points; the
+        # link from the members table carries no query string, and the declared rule's
+        # pick is a badge on an option the member may ignore rather than a preselection
+        # (``MemberDecisionControls``: "it marks, it does not choose"). So the document a
+        # member is shown is the one-week pure-points baseline, whatever the rule named —
+        # and a ``told`` that pointed at the rule's file would permanently name a squad
+        # nobody saw, in a record that cannot afterwards be rewritten.
         emitted_paths = {item.relative_path for item in emitted}
         suggested_slug = str(suggested["strategy"]) if suggested is not None else None
         suggested_path = (
@@ -906,27 +911,30 @@ def build_league_views(
             if suggested_slug is not None
             else None
         )
-        told: dict[str, object] = (
-            {
-                "strategy": suggested_slug,
-                "window": COMPUTED_WINDOW,
-                # The rival of the document pointed at, not the rival the rule compared
-                # against: the pure-points file is rival-free whoever suggested it.
-                "rival_entry_id": (
-                    None if suggested_slug == COMPUTED_MODE else task.default_rival_id
-                ),
-                "published_path": suggested_path,
-                "source": "suggested_strategy",
-            }
-            if suggested_path is not None and suggested_path in emitted_paths
-            else {
-                "strategy": COMPUTED_MODE,
-                "window": COMPUTED_WINDOW,
-                "rival_entry_id": None,
-                "published_path": f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json",
-                "source": "baseline",
-            }
-        )
+        told: dict[str, object] = {
+            "strategy": COMPUTED_MODE,
+            "window": COMPUTED_WINDOW,
+            "rival_entry_id": None,
+            "published_path": f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json",
+            "source": "default_view",
+            # The rule's pick, where the rule could be stated and its file was actually
+            # written. Null covers both halves of "no suggestion stands": the rule had no
+            # proven gap to read, or the strategy it named did not solve for this member.
+            # The rival is the document's own — the pure-points file is rival-free
+            # whoever suggested it — not the rival the rule compared against.
+            "suggested": (
+                {
+                    "strategy": suggested_slug,
+                    "window": COMPUTED_WINDOW,
+                    "rival_entry_id": (
+                        None if suggested_slug == COMPUTED_MODE else task.default_rival_id
+                    ),
+                    "published_path": suggested_path,
+                }
+                if suggested_path is not None and suggested_path in emitted_paths
+                else None
+            ),
+        }
         publications.append((picks, render.transfer_config_fingerprint, emitted, told))
 
         results.append(MemberViewResult(entry_id, registration.label, True, reason=mode_note))
