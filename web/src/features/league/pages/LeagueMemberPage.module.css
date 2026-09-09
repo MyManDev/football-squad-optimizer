@@ -248,3 +248,13 @@
     grid-column: 1;
   }
 }
+
+.viewerClear {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
