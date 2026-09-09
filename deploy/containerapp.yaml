@@ -1,146 +1,174 @@
-# ADR 0006's initial topology, as one `az containerapp create --yaml` input. One definition,
-# not a toolchain: no Terraform, no Bicep, no Helm, no Compose. Read
-# docs/backend_runbook.md#azure-container-apps before applying it.
-#
-# NOTHING HERE IS APPLIED BY READING IT, and applying it creates paid resources.
-#
-# Every <ANGLE_BRACKET> value is a deliberate parameter, not a default worth guessing:
-# subscription, region, registry, storage and domain names belong to whoever owns the
-# account. Values marked "UNVERIFIED" could not be confirmed against current Azure
-# documentation from the environment this file was written in (learn.microsoft.com is blocked
-# by that environment's egress policy) — confirm each against the official documentation
-# before spending, and correct this file in the same change.
-#
-#   az containerapp create --resource-group <RESOURCE_GROUP> --name squadopt-backend \
-#     --environment <CONTAINER_APPS_ENVIRONMENT> --yaml deploy/containerapp.yaml
-#
-# The two storage entries this file references are environment-level and are created first:
-#
-#   az containerapp env storage set --resource-group <RESOURCE_GROUP> \
-#     --name <CONTAINER_APPS_ENVIRONMENT> --storage-name squadopt-store \
-#     --storage-type NfsAzureFile --server <STORAGE_ACCOUNT>.file.core.windows.net \
-#     --file-share /<STORAGE_ACCOUNT>/squadopt-store --access-mode ReadWrite
-#
-#   az containerapp env storage set ... --storage-name squadopt-inputs \
-#     --file-share /<STORAGE_ACCOUNT>/squadopt-inputs --access-mode ReadOnly
-type: Microsoft.App/containerApps
-location: <REGION>
-properties:
-  managedEnvironmentId: /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP>/providers/Microsoft.App/managedEnvironments/<CONTAINER_APPS_ENVIRONMENT>
-  configuration:
-    activeRevisionsMode: Single
-    ingress:
-      # Only the api is reachable. The worker has no listener at all, and naming the target
-      # container is what keeps ingress from being offered to whichever container binds a
-      # port first.
-      external: true
-      targetPort: 8000
-      targetContainerName: api
-      transport: auto
-      allowInsecure: false
-      traffic:
-        - latestRevision: true
-          weight: 100
-      # CORS is enforced by the application from SQUADOPT_BACKEND_ALLOWED_ORIGINS below, not
-      # here: ADR 0006 puts the allowlist in configuration the application reads, and a
-      # second allowlist at the edge is a second thing to forget to update.
-    registries:
-      - server: <REGISTRY_LOGIN_SERVER>
-        identity: system
-  template:
-    # The worker must not be scaled to zero with a queue behind it, and one replica is the
-    # decided starting point. Container Apps defaults minReplicas to 0, which for an
-    # HTTP-idle app would stop the worker mid-solve, so this is a correctness setting.
-    scale:
-      minReplicas: 1
-      maxReplicas: 1
-    # Long enough for the job in hand to finish: a member's plan is 3.0-29.6 s of measured
-    # single-thread solve and a rival strategy is several of those. The worker stops after
-    # the current job, so a grace shorter than the worst case turns a deployment into a lost
-    # solve. UNVERIFIED: field availability and maximum.
-    terminationGracePeriodSeconds: 180
-    volumes:
-      - name: store
-        storageType: NfsAzureFile
-        storageName: squadopt-store
-      - name: inputs
-        storageType: NfsAzureFile
-        storageName: squadopt-inputs
-    containers:
-      # One image, two commands. Same digest in both, always: they share the code that
-      # decides what an answer is, and the commit is part of every answer's identity.
-      - name: api
-        image: <REGISTRY_LOGIN_SERVER>/squadopt-backend@<IMAGE_DIGEST>
-        command: ["uvicorn"]
-        args:
-          - "--factory"
-          - "squadopt.api.runtime:build_app"
-          - "--host"
-          - "0.0.0.0"
-          - "--port"
-          - "8000"
-        resources:
-          # UNVERIFIED: the allowed cpu/memory pairs and whether the per-replica sum across
-          # containers must itself be an allowed pair.
-          cpu: 0.5
-          memory: 1.0Gi
-        volumeMounts:
-          - volumeName: store
-            mountPath: /mnt/squadopt-store
-          - volumeName: inputs
-            mountPath: /mnt/squadopt-inputs
-        env: &backend_environment
-          # The one shared ReadWrite mount, as a subdirectory of it rather than its root: a
-          # share root's mode and owner are the platform's, a subdirectory is ours, and the
-          # runtime runs as uid 10001. The directory must exist before the first start; the
-          # backend never creates it. See the runbook's prepare step.
-          - name: SQUADOPT_BACKEND_STORE_ROOT
-            value: /mnt/squadopt-store/store
-          - name: SQUADOPT_BACKEND_SITE_DATA_ROOT
-            value: /mnt/squadopt-inputs/site/data
-          - name: SQUADOPT_BACKEND_SNAPSHOT_ROOT
-            value: /mnt/squadopt-inputs/snapshots
-          - name: SQUADOPT_BACKEND_HANDOFF_ROOT
-            value: /mnt/squadopt-inputs/handoffs
-          # An allowlist, never a wildcard (ADR 0006). A wildcard is refused at startup.
-          - name: SQUADOPT_BACKEND_ALLOWED_ORIGINS
-            value: <PAGES_ORIGIN>
-          # The same commit the image was built from, and the same value in both containers:
-          # two containers disagreeing here would answer at two different cache keys.
-          - name: SQUADOPT_REPOSITORY_COMMIT
-            value: <REPOSITORY_COMMIT>
-        probes:
-          # /health, not /ready. /ready is data-dependent by design — it is false until ops
-          # has published a capture, its handoff and the league tree — so using it as the
-          # platform's probe would keep a correctly deployed revision from ever going
-          # healthy, and with one replica the platform's own 503 would hide which check
-          # failed. /ready stays the operator's own curl.
-          - type: liveness
-            httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 30
-          - type: startup
-            httpGet:
-              path: /health
-              port: 8000
-            failureThreshold: 30
-            periodSeconds: 5
-      - name: worker
-        image: <REGISTRY_LOGIN_SERVER>/squadopt-backend@<IMAGE_DIGEST>
-        command: ["python"]
-        args: ["-m", "squadopt.platform.advice_worker"]
-        resources:
-          # The solve is single-threaded by design (CP-SAT runs one search worker), so a
-          # worker scales by replication and not by cores. One vCPU is the decided start.
-          cpu: 1.0
-          memory: 2.0Gi
-        volumeMounts:
-          - volumeName: store
-            mountPath: /mnt/squadopt-store
-          - volumeName: inputs
-            mountPath: /mnt/squadopt-inputs
-        env: *backend_environment
-        # No probes. The worker has no listener, and it already fails loudly the only way
-        # that matters: a store it cannot reach exits the process non-zero at startup.
+{
+  "type": "Microsoft.App/containerApps",
+  "location": "<LOCATION>",
+  "properties": {
+    "managedEnvironmentId": "<ENVIRONMENT_ID>",
+    "configuration": {
+      "activeRevisionsMode": "Single",
+      "ingress": {
+        "external": false,
+        "targetPort": 8000,
+        "transport": "auto",
+        "allowInsecure": false,
+        "traffic": [
+          {
+            "latestRevision": true,
+            "weight": 100
+          }
+        ]
+      },
+      "registries": [
+        {
+          "server": "<REGISTRY>",
+          "identity": "<PULL_IDENTITY>"
+        }
+      ]
+    },
+    "template": {
+      "scale": {
+        "minReplicas": 1,
+        "maxReplicas": 1
+      },
+      "terminationGracePeriodSeconds": 180,
+      "volumes": [
+        {
+          "name": "store",
+          "storageType": "NfsAzureFile",
+          "storageName": "squadopt-store"
+        },
+        {
+          "name": "inputs",
+          "storageType": "NfsAzureFile",
+          "storageName": "squadopt-inputs"
+        }
+      ],
+      "containers": [
+        {
+          "name": "api",
+          "image": "<IMAGE>",
+          "command": [
+            "uvicorn"
+          ],
+          "args": [
+            "--factory",
+            "squadopt.api.runtime:build_app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000"
+          ],
+          "resources": {
+            "cpu": 0.5,
+            "memory": "1.0Gi"
+          },
+          "volumeMounts": [
+            {
+              "volumeName": "store",
+              "mountPath": "/mnt/squadopt-store"
+            },
+            {
+              "volumeName": "inputs",
+              "mountPath": "/mnt/squadopt-inputs"
+            }
+          ],
+          "env": [
+            {
+              "name": "SQUADOPT_BACKEND_STORE_ROOT",
+              "value": "/mnt/squadopt-store/store"
+            },
+            {
+              "name": "SQUADOPT_BACKEND_SITE_DATA_ROOT",
+              "value": "/mnt/squadopt-inputs/site/data"
+            },
+            {
+              "name": "SQUADOPT_BACKEND_SNAPSHOT_ROOT",
+              "value": "/mnt/squadopt-inputs/snapshots"
+            },
+            {
+              "name": "SQUADOPT_BACKEND_HANDOFF_ROOT",
+              "value": "/mnt/squadopt-inputs/handoffs"
+            },
+            {
+              "name": "SQUADOPT_BACKEND_ALLOWED_ORIGINS",
+              "value": "<ORIGINS>"
+            }
+          ],
+          "probes": [
+            {
+              "type": "Liveness",
+              "httpGet": {
+                "path": "/health",
+                "port": 8000
+              },
+              "initialDelaySeconds": 10,
+              "periodSeconds": 30
+            },
+            {
+              "type": "Startup",
+              "httpGet": {
+                "path": "/health",
+                "port": 8000
+              },
+              "failureThreshold": 10,
+              "periodSeconds": 15
+            }
+          ]
+        },
+        {
+          "name": "worker",
+          "image": "<IMAGE>",
+          "command": [
+            "python"
+          ],
+          "args": [
+            "-m",
+            "squadopt.platform.advice_worker"
+          ],
+          "resources": {
+            "cpu": 1.0,
+            "memory": "2.0Gi"
+          },
+          "volumeMounts": [
+            {
+              "volumeName": "store",
+              "mountPath": "/mnt/squadopt-store"
+            },
+            {
+              "volumeName": "inputs",
+              "mountPath": "/mnt/squadopt-inputs"
+            }
+          ],
+          "env": [
+            {
+              "name": "SQUADOPT_BACKEND_STORE_ROOT",
+              "value": "/mnt/squadopt-store/store"
+            },
+            {
+              "name": "SQUADOPT_BACKEND_SITE_DATA_ROOT",
+              "value": "/mnt/squadopt-inputs/site/data"
+            },
+            {
+              "name": "SQUADOPT_BACKEND_SNAPSHOT_ROOT",
+              "value": "/mnt/squadopt-inputs/snapshots"
+            },
+            {
+              "name": "SQUADOPT_BACKEND_HANDOFF_ROOT",
+              "value": "/mnt/squadopt-inputs/handoffs"
+            },
+            {
+              "name": "SQUADOPT_BACKEND_ALLOWED_ORIGINS",
+              "value": "<ORIGINS>"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "name": "<APP_NAME>",
+  "identity": {
+    "type": "UserAssigned",
+    "userAssignedIdentities": {
+      "<PULL_IDENTITY>": {}
+    }
+  }
+}
