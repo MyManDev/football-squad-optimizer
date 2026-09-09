@@ -11,23 +11,23 @@ geçmesi ve canlı sistemin kabul edilmesi ayrı durumlardır.
 karşılaştırmaları tarihsel bağlamdır; onları yarınki çalışma HEAD'i gibi kullanma.
 Önce yerel durumu, PR'ın güncel revizyonunu ve İbo'nun devam eden işini kontrol et.
 
-## Son CI ve E2E sonucu: devir kapanışında doldurulacak
+## Son CI ve E2E kaydı
 
-**Bu bölüm hazırlanırken güncel uzak CI devam ediyordu. Aşağıdaki boş alanlar başarı
-anlamına gelmez.** Sonuçlar yalnız ilgili commit, çalıştırma ve kanıtla doldurulmalı;
-önceki yerel veya uzak koşunun başarılı kısımları buraya taşınmamalı.
+Bu tablo tamamlanmış kanıtların sürümünü kaydeder. Son dokümantasyon/CI revizyonunun
+güncel kapısı [PR kontrolleridir](https://github.com/MyManDev/football-squad-optimizer/pull/456/checks).
+Devam eden bir kontrolün sonucu önceki koşudan türetilmemelidir.
 
 | Kapanış alanı | Güncel kayıt |
 | --- | --- |
-| İncelenen son commit / branch | **BEKLİYOR — tam SHA ve dal** |
-| PR ve tam CI çalıştırma bağlantısı | **BEKLİYOR — mevcut PR'ın son HEAD'iyle eşleşmeli** |
-| CI işleri ve nihai sonuçları | **BEKLİYOR — Python sürümleri, web ve container ayrı yazılmalı** |
-| Son E2E ortamı ve kullanılan veriler | **BEKLİYOR — yerel/container/canlı; sentetik/gerçek ayrımı** |
-| Son E2E kullanıcı adımları ve sonuçları | **BEKLİYOR — TR/EN, üye/rakip seçimi, öneri, iptal/hata/cache akışı** |
-| E2E kanıtı ve kaynak/image kimliği | **BEKLİYOR — rapor, log, gerekli ekran/istek kaydı, commit/digest** |
-| Canlı yayın yapıldı mı; hangi adres ve sürüm doğrulandı? | **BEKLİYOR — yerel E2E'den canlı yayın sonucu çıkarılmamalı** |
-| Kalan başarısızlıklar ve kabul edilmeyen ortamlar | **BEKLİYOR — boş bırakılarak gizlenmemeli** |
-| Kontrol kapanış zamanı (UTC) | **BEKLİYOR** |
+| Son uygulama/test commit'i | `0eaed7013ffbdc61cf9348925a64125296d2108a`, `codex/enterprise-software-transition`; sonraki belge commit'lerini uygulama değişikliği sanma |
+| PR ve kaynak CI kanıtı | [PR #456](https://github.com/MyManDev/football-squad-optimizer/pull/456); [ilk kaynak kabulü](https://github.com/MyManDev/football-squad-optimizer/actions/runs/34406830645), kaynak `e9a1693a`; son HEAD için yukarıdaki kontrolleri aç |
+| Tamamlanan CI sonuçları | İlk kaynak kabulünde Python 3.11 ve 3.13 ayrı ayrı **4.778 geçti, 14 atlandı**. Web: 491 birim ve 70 Playwright geçti. Container/browser kabulü eksik `.pt` üst dizininde durdu; bu workflow düzeltildi. Son revizyonun bütün CI sonucu PR'dan doğrulanmalı |
+| Son E2E ortamı ve veriler | Yerel production web bundle, gerçek Chromium/API/worker/solver; sentetik capture ve gerçek publisher çıktısı. Canlı veri değil |
+| Son E2E adımları | TR: 123 fetchsiz ret → 352490 → Bu benim/localStorage → saf-puan1 hesap → 202/worker completed → sonuç → reload/cache200. **1 geçti, 22.54 s**. Diğer dil/rakip/pencere/hata akışları ayrı UI/API testleriyle kapsanır |
+| E2E kanıtı ve image kimliği | `.pt/enterprise/e2e-final-03.log`; önceki kontrast bulgusu `e2e-final-02.log`. Linux image/Compose **4 geçti**; tam image ID ve revision [kabul kaydında](enterprise_acceptance.md) |
+| Canlı yayın | Bu geçiş yayımlanmadı veya merge edilmedi. Son GitHub deployment kaydı `6350426966`, `a85c7bdd`, 9 Eylül 13:06 UTC, `https://squadopt.pages.dev`; bu branch'in deployment'ı değil. Bu makineden tek denemelik güncel HTTP smoke timeout verdi; sitenin genel olarak kapalı olduğu sonucu çıkarılmadı |
+| Kalan ortam sınırları | Üç Windows rename hatası tekrar edilmedi; uzun Windows kökleri desteklenmiş sayılmıyor. Uzak host, bağımsız backup, live scheduler, restored-host browser kabulü yok. R07/R09/R10 şartları aşağıda |
+| Kanıt tarihi | 10 Eylül 2026 Türkiye saati; CI ve E2E kapanış durumunu yukarıdaki sürüm/linklerden doğrula |
 
 [Kabul kaydındaki](enterprise_acceptance.md) tarihsel tam Python koşusu 4.755 geçti,
 19 hata, 13 atlama sonucuyla bitmiştir; “tam paket yeşil” değildir. On dört hata için

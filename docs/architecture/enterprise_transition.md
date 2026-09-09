@@ -21,10 +21,10 @@
 - [x] Güncel tarayıcı/backend ve Python–web sözleşmesi: 2 test geçti; Linux container/Compose: 4 test geçti.
 - [x] Tam Python koşusunu incele: 4.755 geçti; 14 hata düzeltildi (101 odaklı test geçti), 2 uzun yol hatası kısa kökle doğrulandı. Bilinen 3 Windows izin hatası tekrar koşulmadan kaydedildi.
 - [ ] **Şimdi:** Commit/PR ve uzak CI doğrulaması. [Son kabul kaydı](enterprise_acceptance.md).
-- [ ] Son kullanıcı akışlarıyla E2E kabulünü tamamla; yeni kapsam veya mimari katman ekleme.
-- [ ] Yarınki geliştirme için ayrıntılı teknik devir, açık konular ve kısa öncelik listesi hazırla.
+- [x] Son kullanıcı akışı: lig girişi → üye seçimi → gerçek hesap → cache geçti; bulunan bağlantı kontrastı düzeltildi, mimari genişletilmedi.
+- [x] Yarınki geliştirme için [ayrıntılı teknik devir](enterprise_developer_handoff.md), açık konular ve kısa öncelik listesi hazır.
 - [ ] Hedef sunucu, bağımsız dış yedek ve canlı scheduler kabulü; mevcut altyapı henüz doğrulanmadı.
-- [ ] Son klasör düzeni, tam doğrulama ve commit'ler (R15).
+- [x] Klasör/belge düzeni ve commit'ler (R15); son uzak CI kapısı ayrıca izleniyor.
 
 Tamamlanan kod ile gerçek ortamda kabul ayrı kaydedilir. R09 gerçek gelecek hafta
 verisi gerektirir; R10'un bilimsel kapıları kod değişikliğiyle geçmiş sayılmaz.
