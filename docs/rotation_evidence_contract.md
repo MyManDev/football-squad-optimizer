@@ -192,3 +192,8 @@ of the lane brief; no capture has been read here to confirm them. The refusal in
 "absent means" is what keeps that honest — if the source spells them differently, the first
 real capture stops with the names it was looking for rather than quietly reporting that nobody
 has any risks.
+
+## The model call
+
+How the coding response is produced, what the prompt asks for, and why the model is never
+asked for a byte offset: `docs/rotation_claim_coding.md`.
