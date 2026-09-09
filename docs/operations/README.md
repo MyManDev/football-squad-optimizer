@@ -2,6 +2,8 @@
 
 | Task | Procedure |
 | --- | --- |
+| Inspect discovered infrastructure and start the prepared API/worker deployment | [Operations inventory](../architecture/operations_inventory.md) |
+| Create, verify and restore private backups | [Backup and recovery](../architecture/backup_recovery.md) |
 | Produce the member publication for a week | [Weekly runbook](../weekly_runbook.md) |
 | Understand opening capture/decision/settlement | [Opening-week runbook](../opening_week_runbook.md) |
 | Deploy the static website | [Deployment runbook](../deployment_runbook.md) |
