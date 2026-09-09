@@ -122,9 +122,9 @@ jobs:
         env:
           SQUADOPT_CONTAINER_SMOKE: "1"
           SQUADOPT_CONTAINER_IMAGE: squadopt-backend:ci
-        run: >-
-          python -m pytest tests/integration/test_backend_container.py -q -p no:cacheprovider
-          --basetemp .pt/ci-container -rA
+        run: |
+          mkdir -p .pt
+          python -m pytest tests/integration/test_backend_container.py -q -p no:cacheprovider --basetemp .pt/ci-container -rA
 
       - name: Retain container failure evidence
         if: failure()
@@ -132,6 +132,7 @@ jobs:
         with:
           name: container-failure
           path: .pt/ci-container
+          include-hidden-files: true
           retention-days: 7
 
   web:
@@ -214,16 +215,16 @@ jobs:
         env:
           SQUADOPT_PUBLICATION_CONTRACT: "1"
           SQUADOPT_BROWSER_SMOKE: "1"
-        run: >-
-          python -m pytest tests/integration/test_publication_contract.py
-          tests/integration/test_advice_browser.py -q -p no:cacheprovider
-          --basetemp .pt/ci-backend -rA
+        run: |
+          mkdir -p .pt
+          python -m pytest tests/integration/test_publication_contract.py tests/integration/test_advice_browser.py -q -p no:cacheprovider --basetemp .pt/ci-backend -rA
 
       - name: Retain browser and backend failure evidence
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: browser-backend-failure
+          include-hidden-files: true
           path: |
             web/test-results
             web/playwright-report

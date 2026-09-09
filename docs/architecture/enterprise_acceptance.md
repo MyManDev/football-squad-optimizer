@@ -57,6 +57,17 @@ Local raw logs and detailed failure classification remain under `.pt/enterprise/
 They are development evidence, not private production backups. Remote CI remains a
 separate merge gate; no failed test has been removed or marked xfail for this transition.
 
+## Remote CI follow-up
+
+[PR #456](https://github.com/MyManDev/football-squad-optimizer/pull/456) targets develop.
+The first CI run passed all 70 Playwright cases and 491 web unit tests (one skipped),
+along with the web build and release checks. Container and browser/backend fixtures
+then exposed a clean-checkout setup error: the parent `.pt` directory did not exist
+for the explicit pytest base directory. Both workflow steps now create that parent
+before pytest. Failure artifacts explicitly include files under the named hidden
+scratch directories. The first failed CI result remains evidence; a subsequent run
+must establish acceptance of this workflow correction.
+
 ## Unfulfilled operational and research prerequisites
 
 No independent backup destination, live backend host or running weekly scheduler was
