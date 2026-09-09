@@ -1,13 +1,15 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-08-25T12:32:57Z",
+  "generated_at_utc": "2026-09-09T06:31:41Z",
   "payload": {
     "files": [
+      "2026-27/gw01/live.json",
       "2026-27/gw01/pool.json",
       "2026-27/gw01/recommendation.json",
       "2026-27/league.json",
       "2026-27/ledger.json",
       "2026-27/status.json",
+      "schema/live_score_v1.schema.json",
       "schema/ui_view_v1.schema.json"
     ],
     "gameweeks": {
@@ -15,7 +17,7 @@
         1
       ]
     },
-    "generated_at_utc": "2026-08-25T12:32:57Z",
+    "generated_at_utc": "2026-09-09T06:31:41Z",
     "latest": {
       "gameweek": 1,
       "path": "2026-27/gw01/recommendation.json",
