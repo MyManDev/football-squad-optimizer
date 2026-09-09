@@ -1272,6 +1272,100 @@ def fpl_live_event_points(
     )
 
 
+#: What a settled outcome reads out of one live element's ``stats`` blob. A superset of
+#: what :func:`fpl_live_event_points` needs, because that function answers "what has this
+#: squad scored so far" while a settled outcome has to separate *appearing* from
+#: *starting* -- and only ``starts`` can do that. A payload missing any of the three stops
+#: the run and names the field, rather than yielding a column of nulls: a settled outcome
+#: table whose start column is empty is exactly the table nobody can measure rotation on.
+_LIVE_OUTCOME_STATS_FIELDS: Final = ("minutes", "starts", "total_points")
+
+#: What the live document alone can say about a player's gameweek. The artifact adds the
+#: pre-deadline availability columns on top; these are the outcome half.
+LIVE_OUTCOME_COLUMNS: Final = (
+    "player_id",
+    "appearance",
+    "start",
+    "minutes",
+    "total_points",
+)
+
+
+def live_event_outcomes(live: bytes, bootstrap: bytes, *, gameweek: int) -> pd.DataFrame:
+    """Return one settled gameweek's per-player outcome, keyed on the persistent code.
+
+    Deliberately separate from :func:`fpl_live_event_points`, which keys on the per-season
+    element ``id`` and reads points and minutes alone. Both differences matter here: an
+    outcome recorded this week is read again next season, so it has to name a player by the
+    identity that survives a transfer window; and rotation is a question about *starting*,
+    which minutes cannot answer -- a substitute who played sixty minutes and a starter who
+    played sixty are the same row without ``starts``.
+
+    ``appearance`` is derived from minutes rather than read, because that is the basis the
+    rest of this repository already uses and the payload publishes no separate flag this
+    adapter has been shown to carry. ``start`` is read, never derived: minutes above zero
+    is not a start, and inferring one would invent the very label the measurement is about.
+
+    Nothing here decides whether the gameweek is settled. :func:`scored_gameweeks` owns
+    that, from the bootstrap's own ``finished`` and ``data_checked`` flags, and a caller
+    that skips it would be recording a running total as a final one.
+    """
+
+    week = _positive(gameweek, "gameweek")
+    codes = player_codes(bootstrap)
+    records = _records(_document(live, "Live"), "elements", "Live element")
+    _require_fields(records, _LIVE_ELEMENT_FIELDS, "Live element")
+
+    rows: list[dict[str, object]] = []
+    for record in records:
+        element = _integer(record, "id", "Live element")
+        stats = record.get("stats")
+        if not isinstance(stats, dict):
+            raise DataSourceError(
+                f"Live element {element} carries a {type(stats).__name__} 'stats' section "
+                "rather than an object; the adapter reads its minutes, starts and points."
+            )
+        _require_fields((stats,), _LIVE_OUTCOME_STATS_FIELDS, f"Live element {element} stats")
+        if element not in codes:
+            raise DataSourceError(
+                f"The captured bootstrap names no element {element}, which the live payload "
+                f"for gameweek {week} scores. The two documents describe different squads, "
+                "so the code this row would be filed under is unknown rather than missing."
+            )
+        # No duplicate guard here: :func:`player_codes` refuses a repeated id *and* a
+        # repeated code, so the mapping it returns is injective and two elements cannot
+        # arrive at one code. A check that can never fire is a dead branch, not a safeguard.
+        player = codes[element]
+        minutes = _integer(stats, "minutes", f"Live element {element} stats")
+        if minutes < 0:
+            raise InvalidValueError(
+                f"Gameweek {week} reports {minutes} minutes for player {player}."
+            )
+        starts = _integer(stats, "starts", f"Live element {element} stats")
+        rows.append(
+            {
+                "player_id": player,
+                "appearance": minutes > 0,
+                "start": starts > 0,
+                "minutes": minutes,
+                "total_points": _integer(stats, "total_points", f"Live element {element} stats"),
+            }
+        )
+
+    if not rows:
+        raise DataSourceError(
+            f"Live payload for gameweek {week} scores no players, so it describes no outcome."
+        )
+
+    frame = pd.DataFrame(rows, columns=list(LIVE_OUTCOME_COLUMNS))
+    frame["player_id"] = frame["player_id"].astype("int64")
+    frame["appearance"] = frame["appearance"].astype("boolean")
+    frame["start"] = frame["start"].astype("boolean")
+    frame["minutes"] = frame["minutes"].astype("int64")
+    frame["total_points"] = frame["total_points"].astype("int64")
+    return frame.sort_values("player_id", kind="stable").reset_index(drop=True)
+
+
 def build_live_player_history(
     bootstrap: bytes,
     fixtures: bytes,
