@@ -16,7 +16,9 @@ The working agreements live under [`docs/architecture/`](docs/architecture/). St
 
 ## The short version
 
-1. Branch from `develop`. Pull requests target `develop`; `main` is the release pointer.
+1. Work on `develop` in small topical commits; `main` remains the release pointer. Follow
+   the [current development workflow](docs/architecture/development_workflow.md) for the
+   published baseline, temporary PR branches and archived work.
 2. **One topic per PR.** A refactor never produces an artifact; a measurement never moves a
    file; a docs PR touches no source.
 3. All gates pass on your branch before review:

@@ -1,5 +1,8 @@
 # Branching and Protection
 
+For the owner-directed baseline and branch lifecycle adopted on 9 September 2026, see
+[the current development workflow](development_workflow.md). The checks and release safeguards below still apply.
+
 Where work lands, what must pass before it lands, and what `main` is for.
 
 ## The trunk
