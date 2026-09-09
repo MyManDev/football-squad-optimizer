@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 import { installLeagueMocks } from "./leagueMocks";
+import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 
 const PAGES = [
+  { heading: "Ligini bul", path: "/" },
   { heading: "Lig Üyeleri", path: "/league/members" },
   { heading: /Oyun haftası/, path: "/gw/2026-27/1" },
   { heading: "Önerilen Hamleler", path: "/moves" },
@@ -15,7 +17,9 @@ test.beforeEach(async ({ page }) => {
   await installLeagueMocks(page);
 });
 
-test("visitor navigation reaches members and analysis without browser errors", async ({ page }) => {
+test("visitor navigation reaches league entry and analysis without browser errors", async ({
+  page,
+}) => {
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
@@ -24,7 +28,7 @@ test("visitor navigation reaches members and analysis without browser errors", a
 
   await page.goto("/");
   for (const destination of [
-    { link: "Lig", heading: "Lig Üyeleri", path: "/league/members" },
+    { link: "Lig", heading: "Ligini bul", path: "/" },
     { link: "Analiz", heading: "Analiz Merkezi", path: "/analysis" },
   ]) {
     await page.getByRole("link", { name: destination.link, exact: true }).click();
@@ -36,7 +40,7 @@ test("visitor navigation reaches members and analysis without browser errors", a
 });
 
 for (const language of ["tr", "en"] as const) {
-  test(`a cold ${language} visitor enters the member list without system-squad links`, async ({
+  test(`a cold ${language} visitor finds the published member list without system-squad links`, async ({
     page,
   }) => {
     await page.addInitScript((value) => {
@@ -50,7 +54,21 @@ for (const language of ["tr", "en"] as const) {
       }
     });
 
+    await page.route("**/data/league/members.json", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ...mockLeagueMembersEnvelope, source_kind: "live" }),
+      }),
+    );
     await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      language === "tr" ? "Ligini bul" : "Find your league",
+    );
+    await expect(page.getByLabel(language === "tr" ? "Lig numarası" : "League ID")).toHaveValue("");
+    await page.getByLabel(language === "tr" ? "Lig numarası" : "League ID").fill("352490");
+    await page
+      .getByRole("button", { name: language === "tr" ? "Ligi bul" : "Find league" })
+      .click();
 
     await expect(page).toHaveURL("/league/members");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(
@@ -63,10 +81,10 @@ for (const language of ["tr", "en"] as const) {
       await page
         .locator("header nav a, footer a")
         .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
-    ).toEqual(["/league/members", "/analysis", "/status"]);
+    ).toEqual(["/", "/analysis", "/status"]);
     await expect(
       page.locator(
-        'a[href="/"], a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',
+        'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',
       ),
     ).toHaveCount(0);
     expect(systemDataRequests).toEqual([]);

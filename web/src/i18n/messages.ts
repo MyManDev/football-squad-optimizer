@@ -352,6 +352,17 @@ const en = {
     modeNote:
       "live: decided before the deadline, from a capture that run took. replay: recorded after that deadline, or from a capture the run did not take but named.",
   },
+  leagueEntry: {
+    title: "Find your league",
+    label: "League ID",
+    hint: "Type your league ID to continue.",
+    submit: "Find league",
+    invalid: "Enter a positive whole-number league ID.",
+    loading: "Reading the published league…",
+    unsupported: "Only league 352490 is supported for now.",
+    missing: "The published league document is unavailable. Try again later.",
+    failed: "The published league data could not be read. Try again.",
+  },
   leagueMembers: {
     loading: "Loading league members…",
     computeTitle: "Compute this plan",
@@ -1037,6 +1048,17 @@ const tr: MessageSchema<typeof en> = {
       "Geçici işaretli bir oyun haftası bitmiştir ama bu capture'da veri denetimi tamamlanmamıştır: bonus puanlar maç maç işlendiği için puanları hâlâ değişebilir.",
     modeNote:
       "live: son tarihten önce, o koşunun kendi aldığı capture'dan kararlaştırıldı. replay: son tarihten sonra kaydedildi ya da koşunun kendisinin almadığı, adıyla verilen bir capture'dan kararlaştırıldı.",
+  },
+  leagueEntry: {
+    title: "Ligini bul",
+    label: "Lig numarası",
+    hint: "Devam etmek için lig numaranı yaz.",
+    submit: "Ligi bul",
+    invalid: "Pozitif tam sayı olan bir lig numarası gir.",
+    loading: "Yayımlanan lig okunuyor…",
+    unsupported: "Şimdilik yalnız 352490 numaralı lig destekleniyor.",
+    missing: "Yayımlanmış lig belgesi şu anda mevcut değil. Daha sonra yeniden dene.",
+    failed: "Yayımlanan lig verisi okunamadı. Yeniden dene.",
   },
   leagueMembers: {
     computeTitle: "Bu planı hesapla",
