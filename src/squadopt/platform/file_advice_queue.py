@@ -36,6 +36,16 @@ def _serialize(job: AdviceJob) -> bytes:
     return (json.dumps(job.as_payload(), sort_keys=True, indent=2) + "\n").encode("utf-8")
 
 
+def _transition_clock(at_utc: str | None, clock: Callable[[], str] | None) -> Callable[[], str]:
+    if clock is not None:
+        if at_utc is not None:
+            raise AdviceQueueError("Supply either at_utc or clock, not both.")
+        return clock
+    if at_utc is None:
+        raise AdviceQueueError("A transition requires at_utc or clock.")
+    return lambda: at_utc
+
+
 class FileJobQueue:
     """One immutable identity per job, durable intent per open key, fenced attempts."""
 
@@ -246,7 +256,10 @@ class FileJobQueue:
             self.store(completed)
             return completed
 
-    def claim(self, *, at_utc: str) -> AdviceJob | None:
+    def claim(
+        self, *, at_utc: str | None = None, clock: Callable[[], str] | None = None
+    ) -> AdviceJob | None:
+        stamp = _transition_clock(at_utc, clock)
         with self._lock.hold():
             for job in self._scan():
                 if job.status != "queued":
@@ -254,7 +267,9 @@ class FileJobQueue:
                 marker = self._claim_marker(job.job_id)
                 if marker.exists():
                     continue
-                running = job.transition("running", at_utc=at_utc)
+                # The selected job may have arrived or been requeued while this caller
+                # waited for the lock. Live time is read at the transition, not before it.
+                running = job.transition("running", at_utc=stamp())
                 self._publish(marker, str(job.attempt).encode("ascii"), create=True)
                 self._write(self._path(job.job_id), running)
                 return running
@@ -269,8 +284,13 @@ class FileJobQueue:
             os.utime(self._claim_marker(job_id))
 
     def recover(
-        self, *, at_utc: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
+        self,
+        *,
+        at_utc: str | None = None,
+        clock: Callable[[], str] | None = None,
+        lease_seconds: float = DEFAULT_LEASE_SECONDS,
     ) -> tuple[AdviceJob, ...]:
+        stamp = _transition_clock(at_utc, clock)
         if not math.isfinite(lease_seconds) or lease_seconds < 0:
             raise AdviceQueueError("lease_seconds must be finite and non-negative.")
         recovered = []
@@ -302,7 +322,7 @@ class FileJobQueue:
                     age = float("inf")
                 if age < lease_seconds:
                     continue
-                requeued = job.transition("queued", at_utc=at_utc)
+                requeued = job.transition("queued", at_utc=stamp())
                 self._write(self._path(job.job_id), requeued)
                 marker.unlink(missing_ok=True)
                 recovered.append(requeued)

@@ -88,7 +88,8 @@ def _run_advice_worker_once(
     cache: AdviceCacheRepository,
     compute: Callable[[AdviceJob], bytes],
     *,
-    at_utc: str,
+    at_utc: str | None = None,
+    claim_at_utc: Callable[[], str] | None = None,
     terminal_at_utc: Callable[[], str] = _utc_stamp,
     heartbeat_seconds: float | None = None,
     metrics: AdviceMetrics | None = None,
@@ -102,8 +103,9 @@ def _run_advice_worker_once(
     of the composition rather than a hope. Returns the terminal record, or ``None``
     when the queue is empty.
 
-    ``at_utc`` timestamps the claim; ``terminal_at_utc`` reads the clock when the
-    computation's outcome is recorded, so completion or failure is not backdated.
+    ``at_utc`` supplies a fixed claim instant for replay/tests. Live callers instead
+    pass ``claim_at_utc``, sampled by the queue after acquiring its transition lock.
+    ``terminal_at_utc`` is read after computation, so its outcome is not backdated.
 
     ``heartbeat_seconds`` refreshes the claim while ``compute`` runs. It belongs here
     because this function owns the claim's whole lifetime — from the owned claim to
@@ -117,7 +119,7 @@ def _run_advice_worker_once(
 
     from time import perf_counter
 
-    job = queue.claim(at_utc=at_utc)
+    job = queue.claim(at_utc=at_utc, clock=claim_at_utc)
     if job is None:
         return None
     if metrics is not None:
@@ -234,7 +236,8 @@ def run_advice_worker_once(
     cache: AdviceCacheRepository,
     compute: Callable[[AdviceJob], bytes],
     *,
-    at_utc: str,
+    at_utc: str | None = None,
+    claim_at_utc: Callable[[], str] | None = None,
     terminal_at_utc: Callable[[], str] = _utc_stamp,
     heartbeat_seconds: float | None = None,
     metrics: AdviceMetrics | None = None,
@@ -247,6 +250,7 @@ def run_advice_worker_once(
             cache,
             compute,
             at_utc=at_utc,
+            claim_at_utc=claim_at_utc,
             terminal_at_utc=terminal_at_utc,
             heartbeat_seconds=heartbeat_seconds,
             metrics=metrics,

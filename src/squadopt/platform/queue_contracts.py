@@ -30,7 +30,9 @@ class JobQueue(Protocol):
         self, job: AdviceJob, *, read_cached: Callable[[str], bytes | None]
     ) -> AdviceJob | bytes: ...
 
-    def claim(self, *, at_utc: str) -> AdviceJob | None: ...
+    def claim(
+        self, *, at_utc: str | None = None, clock: Callable[[], str] | None = None
+    ) -> AdviceJob | None: ...
 
     def store(self, job: AdviceJob) -> None: ...
 
@@ -45,5 +47,9 @@ class JobQueue(Protocol):
     def heartbeat(self, job_id: str, *, attempt: int) -> None: ...
 
     def recover(
-        self, *, at_utc: str, lease_seconds: float = DEFAULT_LEASE_SECONDS
+        self,
+        *,
+        at_utc: str | None = None,
+        clock: Callable[[], str] | None = None,
+        lease_seconds: float = DEFAULT_LEASE_SECONDS,
     ) -> tuple[AdviceJob, ...]: ...

@@ -210,14 +210,14 @@ def run_advice_worker(
         elapsed = time.monotonic()
         if elapsed - recovered_at >= recover_every_seconds:
             recovered_at = elapsed
-            recovered = queue.recover(at_utc=_stamp(now()), lease_seconds=lease_seconds)
+            recovered = queue.recover(clock=lambda: _stamp(now()), lease_seconds=lease_seconds)
             if recovered and log is not None:
                 log.event("advice_jobs_recovered", count=len(recovered))
         job = run_advice_worker_once(
             queue,
             cache,
             compute,
-            at_utc=_stamp(now()),
+            claim_at_utc=lambda: _stamp(now()),
             terminal_at_utc=lambda: _stamp(now()),
             heartbeat_seconds=heartbeat_seconds,
             metrics=metrics,

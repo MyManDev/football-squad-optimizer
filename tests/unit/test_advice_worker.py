@@ -814,13 +814,15 @@ def test_a_store_that_breaks_later_stops_the_worker_taking_new_work(
         def __getattr__(self, name: str) -> Any:
             return getattr(self._inner, name)
 
-        def claim(self, *, at_utc: str) -> Any:
-            claims.append(at_utc)
-            return self._inner.claim(at_utc=at_utc)
+        def claim(self, *, at_utc=None, clock=None) -> Any:
+            result = self._inner.claim(at_utc=at_utc, clock=clock)
+            claims.append(result.updated_at_utc if result else "empty")
+            return result
 
-        def recover(self, *, at_utc: str, lease_seconds: float = 300.0) -> Any:
-            recoveries.append(at_utc)
-            return self._inner.recover(at_utc=at_utc, lease_seconds=lease_seconds)
+        def recover(self, *, at_utc=None, clock=None, lease_seconds: float = 300.0) -> Any:
+            result = self._inner.recover(at_utc=at_utc, clock=clock, lease_seconds=lease_seconds)
+            recoveries.append(result[0].updated_at_utc if result else "empty")
+            return result
 
     healthy = [True]
     processed = run_advice_worker(
