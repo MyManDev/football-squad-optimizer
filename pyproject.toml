@@ -25,6 +25,7 @@ dependencies = [
 squadopt = "squadopt.platform.cli:main"
 
 [project.optional-dependencies]
+capacity = ["psutil==7.2.2"]
 api = [
     "fastapi>=0.141,<1",
     "jsonschema>=4.23,<5",
