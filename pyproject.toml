@@ -83,9 +83,8 @@ root_package = "squadopt"
 include_external_packages = false
 
 # The layered modular monolith (docs/architecture/dependency_rules.md). Higher layers may
-# import lower ones, never the reverse. The ignore list is the measured baseline of
-# violations on the day the contract was added; it may only shrink (Stage 3/4 remove
-# every entry), and a new violation fails the gate.
+# import lower ones, never the reverse. There are no baseline exceptions; a new
+# violation fails the gate.
 [[tool.importlinter.contracts]]
 name = "Layered architecture"
 type = "layers"
@@ -108,13 +107,7 @@ layers = [
     "squadopt.prediction",
     "squadopt.features",
     "squadopt.data",
-]
-ignore_imports = [
-    "squadopt.data.schema -> squadopt.optimization.config",
-    "squadopt.data.schema -> squadopt.optimization.validation",
-    "squadopt.prediction.integration -> squadopt.optimization.coefficients",
-    "squadopt.backtest.production_benchmark -> squadopt.experiments",
-    "squadopt.backtest.production_benchmark -> squadopt.experiments.config",
+    "squadopt.contracts",
 ]
 
 [[tool.importlinter.contracts]]
@@ -137,5 +130,6 @@ forbidden_modules = [
     "squadopt.prediction",
     "squadopt.features",
     "squadopt.data",
+    "squadopt.contracts",
 ]
 allow_indirect_imports = true

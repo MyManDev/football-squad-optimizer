@@ -11,7 +11,8 @@ For the boundary above the application layer, see
 
 ## The order
 
-A package may import anything **below** it and nothing at or above it.
+A package may import any **lower-level** package, never a higher-level one. The diagram
+lists the levels from lowest to highest; dependencies point toward `contracts`.
 
 ```
 contracts
@@ -36,9 +37,8 @@ contracts
 ```
 
 `application`, `platform`, and the optional `api` adapter now exist and are enforced as the
-three highest package layers in `pyproject.toml`. `contracts` does not exist yet; it is in the
-order so that when it is built there is no argument about where it goes. `contracts` depends
-on nothing; `application` may reach everything below it; and `platform` may consume
+three highest package layers in `pyproject.toml`. `contracts` is the lowest package and
+imports no other `squadopt` layer; `application` may reach everything below it; and `platform` may consume
 application contracts without allowing HTTP, persistence, queue, authentication, or
 deployment concerns to flow back into them. `api` is the concrete FastAPI entry point and may
 consume `platform` and `application` public contracts. Other entry points mean CLI, workers,
@@ -63,10 +63,9 @@ otherwise:
 | `{uncertainty, scenarios, risk}` as one tier | `risk` imports `uncertainty` three times (`config.py:13`, `evaluation.py:29`, `optimizer.py:20`). Risk is built on top of spread, not beside it. |
 | `{experiments, bayesopt, recalibration, preflight}` as one tier | Four separate edges cross it: `experiments` to `bayesopt` (4), `backtest` to `bayesopt` (1), `backtest` to `preflight` (1), `experiments` to `preflight` (1). `bayesopt` is in fact a pure leaf and `preflight` only imports `data`, so both belong far lower. |
 
-Choosing the order above instead of the thematic one takes the violation count from **16
+The original ordering change took the violation count from **16
 imports across 9 pairs** to **5 imports across 3 pairs** without moving a single line of code.
-That is the whole point of writing the order down before starting the migration: most of what
-looked like technical debt was a mis-drawn diagram.
+The shared-contract and evaluation extraction subsequently removed those five exceptions.
 
 ### Where the order is genuinely free
 
@@ -81,34 +80,40 @@ read meaning into it, and do not "fix" it:
 
 If a future import makes one of these positions load-bearing, say so here at the same time.
 
-## The exceptions that exist today
+## No baseline exceptions
 
-Five import statements violate the order. They are listed exhaustively, they are the
-`lint-imports` baseline, and **the list may only get shorter**.
+The layers contract contains **zero `ignore_imports` entries**. The five former exceptions
+are resolved by these shared owners:
 
-| # | Edge | Imports | Sites | Closes with |
-| --- | --- | --- | --- | --- |
-| 1 | `data` to `optimization` | 2 | `data/schema.py:19`, `data/schema.py:20` | `contracts` |
-| 2 | `prediction` to `optimization` | 1 | `prediction/integration.py:15` | `contracts` |
-| 3 | `backtest` to `experiments` | 2 | `backtest/production_benchmark.py:57`, `:58` | `statistics` and `PromotionPolicy` moving to `evaluation` |
+| Former edge | Shared owner | Compatibility imports |
+| --- | --- | --- |
+| `data.schema` to `optimization.config` / `optimization.validation` | `contracts.players`: `Position`, `POSITIONS`, `REQUIRED_COLUMNS` | Original optimization locations and `data.schema` still expose the same objects. |
+| `prediction.integration` to `optimization.coefficients` | `contracts.players.sort_players_by_id` | `optimization.coefficients.sort_players_by_id` re-exports the same function. |
+| `backtest.production_benchmark` to `experiments` / `experiments.config` | `evaluation.promotion.PromotionPolicy` and `evaluation.statistics` | Original experiment locations re-export the policy and bootstrap helpers. |
 
-Both remedies are already planned work, and between them they take the baseline to zero. No
-other package move is required to reach a clean contract — in particular, narrowing the wide
-barrels (`experiments` re-exports 82 names, `live` 79, `data` 68) is a separate quality
-concern and not a prerequisite.
+The policy's two exception base classes also live in `evaluation.promotion`, keeping their
+existing `ExperimentError` / `ExperimentConfigurationError` names and inheritance so callers
+can keep catching the old experiment imports. Experiment execution errors, candidate/design
+types, comparisons and factorial effects remain in `experiments`.
+
+The extraction changes no policy defaults, normalization, error messages, seed derivation,
+resampling order, percentile arithmetic, canonical player ordering or fingerprint payload.
+Compatibility tests pin pre-extraction sequences and fingerprints. Historical measurement
+artifacts are not rewritten. Narrowing the existing public barrels is separate work.
 
 ### What goes in `contracts`
 
 Only vocabulary. Nothing that computes a decision, and nothing that imports anything else in
 `squadopt`.
 
-- `Position` (`optimization/config.py:12`) and `POSITIONS` (`:13`)
-- `REQUIRED_COLUMNS` (`optimization/validation.py:15`), the projection contract
-- `sort_players_by_id` (`optimization/coefficients.py:46`) — nine lines whose docstring calls
+- `Position` and `POSITIONS` in `contracts/players.py`
+- `REQUIRED_COLUMNS` in the same module, the projection contract
+- `sort_players_by_id` in the same module — nine lines whose docstring calls
   it "the stable player ordering used by the model and its fingerprints"; canonical ordering
   is a contract even though it is a function
-- the identity and fingerprint primitives, and the contract-version registry, per
-  [ADR 0002](decisions/0002-contract-versioning.md)
+- Identity and fingerprint primitives and the contract-version registry remain future
+  candidates under [ADR 0002](decisions/0002-contract-versioning.md); they are not moved by
+  this extraction.
 
 `contracts` is a shared boundary in [ownership](ownership.md): changes need all three owners.
 That is deliberate friction. A module every layer depends on is the one place where a casual
@@ -159,6 +164,7 @@ layers = [
     "prediction",
     "features",
     "data",
+    "contracts",
 ]
 ```
 
@@ -166,14 +172,14 @@ The excerpt abbreviates the fully qualified names used by `pyproject.toml`, whic
 executable source of truth. `squadopt.api` is listed above `squadopt.platform`, which is listed
 above `squadopt.application`; the API therefore cannot be imported back into runtime or
 application code. The platform's first package contract is the versioned run context and
-manifest. The five baseline violations are expressed as
-`ignore_imports` entries, one per statement, each carrying the issue that will remove it — not
-as a blanket exemption for the package pair, so a *new* bad import between the same two
-packages still fails.
+manifest. No baseline violation remains and there are no `ignore_imports` entries. Every
+new upward dependency fails the same contract.
 
 A separate forbidden-import contract lists `squadopt.api` as its source, every engine package
 below `application` as forbidden, and permits indirect imports. That last setting is
 deliberate: application services may compose the engine, while HTTP modules may not bypass
 those services.
 
-Last measured against `b031ef1` (PR #110).
+The original five-edge baseline was measured against `b031ef1` (PR #110). The shared-layer
+extraction verifies the zero-exception contract with `lint-imports`; behavior compatibility
+is covered by `tests/unit/test_layer_contracts.py` and the existing consumer suites.

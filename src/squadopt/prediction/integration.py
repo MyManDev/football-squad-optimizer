@@ -11,8 +11,8 @@ from typing import Final
 
 import pandas as pd
 
+from squadopt.contracts import sort_players_by_id
 from squadopt.data.schema import POSITIONS, PROJECTION_REQUIRED_COLUMNS
-from squadopt.optimization.coefficients import sort_players_by_id
 from squadopt.prediction.config import PredictionConfigurationError
 
 PREDICTION_TO_OPTIMIZATION_CONTRACT_VERSION: Final = "prediction_to_optimization_v1"
