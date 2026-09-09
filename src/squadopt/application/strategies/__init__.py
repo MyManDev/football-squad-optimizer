@@ -5,6 +5,8 @@ from squadopt.application.strategies.candidates import (
     solve_strategy_plan,
 )
 from squadopt.application.strategies.catalog import (
+    FORBIDDEN_FIELD_PATTERN,
+    FORBIDDEN_TEXT_PATTERN,
     PUBLISHABLE_FIELDS,
     STRATEGY_CATALOG,
     CandidateConstraints,
@@ -27,6 +29,8 @@ from squadopt.application.strategies.rule import (
 )
 
 __all__ = [
+    "FORBIDDEN_FIELD_PATTERN",
+    "FORBIDDEN_TEXT_PATTERN",
     "PUBLISHABLE_FIELDS",
     "RIVAL_RULE_STRATEGIES",
     "RULE_STRATEGIES",

@@ -104,6 +104,26 @@ _SAFETY_LANGUAGE: Final = re.compile(r"g[üu]venli|riskli?|safe|daha az riskli",
 #: the overlap fields, which are set arithmetic and publishable.
 FORBIDDEN_FIELD_PATTERN: Final = re.compile(r"probab|olas.l.k|quantile|spread|\bp_")
 
+#: The same rule applied to *text* rather than to field names, in both languages the
+#: site publishes. A field name is ours; a string may not be — a team name or a manager
+#: name is typed by a member and travels into ``members.json``, ``entries/{id}.json``
+#: and the page's own heading. The envelope is a property of what we publish, not of who
+#: wrote it, so this is what the producer refuses a name for and what the published
+#: sweep applies to every string in the tree.
+#:
+#: This is the web guard's ``AS_A_CHANCE`` set (``MemberDecisionControls.test.tsx``)
+#: with the repository's own ``P(`` and ``quantile`` beside it. The English words carry
+#: word boundaries because ``odds`` and ``chance`` are substrings of real surnames; the
+#: Turkish stems do not need them. The stem written ``olas\u0131l`` here — with the
+#: dotless i, which is why it is escaped — covers both the noun and the inflected form
+#: the narrower ``olas.l.k`` missed, and a Latin-alphabet name that merely contains
+#: "olas" cannot match it.
+FORBIDDEN_TEXT_PATTERN: Final = re.compile(
+    r"%|\bP\(|probabilit|quantile|\bchances?\b|\blikelihood\b|\bodds\b"
+    "|\\bihtimal|\\b\u015fans|\\by\u00fczde|olas\u0131l",
+    re.IGNORECASE,
+)
+
 
 class RankingCriterion(StrEnum):
     """The closed list of things a strategy may rank its candidates by.
