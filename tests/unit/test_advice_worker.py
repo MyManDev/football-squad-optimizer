@@ -24,12 +24,17 @@ from fastapi.testclient import TestClient
 from squadopt.api.runtime import app_for_backend
 from squadopt.application.advice import COMPUTED_MODE, COMPUTED_WINDOW, EntryError
 from squadopt.data.snapshots import write_snapshot
+from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import (
     AdviceJobSpec,
     AdviceJobSpecConflictError,
     FileAdviceJobSpecStore,
 )
-from squadopt.platform.advice_queue import AdviceComputeRefused, run_advice_worker_once
+from squadopt.platform.advice_queue import (
+    AdviceComputeRefused,
+    FileJobQueue,
+    run_advice_worker_once,
+)
 from squadopt.platform.advice_read import AdviceRequestContext
 from squadopt.platform.advice_worker import build_advice_compute, run_advice_worker
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
@@ -166,6 +171,62 @@ def _stop_after(rounds: int) -> Callable[[], bool]:
         return remaining[0] < 0
 
     return stop
+
+
+@pytest.mark.parametrize(
+    "error_code", [None, "ADVICE_FAILED", "CONTEXT_UNAVAILABLE", "DETERMINISM_DEFECT"]
+)
+def test_terminal_timestamp_is_read_after_computation(
+    tmp_path: Path, error_code: str | None
+) -> None:
+    queue = FileJobQueue(tmp_path / "jobs")
+    cache = FileAdviceCache(tmp_path / "cache")
+    queued = replace(_job("a" * 64), status="queued")
+    queue.submit(queued)
+    original = b'{"answer":"original"}'
+    answer = b'{"answer":"computed"}'
+    if error_code == "DETERMINISM_DEFECT":
+        cache.put(queued.cache_key, original)
+    claimed_at = datetime(2026, 9, 1, 10, 1, tzinfo=UTC)
+    finished_at = datetime(2026, 9, 1, 10, 2, tzinfo=UTC)
+    clock = [claimed_at]
+    claims: list[AdviceJob] = []
+
+    def compute(job: AdviceJob) -> bytes:
+        claims.append(job)
+        clock[0] = finished_at
+        if error_code == "ADVICE_FAILED":
+            raise RuntimeError("Computation failed.")
+        if error_code == "CONTEXT_UNAVAILABLE":
+            raise AdviceComputeRefused(error_code, "The context is no longer available.")
+        return answer
+
+    processed = run_advice_worker(
+        queue,
+        cache,
+        compute,
+        should_stop=_stop_after(1),
+        now=lambda: clock[0],
+        max_jobs=1,
+        heartbeat_seconds=None,
+    )
+
+    assert processed == 1
+    assert len(claims) == 1 and claims[0].status == "running"
+    assert claims[0].updated_at_utc == "2026-09-01T10:01:00Z"
+    terminal = queue.load(queued.job_id)
+    assert terminal is not None
+    assert terminal.created_at_utc == queued.created_at_utc
+    assert terminal.updated_at_utc == "2026-09-01T10:02:00Z"
+    if error_code is None:
+        assert terminal.status == "completed" and terminal.error is None
+        assert terminal.result_ref == queued.cache_key
+        assert cache.get(queued.cache_key) == answer
+    else:
+        assert terminal.status == "failed" and terminal.result_ref is None
+        assert terminal.error is not None and terminal.error.code == error_code
+        expected = original if error_code == "DETERMINISM_DEFECT" else None
+        assert cache.get(queued.cache_key) == expected
 
 
 def test_a_spec_survives_the_round_trip_with_its_context(tmp_path: Path) -> None:
