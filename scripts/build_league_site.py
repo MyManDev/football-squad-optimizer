@@ -384,6 +384,12 @@ def main() -> int:
         for member in report.members:
             if not member.rendered:
                 print(f"  not rendered  {member.entry_id}  {member.reason}")
+            elif member.reason:
+                # A rendered member can still carry a note — competitive modes that did
+                # not price, or a name the publisher had to normalise, truncate or refuse.
+                # Printing it is the only place an operator learns that a published name
+                # is not byte-for-byte what the capture held.
+                print(f"  note          {member.entry_id}  {member.reason}")
         # A member this run did not render must not keep the last publish's document: the
         # tree is checked out of origin/develop and committed as a union, so leaving it
         # would serve a finished gameweek's advice under this week's league.
