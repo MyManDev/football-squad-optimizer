@@ -11,6 +11,7 @@ import type {
   AdviceRequest,
   AdviceRequestResult,
 } from "./adviceClient";
+import { StaticOnlyAdviceClient } from "./adviceClient";
 import { sameAdviceRequest, useAdviceJob, type ComputePhase } from "./useAdviceJob";
 import { AdviceResponseError } from "./adviceResponse";
 
@@ -48,8 +49,14 @@ class ScriptedClient implements AdviceClient {
   }
 }
 
-function Harness({ client }: { client: AdviceClient }) {
-  const { state, compute } = useAdviceJob(client);
+function Harness({
+  client,
+  allowBaseline = true,
+}: {
+  client: AdviceClient;
+  allowBaseline?: boolean;
+}) {
+  const { state, compute } = useAdviceJob(client, allowBaseline);
   return (
     <div>
       <output data-testid="phase">{describePhase(state)}</output>
@@ -242,4 +249,18 @@ describe("useAdviceJob", () => {
     });
     expect(screen.getByTestId("phase").textContent).toBe("done:api-cache");
   });
+});
+
+it("does not probe a saf-puan baseline the member index did not authorize", async () => {
+  const read = vi.spyOn(StaticOnlyAdviceClient.prototype, "readAdvice");
+  try {
+    render(<Harness client={new ScriptedClient()} allowBaseline={false} />);
+    await act(async () => {
+      screen.getByRole("button", { name: "go" }).click();
+    });
+    expect(screen.getByTestId("phase")).toHaveTextContent("waiting:queued:no-fallback");
+    expect(read).not.toHaveBeenCalled();
+  } finally {
+    read.mockRestore();
+  }
 });

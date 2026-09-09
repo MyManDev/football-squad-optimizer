@@ -46,6 +46,36 @@ function renderControls(
 }
 
 describe("member decision controls", () => {
+  it.each(["tr", "en"] as const)(
+    "describes requested minimum and maximum overlap bounds in %s",
+    (language) => {
+      renderControls(`/league/members/${ENTRY}`, mockEntryAdviceIndex(ENTRY).payload, language);
+      const shared = screen.getByText(
+        MESSAGES[language].leagueMembers.strategies["ortak-koru"].description,
+      );
+      const different = screen.getByText(
+        MESSAGES[language].leagueMembers.strategies["fark-yarat"].description,
+      );
+      expect(shared).toHaveTextContent(language === "tr" ? /en az 9/ : /at least 9/);
+      expect(different).toHaveTextContent(language === "tr" ? /en fazla 5/ : /at most 5/);
+      expect(shared).toHaveTextContent(
+        language === "tr" ? /alt sınır düşürülebilir/ : /minimum may be lowered/,
+      );
+      expect(different).toHaveTextContent(
+        language === "tr" ? /üst sınır yükseltilebilir/ : /maximum may be raised/,
+      );
+      for (const description of [shared, different]) {
+        expect(description).toHaveTextContent(
+          language === "tr"
+            ? /yayımlanan plan uygulanan sınırı/
+            : /published plan states the applied bound/,
+        );
+        expect(description).not.toHaveTextContent(
+          /up to nine|down to five|en çok dokuz|en az beş|\bhit\b|reached|ulaştı/i,
+        );
+      }
+    },
+  );
   it("offers the three member strategies and writes the choice to the URL", () => {
     renderControls();
     expect(screen.getByDisplayValue("saf-puan")).toBeChecked();
@@ -79,6 +109,7 @@ describe("member decision controls", () => {
     renderControls(`/league/members/${ENTRY}?mode=${missing.strategy}`);
     const option = screen.getByRole("option", { name: /\(hesaplanamadı\)/ });
     expect(option).toHaveValue(String(missing.rival_entry_id));
+    expect(option).toBeDisabled();
   });
 
   it("enables the windows the index lists for pure points and states what they assume", () => {
@@ -102,7 +133,7 @@ describe("member decision controls", () => {
     expect(screen.getByText(/rakip stratejisi hafta hafta oynanır/)).toBeInTheDocument();
   });
 
-  it("lands a strategy change on a window the index lists, and says it moved", () => {
+  it("writes a strategy change with a listed window into the shareable URL", () => {
     // Pure points solved five weeks, so the radio is clickable; every rival strategy is
     // published at one week only. The window must not survive the change and leave the
     // control showing a checked radio it has just disabled.
@@ -114,9 +145,7 @@ describe("member decision controls", () => {
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /5 hafta/ })).not.toBeChecked();
     expect(screen.getByRole("radio", { name: /5 hafta/ })).toBeDisabled();
-    expect(
-      screen.getByText(/5 haftalık pencere bu strateji için yayınlanmadı/),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("selection").textContent).toBe("ortak-koru/1/-");
   });
 
   it("says nothing about a moved window when the index lists the one asked for", () => {
@@ -146,7 +175,6 @@ describe("member decision controls", () => {
   });
 
   it.each([
-    ["no index", null],
     [
       "an index from before the windows existed",
       { ...mockEntryAdviceIndex(ENTRY).payload, windows: undefined },
@@ -167,18 +195,11 @@ describe("member decision controls", () => {
     }
   });
 
-  it("falls back to the league's members as rivals when no index was published", () => {
+  it("offers no strategies or guessed rivals when no index was published", () => {
     renderControls(`/league/members/${ENTRY}?mode=ortak-koru`, null, "en");
-    const select = screen.getByRole("combobox", { name: "The member you are playing against" });
-    const humans = MEMBERS.filter((m) => m.member_kind === "human" && m.entry_id !== ENTRY);
-    // Every other member is offered; none is presented as chosen, because without an index
-    // there is no producer default and the request would name nobody.
-    const values = screen
-      .getAllByRole("option")
-      .map((option) => (option as HTMLOptionElement).value);
-    expect(values).toEqual(["", ...humans.map((human) => String(human.entry_id))]);
-    expect(select).toHaveValue("");
-    expect(screen.getByRole("option", { name: "Choose a rival" })).toBeDisabled();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByDisplayValue("saf-puan")).toBeNull();
+    for (const radio of screen.getAllByRole("radio")) expect(radio).toBeDisabled();
   });
 
   it("labels the declared rule's pick without preselecting it", () => {
@@ -242,7 +263,9 @@ describe("member decision controls", () => {
         const text = container.textContent ?? "";
         // The rule's label is on the page for this sweep, not merely available to it.
         expect(text).toMatch(/rule's pick|Kuralın seçimi/i);
-        expect(text).not.toMatch(/%|probabilit|olasılık|\bP\(/i);
+        expect(text).not.toMatch(
+          /%|probabilit|olasılık|olasılığ|\bP\(|chance|likelihood|quantile|spread|percentage|ihtimal|şans|yüzde(?!n\b)|kantil|yayılım/i,
+        );
         expect(text).not.toMatch(/chance of falling behind|geride kalma ihtimalini/i);
         unmount();
       }
@@ -250,9 +273,7 @@ describe("member decision controls", () => {
   });
 
   it("phrases the rule as a band on the gap, never as a chance of catching up", () => {
-    // The page-wide sweep above cannot carry these words: the honesty note that denies
-    // probability says "chance" itself. So the rule's own copy is swept on its own, in
-    // both languages, against every word that would turn a band into a likelihood.
+    // Check the declared rule separately as well as the full rendered controls.
     const AS_A_CHANCE = /chance|likelihood|odds|ihtimal|şans|yüzde|olasılık|probabilit|%/i;
     for (const language of ["tr", "en"] as const) {
       const copy = MESSAGES[language].leagueMembers;

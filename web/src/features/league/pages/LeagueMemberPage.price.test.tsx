@@ -58,13 +58,13 @@ describe("a proven price reads as an exact cost", () => {
   it("keeps the sentence and the figure the page has always shown, in English", () => {
     const text = renderText("en", rivalAdvice({}));
     expect(text).toMatch(/gives up ~0\.8 expected points against the pure-points pick/);
-    expect(text).not.toMatch(/at most/);
+    expect(text).not.toMatch(/gives up at most|cost at most/);
   });
 
   it("keeps the sentence and the figure the page has always shown, in Turkish", () => {
     const text = renderText("tr", rivalAdvice({}));
     expect(text).toMatch(/~0,8 beklenen puandan vazgeçiyor/);
-    expect(text).not.toMatch(/en fazla/);
+    expect(text).not.toMatch(/en fazla [\d,.]+ beklenen puandan vazgeçiyor|maliyet en fazla/);
   });
 });
 
@@ -99,7 +99,7 @@ describe("an unproven price reads as a ceiling", () => {
     const text = renderText("tr", unproven);
     expect(text).toMatch(/en fazla 2,3 beklenen puandan vazgeçiyor/);
     expect(text).not.toMatch(/~0,8 beklenen puandan vazgeçiyor/);
-    expect(text).toMatch(/en fazla 7,9 beklenen puan mal olurdu/);
+    expect(text).toMatch(/maliyet en fazla 7,9 beklenen puan/);
     expect(text).toMatch(/tavan olarak yayımlanıyor/);
   });
 

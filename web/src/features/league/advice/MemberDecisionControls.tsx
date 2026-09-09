@@ -27,22 +27,9 @@ import { useSearchParams } from "react-router";
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { WINDOWS, type WindowSize } from "../../moves/modePrices";
-import {
-  MEMBER_STRATEGIES,
-  isMemberStrategy,
-  strategyNeedsRival,
-  type EntryAdviceIndex,
-  type EntryView,
-  type HumanEntryView,
-  type MemberStrategy,
-} from "../types";
-import {
-  availableWindows,
-  publishedWindow,
-  requestedWindow,
-  rivalCandidates,
-} from "./adviceSelection";
+import { WINDOWS } from "../../moves/modePrices";
+import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
+import { resolvePublishedAdvice } from "./adviceSelection";
 import styles from "./MemberDecisionControls.module.css";
 
 /** The gap as the rule read it: signed, so behind and ahead are visibly different. */
@@ -62,30 +49,33 @@ export function MemberDecisionControls({
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const [searchParams, setSearchParams] = useSearchParams();
-  const rawMode = searchParams.get("mode");
-  const strategy: MemberStrategy = isMemberStrategy(rawMode) ? rawMode : "saf-puan";
-  // A window chosen under another strategy does not survive into one that never published
-  // it: the selection lands on a week the index lists, and the note below says it moved.
-  const askedWindow = requestedWindow(searchParams);
-  const windowSize: WindowSize = publishedWindow(askedWindow, index, strategy);
-  const candidates = rivalCandidates(members, entryId).filter(
-    (member): member is HumanEntryView => member.member_kind === "human",
+  const selection = resolvePublishedAdvice(
+    searchParams,
+    index?.league_id ?? 0,
+    entryId,
+    members,
+    index,
   );
-  const rivalIds: number[] = index
-    ? index.rival_entry_ids
-    : candidates.map((member) => member.entry_id);
+  const { strategy, window: windowSize, rivalEntryId: chosenRival } = selection.request;
+  const candidates = members.filter(
+    (member) => member.member_kind === "human" && member.entry_id !== entryId,
+  );
+  const rivalIds = selection.rivals.map((rival) => rival.entryId);
   const defaultRival = index?.default_rival_entry_id ?? null;
-  const rawRival = Number(searchParams.get("rival"));
-  // The same rule the request applies: the URL's rival, else the producer's default, else
-  // none. Displaying a rival the request would not name is what made the compute control
-  // demand a choice the member appeared to have already made.
-  const chosenRival: number | null = rivalIds.includes(rawRival) ? rawRival : defaultRival;
-  const unavailable = new Set(
-    (index?.unavailable ?? [])
-      .filter((entry) => entry.strategy === strategy && entry.rival_entry_id !== null)
-      .map((entry) => entry.rival_entry_id),
-  );
-  const windows = availableWindows(index, strategy);
+  const windows = selection.windows;
+
+  function strategySelection(slug: string) {
+    const next = new URLSearchParams(searchParams);
+    next.set("mode", slug);
+    const offered = resolvePublishedAdvice(next, index?.league_id ?? 0, entryId, members, index);
+    if (!offered.windows.includes(offered.request.window) && offered.windows[0]) {
+      next.set("window", String(offered.windows[0]));
+    }
+    return {
+      next,
+      offered: resolvePublishedAdvice(next, index?.league_id ?? 0, entryId, members, index),
+    };
+  }
 
   function update(changes: Record<string, string | null>): void {
     const next = new URLSearchParams(searchParams);
@@ -117,14 +107,22 @@ export function MemberDecisionControls({
         <fieldset className={styles.fieldset}>
           <legend>{copy.strategyLegend}</legend>
           <div className={styles.options}>
-            {MEMBER_STRATEGIES.map((slug) => (
+            {selection.strategies.map((slug) => (
               <label className={styles.option} key={slug}>
                 <input
                   type="radio"
                   name="strategy"
                   value={slug}
-                  checked={strategy === slug}
-                  onChange={() => update({ mode: slug })}
+                  checked={
+                    strategy === slug &&
+                    (!searchParams.has("mode") || searchParams.get("mode") === slug)
+                  }
+                  disabled={
+                    strategySelection(slug).offered.windows.length === 0 ||
+                    (strategyNeedsRival(slug) &&
+                      !strategySelection(slug).offered.rivals.some((rival) => rival.path))
+                  }
+                  onChange={() => setSearchParams(strategySelection(slug).next)}
                 />
                 <span className={styles.body}>
                   <span className={styles.heading}>
@@ -172,10 +170,16 @@ export function MemberDecisionControls({
                     </option>
                   ) : null}
                   {rivalIds.map((rivalId) => (
-                    <option key={rivalId} value={rivalId}>
+                    <option
+                      key={rivalId}
+                      value={rivalId}
+                      disabled={!selection.rivals.find((rival) => rival.entryId === rivalId)?.path}
+                    >
                       {nameOf(rivalId)}
                       {rivalId === defaultRival ? ` ${copy.rivalDefaultSuffix}` : ""}
-                      {unavailable.has(rivalId) ? ` ${copy.rivalUnavailableSuffix}` : ""}
+                      {selection.rivals.find((rival) => rival.entryId === rivalId)?.path
+                        ? ""
+                        : ` ${copy.rivalUnavailableSuffix}`}
                     </option>
                   ))}
                 </select>
@@ -205,9 +209,6 @@ export function MemberDecisionControls({
               </label>
             ))}
           </div>
-          {askedWindow !== windowSize ? (
-            <p className={styles.note}>{copy.windowFellBack(askedWindow, windowSize)}</p>
-          ) : null}
           <p className={styles.note}>
             {windows.length > 1 ? copy.windowLimits : copy.windowNotComputed}
           </p>

@@ -16,6 +16,9 @@ const MovesPage = lazy(() =>
 const RivalsPage = lazy(() =>
   import("../features/rivals/pages/RivalsPage").then((m) => ({ default: m.RivalsPage })),
 );
+const LeagueEntryPage = lazy(() =>
+  import("../features/league/pages/LeagueEntryPage").then((m) => ({ default: m.LeagueEntryPage })),
+);
 const LeaguePage = lazy(() =>
   import("../features/league/pages/LeaguePage").then((m) => ({ default: m.LeaguePage })),
 );
@@ -56,7 +59,7 @@ function LocalizedApp({ basename }: { basename: string }) {
         <PageShell>
           <Suspense fallback={<EmptyState title={messages.common.loading} />}>
             <Routes>
-              <Route path="/" element={<SquadPage />} />
+              <Route path="/" element={<LeagueEntryPage />} />
               <Route path="/gw/:season/:gameweek" element={<SquadPage />} />
               <Route path="/moves" element={<MovesPage />} />
               <Route path="/moves/:season/:gameweek" element={<MovesPage />} />

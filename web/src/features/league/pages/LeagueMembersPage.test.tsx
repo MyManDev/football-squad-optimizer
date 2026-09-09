@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   mockEntryAdviceEnvelope,
+  mockEntryAdviceIndex,
   mockEntrySquadEnvelopes,
   mockLeagueMembersEnvelope,
 } from "../../../fixtures/league";
@@ -126,26 +127,32 @@ describe("league member points", () => {
 
 describe("league member surfaces", () => {
   it.each(["tr", "en"] as const)(
-    "explains the system score and preserves member differences in %s",
+    "keeps member surfaces free of the system squad and its comparisons in %s",
     (language) => {
       const copy = MESSAGES[language];
       renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />, undefined, language);
-      expect(screen.getAllByText(copy.league.note)).toHaveLength(1);
+      expect(screen.queryByText(copy.league.note)).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
+      expect(screen.queryByText(copy.leagueMembers.systemTeamBadge)).not.toBeInTheDocument();
       cleanup();
       const entryId = 35249001;
       renderPage(
         <LeagueMemberView
+          index={mockEntryAdviceIndex(entryId).payload}
           squad={mockEntrySquadEnvelopes[entryId]!}
           advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
         />,
         `/league/members/${entryId}`,
         language,
       );
-      expect(screen.getAllByText(copy.league.note)).toHaveLength(1);
+      expect(screen.queryByText(copy.league.note)).not.toBeInTheDocument();
       expect(
-        screen.getByRole("heading", { name: copy.leagueMembers.squadoptComparisonTitle }),
-      ).toBeInTheDocument();
-      expect(screen.getByText(copy.leagueMembers.squadoptComparison("+9"))).toBeInTheDocument();
+        screen.queryByRole("heading", { name: copy.leagueMembers.squadoptComparisonTitle }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(copy.leagueMembers.squadoptComparison("+9")),
+      ).not.toBeInTheDocument();
+      expect(mockEntrySquadEnvelopes[entryId]!.payload.squadopt_comparison).not.toBeNull();
     },
   );
 
@@ -162,7 +169,7 @@ describe("league member surfaces", () => {
     expect(screen.queryByText(MESSAGES.tr.league.note)).not.toBeInTheDocument();
   });
 
-  it("appends our own row when the live envelope has none, and claims no rank for it", () => {
+  it("lists only the published human members when the live envelope has no system row", () => {
     const live = {
       ...mockLeagueMembersEnvelope,
       payload: {
@@ -172,30 +179,13 @@ describe("league member surfaces", () => {
         ),
       },
     };
-    renderPage(
-      <LeagueMembersView
-        envelope={live}
-        systemRow={{
-          member_kind: "system",
-          entry_id: null,
-          manager_name: "SquadOpt",
-          team_name: "SquadOpt",
-          rank: 0,
-          gameweek_points: 26,
-          transfer_cost: 0,
-          total_points: 26,
-          movement: "unknown",
-          movement_places: null,
-          data_quality: "complete",
-        }}
-      />,
-    );
+    renderPage(<LeagueMembersView envelope={live} />);
 
-    expect(screen.getByText("SquadOpt · sistem takımı")).toBeInTheDocument();
-    // Placing ourselves among the members needs their points, which the standings view
-    // does not carry; an invented rank would be the page's one unmeasured number.
-    const systemCells = screen.getByRole("link", { name: "SquadOpt" }).closest("tr")!;
-    expect(systemCells.querySelector("td")!.textContent).toBe("—");
+    expect(screen.getAllByRole("row")).toHaveLength(live.payload.members.length + 1);
+    expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(MESSAGES.tr.leagueMembers.memberCount(live.payload.members.length)),
+    ).toBeInTheDocument();
   });
 
   it.each(["tr", "en"] as const)(
@@ -223,27 +213,17 @@ describe("league member surfaces", () => {
     expect(screen.getByText(MESSAGES.tr.leagueMembers.gameweekNetNote)).toBeInTheDocument();
   });
 
-  it("does not double our row when the envelope already carries one", () => {
-    renderPage(
-      <LeagueMembersView
-        envelope={mockLeagueMembersEnvelope}
-        systemRow={{
-          member_kind: "system",
-          entry_id: null,
-          manager_name: "SquadOpt",
-          team_name: "SquadOpt",
-          rank: 0,
-          gameweek_points: 26,
-          transfer_cost: 0,
-          total_points: 26,
-          movement: "unknown",
-          movement_places: null,
-          data_quality: "complete",
-        }}
-      />,
-    );
+  it("excludes a published virtual system row from both the visitor list and its count", () => {
+    renderPage(<LeagueMembersView envelope={mockLeagueMembersEnvelope} />);
 
-    expect(screen.getAllByText("SquadOpt · sistem takımı")).toHaveLength(1);
+    const humans = mockLeagueMembersEnvelope.payload.members.filter(
+      (member) => member.member_kind === "human",
+    );
+    expect(screen.getAllByRole("row")).toHaveLength(humans.length + 1);
+    expect(
+      screen.getByText(MESSAGES.tr.leagueMembers.memberCount(humans.length)),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("SquadOpt · sistem takımı")).not.toBeInTheDocument();
   });
 
   it("renders member standings, the public-data notice and an example badge", () => {
@@ -252,23 +232,23 @@ describe("league member surfaces", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Lig Üyeleri" })).toBeInTheDocument();
     expect(screen.getByText("örnek veri")).toBeInTheDocument();
     expect(screen.getByText(/son tarihinden sonra herkese açık FPL verisidir/)).toBeInTheDocument();
-    expect(screen.getAllByRole("row")).toHaveLength(12);
+    expect(screen.getAllByRole("row")).toHaveLength(11);
     expect(screen.getByRole("link", { name: "Deniz Aral" })).toHaveAttribute(
       "href",
       "/league/members/35249001",
     );
-    expect(screen.getByText("SquadOpt · sistem takımı")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "SquadOpt" })).toHaveAttribute(
-      "href",
-      "/league/members/squadopt",
-    );
+    expect(screen.queryByRole("link", { name: "SquadOpt" })).not.toBeInTheDocument();
   });
 
   it("shows point-cost labels and no probability percentage on member advice", () => {
     const entryId = 35249001;
     const advice = mockEntryAdviceEnvelope(entryId, "ortak-koru", 1);
     const { container } = renderPage(
-      <LeagueMemberView squad={mockEntrySquadEnvelopes[entryId]!} advice={advice} />,
+      <LeagueMemberView
+        index={mockEntryAdviceIndex(entryId).payload}
+        squad={mockEntrySquadEnvelopes[entryId]!}
+        advice={advice}
+      />,
       `/league/members/${entryId}?mode=ortak-koru&window=1`,
     );
 
@@ -278,8 +258,7 @@ describe("league member surfaces", () => {
     expect(screen.getAllByText(/beklenen puan maliyeti/).length).toBeGreaterThan(0);
     expect(screen.getByText(/yalnızca senin kadrondan/)).toBeInTheDocument();
     expect(screen.getByText(/banka edilmiş ikinci transfer/)).toBeInTheDocument();
-    expect(screen.getByText(/Satın alma fiyatları public değildir/)).toBeInTheDocument();
-    expect(screen.getByText(/puan farkın: \+9/)).toBeInTheDocument();
+    expect(screen.getByText(/Satın alma fiyatları herkese açık değildir/)).toBeInTheDocument();
     expect(container.textContent).not.toContain("%");
   });
 
@@ -287,17 +266,19 @@ describe("league member surfaces", () => {
     const entryId = 35249001;
     renderPage(
       <LeagueMemberView
+        index={mockEntryAdviceIndex(entryId).payload}
         squad={mockEntrySquadEnvelopes[entryId]!}
-        advice={mockEntryAdviceEnvelope(entryId, "garantici", 1)}
+        advice={mockEntryAdviceEnvelope(entryId, "ortak-koru", 1)}
       />,
-      `/league/members/${entryId}?mode=garantici`,
+      `/league/members/${entryId}?mode=ortak-koru`,
     );
     expect(screen.getByText(/beklenen puandan vazgeçiyor/)).toBeInTheDocument();
-    expect(screen.getByText(/Harbor Rovers kadrosuna göre fiyatlandı/)).toBeInTheDocument();
+    expect(screen.getByText(/kadrosuna göre fiyatlandı/)).toBeInTheDocument();
 
     cleanup();
     renderPage(
       <LeagueMemberView
+        index={mockEntryAdviceIndex(entryId).payload}
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
       />,
@@ -310,6 +291,7 @@ describe("league member surfaces", () => {
     const entryId = 35249010;
     renderPage(
       <LeagueMemberView
+        index={mockEntryAdviceIndex(entryId).payload}
         squad={mockEntrySquadEnvelopes[entryId]!}
         advice={mockEntryAdviceEnvelope(entryId, "saf-puan", 1)}
       />,
@@ -318,10 +300,82 @@ describe("league member surfaces", () => {
 
     expect(screen.getByText("Bu üye için kadro bulunmuyor.")).toBeInTheDocument();
     expect(
-      screen.getByText("Kaynak kadro eksik olduğu için öneri gösterilmiyor."),
+      screen.getByText(
+        "Bu kayıt, transfersiz bir öneri olduğunu doğrulayacak kadar plan bilgisi içermiyor.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("list", { name: "Pozisyona göre ilk on bir" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe.each(["tr", "en"] as const)("published overlap bounds in %s", (language) => {
+  it.each([
+    ["within_free_transfers", "OPTIMAL"],
+    ["within_free_transfers", "FEASIBLE"],
+    ["with_hits", "OPTIMAL"],
+    ["with_hits", "FEASIBLE"],
+  ] as const)("keeps %s / %s bounds separate from the measured player count", (kind, solver) => {
+    // Published GW4 member 313686 vs 5662073: the recommended 15 share four IDs
+    // with the rival XI, while fark-yarat's applied maximum remains five.
+    const recommendedIds = [
+      154561, 466075, 522047, 106760, 141746, 446008, 466052, 424876, 219168, 475168, 177815,
+      489639, 60307, 487676, 472769,
+    ];
+    const rivalXiIds = new Set([
+      116535, 106760, 606702, 465730, 441302, 141746, 176297, 466052, 209244, 219168, 223094,
+    ]);
+    const measuredOverlap = recommendedIds.filter((id) => rivalXiIds.has(id)).length;
+    expect(new Set(recommendedIds).size).toBe(15);
+    expect(rivalXiIds.size).toBe(11);
+    expect(measuredOverlap).toBe(4);
+    const entryId = 35249001;
+    const index = mockEntryAdviceIndex(entryId).payload;
+    const rivalId = index.default_rival_entry_id!;
+    const advice = mockEntryAdviceEnvelope(entryId, "fark-yarat", 1, rivalId);
+    advice.payload.overlap_count = measuredOverlap;
+    advice.payload.overlap_target = 5;
+    advice.payload.overlap_applied = 5;
+    advice.payload.transfer_cap = 1;
+    advice.payload.transfer_hit_points = 0;
+    advice.payload.expected_points_cost = 0;
+    advice.payload.expected_points_cost_ceiling = 0;
+    advice.payload.solver_status = solver;
+    advice.payload.plan_kind = kind;
+    advice.payload.alternative_plan = {
+      kind: kind === "with_hits" ? "within_free_transfers" : "with_hits",
+      overlap_applied: 5,
+      transfer_hit_points: 0,
+      expected_points_cost: 0,
+      expected_points_cost_ceiling: 0,
+    };
+    renderPage(
+      <LeagueMemberView squad={mockEntrySquadEnvelopes[entryId]!} advice={advice} index={index} />,
+      `/league/members/${entryId}?mode=fark-yarat&rival=${rivalId}`,
+      language,
+    );
+    const copy = MESSAGES[language].leagueMembers;
+    expect(screen.getByText((text) => text.includes(copy.overlapLine(4)))).toBeInTheDocument();
+    expect(
+      screen.queryByText((text) => text.includes(copy.overlapLine(5))),
+    ).not.toBeInTheDocument();
+    const paragraph = screen.getByText(
+      language === "tr" ? /istenen ortak oyuncu sınırı 5/ : /requested overlap bound 5/,
+    );
+    expect(paragraph).toHaveTextContent(
+      language === "tr" ? "uygulanan ortak oyuncu sınırı 5" : "applied overlap bound 5",
+    );
+    expect(paragraph).not.toHaveTextContent(
+      /reached|reachable|ulaş|still came out ahead|önde çıktı/i,
+    );
+    if (kind === "within_free_transfers")
+      expect(paragraph).toHaveTextContent(
+        language === "tr"
+          ? "yayımlanan transfer cezası 0 puan"
+          : "published transfer penalties 0 points",
+      );
+    if (solver === "FEASIBLE")
+      expect(paragraph).toHaveTextContent(language === "tr" ? "maliyet en fazla" : "cost at most");
   });
 });

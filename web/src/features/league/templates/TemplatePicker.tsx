@@ -24,7 +24,13 @@ import styles from "./TemplatePicker.module.css";
 
 const DEFAULT_STORE = new LocalTemplateStore();
 
-export function TemplatePicker({ store = DEFAULT_STORE }: { store?: TemplateStore }) {
+export function TemplatePicker({
+  store = DEFAULT_STORE,
+  canApply,
+}: {
+  store?: TemplateStore;
+  canApply?: (selection: URLSearchParams) => boolean;
+}) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -48,7 +54,7 @@ export function TemplatePicker({ store = DEFAULT_STORE }: { store?: TemplateStor
   const activeRival: number | "nearest_above" =
     Number.isInteger(rawRival) && rawRival > 0 ? rawRival : "nearest_above";
 
-  function apply(template: GameTemplate): void {
+  function selectionFor(template: GameTemplate): URLSearchParams {
     const next = new URLSearchParams(searchParams);
     next.set("mode", template.strategy);
     next.set("window", String(template.window));
@@ -56,7 +62,12 @@ export function TemplatePicker({ store = DEFAULT_STORE }: { store?: TemplateStor
     // producer's default and needs no parameter.
     if (template.rival === "nearest_above") next.delete("rival");
     else next.set("rival", String(template.rival));
-    setSearchParams(next);
+    return next;
+  }
+
+  function apply(template: GameTemplate): void {
+    const next = selectionFor(template);
+    if (!canApply || canApply(next)) setSearchParams(next);
   }
 
   function saveCurrent(): void {
@@ -93,6 +104,7 @@ export function TemplatePicker({ store = DEFAULT_STORE }: { store?: TemplateStor
               <button
                 type="button"
                 className={active ? styles.templateActive : styles.template}
+                disabled={canApply ? !canApply(selectionFor(template)) : false}
                 onClick={() => apply(template)}
               >
                 {template.name}

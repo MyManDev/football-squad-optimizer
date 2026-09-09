@@ -1,20 +1,25 @@
 import { expect, test } from "@playwright/test";
 
 import { installLeagueMocks } from "./leagueMocks";
+import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 
 const PAGES = [
-  { link: "Kadro", heading: /Oyun haftası/, path: "/" },
-  { link: "Önerilen Hamleler", heading: "Önerilen Hamleler", path: "/moves" },
-  { link: "Rakipler", heading: "Rakip Analizi", path: "/rivals" },
-  { link: "Lig", heading: "Lig Analizi", path: "/league" },
-  { link: "Analiz", heading: "Analiz Merkezi", path: "/analysis" },
+  { heading: "Ligini bul", path: "/" },
+  { heading: "Lig Üyeleri", path: "/league/members" },
+  { heading: /Oyun haftası/, path: "/gw/2026-27/1" },
+  { heading: "Önerilen Hamleler", path: "/moves" },
+  { heading: "Rakip Analizi", path: "/rivals" },
+  { heading: "Lig Analizi", path: "/league" },
+  { heading: "Analiz Merkezi", path: "/analysis" },
 ] as const;
 
 test.beforeEach(async ({ page }) => {
   await installLeagueMocks(page);
 });
 
-test("the five primary pages are navigable without browser errors", async ({ page }) => {
+test("visitor navigation reaches league entry and analysis without browser errors", async ({
+  page,
+}) => {
   const errors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
@@ -22,7 +27,10 @@ test("the five primary pages are navigable without browser errors", async ({ pag
   page.on("pageerror", (error) => errors.push(error.message));
 
   await page.goto("/");
-  for (const destination of PAGES) {
+  for (const destination of [
+    { link: "Lig", heading: "Ligini bul", path: "/" },
+    { link: "Analiz", heading: "Analiz Merkezi", path: "/analysis" },
+  ]) {
     await page.getByRole("link", { name: destination.link, exact: true }).click();
     await expect(page).toHaveURL(destination.path);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(destination.heading);
@@ -30,6 +38,58 @@ test("the five primary pages are navigable without browser errors", async ({ pag
 
   expect(errors).toEqual([]);
 });
+
+for (const language of ["tr", "en"] as const) {
+  test(`a cold ${language} visitor finds the published member list without system-squad links`, async ({
+    page,
+  }) => {
+    await page.addInitScript((value) => {
+      localStorage.clear();
+      localStorage.setItem("squadopt.language", value);
+    }, language);
+    const systemDataRequests: string[] = [];
+    page.on("request", (request) => {
+      if (/\/data\/[^/]+\/gw\d+\//.test(new URL(request.url()).pathname)) {
+        systemDataRequests.push(request.url());
+      }
+    });
+
+    await page.route("**/data/league/members.json", (route) =>
+      route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ...mockLeagueMembersEnvelope, source_kind: "live" }),
+      }),
+    );
+    await page.goto("/");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      language === "tr" ? "Ligini bul" : "Find your league",
+    );
+    await expect(page.getByLabel(language === "tr" ? "Lig numarası" : "League ID")).toHaveValue("");
+    await page.getByLabel(language === "tr" ? "Lig numarası" : "League ID").fill("352490");
+    await page
+      .getByRole("button", { name: language === "tr" ? "Ligi bul" : "Find league" })
+      .click();
+
+    await expect(page).toHaveURL("/league/members");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+      language === "tr" ? "Lig Üyeleri" : "League Members",
+    );
+    await expect(page.getByRole("link", { name: "Deniz Aral" })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", language);
+    expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
+    expect(
+      await page
+        .locator("header nav a, footer a")
+        .evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+    ).toEqual(["/", "/analysis", "/status"]);
+    await expect(
+      page.locator(
+        'a[href="/league"], a[href^="/gw/"], a[href^="/moves"], a[href^="/rivals"], a[href="/league/members/squadopt"]',
+      ),
+    ).toHaveCount(0);
+    expect(systemDataRequests).toEqual([]);
+  });
+}
 
 for (const theme of ["dark", "light"] as const) {
   test(`${theme} theme applies its complete root palette`, async ({ page }) => {
