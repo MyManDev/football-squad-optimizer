@@ -30,28 +30,133 @@ export class LeagueDataMissing extends LeagueDataError {
   }
 }
 
-function assertEnvelope<T>(value: LeagueViewEnvelope<T>): LeagueViewEnvelope<T> {
-  if (value.contract_version !== CONTRACT_VERSION) {
-    throw new LeagueDataError(
-      `League view contract mismatch: expected ${CONTRACT_VERSION}, found ${value.contract_version}.`,
-    );
+function record(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function finite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function nullableNumber(value: unknown): boolean {
+  return value === null || finite(value);
+}
+
+function publicMember(value: unknown): boolean {
+  if (!record(value)) return false;
+  return (
+    ((value.member_kind === "human" &&
+      Number.isSafeInteger(value.entry_id) &&
+      Number(value.entry_id) > 0) ||
+      (value.member_kind === "system" && value.entry_id === null)) &&
+    (value.manager_name === null || typeof value.manager_name === "string") &&
+    (value.team_name === null || typeof value.team_name === "string") &&
+    finite(value.rank) &&
+    nullableNumber(value.gameweek_points) &&
+    nullableNumber(value.total_points) &&
+    (value.transfer_cost === undefined || nullableNumber(value.transfer_cost)) &&
+    typeof value.movement === "string" &&
+    ["up", "down", "same", "new", "unknown"].includes(value.movement) &&
+    (value.movement_places === undefined || nullableNumber(value.movement_places))
+  );
+}
+
+function publishedPlayer(value: unknown): boolean {
+  return (
+    record(value) &&
+    Number.isSafeInteger(value.player_id) &&
+    Number(value.player_id) > 0 &&
+    typeof value.name === "string" &&
+    typeof value.short_name === "string" &&
+    typeof value.team === "string" &&
+    typeof value.position === "string" &&
+    ["GK", "DEF", "MID", "FWD"].includes(value.position) &&
+    finite(value.expected_points) &&
+    typeof value.is_captain === "boolean" &&
+    (value.bench_order == null || Number.isSafeInteger(value.bench_order))
+  );
+}
+
+function assertEnvelope<T>(value: unknown): LeagueViewEnvelope<T> {
+  if (
+    !record(value) ||
+    value.contract_version !== CONTRACT_VERSION ||
+    !record(value.payload) ||
+    typeof value.generated_at_utc !== "string" ||
+    (value.source_kind !== "live" && value.source_kind !== "example")
+  ) {
+    throw new LeagueDataError("The published league envelope is invalid.");
   }
-  return value;
+  return value as unknown as LeagueViewEnvelope<T>;
+}
+
+function assertMembers(
+  envelope: LeagueViewEnvelope<LeagueMembers>,
+): LeagueViewEnvelope<LeagueMembers> {
+  const view = envelope.payload;
+  if (
+    !record(view) ||
+    !Number.isSafeInteger(view.league_id) ||
+    view.league_id <= 0 ||
+    typeof view.league_name !== "string" ||
+    typeof view.season !== "string" ||
+    !Number.isSafeInteger(view.gameweek) ||
+    view.public_after_deadline !== true ||
+    (view.scored_gameweek !== null && !Number.isSafeInteger(view.scored_gameweek)) ||
+    !Array.isArray(view.members) ||
+    !view.members.every(publicMember)
+  ) {
+    throw new LeagueDataError("The published member list is invalid.");
+  }
+  return envelope;
+}
+
+function assertSquad(
+  envelope: LeagueViewEnvelope<EntrySquad>,
+  entryId: number,
+): LeagueViewEnvelope<EntrySquad> {
+  const view = envelope.payload;
+  if (
+    !record(view) ||
+    !publicMember(view.entry) ||
+    view.entry.member_kind !== "human" ||
+    view.entry.entry_id !== entryId ||
+    !Number.isSafeInteger(view.league_id) ||
+    view.league_id <= 0 ||
+    typeof view.season !== "string" ||
+    !Number.isSafeInteger(view.gameweek) ||
+    (view.source_snapshot_id !== null && typeof view.source_snapshot_id !== "string") ||
+    !Array.isArray(view.starting_xi) ||
+    !view.starting_xi.every(publishedPlayer) ||
+    !Array.isArray(view.bench) ||
+    !view.bench.every(publishedPlayer) ||
+    !Array.isArray(view.missing_fields) ||
+    !view.missing_fields.every((field) => typeof field === "string") ||
+    !["complete", "partial", "empty"].includes(view.data_quality) ||
+    typeof view.free_transfers_known !== "boolean" ||
+    typeof view.purchase_prices_known !== "boolean" ||
+    !finite(view.free_transfers)
+  ) {
+    throw new LeagueDataError("The published member squad is invalid or belongs to another entry.");
+  }
+  return envelope;
 }
 
 async function read<T>(relative: string): Promise<LeagueViewEnvelope<T>> {
   const response = await fetch(`${BASE}${relative}`, { cache: "no-cache" });
   if (response.status === 404) throw new LeagueDataMissing(relative);
   if (!response.ok) throw new LeagueDataError(`League data is not available (${response.status}).`);
-  // A static host answers an unknown path with the app shell rather than a 404, so a
-  // missing document arrives as a 200 carrying HTML. Parsing that as JSON fails with a
-  // syntax error that says nothing; treating it as "not published" says what happened.
+  // Static hosts can return their HTML app shell for an unpublished JSON path.
+  // A broken JSON publication is unreadable and must not become an example fallback.
   const body = await response.text();
   let parsed: LeagueViewEnvelope<T>;
   try {
     parsed = JSON.parse(body) as LeagueViewEnvelope<T>;
   } catch {
-    throw new LeagueDataMissing(relative);
+    if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(body)) {
+      throw new LeagueDataMissing(relative);
+    }
+    throw new LeagueDataError(`The published league document at ${relative} is not valid JSON.`);
   }
   return assertEnvelope(parsed);
 }
@@ -99,18 +204,23 @@ async function readOrExample<T>(
 }
 
 export async function loadLeagueMembers(): Promise<LeagueViewEnvelope<LeagueMembers>> {
-  return readOrExample<LeagueMembers>(
-    "members.json",
-    async () => (await mockModule()).mockLeagueMembersEnvelope,
+  return assertMembers(
+    await readOrExample<LeagueMembers>(
+      "members.json",
+      async () => (await mockModule()).mockLeagueMembersEnvelope,
+    ),
   );
 }
 
 export async function loadEntrySquad(entryId: number): Promise<LeagueViewEnvelope<EntrySquad>> {
-  return readOrExample<EntrySquad>(`entries/${entryId}.json`, async () => {
-    const fixture = (await mockModule()).mockEntrySquadEnvelopes[entryId];
-    if (!fixture) throw new LeagueDataError(`No example entry ${entryId}.`);
-    return fixture;
-  });
+  return assertSquad(
+    await readOrExample<EntrySquad>(`entries/${entryId}.json`, async () => {
+      const fixture = (await mockModule()).mockEntrySquadEnvelopes[entryId];
+      if (!fixture) throw new LeagueDataError(`No example entry ${entryId}.`);
+      return fixture;
+    }),
+    entryId,
+  );
 }
 
 export async function loadEntryAdvice(
@@ -158,7 +268,7 @@ export async function lookupPublishedLeague(
     throw new LeagueDataError("A positive league ID is required.");
   }
   if (leagueId !== SUPPORTED_LEAGUE_ID) return "unsupported";
-  const envelope = await read<LeagueMembers>("members.json");
+  const envelope = assertMembers(await read<LeagueMembers>("members.json"));
   const payload = envelope.payload;
   if (
     envelope.source_kind !== "live" ||
