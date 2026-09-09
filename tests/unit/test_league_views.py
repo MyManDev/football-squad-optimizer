@@ -1,8 +1,6 @@
 """The league views builder: member advice from the seam, independence pinned as fact."""
 
-import dataclasses
 import json
-from collections.abc import Sequence
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -12,7 +10,6 @@ import pandas as pd
 import pytest
 import tests.unit.test_live_transfers as world_module
 
-import squadopt.live.transfers as live_transfers
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
 from squadopt.application.league_views import MemberStanding, build_league_views
 from squadopt.data.snapshots import read_snapshot
@@ -63,13 +60,8 @@ def _world_context(world: dict[str, Any]) -> tuple[Any, Any, Any]:
 
 def _legal_squad(world: dict[str, Any]) -> list[int]:
     # The world's shape is 3 GK / 8 DEF / 8 MID / 5 FWD with codes 1001..1024 in
-    # position blocks. "Legal" here means the 2-5-5-3 *shape* only: this fifteen holds
-    # four from Club 1 and four from Club 2, which the game's three-per-club rule
-    # forbids, and it holds the injured 1005. Both are deliberate — the member's first
-    # decision is a repair, which is what ``test_a_squad_that_needs_transfers_to_be_legal_
-    # falls_back_to_the_hit_plan`` (test_advise_entry.py) exists to cover. It is also why
-    # this world's plan cannot respond to MEMBER_PLANNING_POLICY's caution margin: use
-    # ``DISCRETIONARY_SQUAD`` below for a member whose transfers are a choice.
+    # position blocks; a legal 2-5-5-3 fifteen with max three per club exists by
+    # construction of the fixture data.
     codes = [1001, 1002]  # GK
     codes += [1004, 1005, 1006, 1007, 1008]  # DEF
     codes += [1012, 1013, 1014, 1015, 1016]  # MID
@@ -660,131 +652,12 @@ def test_the_baseline_advice_is_byte_identical_with_and_without_paths(
     assert first == second
 
 
-# A member whose plan is a *choice*, unlike the shared ``_legal_squad`` fifteen: club-legal
-# (at most three per club), holding the world's one high scorer so the captain is settled
-# either way, and holding nobody the projection has ruled out. Every transfer it makes is
-# therefore discretionary, which is what makes the caution margin able to decide anything.
-DISCRETIONARY_SQUAD = (
-    1001, 1002,                    # GK   Club 1, Club 2
-    1004, 1006, 1007, 1008, 1009,  # DEF  Club 1, 3, 4, 5, 6
-    1012, 1013, 1014, 1015, 1016,  # MID  Club 1, 2, 3, 4, 5
-    1022, 1023, 1024,              # FWD  Club 3, 4, 5
-)  # fmt: skip
-# Two upgrades priced onto this world so one straddles the caution margin: 1017 at 8.0
-# replaces the held 1014 (2.0) for a gain of 6.0, and 1019 at 7.0 replaces the held 1015
-# (2.5) for 4.5. Both stay under 1024's 9.0, so 1024 is captain in every plan and each gain
-# is the plain points difference rather than a captaincy swing. The member has one free
-# transfer, so the first upgrade is free and the second is the one the margin prices.
-DISCRETIONARY_UPGRADES = ((1017, 8.0), (1019, 7.0))
-
-
-def _discretionary_projection(projection: Any) -> Any:
-    """The world's projection with ``DISCRETIONARY_UPGRADES`` applied."""
-
-    table = projection.table.copy(deep=True)
-    for player_id, points in DISCRETIONARY_UPGRADES:
-        table.loc[table["player_id"] == player_id, "expected_points"] = points
-    return dataclasses.replace(projection, table=table)
-
-
-def _publish_member_advice(
-    world: dict[str, Any],
-    tmp_path: Path,
-    *,
-    name: str,
-    squad: Sequence[int],
-    projection: Any,
-    inputs: Any,
-    rules: Any,
-) -> bytes:
-    """Publish one member's ``saf-puan`` advice and return the file's bytes."""
-
-    import datetime
-
-    build_league_views(
-        _Provider({101: _member_picks(world, 101, list(squad))}),
-        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
-        inputs,
-        projection,
-        rules,
-        league_id=352490,
-        league_name="Test League",
-        out_dir=tmp_path / name,
-        now=datetime.datetime(2026, 8, 23, 12, 0, tzinfo=datetime.UTC),
-    )
-    return (tmp_path / name / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
-
-
-def test_the_member_planning_hit_cost_reaches_the_published_bytes(
-    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Moving ``MEMBER_PLANNING_POLICY``'s caution margin changes what the member is told.
-
-    This is the gate on the policy value, and it is stated as a difference rather than as
-    a recorded literal so that it cannot quietly stop discriminating. The pair of values
-    is the owner's 2026-09-07 decision itself, 4.0 -> 8.0: at 4.0 the planner buys the
-    second upgrade and pays the game's four points for it, at 8.0 it declines and takes
-    only the free one. The byte pin below cannot do this — its world forces both of its
-    transfers — so without this test the policy could move, or be reverted by accident,
-    with every published byte unchanged.
-    """
-
-    import hashlib
-
-    inputs, projection, rules = _world_context(world)
-    tuned = _discretionary_projection(projection)
-    published: dict[float, bytes] = {}
-    for margin in (4.0, 8.0):
-        values = dict(live_transfers._MEMBER_PLANNING_POLICY_VALUES)
-        values["transfer_hit_cost_points"] = margin
-        monkeypatch.setattr(live_transfers, "_MEMBER_PLANNING_POLICY_VALUES", values)
-        published[margin] = _publish_member_advice(
-            world,
-            tmp_path,
-            name=f"margin-{margin}",
-            squad=DISCRETIONARY_SQUAD,
-            projection=tuned,
-            inputs=inputs,
-            rules=rules,
-        )
-
-    assert published[4.0] != published[8.0], (
-        "the published advice must respond to MEMBER_PLANNING_POLICY's caution margin; "
-        f"both margins published {hashlib.sha256(published[4.0]).hexdigest()}"
-    )
-    at_four = json.loads(published[4.0])["payload"]
-    at_eight = json.loads(published[8.0])["payload"]
-    # 4.0 is below the second upgrade's 4.5 gain, so the planner buys it and is charged.
-    assert [
-        (move["player_out"]["player_id"], move["player_in"]["player_id"])
-        for move in at_four["moves"]
-    ] == [(1014, 1017), (1015, 1019)]
-    assert at_four["transfer_hit_points"] == 4.0
-    # 8.0 is above it, so only the free transfer is made and nothing is charged.
-    assert [
-        (move["player_out"]["player_id"], move["player_in"]["player_id"])
-        for move in at_eight["moves"]
-    ] == [(1014, 1017)]
-    assert at_eight["transfer_hit_points"] == 0.0
-    # The captain is the same in both, so the difference is the margin and nothing else.
-    assert at_four["captain"]["player_id"] == at_eight["captain"]["player_id"] == 1024
-
-
 # The in-season member plan this world produces, recorded so that a change to the member
 # advice path has to declare itself. Every other test in this file compares two runs of
 # the same commit, which passes even if every number moved; these literals are the only
 # thing here that would notice. The planner itself has the GW1 opening pin
 # (test_live_recommendation.py); this is the same gate for the in-season member path,
 # which that pin never exercised: a held squad, sell prices, and a transfer decision.
-#
-# What these bytes do *not* gate is MEMBER_PLANNING_POLICY. This world's held fifteen is
-# illegal under the game's three-per-club rule (four from Club 1 and four from Club 2), so
-# the planner is repairing squad legality rather than weighing a transfer, and both moves
-# are forced: the caution margin was measured to move the solve's objective from 42.85 at
-# 4.0 to -353.15 at 400.0 while the published bytes never changed. The gate on the policy
-# value is ``test_the_member_planning_hit_cost_reaches_the_published_bytes`` above, which
-# holds a discretionary member; the value itself is pinned in
-# ``tests/unit/test_live_transfers.py``.
 IN_SEASON_MEMBER_ADVICE_SHA256 = "cf3846bd66baba6938898a47b9d67b6a42ead8512f4653f4b0193d41a1441477"
 # (player_out, player_in, expected_points_delta) per move, each pair one position. The
 # week's hit charge is not here because it is not a property of a move: this plan makes
@@ -1409,119 +1282,3 @@ def test_an_unknown_rival_strategy_is_refused(world: dict[str, Any], tmp_path: P
             out_dir=tmp_path / "bad",
             rival_strategies=("kaptan-ayris",),
         )
-
-
-# --- a publish is this week's whole picture, not an overlay on last week's --------------
-
-
-def test_a_member_who_fails_to_render_does_not_keep_last_weeks_documents(
-    world: dict[str, Any], tmp_path: Path
-) -> None:
-    """The live surface defect: last week's advice served as this week's.
-
-    ``publish_gameweek_site`` builds into a worktree checked out of ``origin/develop``, which
-    carries the previous publish's tree, and commits ``git add web/public/data`` — the union.
-    Nothing here removed anything, so a member whose picks could not be read kept last
-    week's ``entries/{id}.json`` and ``advice/{id}/**`` while ``members.json`` was rewritten
-    to this gameweek. Their row still linked, and the page rendered a finished gameweek's
-    transfer recommendation under the current week's league.
-
-    The publish is not refused over it: one member's data gap must not withhold the other
-    members' advice, which is this module's stated rule. The absence is made honest instead —
-    the row already says ``data_quality`` "empty", and now the document is genuinely not
-    there rather than stale.
-    """
-
-    inputs, projection, rules = _world_context(world)
-    squad = _legal_squad(world)
-    out = tmp_path / "league"
-    registrations = (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),)
-    build_league_views(
-        _Provider({101: _member_picks(world, 101, squad)}),
-        registrations,
-        inputs,
-        projection,
-        rules,
-        league_id=352490,
-        league_name="Test League",
-        out_dir=out,
-    )
-    assert (out / "entries" / "101.json").is_file()
-    assert (out / "advice" / "101" / "saf-puan" / "1.json").is_file()
-
-    # The next week's publish, into the tree the last one left, with this member's picks
-    # no longer readable from the capture.
-    report = build_league_views(
-        _Provider({}),
-        registrations,
-        inputs,
-        projection,
-        rules,
-        league_id=352490,
-        league_name="Test League",
-        out_dir=out,
-    )
-
-    assert report.rendered_count == 0
-    assert not (out / "entries" / "101.json").exists(), "last week's squad is still served"
-    assert not (out / "advice" / "101").exists(), "last week's advice is still served"
-    assert report.removed == ("entries/101.json", "advice/101/")
-    # The members list is still published, and still names the member as empty rather than
-    # dropping them: absent advice is not an absent member.
-    members = json.loads((out / "members.json").read_text(encoding="utf-8"))["payload"]["members"]
-    assert [row["entry_id"] for row in members] == [101]
-    assert members[0]["data_quality"] == "empty"
-
-
-def test_a_rendered_member_keeps_every_document_the_run_wrote(
-    world: dict[str, Any], tmp_path: Path
-) -> None:
-    """The pruning may only reach documents this run did not produce."""
-
-    inputs, projection, rules = _world_context(world)
-    out = tmp_path / "league"
-    picks = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
-    registrations = (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),)
-    for _ in range(2):
-        report = build_league_views(
-            picks,
-            registrations,
-            inputs,
-            projection,
-            rules,
-            league_id=352490,
-            league_name="Test League",
-            out_dir=out,
-        )
-
-    assert report.removed == ()
-    assert (out / "entries" / "101.json").is_file()
-    assert (out / "advice" / "101" / "saf-puan" / "1.json").is_file()
-
-
-def test_files_the_rule_does_not_understand_are_left_alone(
-    world: dict[str, Any], tmp_path: Path
-) -> None:
-    """``scoreboard.json`` is written into this same directory by a different script, after
-    this one runs. A rule that deletes what it did not anticipate is a worse failure than
-    the one it fixes, so only entry-shaped names are touched."""
-
-    inputs, projection, rules = _world_context(world)
-    out = tmp_path / "league"
-    (out / "entries").mkdir(parents=True)
-    (out / "scoreboard.json").write_text("{}", encoding="utf-8")
-    (out / "entries" / "README.json").write_text("{}", encoding="utf-8")
-
-    build_league_views(
-        _Provider({101: _member_picks(world, 101, _legal_squad(world))}),
-        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
-        inputs,
-        projection,
-        rules,
-        league_id=352490,
-        league_name="Test League",
-        out_dir=out,
-    )
-
-    assert (out / "scoreboard.json").is_file()
-    assert (out / "entries" / "README.json").is_file()

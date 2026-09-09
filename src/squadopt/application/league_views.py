@@ -25,8 +25,7 @@ Two rules are load-bearing and tested rather than asserted:
 
 import functools
 import json
-import shutil
-from collections.abc import Callable, Collection, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -297,69 +296,10 @@ class LeagueViewsReport:
     gameweek: int
     members: tuple[MemberViewResult, ...]
     files: tuple[str, ...]
-    #: Documents from an earlier publish that this run removed because it did not produce
-    #: them. Reported rather than done quietly: a deletion under ``web/public`` is a change
-    #: to what the site serves, and the operator reads this line beside "not rendered".
-    removed: tuple[str, ...] = ()
 
     @property
     def rendered_count(self) -> int:
         return sum(1 for member in self.members if member.rendered)
-
-
-def _prune_unpublished_members(out: Path, published: Collection[int]) -> tuple[str, ...]:
-    """Remove the member documents this run did not write, and name them.
-
-    A publish is a whole picture of one gameweek, not an overlay on the last one — but the
-    tree it builds into is the previous publish's. ``publish_gameweek_site`` checks a
-    worktree out of ``origin/develop``, which carries the committed tree from last week, and
-    then commits ``git add web/public/data``: the union of what it finds. Nothing here used
-    to remove anything, so a member whose render failed kept last week's
-    ``entries/{id}.json`` and ``advice/{id}/**`` while ``members.json`` was rewritten to this
-    gameweek. Their row still linked, their page still rendered, and what it rendered was a
-    finished gameweek's transfer recommendation served as this week's advice.
-
-    Refusing the whole publish was the other way to answer that, and it is the wrong one. A
-    member's picks go missing for reasons that have nothing to do with the other fourteen —
-    a member with no current price took the whole batch out once — and this module's stated
-    rule is that one failure does not sink the batch. Refusing would answer one member's
-    data gap by withholding everyone else's advice, which is a larger harm than the one
-    being fixed.
-
-    So the publish stands and the absence becomes honest. The tree can already *say* absent:
-    the member's row carries ``data_quality`` "empty". What it could not do was *be* absent,
-    because the old document was still at the address. Removing it means the page has
-    nothing to render rather than something wrong — absent, which is not the same as zero
-    and not the same as stale.
-
-    Only entry-shaped names are touched: a file under ``entries/`` or a directory under
-    ``advice/`` whose name is an entry id this run did not publish. Anything else in the
-    tree — ``scoreboard.json``, which a different script writes into the same directory
-    after this one — is left exactly as found, because a rule that deletes what it did not
-    anticipate is a worse failure than the one it fixes.
-    """
-
-    removed: list[str] = []
-
-    def _stale(name: str) -> bool:
-        try:
-            return int(name) not in published
-        except ValueError:
-            return False
-
-    entries = out / "entries"
-    if entries.is_dir():
-        for path in sorted(entries.iterdir()):
-            if path.is_file() and path.suffix == ".json" and _stale(path.stem):
-                path.unlink()
-                removed.append(f"entries/{path.name}")
-    advice = out / "advice"
-    if advice.is_dir():
-        for path in sorted(advice.iterdir()):
-            if path.is_dir() and _stale(path.name):
-                shutil.rmtree(path)
-                removed.append(f"advice/{path.name}/")
-    return tuple(removed)
 
 
 def _envelope(payload: Mapping[str, object], *, generated_at_utc: str) -> dict[str, object]:
@@ -894,16 +834,11 @@ def build_league_views(
                 # carry — a data gap for this member, not a reason the league fails.
                 mode_note = f"competitive modes unavailable: {error}"
 
-        # Which of the member's documents is the one we told them, and which one the rule
-        # merely suggested. These are two facts, and the record keeps them as two.
-        #
-        # The page selects its strategy from the URL and falls back to pure points; the
-        # link from the members table carries no query string, and the declared rule's
-        # pick is a badge on an option the member may ignore rather than a preselection
-        # (``MemberDecisionControls``: "it marks, it does not choose"). So the document a
-        # member is shown is the one-week pure-points baseline, whatever the rule named —
-        # and a ``told`` that pointed at the rule's file would permanently name a squad
-        # nobody saw, in a record that cannot afterwards be rewritten.
+        # Which of the member's documents is the one we told them. The page points at the
+        # declared rule's pick when there is one and its file was actually written; when
+        # the rule could not be stated, or its file did not solve, the page shows the
+        # pure-points baseline, and the record says which of the two it was rather than
+        # leaving a later reader to re-apply a rule from inputs that have since moved.
         emitted_paths = {item.relative_path for item in emitted}
         suggested_slug = str(suggested["strategy"]) if suggested is not None else None
         suggested_path = (
@@ -911,30 +846,27 @@ def build_league_views(
             if suggested_slug is not None
             else None
         )
-        told: dict[str, object] = {
-            "strategy": COMPUTED_MODE,
-            "window": COMPUTED_WINDOW,
-            "rival_entry_id": None,
-            "published_path": f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json",
-            "source": "default_view",
-            # The rule's pick, where the rule could be stated and its file was actually
-            # written. Null covers both halves of "no suggestion stands": the rule had no
-            # proven gap to read, or the strategy it named did not solve for this member.
-            # The rival is the document's own — the pure-points file is rival-free
-            # whoever suggested it — not the rival the rule compared against.
-            "suggested": (
-                {
-                    "strategy": suggested_slug,
-                    "window": COMPUTED_WINDOW,
-                    "rival_entry_id": (
-                        None if suggested_slug == COMPUTED_MODE else task.default_rival_id
-                    ),
-                    "published_path": suggested_path,
-                }
-                if suggested_path is not None and suggested_path in emitted_paths
-                else None
-            ),
-        }
+        told: dict[str, object] = (
+            {
+                "strategy": suggested_slug,
+                "window": COMPUTED_WINDOW,
+                # The rival of the document pointed at, not the rival the rule compared
+                # against: the pure-points file is rival-free whoever suggested it.
+                "rival_entry_id": (
+                    None if suggested_slug == COMPUTED_MODE else task.default_rival_id
+                ),
+                "published_path": suggested_path,
+                "source": "suggested_strategy",
+            }
+            if suggested_path is not None and suggested_path in emitted_paths
+            else {
+                "strategy": COMPUTED_MODE,
+                "window": COMPUTED_WINDOW,
+                "rival_entry_id": None,
+                "published_path": f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}.json",
+                "source": "baseline",
+            }
+        )
         publications.append((picks, render.transfer_config_fingerprint, emitted, told))
 
         results.append(MemberViewResult(entry_id, registration.label, True, reason=mode_note))
@@ -960,11 +892,6 @@ def build_league_views(
         newline="\n",
     )
     written.append(members_path.name)
-
-    # Whatever this run did not produce is not this week's advice, and the tree it wrote
-    # into is last week's. Removed after members.json rather than before the renders, so a
-    # run that dies mid-batch leaves the old tree whole rather than half-deleted.
-    removed = _prune_unpublished_members(out, {picks.entry_id for picks, _, _, _ in publications})
 
     # The record comes last, after every published file is on disk: a refusal here must
     # never be able to stop a member's advice reaching them. Every member is attempted
@@ -1002,5 +929,4 @@ def build_league_views(
         gameweek=gameweek,
         members=tuple(results),
         files=tuple(sorted(written)),
-        removed=removed,
     )

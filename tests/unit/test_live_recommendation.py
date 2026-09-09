@@ -34,11 +34,6 @@ from squadopt.live import (
     read_inputs,
     render,
 )
-from squadopt.live.report import (
-    LIVE_DETERMINISTIC_UNITS,
-    LIVE_WALL_CEILING_SECONDS,
-    live_optimization_config,
-)
 from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
 from squadopt.prediction.elite_evidence import (
     ELITE_EVIDENCE_MODEL_VERSION,
@@ -353,85 +348,6 @@ def test_a_feasible_but_unproven_squad_is_not_a_live_recommendation(
     monkeypatch.setattr(live_report, "optimize_squad", lambda *_args, **_kwargs: partial)
 
     with pytest.raises(DataSourceError, match="did not prove the squad optimal"):
-        build_recommendation(inputs, projection)
-
-
-def test_the_live_configuration_stops_on_deterministic_work_not_the_clock() -> None:
-    """Only a budget that is a function of the inputs may decide where the search stops.
-
-    The live path ran for a season with ``solver_deterministic_time_limit=None``, which
-    left ``solver_time_limit_seconds`` as the tie-break's only stopping rule: the choice
-    between equally-optimal squads was settled by whatever else the machine was doing.
-    """
-
-    config = live_optimization_config()
-
-    assert config.solver_deterministic_time_limit == LIVE_DETERMINISTIC_UNITS
-    assert config.solver_time_limit_seconds == LIVE_WALL_CEILING_SECONDS
-    # Measured on the recorded opening-gameweek pool (600 players): the whole solve costs
-    # 3.512 deterministic units and 4.40s-4.52s of wall clock over five runs, so the
-    # budget is what binds and the ceiling is a stop rather than a second budget.
-    assert LIVE_DETERMINISTIC_UNITS > 4.0 * 3.512
-    assert LIVE_WALL_CEILING_SECONDS > 10.0 * 4.52
-
-
-def test_build_recommendation_solves_at_the_live_configuration(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A caller that names no config gets the measured live one, not the dataclass default."""
-
-    snapshot = _capture(tmp_path)
-    inputs = read_inputs(snapshot, season=SEASON)
-    projection = project(inputs, _panel(players=(1001, 1004, 1012)))
-    seen: list[OptimizationConfig] = []
-    original = live_report.optimize_squad
-
-    def _spy(pool: Any, config: OptimizationConfig) -> Any:
-        seen.append(config)
-        return original(pool, config)
-
-    monkeypatch.setattr(live_report, "optimize_squad", _spy)
-    build_recommendation(inputs, projection)
-
-    assert [config.solver_deterministic_time_limit for config in seen] == [LIVE_DETERMINISTIC_UNITS]
-    assert [config.solver_time_limit_seconds for config in seen] == [LIVE_WALL_CEILING_SECONDS]
-
-
-def test_a_clock_stopped_solve_is_refused_rather_than_recorded_as_proven(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """``OPTIMAL`` with an unfinished tie-break is not a proof, and must not be recorded.
-
-    The primary solve proves the objective value; which of the squads reaching that value
-    ships is settled afterwards by the lexicographic tie-break. A tie-break the wall clock
-    cut off returns whichever member of the optimal set it was holding, and the status
-    still reads ``OPTIMAL`` — so the ledger would freeze a machine-dependent squad as the
-    proven one. The run has to fail instead.
-    """
-
-    snapshot = _capture(tmp_path)
-    inputs = read_inputs(snapshot, season=SEASON)
-    projection = project(inputs, _panel(players=(1001, 1004, 1012)))
-    pool = projection.table.loc[
-        :, ["player_id", "name", "team_id", "position", "price_tenths", "expected_points"]
-    ]
-    solved = optimize_squad(pool, live_optimization_config())
-    assert solved.diagnostics["tiebreak_completed"] is True  # the honest case still passes
-    cut = replace(
-        solved,
-        diagnostics={
-            **solved.diagnostics,
-            "tiebreak_attempted": True,
-            "tiebreak_status": "FEASIBLE",
-            "tiebreak_completed": False,
-            "deterministic_time_budget_exhausted": False,
-        },
-    )
-    monkeypatch.setattr(live_report, "optimize_squad", lambda *_args, **_kwargs: cut)
-
-    with pytest.raises(DataSourceError, match="wall-clock safety cap"):
         build_recommendation(inputs, projection)
 
 

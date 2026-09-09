@@ -10,24 +10,6 @@ unlimited; the operating budget assumes 500 deployments per month, 20,000 files 
 25 MiB per file. Recheck the official [Pages overview][pages], [Pages limits][pages-limits],
 and [Functions pricing][functions-pricing] before adding server-side code.
 
-## The address members open
-
-The Pages project serves two hostnames. **`https://squadopt.mymandev.com` is the canonical
-one**: it is the address given to members, the only one reachable from their networks, and the
-origin their browsers send. The project's `*.pages.dev` subdomain remains the deployment alias
-— CI smokes it, identity verification resolves it from the API, and it works fine from GitHub
-Actions — but it is not a link to hand to anyone.
-
-`pages.dev` is filtered on the hostname from the owner's network. Measured on 2026-09-09: TCP
-to `squadopt.pages.dev:443` completes in about 29 ms and the peer then resets the connection
-before any TLS record, identically on the apex, on a per-deployment alias, and on an unrelated
-`*.pages.dev` site. `developers.cloudflare.com` answers 200 over the same path, and still
-answers 200 when curl is forced to send that request to the address `squadopt.pages.dev`
-resolves to — while sending SNI `squadopt.pages.dev` to the address that just answered gets the
-reset. So it is the name, not Cloudflare, the IP, or the deployment.
-`docs/handover_2026-08-23.md` recorded the same unreachability from a second network on
-2026-08-23. The custom domain answers 200 on all seven smoke paths and serves the current data.
-
 ## Immediate credential rule
 
 Any API token pasted into chat, a ticket, a command-line argument, or a log is compromised.
@@ -158,15 +140,7 @@ The trusted smoke test checks `/`, `/moves`, `/rivals`, `/league`, `/analysis`, 
 document; the data endpoint must parse as JSON and carry the short-lived revalidation policy.
 Transient edge/propagation failures are retried for roughly one minute.
 
-Production runs it twice: once against the `pages.dev` alias, then against
-`https://squadopt.mymandev.com`. Both must pass. The second run is what makes a publication
-that never reached the address members open fail instead of reporting green; it is not
-retried differently, because the same one-minute budget covers alias propagation on either
-hostname. Preview deployments run the alias check only — custom domains serve the production
-branch, so a `pr-N` preview never appears on the canonical host.
-
-Run the same check from any machine with Node 22 when diagnosing a deployment. Note that
-`pages.dev` will fail from a filtered network; use the canonical host there:
+Run the same check from any machine with Node 22 when diagnosing a deployment:
 
 ```console
 cd web

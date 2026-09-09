@@ -58,9 +58,6 @@ from squadopt.platform.capture_context import (
 from squadopt.platform.store_probe import StoreProbeResult, probe_store
 
 __all__ = [
-    "CANONICAL_SITE_ORIGIN",
-    "PAGES_ALIAS_ORIGIN",
-    "SITE_ORIGINS",
     "BackendConfig",
     "BackendConfigError",
     "CaptureContextProvider",
@@ -72,28 +69,6 @@ __all__ = [
 ]
 
 _COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
-
-CANONICAL_SITE_ORIGIN = "https://squadopt.mymandev.com"
-"""The address members open, and therefore the ``Origin`` a real browser sends.
-
-The Pages project answers on two hostnames. This is the one that is reachable: from the
-owner's network `squadopt.pages.dev` accepts the TCP connection and is then reset before any
-TLS record, while the same request to the same Cloudflare address under another hostname
-answers 200 (`docs/architecture/decisions/0004-cloudflare-pages-deployment.md`).
-"""
-
-PAGES_ALIAS_ORIGIN = "https://squadopt.pages.dev"
-"""The project alias. Still served, still deployed to, and still allowed — it is what CI and
-anyone outside the filtered networks uses — but it is not the address given to members."""
-
-SITE_ORIGINS: tuple[str, ...] = (CANONICAL_SITE_ORIGIN, PAGES_ALIAS_ORIGIN)
-"""Every hostname the site is published on, canonical first. The CORS allowlist the
-deployment sets is this tuple; it is a named fact here so the runbook cannot drift from it.
-
-This is deliberately *not* the ``BackendConfig.allowed_origins`` default. An unset
-``SQUADOPT_BACKEND_ALLOWED_ORIGINS`` must keep meaning no cross-origin access at all, so a
-deployment that forgets the variable fails closed rather than inheriting an allowlist.
-"""
 
 DEFAULT_RATE_LIMIT = 30
 DEFAULT_RATE_WINDOW_SECONDS = 60.0

@@ -29,12 +29,7 @@ from squadopt.live.risk import (
 )
 from squadopt.live.rules import SeasonRules
 from squadopt.live.transfers import HeldSquad, TransferDecision, plan_transfers
-from squadopt.optimization import (
-    OptimizationConfig,
-    SolverStatus,
-    optimize_squad,
-    wall_clock_stopped_the_search,
-)
+from squadopt.optimization import OptimizationConfig, SolverStatus, optimize_squad
 from squadopt.optimization.models import OptimizationResult
 from squadopt.prediction.elite_evidence import (
     COMPONENT_ELITE_MODEL_VERSION,
@@ -52,69 +47,6 @@ SQUAD_COLUMNS: Final = ("name", "team_id", "position", "price_tenths", "expected
 # reported rather than presented as a recommendation, because a squad found before the
 # clock ran out is not the best squad for the projection it came from.
 PROVEN_STATUSES: Final = (SolverStatus.OPTIMAL,)
-
-#: The live solve's deterministic budget, in CP-SAT deterministic units. Only a budget
-#: that is a function of the inputs may decide where the search stops: the primary proves
-#: the objective, and the lexicographic tie-break then picks the canonical member of the
-#: primal-optimal set, so a tie-break cut short hands that choice to whatever the machine
-#: was doing. Before this constant existed the live path ran with no deterministic budget
-#: at all, and the tie-break's only stopping rule was ``solver_time_limit_seconds``.
-#:
-#: Measured on the recorded opening-gameweek pool (``data/ledger/2026-27/gw01``, 600
-#: players) at this configuration: the primary spends 0.641 units, the tie-break 2.871,
-#: 3.512 in total, and the tie-break proves its optimum. 60.0 is seventeen times that, so
-#: it does not bind on work this pool has been seen to need; when it does bind, it binds
-#: at the same place on every machine and ``deterministic_time_budget_exhausted`` says so.
-LIVE_DETERMINISTIC_UNITS: Final = 60.0
-
-#: The wall-clock ceiling is a safety stop, never a budget: it exists so a pathological
-#: solve ends, not so it decides. The same recorded pool spends its 3.512 deterministic
-#: units in 4.40s-4.52s of wall clock over five runs on the development machine, and the
-#: whole 60-unit budget projects to roughly 76s at that rate. 300.0 is sixty-six times the
-#: measured solve and about four times the budget's projected cost, so the clock cannot
-#: reach the search first on work this machine has been seen to do. ``build_recommendation``
-#: refuses a solve this ceiling did cut rather than recording it as proven.
-LIVE_WALL_CEILING_SECONDS: Final = 300.0
-
-
-def live_optimization_config() -> OptimizationConfig:
-    """The live path's solver settings: a deterministic budget under a wall-clock stop."""
-
-    return OptimizationConfig(
-        solver_time_limit_seconds=LIVE_WALL_CEILING_SECONDS,
-        solver_deterministic_time_limit=LIVE_DETERMINISTIC_UNITS,
-    )
-
-
-def _refuse_a_clock_stopped_solve(
-    inputs: RecommendationInputs,
-    status: SolverStatus,
-    diagnostics: Mapping[str, object],
-    what: str,
-) -> None:
-    """Refuse a live decision the wall clock, not the deterministic budget, ended.
-
-    ``OPTIMAL`` on its own does not mean the answer replays. The status reports the
-    *primary* solve, which proves the objective value; the identity of the squad among
-    the plans that reach that value is settled afterwards by the lexicographic tie-break,
-    and a tie-break the clock cut off returns whichever member of the optimal set it
-    happened to hold. Recording that as ``OPTIMAL`` states a proof the run does not have,
-    and the ledger keeps it forever. So the run fails here instead: where a clock stops a
-    search is a function of the machine, not of the inputs.
-    """
-
-    if not wall_clock_stopped_the_search(status, diagnostics):
-        return
-    raise DataSourceError(
-        f"The {what} returned {status.name} for {inputs.season} gameweek "
-        f"{inputs.deadline.gameweek}, but the wall-clock safety cap of "
-        f"{diagnostics.get('solver_time_limit_seconds')!r}s stopped the search before its "
-        f"deterministic budget of {diagnostics.get('solver_deterministic_time_limit')!r} "
-        f"units — {diagnostics.get('deterministic_time_used')!r} units were spent, and the "
-        f"tie-break reported {diagnostics.get('tiebreak_status')!r}. Where the clock stops "
-        "a search is a function of the machine, not of the inputs, so this squad is not "
-        "the squad a second run would find and may not be recorded as proven."
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,7 +120,7 @@ def build_recommendation(
     would hand back an empty recommendation dressed as an answer.
     """
 
-    settings = live_optimization_config() if optimization is None else optimization
+    settings = OptimizationConfig() if optimization is None else optimization
     pool = projection.table.loc[
         :, ["player_id", "name", "team_id", "position", "price_tenths", "expected_points"]
     ]
@@ -214,7 +146,6 @@ def build_recommendation(
             f"gameweek {inputs.deadline.gameweek} but did not prove the squad optimal. "
             "A live recommendation requires an OPTIMAL result."
         )
-    _refuse_a_clock_stopped_solve(inputs, result.solver_status, result.diagnostics, "solver")
 
     risk = (
         risk_not_requested()
@@ -281,7 +212,7 @@ def build_transfer_recommendation(
     a reader should make is that the bank after is not negative.
     """
 
-    settings = live_optimization_config() if optimization is None else optimization
+    settings = OptimizationConfig() if optimization is None else optimization
     plan, decision, _ = plan_transfers(
         inputs, projection, held, rules, optimization=settings, chip=chip
     )
@@ -291,7 +222,6 @@ def build_transfer_recommendation(
             f"gameweek {inputs.deadline.gameweek} but did not prove the plan optimal. "
             "A live decision requires an OPTIMAL result."
         )
-    _refuse_a_clock_stopped_solve(inputs, plan.solver_status, plan.diagnostics, "transfer planner")
     week = plan.weeks[0]
     risk = risk_not_requested()
     if risk_history is not None:

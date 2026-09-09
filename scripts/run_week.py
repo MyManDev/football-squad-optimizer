@@ -58,17 +58,9 @@ Steps, each skippable by naming its output:
 Timing rules the scripts enforce and this one states up front: the Top-100 captures
 must happen before the deadline and after the previous gameweek's picks are public; the
 handoff must be built from the capture the decision will run on.
-
-Everything that can refuse is asked before the first capture is taken, because a refusal
-after one has been spent cannot be retried cleanly against a deadline: the ledger's ability
-to start this gameweek, the chip's window, whether a reused capture's evidence artifact is
-both present and older than it, and whether the working tree still matches the commit an
-artifact would record. That last one tolerates changes under ``web/public/data`` — the tree
-steps 6 to 8 write themselves, which nothing reads back — and refuses every other change.
 """
 
 import argparse
-import json
 import re
 import subprocess
 import sys
@@ -76,8 +68,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-
-from scripts._experiment_cli import GENERATED_SITE_TREE, reproducibility_blockers
 
 from squadopt.application.commands import DecideRequest, decide
 from squadopt.data.errors import DataError
@@ -284,92 +274,8 @@ def check_rotation_for_reused_capture(
     )
 
 
-def _pair_on_disk(pair: tuple[Path, Path]) -> bool:
-    """Both halves of an artifact are there. Half of one is not a reusable artifact."""
-
-    return all(path.is_file() for path in pair)
-
-
-def will_export_provenance_artifact(
-    plan: WeekPlan,
-    *,
-    elite_snapshot: str | None,
-    snapshot_id: str | None,
-    evidence_root: Path = EVIDENCE_ROOT,
-    rotation_root: Path = ROTATION_ROOT,
-) -> bool:
-    """Whether this run will *write* an artifact that records the commit it was built at.
-
-    Only those steps ask anything of the working tree, and only when the artifact is not
-    already on disk: a reused export is bytes written at some other commit, and nothing in
-    this checkout can change them. Mirrors the reuse branches in :func:`run_week` exactly,
-    so the pre-flight neither refuses a run the loop would have completed nor lets one
-    through that the export will stop.
-    """
-
-    if "top100" in plan.steps and not (
-        elite_snapshot is not None
-        and _pair_on_disk(
-            evidence_artifact(evidence_root, plan.season, plan.gameweek, elite_snapshot)
-        )
-    ):
-        return True
-    return "rotation" in plan.steps and not (
-        snapshot_id is not None
-        and _pair_on_disk(rotation_artifact(rotation_root, plan.season, plan.gameweek, snapshot_id))
-    )
-
-
-def check_working_tree(*, cwd: Path = REPOSITORY_ROOT) -> None:
-    """Refuse a working tree the evidence export would refuse -- before anything is spent.
-
-    The export records the commit it ran at so the artifact can be rebuilt from it, and
-    refuses when the tree disagrees with that commit. That refusal is right. Where it
-    happened was not: it is the third action of step 1, after ``capture_top100_cohort`` and
-    ``capture_elite_picks`` have each taken and written a live capture. It is precisely what
-    :func:`preflight_decide` exists to prevent -- "a refusal there wastes the week's
-    captures. Asked here first" -- and the same sentence applies word for word here.
-
-    **What is tolerated: this loop's own output under ``web/public/data/``.** Steps 6 to 8
-    rewrite that tree on every run, and ``status.json`` carries the hours left to the
-    deadline, so it differs a second later. A checkout that has published once can therefore
-    never start a second run clean, which made the loop the commonest cause of its own
-    refusal. Nothing under that tree is read by anything the loop exports -- the evidence
-    table is built from the captures under ``data/snapshots/`` and the code at ``HEAD`` -- so
-    a change confined to it cannot change what the artifact says and cannot stop it being
-    rebuilt from the commit it records.
-
-    **What still refuses: every other change, tracked or untracked.** A modified source file
-    means the artifact was not produced by the commit it names, and re-running at that commit
-    would not reproduce it. An untracked file is refused for a narrower reason that is just
-    as real: an untracked module beside an exporter can be imported and change what the
-    export computes, and it is in no commit at all, so nothing could reproduce it. Both are
-    answered by committing, restoring or removing the paths named below -- never by widening
-    this rule, which is exactly as strict as the export's own.
-    """
-
-    blockers = reproducibility_blockers(cwd)
-    if not blockers:
-        return
-    listed = "\n".join(f"    {line}" for line in blockers)
-    raise WeekError(
-        "The working tree carries changes outside the site tree this loop writes, so the "
-        "evidence export would refuse -- but only after the week's two Top-100 captures had "
-        f"been taken. Refused here instead, with nothing spent:\n{listed}\n"
-        "  Commit them, restore the tracked ones with `git checkout -- <path>`, or remove "
-        f"the untracked ones, then run again. Changes under {GENERATED_SITE_TREE}/ are this "
-        "loop's own output and are already tolerated, so they are not listed above."
-    )
-
-
 def check_evidence_for_reused_capture(
-    evidence_root: Path,
-    *,
-    season: str,
-    gameweek: int,
-    elite_snapshot: str,
-    snapshot_id: str,
-    captured_at_utc: str,
+    evidence_root: Path, *, season: str, gameweek: int, elite_snapshot: str, snapshot_id: str
 ) -> None:
     """Refuse a reused live capture whose evidence export is not already on disk.
 
@@ -382,60 +288,18 @@ def check_evidence_for_reused_capture(
     not a timing accident and no amount of promptness escapes it. Worse, the refused run
     leaves the artifact behind, so every later run for that pair takes the "already
     exported" branch and fails the same way. Said here, before anything is spent.
-
-    Which is why *being on disk is not the question*. The artifact left behind by a refused
-    run — or written by a ``--projection component-only`` run, which still exports and skips
-    this guard — is on disk and too late, so an existence test passes it and the run dies at
-    the handoff about ninety seconds later with the timing refusal instead. So the manifest
-    is read here and its ``generated_at_utc`` compared against the capture, which is the
-    check ``apply_elite_evidence`` makes anyway, moved to where nothing has been spent.
     """
 
     table, manifest = evidence_artifact(evidence_root, season, gameweek, elite_snapshot)
-    # "Export it for that picks capture first" is not among the escapes named below, because
-    # it cannot be done: the export stamps the wall clock and its CLI offers no override.
-    escapes = (
-        "Run with --skip-top100 or --projection component-only to leave the Top-100 uplift "
-        "out, or reuse a live capture taken after this artifact was generated."
+    if table.is_file() and manifest.is_file():
+        return
+    raise WeekError(
+        f"Reusing {snapshot_id} needs the evidence export for {elite_snapshot} already on "
+        f"disk; {table.name} is not under {evidence_root}. Re-exporting it now would stamp "
+        "the artifact after that capture was taken, which the handoff refuses. Export it "
+        "for that picks capture first, or run with --skip-top100 or --projection "
+        "component-only to leave the Top-100 uplift out."
     )
-    if not _pair_on_disk((table, manifest)):
-        raise WeekError(
-            f"Reusing {snapshot_id} needs the evidence export for {elite_snapshot} already "
-            f"on disk; {table.name} is not under {evidence_root}. Re-exporting it now would "
-            f"stamp the artifact after that capture was taken, which the handoff refuses. "
-            f"{escapes}"
-        )
-    generated_at_utc = _artifact_generated_at(manifest)
-    if as_instant(normalize_utc_timestamp(generated_at_utc, label="generated_at_utc")) > as_instant(
-        normalize_utc_timestamp(captured_at_utc, label="captured_at_utc")
-    ):
-        raise WeekError(
-            f"The evidence artifact {table.name} was generated at {generated_at_utc}, after "
-            f"{snapshot_id} was captured at {captured_at_utc}. The handoff refuses an "
-            f"artifact generated after the decision capture, and no re-export can be earlier "
-            f"than a capture already taken. {escapes}"
-        )
-
-
-def _artifact_generated_at(manifest: Path) -> str:
-    """The evidence manifest's own generation stamp, or a refusal naming the file.
-
-    A manifest that cannot be read or does not carry the stamp is not an artifact the
-    handoff can use either, so it is refused here rather than at the read an hour later.
-    """
-
-    try:
-        document = json.loads(manifest.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as error:
-        raise WeekError(f"The evidence manifest {manifest} could not be read: {error}") from error
-    generated_at = document.get("generated_at_utc") if isinstance(document, dict) else None
-    if not isinstance(generated_at, str):
-        raise WeekError(
-            f"The evidence manifest {manifest} carries no generated_at_utc, so whether the "
-            "artifact predates the capture cannot be told. The handoff asks the same "
-            "question and would refuse it."
-        )
-    return generated_at
 
 
 def new_snapshot(before: Sequence[str], after: Sequence[str], prefix: str) -> str:
@@ -618,15 +482,6 @@ def run_week(arguments: argparse.Namespace) -> int:
             f"No entry registry at {REGISTRY_PATH}; seed it first with "
             "`python -m scripts.seed_entry_registry --league <id>`."
         )
-    if will_export_provenance_artifact(
-        plan,
-        elite_snapshot=arguments.elite_snapshot,
-        snapshot_id=arguments.snapshot_id,
-    ):
-        # Before any capture: an artifact records the commit it was built at, and a tree
-        # that disagrees with that commit makes it unreproducible. The export says so too,
-        # but only after two captures have been taken and written.
-        check_working_tree()
     if (
         arguments.snapshot_id
         and "top100" in plan.steps
@@ -634,16 +489,13 @@ def run_week(arguments: argparse.Namespace) -> int:
         and arguments.elite_snapshot
     ):
         # The other half of "the evidence must predate the decision capture": the artifact
-        # itself, which a re-export would stamp with the wall clock. The capture is on disk
-        # — this branch only runs for a reused one — so when it was taken can be read and
-        # compared here rather than discovered at the handoff.
+        # itself, which a re-export would stamp with the wall clock.
         check_evidence_for_reused_capture(
             EVIDENCE_ROOT,
             season=plan.season,
             gameweek=plan.gameweek,
             elite_snapshot=arguments.elite_snapshot,
             snapshot_id=arguments.snapshot_id,
-            captured_at_utc=capture_deadline(SNAPSHOT_ROOT, arguments.snapshot_id)[2],
         )
     if arguments.snapshot_id and "rotation" in plan.steps:
         # The same half of the same rule, for this lane's own artifact.

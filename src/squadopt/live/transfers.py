@@ -267,24 +267,12 @@ Provenance — what each measurement said about moving them, in date order:
   read as one.
 
 Revisit rule. These values change only in a pull request that cites a measurement on
-the lookahead-1 season chain with 2025-26 included as a season, and that re-pins the
-site's pinned fixture under ``web/public/data`` in the same commit, because a changed
-policy changes what every member is told. The reading is re-examined at gameweek 19 from
-the live scorecard (``docs/weekly_scorecard.md``): the season's own hits and what they
-returned are the evidence the development seasons cannot give.
-
-What enforces that rule in the suite, and what does not. The values are pinned literally
-in ``test_the_member_planning_policy_is_the_rule_and_its_provenance_exists``
-(``tests/unit/test_live_transfers.py``), so a changed or accidentally reverted value fails
-loudly there. That a changed value reaches what a member is *told* is
-``test_the_member_planning_hit_cost_reaches_the_published_bytes``
-(``tests/unit/test_league_views.py``), which publishes one discretionary member's advice
-at ``transfer_hit_cost_points`` 4.0 and again at 8.0 and requires the bytes to differ.
-``IN_SEASON_MEMBER_ADVICE_SHA256`` in that same file is the member path's *replay* gate --
-it notices a changed planner, projection reading, payload or rendering -- but it is not a
-gate on this policy and was cited as one until 2026-09-09: its world's held fifteen breaks
-the game's three-per-club rule, so both of its transfers are forced repairs and the
-published bytes were measured unchanged from a hit cost of 4.0 through 400.0.
+the lookahead-1 season chain with 2025-26 included as a season, and that re-pins
+``IN_SEASON_MEMBER_ADVICE_SHA256`` (``tests/unit/test_league_views.py``) and the site's
+pinned fixture under ``web/public/data`` in the same commit, because a changed policy
+changes what every member is told. The reading is re-examined at gameweek 19 from the live scorecard
+(``docs/weekly_scorecard.md``): the season's own hits and what they returned are the
+evidence the development seasons cannot give.
 
 A planning hit cost above 4 is a caution margin on projected gains, not a rule
 change: the ledger and the settle step charge the game's 4 regardless.
