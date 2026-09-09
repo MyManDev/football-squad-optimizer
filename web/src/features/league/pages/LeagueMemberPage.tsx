@@ -433,10 +433,18 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
       ) : null}
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      {/* A bound that was not recorded is not a bound of zero. The producer emits null
+          for exactly that state and refuses to read it as zero on its own side
+          (`advice.py`'s `bound_slack`: "the proof did not finish" and "the proof finished
+          at zero" are different facts); defaulting here would perform the conflation the
+          backend forbids, and "gap ≤ 0.0 pts" is the strongest proof claim there is —
+          printed inside the sentence that says the proof did not finish. */}
       {view.solver_status === "FEASIBLE" ? (
         <p className={styles.honesty}>
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
-          {copy.unprovenPlanBody(points(view.optimality_gap ?? 0, 1, locale))}
+          {view.optimality_gap != null
+            ? copy.unprovenPlanBody(points(view.optimality_gap, 1, locale))
+            : copy.unprovenPlanBodyNoGap}
         </p>
       ) : null}
       {showsPrice && price != null ? (
@@ -454,7 +462,9 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
       {view.control_solver_status === "FEASIBLE" ? (
         <p className={styles.honesty}>
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
-          {copy.controlUnprovenBody(points(view.control_optimality_gap ?? 0, 1, locale))}
+          {view.control_optimality_gap != null
+            ? copy.controlUnprovenBody(points(view.control_optimality_gap, 1, locale))
+            : copy.controlUnprovenBodyNoGap}
         </p>
       ) : null}
       {view.overlap_count != null && view.expected_gap_vs_rival != null ? (
