@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 from ortools.sat.python import cp_model
 from pandas.testing import assert_frame_equal
+from tests.fixtures.synthetic_players import make_full_size_players
 
 from squadopt import (
     InvalidPlayerDataError,
@@ -15,10 +16,12 @@ from squadopt import (
     SolverStatus,
     optimize_squad,
 )
+from squadopt.live.report import live_optimization_config
 from squadopt.optimization.optimizer import (
     _map_solver_status,
     _scale_bench_coefficient,
     _scale_expected_points,
+    wall_clock_stopped_the_search,
 )
 
 
@@ -271,12 +274,18 @@ def test_bench_is_ordered_keeper_first_then_by_descending_expectation(
     assert outfield_points == sorted(outfield_points, reverse=True)
 
 
-def test_the_tiebreak_gets_its_own_budget_and_completes_on_the_baseline(
+def test_the_tiebreak_is_attempted_and_completes_on_the_baseline(
     baseline_players: pd.DataFrame,
 ) -> None:
-    """#192: a tie-break cut off by the primary's leftover returned an arbitrary
-    secondary optimum. With its own budget and the primary solution as a hint, the
-    baseline solve must report the tie-break attempted and completed."""
+    """The tie-break runs and proves itself on the 24-player baseline.
+
+    This is a smoke check on the plumbing, not the #192 pin it used to call itself. The
+    baseline pool solves in milliseconds, so ``tiebreak_completed`` is true here whatever
+    the budget is: reverting either half of the #192 fix — the tie-break's own budget and
+    the primary-solution hint — leaves this test green. The pin that can notice a budget
+    too small for the pool the live path actually gets is
+    ``test_the_tiebreak_completes_within_the_live_budget_on_a_full_size_pool``.
+    """
 
     result = optimize_squad(baseline_players, OptimizationConfig())
     assert result.solver_status is SolverStatus.OPTIMAL
@@ -284,8 +293,89 @@ def test_the_tiebreak_gets_its_own_budget_and_completes_on_the_baseline(
     assert result.diagnostics["tiebreak_completed"] is True
 
 
+# Measured on the full-size fixture at ``live_optimization_config()``: the primary spends
+# 1.171 deterministic units and the tie-break 4.183, 5.354 in total, identically on three
+# consecutive runs and in separate processes. The recorded opening-gameweek pool costs
+# 3.512 at the same settings, so the fixture is the harder of the two.
+#
+# The ceiling is 1.31x the measurement, and it is chosen against a number rather than for
+# comfort: dropping the #192 hint (``optimizer.py``, the primary solution handed to the
+# tie-break as a start) costs this pool 8.034 units instead of 5.354, so a ceiling of 7.0
+# fails when that hint goes and 12.0 would not have. Deterministic time is reproducible by
+# construction -- one search worker, a fixed seed -- so the only thing that legitimately
+# moves these numbers is a CP-SAT version change, and a version change should re-measure
+# and re-pin them rather than find the gate already loosened to accommodate it.
+FULL_SIZE_TIEBREAK_UNITS = 5.354
+FULL_SIZE_TIEBREAK_UNITS_WITHOUT_THE_HINT = 8.034
+FULL_SIZE_TIEBREAK_UNITS_CEILING = 7.0
+
+
+def test_the_tiebreak_completes_within_the_live_budget_on_a_full_size_pool() -> None:
+    """The live budget proves the tie-break on a pool the size of the one it really gets.
+
+    The tie-break exists to pick a canonical member of the primal-optimal set. Cut short it
+    returns whichever member it was holding, while ``solver_status`` still reports the
+    primary's ``OPTIMAL`` — so an unproven pick would be recorded as the proven answer. The
+    only assertion that can notice the live budget stopping being enough is one made on a
+    pool of the real size: the 24-player baseline above completes whatever the budget is.
+    """
+
+    pool = make_full_size_players()
+    assert len(pool) == 600, "a pin on a small pool cannot notice the real one failing"
+    # The ceiling is between what the tie-break costs and what it costs without the #192
+    # hint, so this test is the pin on that hint as well as on the budget.
+    assert (
+        FULL_SIZE_TIEBREAK_UNITS
+        < FULL_SIZE_TIEBREAK_UNITS_CEILING
+        < FULL_SIZE_TIEBREAK_UNITS_WITHOUT_THE_HINT
+    )
+
+    result = optimize_squad(pool, live_optimization_config())
+
+    assert result.solver_status is SolverStatus.OPTIMAL
+    assert result.diagnostics["tiebreak_attempted"] is True
+    assert result.diagnostics["tiebreak_completed"] is True
+    assert wall_clock_stopped_the_search(result.solver_status, result.diagnostics) is False
+    assert result.diagnostics["deterministic_time_budget_exhausted"] is False
+    spent = float(str(result.diagnostics["deterministic_time_used"]))
+    assert spent < FULL_SIZE_TIEBREAK_UNITS_CEILING, (
+        f"the tie-break spent {spent} deterministic units against a measured "
+        f"{FULL_SIZE_TIEBREAK_UNITS}; the live budget is sized from that measurement"
+    )
+
+
+def test_a_budget_below_the_full_size_pool_stops_it_deterministically() -> None:
+    """The pin above can fail, and when the budget is what stops the search it says so.
+
+    A guard nobody has watched fail is not evidence. Halving the measured need leaves the
+    tie-break unfinished — and because a deterministic budget, not a clock, is what ran
+    out, both the stopping point and this test's outcome are the same on every machine.
+    """
+
+    starved = replace(
+        OptimizationConfig(),
+        solver_time_limit_seconds=600.0,
+        solver_deterministic_time_limit=FULL_SIZE_TIEBREAK_UNITS / 2.0,
+    )
+
+    result = optimize_squad(make_full_size_players(), starved)
+
+    assert result.solver_status is SolverStatus.OPTIMAL  # the primary still proves itself
+    assert result.diagnostics["tiebreak_attempted"] is True
+    assert result.diagnostics["tiebreak_completed"] is False
+    assert result.diagnostics["deterministic_time_budget_exhausted"] is True
+    # The budget ran out, not the clock, so a second run stops in the same place.
+    assert wall_clock_stopped_the_search(result.solver_status, result.diagnostics) is False
+
+
 def test_two_solves_agree_on_the_full_squad_identity(baseline_players: pd.DataFrame) -> None:
-    """The replay guarantee at solution identity, not only objective value."""
+    """The replay guarantee at solution identity, not only objective value.
+
+    Two solves at the same limit on the same 24-player pool, which agree even when the
+    answer is clock-dependent, so this cannot show that identity replays under load. What
+    can is the pair above: the identity a cut tie-break leaves to the machine, and the
+    budget that keeps it from being cut.
+    """
 
     first = optimize_squad(baseline_players, OptimizationConfig())
     second = optimize_squad(baseline_players, OptimizationConfig())
