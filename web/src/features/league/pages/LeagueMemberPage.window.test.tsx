@@ -59,39 +59,53 @@ describe("the advice card shows a window week by week", () => {
     expect(screen.getByText("Kanıt tamamlanamadı")).toBeInTheDocument();
   });
 
-  it("states every limit the producer sends, translated where the site knows it", () => {
+  it.each(["tr", "en"] as const)("translates each known published limit in %s", (language) => {
     const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 5);
-    const known = MESSAGES.tr.leagueMembers.statedLimits;
+    const copy = MESSAGES[language].leagueMembers;
     for (const sentence of WINDOW_STATED_LIMITS) {
-      expect(known[sentence], sentence).toBeTruthy();
+      expect(Object.hasOwn(copy.statedLimits, sentence), sentence).toBe(true);
     }
-    renderAdvice(advice);
-    const section = screen.getByRole("region", { name: "5 haftalık pencere" });
+    renderAdvice(advice, language);
+    const section = screen.getByRole("region", { name: copy.windowTitle(5) });
     const items = within(section).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual(
-      WINDOW_STATED_LIMITS.map((sentence) => known[sentence]),
+      WINDOW_STATED_LIMITS.map((sentence) => copy.statedLimits[sentence]),
     );
     expect(
-      within(section).getByText(/İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır/),
+      within(section).getByRole("columnheader", { name: copy.windowHits }),
     ).toBeInTheDocument();
+    if (language === "tr") expect(section).not.toHaveTextContent(/capture|\bhit\b/i);
   });
 
-  it("shows the producer's own words in English and for a sentence it does not know", () => {
-    const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
-    const stranger = "A sentence the site has never seen.";
-    renderAdvice(
-      {
+  it.each(["tr", "en"] as const)(
+    "keeps unknown and inherited published limits neutral in %s",
+    (language) => {
+      const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 3);
+      const raw = [
+        "A sentence the site has never seen.",
+        "__proto__",
+        "toString",
+        "probability 97% chance",
+      ];
+      const published = [WINDOW_STATED_LIMITS[0]!, ...raw];
+      const advice = {
         ...base,
-        payload: { ...base.payload, stated_limits: [WINDOW_STATED_LIMITS[0]!, stranger] },
-      },
-      "en",
-    );
-    const section = screen.getByRole("region", { name: "The 3-week window" });
-    expect(within(section).getByText(WINDOW_STATED_LIMITS[0]!)).toBeInTheDocument();
-    expect(within(section).getByText(stranger)).toBeInTheDocument();
-    expect(within(section).getByText("GW2")).toBeInTheDocument();
-    expect(within(section).getByText("What this window assumes")).toBeInTheDocument();
-  });
+        payload: { ...base.payload, stated_limits: [...published] },
+      };
+      renderAdvice(advice, language);
+      const copy = MESSAGES[language].leagueMembers;
+      const section = screen.getByRole("region", { name: copy.windowTitle(3) });
+      const items = within(section).getAllByRole("listitem");
+      expect(items.map((item) => item.textContent)).toEqual([
+        copy.statedLimits[WINDOW_STATED_LIMITS[0]!],
+        ...raw.map(() => copy.statedLimitUnknown),
+      ]);
+      for (const sentence of raw) expect(section).not.toHaveTextContent(sentence);
+      expect(advice.payload.stated_limits).toEqual(published);
+      expect(within(section).getByText(copy.windowWeekOf(2))).toBeInTheDocument();
+      expect(within(section).getByText(copy.windowLimitsLabel)).toBeInTheDocument();
+    },
+  );
 
   it("shows no window for a one-week document", () => {
     renderAdvice(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1));

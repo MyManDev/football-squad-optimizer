@@ -7,7 +7,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import { loadLeagueMembers } from "../data";
+import { LeagueDataMissing, loadLeagueMembers } from "../data";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import type { EntryView, LeagueMembers, LeagueViewEnvelope } from "../types";
 import styles from "./LeagueMembersPage.module.css";
@@ -22,7 +22,17 @@ export function LeagueMembersPage() {
   });
   if (query.isPending) return <EmptyState title={copy.loading} />;
   if (query.isError) {
-    return <EmptyState title={copy.notAvailable}>{copy.notAvailableBody}</EmptyState>;
+    const missing = query.error instanceof LeagueDataMissing;
+    return (
+      <EmptyState title={missing ? copy.notAvailable : copy.membersUnreadable}>
+        <p>{missing ? copy.notAvailableBody : copy.membersUnreadableBody}</p>
+        {!missing ? (
+          <button type="button" onClick={() => void query.refetch()}>
+            {copy.retryPublishedRead}
+          </button>
+        ) : null}
+      </EmptyState>
+    );
   }
   return <LeagueMembersView envelope={query.data} />;
 }
@@ -168,7 +178,11 @@ function MemberRow({
       ? copy.unknown
       : member.movement === "new"
         ? copy.newMember
-        : copy.movementLabel(member.movement, member.movement_places ?? 0);
+        : member.movement === "same"
+          ? copy.movementLabel("same", 0)
+          : typeof member.movement_places === "number" && Number.isFinite(member.movement_places)
+            ? copy.movementLabel(member.movement, member.movement_places)
+            : copy.unknown;
   return (
     <tr className={member.member_kind === "system" ? styles.systemRow : undefined}>
       <td className="num">{member.rank === 0 ? "—" : member.rank}</td>

@@ -207,6 +207,7 @@ describe("league member advice flow", () => {
 
   it("leaves the published plan standing when the request fails", async () => {
     const published = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    published.payload.solver_status = "OPTIMAL";
     renderView({
       advice: published,
       client: new FakeClient(async () => {
@@ -218,7 +219,7 @@ describe("league member advice flow", () => {
 
     expect(await screen.findByText(/Hesap tamamlanamadı/)).toBeInTheDocument();
     expect(
-      screen.getByText(published.payload.moves.length === 0 ? /hamle yok/ : /Çıkan/),
+      screen.getByText(published.payload.moves.length === 0 ? /plan transfer önermiyor/ : /Çıkan/),
     ).toBeInTheDocument();
     expect(screen.queryByText("Hesap sonucu")).toBeNull();
   });
@@ -450,7 +451,7 @@ describe("league member advice flow", () => {
       });
 
       expect(screen.queryByText("Computed Striker")).toBeNull();
-      expect(screen.getByText("Bu kombinasyon bu yayın için hesaplanmadı.")).toBeInTheDocument();
+      expect(screen.getByText("Dönen öneri bu görünümle eşleşmiyor.")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Hesapla" })).toBeEnabled();
     },
   );

@@ -300,7 +300,9 @@ describe("league member surfaces", () => {
 
     expect(screen.getByText("Bu üye için kadro bulunmuyor.")).toBeInTheDocument();
     expect(
-      screen.getByText("Kaynak kadro eksik olduğu için öneri gösterilmiyor."),
+      screen.getByText(
+        "Bu kayıt, transfersiz bir öneri olduğunu doğrulayacak kadar plan bilgisi içermiyor.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("list", { name: "Pozisyona göre ilk on bir" }),

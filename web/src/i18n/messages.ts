@@ -23,8 +23,7 @@ const en = {
     rivals: "Rivals",
     league: "League",
     analysis: "Analysis",
-    footer:
-      "Decisions and settled results come from the SquadOpt ledger. Provisional scores show their source capture and time.",
+    footer: "Public league records, published plans and analysis.",
     operations: "Operations Status",
     notFound: "There is no page here.",
     metaDescription: "SquadOpt: a weekly FPL decision, and what it rests on.",
@@ -418,18 +417,26 @@ const en = {
       "ortak-koru": {
         name: "Keep the shared core",
         description:
-          "Hold as many of the rival's eleven as the free transfers reach, up to nine; a hit is spent only where it pays for itself.",
+          "Requests at least 9 shared players between your recommended 15 and the rival's XI. This minimum may be lowered to fit the free-transfer limit; the published plan states the applied bound.",
       },
       "fark-yarat": {
         name: "Create a gap",
         description:
-          "Hold as few of the rival's eleven as the free transfers allow, down to five; the players you do not share decide the gap.",
+          "Requests at most 5 shared players between your recommended 15 and the rival's XI. This maximum may be raised to fit the free-transfer limit; the published plan states the applied bound.",
       },
     } as Record<"saf-puan" | "ortak-koru" | "fark-yarat", { name: string; description: string }>,
     rulePickBadge: "The rule's pick",
     rulePickNote: (rival: string, gap: string, weeks: number) =>
       `A declared rule marks one option from two numbers: your league points against ${rival} (${gap}) and the ${weeks} gameweeks still to play. The rule is written down, not measured — nothing has tested whether following it does better than ignoring it — so it labels an option and never chooses for you.`,
     publicationStates: {
+      "published-missing": {
+        title: "The listed advice file is unavailable.",
+        body: "The index lists this plan, but its document is missing. This does not mean the publisher could not solve the plan.",
+      },
+      "context-mismatch": {
+        title: "The returned advice does not match this view.",
+        body: "Its member, selection, week or data snapshot differs. The mismatched plan is not shown; the held squad remains visible.",
+      },
       "index-missing": {
         title: "This member's advice index is not published.",
         body: "Strategies, windows and rivals can be selected only after the index is available.",
@@ -482,9 +489,23 @@ const en = {
     windowWeekOf: (gameweek: number) => `GW${gameweek}`,
     windowHits: "Hit points",
     windowPoints: "Expected points",
-    // The producer's limit sentences travel in the payload; English shows them as
-    // written, so nothing is listed here and every sentence falls through unchanged.
-    statedLimits: {} as Record<string, string>,
+    // Only exact published limit keys receive these reviewed explanations.
+    statedLimitUnknown:
+      "No translated explanation is available for this published window assumption.",
+    statedLimits: {
+      "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
+        "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.",
+      "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
+        "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.",
+      "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.":
+        "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
+      "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.":
+        "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.",
+      "Prices are held at the captured values; no price change is modelled.":
+        "Prices are held at the captured values; no price change is modelled.",
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.":
+        "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+    } as Record<string, string>,
     controlUnprovenBody: (gap: string) =>
       `The pure-points plan this price is measured against was not proven optimal (gap ≤ ${gap} pts), so the price is published as a ceiling — the most this strategy can cost — and not as an exact figure.`,
     overlapLine: (count: number) => `${count} of the rival's eleven in your fifteen`,
@@ -512,9 +533,35 @@ const en = {
     templateNamePlaceholder: "Name this combination",
     templateSave: "Save current",
     templateRemove: (name: string) => `Remove template ${name}`,
-    notAvailable: "League member data is not connected yet.",
-    notAvailableBody:
-      "The page is ready for the post-deadline public entry feed. No example records are shipped in the production build.",
+    notAvailable: "The member list is not published.",
+    notAvailableBody: "This site has no published member-list document available.",
+    membersUnreadable: "The member list could not be read.",
+    membersUnreadableBody:
+      "The published document did not return readable data. You can try the same document again.",
+    membersAuxiliaryUnavailable:
+      "This member's held squad remains visible. Some names in the member list may be unavailable.",
+    retryPublishedRead: "Try reading again",
+    loadingAdvice: "Loading published advice…",
+    entryUnreadable: "This member's squad could not be read.",
+    entryUnreadableBody: "The published squad document did not return readable data.",
+    unprovenPlanGapUnknown:
+      "The proof for this plan is incomplete. The optimality gap was not published.",
+    controlGapUnknown:
+      "The pure-points control was not proven optimal and its gap was not published. Any stated price ceiling remains an upper bound.",
+    planWithinFreeUnknown: (cap: number, target: number) =>
+      `The plan used a free-transfer limit of ${cap} and requested an overlap bound of ${target} players. The applied overlap bound was not published.`,
+    hitPointsNotPublished: "an unpublished number of",
+    noPlanInRecord:
+      "This record does not provide enough plan detail to establish a no-transfer recommendation.",
+    publicationReasons: {
+      "The advice rules belong to another capture.":
+        "The advice inputs use different data snapshots.",
+      "The advice rules belong to another season.":
+        "The advice inputs belong to different seasons.",
+      "A member cannot be their own rival.": "The selected member and rival are the same.",
+    } as Record<string, string>,
+    publicationReasonUnknown:
+      "The publisher supplied a reason, but no translated explanation is available.",
     loadingEntry: "Loading this member's squad…",
     adviceNotComputed: "This combination was not computed for this publish.",
     adviceNotComputedBody:
@@ -522,9 +569,8 @@ const en = {
     adviceUnreadable: "This member's advice could not be read.",
     adviceUnreadableBody:
       "The squad above came from this build and the advice document did not answer, so this is a fault in reading the site rather than a combination nobody solved. Reloading, or reporting it, is the right move.",
-    entryNotAvailable: "This member is not available yet.",
-    entryNotAvailableBody:
-      "The public post-deadline squad or its advice has not been published to this site build.",
+    entryNotAvailable: "This member’s squad document is not published.",
+    entryNotAvailableBody: "Return to the member list or try again after the next publication.",
     invalidEntry: "This entry ID is not valid.",
     exampleData: "example data",
     systemTeamBadge: "SquadOpt · system team",
@@ -540,7 +586,7 @@ const en = {
     gameweekNetPoints: "GW net points",
     gameweekNetPointsFor: (gameweek: number) => `GW${gameweek} net points`,
     gameweekNetNote:
-      "The gameweek column is net for every row, SquadOpt's included: the week's score after the transfer hits taken that week, which is the amount the season total moved by. The FPL site shows the week before hits, so a member who took a four-point hit reads four points lower here than there. A row whose hit is not in the published data shows a dash rather than a number on the other basis.",
+      "The gameweek column is net for every row: the week's score after the transfer hits taken that week, which is the amount the season total moved by. The FPL site shows the week before hits, so a member who took a four-point hit reads four points lower here than there. A row whose hit is not in the published data shows a dash rather than a number on the other basis.",
     noScoredWeek:
       "No gameweek has been finalised yet, so no scores are published: points are only final once the platform has added bonus and checked the week.",
     total: "total",
@@ -556,6 +602,11 @@ const en = {
       "These records are public FPL data after the gameweek deadline. SquadOpt never asks for an FPL password, session or private account access.",
     backToMembers: "← League members",
     incompleteTitle: "Incomplete Source Record",
+    missingFieldLabels: {
+      free_transfers: "free-transfer allowance",
+      purchase_prices: "purchase prices",
+    } as Record<string, string>,
+    missingFieldUnknown: "other missing data",
     incompleteBody: (fields: string) =>
       `The source did not provide: ${fields}. Nothing is invented to fill it.`,
     entryAssumptionsTitle: "Public-data limits",
@@ -578,7 +629,7 @@ const en = {
     squadoptComparisonTitle: "Recorded score difference",
     squadoptComparison: (difference: string) =>
       `Your point difference from SquadOpt's squad this gameweek: ${difference}`,
-    noMove: "No move clears the selected example point trade-off.",
+    noMove: "The published plan recommends no transfers.",
     noAdviceMissingData: "Advice is withheld because the source squad is incomplete.",
     diagnosticOnly:
       "The two starting XIs use the same projection. Shared players with equal multipliers cancel out; the remaining expected points, captain multipliers and this plan’s transfer hits determine the expected gap.",
@@ -758,8 +809,7 @@ const tr: MessageSchema<typeof en> = {
     rivals: "Rakipler",
     league: "Lig",
     analysis: "Analiz",
-    footer:
-      "Kararlar ve kesinleşmiş sonuçlar SquadOpt ledger kaydından gelir. Geçici puanlar kaynak capture ve zamanıyla gösterilir.",
+    footer: "Herkese açık lig kayıtları, yayımlanan planlar ve analizler.",
     operations: "Operasyon Durumu",
     notFound: "Burada bir sayfa yok.",
     metaDescription: "SquadOpt: haftalık FPL kararı ve dayandığı kanıt.",
@@ -1143,18 +1193,26 @@ const tr: MessageSchema<typeof en> = {
       "ortak-koru": {
         name: "Ortak çekirdeği koru",
         description:
-          "Rakibin on birinden ücretsiz transferlerin ulaştığı kadarını tut, en çok dokuz; hit yalnız kendini ödüyorsa harcanır.",
+          "Önerilen 15 oyuncun ile rakibin ilk 11'i arasında en az 9 ortak oyuncu ister. Ücretsiz transfer sınırına uymak için bu alt sınır düşürülebilir; yayımlanan plan uygulanan sınırı belirtir.",
       },
       "fark-yarat": {
         name: "Fark yarat",
         description:
-          "Rakibin on birinden ücretsiz transferlerin izin verdiği kadar azını tut, en az beş; paylaşmadığın oyuncular farkı belirler.",
+          "Önerilen 15 oyuncun ile rakibin ilk 11'i arasında en fazla 5 ortak oyuncu ister. Ücretsiz transfer sınırına uymak için bu üst sınır yükseltilebilir; yayımlanan plan uygulanan sınırı belirtir.",
       },
     },
     rulePickBadge: "Kuralın seçimi",
     rulePickNote: (rival: string, gap: string, weeks: number) =>
       `Tanımlı bir kural, iki sayıya bakarak seçeneklerden birini işaretler: ${rival} karşısındaki lig puanın (${gap}) ve oynanacak ${weeks} hafta. Kural yazılı, ölçülmüş değil — uymanın uymamaktan daha iyi olduğu test edilmedi — yani bir seçeneği etiketler, senin yerine seçmez.`,
     publicationStates: {
+      "published-missing": {
+        title: "Listelenen öneri dosyası bulunamadı.",
+        body: "İndeks bu planı listeliyor, fakat belgesi bulunamıyor. Bu durum, planın çözülemediği anlamına gelmez.",
+      },
+      "context-mismatch": {
+        title: "Dönen öneri bu görünümle eşleşmiyor.",
+        body: "Üye, seçim, hafta veya veri kaydı farklı. Eşleşmeyen plan gösterilmez; mevcut kadro görünür kalır.",
+      },
       "index-missing": {
         title: "Bu üyenin öneri indeksi yayımlanmamış.",
         body: "Strateji, pencere ve rakip seçimi için yayımlanan indeks gerekli.",
@@ -1174,7 +1232,7 @@ const tr: MessageSchema<typeof en> = {
     },
     rivalPlayersTitle: "Ortak ve farklı oyuncular",
     rivalPlayersBasis:
-      "Adlar, aynı capture içindeki oyuncu kimlikleriyle önerilen 15'i (ilk 11 ve yedekler) rakibin yayımlanan ilk 11'iyle karşılaştırır. Sıralama veya yeni puan tahmini değildir. Yayımlanan beklenen fark, iki ilk 11'i kaptanlarla karşılaştırır ve bu planın transfer cezasını çıkarır.",
+      "Adlar, aynı veri kesitindeki oyuncu kimlikleriyle önerilen 15'i (ilk 11 ve yedekler) rakibin yayımlanan ilk 11'iyle karşılaştırır. Sıralama veya yeni puan tahmini değildir. Yayımlanan beklenen fark, iki ilk 11'i kaptanlarla karşılaştırır ve bu planın transfer cezasını çıkarır.",
     rivalPlayerGroups: {
       shared: "Ortak: önerilen 15 ve rakibin ilk 11'i",
       recommendedOnly: "Yalnız önerilen 15'te",
@@ -1182,7 +1240,7 @@ const tr: MessageSchema<typeof en> = {
     },
     rivalPlayersNone: "Yok",
     rivalPlayersUnavailable:
-      "Oyuncu adları karşılaştırılamıyor: lig, sezon, oyun haftası ve capture eşleşmeli; oyuncu listeleri tam olmalı.",
+      "Oyuncu adları karşılaştırılamıyor: lig, sezon, oyun haftası ve veri kesiti eşleşmeli; oyuncu listeleri tam olmalı.",
     rivalLegend: "Rakip",
     rivalLabel: "Karşısında oynadığın üye",
     rivalChoose: "Bir rakip seç",
@@ -1205,21 +1263,21 @@ const tr: MessageSchema<typeof en> = {
     windowLimitsLabel: "Bu pencerenin varsaydıkları",
     windowWeek: "Hafta",
     windowWeekOf: (gameweek) => `OH${gameweek}`,
-    windowHits: "Hit puanı",
+    windowHits: "Transfer cezası",
     windowPoints: "Beklenen puan",
-    // The producer's sentences, keyed exactly as its payload carries them; a sentence
-    // the site does not know falls through in the producer's own words.
+    // Only exact published limit keys receive these reviewed explanations.
+    statedLimitUnknown: "Yayımlanan bu pencere varsayımı için çevrilmiş bir açıklama bulunmuyor.",
     statedLimits: {
       "The first week's projection is repeated over the later weeks, rescaled by each club's fixture count in that week relative to its count in the first week, from the captured calendar; a club with no fixture in the first week stays at zero all the way through, and the later weeks are not projected separately.":
-        "İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır; her kulüp için capture'daki takvimde o haftanın maç sayısı, ilk haftanın maç sayısına oranlanarak ölçeklenir. İlk haftada maçı olmayan bir kulüp pencere boyunca sıfırda kalır ve sonraki haftalar ayrıca projekte edilmez.",
+        "İlk haftanın projeksiyonu sonraki haftalarda tekrarlanır; her kulüp için veri kesitindeki takvimde o haftanın maç sayısı, ilk haftanın maç sayısına oranlanarak ölçeklenir. İlk haftada maçı olmayan bir kulüp pencere boyunca sıfırda kalır ve sonraki haftalar ayrıca projekte edilmez.",
       "Availability is applied once, from the capture: injuries, rotation and suspensions after it are not seen.":
-        "Oynayabilirlik bir kez, capture'dan uygulanır: sonrasındaki sakatlıklar, rotasyon ve cezalar görülmez.",
+        "Oynayabilirlik bir kez, veri kesitinden uygulanır: sonrasındaki sakatlıklar, rotasyon ve cezalar görülmez.",
       "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.":
         "Pencere içindeki her hafta, ilki dahil, bir transferle sınırlıdır (wildcard haftası hariç); bir haftalık planda böyle bir sınır yoktur.",
       "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.":
         "Top-100 düzeltmesi ilk haftanın sayılarının içindedir ve tekrar onu sonraki her haftaya taşır.",
       "Prices are held at the captured values; no price change is modelled.":
-        "Fiyatlar capture'daki değerlerde tutulur; fiyat değişimi modellenmez.",
+        "Fiyatlar veri kesitindeki değerlerde tutulur; fiyat değişimi modellenmez.",
       "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.":
         "Pencere içinde çip önerilmez. Sonlu bir pencere, bir çipi elde tutmaya değer biçmez; ulaşabilse harcardı. Çip zamanlaması sezonluk bir karardır ve bu pencere onu fiyatlayamaz.",
     },
@@ -1249,9 +1307,34 @@ const tr: MessageSchema<typeof en> = {
     templateSave: "Seçimi kaydet",
     templateRemove: (name: string) => `${name} şablonunu kaldır`,
     loading: "Lig üyeleri yükleniyor…",
-    notAvailable: "Lig üye verisi henüz bağlı değil.",
-    notAvailableBody:
-      "Sayfa son tarih sonrası public entry akışına hazırdır. Örnek kayıtlar production paketine dahil edilmez.",
+    notAvailable: "Üye listesi yayımlanmamış.",
+    notAvailableBody: "Bu sitede okunabilecek yayımlanmış bir üye listesi bulunmuyor.",
+    membersUnreadable: "Üye listesi okunamadı.",
+    membersUnreadableBody:
+      "Yayımlanan belge okunabilir veri döndürmedi. Aynı belgeyi yeniden okumayı deneyebilirsin.",
+    membersAuxiliaryUnavailable:
+      "Bu üyenin mevcut kadrosu görünür kalır. Üye listesindeki bazı adlar kullanılamayabilir.",
+    retryPublishedRead: "Yeniden oku",
+    loadingAdvice: "Yayımlanan öneri okunuyor…",
+    entryUnreadable: "Bu üyenin kadrosu okunamadı.",
+    entryUnreadableBody: "Yayımlanan kadro belgesi okunabilir veri döndürmedi.",
+    unprovenPlanGapUnknown:
+      "Bu planın en iyi olduğu kanıtlanamadı. En iyi çözüme uzaklık sınırı yayımlanmamış.",
+    controlGapUnknown:
+      "Saf puan planının en iyi olduğu kanıtlanamadı ve fark sınırı yayımlanmamış. Belirtilen maliyet tavanı bir üst sınırdır.",
+    planWithinFreeUnknown: (cap: number, target: number) =>
+      `Planın serbest transfer sınırı ${cap}, ortak oyuncu sayısı için istenen sınır ${target}. Uygulanan ortak oyuncu sınırı yayımlanmamış.`,
+    hitPointsNotPublished: "yayımlanmayan sayıda",
+    noPlanInRecord:
+      "Bu kayıt, transfersiz bir öneri olduğunu doğrulayacak kadar plan bilgisi içermiyor.",
+    publicationReasons: {
+      "The advice rules belong to another capture.":
+        "Önerinin girdileri farklı veri kayıtlarına ait.",
+      "The advice rules belong to another season.": "Önerinin girdileri farklı sezonlara ait.",
+      "A member cannot be their own rival.": "Seçilen üye ve rakip aynı kişi.",
+    } as Record<string, string>,
+    publicationReasonUnknown:
+      "Yayıncı bir neden belirtmiş; bu nedenin çevrilmiş açıklaması bulunmuyor.",
     loadingEntry: "Üyenin kadrosu yükleniyor…",
     adviceNotComputed: "Bu kombinasyon bu yayın için hesaplanmadı.",
     adviceNotComputedBody:
@@ -1259,10 +1342,9 @@ const tr: MessageSchema<typeof en> = {
     adviceUnreadable: "Bu üyenin önerisi okunamadı.",
     adviceUnreadableBody:
       "Yukarıdaki kadro bu yayından geldi, öneri belgesi ise yanıt vermedi; yani bu, kimsenin çözmediği bir kombinasyon değil, siteyi okurken çıkan bir arıza. Sayfayı yenilemek ya da bildirmek doğru olan.",
-    entryNotAvailable: "Bu üye henüz kullanılamıyor.",
-    entryNotAvailableBody:
-      "Son tarih sonrası public kadro veya öneri bu site paketine henüz yayımlanmadı.",
-    invalidEntry: "Bu entry ID geçerli değil.",
+    entryNotAvailable: "Bu üyenin kadro belgesi yayımlanmamış.",
+    entryNotAvailableBody: "Üye listesine dönebilir veya sonraki yayında yeniden deneyebilirsin.",
+    invalidEntry: "Bu üye numarası geçerli değil.",
     exampleData: "örnek veri",
     systemTeamBadge: "SquadOpt · sistem takımı",
     systemTeamTitle: "SquadOpt da oynuyor",
@@ -1277,7 +1359,7 @@ const tr: MessageSchema<typeof en> = {
     gameweekNetPoints: "OH net puanı",
     gameweekNetPointsFor: (gameweek) => `OH${gameweek} net puanı`,
     gameweekNetNote:
-      "Oyun haftası sütunu, SquadOpt dahil her satır için nettir: o haftaki transfer cezaları düşüldükten sonraki puan, yani sezon toplamının arttığı miktarın ta kendisi. FPL sitesi haftayı cezalardan önce gösterir; bu yüzden 4 puan ceza alan bir üye burada oradakinden 4 puan düşük görünür. Cezası yayınlanan veride bulunmayan bir satırda, yanlış temeldeki bir sayı yerine tire gösterilir.",
+      "Oyun haftası sütunu her satır için nettir: o haftaki transfer cezaları düşüldükten sonraki puan, yani sezon toplamının arttığı miktarın ta kendisi. FPL sitesi haftayı cezalardan önce gösterir; bu yüzden 4 puan ceza alan bir üye burada oradakinden 4 puan düşük görünür. Cezası yayınlanan veride bulunmayan bir satırda, yanlış temeldeki bir sayı yerine tire gösterilir.",
     noScoredWeek:
       "Henüz kesinleşmiş oyun haftası yok, o yüzden puan yayınlanmıyor: puanlar ancak platform bonusu ekleyip haftayı kontrol edince kesinleşir.",
     total: "toplam",
@@ -1293,6 +1375,11 @@ const tr: MessageSchema<typeof en> = {
       "Bu kayıtlar oyun haftası son tarihinden sonra herkese açık FPL verisidir. SquadOpt hiçbir zaman FPL şifresi, oturumu veya özel hesap erişimi istemez.",
     backToMembers: "← Lig üyeleri",
     incompleteTitle: "Eksik Kaynak Kaydı",
+    missingFieldLabels: {
+      free_transfers: "ücretsiz transfer hakkı",
+      purchase_prices: "satın alma fiyatları",
+    },
+    missingFieldUnknown: "diğer eksik veri",
     incompleteBody: (fields) =>
       `Kaynak şu alanları sağlamadı: ${fields}. Boşlukları doldurmak için veri uydurulmaz.`,
     entryAssumptionsTitle: "Herkese Açık Veri Sınırları",
@@ -1315,7 +1402,7 @@ const tr: MessageSchema<typeof en> = {
     squadoptComparisonTitle: "Kaydedilen puan farkı",
     squadoptComparison: (difference) =>
       `SquadOpt'un bu haftaki kadrosuyla puan farkın: ${difference}`,
-    noMove: "Seçilen örnek puan ödünleşimini geçen bir hamle yok.",
+    noMove: "Yayımlanan plan transfer önermiyor.",
     noAdviceMissingData: "Kaynak kadro eksik olduğu için öneri gösterilmiyor.",
     diagnosticOnly:
       "İki ilk 11 aynı projeksiyonla karşılaştırılır. Aynı çarpana sahip ortak oyuncuların katkıları sadeleşir; kalan beklenen puanlar, kaptan çarpanları ve bu planın transfer cezaları beklenen farkı belirler.",
