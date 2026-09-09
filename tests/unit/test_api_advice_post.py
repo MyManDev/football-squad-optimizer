@@ -285,6 +285,67 @@ def test_two_racing_submitters_converge_on_one_open_job(tmp_path: Path) -> None:
     assert len(open_jobs) == 1
 
 
+@pytest.mark.parametrize("completion_boundary", ["cache-read", "history-read"])
+@pytest.mark.parametrize("retry_key", [None, "client:another-request"])
+def test_completion_after_a_cache_miss_does_not_enqueue_another_job(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    completion_boundary: str,
+    retry_key: str | None,
+) -> None:
+    """A worker can finish between POST's initial miss and its enqueue decision."""
+
+    client, cache, queue = _world(tmp_path)
+    first = client.post(ADVICE_URL, json=BODY)
+    assert first.status_code == 202
+    worker_queue = FileJobQueue(tmp_path / "jobs")
+    finished = False
+
+    def finish() -> None:
+        nonlocal finished
+        if finished:
+            return
+        finished = True
+        result = run_advice_worker_once(
+            worker_queue,
+            cache,
+            lambda _job: _valid_advice_document(),
+            at_utc="2026-08-27T18:00:00Z",
+            terminal_at_utc=lambda: "2026-08-27T18:00:01Z",
+        )
+        assert result is not None and result.status == "completed"
+
+    if completion_boundary == "cache-read":
+        original_cached = AdviceReadStore.cached
+
+        def stale_miss(reader: AdviceReadStore, key: str) -> bytes | None:
+            answer = original_cached(reader, key)
+            finish()
+            return answer
+
+        monkeypatch.setattr(AdviceReadStore, "cached", stale_miss)
+    else:
+        original_jobs = queue.jobs
+
+        def stale_history() -> tuple[AdviceJob, ...]:
+            history = original_jobs()
+            finish()
+            return history
+
+        monkeypatch.setattr(queue, "jobs", stale_history)
+
+    headers = {} if retry_key is None else {"Idempotency-Key": retry_key}
+    replay = client.post(ADVICE_URL, json=BODY, headers=headers)
+
+    assert finished
+    assert replay.status_code == 200, replay.text
+    assert replay.content == _valid_advice_document()
+    jobs = worker_queue.jobs()
+    assert len(jobs) == 1
+    assert jobs[0].job_id == first.json()["job_id"]
+    assert jobs[0].status == "completed"
+
+
 def test_the_public_job_view_carries_no_private_fields(tmp_path: Path) -> None:
     """The stored record is not the public record (reviewed finding 4)."""
 

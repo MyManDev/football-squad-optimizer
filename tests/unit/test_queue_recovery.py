@@ -6,7 +6,7 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, Event
 
 import pytest
 
@@ -63,6 +63,79 @@ if boundary == 'terminal':
 q.complete(running, cache=c, payload=b'answer', at_utc='2026-08-27T12:00:02Z')
 raise AssertionError('crash boundary not reached')
 """
+
+
+POLL_WITH_OPEN_HANDLE = r"""
+import sys
+from pathlib import Path
+from unittest.mock import patch
+from squadopt.platform.advice_queue import FileJobQueue
+root = Path(sys.argv[1])
+target = root / 'jobs' / 'job-one.json'
+original_read = Path.read_bytes
+def held_read(path):
+    if path != target:
+        return original_read(path)
+    with path.open('rb') as handle:
+        print('handle-open', flush=True)
+        if sys.stdin.readline().strip() != 'release':
+            raise AssertionError('poll was not released')
+        return handle.read()
+with patch.object(Path, 'read_bytes', held_read):
+    observed = FileJobQueue(root / 'jobs').load('job-one')
+assert observed.status == 'running'
+"""
+
+
+def test_polling_read_and_terminal_replace_share_the_process_lock(tmp_path: Path) -> None:
+    """A held poll handle must close before another process publishes completion.
+
+    On Windows an overlapping os.replace raises WinError 5. On other platforms the
+    same test checks the serialization contract, without relying on handle semantics.
+    """
+
+    queue = FileJobQueue(tmp_path / "jobs")
+    cache = FileAdviceCache(tmp_path / "cache")
+    queue.submit_unique(job())
+    running = queue.claim(at_utc=START)
+    assert running is not None
+    child = subprocess.Popen(
+        [sys.executable, "-B", "-c", POLL_WITH_OPEN_HANDLE, str(tmp_path)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    started = Event()
+
+    def complete() -> AdviceJob:
+        started.set()
+        return queue.complete(running, cache=cache, payload=b"answer", at_utc=LATER)
+
+    try:
+        assert child.stdin is not None and child.stdout is not None
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            try:
+                assert (
+                    pool.submit(child.stdout.readline).result(timeout=10).strip() == "handle-open"
+                )
+                future = pool.submit(complete)
+                assert started.wait(timeout=5)
+                with pytest.raises(TimeoutError):
+                    future.result(timeout=0.2)
+            finally:
+                child.stdin.write("release\n")
+                child.stdin.flush()
+            completed = future.result(timeout=10)
+        assert completed.status == "completed"
+        assert cache.get(KEY) == b"answer"
+        assert queue.load("job-one") == completed
+        _stdout, stderr = child.communicate(timeout=10)
+        assert child.returncode == 0, stderr
+    finally:
+        if child.poll() is None:
+            child.kill()
+        child.communicate(timeout=10)
 
 
 @pytest.mark.parametrize("boundary", ["intent", "claim", "requeue", "cache", "terminal"])

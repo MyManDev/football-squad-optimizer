@@ -1,5 +1,6 @@
 """Adapter-neutral advice queue operations and attempt ownership errors."""
 
+from collections.abc import Callable
 from typing import Final, Protocol
 
 from squadopt.platform.advice_cache import AdviceCacheRepository
@@ -24,6 +25,10 @@ class JobQueue(Protocol):
     def submit(self, job: AdviceJob) -> None: ...
 
     def submit_unique(self, job: AdviceJob) -> tuple[AdviceJob, bool]: ...
+
+    def submit_unless_cached(
+        self, job: AdviceJob, *, read_cached: Callable[[str], bytes | None]
+    ) -> AdviceJob | bytes: ...
 
     def claim(self, *, at_utc: str) -> AdviceJob | None: ...
 

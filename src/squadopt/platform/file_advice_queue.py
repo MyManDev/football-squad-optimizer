@@ -17,6 +17,7 @@ import os
 import re
 import tempfile
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from squadopt.platform._queue_lock import QueueFileLock
@@ -89,10 +90,14 @@ class FileJobQueue:
 
     def load(self, job_id: str) -> AdviceJob | None:
         path = self._path(job_id)
-        try:
-            raw = path.read_bytes()
-        except FileNotFoundError:
-            return None
+        # A Windows reader's open handle can deny a concurrent atomic replacement.
+        # Polls share the same short transaction as writers; nested queue reads use
+        # the existing reentrant lock, and parsing needs no open file handle.
+        with self._lock.hold():
+            try:
+                raw = path.read_bytes()
+            except FileNotFoundError:
+                return None
         try:
             job = AdviceJob.from_payload(json.loads(raw))
             if job.job_id != job_id:
@@ -155,6 +160,25 @@ class FileJobQueue:
         winner = self._index_job(index, repair=False)
         if winner is not None and winner.job_id == job.job_id:
             index.unlink(missing_ok=True)
+
+    def submit_unless_cached(
+        self, job: AdviceJob, *, read_cached: Callable[[str], bytes | None]
+    ) -> AdviceJob | bytes:
+        """Recheck the validated cache and reserve work atomically with completion.
+
+        A POST's earlier miss can outlive a worker's cache publication and open-index
+        cleanup. The read callback only reads and validates immutable answer bytes;
+        computation stays outside this short metadata transaction.
+        """
+
+        if job.status != "queued":
+            raise AdviceQueueError("Only a queued job can be submitted.")
+        with self._lock.hold():
+            cached = read_cached(job.cache_key)
+            if cached is not None:
+                return cached
+            winner, _created = self.submit_unique(job)
+            return winner
 
     def submit_unique(self, job: AdviceJob) -> tuple[AdviceJob, bool]:
         if job.status != "queued":
