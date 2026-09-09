@@ -159,7 +159,7 @@ for (const [state, language] of (["tr", "en"] as const).flatMap((language) =>
     });
     await page.goto(`/league/members/${ENTRY}?mode=${pair.strategy}&rival=${pair.rival_entry_id}`);
     const issue =
-      state === "index-error"
+      state === "index-error" || state === "wrong-path"
         ? "index-error"
         : state === "declared"
           ? "declared-unavailable"
