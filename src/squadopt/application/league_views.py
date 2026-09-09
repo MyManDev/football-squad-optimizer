@@ -493,10 +493,13 @@ def build_league_views(
     around this could only guess, because the weekly publish re-solves in a fresh worktree.
 
     The record is keyed by ``inputs``' capture, so the mid-week publish and the one taken
-    shortly before the deadline each write their own and neither refuses the other. What is
-    still refused is a *rebuild of one capture* that produces different bytes: the capture
-    is the whole input, so that is our own non-determinism, and it raises
-    ``AdviceRecordConflictError`` naming the difference.
+    shortly before the deadline each write their own and neither refuses the other. A
+    re-publish of *one* capture is a replay and keeps the record it already wrote: the
+    envelopes below are stamped with ``generated``, which moves whenever ``now`` is not
+    passed — and no caller here passes it — so the same advice re-published is never the
+    same bytes. What is still refused is a rebuild of one capture that produces different
+    *advice*: the capture is the whole input, so that is our own non-determinism, and it
+    raises ``AdviceRecordConflictError`` naming the difference.
 
     The records are written after every member's files are on disk, so a refusal can never
     stop the advice being published; the refusal is raised once, after every writable record
