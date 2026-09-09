@@ -53,9 +53,9 @@ SQUADOPT_BACKEND_STORE_ROOT=/mnt/squadopt-store/store
 # connected" from this tree and never from an upstream call.
 SQUADOPT_BACKEND_SITE_DATA_ROOT=/mnt/squadopt-inputs/site/data
 
-# Captures, and the projection handoffs that go with them. The most recent capture that has a
-# handoff is the context; publishing a new pair moves the backend to the new week with no
-# redeploy.
+# Captures and their projection handoffs. The newest live capture is selected first and
+# must have its own matching handoff. An invalid newest pair makes the context unavailable;
+# the resolver does not search older captures for a usable pair. No redeploy is needed.
 SQUADOPT_BACKEND_SNAPSHOT_ROOT=/mnt/squadopt-inputs/snapshots
 SQUADOPT_BACKEND_HANDOFF_ROOT=/mnt/squadopt-inputs/handoffs
 
@@ -426,15 +426,17 @@ The ops process does not move. Captures, decisions, settles and site builds stay
 machine that owns the ledger; this is only how the bytes reach the backend's read-only mount.
 
 **Order matters, and getting it wrong takes the whole backend down.** The context is the most
-recent **live** capture that has a handoff — the newest `fpl-live-` snapshot directory holding
-`metadata.json`, projected through the handoff addressed by *that capture's* season and
-gameweek. Captures from the other collectors are ignored here, so a root holding only those
+recent **live** capture — the newest `fpl-live-` snapshot directory holding `metadata.json`.
+Its season/gameweek handoff must name that exact capture before it can be projected. The
+resolver does not search older captures for a valid pair. Captures from the other collectors
+are ignored here, so a root holding only those
 reads as not ready and logs `advice_context_absent` naming the source it wanted. A capture
 published without its handoff is therefore not a partial upgrade: it is the newest capture,
 it has no projection anyone can name, `capture_context` goes false, and **every** advice route
 answers 503 until the handoff lands.
 
-So publish in this order, always:
+The recipe below is for a new gameweek whose handoff does not already exist on the mount.
+It preserves the previous capture and its matching handoff. Publish in this order:
 
 1. **Site data** — `<inputs>/site/data`. Independent of the pair below, but
    `league/members.json` is what makes the league connected at all.
@@ -450,12 +452,17 @@ So publish in this order, always:
 No redeploy is involved: publishing a new pair moves the backend to the new week, and the
 context is re-resolved on every request rather than cached for the life of the process.
 
-**Recovering from a half-published week** is the reverse of step 3: delete the new capture's
-`metadata.json`. The backend falls back to the previous capture — which still has its handoff —
-on the next request, with no restart. Nothing wrong is served in the meantime, because the
-capture id is part of every cache key: answers computed under the older capture are addressed
-under the older capture, and the rolled-back week's entries stay addressable if it is
-republished.
+**Recovering from a half-published new gameweek** is the reverse of step 3: withdraw the new
+capture's `metadata.json`. The previous capture becomes newest again and remains usable
+because this recipe kept its matching handoff. No restart is needed. Capture identity remains
+part of every cache key, so old answers keep their original identity.
+
+**Replacing a capture within the same gameweek is outside this recipe.** Handoffs are named
+by season/gameweek, and replacing that file overwrites the previous capture's handoff.
+Preserve the previous matching handoff before such an update. Rolling it back requires both
+withdrawing the new capture marker and restoring the previous matching handoff; withdrawing
+the marker alone is insufficient. Readiness can be false while the selected capture and the
+handoff refer to different snapshots. Do not treat the pair as an atomic publication.
 
 ### Concrete publication transport
 
@@ -480,8 +487,9 @@ scp $Handoff "${PublishHost}:squadopt-stage/release-gw04/handoff.json"
 scp -r $Snapshot "${PublishHost}:squadopt-stage/release-gw04/snapshot"
 ```
 
-On the Linux preparation host, use the matching names below. Refuse an already-published
-snapshot directory, copy/check payloads, and expose metadata only as the final rename:
+On the Linux preparation host, use the matching names below. Refuse an existing snapshot
+directory or target gameweek handoff before any publication writes, copy/check payloads,
+and expose metadata only as the final rename:
 
 ```bash
 set -euo pipefail
@@ -492,6 +500,7 @@ HANDOFF_NAME=2026-27-gw04.json
 test -f "$STAGE/snapshot/metadata.json"
 test -f "$STAGE/handoff.json"
 test ! -e "$INPUTS/snapshots/$SNAPSHOT_ID"
+test ! -e "$INPUTS/handoffs/$HANDOFF_NAME"
 mkdir -p "$INPUTS/site/data" "$INPUTS/handoffs" "$INPUTS/snapshots"
 rsync -a "$STAGE/site-data/" "$INPUTS/site/data/"
 cp "$STAGE/handoff.json" "$INPUTS/handoffs/$HANDOFF_NAME.pending"
@@ -509,14 +518,15 @@ mv "$INPUTS/snapshots/$SNAPSHOT_ID/metadata.json.pending" "$INPUTS/snapshots/$SN
 Source names above are examples, not evidence of an available GW4 capture. The handoff's
 season/gameweek and snapshot identity must agree with the actual ops output. After publication,
 check `/ready` and one connected member request through the internal endpoint. If readiness
-regresses, withdraw only the new capture marker on that same mounted host:
+regresses after this new-gameweek recipe, withdraw the new capture marker on that same host:
 
 ```bash
 mv "$INPUTS/snapshots/$SNAPSHOT_ID/metadata.json" "$INPUTS/snapshots/$SNAPSHOT_ID/metadata.json.withdrawn"
 ```
 
-This preserves the marker for diagnosis while making the previous valid capture selectable.
-Never withdraw the previous good capture or its handoff while recovering the new publication.
+This preserves the marker for diagnosis and selects the previous capture, whose matching
+handoff this recipe retained. Do not withdraw that previous capture or handoff. For a same-week
+replacement, also restore its previous handoff as described above.
 
 ## Rollback
 
@@ -542,9 +552,9 @@ resolved YAML moves both containers together. Answers computed by the older code
 addressable because `repository_commit` is part of the cache key; rollback does not read the
 newer code's entries or overwrite them.
 
-Image and data roll back independently, and that is why they are kept separate: a bad image is
-the command above, a bad data release is the `metadata.json` deletion under
-[publishing](#publishing-what-ops-owns). Neither needs the other.
+Image and data roll back independently. A bad image uses the command above; a bad data release
+must restore the previous capture and its matching handoff as described under
+[publishing](#publishing-what-ops-owns). Neither requires changing the other release.
 
 ## When a member sees no answer
 
