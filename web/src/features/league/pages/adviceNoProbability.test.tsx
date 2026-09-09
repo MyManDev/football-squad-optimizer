@@ -25,8 +25,10 @@ import { LeagueMemberView } from "./LeagueMemberPage";
 
 afterEach(cleanup);
 
-// The plan's regex plus the two words that crept past it in mode copy.
-const FORBIDDEN = /%|probabilit|olasılık|\bP\(/i; // the plan's regex, verbatim
+// Keep the original patterns and cover the plan's full forbidden vocabulary.
+// The exact causal word "yüzden" means "because", not the numerical term "yüzde".
+const FORBIDDEN =
+  /%|probabilit|olasılık|olasılığ|\bP\(|chance|likelihood|quantile|spread|percentage|ihtimal|şans|yüzde(?!n\b)|kantil|yayılım/i;
 // The mode copy that used to reach the member page ("reduce the chance of falling
 // behind") is not a probability claim by the regex but reads as one; it must not return.
 const MODE_PROMISE = /chance of falling behind|geride kalma ihtimalini/i;
@@ -61,7 +63,8 @@ function renderState(language: Language, advice: LeagueViewEnvelope<EntryAdvice>
 const STATES: Array<[string, LeagueViewEnvelope<EntryAdvice>]> = [
   ["proven baseline", withAdvice({ solver_status: "OPTIMAL", optimality_gap: 0 })],
   ["unproven plan", withAdvice({ solver_status: "FEASIBLE", optimality_gap: 1.3 })],
-  ["priced competitive mode", mockEntryAdviceEnvelope(35249001, "garantici", 1)],
+  ["priced competitive mode", mockEntryAdviceEnvelope(35249001, "ortak-koru", 1)],
+  ["unlisted legacy selection", mockEntryAdviceEnvelope(35249001, "garantici", 1)],
   ["rival strategy: keep the shared core", mockEntryAdviceEnvelope(35249001, "ortak-koru", 1)],
   ["rival strategy: create a gap", mockEntryAdviceEnvelope(35249001, "fark-yarat", 1)],
   [
@@ -293,6 +296,8 @@ describe("a move card claims only what the payload carries", () => {
   it("keeps the longer-window caption for a window that solved one", () => {
     const window = mockEntryAdviceEnvelope(35249001, "saf-puan", 3);
     expect(window.payload.moves[0]?.reason_code).toBe("window_value");
-    expect(renderState("en", window)).toMatch(/longer window/);
+    expect(renderState("en", window)).toMatch(
+      /Part of the multiweek plan using published projections/,
+    );
   });
 });

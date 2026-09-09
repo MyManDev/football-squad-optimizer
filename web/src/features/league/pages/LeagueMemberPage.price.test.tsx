@@ -99,7 +99,7 @@ describe("an unproven price reads as a ceiling", () => {
     const text = renderText("tr", unproven);
     expect(text).toMatch(/en fazla 2,3 beklenen puandan vazgeçiyor/);
     expect(text).not.toMatch(/~0,8 beklenen puandan vazgeçiyor/);
-    expect(text).toMatch(/en fazla 7,9 beklenen puan mal olurdu/);
+    expect(text).toMatch(/maliyet en fazla 7,9 beklenen puan/);
     expect(text).toMatch(/tavan olarak yayımlanıyor/);
   });
 

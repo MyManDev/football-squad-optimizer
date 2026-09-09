@@ -51,7 +51,7 @@ test("the virtual SquadOpt member remains available by direct URL without probab
 
   await expect(page).toHaveURL(/\/league\/members\/squadopt$/);
   await expect(page.getByText("SquadOpt da oynuyor")).toBeVisible();
-  await expect(page.getByText(/Sistemin kendi takımı bu hesaba girmez/)).toBeVisible();
+  await expect(page.getByText(/aynı karar kurallarıyla değerlendirilir/)).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Oyun haftası 1/);
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText("SquadOpt da oynuyor").locator("..")).not.toContainText("%");

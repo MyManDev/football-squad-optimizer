@@ -60,7 +60,7 @@ export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): bo
   );
 }
 
-export function useAdviceJob(client: AdviceClient): AdviceJob {
+export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true): AdviceJob {
   const [state, setState] = useState<ComputePhase>({ phase: "idle" });
   const generation = useRef(0);
 
@@ -103,13 +103,15 @@ export function useAdviceJob(client: AdviceClient): AdviceJob {
         // A job: fetch the published baseline once, show it while we wait.
         let fallback: LeagueViewEnvelope<EntryAdvice> | null = null;
         try {
-          const published = await new StaticOnlyAdviceClient().readAdvice({
-            ...request,
-            strategy: "saf-puan",
-            window: 1,
-            rivalEntryId: null,
-          });
-          if (published.kind === "advice") fallback = published.envelope;
+          const published = allowPublishedBaseline
+            ? await new StaticOnlyAdviceClient().readAdvice({
+                ...request,
+                strategy: "saf-puan",
+                window: 1,
+                rivalEntryId: null,
+              })
+            : null;
+          if (published?.kind === "advice") fallback = published.envelope;
         } catch {
           fallback = null; // the wait is just quieter
         }
@@ -167,7 +169,7 @@ export function useAdviceJob(client: AdviceClient): AdviceJob {
         if (alive()) setState({ phase: "failed", request });
       })();
     },
-    [client],
+    [client, allowPublishedBaseline],
   );
 
   return { state, compute, reset };
