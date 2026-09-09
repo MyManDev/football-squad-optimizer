@@ -46,6 +46,36 @@ function renderControls(
 }
 
 describe("member decision controls", () => {
+  it.each(["tr", "en"] as const)(
+    "describes requested minimum and maximum overlap bounds in %s",
+    (language) => {
+      renderControls(`/league/members/${ENTRY}`, mockEntryAdviceIndex(ENTRY).payload, language);
+      const shared = screen.getByText(
+        MESSAGES[language].leagueMembers.strategies["ortak-koru"].description,
+      );
+      const different = screen.getByText(
+        MESSAGES[language].leagueMembers.strategies["fark-yarat"].description,
+      );
+      expect(shared).toHaveTextContent(language === "tr" ? /en az 9/ : /at least 9/);
+      expect(different).toHaveTextContent(language === "tr" ? /en fazla 5/ : /at most 5/);
+      expect(shared).toHaveTextContent(
+        language === "tr" ? /alt sınır düşürülebilir/ : /minimum may be lowered/,
+      );
+      expect(different).toHaveTextContent(
+        language === "tr" ? /üst sınır yükseltilebilir/ : /maximum may be raised/,
+      );
+      for (const description of [shared, different]) {
+        expect(description).toHaveTextContent(
+          language === "tr"
+            ? /yayımlanan plan uygulanan sınırı/
+            : /published plan states the applied bound/,
+        );
+        expect(description).not.toHaveTextContent(
+          /up to nine|down to five|en çok dokuz|en az beş|\bhit\b|reached|ulaştı/i,
+        );
+      }
+    },
+  );
   it("offers the three member strategies and writes the choice to the URL", () => {
     renderControls();
     expect(screen.getByDisplayValue("saf-puan")).toBeChecked();

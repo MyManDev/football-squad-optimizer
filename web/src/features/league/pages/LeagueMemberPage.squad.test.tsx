@@ -50,6 +50,37 @@ function sectionFor(title: string): HTMLElement {
 }
 
 describe("the member's published squad", () => {
+  it.each(["tr", "en"] as const)("translates known missing fields in %s", (language) => {
+    const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    squad.payload.data_quality = "partial";
+    squad.payload.missing_fields = ["free_transfers", "purchase_prices"];
+    render(memberSurface(squad, language));
+
+    const card = sectionFor(MESSAGES[language].leagueMembers.incompleteTitle);
+    expect(card).toHaveTextContent(
+      language === "tr"
+        ? "ücretsiz transfer hakkı, satın alma fiyatları"
+        : "free-transfer allowance, purchase prices",
+    );
+    expect(card).not.toHaveTextContent(/free_transfers|purchase_prices/);
+    expect(squad.payload.missing_fields).toEqual(["free_transfers", "purchase_prices"]);
+  });
+
+  it.each(["tr", "en"] as const)(
+    "keeps unknown and inherited missing-field names neutral in %s",
+    (language) => {
+      const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+      squad.payload.data_quality = "partial";
+      const raw = ["__proto__", "toString", "probability 97% chance"];
+      squad.payload.missing_fields = raw;
+      render(memberSurface(squad, language));
+
+      const card = sectionFor(MESSAGES[language].leagueMembers.incompleteTitle);
+      expect(card).toHaveTextContent(language === "tr" ? "diğer eksik veri" : "other missing data");
+      for (const field of raw) expect(card).not.toHaveTextContent(field);
+      expect(squad.payload.missing_fields).toEqual(raw);
+    },
+  );
   it.each(["tr", "en"] as const)("shows the entry's XI, captain and bench in %s", (language) => {
     const squad = mockEntrySquadEnvelopes[ENTRY]!;
     const copy = MESSAGES[language];
