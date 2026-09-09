@@ -429,6 +429,35 @@ const en = {
     rulePickBadge: "The rule's pick",
     rulePickNote: (rival: string, gap: string, weeks: number) =>
       `A declared rule marks one option from two numbers: your league points against ${rival} (${gap}) and the ${weeks} gameweeks still to play. The rule is written down, not measured — nothing has tested whether following it does better than ignoring it — so it labels an option and never chooses for you.`,
+    publicationStates: {
+      "index-missing": {
+        title: "This member's advice index is not published.",
+        body: "Strategies, windows and rivals can be selected only after the index is available.",
+      },
+      "index-error": {
+        title: "This member's advice index could not be read.",
+        body: "The held squad remains visible. Advice requests are paused until the index can be read.",
+      },
+      "not-listed": {
+        title: "This selection is not listed in this publication.",
+        body: "Choose a strategy, window and rival that this member's index publishes.",
+      },
+      "declared-unavailable": {
+        title: "The publisher could not produce this selection.",
+        body: "The publisher marked this selection as having no available plan.",
+      },
+    },
+    rivalPlayersTitle: "Shared and different players",
+    rivalPlayersBasis:
+      "Names compare the recommended 15 (XI plus bench) with the rival's published XI, using player IDs from the same capture. They are not rankings or new projections. The published expected gap compares the two XIs with captains and subtracts this plan's transfer hits.",
+    rivalPlayerGroups: {
+      shared: "Shared: recommended 15 and rival XI",
+      recommendedOnly: "Recommended 15 only",
+      rivalOnly: "Rival XI only",
+    },
+    rivalPlayersNone: "None",
+    rivalPlayersUnavailable:
+      "Player names cannot be compared: matching league, season, gameweek, capture and complete player lists are required.",
     rivalLegend: "Rival",
     rivalLabel: "The member you are playing against",
     rivalChoose: "Choose a rival",
@@ -462,19 +491,19 @@ const en = {
     gapLine: (points: string) => `expected gap vs rival ${points}`,
     captainShared: "same captain",
     planWithinFree: (cap: number, target: number, applied: number) =>
-      `Played within ${cap} free transfer${cap === 1 ? "" : "s"}, no hits: the strategy asked for ${target} of the rival's eleven and ${applied} was reachable.`,
+      `Free-transfer allowance ${cap}, no transfer penalties: requested overlap bound ${target}, applied overlap bound ${applied}.`,
     planWithHits: (cap: number, target: number) =>
-      `Reaching ${target} of the rival's eleven needed more than the ${cap} free transfer${cap === 1 ? "" : "s"}; the hits are charged in the price and still came out ahead.`,
+      `Plan allowing paid transfers: free-transfer allowance ${cap}, requested overlap bound ${target}. Published transfer penalties are included in the price.`,
     alternativeWithHits: (applied: number, hits: string, cost: string) =>
-      `Not taken: reaching ${applied} with hits would have cost ${hits} hit points, ${cost} expected points against pure points.`,
+      `Alternative allowing paid transfers: applied overlap bound ${applied}; published transfer penalties ${hits} points, cost ${cost} expected points against pure points.`,
     alternativeWithinFree: (applied: number, cost: string) =>
-      `Not taken: staying within the free transfers reached ${applied} at ${cost} expected points against pure points.`,
+      `Alternative within free transfers: applied overlap bound ${applied}; cost ${cost} expected points against pure points.`,
     // The same two sentences where a proof is missing: the figure is the most the
     // candidate could have cost, never a claimed exact cost.
     alternativeWithHitsAtMost: (applied: number, hits: string, cost: string) =>
-      `Not taken: reaching ${applied} with hits would have cost ${hits} hit points and at most ${cost} expected points against pure points.`,
+      `Alternative allowing paid transfers: applied overlap bound ${applied}; published transfer penalties ${hits} points, cost at most ${cost} expected points against pure points.`,
     alternativeWithinFreeAtMost: (applied: number, cost: string) =>
-      `Not taken: staying within the free transfers reached ${applied} at a cost of at most ${cost} expected points against pure points.`,
+      `Alternative within free transfers: applied overlap bound ${applied}; cost at most ${cost} expected points against pure points.`,
     templatesTitle: "Game templates",
     templatesBody:
       "A template is a named strategy-and-window pair. Applying one sets the same shareable selection the controls read; your own templates live in this browser.",
@@ -543,16 +572,16 @@ const en = {
     emptySquadBody: "The published member record does not contain squad data.",
     advice: "Suggested Moves",
     honestyRule:
-      "Advice is labelled only with a point trade-off. Crowd-relative window diagnostics are never dressed up as a chance of winning.",
+      "Advice shows expected-point trade-offs. Strategy labels follow declared rules; the published solver status and bounds state what was established.",
     independentAdviceRule:
-      "Your advice is calculated only from your squad and your objective. SquadOpt's own team does not enter that calculation: the system cannot protect its rank by giving anyone worse advice; every member is evaluated independently by the same decision function.",
+      "Your advice is calculated from your squad and selected strategy. Every member is evaluated independently under the same decision rules.",
     squadoptComparisonTitle: "Recorded score difference",
     squadoptComparison: (difference: string) =>
       `Your point difference from SquadOpt's squad this gameweek: ${difference}`,
     noMove: "No move clears the selected example point trade-off.",
     noAdviceMissingData: "Advice is withheld because the source squad is incomplete.",
     diagnosticOnly:
-      "Two squads are compared under one projection. Players you both own cancel out; the players you do not share decide the gap. We publish expected points, never a chance of winning — that claim fell three times in its own measurement, and the line is closed.",
+      "The two starting XIs use the same projection. Shared players with equal multipliers cancel out; the remaining expected points, captain multipliers and this plan’s transfer hits determine the expected gap.",
     unprovenPlanBadge: "Proof incomplete",
     unprovenPlanBody: (gap: string) =>
       `The solver could not finish the proof for this plan (gap ≤ ${gap} pts). It is the best plan the search found, not a plan shown to be the best one.`,
@@ -561,10 +590,9 @@ const en = {
     projectedGain: (points: string) => `${points} projected gain`,
     weekTransferCost: (points: string) =>
       `~${points} expected-point cost for this week's transfers in total: the game charges the week, not each move.`,
-    windowValueReason: "The longer window recovers the transfer cost in the example projection.",
+    windowValueReason: "Part of the multiweek plan using published projections.",
     pointsGainReason: "Part of the one-week pure-points plan, chosen for expected points alone.",
-    modeTradeoffReason:
-      "The mode changes the point trade-off, never a claimed chance of beating a rival.",
+    modeTradeoffReason: "This move is part of the selected strategy’s expected-point trade-off.",
     planCost: (points: string) =>
       `This strategy gives up ~${points} expected points against the pure-points pick, hits included.`,
     // The same price where a proof is missing. A bound is not a range around a guess:
@@ -1126,6 +1154,35 @@ const tr: MessageSchema<typeof en> = {
     rulePickBadge: "Kuralın seçimi",
     rulePickNote: (rival: string, gap: string, weeks: number) =>
       `Tanımlı bir kural, iki sayıya bakarak seçeneklerden birini işaretler: ${rival} karşısındaki lig puanın (${gap}) ve oynanacak ${weeks} hafta. Kural yazılı, ölçülmüş değil — uymanın uymamaktan daha iyi olduğu test edilmedi — yani bir seçeneği etiketler, senin yerine seçmez.`,
+    publicationStates: {
+      "index-missing": {
+        title: "Bu üyenin öneri indeksi yayımlanmamış.",
+        body: "Strateji, pencere ve rakip seçimi için yayımlanan indeks gerekli.",
+      },
+      "index-error": {
+        title: "Bu üyenin öneri indeksi okunamadı.",
+        body: "Mevcut kadro görünür kalır. İndeks okunana kadar öneri istekleri durdurulur.",
+      },
+      "not-listed": {
+        title: "Bu seçim bu yayında listelenmiyor.",
+        body: "Bu üyenin indeksinde yayımlanan bir strateji, pencere ve rakip seç.",
+      },
+      "declared-unavailable": {
+        title: "Yayıncı bu seçim için plan üretemedi.",
+        body: "Yayıncı, bu seçim için kullanılabilir bir plan olmadığını bildirdi.",
+      },
+    },
+    rivalPlayersTitle: "Ortak ve farklı oyuncular",
+    rivalPlayersBasis:
+      "Adlar, aynı capture içindeki oyuncu kimlikleriyle önerilen 15'i (ilk 11 ve yedekler) rakibin yayımlanan ilk 11'iyle karşılaştırır. Sıralama veya yeni puan tahmini değildir. Yayımlanan beklenen fark, iki ilk 11'i kaptanlarla karşılaştırır ve bu planın transfer cezasını çıkarır.",
+    rivalPlayerGroups: {
+      shared: "Ortak: önerilen 15 ve rakibin ilk 11'i",
+      recommendedOnly: "Yalnız önerilen 15'te",
+      rivalOnly: "Yalnız rakibin ilk 11'inde",
+    },
+    rivalPlayersNone: "Yok",
+    rivalPlayersUnavailable:
+      "Oyuncu adları karşılaştırılamıyor: lig, sezon, oyun haftası ve capture eşleşmeli; oyuncu listeleri tam olmalı.",
     rivalLegend: "Rakip",
     rivalLabel: "Karşısında oynadığın üye",
     rivalChoose: "Bir rakip seç",
@@ -1172,17 +1229,17 @@ const tr: MessageSchema<typeof en> = {
     gapLine: (pointsValue: string) => `rakibe karşı beklenen fark ${pointsValue}`,
     captainShared: "aynı kaptan",
     planWithinFree: (cap: number, target: number, applied: number) =>
-      `${cap} ücretsiz transfer içinde, hit yok: strateji rakibin on birinden ${target} istedi, ${applied} ulaşılabilirdi.`,
+      `Ücretsiz transfer hakkı ${cap}, transfer cezası yok: istenen ortak oyuncu sınırı ${target}, uygulanan ortak oyuncu sınırı ${applied}.`,
     planWithHits: (cap: number, target: number) =>
-      `Rakibin on birinden ${target} tanesine ulaşmak ${cap} ücretsiz transferden fazlasını istedi; hit'ler fiyata dahil ve yine de önde çıktı.`,
+      `Transfer cezalarına izin veren plan: ücretsiz transfer hakkı ${cap}, istenen ortak oyuncu sınırı ${target}. Yayımlanan transfer cezaları fiyata dahildir.`,
     alternativeWithHits: (applied: number, hits: string, cost: string) =>
-      `Tercih edilmedi: hit'lerle ${applied} tanesine ulaşmak ${hits} hit puanı, saf puana göre ${cost} beklenen puan mal olurdu.`,
+      `Transfer cezalarına izin veren alternatif: uygulanan ortak oyuncu sınırı ${applied}; yayımlanan transfer cezası ${hits} puan, saf puana göre maliyet ${cost} beklenen puan.`,
     alternativeWithinFree: (applied: number, cost: string) =>
-      `Tercih edilmedi: ücretsiz transferlerde kalmak ${applied} tanesine ulaşırdı, saf puana göre ${cost} beklenen puana.`,
+      `Ücretsiz transferler içinde kalan alternatif: uygulanan ortak oyuncu sınırı ${applied}; saf puana göre maliyet ${cost} beklenen puan.`,
     alternativeWithHitsAtMost: (applied: number, hits: string, cost: string) =>
-      `Tercih edilmedi: hit'lerle ${applied} tanesine ulaşmak ${hits} hit puanı ve saf puana göre en fazla ${cost} beklenen puan mal olurdu.`,
+      `Transfer cezalarına izin veren alternatif: uygulanan ortak oyuncu sınırı ${applied}; yayımlanan transfer cezası ${hits} puan, saf puana göre maliyet en fazla ${cost} beklenen puan.`,
     alternativeWithinFreeAtMost: (applied: number, cost: string) =>
-      `Tercih edilmedi: ücretsiz transferlerde kalmak ${applied} tanesine ulaşırdı, saf puana göre en fazla ${cost} beklenen puana.`,
+      `Ücretsiz transferler içinde kalan alternatif: uygulanan ortak oyuncu sınırı ${applied}; saf puana göre maliyet en fazla ${cost} beklenen puan.`,
     templatesTitle: "Oyun şablonları",
     templatesBody:
       "Şablon, adlandırılmış bir strateji-pencere çiftidir. Uygulamak, kontrollerin okuduğu paylaşılabilir seçimi kurar; kendi şablonların bu tarayıcıda durur.",
@@ -1238,11 +1295,11 @@ const tr: MessageSchema<typeof en> = {
     incompleteTitle: "Eksik Kaynak Kaydı",
     incompleteBody: (fields) =>
       `Kaynak şu alanları sağlamadı: ${fields}. Boşlukları doldurmak için veri uydurulmaz.`,
-    entryAssumptionsTitle: "Public Veri Sınırları",
+    entryAssumptionsTitle: "Herkese Açık Veri Sınırları",
     freeTransfersAssumed: (count) =>
-      `Public kaynak banka edilmiş serbest transfer sayısını göstermiyor. Bu plan ${count} varsayıyor; banka edilmiş ikinci transfer görünmüyor olabilir.`,
+      `Herkese açık kaynak banka edilmiş serbest transfer sayısını göstermiyor. Bu plan ${count} varsayıyor; banka edilmiş ikinci transfer görünmüyor olabilir.`,
     currentPriceFallback:
-      "Satın alma fiyatları public değildir. Satış fiyatı olarak mevcut fiyat kullanılır; fiyatı yükselen bir oyuncu için kullanılabilir bütçe olduğundan yüksek görünebilir.",
+      "Satın alma fiyatları herkese açık değildir. Satış fiyatı olarak mevcut fiyat kullanılır; fiyatı yükselen bir oyuncu için kullanılabilir bütçe olduğundan yüksek görünebilir.",
     memberSquad: "Üye kadrosu",
     heldViceCaptainUnavailable: "Yayımlanan kadroda yedek kaptan belirtilmiyor.",
     starterCount: (count) => `${count} ilk 11 oyuncusu`,
@@ -1252,16 +1309,16 @@ const tr: MessageSchema<typeof en> = {
     emptySquadBody: "Yayımlanan üye kaydında kadro bilgisi bulunmuyor.",
     advice: "Önerilen Hamleler",
     honestyRule:
-      "Öneriler yalnızca puan ödünleşimi etiketi taşır. Kalabalık-göreli pencere diagnostikleri kazanma ihtimali gibi sunulmaz.",
+      "Öneriler beklenen puan ödünleşimlerini gösterir. Strateji etiketleri tanımlı kurallara dayanır; yayımlanan çözücü durumu ve sınırlar, kanıtın kapsamını belirtir.",
     independentAdviceRule:
-      "Sana verilen öneri yalnızca senin kadrondan ve senin hedefinden hesaplanır. Sistemin kendi takımı bu hesaba girmez. Sistem kendi sırasını korumak için kimseye kötü öneri veremez; her üyenin önerisi bağımsız olarak aynı karar fonksiyonundan çıkar.",
+      "Önerin yalnızca senin kadrondan hareketle, seçtiğin stratejiye göre hesaplanır. Her üye bağımsız olarak aynı karar kurallarıyla değerlendirilir.",
     squadoptComparisonTitle: "Kaydedilen puan farkı",
     squadoptComparison: (difference) =>
       `SquadOpt'un bu haftaki kadrosuyla puan farkın: ${difference}`,
     noMove: "Seçilen örnek puan ödünleşimini geçen bir hamle yok.",
     noAdviceMissingData: "Kaynak kadro eksik olduğu için öneri gösterilmiyor.",
     diagnosticOnly:
-      "İki kadro aynı projeksiyonla karşılaştırılır. İkinizde de olan oyuncular sadeleşir; farkı paylaşmadığınız oyuncular belirler. Beklenen puan yayınlıyoruz, kazanma ihtimali değil — o iddia kendi ölçümünde üç kez düştü ve hat kapandı.",
+      "İki ilk 11 aynı projeksiyonla karşılaştırılır. Aynı çarpana sahip ortak oyuncuların katkıları sadeleşir; kalan beklenen puanlar, kaptan çarpanları ve bu planın transfer cezaları beklenen farkı belirler.",
     unprovenPlanBadge: "Kanıt tamamlanamadı",
     unprovenPlanBody: (gap: string) =>
       `Çözücü bu plan için kanıtı tamamlayamadı (fark ≤ ${gap} puan). Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.`,
@@ -1270,15 +1327,14 @@ const tr: MessageSchema<typeof en> = {
     projectedGain: (pointsValue) => `${pointsValue} tahmini kazanç`,
     weekTransferCost: (pointsValue) =>
       `Bu haftanın transferlerinin toplam beklenen puan maliyeti ~${pointsValue}: oyun haftayı ücretlendirir, her hamleyi ayrı ayrı değil.`,
-    windowValueReason: "Uzun pencere, örnek projeksiyonda transfer maliyetini geri kazanıyor.",
+    windowValueReason: "Yayımlanan puan tahminlerini kullanan çok haftalı planın bir parçası.",
     pointsGainReason:
       "Bir haftalık saf puan planının parçası; yalnızca beklenen puana göre seçildi.",
-    modeTradeoffReason:
-      "Mod, rakibi geçme olasılığı iddia etmek yerine puan ödünleşimini değiştirir.",
+    modeTradeoffReason: "Bu hamle, seçilen stratejinin beklenen puan ödünleşiminin bir parçasıdır.",
     planCost: (pointsValue) =>
-      `Bu strateji, saf puan seçimine göre ~${pointsValue} beklenen puandan vazgeçiyor (hit'ler dahil).`,
+      `Bu strateji, saf puan seçimine göre ~${pointsValue} beklenen puandan vazgeçiyor (transfer cezaları dahil).`,
     planCostAtMost: (pointsValue) =>
-      `Bu strateji, saf puan seçimine göre en fazla ${pointsValue} beklenen puandan vazgeçiyor (hit'ler dahil).`,
+      `Bu strateji, saf puan seçimine göre en fazla ${pointsValue} beklenen puandan vazgeçiyor (transfer cezaları dahil).`,
     planRival: (name) => `${name} kadrosuna göre fiyatlandı`,
     lineupTitle: "Bu haftaki kadron",
     lineupRule:
