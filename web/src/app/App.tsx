@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import { EmptyState } from "../design/components/EmptyState";
 import { PageShell } from "../design/components/PageShell";
@@ -56,7 +56,7 @@ function LocalizedApp({ basename }: { basename: string }) {
         <PageShell>
           <Suspense fallback={<EmptyState title={messages.common.loading} />}>
             <Routes>
-              <Route path="/" element={<SquadPage />} />
+              <Route path="/" element={<Navigate to="/league/members" replace />} />
               <Route path="/gw/:season/:gameweek" element={<SquadPage />} />
               <Route path="/moves" element={<MovesPage />} />
               <Route path="/moves/:season/:gameweek" element={<MovesPage />} />
