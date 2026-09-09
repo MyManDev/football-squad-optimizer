@@ -11,10 +11,11 @@ import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
 import { createAdviceClient, type AdviceClient, type AdviceSource } from "../advice/adviceClient";
 import {
   canComputeAdvice,
-  publishedSelection,
-  selectedAdviceRequest,
+  resolvePublishedAdvice,
+  type PublishedAdviceStatus,
 } from "../advice/adviceSelection";
-import { checkedAdvice } from "../advice/adviceResponse";
+import { comparedRivalPlayers } from "../advice/rivalPlayers";
+import { AdviceContextError, checkedAdvice } from "../advice/adviceResponse";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { sameAdviceRequest, useAdviceJob } from "../advice/useAdviceJob";
 import { useViewerEntry } from "../identity/useViewerEntry";
@@ -41,7 +42,12 @@ import type {
 import styles from "./LeagueMemberPage.module.css";
 
 /** Why no published advice is on hand for the selection: never published, or not loadable. */
-export type AdviceIssue = "not-computed" | "unavailable";
+export type AdviceIssue =
+  | "not-computed"
+  | "unavailable"
+  | "published-missing"
+  | "context-mismatch"
+  | Exclude<PublishedAdviceStatus, "ready">;
 
 export function LeagueMemberPage() {
   const { messages } = useLanguage();
@@ -62,7 +68,7 @@ export function LeagueMemberPage() {
     staleTime: 60_000,
   });
   // The index says which (strategy, rival) files the producer wrote for this member; a
-  // tree from before the menu has none, and the page then offers the baseline only.
+  // missing or unreadable index cannot authorize a guessed baseline read.
   const indexQuery = useQuery({
     queryKey: ["provisional-entry-advice-index", entryId],
     queryFn: () => loadEntryAdviceIndex(entryId),
@@ -71,15 +77,23 @@ export function LeagueMemberPage() {
     retry: false,
   });
   const members = membersQuery.data?.payload.members ?? [];
-  const index = indexQuery.data?.payload ?? null;
-  const request = selectedAdviceRequest(
-    publishedSelection(searchParams, index),
+  const index = indexQuery.isError ? null : (indexQuery.data?.payload ?? null);
+  const selection = resolvePublishedAdvice(
+    searchParams,
     squad.data?.payload.league_id ?? 0,
     entryId,
     members,
-    undefined,
-    index?.default_rival_entry_id ?? null,
+    index,
+    squad.data
+      ? {
+          season: squad.data.payload.season,
+          gameweek: squad.data.payload.gameweek,
+        }
+      : undefined,
   );
+  const { request } = selection;
+  const adviceEnabled = validEntryId && !!squad.data && selection.status === "ready";
+
   const advice = useQuery({
     queryKey: [
       "provisional-entry-advice",
@@ -87,33 +101,73 @@ export function LeagueMemberPage() {
       request.strategy,
       request.window,
       request.rivalEntryId,
+      selection.path,
+      request.season,
+      request.gameweek,
+      squad.data?.payload.source_snapshot_id,
     ],
     queryFn: () =>
       loadEntryAdvice(entryId, request.strategy, request.window, request.rivalEntryId ?? null),
-    enabled: validEntryId && !membersQuery.isPending && !indexQuery.isPending,
+    enabled: adviceEnabled,
     staleTime: 60_000,
+  });
+
+  const rival = useQuery({
+    queryKey: ["provisional-entry-squad", request.rivalEntryId],
+    queryFn: () => loadEntrySquad(request.rivalEntryId!),
+    enabled: adviceEnabled && request.rivalEntryId != null,
+    staleTime: 60_000,
+    retry: false,
   });
 
   if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
   if (!validEntryId) return <EmptyState title={copy.invalidEntry} />;
-  if (squad.isPending || advice.isPending) return <EmptyState title={copy.loadingEntry} />;
+  if (squad.isPending) return <EmptyState title={copy.loadingEntry} />;
   if (squad.isError) {
-    return <EmptyState title={copy.entryNotAvailable}>{copy.entryNotAvailableBody}</EmptyState>;
+    const missing = squad.error instanceof LeagueDataMissing;
+    return (
+      <EmptyState title={missing ? copy.entryNotAvailable : copy.entryUnreadable}>
+        <p>{missing ? copy.entryNotAvailableBody : copy.entryUnreadableBody}</p>
+        <Link to="/league/members">{copy.backToMembers}</Link>{" "}
+        {!missing ? (
+          <button type="button" onClick={() => void squad.refetch()}>
+            {copy.retryPublishedRead}
+          </button>
+        ) : null}
+      </EmptyState>
+    );
   }
   // Published advice that is missing or unloadable does not close the page: the member
   // context is valid, so the squad and the compute control stay, and the advice card says
   // what is missing. Only this pair is solved per member, so an unpublished combination
   // is a normal outcome rather than a fault the reader should report.
-  const adviceIssue: AdviceIssue | undefined = advice.isError
-    ? advice.error instanceof LeagueDataMissing
-      ? "not-computed"
-      : "unavailable"
-    : undefined;
+  const adviceIssue: AdviceIssue | undefined = indexQuery.isError
+    ? indexQuery.error instanceof LeagueDataMissing
+      ? "index-missing"
+      : "index-error"
+    : selection.status !== "ready"
+      ? selection.status
+      : advice.isError
+        ? advice.error instanceof LeagueDataMissing
+          ? "published-missing"
+          : "unavailable"
+        : undefined;
   return (
     <LeagueMemberView
       squad={squad.data}
-      advice={advice.isError ? null : advice.data}
+      advice={adviceEnabled && !advice.isError ? (advice.data ?? null) : null}
+      rivalSquad={rival.data ?? null}
       adviceIssue={adviceIssue}
+      adviceLoading={indexQuery.isPending || (adviceEnabled && advice.isPending)}
+      membersIssue={
+        membersQuery.isError
+          ? membersQuery.error instanceof LeagueDataMissing
+            ? "missing"
+            : "unavailable"
+          : undefined
+      }
+      onRetryAdvice={() => void advice.refetch()}
+      onRetryIndex={() => void indexQuery.refetch()}
       members={members}
       index={index}
     />
@@ -154,9 +208,14 @@ interface LeagueMemberViewProps {
   squad: LeagueViewEnvelope<EntrySquad>;
   advice: LeagueViewEnvelope<EntryAdvice> | null;
   adviceIssue?: AdviceIssue;
+  adviceLoading?: boolean;
+  membersIssue?: "missing" | "unavailable";
+  onRetryAdvice?: () => void;
+  onRetryIndex?: () => void;
   members?: EntryView[];
   index?: EntryAdviceIndex | null;
   client?: AdviceClient;
+  rivalSquad?: LeagueViewEnvelope<EntrySquad> | null;
 }
 
 export function LeagueMemberView(props: LeagueMemberViewProps) {
@@ -177,33 +236,43 @@ function LeagueMemberContent({
   squad,
   advice,
   adviceIssue,
+  adviceLoading = false,
+  membersIssue,
+  onRetryAdvice,
+  onRetryIndex,
   members = [],
   index = null,
   client,
+  rivalSquad = null,
 }: LeagueMemberViewProps) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const view = squad.payload;
   const [searchParams] = useSearchParams();
-  const { viewer } = useViewerEntry();
+  const { viewer, clear } = useViewerEntry();
   const adviceClient = useMemo(() => client ?? createAdviceClient(), [client]);
-  const job = useAdviceJob(adviceClient);
   const leagueId = view.league_id;
   const entryId = view.entry.entry_id;
-  const request = selectedAdviceRequest(
-    publishedSelection(searchParams, index),
-    leagueId,
-    entryId,
-    members,
-    { season: view.season, gameweek: view.gameweek },
-    index?.default_rival_entry_id ?? null,
-  );
+  const resolve = (params: URLSearchParams) =>
+    resolvePublishedAdvice(params, leagueId, entryId, members, index, {
+      season: view.season,
+      gameweek: view.gameweek,
+    });
+  const selection = resolve(searchParams);
+  const { request } = selection;
+  const indexReadable = adviceIssue !== "index-missing" && adviceIssue !== "index-error";
+  const selectionAvailable = !adviceLoading && indexReadable && selection.status === "ready";
+  const baselineAvailable =
+    resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
+  const job = useAdviceJob(adviceClient, baselineAvailable);
   const requestKey = [
     request.leagueId,
     request.entryId,
     request.strategy,
     request.window,
     request.rivalEntryId ?? "",
+    selection.status,
+    selection.path,
   ].join(":");
 
   // A new selection starts clean: an earlier request's answer, wait or failure must not
@@ -214,16 +283,26 @@ function LeagueMemberContent({
   }, [requestKey, reset]);
 
   const current =
-    job.state.phase !== "idle" && sameAdviceRequest(job.state.request, request) ? job.state : null;
+    selectionAvailable &&
+    job.state.phase !== "idle" &&
+    sameAdviceRequest(job.state.request, request)
+      ? job.state
+      : null;
   const computed = current?.phase === "done" ? current : null;
   const waiting = current?.phase === "waiting" ? current : null;
   let published: LeagueViewEnvelope<EntryAdvice> | null = null;
-  if (advice) {
+  let rejectedContext = false;
+  let rejectedUnreadable = false;
+  if (advice && selectionAvailable) {
     try {
-      published = checkedAdvice(advice, request);
-    } catch {
-      // A published file for another selection or week is not this request's answer.
-      published = null;
+      const checked = checkedAdvice(advice, request);
+      const snapshot = checked.payload.source_snapshot_id;
+      rejectedContext =
+        snapshot != null && view.source_snapshot_id != null && snapshot !== view.source_snapshot_id;
+      published = rejectedContext ? null : checked;
+    } catch (error) {
+      rejectedContext = error instanceof AdviceContextError;
+      rejectedUnreadable = !rejectedContext;
     }
   }
   let shown: ShownAdvice | null = null;
@@ -259,10 +338,37 @@ function LeagueMemberContent({
         <p className={styles.notice}>{copy.publicDataBody}</p>
       </Card>
 
+      {viewer ? (
+        <Card tone="muted" title={copy.viewerTitle}>
+          <p className={styles.notice}>{copy.viewerBody}</p>
+          <p className={styles.notice}>
+            <strong>
+              {copy.viewerSelected(
+                viewer.entryId === entryId
+                  ? (view.entry.manager_name ?? `#${viewer.entryId}`)
+                  : `#${viewer.entryId}`,
+              )}
+            </strong>{" "}
+            <Link to="/league/members">{copy.viewerChange}</Link>{" "}
+            <button type="button" className={styles.viewerClear} onClick={clear}>
+              {copy.viewerClear}
+            </button>
+          </p>
+        </Card>
+      ) : null}
+
       {view.data_quality !== "complete" ? (
         <Card tone="muted" title={copy.incompleteTitle}>
           <p className={styles.notice}>
-            {copy.incompleteBody(view.missing_fields.join(", ") || copy.unknown)}
+            {copy.incompleteBody(
+              view.missing_fields
+                .map((field) =>
+                  Object.hasOwn(copy.missingFieldLabels, field)
+                    ? copy.missingFieldLabels[field]
+                    : copy.missingFieldUnknown,
+                )
+                .join(", ") || copy.unknown,
+            )}
           </p>
         </Card>
       ) : null}
@@ -278,17 +384,6 @@ function LeagueMemberContent({
         </Card>
       ) : null}
 
-      {view.squadopt_comparison ? (
-        <Card title={copy.squadoptComparisonTitle}>
-          <p className={styles.notice}>{messages.league.note}</p>
-          <p className={`${styles.comparison} num`}>
-            {copy.squadoptComparison(
-              signedPoints(view.squadopt_comparison.difference_points, 0, locale),
-            )}
-          </p>
-        </Card>
-      ) : null}
-
       {view.starting_xi.length > 0 ? (
         <>
           <Card
@@ -297,27 +392,43 @@ function LeagueMemberContent({
             aside={copy.starterCount(view.starting_xi.length)}
           >
             <Pitch starters={view.starting_xi} />
+            <p className={styles.notice}>{copy.heldViceCaptainUnavailable}</p>
           </Card>
           <Card title={copy.bench} aside={copy.benchCount(view.bench.length)}>
             <div className={styles.bench}>
-              {view.bench.map((player) => (
-                <div className={styles.benchRow} key={player.player_id}>
-                  <span className="num">{player.bench_order}</span>
-                  <strong>{player.name}</strong>
-                  <span className={styles.muted}>
-                    {player.team} · {player.position}
-                  </span>
-                  <span className={`${styles.benchPoints} num`}>
-                    {points(player.expected_points, 1, locale)} xP
-                  </span>
-                </div>
-              ))}
+              {[...view.bench]
+                .sort(
+                  (left, right) =>
+                    (left.bench_order ?? Number.MAX_SAFE_INTEGER) -
+                    (right.bench_order ?? Number.MAX_SAFE_INTEGER),
+                )
+                .map((player) => (
+                  <div className={styles.benchRow} key={player.player_id}>
+                    <span className="num">{player.bench_order ?? "—"}</span>
+                    <strong>{player.name}</strong>
+                    <span className={styles.muted}>
+                      {player.team} · {player.position}
+                    </span>
+                    <span className={`${styles.benchPoints} num`}>
+                      {points(player.expected_points, 1, locale)} xP
+                    </span>
+                  </div>
+                ))}
             </div>
           </Card>
         </>
       ) : (
         <EmptyState title={copy.emptySquad}>{copy.emptySquadBody}</EmptyState>
       )}
+
+      {membersIssue ? (
+        <Card
+          tone="muted"
+          title={membersIssue === "missing" ? copy.notAvailable : copy.membersUnreadable}
+        >
+          <p className={styles.notice}>{copy.membersAuxiliaryUnavailable}</p>
+        </Card>
+      ) : null}
 
       <section aria-labelledby="entry-advice-title" className={styles.adviceSection}>
         <h2 className="visually-hidden" id="entry-advice-title">
@@ -331,15 +442,43 @@ function LeagueMemberContent({
             </p>
           </Card>
         ) : null}
-        <TemplatePicker />
-        <MemberDecisionControls entryId={entryId} members={members} index={index} />
-        <AdviceRequestPanel request={request} job={job} />
-        {shown ? (
-          <AdviceCard shown={shown} members={members} />
+        <TemplatePicker
+          canApply={(params) =>
+            !adviceLoading && indexReadable && resolve(params).status === "ready"
+          }
+        />
+        <MemberDecisionControls
+          entryId={entryId}
+          members={members}
+          index={selection.status === "index-error" ? null : index}
+        />
+        <AdviceRequestPanel request={request} job={job} selectionAvailable={selectionAvailable} />
+        {adviceLoading ? (
+          <EmptyState title={copy.loadingAdvice} />
+        ) : shown ? (
+          <AdviceCard shown={shown} members={members} squad={squad} rivalSquad={rivalSquad} />
         ) : (
           <MissingAdviceCard
-            issue={advice && !published ? "not-computed" : (adviceIssue ?? "not-computed")}
-            canCompute={canComputeAdvice(request)}
+            issue={
+              rejectedContext
+                ? "context-mismatch"
+                : rejectedUnreadable
+                  ? "unavailable"
+                  : (adviceIssue ??
+                    (selection.status !== "ready" ? selection.status : "not-computed"))
+            }
+            reason={selection.reason}
+            onRetry={
+              adviceIssue === "index-error"
+                ? onRetryIndex
+                : rejectedContext ||
+                    rejectedUnreadable ||
+                    adviceIssue === "published-missing" ||
+                    adviceIssue === "unavailable"
+                  ? onRetryAdvice
+                  : undefined
+            }
+            canCompute={selectionAvailable && canComputeAdvice(request)}
           />
         )}
       </section>
@@ -353,23 +492,73 @@ function LeagueMemberContent({
  * and saying "not published yet" for it would tell the reader to wait for a publish that
  * already happened — on a page whose squad, read from the same build, is above it.
  */
-function MissingAdviceCard({ issue, canCompute }: { issue: AdviceIssue; canCompute: boolean }) {
+function MissingAdviceCard({
+  issue,
+  canCompute,
+  reason,
+  onRetry,
+}: {
+  issue: AdviceIssue;
+  canCompute: boolean;
+  reason?: string | null;
+  onRetry?: () => void;
+}) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
+  const issueCopy =
+    issue === "not-computed"
+      ? [copy.adviceNotComputed, copy.adviceNotComputedBody]
+      : issue === "unavailable"
+        ? [copy.adviceUnreadable, copy.adviceUnreadableBody]
+        : [copy.publicationStates[issue].title, copy.publicationStates[issue].body];
   return (
     <Card title={copy.advice}>
       <p className={styles.honesty}>
-        <strong>{issue === "not-computed" ? copy.adviceNotComputed : copy.adviceUnreadable}</strong>
+        <strong>{issueCopy[0]}</strong>
       </p>
-      <p className={styles.muted}>
-        {issue === "not-computed" ? copy.adviceNotComputedBody : copy.adviceUnreadableBody}
-      </p>
+      <p className={styles.muted}>{issueCopy[1]}</p>
+      {reason ? (
+        <p className={styles.muted}>
+          {Object.hasOwn(copy.publicationReasons, reason)
+            ? copy.publicationReasons[reason]
+            : copy.publicationReasonUnknown}
+        </p>
+      ) : null}
+      {onRetry ? (
+        <button type="button" onClick={onRetry}>
+          {copy.retryPublishedRead}
+        </button>
+      ) : null}
       {canCompute ? <p className={styles.muted}>{copy.adviceRequestHint}</p> : null}
     </Card>
   );
 }
 
-function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: EntryView[] }) {
+function finiteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function hasPublishedPlan(view: EntryAdvice): boolean {
+  return (
+    (view.solver_status === "OPTIMAL" || view.solver_status === "FEASIBLE") &&
+    view.starting_xi?.length === 11 &&
+    view.bench?.length === 4 &&
+    view.captain != null &&
+    view.vice_captain != null
+  );
+}
+
+function AdviceCard({
+  shown,
+  members = [],
+  squad,
+  rivalSquad,
+}: {
+  shown: ShownAdvice;
+  members?: EntryView[];
+  squad: LeagueViewEnvelope<EntrySquad>;
+  rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
+}) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
@@ -391,7 +580,7 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
   const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
   const priceCeiling = view.expected_points_cost_ceiling;
   const price = unproven ? priceCeiling : (priceCeiling ?? view.expected_points_cost);
-  const showsPrice = view.mode !== "saf-puan" && price != null && price >= 0;
+  const showsPrice = view.mode !== "saf-puan" && finiteNumber(price) && price >= 0;
   const alternative = view.alternative_plan;
   const alternativePrice = unproven
     ? alternative?.expected_points_cost_ceiling
@@ -417,7 +606,9 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
       {view.solver_status === "FEASIBLE" ? (
         <p className={styles.honesty}>
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
-          {copy.unprovenPlanBody(points(view.optimality_gap ?? 0, 1, locale))}
+          {finiteNumber(view.optimality_gap)
+            ? copy.unprovenPlanBody(points(view.optimality_gap, 1, locale))
+            : copy.unprovenPlanGapUnknown}
         </p>
       ) : null}
       {showsPrice && price != null ? (
@@ -435,27 +626,36 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
       {view.control_solver_status === "FEASIBLE" ? (
         <p className={styles.honesty}>
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
-          {copy.controlUnprovenBody(points(view.control_optimality_gap ?? 0, 1, locale))}
+          {finiteNumber(view.control_optimality_gap)
+            ? copy.controlUnprovenBody(points(view.control_optimality_gap, 1, locale))
+            : copy.controlGapUnknown}
         </p>
       ) : null}
-      {view.overlap_count != null && view.expected_gap_vs_rival != null ? (
+      {finiteNumber(view.overlap_count) && finiteNumber(view.expected_gap_vs_rival) ? (
         <p className={styles.muted}>
           {copy.overlapLine(view.overlap_count)} ·{" "}
           {copy.gapLine(signedPoints(view.expected_gap_vs_rival, 1, locale))}
           {view.captain_agreement ? ` · ${copy.captainShared}` : ""}
         </p>
       ) : null}
-      {view.plan_kind && view.transfer_cap != null && view.overlap_target != null ? (
+      {view.plan_kind && finiteNumber(view.transfer_cap) && finiteNumber(view.overlap_target) ? (
         <p className={styles.muted}>
           {view.plan_kind === "within_free_transfers"
-            ? copy.planWithinFree(view.transfer_cap, view.overlap_target, view.overlap_applied ?? 0)
+            ? finiteNumber(view.overlap_applied)
+              ? copy.planWithinFree(view.transfer_cap, view.overlap_target, view.overlap_applied)
+              : copy.planWithinFreeUnknown(view.transfer_cap, view.overlap_target)
             : copy.planWithHits(view.transfer_cap, view.overlap_target)}
-          {alternative && alternativePrice != null && alternativePrice >= 0
+          {alternative &&
+          finiteNumber(alternative.overlap_applied) &&
+          finiteNumber(alternativePrice) &&
+          alternativePrice >= 0
             ? ` ${
                 alternative.kind === "with_hits"
                   ? (unproven ? copy.alternativeWithHitsAtMost : copy.alternativeWithHits)(
                       alternative.overlap_applied,
-                      points(alternative.transfer_hit_points ?? 0, 0, locale),
+                      finiteNumber(alternative.transfer_hit_points)
+                        ? points(alternative.transfer_hit_points, 0, locale)
+                        : copy.hitPointsNotPublished,
                       points(alternativePrice, 1, locale),
                     )
                   : (unproven ? copy.alternativeWithinFreeAtMost : copy.alternativeWithinFree)(
@@ -467,9 +667,7 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
         </p>
       ) : null}
       {view.moves.length === 0 ? (
-        <p className={styles.muted}>
-          {view.data_quality === "complete" ? copy.noMove : copy.noAdviceMissingData}
-        </p>
+        <p className={styles.muted}>{hasPublishedPlan(view) ? copy.noMove : copy.noPlanInRecord}</p>
       ) : (
         <>
           <div className={styles.moves}>
@@ -486,10 +684,45 @@ function AdviceCard({ shown, members = [] }: { shown: ShownAdvice; members?: Ent
           ) : null}
         </>
       )}
+      <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
       <LineupSection view={view} />
       <WindowSection view={view} />
       <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
     </Card>
+  );
+}
+
+function RivalPlayers({
+  advice,
+  squad,
+  rivalSquad,
+}: {
+  advice: LeagueViewEnvelope<EntryAdvice>;
+  squad: LeagueViewEnvelope<EntrySquad>;
+  rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
+}) {
+  const copy = useLanguage().messages.leagueMembers;
+  if (advice.payload.rival_entry_id == null) return null;
+  const comparison = comparedRivalPlayers(advice, squad, rivalSquad);
+  return (
+    <section className={styles.lineup} aria-label={copy.rivalPlayersTitle}>
+      <h3 className={styles.lineupTitle}>{copy.rivalPlayersTitle}</h3>
+      <p className={styles.honesty}>{copy.rivalPlayersBasis}</p>
+      {comparison ? (
+        <dl>
+          {(["shared", "recommendedOnly", "rivalOnly"] as const).map((kind) => (
+            <div key={kind}>
+              <dt>{copy.rivalPlayerGroups[kind]}</dt>
+              <dd>
+                {comparison[kind].map((player) => player.name).join(", ") || copy.rivalPlayersNone}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className={styles.muted}>{copy.rivalPlayersUnavailable}</p>
+      )}
+    </section>
   );
 }
 
@@ -517,9 +750,11 @@ function WindowSection({ view }: { view: EntryAdvice }) {
           <h4 className={styles.lineupSub}>{copy.windowLimitsLabel}</h4>
           <ul className={styles.limits}>
             {limits.map((sentence) => (
-              // The producer's sentence in this language where the site knows it; the
-              // producer's own words otherwise, never dropped.
-              <li key={sentence}>{copy.statedLimits[sentence] ?? sentence}</li>
+              <li key={sentence}>
+                {Object.hasOwn(copy.statedLimits, sentence)
+                  ? copy.statedLimits[sentence]
+                  : copy.statedLimitUnknown}
+              </li>
             ))}
           </ul>
         </>
@@ -579,7 +814,7 @@ function LineupSection({ view }: { view: EntryAdvice }) {
     <section className={styles.lineup} aria-label={copy.lineupTitle}>
       <h3 className={styles.lineupTitle}>{copy.lineupTitle}</h3>
       <p className={styles.honesty}>{copy.lineupRule}</p>
-      {view.expected_own_points != null ? (
+      {finiteNumber(view.expected_own_points) ? (
         <p className={styles.planCost}>
           <strong className="num">
             {copy.expectedOwnPoints(points(view.expected_own_points, 1, locale))}

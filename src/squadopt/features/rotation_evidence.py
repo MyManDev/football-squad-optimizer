@@ -18,6 +18,12 @@ and a byte span into it. The card resolves those against the locally held snapsh
 it renders, so a member reads the manager's own words while this table carries none of them --
 and the words shown are provably the words captured, because the digest is checked first.
 
+**The chain is frozen before the decision.** Every club document must have been fetched
+strictly before the decision capture was taken, and a week that breaks that is refused rather
+than published with a caveat: if the bytes were fetched after the capture, the words could
+have been chosen after seeing it. What that refusal does *not* cover is the model's own call
+instant, which closes where the response gets a capture of its own.
+
 **Absent and zero, twice over.** ``rotation_claim_observed`` and ``model_evidence_observed``
 are never missing: they say whether the process ran and produced anything for this player, so
 a player nobody wrote about is distinguishable from a player who was written about and not
@@ -372,6 +378,41 @@ def _timing_verified(
     return all(as_instant(value) < deadline for value in instants)
 
 
+def _require_documents_precede_the_capture(
+    documents: Sequence[RawDocument], captured_at_utc: str
+) -> None:
+    """Refuse a week whose club documents were fetched after the decision capture.
+
+    This is the half of the lane's ordering constraint that a per-row flag cannot express.
+    ``timing_verified`` says every instant a row rests on is earlier than the *deadline*,
+    which is a fact about the claim. This is a fact about the **method**: if the club bytes
+    were fetched after the capture was taken, then whoever fetched them could have looked at
+    the capture first, noticed a player who looked wrong, and gone hunting for words about
+    him. No amount of promptness escapes that, and no column can record it as partially
+    true — the artifact is either built on a chain that was frozen before the decision or it
+    is not, so the build refuses rather than publishing a table with a caveat.
+
+    **What this does not close.** The model's own call instant is not checked here, because a
+    response carries no timestamp and the club-news capture arrives as an identifier rather
+    than as a snapshot. That half closes in A6, where the response is written into a capture
+    with its own stamped instant. Said here rather than left for a reader to assume the check
+    is stronger than it is.
+    """
+
+    captured = as_instant(captured_at_utc)
+    late = [
+        document.requested_url
+        for document in documents
+        if as_instant(document.fetched_at_utc) >= captured
+    ]
+    if late:
+        raise DataSourceError(
+            f"{len(late)} club document(s) were fetched at or after the decision capture at "
+            f"{captured_at_utc} (for example {late[:3]!r}). The claim chain has to be frozen "
+            "before the capture, or the words could have been chosen after seeing it."
+        )
+
+
 def build_rotation_evidence_table(
     *,
     season: str,
@@ -455,6 +496,7 @@ def build_rotation_evidence_table(
 
     captured_at_utc = decision_snapshot.metadata.captured_at_utc
     decision_id = decision_snapshot.metadata.snapshot_id
+    _require_documents_precede_the_capture(documents, captured_at_utc)
     fetched_by_digest = {document.requested_url: document.fetched_at_utc for document in documents}
     covered = {name for name in clubs_covered}
 

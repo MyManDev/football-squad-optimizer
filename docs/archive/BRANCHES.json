@@ -1,0 +1,565 @@
+{
+  "baseline_develop": "a85c7bddf9c7622ebc029204e47bccb62b2cd6b1",
+  "published_main": "eb5634b5e8b7f2bc0a5e4e0e621205e353e9109e",
+  "refs": [
+    {
+      "ref": "refs/heads/backup/2026-08-30-312-local",
+      "commit": "0c450857c6af57a5394cd14ac13d40e1e324a348"
+    },
+    {
+      "ref": "refs/heads/backup/2026-08-30-312-remote",
+      "commit": "eca6ecf6137be3399766cab0f64ee860d471243a"
+    },
+    {
+      "ref": "refs/heads/backup/2026-08-30-316",
+      "commit": "3a904695e7d18fe665e2e2565686d571f03957d4"
+    },
+    {
+      "ref": "refs/heads/backup/2026-08-30-317",
+      "commit": "b06b3c2e6bed77ed637e4c4de609a32b691ba987"
+    },
+    {
+      "ref": "refs/heads/backup/2026-08-30-p2c-prereg",
+      "commit": "446255622c19926c4335b2b787119466147f765f"
+    },
+    {
+      "ref": "refs/heads/backup/2026-08-30-p2c-runner",
+      "commit": "5021cca9a3c91a3f37c5a3ad84c864539599fabd"
+    },
+    {
+      "ref": "refs/heads/backup/phase-c-evaluation-before-restack",
+      "commit": "fc1337007591f659c32d93c7ab2a25b43e59e9d4"
+    },
+    {
+      "ref": "refs/heads/backup/phase-c-live-before-restack",
+      "commit": "7c48c8c6bbf22b72496b569548f3f42a184065c8"
+    },
+    {
+      "ref": "refs/heads/chore/ignore-agent-tool-directories",
+      "commit": "506ed65a60555561336e1a0f19e75aaf9e456403"
+    },
+    {
+      "ref": "refs/heads/chore/web-dead-code",
+      "commit": "852652c3980467d7000cb83b58f0c6fac05a783b"
+    },
+    {
+      "ref": "refs/heads/claude/practical-bun-d79ceb",
+      "commit": "3e83e91cb6c15d772a9150586f1bd596f8818cb3"
+    },
+    {
+      "ref": "refs/heads/claude/trusting-williams-1f4434",
+      "commit": "3e83e91cb6c15d772a9150586f1bd596f8818cb3"
+    },
+    {
+      "ref": "refs/heads/codex/league-score-presentation",
+      "commit": "b426789e9aa4f1c83e8e6fc5d759b50e93294b17"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-d-record",
+      "commit": "34b857b794b3fd7096eb171b6d000dffe6bc086b"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-stage",
+      "commit": "ee905b5365202d4c041401f865ca3cb395373d0c"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-status-docs",
+      "commit": "ee905b5365202d4c041401f865ca3cb395373d0c"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-349",
+      "commit": "6c73a5405ae10ec5daecad2aef9f17c594d60bbd"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-350",
+      "commit": "a0607b570902ee90591a5ad911aa6ffd17653396"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-351",
+      "commit": "ec425995c982b27b6125aec787aa6b69ca56315c"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-353",
+      "commit": "ff664a625e4a6f7220359d3c4999dcc877b4d3a0"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-354",
+      "commit": "513eb3e92736eedfd7bc78588441b8897ba04715"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-355",
+      "commit": "7d685e790b2c763f54fd94e1e16fe413fc2eced2"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-356",
+      "commit": "0918223f26e06ae0256c5c1ae758ef0c95781794"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-358",
+      "commit": "a5c6e4fd567c71899b016ff74222749e0e041680"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-359",
+      "commit": "21bd05a4bf930d26d57288bd0e5a7930cf7254bf"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-360",
+      "commit": "9e3bee68fb167578f2e2d34c64fa64d4dd85586b"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-361",
+      "commit": "986c2509c45ce98c4a8a746524e20e34c7c5516d"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-362",
+      "commit": "37565576fcde10471105b13f1a65e9d374810aba"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-363",
+      "commit": "c28a4a8e2f39a2538bf8134a6c522b685e691dad"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-364",
+      "commit": "2cf64302c33444dcb0edbcb0a565fa97920db0c4"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-365",
+      "commit": "85735a63b483244d43cd34caee0df1722fd8cda0"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-366",
+      "commit": "5a2a81e5637681d456c6efc176e324f6c5def097"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-367",
+      "commit": "ee905b5365202d4c041401f865ca3cb395373d0c"
+    },
+    {
+      "ref": "refs/heads/codex/overnight-topic-runner",
+      "commit": "ff22c1731cedecf305388de06f86ae6ba6fcde8c"
+    },
+    {
+      "ref": "refs/heads/codex/phase-c-evaluation-gates",
+      "commit": "42d958ffc1dba0691dd3dd3bac6762baedb3a245"
+    },
+    {
+      "ref": "refs/heads/codex/phase-c-live-default",
+      "commit": "15846431c78998f372f793c0fff41f414a9b5da4"
+    },
+    {
+      "ref": "refs/heads/codex/phase-c-v2-season-weights",
+      "commit": "f04559809ac4a1ad2c67ed386f412a13710094f7"
+    },
+    {
+      "ref": "refs/heads/codex/phase-d-binding-record",
+      "commit": "ac793b6e33914a07ae7e64085a4fc94e5c73207b"
+    },
+    {
+      "ref": "refs/heads/codex/phase-d-binding-runner",
+      "commit": "7addeccb0d2bd7296b1145a1c6c0762253bfb7dd"
+    },
+    {
+      "ref": "refs/heads/codex/phase-d-binding-runner-pr",
+      "commit": "c54c8bdd7da26433a77da6b33e1b87ea9f7fd977"
+    },
+    {
+      "ref": "refs/heads/codex/phase-d-calibration-evaluator",
+      "commit": "ebf18c9ca7b7cdec846297071ff12a8001a3f876"
+    },
+    {
+      "ref": "refs/heads/codex/phase-d-calibration-fix",
+      "commit": "9124d70f6510aec7173c625ee89716c7fc809089"
+    },
+    {
+      "ref": "refs/heads/codex/phase-d-decision-scoring",
+      "commit": "1922eb56a3d6bfc57f56db2beb06d5755d6714ce"
+    },
+    {
+      "ref": "refs/heads/codex/phase-d-distribution-readout",
+      "commit": "dc2686662800aabd5a155846b92f194fd3ab3513"
+    },
+    {
+      "ref": "refs/heads/codex/phase-d-v2-binding",
+      "commit": "3ca404ecf4a0e11ee1bd22d03081fa6e4fff886b"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-capture-readiness",
+      "commit": "26c3457e608f5f0421edbbb35b377047313b2955"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-command-base",
+      "commit": "9fcadb6602debe962fa915c09864965b73e6d771"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-conditional-integration",
+      "commit": "8d9cecaa7774441bb9964d4db4c2fb19214709f2"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-fixed-selector",
+      "commit": "08113e8628cab83626aaf662b4146fec50d472b1"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-freeze-ready",
+      "commit": "82f1ae146200ffe1124c6e43ec0ab85176847933"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-integration-base",
+      "commit": "478a03b558b66384f0343ac57f175332f925c346"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-live-components",
+      "commit": "fb4c5718315722f8d8f3bf0a79f5e6aa4debb2e5"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-runtime-integration",
+      "commit": "1f5d71676499250b85f39a2a4f17cdb50f18ed7d"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-scope-amendment",
+      "commit": "5ca21a67f629eb8244405affe5e364db28a4404f"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-shadow-command",
+      "commit": "a2fdc228878218c068a6049d2d673c030c731780"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-shadow-evaluator",
+      "commit": "83a2b151f0dc8de362ad27fa967a05d19a46707b"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-shadow-runner",
+      "commit": "97480875bc227e572293fe4a9f9dda3846c3a465"
+    },
+    {
+      "ref": "refs/heads/codex/phase-e-transfer-scenarios",
+      "commit": "c23d97170747e03efe745bf7b7448e5601b1e906"
+    },
+    {
+      "ref": "refs/heads/codex/phase1-final-check",
+      "commit": "b2a0d3c6ca863c964dc4c4ff3d1c247611892f01"
+    },
+    {
+      "ref": "refs/heads/codex/phase1-final-check-v2",
+      "commit": "e736b1f4926c819c512acb610889d9f49a187ec7"
+    },
+    {
+      "ref": "refs/heads/codex/phase1-restack",
+      "commit": "820215bd61614ec6b8604492a04381d4603e12b7"
+    },
+    {
+      "ref": "refs/heads/codex/phase2f-downside-dependence",
+      "commit": "937211fed058dbcc5605ebfd16e1c8705fe00019"
+    },
+    {
+      "ref": "refs/heads/codex/repository-roadmap-20260909",
+      "commit": "a85c7bddf9c7622ebc029204e47bccb62b2cd6b1"
+    },
+    {
+      "ref": "refs/heads/develop",
+      "commit": "9512804e302e0257cda523614df36d87a960a1a9"
+    },
+    {
+      "ref": "refs/heads/docs/amend-component-promotion-rule",
+      "commit": "ee8c2a0281564f1308cf27764a7f1dfa68fbe880"
+    },
+    {
+      "ref": "refs/heads/fable/phase-e-candidate-generator",
+      "commit": "b9c2e413e6766fdaae07e97e6fe8b490aea00a67"
+    },
+    {
+      "ref": "refs/heads/fable/phase-e-prereg",
+      "commit": "09624f920082fb08090b8fbec4deeae3a1bcceb9"
+    },
+    {
+      "ref": "refs/heads/fable/phase-e-probe-base",
+      "commit": "cbbd8d3fa5997b8e5b0b3d3da5382d581250b62f"
+    },
+    {
+      "ref": "refs/heads/fable/phase-e-runtime-probe",
+      "commit": "3f0623ffa34b2586dc3734ffd2a6659463bcc36e"
+    },
+    {
+      "ref": "refs/heads/fable/phase2-characterization",
+      "commit": "8be877e680032d5cf056ea515cbc8fd9a50ea2a0"
+    },
+    {
+      "ref": "refs/heads/feat/first-week-transfer-cap",
+      "commit": "a67ecf0da2658b55353f8fda98c1438aaf65b70d"
+    },
+    {
+      "ref": "refs/heads/feat/freeze-published-advice",
+      "commit": "458c6e46c573160bda5b1cb841c4d4c7ef7a7145"
+    },
+    {
+      "ref": "refs/heads/feat/member-hit-cost-caution-margin",
+      "commit": "a19a2d3cfd6eb700b74bc37dc7a4113076ea82f2"
+    },
+    {
+      "ref": "refs/heads/feat/member-windows",
+      "commit": "29adfd0555fe9939f1b947408fd19dd822545413"
+    },
+    {
+      "ref": "refs/heads/feat/publish-unproven-plans-as-a-bound",
+      "commit": "137f8e03bddea2e3e87fbb27e34655343cc62917"
+    },
+    {
+      "ref": "refs/heads/feat/serving-backend",
+      "commit": "e5d44f7ed9cb7b690f0e06fa54ec167520fece5c"
+    },
+    {
+      "ref": "refs/heads/feat/strategy-rule-by-gap-and-weeks",
+      "commit": "b00ff4437dc2236efdc9b1a63d2ae588e4320666"
+    },
+    {
+      "ref": "refs/heads/feat/system-squad-scoreboard",
+      "commit": "6cd50aac2c5cbd965d6608dc57af4fabac6fda7e"
+    },
+    {
+      "ref": "refs/heads/fix/advice-record-claims",
+      "commit": "1593dd33b7a455d357c7d3ba5719a6d1df6c4ce6"
+    },
+    {
+      "ref": "refs/heads/fix/advice-record-keyed-by-capture",
+      "commit": "99e5472ceae895e8df164c809347ddec8ec9843b"
+    },
+    {
+      "ref": "refs/heads/fix/advice-record-replay",
+      "commit": "543beda1d380f71a242282deb7ab9693b7f27ba3"
+    },
+    {
+      "ref": "refs/heads/fix/advice-record-root-on-publish",
+      "commit": "55743f125d9b73ffb1053304c13d81a99362ab2c"
+    },
+    {
+      "ref": "refs/heads/fix/canonical-site-domain",
+      "commit": "90c0b080a9bcb0906261de27bd5497c610d25784"
+    },
+    {
+      "ref": "refs/heads/fix/capture-source-remaining-callers",
+      "commit": "cbe7780d801874bf058b787d1fc7f7cd2379b44b"
+    },
+    {
+      "ref": "refs/heads/fix/horizon-fixture-scaling",
+      "commit": "91203851fa426d39a5dc3adf6e86a7ad678c86d6"
+    },
+    {
+      "ref": "refs/heads/fix/league-page-selection-and-claims",
+      "commit": "88ced57d683fde64ab56c018aedab807c027e5b0"
+    },
+    {
+      "ref": "refs/heads/fix/ledger-rename-retry",
+      "commit": "00ae7bb2b28fcbeb15582f05d0cc45d2bf7bbb1d"
+    },
+    {
+      "ref": "refs/heads/fix/member-advice-published-numbers",
+      "commit": "a50a54814a210f422611bd18b79477fb437d9c1c"
+    },
+    {
+      "ref": "refs/heads/fix/member-week-column-basis",
+      "commit": "8a8dc36cf8380207dbdaf69210aaf6c161a9c51b"
+    },
+    {
+      "ref": "refs/heads/fix/multi-week-window-determinism",
+      "commit": "283f3837b888a80ec02d38cc259608bd48d81f73"
+    },
+    {
+      "ref": "refs/heads/fix/published-claims-and-free-text",
+      "commit": "acf63395c7def07c5766b04fc02c50fb5b9d2114"
+    },
+    {
+      "ref": "refs/heads/fix/replay-determinism-pins",
+      "commit": "a69c770f948f7fa65c5f9e02e30b852c4a882620"
+    },
+    {
+      "ref": "refs/heads/fix/scenario-paths-and-measurement-record",
+      "commit": "2ef3df469ffbd22e9b4998596b3e14520a60957b"
+    },
+    {
+      "ref": "refs/heads/fix/scratch-name-path-limit",
+      "commit": "6e573c5fcfe862b7fb7a725b5428a35a145174bc"
+    },
+    {
+      "ref": "refs/heads/fix/smoke-league-table-locator",
+      "commit": "a3ae05ed6e656fd5603ff39cfff1bfd640f0fbc3"
+    },
+    {
+      "ref": "refs/heads/fix/weekly-loop-and-capture-selection",
+      "commit": "ef75b10e25a639fdb31fde3cffa2d41cbfb32166"
+    },
+    {
+      "ref": "refs/heads/fix/weekly-loop-preflight-and-staleness",
+      "commit": "8f828f9fec2c0510aec28dde20de8584ccb6f312"
+    },
+    {
+      "ref": "refs/heads/main",
+      "commit": "3e83e91cb6c15d772a9150586f1bd596f8818cb3"
+    },
+    {
+      "ref": "refs/heads/measure/component-squad-calibration",
+      "commit": "ba5b09a5cebc9ebbaf20538cce3a50b856cf7ad8"
+    },
+    {
+      "ref": "refs/heads/wip/phase2c-runner-preintegration",
+      "commit": "6ba999072bd1187d68f80f60b2b170d4a9524432"
+    },
+    {
+      "ref": "refs/remotes/origin/chore/ignore-agent-tool-directories",
+      "commit": "506ed65a60555561336e1a0f19e75aaf9e456403"
+    },
+    {
+      "ref": "refs/remotes/origin/codex/phase-d-binding-runner",
+      "commit": "7addeccb0d2bd7296b1145a1c6c0762253bfb7dd"
+    },
+    {
+      "ref": "refs/remotes/origin/codex/phase-e-command-base",
+      "commit": "9fcadb6602debe962fa915c09864965b73e6d771"
+    },
+    {
+      "ref": "refs/remotes/origin/codex/phase-e-integration-base",
+      "commit": "478a03b558b66384f0343ac57f175332f925c346"
+    },
+    {
+      "ref": "refs/remotes/origin/codex/phase-e-runtime-integration",
+      "commit": "1f5d71676499250b85f39a2a4f17cdb50f18ed7d"
+    },
+    {
+      "ref": "refs/remotes/origin/develop",
+      "commit": "a85c7bddf9c7622ebc029204e47bccb62b2cd6b1"
+    },
+    {
+      "ref": "refs/remotes/origin/fable/phase-e-probe-base",
+      "commit": "cbbd8d3fa5997b8e5b0b3d3da5382d581250b62f"
+    },
+    {
+      "ref": "refs/remotes/origin/feat/club-news-model-call",
+      "commit": "e6c3b40b9cdeec535c58a2616ef67a22a650002c"
+    },
+    {
+      "ref": "refs/remotes/origin/feat/freeze-published-advice",
+      "commit": "458c6e46c573160bda5b1cb841c4d4c7ef7a7145"
+    },
+    {
+      "ref": "refs/remotes/origin/feat/per-club-model-provenance",
+      "commit": "40584600b4f1337f94279140d7c7ce49d10359dc"
+    },
+    {
+      "ref": "refs/remotes/origin/feature/phase-b-evidence-handoff",
+      "commit": "9e5bb971559e863b37b31dd1e3911f7f2041fc1d"
+    },
+    {
+      "ref": "refs/remotes/origin/feature/rotation-evidence-artifact",
+      "commit": "65735dcb18292999ae462beb05ba3260f42b2dbd"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/advice-record-claims",
+      "commit": "2e515649ed44d3c9c8656b410fb806dd2002dbfd"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/advice-record-keyed-by-capture",
+      "commit": "df2c14dd7f89ceb68cffcd218c33c48545e407c4"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/advice-record-replay",
+      "commit": "15ee765033f19b71e028371256792c807e2d255d"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/advice-record-root-on-publish",
+      "commit": "55743f125d9b73ffb1053304c13d81a99362ab2c"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/canonical-site-domain",
+      "commit": "fd038ddf677e3437a11cf48a0926aaf974aa6fbf"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/ledger-rename-retry",
+      "commit": "b3f6ed73a5a6b64460e0d1971ad57ec8d6c77c00"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/member-week-column-basis",
+      "commit": "266d06e7b42780b5eec11d7c531969bfe7ed367e"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/multi-week-window-determinism",
+      "commit": "283f3837b888a80ec02d38cc259608bd48d81f73"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/published-claims-and-free-text",
+      "commit": "2529cdd36805520ec6d92b21b23c2d2acbe9502b"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/replay-determinism-pins",
+      "commit": "d8f5ce57231cd8318a4b07d254870199bff1ed1c"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/smoke-league-table-locator",
+      "commit": "6dd58c25de1bace67bb2140dd91220c7d42dd524"
+    },
+    {
+      "ref": "refs/remotes/origin/fix/weekly-loop-preflight-and-staleness",
+      "commit": "dc95aeeb12e4630c76c0a0fc15c78b662fa48540"
+    },
+    {
+      "ref": "refs/remotes/origin/main",
+      "commit": "eb5634b5e8b7f2bc0a5e4e0e621205e353e9109e"
+    },
+    {
+      "ref": "refs/remotes/origin/ops/capture-lead-time-record",
+      "commit": "ed4a91d53643ba02ea011d820ca4ea995ef00094"
+    }
+  ],
+  "worktree_heads": [
+    "00ae7bb2b28fcbeb15582f05d0cc45d2bf7bbb1d",
+    "137f8e03bddea2e3e87fbb27e34655343cc62917",
+    "1593dd33b7a455d357c7d3ba5719a6d1df6c4ce6",
+    "22b80de72a16ee672b8f2716f3008574bce754e3",
+    "283f3837b888a80ec02d38cc259608bd48d81f73",
+    "29adfd0555fe9939f1b947408fd19dd822545413",
+    "2ef3df469ffbd22e9b4998596b3e14520a60957b",
+    "44a3d383f6aa76df9b53ee28fc8a7f19fc3d53c2",
+    "458c6e46c573160bda5b1cb841c4d4c7ef7a7145",
+    "506ed65a60555561336e1a0f19e75aaf9e456403",
+    "543beda1d380f71a242282deb7ab9693b7f27ba3",
+    "55743f125d9b73ffb1053304c13d81a99362ab2c",
+    "5cd02ab7d3727b3564e324ef86e4484ccc79fdff",
+    "5e630dfff7bc90a7786607e25668c6b6b7f71624",
+    "6cd50aac2c5cbd965d6608dc57af4fabac6fda7e",
+    "6e573c5fcfe862b7fb7a725b5428a35a145174bc",
+    "7869e4ab1268cfc2c46e48ee4dec84a0166bac71",
+    "7c86b28d9f94f1304bf3926e25e940d98aaa812f",
+    "852652c3980467d7000cb83b58f0c6fac05a783b",
+    "88ced57d683fde64ab56c018aedab807c027e5b0",
+    "8a8dc36cf8380207dbdaf69210aaf6c161a9c51b",
+    "8cff6d26bb0a01dd07fab072046e6fd755561a5f",
+    "8f828f9fec2c0510aec28dde20de8584ccb6f312",
+    "90c0b080a9bcb0906261de27bd5497c610d25784",
+    "91203851fa426d39a5dc3adf6e86a7ad678c86d6",
+    "9512804e302e0257cda523614df36d87a960a1a9",
+    "95b405da5cde14ac2e2a13c9b3c4a876a0c2844b",
+    "99e5472ceae895e8df164c809347ddec8ec9843b",
+    "9c5f5cb22e0d880b68f3b38b1f5359d0eda75747",
+    "a19a2d3cfd6eb700b74bc37dc7a4113076ea82f2",
+    "a3ae05ed6e656fd5603ff39cfff1bfd640f0fbc3",
+    "a50a54814a210f422611bd18b79477fb437d9c1c",
+    "a67ecf0da2658b55353f8fda98c1438aaf65b70d",
+    "a69c770f948f7fa65c5f9e02e30b852c4a882620",
+    "a73cdc8c9092af774bc04fb03853de978e1b7d1f",
+    "a85c7bddf9c7622ebc029204e47bccb62b2cd6b1",
+    "acf63395c7def07c5766b04fc02c50fb5b9d2114",
+    "b00ff4437dc2236efdc9b1a63d2ae588e4320666",
+    "b426789e9aa4f1c83e8e6fc5d759b50e93294b17",
+    "b5d7ba8ac0b18f80ff190951a7dede632d90b074",
+    "ba5b09a5cebc9ebbaf20538cce3a50b856cf7ad8",
+    "bf936c21ae90d53141620564e8d5d0235831ba86",
+    "c6884db8fe6621f806fffb3eb6fe4557aa6fb137",
+    "cbe7780d801874bf058b787d1fc7f7cd2379b44b",
+    "d61bc2872839f7f8f3f04990f734aa96bbde8919",
+    "de260b300dd057fa00b1a8d6caa7ba3d26f5fd31",
+    "e863bc593063a5fb6826995b65b22189db5f3d12",
+    "ee8c2a0281564f1308cf27764a7f1dfa68fbe880",
+    "ee905b5365202d4c041401f865ca3cb395373d0c",
+    "ef75b10e25a639fdb31fde3cffa2d41cbfb32166"
+  ],
+  "local_publication_snapshot": "9d2da23ac280fd0318bd06efad6922b506e9d1e3",
+  "local_publication_changed_files": 536,
+  "scope": "Branch commits and detached commit heads are retained in ancestry. Dirty worktree files other than the primary public-data snapshot remain in their existing worktrees; this manifest does not claim to commit them."
+}

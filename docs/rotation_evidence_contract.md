@@ -40,6 +40,24 @@ in the manifest, checked on read. Phase B can check an arithmetic identity — i
 this is the honest replacement: every roster player gets a row, and the flags say what was and
 was not observed for him. A table with a player quietly missing would look complete otherwise.
 
+## The chain is frozen before the decision
+
+Every club document must have been fetched **strictly before** the decision capture was
+taken. A week that breaks that is refused, not published with a caveat.
+
+This is a rule about the *method*, which is why no column records it. `timing_verified`
+(column 8) is a fact about a claim — every instant it rests on is earlier than the deadline.
+This is a fact about the order things happened in: if the club bytes were fetched after the
+capture was taken, then whoever fetched them could have looked at the capture first, noticed
+a player who looked wrong, and gone hunting for words about him. That is not partially true
+on some rows, so the build refuses.
+
+**What the refusal does not cover.** The model's own call instant. A response carries no
+timestamp, and the club-news capture reaches the builder as an identifier rather than as a
+snapshot, so there is nothing to compare. That half closes where the response is written
+into a capture with its own stamped instant — until then, this document says so rather than
+letting a reader assume the check is stronger than it is.
+
 ## Columns, in the one order they are ever written or read
 
 | # | column | dtype | absent (`pd.NA`) means |
@@ -159,6 +177,9 @@ What the manifest can do, and does, is record the exact prompt digest, the model
 version, and every source document digest, so that *"the claim is traceable to bytes we
 captured at time T"* is checkable rather than asserted.
 
+The ordering rule above is what bounds the first two clocks against each other; it does not
+touch the third, and nothing can.
+
 A related limit, stated for the same reason: a `day`-precision dateline is **not** compared
 against the deadline. It names a calendar day and no time, so testing it against an instant
 would require inventing one, and the invented time would decide the answer. Such a row's
@@ -171,3 +192,8 @@ of the lane brief; no capture has been read here to confirm them. The refusal in
 "absent means" is what keeps that honest — if the source spells them differently, the first
 real capture stops with the names it was looking for rather than quietly reporting that nobody
 has any risks.
+
+## The model call
+
+How the coding response is produced, what the prompt asks for, and why the model is never
+asked for a byte offset: `docs/rotation_claim_coding.md`.

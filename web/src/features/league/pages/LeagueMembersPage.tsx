@@ -1,14 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
-import { useIndex, useLedger } from "../../../data/queries";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
-import { loadLeagueMembers } from "../data";
+import { LeagueDataMissing, loadLeagueMembers } from "../data";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import type { EntryView, LeagueMembers, LeagueViewEnvelope } from "../types";
 import styles from "./LeagueMembersPage.module.css";
@@ -16,63 +15,26 @@ import styles from "./LeagueMembersPage.module.css";
 export function LeagueMembersPage() {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const index = useIndex();
   const query = useQuery({
     queryKey: ["provisional-league-members"],
     queryFn: loadLeagueMembers,
     staleTime: 60_000,
   });
-  // Our row's week must match the week the published members are scored in, so it is read
-  // after the members document rather than beside it.
-  const scored = query.data?.payload.scored_gameweek ?? null;
-  const systemRow = useSystemRow(index.data?.payload.seasons[0], scored);
-
   if (query.isPending) return <EmptyState title={copy.loading} />;
   if (query.isError) {
-    return <EmptyState title={copy.notAvailable}>{copy.notAvailableBody}</EmptyState>;
+    const missing = query.error instanceof LeagueDataMissing;
+    return (
+      <EmptyState title={missing ? copy.notAvailable : copy.membersUnreadable}>
+        <p>{missing ? copy.notAvailableBody : copy.membersUnreadableBody}</p>
+        {!missing ? (
+          <button type="button" onClick={() => void query.refetch()}>
+            {copy.retryPublishedRead}
+          </button>
+        ) : null}
+      </EmptyState>
+    );
   }
-  return <LeagueMembersView envelope={query.data} systemRow={systemRow} />;
-}
-
-/**
- * Our own row, read from the ledger the site already publishes.
- *
- * The producer deliberately does not write it: a member's advice must be computed without
- * reference to our squad, so the module that renders members never reads our ledger. That
- * leaves the site to add the row from its own record — which is also the only place the
- * number is settled rather than projected.
- *
- * No rank is claimed. Placing ourselves among the members needs their points, and the
- * standings view does not carry them; a rank invented here would be the one number on the
- * page that nobody measured.
- */
-function useSystemRow(season: string | undefined, scoredGameweek: number | null): EntryView | null {
-  const ledger = useLedger(season);
-  const payload = ledger.data?.payload;
-  if (!payload || payload.settled_gameweeks === 0) return null;
-  const settled = payload.rows.filter((row) => row.settled && row.realized_net_score !== null);
-  // Our score and theirs share one column under one heading. If our latest settled week is
-  // not the week that heading names, the two numbers describe different weeks, so ours is
-  // withheld rather than shown beside a label it does not belong to.
-  const latest =
-    scoredGameweek === null
-      ? null
-      : (settled.find((row) => row.gameweek === scoredGameweek) ?? null);
-  return {
-    member_kind: "system",
-    entry_id: null,
-    manager_name: "SquadOpt",
-    team_name: "SquadOpt",
-    rank: 0,
-    // Gross week plus the hit, the same two numbers every member's row carries, so the
-    // column nets all of them the same way instead of netting ours somewhere else.
-    gameweek_points: latest?.realized_score ?? null,
-    transfer_cost: latest?.transfer_hit_points ?? null,
-    total_points: latest === null ? null : payload.total_realized_net_score,
-    movement: "unknown",
-    movement_places: null,
-    data_quality: "complete",
-  };
+  return <LeagueMembersView envelope={query.data} />;
 }
 
 /**
@@ -93,16 +55,11 @@ function netWeekPoints(member: EntryView): number | null {
   return gross - cost;
 }
 
-export function LeagueMembersView({
-  envelope,
-  systemRow = null,
-}: {
-  envelope: LeagueViewEnvelope<LeagueMembers>;
-  systemRow?: EntryView | null;
-}) {
+export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<LeagueMembers> }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { viewer, select, clear } = useViewerEntry();
+  const navigate = useNavigate();
   const view = envelope.payload;
   const viewerRow =
     viewer === null
@@ -110,11 +67,8 @@ export function LeagueMembersView({
       : (view.members.find(
           (member) => member.member_kind === "human" && member.entry_id === viewer.entryId,
         ) ?? null);
-  // The example envelope carries its own system row; a live one never does, because the
-  // producer must not read our ledger. Appending unconditionally would double it.
-  const alreadyPresent = view.members.some((member) => member.member_kind === "system");
-  const rows: EntryView[] =
-    systemRow && !alreadyPresent ? [...view.members, systemRow] : view.members;
+  // A published example can include our virtual team; the visitor list is for members.
+  const rows = view.members.filter((member) => member.member_kind === "human");
   return (
     <div className={styles.page}>
       <header className={styles.head}>
@@ -135,12 +89,19 @@ export function LeagueMembersView({
 
       <Card tone="muted" title={copy.viewerTitle}>
         <p className={styles.notice}>{copy.viewerBody}</p>
-        {viewerRow ? (
+        {viewer ? (
           <p className={styles.notice}>
-            <strong>
-              {copy.viewerSelected(viewerRow.manager_name ?? `#${viewerRow.entry_id}`)}
-            </strong>{" "}
-            <Link to={`/league/members/${viewerRow.entry_id}`}>{copy.viewerOpenMine}</Link>{" "}
+            {viewerRow ? (
+              <>
+                <strong>
+                  {copy.viewerSelected(viewerRow.manager_name ?? `#${viewerRow.entry_id}`)}
+                </strong>{" "}
+                <Link to={`/league/members/${viewerRow.entry_id}`}>{copy.viewerOpenMine}</Link>{" "}
+              </>
+            ) : (
+              <>{copy.viewerMissing} </>
+            )}
+            <a href="#league-member-list">{copy.viewerChange}</a>{" "}
             <button type="button" className={styles.viewerClear} onClick={clear}>
               {copy.viewerClear}
             </button>
@@ -148,9 +109,9 @@ export function LeagueMembersView({
         ) : null}
       </Card>
 
-      <Card title={copy.members} aside={copy.memberCount(view.members.length)}>
+      <Card title={copy.members} aside={copy.memberCount(rows.length)}>
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
+          <table id="league-member-list" className={styles.table}>
             <caption className="visually-hidden">{copy.caption(view.league_name)}</caption>
             <thead>
               <tr>
@@ -171,11 +132,14 @@ export function LeagueMembersView({
             <tbody>
               {rows.map((member) => (
                 <MemberRow
-                  key={member.member_kind === "system" ? "squadopt" : member.entry_id}
+                  key={member.entry_id}
                   member={member}
                   locale={locale}
                   viewerEntryId={viewer?.entryId ?? null}
-                  onSelectViewer={select}
+                  onSelectViewer={(entryId) => {
+                    select(entryId);
+                    navigate(`/league/members/${entryId}`);
+                  }}
                 />
               ))}
             </tbody>
@@ -188,9 +152,6 @@ export function LeagueMembersView({
              the column rather than to our presence in it — and it differs from what the
              FPL site shows a manager, which is the surprise the note exists to remove. */
           <p className={styles.notice}>{copy.gameweekNetNote}</p>
-        )}
-        {rows.some((member) => member.member_kind === "system") && (
-          <p className={styles.notice}>{messages.league.note}</p>
         )}
       </Card>
     </div>
@@ -217,7 +178,11 @@ function MemberRow({
       ? copy.unknown
       : member.movement === "new"
         ? copy.newMember
-        : copy.movementLabel(member.movement, member.movement_places ?? 0);
+        : member.movement === "same"
+          ? copy.movementLabel("same", 0)
+          : typeof member.movement_places === "number" && Number.isFinite(member.movement_places)
+            ? copy.movementLabel(member.movement, member.movement_places)
+            : copy.unknown;
   return (
     <tr className={member.member_kind === "system" ? styles.systemRow : undefined}>
       <td className="num">{member.rank === 0 ? "—" : member.rank}</td>

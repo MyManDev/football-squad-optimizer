@@ -8,17 +8,25 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { mockEntrySquadEnvelopes, mockLeagueMembersEnvelope } from "../../fixtures/league";
+
 import {
   LeagueDataError,
   LeagueDataMissing,
   loadEntryAdvice,
   loadEntryAdviceIndex,
+  loadEntrySquad,
+  loadLeagueMembers,
   loadScoreboard,
+  lookupPublishedLeague,
 } from "./data";
 
 const ENTRY = 35249001;
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
 
 describe("league advice loaders", () => {
   it.each([1, 3, 5] as const)("loads the pure-points document for window %i", async (window) => {
@@ -63,12 +71,38 @@ describe("loadScoreboard", () => {
     await expect(loadScoreboard()).rejects.toBeInstanceOf(LeagueDataMissing);
   });
 
-  it("raises LeagueDataMissing when a static host answers with the app shell", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response("<!doctype html><html></html>", { status: 200 })),
-    );
-    await expect(loadScoreboard()).rejects.toBeInstanceOf(LeagueDataMissing);
+  it.each(["<!doctype html><html></html>", ' \n<HTML lang="en"></HTML>'])(
+    "raises LeagueDataMissing when a static host answers with the app shell: %s",
+    async (body) => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, { status: 200 })));
+      await expect(loadScoreboard()).rejects.toBeInstanceOf(LeagueDataMissing);
+    },
+  );
+
+  it.each(["", " ", '{"contract_version":', "upstream unavailable"])(
+    "keeps an unreadable publication distinct from a missing document: %s",
+    async (body) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response(body, { status: 200, headers: { "Content-Type": "application/json" } }),
+          ),
+      );
+      const failure = loadScoreboard();
+      await expect(failure).rejects.toBeInstanceOf(LeagueDataError);
+      await expect(failure).rejects.not.toBeInstanceOf(LeagueDataMissing);
+    },
+  );
+
+  it("does not hide a broken published member document behind development examples", async () => {
+    vi.stubEnv("MODE", "development");
+    vi.stubEnv("DEV", true);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('{"payload":')));
+    const failure = loadLeagueMembers();
+    await expect(failure).rejects.toBeInstanceOf(LeagueDataError);
+    await expect(failure).rejects.not.toBeInstanceOf(LeagueDataMissing);
   });
 
   it("refuses another contract version as an error, not as an absence", async () => {
@@ -91,4 +125,138 @@ describe("loadScoreboard", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 404 })));
     await expect(loadScoreboard()).rejects.toThrow("No published league document");
   });
+});
+
+const publishedMembers = {
+  contract_version: "provisional_league_ui_v1",
+  generated_at_utc: "2026-09-09T06:00:00Z",
+  source_kind: "live",
+  payload: {
+    league_id: 352490,
+    league_name: "Published league",
+    season: "2026-27",
+    gameweek: 4,
+    public_after_deadline: true,
+    scored_gameweek: 3,
+    members: [],
+  },
+};
+
+describe("published league lookup", () => {
+  it("uses the fixed publication URL and treats an empty connected league as connected", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(publishedMembers)));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(lookupPublishedLeague(352490)).resolves.toBe("connected");
+    expect(fetcher).toHaveBeenCalledWith("/data/league/members.json", { cache: "no-cache" });
+  });
+
+  it("rejects any other ID without requesting a document or upstream API", async () => {
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    await expect(lookupPublishedLeague(123)).resolves.toBe("unsupported");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each(["test", "development"])("never falls back to an example in %s", async (mode) => {
+    vi.stubEnv("MODE", mode);
+    vi.stubEnv("DEV", true);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 404 })));
+    await expect(lookupPublishedLeague(352490)).rejects.toBeInstanceOf(LeagueDataMissing);
+  });
+
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    "refuses invalid ID %s without a fetch",
+    async (id) => {
+      const fetcher = vi.fn();
+      vi.stubGlobal("fetch", fetcher);
+      await expect(lookupPublishedLeague(id)).rejects.toBeInstanceOf(LeagueDataError);
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { ...publishedMembers, source_kind: "example" },
+    { ...publishedMembers, contract_version: "other" },
+    { ...publishedMembers, payload: null },
+    { ...publishedMembers, payload: { ...publishedMembers.payload, public_after_deadline: false } },
+    { ...publishedMembers, payload: { ...publishedMembers.payload, league_id: "352490" } },
+    { ...publishedMembers, payload: { ...publishedMembers.payload, league_id: 123 } },
+    { ...publishedMembers, payload: { ...publishedMembers.payload, members: [null] } },
+  ])(
+    "does not classify an incompatible or invalid publication as a league result",
+    async (value) => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(value))));
+      await expect(lookupPublishedLeague(352490)).rejects.toBeInstanceOf(LeagueDataError);
+    },
+  );
+
+  it("keeps transport failure distinct from missing publication", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("", { status: 503 })));
+    const request = lookupPublishedLeague(352490);
+    await expect(request).rejects.toBeInstanceOf(LeagueDataError);
+    await expect(request).rejects.not.toBeInstanceOf(LeagueDataMissing);
+  });
+});
+
+describe("published member document shapes", () => {
+  function fromNetwork(value: unknown) {
+    vi.stubEnv("MODE", "development");
+    vi.stubEnv("DEV", true);
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(value)));
+    vi.stubGlobal("fetch", fetcher);
+    return fetcher;
+  }
+
+  it.each([null, { members: null }, { members: [null] }])(
+    "rejects a malformed member list without development examples: %j",
+    async (payload) => {
+      const fetcher = fromNetwork({ ...mockLeagueMembersEnvelope, payload });
+      const failure = loadLeagueMembers();
+      await expect(failure).rejects.toBeInstanceOf(LeagueDataError);
+      await expect(failure).rejects.not.toBeInstanceOf(LeagueDataMissing);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["entry", "starting_xi", "bench", "missing_fields"])(
+    "rejects missing squad %s without development examples",
+    async (field) => {
+      const source = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+      const fetcher = fromNetwork({ ...source, payload: { ...source.payload, [field]: null } });
+      const failure = loadEntrySquad(ENTRY);
+      await expect(failure).rejects.toBeInstanceOf(LeagueDataError);
+      await expect(failure).rejects.not.toBeInstanceOf(LeagueDataMissing);
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("refuses a well-shaped squad for another member", async () => {
+    fromNetwork(mockEntrySquadEnvelopes[ENTRY]);
+    await expect(loadEntrySquad(ENTRY + 1)).rejects.toBeInstanceOf(LeagueDataError);
+  });
+
+  it("refuses an object-valued display name instead of crashing the member list", async () => {
+    const envelope = structuredClone(mockLeagueMembersEnvelope);
+    const first = envelope.payload.members[0]!;
+    fromNetwork({
+      ...envelope,
+      payload: { ...envelope.payload, members: [{ ...first, manager_name: {} }] },
+    });
+    await expect(loadLeagueMembers()).rejects.toBeInstanceOf(LeagueDataError);
+  });
+
+  it("refuses a malformed player instead of crashing the pitch", async () => {
+    const envelope = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    fromNetwork({ ...envelope, payload: { ...envelope.payload, starting_xi: [null] } });
+    await expect(loadEntrySquad(ENTRY)).rejects.toBeInstanceOf(LeagueDataError);
+  });
+
+  it.each([ENTRY, 35249010])(
+    "preserves valid partial or empty public squad %i",
+    async (entryId) => {
+      const envelope = mockEntrySquadEnvelopes[entryId]!;
+      fromNetwork(envelope);
+      await expect(loadEntrySquad(entryId)).resolves.toEqual(envelope);
+    },
+  );
 });

@@ -1,0 +1,205 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 4,
+    "entry_id": 3832237,
+    "league_id": 352490,
+    "mode": "ortak-koru",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "moves": [
+      {
+        "move_id": "gw04-1",
+        "player_out": {
+          "player_id": 178301,
+          "name": "Ollie Watkins",
+          "short_name": "Watkins",
+          "position": "FWD",
+          "team": "Aston Villa"
+        },
+        "player_in": {
+          "player_id": 475168,
+          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+          "short_name": "Jesus",
+          "position": "FWD",
+          "team": "Chelsea"
+        },
+        "expected_points_delta": 4.8089656617809755,
+        "reason_code": "mode_tradeoff"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_points_cost": 0.0,
+    "rival_label": "entry-7252721",
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
+    "expected_own_points": 46.54539159350413,
+    "captain": {
+      "player_id": 446008,
+      "name": "Bryan Mbeumo",
+      "short_name": "Mbeumo",
+      "position": "MID",
+      "team": "Man Utd",
+      "expected_points": 4.934679467666494
+    },
+    "vice_captain": {
+      "player_id": 475168,
+      "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+      "short_name": "Jesus",
+      "position": "FWD",
+      "team": "Chelsea",
+      "expected_points": 4.8089656617809755
+    },
+    "starting_xi": [
+      {
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
+        "position": "GK",
+        "team": "Arsenal",
+        "expected_points": 3.450579897041415
+      },
+      {
+        "player_id": 226597,
+        "name": "Gabriel dos Santos Magalh\u00e3es",
+        "short_name": "Magalh\u00e3es",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 4.305863646230902
+      },
+      {
+        "player_id": 441164,
+        "name": "Pedro Porro Sauceda",
+        "short_name": "Sauceda",
+        "position": "DEF",
+        "team": "Spurs",
+        "expected_points": 2.227509225197033
+      },
+      {
+        "player_id": 472769,
+        "name": "Nico O'Reilly",
+        "short_name": "O'Reilly",
+        "position": "DEF",
+        "team": "Man City",
+        "expected_points": 1.550337345902003
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.934679467666494
+      },
+      {
+        "player_id": 437730,
+        "name": "Antoine Semenyo",
+        "short_name": "Semenyo",
+        "position": "MID",
+        "team": "Man City",
+        "expected_points": 4.435285999290234
+      },
+      {
+        "player_id": 430871,
+        "name": "Matheus Santos Carneiro da Cunha",
+        "short_name": "Cunha",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.285006658813828
+      },
+      {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 4.232677554424536
+      },
+      {
+        "player_id": 84450,
+        "name": "Granit Xhaka",
+        "short_name": "Xhaka",
+        "position": "MID",
+        "team": "Sunderland",
+        "expected_points": 3.6786815840462794
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "expected_points": 4.8089656617809755
+      },
+      {
+        "player_id": 502500,
+        "name": "Igor Thiago Nascimento Rodrigues",
+        "short_name": "Rodrigues",
+        "position": "FWD",
+        "team": "Brentford",
+        "expected_points": 3.7011250854439344
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 204936,
+        "name": "Gianluigi Donnarumma",
+        "short_name": "Donnarumma",
+        "position": "GK",
+        "team": "Man City",
+        "expected_points": 2.960998405165074
+      },
+      {
+        "player_id": 169432,
+        "name": "Oli McBurnie",
+        "short_name": "McBurnie",
+        "position": "FWD",
+        "team": "Hull City",
+        "expected_points": 2.846724371266304
+      },
+      {
+        "player_id": 231416,
+        "name": "Ferdi Kad\u0131o\u011flu",
+        "short_name": "Kad\u0131o\u011flu",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 1.2523629866664963
+      },
+      {
+        "player_id": 106611,
+        "name": "Michael Keane",
+        "short_name": "Keane",
+        "position": "DEF",
+        "team": "Everton",
+        "expected_points": 0.1245569098822726
+      }
+    ],
+    "chip": null,
+    "data_quality": "partial",
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ],
+    "rival_entry_id": 7252721,
+    "expected_points_cost_ceiling": 0.0,
+    "overlap_count": 4,
+    "transfer_cap": 1,
+    "overlap_target": 9,
+    "overlap_applied": 4,
+    "plan_kind": "within_free_transfers",
+    "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 20.0,
+      "expected_points_cost": 11.058955387742927,
+      "expected_points_cost_ceiling": 11.058955387742927
+    },
+    "expected_gap_vs_rival": -8.605567066491055,
+    "captain_agreement": false,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0
+  }
+}

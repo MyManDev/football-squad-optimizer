@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test("squad shows the latest decision", async ({ page }) => {
-  await page.goto("/");
+test("the legacy squad remains reachable by its direct gameweek URL", async ({ page }) => {
+  await page.goto("/gw/2026-27/1");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(/Oyun haftası/);
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText(/Bu sayılar neyi söylemiyor/)).toBeVisible();
@@ -40,7 +40,12 @@ test("league shows the season and the cumulative chart", async ({ page }) => {
   // Turkish because the payload now carries a stable code the page translates.
   await expect(page.getByText(/oyun ortalamasına karşı/)).toBeVisible();
   await expect(page.getByText(/Bu kadronun ne kadarı şablon/)).toBeVisible();
-  await expect(page.getByRole("table")).toBeVisible();
+  // Named rather than taken by role alone, for the same reason the comment above gives. A
+  // bare `getByRole("table")` assumed the page had exactly one, which was true only while
+  // the scoreboard had nothing to publish; a week with a scoreboard renders a second table
+  // and the locator fails on strict mode rather than on anything being wrong. The season
+  // ledger is the table that is there in every season state, so that is the one asserted.
+  await expect(page.getByRole("table", { name: /sezon ledger/i })).toBeVisible();
 });
 
 test("status is reachable from the footer", async ({ page }) => {
@@ -61,5 +66,9 @@ test("language selection switches the full frame and persists across routes", as
   await page.getByRole("link", { name: "Analysis" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analysis Center");
   await page.reload();
-  await expect(page.getByRole("link", { name: "Suggested Moves" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "League", exact: true })).toHaveAttribute(
+    "href",
+    "/",
+  );
+  await expect(page.getByRole("link", { name: "Suggested Moves" })).toHaveCount(0);
 });

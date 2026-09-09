@@ -1,0 +1,156 @@
+{
+  "arms": {
+    "control": "historical Ridge projection, no exclusion",
+    "oracle_exclusion": "the same projection with the flagged players' expected points set to zero before the solve",
+    "scoring": "Scored with official autosubs and vice-captain fallback (official_autosub_captain_v2) through evaluation.scoring.score_frozen_squad_decision. The season-chain path was rejected: it scores starters plus the captain again with no automatic substitutions, so removing the autosub rule that recovers points from a non-appearing starter would inflate the very gain this measurement is trying to bound."
+  },
+  "comparison": {
+    "attempted_folds": 147,
+    "comparable_folds": 147,
+    "control_autosub_points": 186.0,
+    "control_mean_points": 58.605442176870746,
+    "control_started_excluded_players": 53,
+    "control_zero_minute_starters": 76,
+    "dropped_fold_ids": [],
+    "interval_lower": 0.027210884353741496,
+    "interval_upper": 1.6326530612244898,
+    "mean_difference": 0.9659863945578231,
+    "median_difference": 0.0,
+    "oracle_autosub_points": 75.0,
+    "oracle_losses": 19,
+    "oracle_mean_points": 59.57142857142857,
+    "oracle_wins": 35,
+    "oracle_zero_minute_starters": 27,
+    "season_mean_differences": {
+      "2021-22": -0.3783783783783784,
+      "2022-23": 0.6388888888888888,
+      "2023-24": 2.891891891891892,
+      "2024-25": 0.7027027027027027
+    },
+    "ties": 93
+  },
+  "contract_version": "rotation_oracle_ceiling_v1",
+  "decision_seasons": [
+    "2021-22",
+    "2022-23",
+    "2023-24",
+    "2024-25"
+  ],
+  "descriptive_only": true,
+  "environment": {
+    "logical_cpu_count": 4,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "Linux-6.18.44-fc-v24-x86_64-with-glibc2.39",
+    "processor": "x86_64",
+    "python": "3.13.12"
+  },
+  "evidence": {
+    "columns": [
+      "fold_id",
+      "season",
+      "gameweek",
+      "control_points",
+      "oracle_points",
+      "difference",
+      "control_zero_minute_starters",
+      "oracle_zero_minute_starters",
+      "control_autosub_points",
+      "oracle_autosub_points",
+      "flagged_players",
+      "excluded_players_applied",
+      "control_started_excluded_players"
+    ],
+    "committed": false,
+    "path": "artifacts/rotation/rotation_oracle_ceiling_folds.csv",
+    "sha256": "37060f9426b4ef7c00ba84ae1c167dc09047b5aad1420609d4f0745954ba9722"
+  },
+  "execution": {
+    "completed_at_utc": "2026-09-08T19:01:49+00:00",
+    "elapsed_seconds": 2057.893665,
+    "started_at_utc": "2026-09-08T18:27:31+00:00",
+    "warnings": []
+  },
+  "generated_at_utc": "2026-09-08T18:27:31+00:00",
+  "limits": [
+    {
+      "detail": "The flag uses the target gameweek's own minutes. That is what makes this a ceiling and it is what every feature in the repository is forbidden to do. A gameweek's own outcome may score a decision, never inform it; this measurement stands outside that rule by construction and produces no feature, column or model input.",
+      "name": "oracle_reads_the_target_gameweek"
+    },
+    {
+      "detail": "The development archive carries no verified start labels, so the appearance signal is minutes > 0. The oracle marks a recent regular who did not play at all, and cannot see a regular who started and was withdrawn early. It therefore flags fewer players than a start-aware oracle would, which makes the measured ceiling conservative in that direction.",
+      "name": "playing_not_starting"
+    },
+    {
+      "detail": "Development folds carry no availability layer, so neither arm suppresses an injured or suspended player before the solve. The oracle therefore also catches absences a live availability rule already handles, which makes the measured ceiling generous in that direction: part of the gain is not rotation at all.",
+      "name": "no_availability_rule_in_either_arm"
+    },
+    {
+      "detail": "A player needs all 6 prior gameweeks to be eligible. With the primitive's default of one prior observation a rate of 1.0 would mean 'played once', so the rule requires the whole window and a player without it is not eligible rather than being read as a regular.",
+      "name": "full_window_required"
+    }
+  ],
+  "locked_holdout_accessed": false,
+  "operational_control_changed": false,
+  "oracle": {
+    "decisions_with_a_flag": 127,
+    "eligible_rows": 85019,
+    "exclusions_applied": 1829,
+    "flagged_by_season": {
+      "2021-22": 426,
+      "2022-23": 454,
+      "2023-24": 474,
+      "2024-25": 475
+    },
+    "flagged_players_absent_from_the_pool": 0,
+    "flagged_rows": 1829,
+    "flagged_seasons": [
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "min_periods": 6,
+    "panel_rows": 103848,
+    "version": "rested_regular_oracle_v1",
+    "window": 6,
+    "zero_minute_eligible_rows": 49731
+  },
+  "policy": {
+    "bootstrap_resamples": 5000,
+    "candidate_id": "rotation-oracle-ceiling-vs-control",
+    "confidence_level": 0.9,
+    "deterministic_seed": 0,
+    "min_mean_improvement": 0.5,
+    "moving_block_length": 4
+  },
+  "prereg": "docs/rotation_evidence_prereg.md",
+  "promotion_decision": "not_evaluated",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 126737,
+    "history_seasons": [
+      "2020-21",
+      "2021-22",
+      "2022-23",
+      "2023-24",
+      "2024-25"
+    ],
+    "repository_commit": "88a8e2551d1c4b2a747b082b918e899861d5bb25",
+    "working_tree_dirty": false
+  },
+  "verdict": {
+    "claim": "A perfect rotation signal would be worth at least min_mean_improvement points per decision as a default exclusion, on the development folds.",
+    "gate": "G0",
+    "licenses": "Nothing about the signal this lane is building. G0 measures an oracle that reads the target gameweek's own minutes; a reachable signal is measured under G1 and G2. A ceiling above the threshold licenses continuing to look, not shipping anything, and a ceiling below it says no reachable signal can clear the gate as a default exclusion.",
+    "licenses_candidate_signal": false,
+    "meets_threshold": true,
+    "threshold_points_per_decision": 0.5,
+    "threshold_source": "squadopt.experiments.config.PromotionPolicy.min_mean_improvement",
+    "verdict": "ceiling_at_or_above_threshold"
+  }
+}

@@ -1,0 +1,205 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 4,
+    "entry_id": 5662073,
+    "league_id": 352490,
+    "mode": "ortak-koru",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "moves": [
+      {
+        "move_id": "gw04-1",
+        "player_out": {
+          "player_id": 176297,
+          "name": "Marcus Rashford",
+          "short_name": "Rashford",
+          "position": "MID",
+          "team": "Man Utd"
+        },
+        "player_in": {
+          "player_id": 60307,
+          "name": "Pascal Gro\u00df",
+          "short_name": "Gro\u00df",
+          "position": "MID",
+          "team": "Brighton"
+        },
+        "expected_points_delta": 0.014718406903155401,
+        "reason_code": "mode_tradeoff"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_points_cost": 0.9098391461054547,
+    "rival_label": "entry-313686",
+    "solver_status": "OPTIMAL",
+    "optimality_gap": 0.0,
+    "expected_own_points": 54.837532978509316,
+    "captain": {
+      "player_id": 223094,
+      "name": "Erling Haaland",
+      "short_name": "Haaland",
+      "position": "FWD",
+      "team": "Man City",
+      "expected_points": 8.360382282553875
+    },
+    "vice_captain": {
+      "player_id": 141746,
+      "name": "Bruno Borges Fernandes",
+      "short_name": "Fernandes",
+      "position": "MID",
+      "team": "Man Utd",
+      "expected_points": 7.066032835980204
+    },
+    "starting_xi": [
+      {
+        "player_id": 116535,
+        "name": "Alisson Becker",
+        "short_name": "Becker",
+        "position": "GK",
+        "team": "Liverpool",
+        "expected_points": 3.248345995552084
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.2356844156410305
+      },
+      {
+        "player_id": 606702,
+        "name": "Jeremy Jacquet",
+        "short_name": "Jacquet",
+        "position": "DEF",
+        "team": "Liverpool",
+        "expected_points": 2.8008054349848788
+      },
+      {
+        "player_id": 441302,
+        "name": "Ian Maatsen",
+        "short_name": "Maatsen",
+        "position": "DEF",
+        "team": "Aston Villa",
+        "expected_points": 2.5908352756752766
+      },
+      {
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
+        "position": "DEF",
+        "team": "Man Utd",
+        "expected_points": 2.521244083180876
+      },
+      {
+        "player_id": 141746,
+        "name": "Bruno Borges Fernandes",
+        "short_name": "Fernandes",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 7.066032835980204
+      },
+      {
+        "player_id": 466052,
+        "name": "Rayan Cherki",
+        "short_name": "Cherki",
+        "position": "MID",
+        "team": "Man City",
+        "expected_points": 4.391694024990014
+      },
+      {
+        "player_id": 209244,
+        "name": "Phil Foden",
+        "short_name": "Foden",
+        "position": "MID",
+        "team": "Man City",
+        "expected_points": 3.34397088815176
+      },
+      {
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 3.296421745499964
+      },
+      {
+        "player_id": 223094,
+        "name": "Erling Haaland",
+        "short_name": "Haaland",
+        "position": "FWD",
+        "team": "Man City",
+        "expected_points": 8.360382282553875
+      },
+      {
+        "player_id": 219168,
+        "name": "Alexander Isak",
+        "short_name": "Isak",
+        "position": "FWD",
+        "team": "Liverpool",
+        "expected_points": 5.621733713745486
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 40383,
+        "name": "Fraser Forster",
+        "short_name": "Forster",
+        "position": "GK",
+        "team": "Bournemouth",
+        "expected_points": 0.10027015579447286
+      },
+      {
+        "player_id": 645618,
+        "name": "Bradley Burrowes",
+        "short_name": "Burrowes",
+        "position": "MID",
+        "team": "Aston Villa",
+        "expected_points": 0.1239557013485021
+      },
+      {
+        "player_id": 593174,
+        "name": "Kaye Furo",
+        "short_name": "Furo",
+        "position": "FWD",
+        "team": "Brentford",
+        "expected_points": 0.10433696207867905
+      },
+      {
+        "player_id": 606798,
+        "name": "Andr\u00e9s Garc\u00eda",
+        "short_name": "Garc\u00eda",
+        "position": "DEF",
+        "team": "Aston Villa",
+        "expected_points": 0.10027015579447286
+      }
+    ],
+    "chip": null,
+    "data_quality": "partial",
+    "missing_fields": [
+      "free_transfers",
+      "purchase_prices"
+    ],
+    "rival_entry_id": 313686,
+    "expected_points_cost_ceiling": 0.9098391461054547,
+    "overlap_count": 4,
+    "transfer_cap": 1,
+    "overlap_target": 9,
+    "overlap_applied": 4,
+    "plan_kind": "within_free_transfers",
+    "alternative_plan": {
+      "kind": "with_hits",
+      "overlap_applied": 9,
+      "transfer_hit_points": 20.0,
+      "expected_points_cost": 19.093287377897212,
+      "expected_points_cost_ceiling": 19.093287377897212
+    },
+    "expected_gap_vs_rival": 7.5195768559283565,
+    "captain_agreement": false,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0
+  }
+}

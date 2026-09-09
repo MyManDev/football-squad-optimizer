@@ -134,7 +134,17 @@ def _build(
     free_transfers: int = 1,
     now: datetime.datetime = WHEN,
     capture: str | None = None,
+    totals: dict[int, int] | None = None,
 ) -> None:
+    """Publish the two-member league, optionally with league totals the rule reads.
+
+    The default totals sit ten points apart, which is inside the rule's band at this
+    gameweek, so the rule names pure points. ``totals`` moves them far enough apart for
+    the rule to name a *rival* strategy, which is the case the record has to describe
+    without claiming the member's page followed it.
+    """
+
+    league_totals = totals or {101: 80, 202: 70}
     inputs, projection, rules = _world_context(world, capture)
     provider = _Provider(
         {
@@ -157,8 +167,8 @@ def _build(
         league_name="Test League",
         out_dir=out_dir,
         standings={
-            101: MemberStanding(101, "A", "Manager A", 1, 40, 80),
-            202: MemberStanding(202, "B", "Manager B", 2, 30, 70),
+            101: MemberStanding(101, "A", "Manager A", 1, 40, league_totals[101]),
+            202: MemberStanding(202, "B", "Manager B", 2, 30, league_totals[202]),
         },
         scored_gameweek=1,
         now=now,
@@ -265,6 +275,202 @@ def test_the_publish_records_what_each_member_was_told(
     assert provenance["planner_policy_id"] == "member_planning_policy_v2"
     assert len(str(provenance["transfer_config_fingerprint"])) == 64
     assert record["league_view_contract_version"] == "provisional_league_ui_v1"
+
+
+def test_the_record_names_the_document_the_page_shows_not_the_one_the_rule_picked(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """``told`` describes the page, so it may only say what the page actually does.
+
+    The member's page selects its strategy from the URL and falls back to pure points;
+    the link from the members table carries no query string, so a member arriving from the
+    league table sees the ``saf-puan`` card whatever the rule named. The rule's pick is a
+    badge on an option the member may ignore — the web pins that deliberately — so a record
+    that pointed ``told`` at the rule's file would name a squad nobody was shown, forever
+    and un-rewritably. The two facts are recorded as two facts instead.
+    """
+
+    records = tmp_path / "records"
+    out = tmp_path / "site"
+    # Three hundred points apart: outside the rule's band, so it names a rival strategy
+    # for both members rather than pure points.
+    _build(world, out, record_root=records, totals={101: 400, 202: 100})
+
+    # The leader's rule pick solved against their neighbour; the chaser's did not, which
+    # this world reports rather than hides. Both members are shown the same baseline.
+    for entry_id, slug in ((101, "ortak-koru"), (202, "fark-yarat")):
+        record = load_member_advice_record(records, SEASON, 2, entry_id, world["gw2_id"])
+        told = record["told"]
+        assert isinstance(told, dict)
+        # What the page shows a member who followed the members-table link: the baseline.
+        assert told["published_path"] == f"advice/{entry_id}/saf-puan/1.json"
+        assert told["strategy"] == "saf-puan"
+        assert told["window"] == 1
+        assert told["rival_entry_id"] is None
+        assert told["source"] == "default_view"
+        assert told["published_path"] in {
+            document["published_path"]
+            for document in record["advice"]  # type: ignore[union-attr]
+        }
+        # The record and the index the page reads agree about which strategy the rule named.
+        index = json.loads(
+            (out / "advice" / str(entry_id) / "index.json").read_text(encoding="utf-8")
+        )["payload"]
+        assert index["suggested_strategy"]["strategy"] == slug
+
+    # The rule's pick beside it, named as a suggestion rather than as what was shown.
+    leader = load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"])
+    leader_told = leader["told"]
+    assert isinstance(leader_told, dict)
+    suggested = leader_told["suggested"]
+    assert isinstance(suggested, dict)
+    assert suggested["strategy"] == "ortak-koru"
+    assert suggested["rival_entry_id"] == 202
+    assert suggested["published_path"] == "advice/101/ortak-koru/1.json"
+    assert suggested["published_path"] != leader_told["published_path"]
+    assert suggested["published_path"] in {
+        document["published_path"]
+        for document in leader["advice"]  # type: ignore[union-attr]
+    }
+
+    # The chaser's rule pick had no provable plan against their neighbour, so no file was
+    # written for it: the record names no suggestion rather than an address nobody wrote.
+    chaser = load_member_advice_record(records, SEASON, 2, 202, world["gw2_id"])
+    chaser_told = chaser["told"]
+    assert isinstance(chaser_told, dict)
+    assert chaser_told["suggested"] is None
+    assert not (out / "advice" / "202" / "fark-yarat" / "1.json").exists()
+
+
+def test_a_multi_week_record_keeps_the_whole_plan_it_advised(world: dict[str, Any]) -> None:
+    """A window document's advice is the plan, so the record keeps every week of it.
+
+    The published tree is overwritten next week and the later weeks of a plan exist
+    nowhere else, so a record that kept only the decided week would lose them for good —
+    and the players named only in a later week would be in neither the record's player map
+    nor its list of ids it could not resolve. A document that carries no plan for the
+    weeks it covers is not scoring-complete and no longer says it is.
+    """
+
+    from squadopt.application.advice_record import PublishedAdvice, RecordCapture
+    from squadopt.application.advice_record import build_member_advice_record as build_record
+
+    _inputs, projection, _rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad())
+    one_week = {
+        "season": SEASON,
+        "gameweek": 2,
+        "entry_id": 101,
+        "mode": "saf-puan",
+        "window": 1,
+        "starting_xi": [{"player_id": player} for player in _legal_squad()[:11]],
+        "bench": [{"player_id": player} for player in _legal_squad()[11:]],
+        "captain": {"player_id": 1012},
+        "vice_captain": {"player_id": 1013},
+        "chip": None,
+        "moves": [],
+        "transfer_hit_points": 0.0,
+        "expected_own_points": 50.0,
+        "solver_status": "OPTIMAL",
+        "optimality_gap": None,
+    }
+    # Week three swaps in a defender the squad never held and a player the projection has
+    # no row for; week four swaps a midfielder. None of the three is named anywhere else.
+    later_weeks = [
+        {
+            "gameweek": 2,
+            "transfers_in": [],
+            "transfers_out": [],
+            "transfer_hit_points": 0.0,
+            "chip": None,
+            "free_transfers_before": 1,
+            "free_transfers_after": 1,
+            "expected_points": 50.0,
+        },
+        {
+            "gameweek": 3,
+            "transfers_in": [{"player_id": 1009, "name": "Nine"}],
+            "transfers_out": [{"player_id": 1008, "name": "Eight"}],
+            "transfer_hit_points": 4.0,
+            "chip": None,
+            "free_transfers_before": 1,
+            "free_transfers_after": 0,
+            "expected_points": 48.0,
+        },
+        {
+            "gameweek": 4,
+            "transfers_in": [{"player_id": 1017, "name": "Seventeen"}],
+            "transfers_out": [{"player_id": 9999, "name": "Stranger"}],
+            "transfer_hit_points": 0.0,
+            "chip": None,
+            "free_transfers_before": 1,
+            "free_transfers_after": 1,
+            "expected_points": 47.0,
+        },
+    ]
+    limits = ["Prices are held at the captured values; no price change is modelled."]
+    window_payload: dict[str, Any] = {
+        **one_week,
+        "window": 3,
+        "plan_weeks": later_weeks,
+        "stated_limits": limits,
+    }
+
+    def _published(payload: dict[str, Any], window: int) -> PublishedAdvice:
+        relative = f"advice/101/saf-puan/{window}.json"
+        raw = json.dumps(payload, sort_keys=True).encode("utf-8")
+        return PublishedAdvice("saf-puan", window, None, relative, payload, raw)
+
+    record = build_record(
+        picks,
+        projection,
+        [_published(one_week, 1), _published(window_payload, 3)],
+        capture=RecordCapture(world["gw2_id"], world_module.GW2_CAPTURED_AT),
+        league_id=352490,
+        generated_at_utc="2026-08-23T12:00:00Z",
+        league_view_contract_version="provisional_league_ui_v1",
+    )
+    documents = {int(item["window"]): item for item in record["advice"]}  # type: ignore[index,union-attr]
+
+    # A one-week document has no plan beyond its own week, and says so by absence.
+    assert "plan_weeks" not in documents[1]
+    assert documents[1]["scoring_complete"] is True
+
+    # The window document keeps every week it advised, reduced to ids the way moves are.
+    assert documents[3]["plan_weeks"] == [
+        {
+            "gameweek": week["gameweek"],
+            "transfers_in": [player["player_id"] for player in week["transfers_in"]],
+            "transfers_out": [player["player_id"] for player in week["transfers_out"]],
+            "transfer_hit_points": week["transfer_hit_points"],
+            "chip": week["chip"],
+            "free_transfers_before": week["free_transfers_before"],
+            "free_transfers_after": week["free_transfers_after"],
+            "expected_points": week["expected_points"],
+        }
+        for week in later_weeks
+    ]
+    assert documents[3]["stated_limits"] == limits
+    assert documents[3]["scoring_complete"] is True
+
+    # Players named only in a later week are joinable, and the one the projection has no
+    # row for is listed as unresolved rather than silently dropped from both.
+    players = record["players"]
+    assert isinstance(players, dict)
+    assert {"1009", "1017"} <= set(players)
+    assert 9999 in record["unresolved_player_ids"]  # type: ignore[operator]
+
+    # A window document with no plan is not scoring-complete, whatever its eleven says.
+    without_plan = build_record(
+        picks,
+        projection,
+        [_published({**one_week, "window": 3}, 3)],
+        capture=RecordCapture(world["gw2_id"], world_module.GW2_CAPTURED_AT),
+        league_id=352490,
+        generated_at_utc="2026-08-23T12:00:00Z",
+        league_view_contract_version="provisional_league_ui_v1",
+    )
+    assert without_plan["advice"][0]["scoring_complete"] is False  # type: ignore[index]
 
 
 def test_writing_the_record_does_not_move_a_single_published_byte(

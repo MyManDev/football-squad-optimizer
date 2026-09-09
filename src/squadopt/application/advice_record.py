@@ -18,10 +18,12 @@ emitted. Three properties make it usable as evidence rather than as a note:
   describe a different solve than the one that shipped.
 - **It is scoring-complete.** Everything a later page needs to score what we advised is in
   the record: the eleven in pitch order, the bench in autosub order, the captain, the vice,
-  the chip, the moves, the week's hit charge and the expected own points; the state the
-  advice was computed from, so "ignored our advice" and "could not afford it" stay
-  different answers; and the provenance that says which model, which planner policy and
-  which commit produced it. Nothing has to be re-solved, and nothing may be inferred.
+  the chip, the moves, the week's hit charge and the expected own points; for a document
+  that advised a *window*, every later week of the plan as well, because that is what it
+  advised and nothing else keeps it; the state the advice was computed from, so "ignored
+  our advice" and "could not afford it" stay different answers; and the provenance that
+  says which model, which planner policy and which commit produced it. Nothing has to be
+  re-solved, and nothing may be inferred.
 - **It refuses to change.** A second build *of the same capture* either writes exactly the
   same document — a no-op — or is refused with the difference named. It is never mutated
   silently, because a record that can be rewritten proves nothing about what was published.
@@ -70,11 +72,22 @@ from squadopt.live.ledger import (
 from squadopt.live.recommendation import Projection
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY, MEMBER_PLANNING_POLICY_ID
 
-#: ``v2`` keys a record by its capture as well, and carries the capture in the document.
+#: ``v3`` states in ``told`` the document the member's page *shows* — always the one-week
+#: pure-points baseline — with the declared rule's pick beside it as ``told.suggested``,
+#: and keeps a multi-week document's whole plan (``plan_weeks``, ``stated_limits``).
+#: ``v2`` wrote the rule's pick into ``told`` itself under ``source:
+#: "suggested_strategy"``, which claimed the page pointed at a file the page never
+#: selects, and recorded only a window document's first week while calling it
+#: scoring-complete. The layout did not change, so a ``v2`` record on disk is still read
+#: and still says what it says; it is this field that tells the two apart, and neither
+#: ``told`` nor ``scoring_complete`` may be read across the boundary. Nothing is migrated:
+#: the record is immutable evidence of a publish that happened, so the honest repair is to
+#: stop emitting the claim, not to rewrite the records that carry it.
+#:
 #: ``v1`` was one record per season, gameweek and entry, addressed at ``entry-<id>/`` with
-#: no capture anywhere in it, so the two shapes cannot be read as one — see
+#: no capture anywhere in it, so its *layout* cannot be read as this one — see
 #: ``LEGACY_LAYOUT_NOTE`` for why no migration is written.
-MEMBER_ADVICE_RECORD_CONTRACT_VERSION: Final = "member_advice_record_v2"
+MEMBER_ADVICE_RECORD_CONTRACT_VERSION: Final = "member_advice_record_v3"
 
 #: What the record's player ids are. Everything the projection, the prices and the picks
 #: provider publish is the FPL **element code** — the identifier that survives a transfer
@@ -98,7 +111,7 @@ _CAPTURE_SEGMENT: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,95}")
 
 #: What happens to a record written under the pre-capture key. Nothing: none exists.
 #:
-#: ``v1`` wrote ``<season>/gw<NN>/entry-<id>/advice.json``; ``v2`` writes
+#: ``v1`` wrote ``<season>/gw<NN>/entry-<id>/advice.json``; ``v2`` and after write
 #: ``<season>/gw<NN>/entry-<id>/<snapshot id>/advice.json``. No ``v1`` record existed on any
 #: disk when the key changed — the record had never been written by a real publish — so a
 #: migration would be code with nothing to migrate, and it is deliberately not written.
@@ -257,9 +270,9 @@ def record_directory(
 def _refuse_legacy_layout(directory: Path) -> None:
     """Refuse a member-week directory that holds a record in the pre-capture shape.
 
-    ``v1`` put ``advice.json`` directly here; ``v2`` puts a capture directory here. Reading
-    on would silently ignore the ``v1`` file, and writing on would leave it unreadable
-    beside the new records, so both stop and name it.
+    ``v1`` put ``advice.json`` directly here; every contract since puts a capture directory
+    here. Reading on would silently ignore the ``v1`` file, and writing on would leave it
+    unreadable beside the new records, so both stop and name it.
     """
 
     legacy = directory / RECORD_FILE
@@ -286,6 +299,19 @@ def _player_ids(document: Mapping[str, object]) -> set[int]:
                 player = move.get(side)
                 if player is not None:
                     found.add(int(str(player)))
+    # A multi-week plan names players in weeks after the decided one. They are as much
+    # part of what the member was advised as the first week's eleven, so the record's
+    # player map has to cover them too — otherwise a later reader finds an id with no row
+    # and no entry in ``unresolved_player_ids`` either, and cannot tell which it is.
+    weeks = document.get("plan_weeks")
+    if isinstance(weeks, list):
+        for week in weeks:
+            if not isinstance(week, Mapping):
+                continue
+            for side in ("transfers_in", "transfers_out"):
+                players = week.get(side)
+                if isinstance(players, list):
+                    found.update(int(str(player)) for player in players)
     return found
 
 
@@ -338,6 +364,48 @@ def _moves(payload: Mapping[str, object]) -> list[dict[str, object]]:
     return moves
 
 
+def _count(values: Mapping[str, object], key: str) -> int | None:
+    value = values.get(key)
+    return None if value is None else int(str(value))
+
+
+def _plan_player_ids(week: Mapping[str, object], key: str) -> list[int]:
+    value = week.get(key)
+    if not isinstance(value, list):
+        return []
+    return [int(str(player["player_id"])) for player in value if isinstance(player, Mapping)]
+
+
+def _plan_weeks(payload: Mapping[str, object]) -> list[dict[str, object]] | None:
+    """A multi-week document's plan, one row per gameweek, reduced to player ids.
+
+    ``None`` where the payload publishes no plan — a one-week document, or a competitive
+    mode — because a document that covers one week and a document whose plan is empty are
+    different things and only one of them exists.
+    """
+
+    raw = payload.get("plan_weeks")
+    if not isinstance(raw, list):
+        return None
+    weeks: list[dict[str, object]] = []
+    for week in raw:
+        if not isinstance(week, Mapping):
+            continue
+        weeks.append(
+            {
+                "gameweek": _count(week, "gameweek"),
+                "transfers_in": _plan_player_ids(week, "transfers_in"),
+                "transfers_out": _plan_player_ids(week, "transfers_out"),
+                "transfer_hit_points": _number(week, "transfer_hit_points"),
+                "chip": _text(week, "chip"),
+                "free_transfers_before": _count(week, "free_transfers_before"),
+                "free_transfers_after": _count(week, "free_transfers_after"),
+                "expected_points": _number(week, "expected_points"),
+            }
+        )
+    return weeks
+
+
 def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
     """One published document, reduced to what scoring it needs plus its two digests.
 
@@ -345,6 +413,15 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
     for every document in the record and live once in ``players``. What is per-document is
     the decision — who starts, in what order, who wears the armband, which chip, what
     moved and what the week's hit cost.
+
+    A multi-week document decides more than a week, and the rest of it is kept too:
+    ``plan_weeks`` carries each later gameweek's transfers, hit charge, chip, free
+    transfers and expected points, and ``stated_limits`` the envelope the page showed
+    those numbers under. They are published nowhere the next week's publish does not
+    overwrite, so a record that dropped them would lose most of what a member was advised
+    to do — and *scoring-complete* for a window document has to mean the whole window,
+    not the first week of it. Absent keys, not empty ones, where the payload publishes
+    neither: every rival strategy and the one-week baseline decide exactly one week.
 
     Two digests, because they answer different questions. ``published_sha256`` is of the
     exact bytes at that address, envelope and generation timestamp included, so the record
@@ -357,14 +434,17 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
     starting_xi = _lineup_ids(payload, "starting_xi")
     bench = _lineup_ids(payload, "bench")
     captain = _player_id(payload, "captain")
+    window = int(advice.window)
+    plan_weeks = _plan_weeks(payload)
+    limits = payload.get("stated_limits")
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return {
+    document: dict[str, object] = {
         # Which document this is. Several are published per member — the pure-points
         # baseline, each rival strategy against each rival, each solved window — and only
         # one of them is what the member's page points at, so every one carries its own
         # address rather than being identified by position in a list.
         "strategy": advice.strategy,
-        "window": int(advice.window),
+        "window": window,
         "rival_entry_id": advice.rival_entry_id,
         "published_path": advice.relative_path,
         # The decision itself, in the published order: the eleven in pitch order and the
@@ -381,13 +461,22 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
         # with the measured bound gap beside it.
         "solver_status": _text(payload, "solver_status"),
         "optimality_gap": _number(payload, "optimality_gap"),
-        # Whether this document can be scored at all. A competitive mode's payload is
-        # published without a lineup (the selector chose a transfer decision, not a week),
-        # and the record says so rather than presenting an empty eleven as a decision.
-        "scoring_complete": bool(starting_xi and bench and captain is not None),
+        # Whether everything this document decided is here to be scored. A competitive
+        # mode's payload is published without a lineup (the selector chose a transfer
+        # decision, not a week), and the record says so rather than presenting an empty
+        # eleven as a decision. A multi-week document additionally needs a plan row for
+        # every week it covers: it advised a window, so a first week alone is a part of
+        # the advice and may not be labelled the whole of it.
+        "scoring_complete": bool(starting_xi and bench and captain is not None)
+        and (window == 1 or (plan_weeks is not None and len(plan_weeks) == window)),
         "published_sha256": _sha256(advice.raw),
         "advice_sha256": _sha256(encoded),
     }
+    if plan_weeks is not None:
+        document["plan_weeks"] = plan_weeks
+    if isinstance(limits, list):
+        document["stated_limits"] = [str(line) for line in limits]
+    return document
 
 
 def _sha256(data: bytes) -> str:
@@ -444,8 +533,10 @@ def build_member_advice_record(
     this runs: the record describes a publication, and stamping it with its own clock
     would make every re-publish differ for a reason that has nothing to do with the advice.
 
-    ``told`` names the document the member's page points at, so a later page can tell what
-    we told them from what we merely also computed.
+    ``told`` names the document the member's page shows by default, so a later page can
+    tell what we told them from what we merely also computed. The declared rule's pick
+    rides inside it as ``suggested`` — the page badges that option and never selects it,
+    so the two are recorded as two facts and neither is presented as the other.
     """
 
     if not published:
