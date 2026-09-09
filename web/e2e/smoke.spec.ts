@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-test("squad shows the latest decision", async ({ page }) => {
-  await page.goto("/");
+test("the legacy squad remains reachable by its direct gameweek URL", async ({ page }) => {
+  await page.goto("/gw/2026-27/1");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(/Oyun haftası/);
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText(/Bu sayılar neyi söylemiyor/)).toBeVisible();
@@ -66,5 +66,9 @@ test("language selection switches the full frame and persists across routes", as
   await page.getByRole("link", { name: "Analysis" }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analysis Center");
   await page.reload();
-  await expect(page.getByRole("link", { name: "Suggested Moves" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "League", exact: true })).toHaveAttribute(
+    "href",
+    "/league/members",
+  );
+  await expect(page.getByRole("link", { name: "Suggested Moves" })).toHaveCount(0);
 });

@@ -7,7 +7,7 @@ import { installSettledRecommendationMock } from "./settledMocks";
 test("the real settled contract fills the scorecard and player rows at 390px", async ({ page }) => {
   await installSettledRecommendationMock(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/");
+  await page.goto("/gw/2026-27/1");
 
   await expect(page.getByText("Projeksiyon ve Gerçekleşen")).toBeVisible();
   await expect(page.getByText("×2 C", { exact: true })).toBeVisible();

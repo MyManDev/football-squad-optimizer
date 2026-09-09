@@ -10,7 +10,7 @@ test("member list links to point-labelled advice and preserves its URL state", a
   await page.goto("/league/members");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Lig Üyeleri");
   await expect(page.getByText("örnek veri")).toBeVisible();
-  await expect(page.getByText("SquadOpt · sistem takımı")).toBeVisible();
+  await expect(page.getByText("SquadOpt · sistem takımı")).toHaveCount(0);
 
   await page.getByRole("link", { name: "Deniz Aral" }).click();
   await expect(page).toHaveURL(/\/league\/members\/35249001$/);
@@ -42,11 +42,10 @@ test("member list links to point-labelled advice and preserves its URL state", a
   await expect(page).toHaveURL(/rival=\d+/);
 });
 
-test("the virtual SquadOpt member reuses the existing squad view without probability claims", async ({
+test("the virtual SquadOpt member remains available by direct URL without probability claims", async ({
   page,
 }) => {
-  await page.goto("/league/members");
-  await page.getByRole("link", { name: "SquadOpt", exact: true }).click();
+  await page.goto("/league/members/squadopt");
 
   await expect(page).toHaveURL(/\/league\/members\/squadopt$/);
   await expect(page.getByText("SquadOpt da oynuyor")).toBeVisible();
