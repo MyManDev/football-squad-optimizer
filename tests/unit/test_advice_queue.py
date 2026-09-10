@@ -151,7 +151,7 @@ def test_a_live_workers_claim_is_not_stolen_by_recovery(tmp_path: Path) -> None:
     still = queue.load("job-0001")
     assert still is not None and still.status == "running" and still.attempt == 1
 
-    queue.heartbeat("job-0001")  # A is still alive
+    queue.heartbeat("job-0001", attempt=claimed.attempt)  # A is still alive
     assert queue.recover(at_utc="2026-08-27T12:00:20Z") == ()
 
     stolen = queue.recover(at_utc="2026-08-27T12:10:00Z", lease_seconds=0.0)

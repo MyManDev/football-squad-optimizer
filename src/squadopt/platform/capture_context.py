@@ -13,8 +13,8 @@ ledger name them by **code**, the identifier that survives a transfer window. Ha
 element ids to a consumer that means codes does not fail loudly; it silently finds none
 of the squad, which is exactly how this surfaced when the league site first rendered
 (fifteen members, "no current price", zero rendered). ``scripts/build_league_site.py``
-owned this class privately; it now imports it from here, so there is one implementation
-rather than two that can drift.
+owned this class privately; application.capture_entries now owns the offline adapter,
+and this module re-exports the same object for existing callers.
 
 Serving advice needs a **projection handoff**. The opening gameweek's archive-panel route
 exists in the decision path and is deliberately not offered here: a backend that answered
@@ -25,16 +25,19 @@ itself unready rather than answering from whatever it can find.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
 
 from squadopt.application.advice import HorizonBuilder, member_horizon_builder
-from squadopt.application.entries import EntryPicks
+from squadopt.application.capture_entries import (
+    CapturePicksProvider as CapturePicksProvider,
+)
+from squadopt.application.capture_entries import (
+    capture_element_codes as capture_element_codes,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
-from squadopt.data.sources.fpl_live import fpl_entry_picks
 from squadopt.live import (
     InSeasonProjection,
     Projection,
@@ -59,78 +62,6 @@ __all__ = [
     "load_capture_context",
     "load_capture_identity",
 ]
-
-
-def capture_element_codes(payloads: object) -> dict[int, int]:
-    """Map the capture's per-season element ids onto the codes everything else uses."""
-
-    document = json.loads(payloads["bootstrap-static.json"].decode("utf-8"))  # type: ignore[index]
-    elements = document.get("elements")
-    if not isinstance(elements, list):
-        raise DataError("The capture's bootstrap payload carries no elements list.")
-    return {
-        int(element["id"]): int(element["code"])
-        for element in elements
-        if isinstance(element, dict) and "id" in element and "code" in element
-    }
-
-
-class CapturePicksProvider:
-    """Serves each member's picks from the capture's own payloads.
-
-    Implements ``application.entries.EntryPicksProvider`` structurally: the protocol is
-    declared by the application layer so adapters like this one live outside it.
-    """
-
-    def __init__(self, snapshot: object, snapshot_id: str) -> None:
-        self._payloads = getattr(snapshot, "payloads", {})
-        self._snapshot_id = snapshot_id
-        self._code_by_element = capture_element_codes(self._payloads)
-
-    def _code(self, element: int) -> int:
-        code = self._code_by_element.get(int(element))
-        if code is None:
-            raise DataError(
-                f"The capture's bootstrap does not name element {element}, so the squad "
-                "cannot be resolved to the ids the projection uses."
-            )
-        return code
-
-    def picks(self, entry_id: int, season: str, gameweek: int) -> EntryPicks:
-        picks_name = f"entry-{entry_id}-picks-gw{gameweek:02d}.json"
-        history_name = f"entry-{entry_id}-history.json"
-        for name in (picks_name, history_name):
-            if name not in self._payloads:
-                raise DataError(f"The capture holds no {name}; re-capture with --entries.")
-        record = fpl_entry_picks(
-            self._payloads[picks_name],
-            self._payloads[history_name],
-            entry_id=entry_id,
-            season=season,
-            gameweek=gameweek,
-            source_snapshot_id=self._snapshot_id,
-        )
-        # The data record and the application type are twins by design: same field names,
-        # no translation table, so a drift on either side is a type error rather than a
-        # silently wrong squad.
-        return EntryPicks(
-            entry_id=record.entry_id,
-            season=record.season,
-            gameweek=record.gameweek,
-            squad=tuple(self._code(player) for player in record.squad),
-            starting_xi=tuple(self._code(player) for player in record.starting_xi),
-            captain=self._code(record.captain),
-            vice_captain=self._code(record.vice_captain),
-            bank_tenths=record.bank_tenths,
-            free_transfers=record.free_transfers,
-            free_transfers_known=record.free_transfers_known,
-            chips_used=record.chips_used,
-            purchase_prices={
-                self._code(player): price for player, price in record.purchase_prices.items()
-            },
-            purchase_prices_known=record.purchase_prices_known,
-            source_snapshot_id=record.source_snapshot_id,
-        )
 
 
 @dataclass(frozen=True, slots=True)

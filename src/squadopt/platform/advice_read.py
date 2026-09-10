@@ -22,6 +22,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Protocol
 
+from squadopt.application.advice_capabilities import (
+    COMPUTED_MODE,
+    COMPUTED_WINDOW,
+    MEMBER_WINDOWS,
+    AdviceCapability,
+    validate_advice_selection,
+)
+from squadopt.application.entries import EntryError
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import (
     LEAGUE_STATE_CONTRACT_VERSION,
@@ -56,6 +64,10 @@ class AdviceBackendNotReadyError(AdviceReadError):
     """No capture context yet; readiness, not absence of an answer."""
 
 
+class UnsupportedAdviceRequestError(AdviceReadError):
+    """A validly encoded request is not a computable strategy/window/rival combination."""
+
+
 @dataclass(frozen=True, slots=True)
 class AdviceRequestContext:
     """What the deployment knows at read time; every field enters the cache key."""
@@ -87,21 +99,66 @@ class FileLeagueDirectory:
     def __init__(self, site_data_root: Path | str) -> None:
         self._root = Path(site_data_root)
 
-    def league(self, league_id: int) -> Mapping[str, object] | None:
+    def _read(self) -> Mapping[str, object] | None:
         path = self._root / "league" / "members.json"
         try:
             raw = path.read_text(encoding="utf-8")
         except FileNotFoundError:
             return None
-        document = json.loads(raw)
-        payload = document.get("payload") if isinstance(document, dict) else None
-        if not isinstance(payload, dict):
-            return None
-        if document.get("contract_version") != LEAGUE_TREE_CONTRACT_VERSION:
-            return None
-        if int(str(payload.get("league_id", 0))) != int(league_id):
-            return None
+        except (OSError, UnicodeError) as error:
+            raise AdviceBackendNotReadyError(
+                "The published member directory is unreadable."
+            ) from error
+        try:
+            document = json.loads(raw)
+            payload = document.get("payload") if isinstance(document, dict) else None
+            if not isinstance(payload, dict):
+                raise ValueError("Missing member payload.")
+            if document.get("contract_version") != LEAGUE_TREE_CONTRACT_VERSION:
+                raise ValueError("Unsupported member contract.")
+            for name in ("league_id", "gameweek"):
+                value = payload.get(name)
+                if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                    raise ValueError("Invalid member publication identity.")
+            for name in ("league_name", "season"):
+                if not isinstance(payload.get(name), str) or not payload[name].strip():
+                    raise ValueError("Missing member publication identity.")
+            members = payload.get("members")
+            if not isinstance(members, list):
+                raise ValueError("Missing member rows.")
+            seen = set()
+            for member in members:
+                if not isinstance(member, dict):
+                    raise ValueError("Invalid member row.")
+                kind, identifier = member.get("member_kind"), member.get("entry_id")
+                if kind == "system" and (
+                    identifier is None or (type(identifier) is int and identifier == 0)
+                ):
+                    continue
+                if (
+                    kind != "human"
+                    or isinstance(identifier, bool)
+                    or not isinstance(identifier, int)
+                ):
+                    raise ValueError("Invalid member identity.")
+                if identifier < 1 or identifier in seen:
+                    raise ValueError("Invalid or duplicate member identity.")
+                seen.add(identifier)
+        except (ValueError, TypeError) as error:
+            raise AdviceBackendNotReadyError(
+                "The published member directory is unreadable."
+            ) from error
         return payload
+
+    def league(self, league_id: int) -> Mapping[str, object] | None:
+        payload = self._read()
+        return payload if payload is not None and payload["league_id"] == league_id else None
+
+    def readable(self) -> bool:
+        try:
+            return self._read() is not None
+        except (AdviceBackendNotReadyError, OSError, UnicodeError):
+            return False
 
 
 def _member_entry_ids(payload: Mapping[str, object]) -> frozenset[int]:
@@ -134,6 +191,12 @@ class AdviceReadStore:
         self._cache = cache
         self._context = context_provider
         self._strategies = dict(strategies)
+        self._capabilities = {
+            slug: AdviceCapability(
+                MEMBER_WINDOWS if slug == COMPUTED_MODE else (COMPUTED_WINDOW,), rival
+            )
+            for slug, rival in strategies.items()
+        }
 
     def league_state(self, league_id: int) -> dict[str, object]:
         """Connected or not, from the published tree — never an upstream call."""
@@ -184,6 +247,16 @@ class AdviceReadStore:
             raise UnknownEntryError(f"Entry {entry_id} is not in league {league_id}.")
         if rival_entry_id is not None and int(rival_entry_id) not in members:
             raise UnknownEntryError(f"Rival {rival_entry_id} is not in league {league_id}.")
+        try:
+            validate_advice_selection(
+                strategy=strategy,
+                window=window,
+                entry_id=entry_id,
+                rival_entry_id=rival_entry_id,
+                capabilities=self._capabilities,
+            )
+        except EntryError as error:
+            raise UnsupportedAdviceRequestError(str(error)) from error
         context = self._context.current()
         if context is None:
             raise AdviceBackendNotReadyError("No capture context is loaded yet.")
@@ -217,9 +290,12 @@ class AdviceReadStore:
         return self._strategies[strategy]
 
     def cached(self, key: str) -> bytes | None:
-        """The exact cached bytes under a resolved key, or None."""
+        """GET and POST share the same validation of exact cached bytes."""
 
-        return self._cache.get(key)
+        cached = self._cache.get(key)
+        if cached is not None:
+            validate_advice_document(cached)
+        return cached
 
     def read_advice(
         self,
@@ -239,12 +315,11 @@ class AdviceReadStore:
             window=window,
             rival_entry_id=rival_entry_id,
         )
-        cached = self._cache.get(key)
+        cached = self.cached(key)
         if cached is None:
             raise AdviceNotComputedError(
                 f"No advice computed for entry {entry_id} under {strategy}/{window}."
             )
         # The route serves these bytes verbatim under a versioned claim, so bytes that
         # do not carry the version are an internal error, never a published document.
-        validate_advice_document(cached)
         return cached

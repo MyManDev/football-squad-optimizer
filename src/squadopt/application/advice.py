@@ -22,6 +22,18 @@ from typing import Any
 
 import pandas as pd
 
+from squadopt.application.advice_capabilities import (
+    COMPUTED_MODE as COMPUTED_MODE,
+)
+from squadopt.application.advice_capabilities import (
+    COMPUTED_WINDOW as COMPUTED_WINDOW,
+)
+from squadopt.application.advice_capabilities import (
+    MEMBER_WINDOWS as MEMBER_WINDOWS,
+)
+from squadopt.application.advice_capabilities import (
+    validate_advice_selection,
+)
 from squadopt.application.entries import (
     EntryError,
     EntryPicks,
@@ -57,14 +69,6 @@ from squadopt.planning import (
     TransferPlanResult,
 )
 
-#: The baseline combination: the deterministic planner's own one-week answer. Every
-#: rival strategy is computed at this window only.
-COMPUTED_MODE = "saf-puan"
-COMPUTED_WINDOW = 1
-#: The windows ``saf-puan`` is computed for. A longer window is the multi-week planner
-#: over the week-1 projection repeated across the captured calendar — a plan under
-#: stated limits, not a forecast of the later weeks.
-MEMBER_WINDOWS: tuple[int, ...] = (1, 3, 5)
 #: The multi-week solve's budget, as the system's own horizon path spends it: twenty
 #: deterministic units per gameweek, under one wall-clock ceiling. A plan the budget
 #: cannot prove is published FEASIBLE with its gap, never dropped.
@@ -789,18 +793,13 @@ def advise_entry(
         raise EntryError("The advice rules belong to another season.")
     if rules.source_snapshot_id != inputs.snapshot_id:
         raise EntryError("The advice rules belong to another capture.")
-    if request.window not in MEMBER_WINDOWS:
-        raise EntryError(
-            f"Window {request.window} is not computed; {COMPUTED_MODE!r} windows are "
-            f"{MEMBER_WINDOWS} and rival strategies are computed at window "
-            f"{COMPUTED_WINDOW} only."
-        )
+    validate_advice_selection(
+        strategy=request.strategy,
+        window=request.window,
+        entry_id=request.entry_id,
+        rival_entry_id=request.rival_entry_id,
+    )
     if request.strategy == COMPUTED_MODE:
-        if request.rival_entry_id is not None:
-            raise EntryError(
-                f"{COMPUTED_MODE!r} is rival-free; to name a rival, ask for a rival "
-                "strategy from the catalogue."
-            )
         picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
         if request.window != COMPUTED_WINDOW:
             return build_window_payload(
@@ -821,25 +820,10 @@ def advise_entry(
             control=control,
             phase_e_diagnostic=phase_e_diagnostic,
         )
-    strategy = STRATEGY_CATALOG.get(request.strategy)
-    if strategy is None:
-        raise EntryError(f"Strategy {request.strategy!r} is not in the catalogue.")
-    if request.window != COMPUTED_WINDOW:
-        raise EntryError(
-            f"Strategy {request.strategy!r} is computed at window {COMPUTED_WINDOW} only; "
-            f"windows {MEMBER_WINDOWS[1:]} are {COMPUTED_MODE!r} only."
-        )
+    strategy = STRATEGY_CATALOG[request.strategy]
     floor = strategy.constraints.overlap_floor
     ceiling = strategy.constraints.overlap_ceiling
-    if floor is None and ceiling is None:
-        raise EntryError(
-            f"Strategy {request.strategy!r} is not computed on this path yet; its "
-            "constraint is not wired to the solver."
-        )
-    if request.rival_entry_id is None:
-        raise EntryError(f"Strategy {request.strategy!r} needs a rival: pass rival_entry_id.")
-    if request.rival_entry_id == request.entry_id:
-        raise EntryError("A member cannot be their own rival.")
+    assert request.rival_entry_id is not None  # validated by the shared capability contract
     return _advise_against_rival(
         request,
         rival_entry_id=request.rival_entry_id,

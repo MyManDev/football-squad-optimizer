@@ -43,6 +43,36 @@ function missingLoader(): never {
   throw new LeagueDataMissing("advice/101/saf-puan/5.json");
 }
 
+it("a cancelled HTTP call never starts the static fallback", async () => {
+  const controller = new AbortController();
+  const fallback = vi.fn(async () => mockEntryAdviceEnvelope(101, "saf-puan", 1));
+  const transport = vi.fn(async () => new Promise<Response>(() => {}));
+  const client = new FallbackAdviceClient(
+    new HttpAdviceClient("https://api.example", transport),
+    new StaticOnlyAdviceClient(fallback),
+  );
+  const response = client.readAdvice(REQUEST, { signal: controller.signal });
+  await Promise.resolve();
+  controller.abort();
+  await expect(response).rejects.toMatchObject({ name: "AbortError" });
+  expect(fallback).not.toHaveBeenCalled();
+});
+
+it("the HTTP deadline includes a hanging response body", async () => {
+  vi.useFakeTimers();
+  try {
+    const response = new Response("{}");
+    vi.spyOn(response, "json").mockImplementation(() => new Promise(() => {}));
+    const client = new HttpAdviceClient("https://api.example", async () => response);
+    const result = client.readAdvice(REQUEST, { timeoutMs: 50 });
+    const assertion = expect(result).rejects.toMatchObject({ name: "TimeoutError" });
+    await vi.advanceTimersByTimeAsync(50);
+    await assertion;
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 describe("StaticOnlyAdviceClient", () => {
   it("serves the published tree and reports an uncomputed combination honestly", async () => {
     const client = new StaticOnlyAdviceClient();

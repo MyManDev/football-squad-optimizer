@@ -1,19 +1,23 @@
 """Public-output guards: everything published under `data/league/` stays probability-free.
 
-Three guards the existing suites do not carry: (1) a sweep of every file the league
-builder publishes, applying the web test's own bilingual regex backend-side (today
-only the English substring 'probability' is checked there), with '%' scoped to
-advice files because ownership percentages are the game's own facts elsewhere;
-(2) the same sweep over `scoreboard.json`, which the league builder does not write —
-`scripts/build_scoreboard.py` does, into the same directory, so the first guard would
-never have seen it; and (3) a pin that the ledger site path renders every probability
-field of the risk block as null with no rivals — so switching the site build to a
-populated risk view breaks a named test instead of silently shipping probabilities to
-pages that already render them.
+Four guards the existing suites do not carry: (1) a sweep of every file the league
+builder publishes, applying the web guard's own bilingual regex backend-side
+(`FORBIDDEN_TEXT_PATTERN`, shared with the producer that refuses a name for it), with
+'%' refused everywhere in this tree rather than only under `advice/`: the earlier scope
+was justified by ownership percentages, and the league builder publishes none — the
+real 527-file tree contains no '%' at all, so the exemption only ever covered
+`members.json` and `entries/{id}.json`, which are exactly the two files member-typed
+free text lands in; (2) the same sweep with a hostile team and manager name driven
+through the real builder, because a guard that invents its own team names is blind to
+the one field a member writes; (3) the same sweep over `scoreboard.json`, which the
+league builder does not write — `scripts/build_scoreboard.py` does, into the same
+directory, so the first guard would never have seen it; and (4) a pin that the ledger
+site path renders every probability field of the risk block as null with no rivals — so
+switching the site build to a populated risk view breaks a named test instead of
+silently shipping probabilities to pages that already render them.
 """
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -23,8 +27,15 @@ from scripts.build_scoreboard import CohortCapture, CohortPicks, scoreboard_payl
 
 from squadopt.application.build import _risk_from_status
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
-from squadopt.application.league_views import MemberStanding, build_league_views
-from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN
+from squadopt.application.league_views import (
+    PUBLISHED_NAME_LIMIT,
+    MemberStanding,
+    build_league_views,
+)
+from squadopt.application.strategies.catalog import (
+    FORBIDDEN_FIELD_PATTERN,
+    FORBIDDEN_TEXT_PATTERN,
+)
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live import LedgerEntry, read_inputs, read_season_rules
 from squadopt.live.recommendation import project, read_projection_handoff
@@ -33,9 +44,9 @@ SEASON = world_module.SEASON
 
 world = world_module._world  # re-register the fixture in this module
 
-#: The web guard's regex (adviceNoProbability.test.tsx), minus '%', which is scoped
-#: to advice files below — league pages legitimately show ownership percentages.
-_FORBIDDEN_TEXT = re.compile(r"probabilit|olas.l.k|\bP\(", re.IGNORECASE)
+#: The producer's own rule, used as the sweep's rule: one pattern decides both what a
+#: name may say and what a published file may contain, so the two cannot drift apart.
+_FORBIDDEN_TEXT = FORBIDDEN_TEXT_PATTERN
 
 
 class _Provider:
@@ -82,6 +93,25 @@ def _walk(node: object, path: str, offenders: list[str]) -> None:
         offenders.append(f"{path} (text: {node[:60]!r})")
 
 
+def _sweep(out_dir: Path) -> list[str]:
+    """Every offender in a published league tree, by the shared bilingual rule.
+
+    The '%' check is over the file's raw text, not only its string values, so a key or a
+    path carrying one is caught too; nothing in this tree is a share of anything.
+    """
+
+    published = sorted(out_dir.rglob("*.json"))
+    assert published, "the builder wrote nothing — the sweep has no subject"
+    offenders: list[str] = []
+    for file in published:
+        raw = file.read_text(encoding="utf-8")
+        relative = file.relative_to(out_dir).as_posix()
+        _walk(json.loads(raw), relative, offenders)
+        if "%" in raw:
+            offenders.append(f"{relative} (raw text contains '%')")
+    return offenders
+
+
 def test_every_published_league_file_is_probability_free(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
@@ -123,20 +153,119 @@ def test_every_published_league_file_is_probability_free(
         standings=standings,
         scored_gameweek=1,
     )
-    published = sorted(out_dir.rglob("*.json"))
-    assert published, "the builder wrote nothing — the sweep has no subject"
     suggested = json.loads((out_dir / "advice" / "101" / "index.json").read_text(encoding="utf-8"))[
         "payload"
     ]["suggested_strategy"]
     assert suggested is not None, "the rule's band must be in the swept tree, not null"
-    offenders: list[str] = []
-    for file in published:
-        raw = file.read_text(encoding="utf-8")
-        relative = file.relative_to(out_dir).as_posix()
-        _walk(json.loads(raw), relative, offenders)
-        if relative.startswith("advice/") and "%" in raw:
-            offenders.append(f"{relative} (advice text contains '%')")
+    offenders = _sweep(out_dir)
     assert offenders == [], f"probability-shaped content in the published tree: {offenders}"
+
+
+#: One value per way a member-typed name can hurt a reader of these documents. Markup and
+#: the script tag: our page is React and escapes both, but the files are served to
+#: whoever asks. The controls: a NUL truncates a C string, an ESC is a command to a
+#: terminal, a newline forges a log line. The override: U+202E reverses everything
+#: printed after it. The long one: a name deciding the size of a payload every other
+#: member downloads. The last two are the honesty half — a percentage and the inflected
+#: Turkish form of "probability", which the guard's earlier `olas.l.k` did not match.
+_HOSTILE_NAMES = {
+    "markup": '<img src=x onerror="alert(1)">',
+    "script": "<script>alert('xss')</script>",
+    "long": "A" * 5000,
+    "controls": "Team \x00\x1b[31m\tname\nsecond line",
+    "override": "Team \u202eelbisrever\u202c name",
+    "percent": "%72 sans",
+    "turkish": "Kazanma olas\u0131l\u0131\u011f\u0131 y\u00fcksek",
+}
+
+
+def test_a_member_typed_name_cannot_carry_anything_into_the_published_tree(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The same sweep, with the free text the capture actually carries made hostile.
+
+    A team name and a manager name are typed by the member; the builder copies both into
+    `members.json` and into the `entry` block of `entries/{id}.json`, and the page renders
+    the team name as its `<h1>`. The guard above builds its own names ("Team 101"), so it
+    could never have seen this. Every value below reached both files unchanged before the
+    producer filtered them, and `%72 sans` — eight characters, a plausible FPL team name —
+    put a percent sign on a published page.
+    """
+
+    snapshot = read_snapshot(world["snapshot_root"], world["gw2_id"])
+    inputs = read_inputs(snapshot, season=SEASON, gameweek=2)
+    handoff = read_projection_handoff(world_module._handoff(world))
+    projection = project(inputs, in_season=handoff)
+    rules = read_season_rules(snapshot, season=SEASON)
+    squad = _legal_squad()
+    chaser = [*squad[:10], 1017, 1018, *squad[12:]]
+    provider = _Provider(
+        {101: _member_picks(world, 101, squad), 202: _member_picks(world, 202, chaser)}
+    )
+    out_dir = tmp_path / "league"
+    standings = {
+        101: MemberStanding(
+            entry_id=101,
+            team_name=_HOSTILE_NAMES["markup"] + _HOSTILE_NAMES["percent"],
+            manager_name=_HOSTILE_NAMES["script"],
+            rank=1,
+            total_points=400,
+        ),
+        202: MemberStanding(
+            entry_id=202,
+            team_name=_HOSTILE_NAMES["long"],
+            manager_name=(
+                _HOSTILE_NAMES["controls"] + _HOSTILE_NAMES["override"] + _HOSTILE_NAMES["turkish"]
+            ),
+            rank=2,
+            total_points=100,
+        ),
+    }
+    report = build_league_views(
+        provider,
+        # The registry's label is the member's own team name too, so it is hostile here.
+        (
+            EntryRegistration(101, _HOSTILE_NAMES["percent"], "2026-08-23T00:00:00Z"),
+            EntryRegistration(202, _HOSTILE_NAMES["controls"], "2026-08-23T00:00:00Z"),
+        ),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=out_dir,
+        standings=standings,
+        scored_gameweek=1,
+    )
+    assert report.rendered_count == 2, "a hostile name must not cost a member their advice"
+    assert _sweep(out_dir) == [], "a member-typed name reached the published tree"
+
+    rows = json.loads((out_dir / "members.json").read_text(encoding="utf-8"))["payload"]["members"]
+    by_id = {int(row["entry_id"]): row for row in rows}
+    # Refused, not blanked: an absent name and a name we would not print are different
+    # facts, so the refused one is published as the entry's own id.
+    assert by_id[101]["team_name"] == "entry-101"
+    assert by_id[202]["manager_name"] == "entry-202"
+    # Normalised, not refused: nothing here reads as a chance, so the member keeps a name.
+    assert by_id[101]["manager_name"] == "script alert('xss') /script"
+    assert len(by_id[202]["team_name"]) == PUBLISHED_NAME_LIMIT
+    for row in rows:
+        for field in ("team_name", "manager_name"):
+            value = row[field]
+            assert isinstance(value, str)
+            assert "<" not in value and ">" not in value
+            assert not any(ord(char) < 0x20 for char in value)
+            assert "\u202e" not in value
+            assert len(value) <= PUBLISHED_NAME_LIMIT
+    # The same names in the entry document the page reads for its heading.
+    entry = json.loads((out_dir / "entries" / "101.json").read_text(encoding="utf-8"))
+    assert entry["payload"]["entry"]["team_name"] == "entry-101"
+    # Every alteration is stated: a name changed without a word said would be the quiet
+    # half of this. The batch still renders, so the note travels on a rendered row.
+    reasons = {member.entry_id: member.reason for member in report.members}
+    assert "team_name: replaced with 'entry-101'" in reasons[101]
+    assert f"team_name: truncated to {PUBLISHED_NAME_LIMIT} characters" in reasons[202]
+    assert "manager_name: replaced with 'entry-202'" in reasons[202]
 
 
 _DEADLINES = {

@@ -11,7 +11,7 @@ from scripts.publish_gameweek_site import KINDS, PublishError, PublishNames, nex
 def test_the_names_are_derived_from_season_gameweek_and_kind() -> None:
     names = PublishNames(season="2026-27", gameweek=2, kind="decision")
     assert names.branch == "feature/gw02-decision-site"
-    assert names.worktree_directory == "../squadopt-gw02-decision"
+    assert names.worktree_directory == ".codex-tmp/publications/gw02-decision"
     assert names.site_tag == "site-2026-27-gw02-decision"
     assert names.commit_message == "site: publish the gw02 decision view"
 

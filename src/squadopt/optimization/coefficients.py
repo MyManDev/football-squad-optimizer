@@ -8,6 +8,7 @@ from numbers import Integral
 
 import pandas as pd
 
+from squadopt.contracts import sort_players_by_id as sort_players_by_id
 from squadopt.optimization.config import POSITIONS, OptimizationConfig
 
 
@@ -41,17 +42,6 @@ def objective_coefficients(
         bench = scale_bench_coefficient(points, config.bench_weight)
         rows.append((bench, points - bench, points))
     return tuple(rows)
-
-
-def sort_players_by_id(players: pd.DataFrame) -> pd.DataFrame:
-    """Return the stable player ordering used by the model and its fingerprints."""
-
-    player_ids = players["player_id"].tolist()
-    if player_ids and isinstance(player_ids[0], Integral):
-        order = sorted(range(len(players)), key=lambda index: int(player_ids[index]))
-    else:
-        order = sorted(range(len(players)), key=lambda index: str(player_ids[index]))
-    return players.iloc[order].reset_index(drop=True).copy(deep=True)
 
 
 def _typed_identifier(value: object) -> dict[str, object]:

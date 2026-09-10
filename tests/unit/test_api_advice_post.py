@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from squadopt.api.app import create_app
@@ -82,7 +83,10 @@ def _world(tmp_path: Path, **app_kwargs: object):
     cache = FileAdviceCache(tmp_path / "cache")
     queue = FileJobQueue(tmp_path / "jobs")
     reader = AdviceReadStore(
-        FileLeagueDirectory(tmp_path / "site"), cache, _Context(), {"saf-puan": False}
+        FileLeagueDirectory(tmp_path / "site"),
+        cache,
+        _Context(),
+        {"saf-puan": False, "fark-yarat": True},
     )
     submit = AdviceSubmitService(reader, queue, **app_kwargs)
     application = create_app(
@@ -281,6 +285,67 @@ def test_two_racing_submitters_converge_on_one_open_job(tmp_path: Path) -> None:
     assert len(open_jobs) == 1
 
 
+@pytest.mark.parametrize("completion_boundary", ["cache-read", "history-read"])
+@pytest.mark.parametrize("retry_key", [None, "client:another-request"])
+def test_completion_after_a_cache_miss_does_not_enqueue_another_job(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    completion_boundary: str,
+    retry_key: str | None,
+) -> None:
+    """A worker can finish between POST's initial miss and its enqueue decision."""
+
+    client, cache, queue = _world(tmp_path)
+    first = client.post(ADVICE_URL, json=BODY)
+    assert first.status_code == 202
+    worker_queue = FileJobQueue(tmp_path / "jobs")
+    finished = False
+
+    def finish() -> None:
+        nonlocal finished
+        if finished:
+            return
+        finished = True
+        result = run_advice_worker_once(
+            worker_queue,
+            cache,
+            lambda _job: _valid_advice_document(),
+            at_utc="2026-08-27T18:00:00Z",
+            terminal_at_utc=lambda: "2026-08-27T18:00:01Z",
+        )
+        assert result is not None and result.status == "completed"
+
+    if completion_boundary == "cache-read":
+        original_cached = AdviceReadStore.cached
+
+        def stale_miss(reader: AdviceReadStore, key: str) -> bytes | None:
+            answer = original_cached(reader, key)
+            finish()
+            return answer
+
+        monkeypatch.setattr(AdviceReadStore, "cached", stale_miss)
+    else:
+        original_jobs = queue.jobs
+
+        def stale_history() -> tuple[AdviceJob, ...]:
+            history = original_jobs()
+            finish()
+            return history
+
+        monkeypatch.setattr(queue, "jobs", stale_history)
+
+    headers = {} if retry_key is None else {"Idempotency-Key": retry_key}
+    replay = client.post(ADVICE_URL, json=BODY, headers=headers)
+
+    assert finished
+    assert replay.status_code == 200, replay.text
+    assert replay.content == _valid_advice_document()
+    jobs = worker_queue.jobs()
+    assert len(jobs) == 1
+    assert jobs[0].job_id == first.json()["job_id"]
+    assert jobs[0].status == "completed"
+
+
 def test_the_public_job_view_carries_no_private_fields(tmp_path: Path) -> None:
     """The stored record is not the public record (reviewed finding 4)."""
 
@@ -301,3 +366,54 @@ def test_the_public_job_view_carries_no_private_fields(tmp_path: Path) -> None:
     assert "idempotency_key" not in view
     assert "secret-ish" not in json.dumps(view)
     assert "ertug" not in json.dumps(view)  # no raw worker text, no host paths
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"strategy": "saf-puan", "window": 1, "rival_entry_id": 2199732},
+        {"strategy": "fark-yarat", "window": 1},
+        {"strategy": "fark-yarat", "window": 3, "rival_entry_id": 2199732},
+        {"strategy": "fark-yarat", "window": 1, "rival_entry_id": 313686},
+    ],
+)
+def test_unsupported_computations_never_enter_the_queue(tmp_path: Path, body: dict) -> None:
+    client, _cache, queue = _world(tmp_path)
+    posted = client.post(ADVICE_URL, json=body)
+    params = {"strategy": body["strategy"], "window": body["window"]}
+    if "rival_entry_id" in body:
+        params["rival"] = body["rival_entry_id"]
+    read = client.get(ADVICE_URL, params=params)
+    for response in (posted, read):
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "UNSUPPORTED_ADVICE_REQUEST"
+    assert queue.jobs() == ()
+
+
+@pytest.mark.parametrize("broken", [b'{"private":"corrupt"}', b"null"])
+def test_get_and_post_refuse_identical_corrupt_cache_without_new_job(
+    tmp_path: Path,
+    broken: bytes,
+) -> None:
+    client, cache, queue = _world(tmp_path)
+    posted = client.post(ADVICE_URL, json=BODY)
+    job = queue.load(posted.json()["job_id"])
+    cache.put(job.cache_key, broken)
+    for response in (
+        client.get(ADVICE_URL, params=BODY),
+        client.post(ADVICE_URL, json=BODY),
+    ):
+        assert response.status_code == 500
+        assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+        assert "corrupt" not in response.text
+    assert len(queue.jobs()) == 1
+
+
+def test_corrupt_job_is_unavailable_not_missing(tmp_path: Path) -> None:
+    client, _cache, _queue = _world(tmp_path)
+    posted = client.post(ADVICE_URL, json=BODY)
+    identifier = posted.json()["job_id"]
+    (tmp_path / "jobs" / f"{identifier}.json").write_bytes(b"bad json")
+    response = client.get(f"/api/v1/advice-jobs/{identifier}")
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "QUEUE_INTEGRITY_ERROR"

@@ -14,6 +14,7 @@ import type {
 import { StaticOnlyAdviceClient } from "./adviceClient";
 import { sameAdviceRequest, useAdviceJob, type ComputePhase } from "./useAdviceJob";
 import { AdviceResponseError } from "./adviceResponse";
+import type { RequestOptions } from "../../../data/request";
 
 afterEach(cleanup);
 beforeEach(() => {
@@ -56,10 +57,13 @@ function Harness({
   client: AdviceClient;
   allowBaseline?: boolean;
 }) {
-  const { state, compute } = useAdviceJob(client, allowBaseline);
+  const { state, compute, reset } = useAdviceJob(client, allowBaseline);
   return (
     <div>
       <output data-testid="phase">{describePhase(state)}</output>
+      <button type="button" onClick={reset}>
+        reset
+      </button>
       <button type="button" onClick={() => compute(REQUEST)}>
         go
       </button>
@@ -82,6 +86,44 @@ function describePhase(state: ComputePhase): string {
 }
 
 describe("useAdviceJob", () => {
+  it("reset and unmount abort the actual request", async () => {
+    const client = new ScriptedClient();
+    const signals: AbortSignal[] = [];
+    client.requestAdvice = async (_request: AdviceRequest, options?: RequestOptions) => {
+      if (options?.signal) signals.push(options.signal);
+      return new Promise(() => {});
+    };
+    const view = render(<Harness client={client} />);
+    await act(async () => screen.getByText("go").click());
+    expect(signals[0].aborted).toBe(false);
+    await act(async () => screen.getByText("reset").click());
+    expect(signals[0].aborted).toBe(true);
+    expect(screen.getByTestId("phase")).toHaveTextContent("idle");
+    await act(async () => screen.getByText("go").click());
+    view.unmount();
+    expect(signals[1].aborted).toBe(true);
+  });
+
+  it("a five-minute deadline ends a hanging custom client and fences its late answer", async () => {
+    const client = new ScriptedClient();
+    let finish!: (value: AdviceRequestResult) => void;
+    client.requestAdvice = async () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      });
+    render(<Harness client={client} />);
+    await act(async () => screen.getByText("go").click());
+    await act(async () => vi.advanceTimersByTimeAsync(300_000));
+    expect(screen.getByTestId("phase")).toHaveTextContent("failed");
+    await act(async () =>
+      finish({
+        kind: "advice",
+        source: "api-cache",
+        envelope: mockEntryAdviceEnvelope(REQUEST.entryId, REQUEST.strategy, REQUEST.window),
+      }),
+    );
+    expect(screen.getByTestId("phase")).toHaveTextContent("failed");
+  });
   it("a different season or week is a different request even for the same member", () => {
     const request = { ...REQUEST, season: "2026-27", gameweek: 3 };
     expect(sameAdviceRequest(request, { ...request })).toBe(true);

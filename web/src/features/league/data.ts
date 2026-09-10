@@ -1,3 +1,6 @@
+import { withRequestDeadline, type RequestOptions } from "../../data/request";
+import { LeagueDataError, LeagueDataMissing } from "./dataErrors";
+import { assertAdviceIndex, assertEnvelope, assertMembers, assertSquad } from "./publicationShape";
 import type { WindowSize } from "../moves/modePrices";
 import type {
   EntryAdvice,
@@ -9,156 +12,30 @@ import type {
   Scoreboard,
 } from "./types";
 
-const CONTRACT_VERSION = "provisional_league_ui_v1";
+export { LeagueDataError, LeagueDataMissing } from "./dataErrors";
+
 const BASE = `${import.meta.env.BASE_URL}data/league/`;
 
-export class LeagueDataError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "LeagueDataError";
-  }
-}
-
-/**
- * Raised when the document exists nowhere: the site publishes only the mode and window it
- * actually computed, so asking for another one is a normal outcome rather than a fault.
- */
-export class LeagueDataMissing extends LeagueDataError {
-  constructor(relative: string) {
-    super(`No published league document at ${relative}.`);
-    this.name = "LeagueDataMissing";
-  }
-}
-
-function record(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function finite(value: unknown): value is number {
-  return typeof value === "number" && Number.isFinite(value);
-}
-
-function nullableNumber(value: unknown): boolean {
-  return value === null || finite(value);
-}
-
-function publicMember(value: unknown): boolean {
-  if (!record(value)) return false;
-  return (
-    ((value.member_kind === "human" &&
-      Number.isSafeInteger(value.entry_id) &&
-      Number(value.entry_id) > 0) ||
-      (value.member_kind === "system" && value.entry_id === null)) &&
-    (value.manager_name === null || typeof value.manager_name === "string") &&
-    (value.team_name === null || typeof value.team_name === "string") &&
-    finite(value.rank) &&
-    nullableNumber(value.gameweek_points) &&
-    nullableNumber(value.total_points) &&
-    (value.transfer_cost === undefined || nullableNumber(value.transfer_cost)) &&
-    typeof value.movement === "string" &&
-    ["up", "down", "same", "new", "unknown"].includes(value.movement) &&
-    (value.movement_places === undefined || nullableNumber(value.movement_places))
-  );
-}
-
-function publishedPlayer(value: unknown): boolean {
-  return (
-    record(value) &&
-    Number.isSafeInteger(value.player_id) &&
-    Number(value.player_id) > 0 &&
-    typeof value.name === "string" &&
-    typeof value.short_name === "string" &&
-    typeof value.team === "string" &&
-    typeof value.position === "string" &&
-    ["GK", "DEF", "MID", "FWD"].includes(value.position) &&
-    finite(value.expected_points) &&
-    typeof value.is_captain === "boolean" &&
-    (value.bench_order == null || Number.isSafeInteger(value.bench_order))
-  );
-}
-
-function assertEnvelope<T>(value: unknown): LeagueViewEnvelope<T> {
-  if (
-    !record(value) ||
-    value.contract_version !== CONTRACT_VERSION ||
-    !record(value.payload) ||
-    typeof value.generated_at_utc !== "string" ||
-    (value.source_kind !== "live" && value.source_kind !== "example")
-  ) {
-    throw new LeagueDataError("The published league envelope is invalid.");
-  }
-  return value as unknown as LeagueViewEnvelope<T>;
-}
-
-function assertMembers(
-  envelope: LeagueViewEnvelope<LeagueMembers>,
-): LeagueViewEnvelope<LeagueMembers> {
-  const view = envelope.payload;
-  if (
-    !record(view) ||
-    !Number.isSafeInteger(view.league_id) ||
-    view.league_id <= 0 ||
-    typeof view.league_name !== "string" ||
-    typeof view.season !== "string" ||
-    !Number.isSafeInteger(view.gameweek) ||
-    view.public_after_deadline !== true ||
-    (view.scored_gameweek !== null && !Number.isSafeInteger(view.scored_gameweek)) ||
-    !Array.isArray(view.members) ||
-    !view.members.every(publicMember)
-  ) {
-    throw new LeagueDataError("The published member list is invalid.");
-  }
-  return envelope;
-}
-
-function assertSquad(
-  envelope: LeagueViewEnvelope<EntrySquad>,
-  entryId: number,
-): LeagueViewEnvelope<EntrySquad> {
-  const view = envelope.payload;
-  if (
-    !record(view) ||
-    !publicMember(view.entry) ||
-    view.entry.member_kind !== "human" ||
-    view.entry.entry_id !== entryId ||
-    !Number.isSafeInteger(view.league_id) ||
-    view.league_id <= 0 ||
-    typeof view.season !== "string" ||
-    !Number.isSafeInteger(view.gameweek) ||
-    (view.source_snapshot_id !== null && typeof view.source_snapshot_id !== "string") ||
-    !Array.isArray(view.starting_xi) ||
-    !view.starting_xi.every(publishedPlayer) ||
-    !Array.isArray(view.bench) ||
-    !view.bench.every(publishedPlayer) ||
-    !Array.isArray(view.missing_fields) ||
-    !view.missing_fields.every((field) => typeof field === "string") ||
-    !["complete", "partial", "empty"].includes(view.data_quality) ||
-    typeof view.free_transfers_known !== "boolean" ||
-    typeof view.purchase_prices_known !== "boolean" ||
-    !finite(view.free_transfers)
-  ) {
-    throw new LeagueDataError("The published member squad is invalid or belongs to another entry.");
-  }
-  return envelope;
-}
-
-async function read<T>(relative: string): Promise<LeagueViewEnvelope<T>> {
-  const response = await fetch(`${BASE}${relative}`, { cache: "no-cache" });
-  if (response.status === 404) throw new LeagueDataMissing(relative);
-  if (!response.ok) throw new LeagueDataError(`League data is not available (${response.status}).`);
-  // Static hosts can return their HTML app shell for an unpublished JSON path.
-  // A broken JSON publication is unreadable and must not become an example fallback.
-  const body = await response.text();
-  let parsed: LeagueViewEnvelope<T>;
-  try {
-    parsed = JSON.parse(body) as LeagueViewEnvelope<T>;
-  } catch {
-    if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(body)) {
-      throw new LeagueDataMissing(relative);
+async function read<T>(relative: string, options?: RequestOptions): Promise<LeagueViewEnvelope<T>> {
+  return withRequestDeadline(async (signal) => {
+    const response = await fetch(`${BASE}${relative}`, { cache: "no-cache", signal });
+    if (response.status === 404) throw new LeagueDataMissing(relative);
+    if (!response.ok)
+      throw new LeagueDataError(`League data is not available (${response.status}).`);
+    // Static hosts can return their HTML app shell for an unpublished JSON path.
+    // A broken JSON publication is unreadable and must not become an example fallback.
+    const body = await response.text();
+    let parsed: LeagueViewEnvelope<T>;
+    try {
+      parsed = JSON.parse(body) as LeagueViewEnvelope<T>;
+    } catch {
+      if (/^\s*(?:<!doctype\s+html\b|<html\b)/i.test(body)) {
+        throw new LeagueDataMissing(relative);
+      }
+      throw new LeagueDataError(`The published league document at ${relative} is not valid JSON.`);
     }
-    throw new LeagueDataError(`The published league document at ${relative} is not valid JSON.`);
-  }
-  return assertEnvelope(parsed);
+    return assertEnvelope(parsed);
+  }, options);
 }
 
 /**
@@ -192,11 +69,13 @@ async function mockModule() {
 async function readOrExample<T>(
   relative: string,
   example: () => Promise<LeagueViewEnvelope<T>>,
+  options?: RequestOptions,
 ): Promise<LeagueViewEnvelope<T>> {
+  options?.signal?.throwIfAborted();
   if (import.meta.env.MODE === "test") return example();
-  if (!import.meta.env.DEV) return read<T>(relative);
+  if (!import.meta.env.DEV) return read<T>(relative, options);
   try {
-    return await read<T>(relative);
+    return await read<T>(relative, options);
   } catch (error) {
     if (error instanceof LeagueDataMissing) return example();
     throw error;
@@ -228,6 +107,7 @@ export async function loadEntryAdvice(
   mode: AdviceStrategy,
   window: WindowSize,
   rivalEntryId: number | null = null,
+  options?: RequestOptions,
 ): Promise<LeagueViewEnvelope<EntryAdvice>> {
   // A named rival reads the producer's per-rival file; without one, the plain path —
   // the baseline for saf-puan, the standings neighbour's copy for a rival strategy.
@@ -235,17 +115,20 @@ export async function loadEntryAdvice(
     rivalEntryId === null
       ? `advice/${entryId}/${mode}/${window}.json`
       : `advice/${entryId}/${mode}/${window}/vs-${rivalEntryId}.json`;
-  return readOrExample<EntryAdvice>(relative, async () =>
-    (await mockModule()).mockEntryAdviceEnvelope(entryId, mode, window, rivalEntryId),
+  return readOrExample<EntryAdvice>(
+    relative,
+    async () => (await mockModule()).mockEntryAdviceEnvelope(entryId, mode, window, rivalEntryId),
+    options,
   );
 }
 
 export async function loadEntryAdviceIndex(
   entryId: number,
 ): Promise<LeagueViewEnvelope<EntryAdviceIndex>> {
-  return readOrExample<EntryAdviceIndex>(`advice/${entryId}/index.json`, async () =>
+  const envelope = await readOrExample<EntryAdviceIndex>(`advice/${entryId}/index.json`, async () =>
     (await mockModule()).mockEntryAdviceIndex(entryId),
   );
+  return assertAdviceIndex(envelope, entryId);
 }
 
 /**
