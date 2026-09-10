@@ -1,0 +1,11 @@
+{
+  "contract_version": "club_news_sources_v1",
+  "note": "Which club pages this project may read, and where the terms reading for each host is recorded. No club's bytes are redistributed here and no real host is registered yet: the single entry below is a placeholder that keeps the shape readable and exercises the reader. A real host is added only after its terms of use and robots.txt have been read and the reading written into docs/club_news_sources.md, which is why terms_record is required rather than optional.",
+  "sources": [
+    {
+      "club": "Example FC",
+      "url": "https://club.example/team-news",
+      "terms_record": "docs/club_news_sources.md"
+    }
+  ]
+}

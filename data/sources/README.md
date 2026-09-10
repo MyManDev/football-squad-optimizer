@@ -62,3 +62,19 @@ See [the data pipeline](../../docs/data_pipeline.md) for what happens to the dat
 after it is fetched, and [the data dictionary](../../docs/data_dictionary.md) for the
 per-column semantics — including the two source-specific corrections this archive
 needs.
+
+## `club_news_sources.json`
+
+Which club pages the rotation lane may read, one entry per club, and where the terms
+reading for each host was written down. Like the manifest beside it, this file names a
+third-party source and redistributes none of it: the bytes a fetch returns go to
+`data/snapshots/`, which is gitignored.
+
+`terms_record` is required. A source cannot be registered without pointing at where
+somebody read that host's terms of use and `robots.txt` and wrote down what they said —
+the registry is the record of what we *may* read, so an entry with no such pointer would
+be a permission nobody granted. `club` is spelled as the capture spells it (the bootstrap
+payload's `teams[].name`, so `Man Utd` rather than `Manchester United`), because a claim
+is joined against the capture and not against a tidier name.
+
+No real host is registered yet. The one entry is a placeholder.
