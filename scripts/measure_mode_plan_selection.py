@@ -31,14 +31,14 @@ from scripts._experiment_cli import (
 
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.experiments.control_residuals import build_control_residual_table
-from squadopt.experiments.plan_selection import (
+from squadopt.experiments.policy_objective import PolicyObjectiveConfig
+from squadopt.experiments.residual_signal_scan import load_enrichment_rows
+from squadopt.live.plan_selection import (
     PLAN_SELECTION_CONTRACT_VERSION,
     generate_candidate_plans,
     select_plan,
     selection_to_dict,
 )
-from squadopt.experiments.policy_objective import PolicyObjectiveConfig
-from squadopt.experiments.residual_signal_scan import load_enrichment_rows
 from squadopt.optimization import OptimizationConfig, optimize_squad
 from squadopt.planning import InitialSquadState, PlanningHorizon
 from squadopt.prediction import PredictionProvenance, prepare_optimizer_projection

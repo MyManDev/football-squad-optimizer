@@ -13,6 +13,10 @@ class ExperimentConfigurationError(ExperimentError):
     """A policy or experiment configuration violates its public contract."""
 
 
+class ExperimentExecutionError(ExperimentError):
+    """Raised when an experiment cannot produce a trustworthy comparison."""
+
+
 @dataclass(frozen=True, slots=True)
 class PromotionPolicy:
     """Pre-registered gates for sending a challenger to the locked holdout."""

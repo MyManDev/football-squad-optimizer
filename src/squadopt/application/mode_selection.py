@@ -26,11 +26,7 @@ from types import MappingProxyType
 from typing import Final
 
 from squadopt.application.entries import EntryPicks
-from squadopt.experiments.plan_selection import (
-    CandidatePlan,
-    select_plan,
-    selection_to_dict,
-)
+from squadopt.live.plan_selection import CandidatePlan, select_plan, selection_to_dict
 from squadopt.live.recommendation import Projection
 from squadopt.live.risk import LiveResidualHistory
 from squadopt.live.transfers import TransferDecision
