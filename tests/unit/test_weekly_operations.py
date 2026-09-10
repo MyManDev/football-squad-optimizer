@@ -97,9 +97,27 @@ def test_wrong_capture_handoff_is_rejected_before_alias_write(tmp_path: Path) ->
     assert not operation.paths.handoffs.exists()
 
 
-def test_default_preview_can_resume_in_clean_git_checkout_but_source_drift_cannot(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def _git(cwd: Path, *arguments: str) -> str:
+    completed = subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Synthetic",
+            "-c",
+            "user.email=synthetic@example.invalid",
+            *arguments,
+        ],
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
+
+
+def _git_checkout(tmp_path: Path) -> tuple[Path, weekly.WeeklyPaths, list[str]]:
+    """A clean Git checkout holding the synthetic world, and the arguments that run it."""
+
     publication = publication_world(tmp_path / "fixtures")
     checkout = tmp_path / "checkout"
     checkout.mkdir()
@@ -114,25 +132,13 @@ def test_default_preview_can_resume_in_clean_git_checkout_but_source_drift_canno
     handoff = checkout / "data/prebuilt.json"
     shutil.copyfile(publication.handoff_path, handoff)
     (checkout / ".gitignore").write_text("data/\nartifacts/\n")
-    source = checkout / "source.py"
-    source.write_text("unchanged")
+    (checkout / "source.py").write_text("unchanged")
     public = checkout / "web/public/data/members.json"
     public.parent.mkdir(parents=True)
     public.write_text("previous publication")
-    for command in (
-        ["init", "-q"],
-        ["add", "."],
-        [
-            "-c",
-            "user.name=Synthetic",
-            "-c",
-            "user.email=synthetic@example.invalid",
-            "commit",
-            "-qm",
-            "fixture",
-        ],
-    ):
-        subprocess.run(["git", *command], cwd=checkout, check=True, capture_output=True)
+    _git(checkout, "init", "-q")
+    _git(checkout, "add", ".")
+    _git(checkout, "commit", "-qm", "fixture")
     args = [
         "--workspace",
         str(checkout),
@@ -149,9 +155,29 @@ def test_default_preview_can_resume_in_clean_git_checkout_but_source_drift_canno
         "1",
         "--handoff",
         str(handoff),
-        "--run-id",
-        "git-resume",
     ]
+    return checkout, paths, args
+
+
+def _origin_develop_behind_head(checkout: Path) -> str:
+    """Publish HEAD as ``origin/develop``, then commit once more so HEAD is ahead of it."""
+
+    origin = checkout.parent / "origin.git"
+    _git(checkout, "init", "-q", "--bare", str(origin))
+    _git(checkout, "remote", "add", "origin", str(origin))
+    _git(checkout, "push", "-q", "origin", "HEAD:refs/heads/develop")
+    (checkout / "source.py").write_text("committed here, not yet on develop")
+    _git(checkout, "commit", "-qam", "unmerged")
+    return _git(checkout, "rev-parse", "origin/develop")
+
+
+def test_default_preview_can_resume_in_clean_git_checkout_but_source_drift_cannot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checkout, paths, base = _git_checkout(tmp_path)
+    source = checkout / "source.py"
+    public = checkout / "web/public/data/members.json"
+    args = [*base, "--run-id", "git-resume"]
     actual_scoreboard = weekly.publish_scoreboard
 
     def interrupt(request):
@@ -166,6 +192,76 @@ def test_default_preview_can_resume_in_clean_git_checkout_but_source_drift_canno
     assert (paths.journal / "git-resume/preview/data/league/members.json").is_file()
     source.write_text("unrelated source edit")
     assert weekly.main([*args, "--resume"]) == 1
+
+
+def test_a_publish_off_the_fresh_origin_develop_refuses_in_preflight(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The publication base is checked before a capture or a solve is spent on a run that
+    the publish stage would refuse hours later; the refusal names the recovery."""
+
+    checkout, paths, args = _git_checkout(tmp_path)
+    base = _origin_develop_behind_head(checkout)
+    head = _git(checkout, "rev-parse", "HEAD")
+    assert base != head
+
+    assert weekly.main([*args, "--publish", "--run-id", "off-develop"]) == 1
+
+    stderr = capsys.readouterr().err
+    assert "run_week stopped:" in stderr
+    assert "origin/develop" in stderr and base[:12] in stderr and head[:12] in stderr
+    assert "start a new run" in stderr
+    doc = json.loads((paths.journal / "off-develop/run.json").read_bytes())
+    assert doc["stages"][0]["name"] == "preflight" and doc["stages"][0]["status"] == "failed"
+    assert all(stage["status"] == "pending" for stage in doc["stages"][1:])
+    assert not (checkout / ".codex-tmp").exists()
+
+
+def test_the_publish_stage_checks_the_base_again_before_touching_git(tmp_path: Path) -> None:
+    """The backstop: develop can move during the run, so the last stage checks once more,
+    before any worktree or branch exists, and names the same recovery."""
+
+    from squadopt.platform.weekly_publish import PublishError, PublishNames, publish
+
+    checkout, _, _ = _git_checkout(tmp_path)
+    _origin_develop_behind_head(checkout)
+    head = _git(checkout, "rev-parse", "HEAD")
+
+    with pytest.raises(PublishError, match="origin/develop") as refusal:
+        publish(
+            PublishNames("2026-27", 2, "decision"),
+            force_branch=False,
+            dry_run=True,
+            workspace=checkout,
+            expected_commit=head,
+        )
+    assert "start a new run" in str(refusal.value)
+    assert not (checkout / ".codex-tmp").exists()
+
+
+def test_a_settled_outcome_refusal_is_stated_at_the_run_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The stage's own refusal reaches the operator as a stated refusal with exit 1, not as
+    an uncaught traceback, and the journal shows where the run stopped."""
+
+    from squadopt.application.settled_outcomes import SettledOutcomeExportError
+
+    _, paths, args = _git_checkout(tmp_path)
+
+    def refuse(request):
+        raise SettledOutcomeExportError("synthetic: manifest describes a different artifact")
+
+    monkeypatch.setattr(weekly, "export_settled_outcomes", refuse)
+    assert weekly.main([*args, "--run-id", "settled-refusal"]) == 1
+
+    stderr = capsys.readouterr().err
+    assert "run_week stopped: synthetic: manifest describes a different artifact" in stderr
+    doc = json.loads((paths.journal / "settled-refusal/run.json").read_bytes())
+    statuses = {stage["name"]: stage["status"] for stage in doc["stages"]}
+    assert statuses["preflight"] == "completed" and statuses["capture"] == "completed"
+    assert statuses["settled_outcomes"] == "failed"
+    assert statuses["handoff"] == "pending" and statuses["league"] == "pending"
 
 
 def test_prebuilt_handoff_cannot_claim_fresh_top100_composition(tmp_path: Path) -> None:

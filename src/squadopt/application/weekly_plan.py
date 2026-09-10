@@ -242,13 +242,13 @@ def rotation_artifact(
 ) -> tuple[Path, Path]:
     """The rotation table and manifest one capture's export writes.
 
-    The sibling of :func:`evidence_artifact`, and the name is built here rather than parsed
-    out of the export's output for two reasons. The export prints its paths with a trailing
-    ``(written)`` or ``(replay)``, which :func:`_wrote_paths` does not match; and a name
-    constructed from the capture is stable whatever the export decides to print. It mirrors
-    ``scripts.export_rotation_evidence._artifact_name``, including the twelve characters of
-    the capture's own digest, so a rehearsal earlier in the week is a different artifact from
-    Friday's and an export already on disk for that capture is the same one.
+    The sibling of :func:`evidence_artifact`, and the name is built here rather than read
+    back from the export for the same reason: the weekly stage needs the pair's paths before
+    the export runs, to reuse a pair already on disk for this capture, and after it, to read
+    the pair back; it hands the export this name, so the two cannot diverge. It mirrors
+    ``squadopt.application.rotation_export._artifact_name``, including the twelve characters
+    of the capture's own digest, so a rehearsal earlier in the week is a different artifact
+    from Friday's and an export already on disk for that capture is the same one.
     """
 
     name = f"rotation_evidence_v1_{season}_gw{gameweek:02d}_{snapshot_id[-12:]}"
