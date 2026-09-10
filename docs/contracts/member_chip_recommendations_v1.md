@@ -63,3 +63,8 @@ before the worker can cache its result; it is never silently converted into a ho
 Chip comparison also checks configuration and horizon identity, the returned chip
 window, reconciled weekly hit charges and the no-chip control's solver stop reason.
 A wall-clock-stopped control or alternative cannot produce a published price.
+
+The existing one-week advice contract still retains a feasible incumbent with its
+status and bound gap. If that control was clock-truncated, the optional chip block is
+omitted before comparison; normal advice remains available and no chip price or hold
+is invented. Multi-week advice retains its existing refusal of clock-truncated plans.

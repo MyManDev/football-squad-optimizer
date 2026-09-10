@@ -453,10 +453,14 @@ def build_advice_payload(
         raw_gap = plan.diagnostics.get("absolute_optimality_gap")
         optimality_gap = float(str(raw_gap)) if raw_gap is not None else None
         week = plan.weeks[0]
-        chip_fields["chip_recommendations"] = chip_recommendation_payload(
-            recommend_chips(inputs, projection, solved.held, rules, plan),
-            plan,
-        )
+        # The existing one-week contract retains a feasible incumbent with its gap.
+        # A clock-truncated control cannot support a reproducible chip price, but
+        # that optional comparison must not erase the member's ordinary advice.
+        if not wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
+            chip_fields["chip_recommendations"] = chip_recommendation_payload(
+                recommend_chips(inputs, projection, solved.held, rules, plan),
+                plan,
+            )
     else:
         transfers = decision
         by_id = pool_by_id
