@@ -278,7 +278,6 @@ function WeekResult({ week }: { week: WeekReview }) {
                     copy.forecast,
                     copy.realized,
                     copy.error,
-                    copy.minutes,
                   ].map((label) => (
                     <th scope="col" key={label}>
                       {label}
@@ -311,7 +310,6 @@ function WeekResult({ week }: { week: WeekReview }) {
                         ? "—"
                         : signedPoints(player.forecast_error, 1, locale)}
                     </td>
-                    <td>{player.minutes}</td>
                   </tr>
                 ))}
               </tbody>

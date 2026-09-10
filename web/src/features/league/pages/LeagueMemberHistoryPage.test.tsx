@@ -41,7 +41,7 @@ it.each<Language>(["tr", "en"])(
     expect(screen.getByText(new RegExp(`${copy.captain} \\(x2\\)`))).toBeInTheDocument();
     expect(
       within(screen.getByRole("region", { name: copy.players })).getAllByRole("columnheader"),
-    ).toHaveLength(6);
+    ).toHaveLength(5);
   },
 );
 
