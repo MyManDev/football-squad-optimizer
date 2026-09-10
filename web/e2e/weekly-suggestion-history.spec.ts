@@ -22,13 +22,13 @@ test("member can open recorded history and inspect the Python-scored result on m
   );
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/league/members/35249001");
-  await page.getByRole("link", { name: "Haftalık öneri geçmişi" }).click();
+  await page.getByRole("link", { name: "Haftalık Öneri Geçmişi" }).click();
   await expect(page).toHaveURL(/\/35249001\/history$/);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Haftalık öneri geçmişi");
-  await page.getByRole("combobox", { name: "Kayıtlı hafta" }).selectOption("4");
-  await expect(page.getByText("Önerinin neti − üyenin neti:")).toContainText("−2,0");
-  await expect(page.getByRole("row", { name: /Player 8 MID/ })).toContainText("×2");
-  await page.getByText("Kayıt ayrıntıları", { exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Haftalık Öneri Geçmişi");
+  await page.getByRole("combobox", { name: "Kayıtlı Hafta" }).selectOption("4");
+  await expect(page.getByText("Önerinin Neti − Üyenin Neti:")).toContainText("−2,0");
+  await expect(page.getByRole("row", { name: /Player 8 MID/ })).toContainText("Kaptan (x2)");
+  await page.getByText("Kayıt Ayrıntıları", { exact: true }).click();
   await expect(
     page.getByText(historyDocument.payload.weeks[0].advice_sha256, { exact: true }),
   ).toBeVisible();
@@ -38,7 +38,7 @@ test("member can open recorded history and inspect the Python-scored result on m
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath("history-mobile.png"), fullPage: true });
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Haftalık öneri geçmişi");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Haftalık Öneri Geçmişi");
 });
 
 test("unsettled, missing and invalid publications never display an invented comparison", async ({
@@ -57,22 +57,22 @@ test("unsettled, missing and invalid publications never display an invented comp
   });
   await page.route("**/data/league/history/101.json", (route) => route.fulfill({ json: pending }));
   await page.goto("/league/members/101/history");
-  await page.getByRole("combobox", { name: "Kayıtlı hafta" }).selectOption("4");
-  await expect(page.getByText("Sonuç kesinleşmedi", { exact: true })).toBeVisible();
+  await page.getByRole("combobox", { name: "Kayıtlı Hafta" }).selectOption("4");
+  await expect(page.getByText("Sonuç Kesinleşmedi", { exact: true })).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(0);
   await page.unroute("**/data/league/history/101.json");
   await page.route("**/data/league/history/101.json", (route) =>
     route.fulfill({ status: 404, body: "{}" }),
   );
   await page.reload();
-  await expect(page.getByText("Kayıt yok", { exact: true })).toBeVisible();
+  await expect(page.getByText("Kayıt Yok", { exact: true })).toBeVisible();
   await page.unroute("**/data/league/history/101.json");
   await page.route("**/data/league/history/101.json", (route) =>
     route.fulfill({ json: { ...fixture, contract_version: "bad" } }),
   );
   await page.reload();
-  await expect(page.getByText("Geçmiş doğrulanamadı", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Yeniden dene" })).toBeVisible();
+  await expect(page.getByText("Geçmiş Doğrulanamadı", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Yeniden Dene" })).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(0);
 });
 
@@ -83,19 +83,19 @@ test("overview accumulates weeks, preserves totals while scrolling and opens wee
     route.fulfill({ json: mockSuggestionOverview() }),
   );
   await page.goto("/league/members/101/history");
-  const overview = page.getByRole("region", { name: "Genel bakış" });
+  const overview = page.getByRole("region", { name: "Genel Bakış" });
   await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("624,0");
   await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("610,0");
   await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("+14,0");
   await expect(
     overview
       .getByRole("row")
-      .filter({ has: page.getByRole("button", { name: "Oyun haftası 4", exact: true }) }),
+      .filter({ has: page.getByRole("button", { name: "Oyun Haftası 4", exact: true }) }),
   ).toContainText("−2,0");
   await expect(
     overview
       .getByRole("row")
-      .filter({ has: page.getByRole("button", { name: "Oyun haftası 5", exact: true }) }),
+      .filter({ has: page.getByRole("button", { name: "Oyun Haftası 5", exact: true }) }),
   ).toContainText("+4,0");
   expect(await overview.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
     true,
@@ -104,17 +104,17 @@ test("overview accumulates weeks, preserves totals while scrolling and opens wee
   await overview.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
-  await expect(overview.getByRole("button", { name: "Oyun haftası 14" })).toBeVisible();
+  await expect(overview.getByRole("button", { name: "Oyun Haftası 14" })).toBeVisible();
   await expect(overview.getByRole("rowheader", { name: "Toplam", exact: true })).toBeInViewport();
   await page.screenshot({ path: testInfo.outputPath("overview-desktop.png"), fullPage: true });
   await page.getByRole("combobox").selectOption("5");
-  await expect(page.getByText("Önerinin neti − üyenin neti:")).toContainText("+6,0");
+  await expect(page.getByText("Önerinin Neti − Üyenin Neti:")).toContainText("+6,0");
   await page.getByRole("combobox").selectOption("overview");
   await page.setViewportSize({ width: 390, height: 844 });
   await overview.evaluate((element) => {
     element.scrollLeft = element.scrollWidth;
   });
-  await expect(overview.getByRole("button", { name: "Oyun haftası 4" })).toBeInViewport();
+  await expect(overview.getByRole("button", { name: "Oyun Haftası 4" })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath("overview-mobile.png"), fullPage: true });

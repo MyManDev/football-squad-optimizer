@@ -34,7 +34,7 @@
   font-variant-numeric: tabular-nums;
 }
 .players {
-  min-width: 780px;
+  min-width: 620px;
   font-size: var(--step--1);
 }
 .scores th,

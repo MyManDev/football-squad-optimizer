@@ -85,7 +85,7 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
               <option value="overview">{copy.overview}</option>
               {ordered.map((item) => (
                 <option key={item.gameweek} value={item.gameweek}>
-                  {messages.common.gameweek(item.gameweek)}
+                  {copy.gameweek(item.gameweek)}
                 </option>
               ))}
             </select>
@@ -145,7 +145,7 @@ function HistoryOverview({
                     type="button"
                     className={styles.weekLink}
                     onClick={() => onSelect(week.gameweek)}
-                    aria-label={messages.common.gameweek(week.gameweek)}
+                    aria-label={copy.gameweek(week.gameweek)}
                   >
                     {messages.common.gameweekShort(week.gameweek)}
                   </button>
@@ -197,7 +197,7 @@ function WeekResult({ week }: { week: WeekReview }) {
     suggested?.chip === "3xc" ? copy.triple : suggested?.chip ? copy[suggested.chip] : copy.noChip;
   return (
     <>
-      <Card title={messages.common.gameweek(week.gameweek)}>
+      <Card title={copy.gameweek(week.gameweek)}>
         {week.status !== "available" || !suggested ? (
           <EmptyState title={week.status === "unsettled" ? copy.unsettled : copy.unavailable}>
             <p>{week.status === "unsettled" ? copy.pending : reason}</p>
@@ -208,7 +208,7 @@ function WeekResult({ week }: { week: WeekReview }) {
               <table className={styles.scores}>
                 <thead>
                   <tr>
-                    <th scope="col">{messages.common.gameweek(week.gameweek)}</th>
+                    <th scope="col">{copy.gameweek(week.gameweek)}</th>
                     <th scope="col">{copy.suggested}</th>
                     <th scope="col">{copy.actual}</th>
                   </tr>
@@ -279,8 +279,6 @@ function WeekResult({ week }: { week: WeekReview }) {
                     copy.realized,
                     copy.error,
                     copy.minutes,
-                    copy.multiplier,
-                    copy.counted,
                   ].map((label) => (
                     <th scope="col" key={label}>
                       {label}
@@ -302,6 +300,9 @@ function WeekResult({ week }: { week: WeekReview }) {
                         : player.vice_captain
                           ? ` · ${copy.vice}`
                           : ""}
+                      {(player.captain || player.vice_captain) && player.multiplier > 1
+                        ? ` (x${player.multiplier})`
+                        : ""}
                     </td>
                     <td>{format(player.expected_points)}</td>
                     <td>{format(player.realized_points)}</td>
@@ -311,8 +312,6 @@ function WeekResult({ week }: { week: WeekReview }) {
                         : signedPoints(player.forecast_error, 1, locale)}
                     </td>
                     <td>{player.minutes}</td>
-                    <td>×{player.multiplier}</td>
-                    <td>{format(player.counted_points)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -36,7 +36,9 @@ is absent; the comparison then stays unknown.
 
 The signed difference is **suggested net minus actual net**. Player rows show recorded
 expected points, actual unmultiplied points, their difference, minutes, recorded role,
-captain/vice, scoring multiplier and counted contribution. The recorded aggregate
+captain/vice with the applied multiplier beside the captain label. Separate multiplier
+and counted-points columns are omitted. Headings and labels use title case in both
+languages; explanatory sentences retain normal capitalization. The recorded aggregate
 expectation is XI plus captain, before transfer costs and extra chip points; the UI
 explicitly distinguishes this from a net forecast. No accuracy percentage is inferred.
 
