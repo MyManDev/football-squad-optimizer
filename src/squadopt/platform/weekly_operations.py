@@ -460,6 +460,7 @@ class WeeklyOperations:
             gameweek=self.request.gameweek,
             handoff_path=Path(self.values["handoff"]["path"]),
             record_root=self.paths.records if record else None,
+            history_record_root=self.paths.records,
         )
         with league_mapper(request, self.request.workers) as mapper:
             result = publish_league(request, mapper=mapper)

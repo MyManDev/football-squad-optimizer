@@ -165,6 +165,7 @@ def main() -> int:
             handoff_path=arguments.in_season_projection,
             mode_residuals=arguments.mode_residuals,
             record_root=None if arguments.no_advice_record else Path(arguments.advice_record_root),
+            history_record_root=Path(arguments.advice_record_root),
             rival_menu=not arguments.no_rival_menu,
         )
         prepared = prepare_league_publication(request)

@@ -1,0 +1,156 @@
+.page {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.page h1 {
+  font-family: var(--font-display);
+  margin: var(--space-2) 0;
+}
+.muted {
+  color: var(--color-text-muted);
+  max-width: var(--measure);
+}
+.selector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.selector select {
+  padding: 0.6rem;
+  border: 1px solid var(--color-line);
+  border-radius: 0.4rem;
+  font: inherit;
+}
+.tableWrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.scores,
+.players {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.players {
+  min-width: 620px;
+  font-size: var(--step--1);
+}
+.scores th,
+.scores td,
+.players th,
+.players td {
+  padding: 0.7rem;
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+}
+.scores thead,
+.players thead {
+  color: var(--color-text-muted);
+}
+.difference {
+  font-size: var(--step-1);
+}
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+.facts dt {
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}
+.facts dd {
+  margin: 0.4rem 0 0;
+  overflow-wrap: anywhere;
+}
+.facts div {
+  min-width: 0;
+  max-width: 100%;
+}
+.position {
+  display: block;
+  font-weight: normal;
+  color: var(--color-text-muted);
+}
+.evidence summary {
+  cursor: pointer;
+  padding: var(--space-2) 0;
+}
+.overviewScroll {
+  max-height: 28rem;
+  overflow: auto;
+  isolation: isolate;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-s);
+}
+.overviewTable {
+  width: 100%;
+  min-width: 650px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.overviewTable th,
+.overviewTable td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--color-line);
+  text-align: right;
+}
+.overviewTable th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-surface);
+  text-align: left;
+  min-width: 8rem;
+  max-width: 12rem;
+}
+.overviewTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-surface-2);
+  font-size: var(--step--1);
+}
+.overviewTable tfoot th,
+.overviewTable tfoot td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--color-surface-2);
+  font-weight: 700;
+  border-bottom: 0;
+  border-top: 1px solid var(--color-line);
+}
+.overviewTable thead th:first-child,
+.overviewTable tfoot th:first-child {
+  z-index: 3;
+  background: var(--color-surface-2);
+}
+.weekLink {
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-weight: 600;
+  padding: 0.35rem 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.rowStatus {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+  font-weight: 400;
+}
+@media (max-width: 600px) {
+  .scores {
+    font-size: var(--step--1);
+  }
+  .scores th,
+  .scores td {
+    padding: 0.5rem;
+  }
+}

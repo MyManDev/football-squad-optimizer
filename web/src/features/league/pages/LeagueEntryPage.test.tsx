@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
+import { readViewerEntry, writeViewerEntry } from "../identity/useViewerEntry";
 import { LeagueEntryPage } from "./LeagueEntryPage";
 
 const published = { ...mockLeagueMembersEnvelope, source_kind: "live" };
@@ -13,7 +14,10 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-beforeEach(() => localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  writeViewerEntry(null);
+});
 
 function open(language: Language) {
   return render(
@@ -31,8 +35,8 @@ function open(language: Language) {
 describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
   const copy = MESSAGES[language].leagueEntry;
   it("connects through published data without changing the existing viewer selection", async () => {
-    const viewer = JSON.stringify({ entryId: 35249001 });
-    localStorage.setItem("squadopt.viewer", viewer);
+    const viewer = 35249001;
+    writeViewerEntry(viewer);
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(published)));
     vi.stubGlobal("fetch", fetcher);
     open(language);
@@ -42,7 +46,7 @@ describe.each(["tr", "en"] as const)("league entry in %s", (language) => {
     await user.type(screen.getByLabelText(copy.label), String(published.payload.league_id));
     await user.click(screen.getByRole("button", { name: copy.submit }));
     expect(await screen.findByRole("heading", { name: "Member destination" })).toBeInTheDocument();
-    expect(localStorage.getItem("squadopt.viewer")).toBe(viewer);
+    expect(readViewerEntry()?.entryId).toBe(viewer);
   });
 
   it("validates decimal IDs before requesting any publication", async () => {
