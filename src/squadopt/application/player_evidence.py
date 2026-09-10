@@ -32,7 +32,7 @@ from typing import Final
 import pandas as pd
 
 from squadopt.application.evidence_io import write_json
-from squadopt.backtest.export_precision import write_export_table
+from squadopt.data.checksums import compute_table_sha256
 from squadopt.data.errors import (
     DataError,
     DataValidationError,
@@ -41,6 +41,7 @@ from squadopt.data.errors import (
     MissingColumnsError,
 )
 from squadopt.data.snapshots import read_snapshot
+from squadopt.data.tables import write_export_table
 from squadopt.data.timestamps import as_instant
 from squadopt.features.evidence import (
     CONTRACT_VERSION,
@@ -48,7 +49,6 @@ from squadopt.features.evidence import (
     build_player_evidence_table,
 )
 from squadopt.features.evidence_artifact import ARTIFACT_CONTRACT_VERSION
-from squadopt.preflight.validator import compute_table_sha256
 
 
 @dataclass(frozen=True, slots=True)

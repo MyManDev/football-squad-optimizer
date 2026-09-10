@@ -11,7 +11,6 @@ from typing import Final
 
 import pandas as pd
 
-from squadopt.backtest.export_precision import EXPORT_LINE_TERMINATOR
 from squadopt.data.errors import DataError, InvalidValueError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.club_news import (
@@ -21,6 +20,7 @@ from squadopt.data.sources.club_news import (
 from squadopt.data.sources.club_news_capture import CodedClub, read_club_news_capture
 from squadopt.data.sources.club_news_claims import ParsedClaim, parse_claim_response
 from squadopt.data.sources.club_news_coding import locate_claim_response
+from squadopt.data.tables import EXPORT_LINE_TERMINATOR
 from squadopt.experiments.shadow_report import write_document_once
 from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION,
