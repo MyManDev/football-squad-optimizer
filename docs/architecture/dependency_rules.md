@@ -72,7 +72,7 @@ The shared-contract and evaluation extraction subsequently removed those five ex
 Some packages are independent of each other and their relative position is arbitrary. Do not
 read meaning into it, and do not "fix" it:
 
-- `bayesopt` imports no other subpackage at all. It could sit immediately above `contracts`.
+- `bayesopt` imports only `contracts`. It could sit immediately above it.
 - `preflight` imports only `data`.
 - `recalibration` imports `data`, `features` and `scenarios`, so it needs to be above
   `scenarios` but is otherwise unconstrained.
@@ -111,6 +111,10 @@ Only vocabulary. Nothing that computes a decision, and nothing that imports anyt
 - `sort_players_by_id` in the same module — nine lines whose docstring calls
   it "the stable player ordering used by the model and its fingerprints"; canonical ordering
   is a contract even though it is a function
+- `BayesianFactor` and `FactorKind` in `contracts/factors.py`: the bounded-knob grid a
+  strategy declares and DoE/BO read. It is vocabulary two layers share (the product's
+  strategy catalogue and the laboratory), which is why it lives here and not in
+  `bayesopt`; `bayesopt.models` re-exports the names for one release.
 - Identity and fingerprint primitives and the contract-version registry remain future
   candidates under [ADR 0002](decisions/0002-contract-versioning.md); they are not moved by
   this extraction.

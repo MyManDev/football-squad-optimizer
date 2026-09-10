@@ -37,7 +37,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Final
 
-from squadopt.bayesopt import BayesianFactor, FactorKind
+from squadopt.contracts import BayesianFactor, FactorKind
 from squadopt.planning.models import CHIP_NAMES
 
 
