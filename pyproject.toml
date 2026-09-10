@@ -153,8 +153,6 @@ ignore_imports = [
     "squadopt.application.rotation_export -> squadopt.experiments.shadow_report",
     # CandidatePlan / select_plan / selection_to_dict -> squadopt.live (plan_selection PR)
     "squadopt.application.mode_selection -> squadopt.experiments.plan_selection",
-    # BayesianFactor / FactorKind knob vocabulary -> squadopt.contracts (knob vocabulary PR)
-    "squadopt.application.strategies.catalog -> squadopt.bayesopt",
 ]
 
 [[tool.importlinter.contracts]]
