@@ -31,6 +31,7 @@ from squadopt.application.league_views import (
     PUBLISHED_NAME_LIMIT,
     MemberStanding,
     build_league_views,
+    published_member_name,
 )
 from squadopt.application.strategies.catalog import (
     FORBIDDEN_FIELD_PATTERN,
@@ -266,6 +267,49 @@ def test_a_member_typed_name_cannot_carry_anything_into_the_published_tree(
     assert "team_name: replaced with 'entry-101'" in reasons[101]
     assert f"team_name: truncated to {PUBLISHED_NAME_LIMIT} characters" in reasons[202]
     assert "manager_name: replaced with 'entry-202'" in reasons[202]
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        # An adjective and a surname that merely open with the noun "şans", and a
+        # phrase that contains "yüzde" while meaning "for that reason". Each was
+        # published as the entry's id while the Turkish alternatives carried a leading
+        # word boundary only.
+        pytest.param("Şansl\u0131", id="adjective-sansli"),
+        pytest.param("Şansal", id="surname-sansal"),
+        pytest.param("Bu Yüzden", id="phrase-bu-yuzden"),
+    ],
+)
+def test_a_turkish_name_that_only_contains_a_chance_word_is_published_unchanged(raw: str) -> None:
+    """Nothing here reads as a chance, so the producer hands the name on byte for byte
+    and says nothing about it: a refusal note on a legitimate name is a false claim."""
+
+    assert published_member_name(raw, entry_id=7, field="team_name") == (raw, "")
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        # The bare words the new boundaries delimit, and the inflections that are still
+        # the forbidden word rather than a name: ``olas\u0131l\u0131\u011f\u0131`` is the
+        # one an earlier, narrower stem let through.
+        pytest.param("şans", id="sans"),
+        pytest.param("Yüzde 72", id="yuzde-72"),
+        pytest.param("yüzde", id="yuzde"),
+        pytest.param("ihtimali", id="ihtimali"),
+        pytest.param("ihtimalle", id="ihtimalle"),
+        pytest.param("olas\u0131l\u0131\u011f\u0131", id="olasiligi"),
+        pytest.param("Kazanma olas\u0131l\u0131\u011f\u0131 y\u00fcksek", id="olasiligi-sentence"),
+    ],
+)
+def test_a_turkish_chance_word_is_still_refused_whole_or_inflected(raw: str) -> None:
+    """The other half of the same rule. Narrowing the false refusals above must not open
+    a true one, so each of these still publishes as the entry's id, with the reason."""
+
+    published, note = published_member_name(raw, entry_id=7, field="team_name")
+    assert published == "entry-7"
+    assert "team_name: replaced with 'entry-7'" in note
 
 
 _DEADLINES = {
