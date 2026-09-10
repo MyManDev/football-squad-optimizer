@@ -411,6 +411,7 @@ def test_a_document_that_is_not_utf8_is_refused_rather_than_decoded_lossily() ->
     """
 
     document = RawDocument(
+        club="Chelsea",
         requested_url="https://club.example/latin1",
         final_url="https://club.example/latin1",
         http_status=200,
