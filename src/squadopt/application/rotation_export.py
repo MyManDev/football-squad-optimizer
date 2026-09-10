@@ -3,7 +3,7 @@
 import hashlib
 import os
 import secrets
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,13 +12,15 @@ from typing import Final
 import pandas as pd
 
 from squadopt.backtest.export_precision import EXPORT_LINE_TERMINATOR
-from squadopt.data.errors import DataError
+from squadopt.data.errors import DataError, InvalidValueError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.club_news import (
     FixtureClubNewsProvider,
     RawDocument,
 )
+from squadopt.data.sources.club_news_capture import CodedClub, read_club_news_capture
 from squadopt.data.sources.club_news_claims import ParsedClaim, parse_claim_response
+from squadopt.data.sources.club_news_coding import locate_claim_response
 from squadopt.experiments.shadow_report import write_document_once
 from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION,
@@ -33,15 +35,32 @@ _NAME_DIGEST_CHARACTERS: Final = 12
 
 @dataclass(frozen=True, slots=True)
 class RotationExportRequest:
+    """One export, and exactly one club-news source.
+
+    ``club_news_fixture`` and ``club_news_snapshot`` are alternatives, and exactly one must
+    be given. The fixture stands in for a source and is what the offline tests use; the
+    snapshot is a durable club-news capture, read from the same store as the decision
+    capture. Refusing both is not pedantry: "which source produced this evidence" is the
+    first question anyone asks of a row, and a precedence rule would answer it silently.
+    """
+
     season: str
     target_gameweek: int
     deadline_utc: str
     snapshot: str
     snapshot_root: Path
-    club_news_fixture: Path
+    club_news_fixture: Path | None
     output_dir: Path
     club_news_snapshot: str | None = None
     table_name: str | None = None
+
+    def __post_init__(self) -> None:
+        if (self.club_news_fixture is None) == (self.club_news_snapshot is None):
+            raise InvalidValueError(
+                "Name exactly one club-news source: a fixture path or a capture id. Both "
+                "would leave which one produced the evidence to a precedence rule, and "
+                "neither leaves the week with no claims and no way to say why."
+            )
 
 
 def export_rotation_evidence(
@@ -61,12 +80,96 @@ class _ClubNewsInputs:
     clubs_covered: tuple[str, ...]
 
 
-def _club_news_inputs(fixture_path: Path) -> _ClubNewsInputs:
-    """Read the documents, claims and model provenance from the club-news source.
+def _club_news_inputs(request: RotationExportRequest) -> _ClubNewsInputs:
+    """Read the documents, claims and model provenance from whichever source was named.
 
-    **The one construction site.** A real provider replaces the two lines that build and
-    query it; everything after them -- parsing, identity, the table, the manifest -- is
-    already the production path and no test of it moves.
+    **The one construction site**, and now with two sources behind it rather than one. Both
+    are pure: neither reaches a network nor calls a model. That is the whole shape of the
+    integration -- the network adapter writes a capture in ``platform``, and this layer reads
+    the capture. ``application`` therefore never imports ``platform``, and the import
+    contract enforces it rather than a comment asking for it.
+
+    Everything after this function -- locating, parsing, identity, the table, the manifest --
+    is one path regardless of which source was used, so a fixture run and a capture run are
+    the same production path with different bytes.
+    """
+
+    if request.club_news_snapshot is not None:
+        return _inputs_from_capture(
+            read_snapshot(request.snapshot_root, request.club_news_snapshot)
+        )
+    if request.club_news_fixture is None:  # pragma: no cover - __post_init__ refuses this
+        raise InvalidValueError("No club-news source was named.")
+    return _inputs_from_fixture(request.club_news_fixture)
+
+
+def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
+    """Rebuild a week's club-news inputs from a durable capture.
+
+    No network and no model: the documents and the raw responses come off the disk, the
+    quotes are located against those same bytes, and the claims are parsed from the located
+    result. Running this twice over one capture produces the same claims and the same table
+    digest, which is what makes a decision defensible after the fact.
+
+    **Responses are de-duplicated by their text before parsing.** One response can cover
+    several clubs -- the fixture answers once for all of them -- and parsing the same
+    response once per club would produce the same claim twice and refuse the week for a
+    duplication this function created. The provenance mapping still has an entry per club,
+    because that is a statement about which response coded which club and not about how
+    many distinct answers there were.
+    """
+
+    documents, coded, clubs_declared, clubs_covered = read_club_news_capture(snapshot)
+    if not coded:
+        raise DataError(
+            f"{snapshot.metadata.snapshot_id} carries documents but no model response, so "
+            "no claim can be read from it. A capture with nothing coded is a week that was "
+            "read and not asked about."
+        )
+
+    claims: list[ParsedClaim] = []
+    for text in dict.fromkeys(entry.response.text for entry in coded):
+        response = next(entry.response for entry in coded if entry.response.text == text)
+        claims.extend(parse_claim_response(locate_claim_response(response, documents), documents))
+
+    return _ClubNewsInputs(
+        documents=documents,
+        claims=tuple(claims),
+        model=_provenance_from_capture(coded),
+        clubs_declared=clubs_declared,
+        clubs_covered=clubs_covered,
+    )
+
+
+def _provenance_from_capture(coded: Sequence[CodedClub]) -> ClubModelProvenance:
+    """One provenance record per club, every field read from the capture.
+
+    Nothing here is derived from a convention or a default. The response digest is taken
+    over the stored bytes, the prompt digest is the one the capture recorded beside them, and
+    the requested and serving model identities are the two the response itself carries. A
+    week whose clubs disagree about any of the three is refused by
+    :class:`ClubModelProvenance`, not smoothed over here.
+    """
+
+    return ClubModelProvenance(
+        by_club={
+            entry.club: ModelProvenance(
+                identifier=entry.response.model_identifier,
+                version=entry.response.model_version,
+                prompt_sha256=entry.prompt_sha256,
+                response_sha256=hashlib.sha256(entry.response.text.encode("utf-8")).hexdigest(),
+            )
+            for entry in coded
+        }
+    )
+
+
+def _inputs_from_fixture(fixture_path: Path) -> _ClubNewsInputs:
+    """Read the same inputs from the committed synthetic fixture.
+
+    Kept, and not as a courtesy: every offline test of the evidence path runs through here,
+    and the fixture is the specification of the hard cases a live source cannot be relied on
+    to contain.
     """
 
     provider = FixtureClubNewsProvider(fixture_path)
@@ -206,7 +309,7 @@ def _decision_snapshot(root: Path, snapshot_id: str) -> CapturedSnapshot:
 
 def _export(arguments: RotationExportRequest, *, repository_commit: str) -> Mapping[str, object]:
     decision = _decision_snapshot(arguments.snapshot_root, arguments.snapshot)
-    club_news = _club_news_inputs(arguments.club_news_fixture)
+    club_news = _club_news_inputs(arguments)
     table = build_rotation_evidence_table(
         season=arguments.season,
         target_gameweek=arguments.target_gameweek,
