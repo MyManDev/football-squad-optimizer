@@ -212,7 +212,6 @@ lab. The contract `Product does not import the laboratory` in `pyproject.toml` s
 directly; the layers contract stays unchanged as the tie-break within each group.
 
 That contract started with eight `ignore_imports` entries, all in `application`, each annotated
-with the follow-up PR that removes it; two remain (`rotation_export` to `shadow_report`, the
-atomic-write PR; `strategies.catalog` to `bayesopt`, the knob vocabulary PR), and the PR that
-clears the last one deletes the list. The same rule applies as to the layers baseline: the list
-may only shrink, and a new violation fails the gate.
+with the follow-up PR that removed it. The last (`mode_selection` to `experiments.plan_selection`)
+left with the `plan_selection` move to `live`, and the list is gone: like the layers contract, it
+carries **zero** `ignore_imports` entries, and a new violation fails the gate.
