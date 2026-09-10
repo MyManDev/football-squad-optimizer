@@ -69,7 +69,7 @@ from squadopt.application.mode_selection import (
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.application.strategies.rule import RIVAL_RULE_STRATEGIES, suggest_strategy
 from squadopt.data.errors import DataError
-from squadopt.experiments.config import ExperimentError
+from squadopt.evaluation.promotion import ExperimentError
 from squadopt.live import (
     Projection,
     RecommendationInputs,

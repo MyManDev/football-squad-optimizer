@@ -183,3 +183,28 @@ those services.
 The original five-edge baseline was measured against `b031ef1` (PR #110). The shared-layer
 extraction verifies the zero-exception contract with `lint-imports`; behavior compatibility
 is covered by `tests/unit/test_layer_contracts.py` and the existing consumer suites.
+
+## The groups the order encodes
+
+The linear order above is one valid extension of a smaller structure. Read by role, the
+packages fall into five groups, each importing only groups below it:
+
+| Group | Packages |
+| --- | --- |
+| adapters | `api` |
+| runtime | `platform` |
+| use cases | `application` |
+| domain | `live`, `planning`, `optimization`, `evaluation`, `scenarios`, `uncertainty`, `risk`, `prediction`, `features` |
+| data | `data`, `contracts` |
+
+The measurement **laboratory** — `experiments`, `backtest`, `bayesopt`, `recalibration`,
+`preflight` — is a side tree, not a group in that column. It may import domain and data, and no
+product group (adapters, runtime, use cases, or domain) may import it. The linear order alone
+could not say this: it placed the laboratory below `application`, so the deployed advice worker
+was loading 43 laboratory modules, and a product decision (`plan_selection`) was living in the
+lab. The contract `Product does not import the laboratory` in `pyproject.toml` states the rule
+directly; the layers contract stays unchanged as the tie-break within each group.
+
+That contract carries eight `ignore_imports` entries, all in `application`, each annotated with
+the follow-up PR that removes it. The same rule applies as to the layers baseline: the list may
+only shrink, and a new violation fails the gate.
