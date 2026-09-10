@@ -83,6 +83,7 @@ from squadopt.live import (
     load_ledger,
     season_from_bootstrap,
 )
+from squadopt.live.ledger import write_atomic
 from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 
 SCOREBOARD_FILE: Final = "scoreboard.json"
@@ -739,9 +740,9 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
             f"scoreboard rows for gameweeks {list(kept)} rather than publishing none."
         )
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
-        json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n",
-        encoding="utf-8",
+    write_atomic(
+        target,
+        (json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8"),
     )
     return ScoreboardPublicationResult(
         snapshot_id,

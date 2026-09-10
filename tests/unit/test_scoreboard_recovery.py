@@ -104,7 +104,7 @@ def test_api_picks_use_codes_and_multipliers_and_require_reconciliation(
             {"element": player + 100, "position": player, "multiplier": 2 if player == 9 else 1}
             for player in range(1, 16)
         ],
-        "entry_history": {"points": gross + int(wrong_score)},
+        "entry_history": {"event": 1, "points": gross + int(wrong_score)},
     }
     source = replace(
         source, payloads={**source.payloads, "entry-7-picks-gw01.json": json.dumps(picks).encode()}
@@ -204,3 +204,43 @@ def test_surviving_advice_is_visible_but_unsettled_week_is_never_zero(
     assert advice["net"] is None
     assert advice["expected_net"] == 116
     assert all(value is None for value in advice["diagnostics"].values())
+
+
+@pytest.mark.parametrize(
+    "problem",
+    [
+        "gameweek",
+        "fractional_multiplier",
+        "negative_multiplier",
+        "duplicate_position",
+        "duplicate_mapping",
+    ],
+)
+def test_settled_picks_reject_corruption_even_when_points_could_reconcile(
+    tmp_path: Path, problem: str
+) -> None:
+    source = recovery_world(tmp_path)
+    picks = [
+        {"element": player + 100, "position": player, "multiplier": 0} for player in range(1, 16)
+    ]
+    document = {"picks": picks, "entry_history": {"event": 1, "points": 0}}
+    if problem == "gameweek":
+        document["entry_history"]["event"] = 2
+    elif problem == "fractional_multiplier":
+        picks[7]["multiplier"] = 0.5
+    elif problem == "negative_multiplier":
+        picks[7]["multiplier"] = -1
+    elif problem == "duplicate_position":
+        picks[0]["position"] = 2
+    elif problem == "duplicate_mapping":
+        bootstrap = json.loads(source.payloads[BOOTSTRAP_PAYLOAD])
+        bootstrap["elements"].append(bootstrap["elements"][0])
+        source = replace(
+            source, payloads={**source.payloads, BOOTSTRAP_PAYLOAD: json.dumps(bootstrap).encode()}
+        )
+    source = replace(
+        source,
+        payloads={**source.payloads, "entry-7-picks-gw01.json": json.dumps(document).encode()},
+    )
+    with pytest.raises(DataError):
+        settled_member_picks(source, gameweek=1, entry_id=7)

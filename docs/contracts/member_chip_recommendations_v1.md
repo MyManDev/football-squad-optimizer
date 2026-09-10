@@ -48,3 +48,18 @@ not a realized **whole-window** gain, nor evidence that the member followed it.
 
 Start-aware bench selection remains dependent on the producer's fitted start model.
 No start probability is fabricated while `START_TARGET_SUPPORTED_SEASONS` is empty.
+
+
+## Failure boundaries
+
+The application-level semantic validator is shared by publication, API reads and
+recorded settlement. It rejects contradictory play/hold fields, missing or invalid
+15-player lineups, captain metadata mismatches, overlapping chip windows, non-finite
+prices and horizons that differ from the parent advice. The browser applies the same
+relationships before rendering; legacy documents without the optional block still work.
+A play row must carry its complete frozen decision. An invalid block fails validation
+before the worker can cache its result; it is never silently converted into a hold.
+
+Chip comparison also checks configuration and horizon identity, the returned chip
+window, reconciled weekly hit charges and the no-chip control's solver stop reason.
+A wall-clock-stopped control or alternative cannot produce a published price.

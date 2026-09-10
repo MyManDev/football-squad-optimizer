@@ -23,6 +23,7 @@ from squadopt.data.sources.fpl_live import (
 )
 from squadopt.data.timestamps import as_instant
 from squadopt.live import infer_season
+from squadopt.live.ledger import write_atomic
 
 AVAILABILITY_FIELDS = ("status", "chance_of_playing_next_round", "news", "news_added")
 
@@ -212,8 +213,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             season=args.season,
         )
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(
-        json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8"
+    write_atomic(
+        args.out,
+        (json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8"),
     )
     return 0
 

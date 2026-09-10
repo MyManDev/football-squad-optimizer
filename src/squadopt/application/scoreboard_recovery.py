@@ -127,6 +127,7 @@ def load_publication_recovery(
             gameweek=4,
             entry_id=entry_id,
             deadline_utc=events[4]["deadline_time"],
+            as_of_utc=snapshot.metadata.captured_at_utc,
         )
         if record is None:
             continue
@@ -237,15 +238,28 @@ def settled_member_picks(
     """
     bootstrap = json.loads(snapshot.payloads[BOOTSTRAP_PAYLOAD])
     identities = {row["id"]: row["code"] for row in bootstrap["elements"]}
+    if len(identities) != len(bootstrap["elements"]) or len(set(identities.values())) != len(
+        identities
+    ):
+        raise DataError("Settled member identity mapping must be one-to-one.")
     outcomes = live_event_outcomes(
         snapshot.payloads[live_payload(gameweek)],
         snapshot.payloads[BOOTSTRAP_PAYLOAD],
         gameweek=gameweek,
     ).set_index("player_id")
     document = json.loads(snapshot.payloads[f"entry-{entry_id}-picks-gw{gameweek:02d}.json"])
+    if document["entry_history"].get("event") != gameweek:
+        raise DataError("Settled member picks name another gameweek.")
     picks = document["picks"]
     if len(picks) != 15 or len({pick["element"] for pick in picks}) != 15:
         raise DataError("Settled member picks must contain 15 distinct players.")
+    for pick in picks:
+        for name, low, high in (("position", 1, 15), ("multiplier", 0, 3)):
+            value = pick.get(name)
+            if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
+                raise DataError(f"Settled member pick has invalid {name}.")
+    if {pick["position"] for pick in picks} != set(range(1, 16)):
+        raise DataError("Settled member picks must occupy each position exactly once.")
     result = []
     for pick in picks:
         code = identities.get(pick["element"])
@@ -261,6 +275,9 @@ def settled_member_picks(
             }
         )
     gross = sum(row["points"] * row["multiplier"] for row in result)
-    if gross != document["entry_history"]["points"]:
+    reported_points = document["entry_history"]["points"]
+    if isinstance(reported_points, bool) or not isinstance(reported_points, int):
+        raise DataError("Settled entry-history points must be an integer.")
+    if gross != reported_points:
         raise DataError("Settled member picks do not reconcile to entry-history points.")
     return result

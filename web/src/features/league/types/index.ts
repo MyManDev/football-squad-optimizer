@@ -301,18 +301,16 @@ export interface MemberChipRecommendations {
     reason: "window_gain" | "no_positive_gain" | "outside_horizon";
     solver_status: string | null;
     optimality_gap: number | null;
-    decision:
-      | (Pick<
-          EntryAdvice,
-          | "captain"
-          | "vice_captain"
-          | "starting_xi"
-          | "bench"
-          | "chip"
-          | "expected_own_points"
-          | "transfer_hit_points"
-        > & { gameweek: number })
-      | null;
+    decision: {
+      gameweek: number;
+      captain: AdvicePlayer;
+      vice_captain: AdvicePlayer;
+      starting_xi: AdvicePlayer[];
+      bench: AdvicePlayer[];
+      chip: AdviceChip;
+      expected_own_points: number;
+      transfer_hit_points: number;
+    } | null;
   }[];
 }
 

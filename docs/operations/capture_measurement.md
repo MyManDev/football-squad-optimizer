@@ -42,3 +42,17 @@ For the weekly scoreboard, pass `--evidence-root <phase-b-artifacts>` and, when 
 `--baseline-ledger-root <frozen-component-only-ledger>` to `scripts.build_scoreboard`.
 The normal weekly publisher supplies its Phase B evidence root automatically.
 See [the comparison contract](../contracts/scoreboard_comparisons_v1.md).
+
+
+## Publication and replay failures
+
+Recovery selects advice published no later than the outcome capture being replayed,
+as well as enforcing the original pre-deadline cutoff. Later surviving advice cannot
+leak into an older replay. Settled picks must have a unique mapping of FPL IDs to
+player codes, positions 1 through 15, integral multipliers and the requested event;
+their weighted points must reconcile to the recorded integer gross score.
+
+Scoreboard, recovery and measurement outputs are serialized completely and replaced
+through the existing atomic-write primitive. A failed replacement preserves the last
+complete public file and removes the temporary file. This is atomic replacement,
+not a promise of durability after power loss or an archive backup.

@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 
+from squadopt.application.chip_contract import validate_chip_recommendations
 from squadopt.application.lineup_publication import lineup_fields
 from squadopt.live.chip_advice import ChipRecommendation
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY_ID
@@ -46,7 +47,7 @@ def chip_recommendation_payload(
                 "decision": decision,
             }
         )
-    return {
+    result = {
         "contract_version": "member_chip_recommendations_v1",
         "planning_policy_id": MEMBER_PLANNING_POLICY_ID,
         "gameweeks": [week.gameweek for week in control.weeks],
@@ -54,3 +55,5 @@ def chip_recommendation_payload(
         "control_optimality_gap": control.diagnostics.get("absolute_optimality_gap"),
         "comparisons": rows,
     }
+    validate_chip_recommendations(result, gameweeks=[week.gameweek for week in control.weeks])
+    return result

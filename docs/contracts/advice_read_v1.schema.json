@@ -172,29 +172,38 @@
                   "decision": {
                     "properties": {
                       "bench": {
-                        "$ref": "#/properties/payload/properties/bench"
+                        "$ref": "#/properties/payload/properties/bench",
+                        "maxItems": 4,
+                        "minItems": 4,
+                        "type": "array"
                       },
                       "captain": {
-                        "$ref": "#/properties/payload/properties/captain"
+                        "$ref": "#/properties/payload/properties/captain",
+                        "type": "object"
                       },
                       "chip": {
                         "$ref": "#/properties/payload/properties/chip"
                       },
                       "expected_own_points": {
-                        "$ref": "#/properties/payload/properties/expected_own_points"
+                        "type": "number"
                       },
                       "gameweek": {
                         "minimum": 1,
                         "type": "integer"
                       },
                       "starting_xi": {
-                        "$ref": "#/properties/payload/properties/starting_xi"
+                        "$ref": "#/properties/payload/properties/starting_xi",
+                        "maxItems": 11,
+                        "minItems": 11,
+                        "type": "array"
                       },
                       "transfer_hit_points": {
-                        "$ref": "#/properties/payload/properties/transfer_hit_points"
+                        "minimum": 0,
+                        "type": "number"
                       },
                       "vice_captain": {
-                        "$ref": "#/properties/payload/properties/vice_captain"
+                        "$ref": "#/properties/payload/properties/vice_captain",
+                        "type": "object"
                       }
                     },
                     "required": [

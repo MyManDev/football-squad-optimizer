@@ -40,12 +40,21 @@ def expected_chip_week_points(week: PlanningWeekResult) -> float:
 
 
 def _net(plan: TransferPlanResult) -> float:
+    if not plan.has_solution:
+        raise DataSourceError("A chip comparison requires a feasible plan.")
+    if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
+        raise SolverExecutionError("Chip comparison stopped at the wall-clock safety cap.")
+    week_hits = [week.transfer_hit_points for week in plan.weeks]
+    if any(not math.isfinite(value) or value < 0 for value in week_hits):
+        raise DataSourceError("A chip comparison requires finite non-negative weekly hit charges.")
     score, hits = (
         sum(expected_chip_week_points(week) for week in plan.weeks),
         plan.total_transfer_hit_points,
     )
     if score is None or hits is None or not math.isfinite(score) or not math.isfinite(hits):
         raise DataSourceError("A chip comparison requires finite projected points and hit charges.")
+    if not math.isclose(sum(week_hits), hits, rel_tol=0.0, abs_tol=1e-8):
+        raise DataSourceError("Chip comparison total hits disagree with its weekly charges.")
     return score - hits
 
 
@@ -97,15 +106,23 @@ def recommend_chips(
                 optimization=optimization,
                 chips=ChipAvailability(available={window.name: available}),
             )
-        if plan.horizon_fingerprint != control.horizon_fingerprint or plan.diagnostics.get(
-            "configuration_fingerprint"
-        ) != control.diagnostics.get("configuration_fingerprint"):
+        if tuple(week.gameweek for week in plan.weeks) != targets:
+            raise DataSourceError("Chip alternative returned a different horizon.")
+        if (
+            not control.diagnostics.get("configuration_fingerprint")
+            or plan.horizon_fingerprint != control.horizon_fingerprint
+            or plan.diagnostics.get("configuration_fingerprint")
+            != control.diagnostics.get("configuration_fingerprint")
+        ):
             raise DataSourceError(
                 "Chip alternatives need the same inputs and policy as their control."
             )
-        if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
-            raise SolverExecutionError("Chip comparison stopped at the wall-clock safety cap.")
-        chosen = next((week.gameweek for week in plan.weeks if week.chip == window.name), None)
+        played = [week for week in plan.weeks if week.chip is not None]
+        if len(played) > 1 or any(
+            week.chip != window.name or week.gameweek not in available for week in played
+        ):
+            raise DataSourceError("Chip alternative violates the requested chip window.")
+        chosen = played[0].gameweek if played else None
         gain = _net(plan) - control_net
         play = chosen is not None and gain > 0
         result.append(

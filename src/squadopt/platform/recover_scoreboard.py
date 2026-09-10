@@ -23,6 +23,7 @@ from squadopt.data.sources.fpl_live import (
     live_payload,
     scored_gameweeks,
 )
+from squadopt.live.ledger import write_atomic
 from squadopt.platform.fpl_capture import BASE_URL, fetch
 
 
@@ -126,8 +127,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         entry_ids=entry_ids,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(
-        json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8"
+    write_atomic(
+        args.out,
+        (json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8"),
     )
     print(
         json.dumps(

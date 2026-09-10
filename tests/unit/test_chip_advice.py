@@ -10,10 +10,11 @@ from tests.unit.test_member_windows import _window_world
 
 from squadopt.application.chip_publication import chip_recommendation_payload
 from squadopt.application.entries import held_squad_from_picks
+from squadopt.data.errors import DataSourceError
 from squadopt.live.chip_advice import expected_chip_week_points, recommend_chips
 from squadopt.live.rules import ChipWindow
 from squadopt.live.transfers import plan_transfer_horizon, plan_transfers
-from squadopt.optimization import OptimizationConfig
+from squadopt.optimization import OptimizationConfig, SolverExecutionError, SolverStatus
 from squadopt.planning import CHIP_NAMES
 
 world = _world
@@ -101,3 +102,58 @@ def test_window_places_triple_captain_in_the_later_high_scoring_week(
     assert items[0].gameweek == 3
     assert items[0].expected_gain is not None and items[0].expected_gain > 0
     assert all(week.chip is None for week in control.weeks)
+
+
+@pytest.mark.parametrize(
+    "corruption", ["wrong_week", "wrong_chip", "inconsistent_hits", "missing_policy"]
+)
+def test_inconsistent_solver_alternative_is_rejected(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch, corruption: str
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    rules = replace(rules, chips=tuple(row for row in rules.chips if row.name == "bboost"))
+    picks = _member_picks(world, 101, _legal_squad())
+    prices = dict(zip(projection.table["player_id"], projection.table["price_tenths"], strict=True))
+    held = held_squad_from_picks(picks, current_prices=prices)
+    control, _, _ = plan_transfers(inputs, projection, held, rules)
+    candidate = control
+    if corruption == "wrong_week":
+        candidate = replace(control, weeks=(replace(control.weeks[0], gameweek=99),))
+    elif corruption == "wrong_chip":
+        candidate = replace(control, weeks=(replace(control.weeks[0], chip="3xc"),))
+    elif corruption == "inconsistent_hits":
+        candidate = replace(control, total_transfer_hit_points=4.5)
+    else:
+        candidate = replace(
+            control, diagnostics={**control.diagnostics, "configuration_fingerprint": ""}
+        )
+    monkeypatch.setattr(
+        "squadopt.live.chip_advice.plan_transfers", lambda *a, **k: (candidate, None, None)
+    )
+    with pytest.raises(DataSourceError):
+        recommend_chips(inputs, projection, held, rules, control)
+
+
+def test_wall_clock_stopped_control_cannot_price_alternatives(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad())
+    prices = dict(zip(projection.table["player_id"], projection.table["price_tenths"], strict=True))
+    held = held_squad_from_picks(picks, current_prices=prices)
+    control, _, _ = plan_transfers(inputs, projection, held, rules)
+    control = replace(
+        control,
+        solver_status=SolverStatus.FEASIBLE,
+        diagnostics={
+            **control.diagnostics,
+            "deterministic_time_budget_exhausted": False,
+        },
+    )
+
+    def unexpected_solve(*args: Any, **kwargs: Any) -> Any:
+        pytest.fail("Stopped control must be refused before another solve")
+
+    monkeypatch.setattr("squadopt.live.chip_advice.plan_transfers", unexpected_solve)
+    with pytest.raises(SolverExecutionError, match="wall-clock"):
+        recommend_chips(inputs, projection, held, rules, control)

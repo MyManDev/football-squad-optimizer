@@ -90,3 +90,39 @@ def test_nan_outcome_is_refused() -> None:
     outcomes.loc[0, "minutes"] = float("nan")
     with pytest.raises(DataError, match="finite"):
         score_recorded_decision(decision, projections, outcomes)
+
+
+@pytest.mark.parametrize("hits", [float("nan"), float("inf"), -4, True, "4"])
+def test_invalid_hit_charges_are_refused(hits: object) -> None:
+    decision, projections, outcomes = decision_inputs()
+    decision["transfers"]["transfer_hit_points"] = hits
+    with pytest.raises(DataError, match="hit charges"):
+        score_recorded_decision(decision, projections, outcomes)
+
+
+@pytest.mark.parametrize(
+    "field", ["starting_xi_player_ids", "bench_player_ids", "squad_player_ids"]
+)
+def test_duplicate_frozen_identities_are_refused(field: str) -> None:
+    decision, projections, outcomes = decision_inputs()
+    decision[field][0] = decision[field][1]
+    with pytest.raises(DataError, match="duplicate"):
+        score_recorded_decision(decision, projections, outcomes)
+
+
+def test_numeric_outcomes_are_normalized_without_mutating_the_input() -> None:
+    decision, projections, outcomes = decision_inputs()
+    strings = outcomes.astype({"minutes": str, "total_points": str})
+    assert score_recorded_decision(decision, projections, strings) == score_recorded_decision(
+        decision, projections, outcomes
+    )
+    assert isinstance(strings.loc[0, "minutes"], str)
+
+
+@pytest.mark.parametrize("minutes", [90.5, True])
+def test_invalid_minute_values_are_not_appearances(minutes: object) -> None:
+    decision, projections, outcomes = decision_inputs()
+    outcomes["minutes"] = outcomes["minutes"].astype(object)
+    outcomes.loc[0, "minutes"] = minutes
+    with pytest.raises(DataError):
+        score_recorded_decision(decision, projections, outcomes)

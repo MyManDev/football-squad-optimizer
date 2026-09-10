@@ -6,6 +6,7 @@ from typing import Any
 
 import pandas as pd
 
+from squadopt.application.chip_contract import validate_chip_recommendations
 from squadopt.application.scoreboard_diagnostics import score_recorded_decision
 from squadopt.application.weekly_suggestion_eval import select_record
 from squadopt.data.snapshots import CapturedSnapshot
@@ -70,6 +71,9 @@ def recorded_chip_rows(
                 block = advice.get("chip_recommendations")
                 if block is None:
                     continue
+                validate_chip_recommendations(
+                    block, gameweeks=range(deadline.gameweek, deadline.gameweek + advice["window"])
+                )
                 for item in block["comparisons"]:
                     gameweek = item["gameweek"]
                     realized = None
