@@ -165,6 +165,7 @@ def main() -> int:
             handoff_path=arguments.in_season_projection,
             mode_residuals=arguments.mode_residuals,
             record_root=None if arguments.no_advice_record else Path(arguments.advice_record_root),
+            history_record_root=Path(arguments.advice_record_root),
             rival_menu=not arguments.no_rival_menu,
         )
         prepared = prepare_league_publication(request)
@@ -186,6 +187,11 @@ def main() -> int:
                 # Printing it is the only place an operator learns that a published name
                 # is not byte-for-byte what the capture held.
                 print(f"  note          {member.entry_id}  {member.reason}")
+        # A member this run did not render must not keep the last publish's document: the
+        # tree is checked out of origin/develop and committed as a union, so leaving it
+        # would serve a finished gameweek's advice under this week's league.
+        for path in report.removed:
+            print(f"  removed       {path}  (not produced by this run)")
         menu_files = sum(1 for name in report.files if "/vs-" in name)
         window_files = sum(1 for name in report.files if name.endswith(("/3.json", "/5.json")))
         print(

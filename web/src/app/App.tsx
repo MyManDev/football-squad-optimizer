@@ -35,6 +35,11 @@ const LeagueMemberPage = lazy(() =>
 const StatusPage = lazy(() =>
   import("../features/status/pages/StatusPage").then((m) => ({ default: m.StatusPage })),
 );
+const LeagueMemberHistoryPage = lazy(() =>
+  import("../features/league/pages/LeagueMemberHistoryPage").then((m) => ({
+    default: m.LeagueMemberHistoryPage,
+  })),
+);
 const AnalysisPage = lazy(() =>
   import("../features/analysis/pages/AnalysisPage").then((m) => ({ default: m.AnalysisPage })),
 );
@@ -68,6 +73,10 @@ function LocalizedApp({ basename }: { basename: string }) {
               <Route path="/league" element={<LeaguePage />} />
               <Route path="/league/members" element={<LeagueMembersPage />} />
               <Route path="/league/members/:entryId" element={<LeagueMemberPage />} />
+              <Route
+                path="/league/members/:entryId/history"
+                element={<LeagueMemberHistoryPage />}
+              />
               <Route path="/status" element={<StatusPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/analysis/:slug" element={<AnalysisPage />} />

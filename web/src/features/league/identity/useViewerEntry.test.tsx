@@ -1,4 +1,4 @@
-/** The viewer claim: stored in the browser, survives reload, never an identity. */
+/** The viewer claim: held in memory during navigation, never an identity. */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -7,10 +7,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { LeagueMembersView } from "../pages/LeagueMembersPage";
-import { readViewerEntry } from "./useViewerEntry";
+import { readViewerEntry, writeViewerEntry } from "./useViewerEntry";
 
 afterEach(cleanup);
-beforeEach(() => window.localStorage.clear());
+beforeEach(() => {
+  localStorage.clear();
+  writeViewerEntry(null);
+});
 
 function renderMembers() {
   return render(
@@ -49,12 +52,14 @@ describe("the viewer claim", () => {
     expect(screen.getByText("Sen")).toBeInTheDocument();
     expect(readViewerEntry()?.entryId).toBe(claimed);
 
-    fireEvent.click(screen.getByRole("button", { name: "Seçimi kaldır" }));
+    fireEvent.click(screen.getByRole("button", { name: "Seçimi Kaldır" }));
     expect(readViewerEntry()).toBeNull();
     expect(screen.queryByText("Sen")).not.toBeInTheDocument();
   });
 
-  it("a corrupted store reads as nobody selected", () => {
+  it("previous stored selections are ignored", () => {
+    window.localStorage.setItem("squadopt.viewer", JSON.stringify({ entryId: 35249001 }));
+    expect(readViewerEntry()).toBeNull();
     window.localStorage.setItem("squadopt.viewer", "{broken json");
     expect(readViewerEntry()).toBeNull();
     window.localStorage.setItem("squadopt.viewer", JSON.stringify({ entryId: -4 }));

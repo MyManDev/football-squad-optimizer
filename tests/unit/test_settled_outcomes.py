@@ -32,6 +32,7 @@ from squadopt.features.settled_outcomes import (
     build_settled_outcomes,
     read_settled_outcomes_artifact,
 )
+from squadopt.preflight.validator import compute_table_sha256
 
 SEASON = "2026-27"
 GAMEWEEK = 4
@@ -496,13 +497,62 @@ def test_re_running_is_a_no_op_that_returns_the_same_digest(root: Path, tmp_path
 
 
 def test_a_different_table_under_the_same_name_is_refused(root: Path, tmp_path: Path) -> None:
-    """Create-once: an artifact is never overwritten in place."""
+    """Create-once: an artifact is never overwritten in place, and the refusal names the
+    two digests so the reader can tell which bytes are on disk and which were refused."""
 
     output = tmp_path / "out"
-    table_path, _, _ = _write(root, output)
+    table_path, _, manifest = _write(root, output)
     table_path.write_text(table_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="never"):
+    with pytest.raises(RuntimeError, match="never") as refusal:
+        _write(root, output)
+    assert compute_table_sha256(table_path) in str(refusal.value)
+    assert str(manifest["table_sha256"]) in str(refusal.value)
+
+
+def test_a_replay_at_another_commit_is_accepted_and_the_first_manifest_stands(
+    root: Path, tmp_path: Path
+) -> None:
+    """Friday's run writes the pair at one commit; every later run of the week is at another.
+
+    The commit is provenance, not identity: the same two captures joined by the same code
+    contract give the same table bytes whatever revision ran the join, so the second run is
+    a replay and the first manifest stands, exactly as the advice record treats its clock.
+    """
+
+    output = tmp_path / "out"
+    table_path, manifest_path, first = _write(root, output)
+    before = table_path.read_bytes()
+    (pair,) = pair_captures(_captures(root))[0]
+
+    second = write_artifact(
+        _built(root),
+        output,
+        table_name(SEASON, pair),
+        pair=pair,
+        season=SEASON,
+        repository_commit="c" * 40,
+        generated_at_utc="2026-09-15T00:00:00Z",
+    )
+
+    assert second == first
+    assert second["repository_commit"] == COMMIT
+    assert table_path.read_bytes() == before
+    assert json.loads(manifest_path.read_text(encoding="utf-8")) == first
+
+
+def test_a_manifest_naming_another_capture_is_refused_with_the_field_named(
+    root: Path, tmp_path: Path
+) -> None:
+    """Identity fields still refuse: a manifest built from another capture is a different
+    artifact even when its table bytes happen to agree, and the message says which field."""
+
+    output = tmp_path / "out"
+    _, manifest_path, manifest = _write(root, output)
+    altered = {**manifest, "pre_deadline_snapshot_id": "fpl-live-20260101T000000Z-000000000000"}
+    manifest_path.write_text(json.dumps(altered), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="pre_deadline_snapshot_id"):
         _write(root, output)
 
 

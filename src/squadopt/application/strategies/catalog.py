@@ -105,22 +105,41 @@ _SAFETY_LANGUAGE: Final = re.compile(r"g[üu]venli|riskli?|safe|daha az riskli",
 FORBIDDEN_FIELD_PATTERN: Final = re.compile(r"probab|olas.l.k|quantile|spread|\bp_")
 
 #: The same rule applied to *text* rather than to field names, in both languages the
-#: site publishes. A field name is ours; a string may not be — a team name or a manager
-#: name is typed by a member and travels into ``members.json``, ``entries/{id}.json``
-#: and the page's own heading. The envelope is a property of what we publish, not of who
-#: wrote it, so this is what the producer refuses a name for and what the published
-#: sweep applies to every string in the tree.
+#: site publishes. Its subject is the text **this repository generates**: strategy names,
+#: notes, badges, rule copy, every string in the published tree that a member did not
+#: type. ``tests/unit/test_public_probability_guards.py`` sweeps the built tree with it.
+#:
+#: It is deliberately **not** applied to a member's own team name, manager name or
+#: registry label. Those are the member's words, chosen inside the game and public there
+#: once the deadline passes; they are not a claim this site makes, so the honesty envelope
+#: does not reach them and the producer publishes them as captured
+#: (``application/league_views.py``). The producer still normalises a name's *shape* —
+#: control characters, markup delimiters, length — because that is a safety question and
+#: not a question of wording.
 #:
 #: This is the web guard's ``AS_A_CHANCE`` set (``MemberDecisionControls.test.tsx``)
-#: with the repository's own ``P(`` and ``quantile`` beside it. The English words carry
-#: word boundaries because ``odds`` and ``chance`` are substrings of real surnames; the
-#: Turkish stems do not need them. The stem written ``olas\u0131l`` here — with the
-#: dotless i, which is why it is escaped — covers both the noun and the inflected form
-#: the narrower ``olas.l.k`` missed, and a Latin-alphabet name that merely contains
-#: "olas" cannot match it.
+#: with the repository's own ``P(`` and ``quantile`` beside it: one rule written twice.
+#:
+#: Some alternatives carry word boundaries — ``chances?``, ``likelihood``, ``odds``,
+#: ``\u015fans`` and ``y\u00fczde`` — while ``ihtimal`` and ``olas\u0131l`` stay stems.
+#: The boundaries were added while this pattern still read member-typed names, so that
+#: ``\u015eansl\u0131`` ("lucky"), the surname ``\u015eansal`` and ``Bu Y\u00fczden``
+#: ("for that reason") were not published as ``entry-<id>`` in place of the name a member
+#: chose. That reason is gone now that names are out of scope. The boundaries are left
+#: exactly as they are rather than re-tuned in the same change: widening them would move
+#: the guard on our own copy, and this change moves nothing there. Our own wording does
+#: not rely on them either way — the web tests hold it with an unbounded set.
+#:
+#: The dotless i and the soft g are escaped wherever they appear, here and in the pattern,
+#: because they are easy to misread as ``i`` and ``g``.
+#:
+#: The pattern is compiled from ``str``, so ``\b`` is the Unicode boundary and counts
+#: ``\u0131``, ``\u015f``, ``\u011f`` and ``\u00fc`` as word characters — measured,
+#: not assumed: under ``re.ASCII`` it would fall *inside* these words, and bare
+#: ``\u015fans`` would pass.
 FORBIDDEN_TEXT_PATTERN: Final = re.compile(
     r"%|\bP\(|probabilit|quantile|\bchances?\b|\blikelihood\b|\bodds\b"
-    "|\\bihtimal|\\b\u015fans|\\by\u00fczde|olas\u0131l",
+    "|\\bihtimal|\\b\u015fans\\b|\\by\u00fczde\\b|olas\u0131l",
     re.IGNORECASE,
 )
 

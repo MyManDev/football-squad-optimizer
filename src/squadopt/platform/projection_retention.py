@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from squadopt.live import InSeasonProjection, read_projection_handoff, write_projection_handoff
+from squadopt.platform._long_paths import addressable
 
 
 class ProjectionRetentionError(ValueError):
@@ -56,10 +57,14 @@ def _retain(root: Path, source: Path) -> Path:
         retained = read_projection_handoff(temporary)
         if retained.source_snapshot_id != projection.source_snapshot_id:
             raise ProjectionRetentionError("Handoff changed while retaining its capture identity.")
+        # os.link stays the primitive on both platforms: it is the one that fails with
+        # FileExistsError instead of overwriting, which is how create-once is enforced.
+        # Only the addressing differs - the retained name is long enough to fall outside
+        # Windows' MAX_PATH, and addressable() is what puts it back in range there.
         try:
-            os.link(temporary, target)
+            os.link(addressable(temporary), addressable(target))
         except FileExistsError:
-            if target.read_bytes() != raw:
+            if Path(addressable(target)).read_bytes() != raw:
                 raise ProjectionRetentionError(
                     f"Existing retained bytes are corrupt: {target}."
                 ) from None

@@ -60,7 +60,10 @@ SQUADOPT_BACKEND_SNAPSHOT_ROOT=/mnt/squadopt-inputs/snapshots
 SQUADOPT_BACKEND_HANDOFF_ROOT=/mnt/squadopt-inputs/handoffs
 
 # An allowlist, never a wildcard (ADR 0006). Empty means no cross-origin access at all.
-SQUADOPT_BACKEND_ALLOWED_ORIGINS=https://squadopt.pages.dev
+# Both published hostnames, canonical first: squadopt.mymandev.com is the address members
+# open, and the origin their browsers send. Keep it in step with SITE_ORIGINS in
+# src/squadopt/platform/backend_runtime.py — a test asserts this line matches it.
+SQUADOPT_BACKEND_ALLOWED_ORIGINS=https://squadopt.mymandev.com,https://squadopt.pages.dev
 
 # Part of every answer's identity. An image carries no .git, so the build stamps it in;
 # without it the backend refuses to fill a cache it could not name.
