@@ -28,17 +28,35 @@ from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION,
     FORBIDDEN_COLUMNS,
     ROTATION_EVIDENCE_COLUMNS,
+    ClubModelProvenance,
     ModelProvenance,
     build_rotation_evidence_table,
 )
 
 FIXTURE_PATH = Path(__file__).resolve().parents[2] / "data" / "sample" / "club_news_v1.fixture.json"
 
-MODEL = ModelProvenance(
-    identifier="synthetic-stub",
-    version="fixture-1",
-    prompt_sha256="a" * 64,
-    response_sha256="b" * 64,
+PROMPT_SHA256 = "a" * 64
+ARSENAL_RESPONSE_SHA256 = "b" * 64
+UNITED_RESPONSE_SHA256 = "c" * 64
+
+
+def _provenance(response_sha256: str) -> ModelProvenance:
+    return ModelProvenance(
+        identifier="synthetic-stub",
+        version="fixture-1",
+        prompt_sha256=PROMPT_SHA256,
+        response_sha256=response_sha256,
+    )
+
+
+#: Two clubs, two responses, deliberately different digests. Every test in this module
+#: therefore runs against the per-club path rather than a single digest that happens to be
+#: right everywhere -- which is how the aliasing this replaced went unnoticed.
+MODEL = ClubModelProvenance(
+    by_club={
+        "Arsenal": _provenance(ARSENAL_RESPONSE_SHA256),
+        "Man Utd": _provenance(UNITED_RESPONSE_SHA256),
+    }
 )
 CLUB_NEWS_SNAPSHOT_ID = "club-news-20260912T140500Z-0123456789ab"
 
@@ -411,3 +429,183 @@ def test_a_capture_missing_a_payload_the_table_reads_is_refused(
 
 def test_the_contract_version_is_stamped_on_every_row(table: pd.DataFrame) -> None:
     assert table["contract_version"].drop_duplicates().tolist() == [CONTRACT_VERSION]
+
+
+# --- provenance is per club -------------------------------------------------
+
+
+def test_two_clubs_rows_cite_two_different_responses(table: pd.DataFrame) -> None:
+    """The point of the change, stated as a test.
+
+    A model is called once per club, so a row's response digest has to be the digest of
+    *that* club's answer. When one digest was written across every row, an Arsenal player's
+    disposition carried a citation to bytes that never mentioned him -- and the digest looked
+    correct, which is the worst kind of wrong.
+    """
+
+    indexed = table.set_index("player_id")["model_response_sha256"]
+    arsenal = {indexed[identifier] for identifier in _players_of("Arsenal")}
+    united = {indexed[identifier] for identifier in _players_of("Man Utd")}
+
+    assert arsenal - {pd.NA} == {ARSENAL_RESPONSE_SHA256}
+    assert united - {pd.NA} == {UNITED_RESPONSE_SHA256}
+    assert ARSENAL_RESPONSE_SHA256 != UNITED_RESPONSE_SHA256
+
+
+def test_the_manifest_lists_every_response_the_week_holds(table: pd.DataFrame) -> None:
+    """Sorted, so two runs of the same week produce the same manifest."""
+
+    assert table.attrs["response_sha256s"] == tuple(
+        sorted((ARSENAL_RESPONSE_SHA256, UNITED_RESPONSE_SHA256))
+    )
+
+
+def test_the_instrument_stays_single_valued_on_every_row(table: pd.DataFrame) -> None:
+    """One question was asked, however many times it was asked.
+
+    ``prompt_sha256`` is a fact about the instrument and must not become per club just
+    because the responses did.
+    """
+
+    assert set(table["prompt_sha256"].dropna()) == {PROMPT_SHA256}
+    assert table.attrs["prompt_sha256"] == PROMPT_SHA256
+    assert set(table["model_identifier"].dropna()) == {"synthetic-stub"}
+
+
+def test_one_response_covering_several_clubs_is_listed_once(
+    provider: FixtureClubNewsProvider, claims: tuple[ParsedClaim, ...]
+) -> None:
+    """The fixture answers once for every club, and that is not two calls.
+
+    A manifest that listed the same digest twice would imply a second call there never was.
+    """
+
+    shared = _provenance(ARSENAL_RESPONSE_SHA256)
+    table = _build(
+        provider,
+        claims,
+        model=ClubModelProvenance(by_club={"Arsenal": shared, "Man Utd": shared}),
+    )
+
+    assert table.attrs["response_sha256s"] == (ARSENAL_RESPONSE_SHA256,)
+    assert set(table["model_response_sha256"].dropna()) == {ARSENAL_RESPONSE_SHA256}
+
+
+def test_a_claim_from_a_club_with_no_response_refuses_the_week(
+    provider: FixtureClubNewsProvider, claims: tuple[ParsedClaim, ...]
+) -> None:
+    """A disposition whose response cannot be named is traceable to no bytes at all.
+
+    Refused rather than written with some other club's digest beside it, which would hand a
+    member a citation into a response about different players.
+    """
+
+    with pytest.raises(DataSourceError, match="Man Utd"):
+        _build(
+            provider,
+            claims,
+            model=ClubModelProvenance(by_club={"Arsenal": _provenance(ARSENAL_RESPONSE_SHA256)}),
+        )
+
+
+def test_every_club_missing_a_response_is_named_at_once(
+    provider: FixtureClubNewsProvider, claims: tuple[ParsedClaim, ...]
+) -> None:
+    """Whoever wired the provenance up wants the whole list, not the first club found."""
+
+    with pytest.raises(DataSourceError) as error:
+        _build(
+            provider,
+            claims,
+            model=ClubModelProvenance(by_club={"Everton": _provenance(ARSENAL_RESPONSE_SHA256)}),
+        )
+
+    assert "Arsenal" in str(error.value)
+    assert "Man Utd" in str(error.value)
+
+
+def test_a_week_coded_by_two_models_is_refused() -> None:
+    """The manifest states one model, so a mixture is not something it can express.
+
+    Same reason the coding call declares no fallback: a week whose claims came from
+    somewhere other than the model the manifest names is not a week anyone can check.
+    """
+
+    other = ModelProvenance(
+        identifier="another-model",
+        version="fixture-1",
+        prompt_sha256=PROMPT_SHA256,
+        response_sha256=UNITED_RESPONSE_SHA256,
+    )
+
+    with pytest.raises(InvalidValueError, match="disagree about identifier"):
+        ClubModelProvenance(
+            by_club={"Arsenal": _provenance(ARSENAL_RESPONSE_SHA256), "Man Utd": other}
+        )
+
+
+def test_a_week_asked_two_different_questions_is_refused() -> None:
+    """Two prompts are two measurements, and the manifest digests one."""
+
+    other = ModelProvenance(
+        identifier="synthetic-stub",
+        version="fixture-1",
+        prompt_sha256="d" * 64,
+        response_sha256=UNITED_RESPONSE_SHA256,
+    )
+
+    with pytest.raises(InvalidValueError, match="disagree about prompt_sha256"):
+        ClubModelProvenance(
+            by_club={"Arsenal": _provenance(ARSENAL_RESPONSE_SHA256), "Man Utd": other}
+        )
+
+
+def test_a_week_served_by_two_model_versions_is_refused() -> None:
+    """A request naming an alias can be served by a snapshot, and two snapshots are a mixture."""
+
+    other = ModelProvenance(
+        identifier="synthetic-stub",
+        version="fixture-2",
+        prompt_sha256=PROMPT_SHA256,
+        response_sha256=UNITED_RESPONSE_SHA256,
+    )
+
+    with pytest.raises(InvalidValueError, match="disagree about version"):
+        ClubModelProvenance(
+            by_club={"Arsenal": _provenance(ARSENAL_RESPONSE_SHA256), "Man Utd": other}
+        )
+
+
+def test_provenance_naming_no_club_is_refused() -> None:
+    """A week in which no club was coded carries no provenance, not an empty one."""
+
+    with pytest.raises(InvalidValueError, match="at least one club"):
+        ClubModelProvenance(by_club={})
+
+
+def test_a_club_must_be_named() -> None:
+    """A blank key cannot be matched against a roster's club, so it is refused on the way in."""
+
+    with pytest.raises(InvalidValueError, match="must be named"):
+        ClubModelProvenance(by_club={"  ": _provenance(ARSENAL_RESPONSE_SHA256)})
+
+
+def test_the_mapping_is_copied_on_construction() -> None:
+    """A caller editing its own dict afterwards would be editing a written manifest."""
+
+    supplied = {"Arsenal": _provenance(ARSENAL_RESPONSE_SHA256)}
+    model = ClubModelProvenance(by_club=supplied)
+
+    supplied["Man Utd"] = _provenance(UNITED_RESPONSE_SHA256)
+
+    assert set(model.by_club) == {"Arsenal"}
+    assert model.response_sha256s == (ARSENAL_RESPONSE_SHA256,)
+
+
+def test_asking_for_an_uncoded_clubs_response_refuses_rather_than_guessing() -> None:
+    """Reached directly, because the table's own check runs before the rows are built."""
+
+    model = ClubModelProvenance(by_club={"Arsenal": _provenance(ARSENAL_RESPONSE_SHA256)})
+
+    with pytest.raises(DataSourceError, match="Everton"):
+        model.response_sha256_for("Everton")

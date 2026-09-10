@@ -87,7 +87,7 @@ letting a reader assume the check is stronger than it is.
 | 23 | `rotation_claim_speaker` | string, closed | `manager` / `club_official` / `club_statement` / `unattributed`. Never a person's name |
 | 24 | `model_identifier` | string | no model was involved in this row |
 | 25 | `prompt_sha256` | string | no model was involved |
-| 26 | `model_response_sha256` | string | no model was involved, or it said nothing about him |
+| 26 | `model_response_sha256` | string | no model was involved, or it said nothing about him. **This player's club's** response — see below |
 | 27 | `model_evidence_observed` | boolean | **never absent.** False = the model produced no disposition for him at all |
 | 28 | `fixture_context_midweek` | boolean | **never absent** — the calendar could not answer, so the build refused instead |
 
@@ -104,6 +104,29 @@ become a number.
 They are computed independently and they agree on every row today, because the model is
 currently the only source of a disposition. They are kept apart because a later feed-derived
 disposition would set 16 without 27, and a table that had aliased them could not say so.
+
+### Provenance is per club, and the instrument is not
+
+A model is called once per club, so a week holds as many responses as clubs it read. Column 26
+is the digest of **that player's club's** response. A single digest written across every row
+would give an Arsenal player a citation into bytes that never mentioned him — and the digest
+would verify, which is the worst kind of wrong.
+
+Columns 24 and 25 stay single-valued. Which model answered and which question it was asked are
+facts about the instrument, not about a club, and the manifest states one of each. A week
+answered by two models, served by two model versions, or asked under two prompts is therefore
+**refused** rather than recorded: it is a mixture the manifest cannot express, and a week whose
+claims came from somewhere other than the model the manifest names is not a week anyone can
+check. Same reasoning as the coding call's refusal to declare a fallback model.
+
+The manifest's `response_sha256s` lists every response the week holds, sorted and without
+repeats. Deduplicated because one response can legitimately cover several clubs — the fixture
+provider answers once for all of them — and listing the same digest twice would imply a second
+call there never was.
+
+A claim placed on a player whose club has no recorded response refuses the whole week, naming
+every such club at once. A disposition whose response cannot be named is traceable to no bytes
+at all.
 
 ### `feed_news_state`, and why three
 
