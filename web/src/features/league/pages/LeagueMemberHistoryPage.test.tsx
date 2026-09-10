@@ -7,6 +7,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { type Language, MESSAGES } from "../../../i18n/messages";
 import type { SuggestionHistory } from "../history/historyData";
 import { LeagueMemberHistoryView } from "./LeagueMemberHistoryPage";
+import { mockSuggestionOverview } from "../../../fixtures/weeklySuggestionOverview";
 
 afterEach(cleanup);
 const history = () => structuredClone(fixture) as SuggestionHistory;
@@ -22,9 +23,10 @@ function show(value = history(), language: Language = "tr") {
 
 it.each<Language>(["tr", "en"])(
   "shows gross, costs, net and a signed comparison in %s",
-  (language) => {
+  async (language) => {
     show(history(), language);
     const copy = MESSAGES[language].suggestionHistory;
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: copy.week }), "4");
     expect(screen.getByRole("heading", { name: copy.title })).toBeInTheDocument();
     const table = screen.getByRole("region", { name: copy.title });
     const rows = within(table).getAllByRole("row");
@@ -39,7 +41,7 @@ it.each<Language>(["tr", "en"])(
   },
 );
 
-it("labels unknown actual scores without suggesting a zero-point result", () => {
+it("labels unknown actual scores without suggesting a zero-point result", async () => {
   const value = history();
   Object.assign(value.payload.weeks[0], {
     actual: null,
@@ -47,6 +49,7 @@ it("labels unknown actual scores without suggesting a zero-point result", () => 
     actual_reason: "actual_score_missing",
   });
   show(value);
+  await userEvent.selectOptions(screen.getByRole("combobox"), "4");
   expect(screen.getByText(MESSAGES.tr.suggestionHistory.actualMissing)).toBeInTheDocument();
   const table = screen.getByRole("region", { name: MESSAGES.tr.suggestionHistory.title });
   expect(within(table).getAllByText("—")).toHaveLength(3);
@@ -66,12 +69,32 @@ it("switches only between recorded weeks and hides unsettled scores", async () =
   });
   show(value);
   const copy = MESSAGES.tr.suggestionHistory;
+  expect(screen.getByRole("combobox")).toHaveValue("overview");
+  await userEvent.selectOptions(screen.getByRole("combobox"), "5");
   expect(screen.getByText(copy.unsettled)).toBeInTheDocument();
   expect(screen.queryByRole("table")).not.toBeInTheDocument();
-  expect(screen.getAllByRole("option")).toHaveLength(2);
+  expect(screen.getAllByRole("option")).toHaveLength(3);
   await userEvent.selectOptions(screen.getByRole("combobox", { name: copy.week }), "4");
   expect(screen.getAllByRole("table")).toHaveLength(2);
   expect(screen.queryByText(copy.unsettled)).not.toBeInTheDocument();
+});
+
+it("opens all recorded weeks by default, shows totals, and returns from a selected week", async () => {
+  show(mockSuggestionOverview());
+  const overview = screen.getByRole("region", { name: "Genel bakış" });
+  expect(within(overview).getAllByRole("row")).toHaveLength(13);
+  expect(
+    within(within(overview).getByRole("row", { name: /^Toplam/ }))
+      .getAllByRole("cell")
+      .map((cell) => cell.textContent),
+  ).toEqual(["624,0", "610,0", "+14,0", "+14,0"]);
+  expect(screen.getByText("11 kayıtlı haftanın 9 tanesi karşılaştırıldı")).toBeInTheDocument();
+  await userEvent.click(within(overview).getByRole("button", { name: "Oyun haftası 5" }));
+  expect(screen.getByRole("combobox")).toHaveValue("5");
+  expect(screen.queryByRole("region", { name: "Genel bakış" })).not.toBeInTheDocument();
+  expect(screen.getByText("Önerinin neti − üyenin neti:")).toHaveTextContent("+6,0");
+  await userEvent.selectOptions(screen.getByRole("combobox"), "overview");
+  expect(screen.getByRole("region", { name: "Genel bakış" })).toBeInTheDocument();
 });
 
 it("shows no-record state without creating any historical weeks", () => {

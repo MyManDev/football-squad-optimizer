@@ -13,6 +13,7 @@ import {
   type WeekReview,
 } from "../history/historyData";
 import styles from "./LeagueMemberHistoryPage.module.css";
+import { summarizeHistory } from "../history/historySummary";
 
 export function LeagueMemberHistoryPage() {
   const { messages } = useLanguage();
@@ -53,7 +54,7 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
   const { entry_id: entryId, weeks, season } = history.payload;
   const [selected, setSelected] = useState<number | null>(null);
   const ordered = [...weeks].sort((a, b) => b.gameweek - a.gameweek);
-  const week = ordered.find((item) => item.gameweek === selected) ?? ordered[0];
+  const week = ordered.find((item) => item.gameweek === selected);
   return (
     <div className={styles.page}>
       <header>
@@ -67,7 +68,7 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
           {copy.outcomeAsOf}: {utcShort(history.generated_at_utc, locale)}
         </p>
       </header>
-      {!week ? (
+      {weeks.length === 0 ? (
         <EmptyState title={copy.empty}>
           <p>{copy.emptyBody}</p>
         </EmptyState>
@@ -76,9 +77,12 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
           <label className={styles.selector}>
             {copy.week}
             <select
-              value={week.gameweek}
-              onChange={(event) => setSelected(Number(event.target.value))}
+              value={week?.gameweek ?? "overview"}
+              onChange={(event) =>
+                setSelected(event.target.value === "overview" ? null : Number(event.target.value))
+              }
             >
+              <option value="overview">{copy.overview}</option>
               {ordered.map((item) => (
                 <option key={item.gameweek} value={item.gameweek}>
                   {messages.common.gameweek(item.gameweek)}
@@ -86,13 +90,94 @@ export function LeagueMemberHistoryView({ history }: { history: SuggestionHistor
               ))}
             </select>
           </label>
-          <WeekResult week={week} />
+          {week ? (
+            <WeekResult week={week} />
+          ) : (
+            <HistoryOverview weeks={weeks} onSelect={setSelected} />
+          )}
         </>
       )}
       <Card tone="muted">
         <p className={styles.muted}>{copy.method}</p>
       </Card>
     </div>
+  );
+}
+
+function HistoryOverview({
+  weeks,
+  onSelect,
+}: {
+  weeks: WeekReview[];
+  onSelect: (week: number) => void;
+}) {
+  const { messages, locale } = useLanguage();
+  const copy = messages.suggestionHistory;
+  const summary = summarizeHistory(weeks);
+  const format = (value: number | null | undefined) =>
+    value == null ? "—" : points(value, 1, locale);
+  const signed = (value: number | null) => (value === null ? "—" : signedPoints(value, 1, locale));
+  return (
+    <Card title={copy.overview} aside={copy.comparedWeeks(summary.compared, weeks.length)}>
+      <p className={styles.muted}>{copy.overviewNote}</p>
+      <div className={styles.overviewScroll} tabIndex={0} role="region" aria-label={copy.overview}>
+        <table className={styles.overviewTable}>
+          <thead>
+            <tr>
+              {[
+                copy.week,
+                copy.systemNet,
+                copy.memberNet,
+                copy.weekDifference,
+                copy.cumulative,
+              ].map((label) => (
+                <th key={label} scope="col">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {summary.rows.map(({ week, cumulative }) => (
+              <tr key={week.gameweek}>
+                <th scope="row">
+                  <button
+                    type="button"
+                    className={styles.weekLink}
+                    onClick={() => onSelect(week.gameweek)}
+                    aria-label={messages.common.gameweek(week.gameweek)}
+                  >
+                    {messages.common.gameweekShort(week.gameweek)}
+                  </button>
+                  {week.status !== "available" && (
+                    <span className={styles.rowStatus}>
+                      {week.status === "unsettled" ? copy.unsettled : copy.unavailable}
+                    </span>
+                  )}
+                  {week.status === "available" && !week.actual && (
+                    <span className={styles.rowStatus}>{copy.actualNotRecorded}</span>
+                  )}
+                </th>
+                <td>{format(week.status === "available" ? week.suggested?.net_points : null)}</td>
+                <td>{format(week.status === "available" ? week.actual?.net_points : null)}</td>
+                <td>{signed(week.status === "available" ? week.net_difference : null)}</td>
+                <td>{signed(cumulative)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">{copy.total}</th>
+              <td>{format(summary.suggested)}</td>
+              <td>{format(summary.actual)}</td>
+              <td>{signed(summary.difference)}</td>
+              <td>{signed(summary.difference)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p className={styles.muted}>{copy.totalNote}</p>
+    </Card>
   );
 }
 

@@ -53,6 +53,22 @@ page provides a recorded-week selector, score comparison, player details and exp
 source timestamps/digests. Missing files, unfinished results and unreadable records
 have distinct states. Its loader never falls back to example data.
 
+The default view is now an overview ordered by gameweek, with suggested net points,
+the member's actual net points, weekly difference and cumulative difference. The
+table scrolls vertically as weeks accumulate and horizontally on narrow screens;
+week labels, column headings and totals remain visible inside the scroll area.
+Click a week or use the selector for its detailed result; select Overview to return.
+Totals include exactly the same weeks on both sides: only those with both final
+scores. Missing/unfinished weeks stay visible but do not contribute to totals.
+With no comparable weeks, totals are unknown rather than zero.
+
+The overview follow-up passed 26 focused web tests and three Chromium acceptance
+tests, including scrolling, mobile layout, accessibility and switching views.
+Its synthetic fixture covers GW4–14: nine comparable weeks total 624 suggested
+points against 610 actual points, a +14 difference; GW12 lacks the member result
+and GW14 is unfinished. This fixture is used only by tests and a clearly labelled,
+separate local mock preview. It is not imported by the production UI.
+
 `generated_at_utc` in this derived contract denotes the input capture cutoff for
 outcomes, shown as the result-data date. The original advice publication timestamp
 remains separate and can be later than its input capture.

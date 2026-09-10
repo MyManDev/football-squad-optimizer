@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import fixture from "../src/fixtures/weeklySuggestionHistory.json" with { type: "json" };
 import { installLeagueMocks } from "./leagueMocks";
+import { mockSuggestionOverview } from "../src/fixtures/weeklySuggestionOverview";
 
 test.beforeEach(async ({ page }) => {
   // These acceptance tests are offline; a remote font must not hold document load open.
@@ -24,6 +25,7 @@ test("member can open recorded history and inspect the Python-scored result on m
   await page.getByRole("link", { name: "Haftalık öneri geçmişi" }).click();
   await expect(page).toHaveURL(/\/35249001\/history$/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Haftalık öneri geçmişi");
+  await page.getByRole("combobox", { name: "Kayıtlı hafta" }).selectOption("4");
   await expect(page.getByText("Önerinin neti − üyenin neti:")).toContainText("−2,0");
   await expect(page.getByRole("row", { name: /Player 8 MID/ })).toContainText("×2");
   await page.getByText("Kayıt ayrıntıları", { exact: true }).click();
@@ -55,6 +57,7 @@ test("unsettled, missing and invalid publications never display an invented comp
   });
   await page.route("**/data/league/history/101.json", (route) => route.fulfill({ json: pending }));
   await page.goto("/league/members/101/history");
+  await page.getByRole("combobox", { name: "Kayıtlı hafta" }).selectOption("4");
   await expect(page.getByText("Sonuç kesinleşmedi", { exact: true })).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(0);
   await page.unroute("**/data/league/history/101.json");
@@ -71,4 +74,48 @@ test("unsettled, missing and invalid publications never display an invented comp
   await expect(page.getByText("Geçmiş doğrulanamadı", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Yeniden dene" })).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(0);
+});
+
+test("overview accumulates weeks, preserves totals while scrolling and opens weekly detail", async ({
+  page,
+}, testInfo) => {
+  await page.route("**/data/league/history/101.json", (route) =>
+    route.fulfill({ json: mockSuggestionOverview() }),
+  );
+  await page.goto("/league/members/101/history");
+  const overview = page.getByRole("region", { name: "Genel bakış" });
+  await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("624,0");
+  await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("610,0");
+  await expect(overview.getByRole("row", { name: /^Toplam/ })).toContainText("+14,0");
+  await expect(
+    overview
+      .getByRole("row")
+      .filter({ has: page.getByRole("button", { name: "Oyun haftası 4", exact: true }) }),
+  ).toContainText("−2,0");
+  await expect(
+    overview
+      .getByRole("row")
+      .filter({ has: page.getByRole("button", { name: "Oyun haftası 5", exact: true }) }),
+  ).toContainText("+4,0");
+  expect(await overview.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
+    true,
+  );
+  await overview.scrollIntoViewIfNeeded();
+  await overview.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(overview.getByRole("button", { name: "Oyun haftası 14" })).toBeVisible();
+  await expect(overview.getByRole("rowheader", { name: "Toplam", exact: true })).toBeInViewport();
+  await page.screenshot({ path: testInfo.outputPath("overview-desktop.png"), fullPage: true });
+  await page.getByRole("combobox").selectOption("5");
+  await expect(page.getByText("Önerinin neti − üyenin neti:")).toContainText("+6,0");
+  await page.getByRole("combobox").selectOption("overview");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await overview.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+  });
+  await expect(overview.getByRole("button", { name: "Oyun haftası 4" })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath("overview-mobile.png"), fullPage: true });
 });

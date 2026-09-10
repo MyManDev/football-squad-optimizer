@@ -5,6 +5,19 @@ export type ReasonParams = Record<string, string | number | undefined>;
 const en = {
   suggestionHistory: {
     title: "Weekly suggestion history",
+    overview: "Overview",
+    systemNet: "System suggestion · net",
+    memberNet: "Member's squad · net",
+    weekDifference: "Weekly difference",
+    cumulative: "Cumulative difference",
+    total: "Total",
+    comparedWeeks: (compared: number, recorded: number) =>
+      `${compared} of ${recorded} recorded weeks compared`,
+    overviewNote:
+      "Weeks accumulate here in order. Select a week to inspect it. Member points are the final result of their actual FPL squad; all scores are net of transfer costs.",
+    totalNote:
+      "Difference = system suggestion − member's actual result. Totals and cumulative differences include only weeks with both final scores. Missing weeks are excluded from both totals, never counted as zero.",
+    actualNotRecorded: "Member result missing",
     back: "Back to member",
     week: "Recorded week",
     scope: "League 352490 · Last recorded pre-deadline pure-points suggestion for one gameweek.",
@@ -860,6 +873,19 @@ type MessageSchema<T> = {
 const tr: MessageSchema<typeof en> = {
   suggestionHistory: {
     title: "Haftalık öneri geçmişi",
+    overview: "Genel bakış",
+    systemNet: "Sistem tavsiyesi · net",
+    memberNet: "Kullanıcının kadrosu · net",
+    weekDifference: "Haftalık fark",
+    cumulative: "Birikimli fark",
+    total: "Toplam",
+    comparedWeeks: (compared, recorded) =>
+      `${recorded} kayıtlı haftanın ${compared} tanesi karşılaştırıldı`,
+    overviewNote:
+      "Haftalar burada sırayla birikir. Ayrıntılar için bir haftayı seçebilirsin. Kullanıcı puanı, FPL'de oynadığı gerçek kadronun sonucudur; tüm puanlar transfer cezası sonrasıdır.",
+    totalNote:
+      "Fark = sistem tavsiyesi − kullanıcının gerçek sonucu. Toplamlar ve birikimli fark yalnız iki sonucu da kesinleşmiş haftaları içerir. Eksik haftalar iki toplamın da dışında tutulur, sıfır sayılmaz.",
+    actualNotRecorded: "Kullanıcı sonucu kayıtlı değil",
     back: "Üyeye dön",
     week: "Kayıtlı hafta",
     scope: "Lig 352490 · Deadline öncesinde kaydedilmiş son bir haftalık saf puan önerisi.",
