@@ -18,6 +18,7 @@ and its types are the contract.
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Final
 
@@ -35,6 +36,93 @@ class AdviceDocumentError(ValueError):
 def advice_read_schema() -> dict[str, Any]:
     """The strict shape of one served advice document."""
 
+    player = {
+        "type": "object",
+        "properties": {
+            "player_id": {"type": "integer", "minimum": 1},
+            "name": {"type": "string"},
+            "short_name": {"type": "string"},
+            "position": {"enum": ["GK", "DEF", "MID", "FWD"]},
+            "team": {"type": "string"},
+            "expected_points": {"type": "number"},
+        },
+        "required": ["player_id", "name", "short_name", "position", "team"],
+    }
+    chip = {"enum": [None, "bboost", "3xc", "wildcard", "freehit"]}
+    plan_week = {
+        "type": "object",
+        "properties": {
+            "gameweek": {"type": "integer", "minimum": 1},
+            "transfers_in": {"type": "array", "items": player},
+            "transfers_out": {"type": "array", "items": player},
+            "transfer_hit_points": {"type": "number"},
+            "chip": chip,
+            "free_transfers_before": {"type": "integer", "minimum": 0},
+            "free_transfers_after": {"type": "integer", "minimum": 0},
+            "expected_points": {"type": "number"},
+        },
+        "required": [
+            "gameweek",
+            "transfers_in",
+            "transfers_out",
+            "transfer_hit_points",
+            "chip",
+            "free_transfers_before",
+            "free_transfers_after",
+            "expected_points",
+        ],
+    }
+    nullable_number = {"type": ["number", "null"]}
+    optional_fields: dict[str, Any] = {
+        name: {"type": "number"}
+        for name in (
+            "transfer_hit_points",
+            "expected_points_cost",
+            "expected_points_cost_ceiling",
+            "overlap_count",
+            "expected_gap_vs_rival",
+            "transfer_cap",
+            "overlap_target",
+            "overlap_applied",
+        )
+    }
+    optional_fields.update(
+        {
+            "source_snapshot_id": {"type": ["string", "null"]},
+            "rival_label": {"type": ["string", "null"]},
+            "rival_entry_id": {"type": "integer", "minimum": 1},
+            "solver_status": {"type": ["string", "null"]},
+            "control_solver_status": {"type": ["string", "null"]},
+            "optimality_gap": nullable_number,
+            "control_optimality_gap": nullable_number,
+            "expected_own_points": nullable_number,
+            "captain_agreement": {"type": "boolean"},
+            "captain": {"anyOf": [player, {"type": "null"}]},
+            "vice_captain": {"anyOf": [player, {"type": "null"}]},
+            "starting_xi": {"type": ["array", "null"], "items": player},
+            "bench": {"type": ["array", "null"], "items": player},
+            "chip": chip,
+            "plan_weeks": {"type": ["array", "null"], "items": plan_week},
+            "stated_limits": {"type": ["array", "null"], "items": {"type": "string"}},
+            "plan_kind": {"enum": ["within_free_transfers", "with_hits"]},
+            "alternative_plan": {
+                "type": ["object", "null"],
+                "properties": {
+                    "kind": {"enum": ["within_free_transfers", "with_hits"]},
+                    "overlap_applied": {"type": "number"},
+                    "transfer_hit_points": nullable_number,
+                    "expected_points_cost": {"type": "number"},
+                    "expected_points_cost_ceiling": {"type": "number"},
+                },
+                "required": [
+                    "kind",
+                    "overlap_applied",
+                    "transfer_hit_points",
+                    "expected_points_cost",
+                ],
+            },
+        }
+    )
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://squadopt.dev/contracts/advice_read_v1.schema.json",
@@ -43,7 +131,7 @@ def advice_read_schema() -> dict[str, Any]:
         "properties": {
             "contract_version": {"type": "string", "const": "provisional_league_ui_v1"},
             "generated_at_utc": {"type": "string", "pattern": "Z$"},
-            "source_kind": {"type": "string"},
+            "source_kind": {"enum": ["live", "example"]},
             "payload": {
                 "type": "object",
                 "properties": {
@@ -53,9 +141,31 @@ def advice_read_schema() -> dict[str, Any]:
                     "league_id": {"type": "integer", "minimum": 1},
                     "mode": {"type": "string"},
                     "window": {"type": "integer", "enum": [1, 3, 5]},
-                    "moves": {"type": "array"},
-                    "data_quality": {"type": "string"},
+                    "moves": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "move_id": {"type": "string"},
+                                "player_out": {"anyOf": [player, {"type": "null"}]},
+                                "player_in": {"anyOf": [player, {"type": "null"}]},
+                                "expected_points_delta": {"type": "number"},
+                                "reason_code": {
+                                    "enum": ["window_value", "mode_tradeoff", "points_gain"]
+                                },
+                            },
+                            "required": [
+                                "move_id",
+                                "player_out",
+                                "player_in",
+                                "expected_points_delta",
+                                "reason_code",
+                            ],
+                        },
+                    },
+                    "data_quality": {"enum": ["complete", "partial", "empty"]},
                     "missing_fields": {"type": "array", "items": {"type": "string"}},
+                    **optional_fields,
                 },
                 "required": [
                     "season",
@@ -106,14 +216,25 @@ def validate_advice_document(raw: bytes) -> None:
     """Refuse bytes that do not carry the versioned advice shape."""
 
     try:
-        document = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        document = json.loads(raw, parse_constant=_invalid_number, parse_float=_finite_float)
+    except (UnicodeDecodeError, ValueError) as error:
         raise AdviceDocumentError("The advice document is not valid JSON.") from error
     errors = sorted(_ADVICE_VALIDATOR.iter_errors(document), key=str)
     if errors:
         raise AdviceDocumentError(
             f"The advice document violates advice_read_v1: {errors[0].message}"
         )
+
+
+def _invalid_number(value: str) -> None:
+    raise ValueError(f"Non-finite JSON number: {value}.")
+
+
+def _finite_float(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("The JSON number is outside the finite range.")
+    return number
 
 
 def validate_league_state(document: dict[str, object]) -> None:

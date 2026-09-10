@@ -412,7 +412,14 @@ const en = {
     strategies: {
       "saf-puan": {
         name: "Pure points",
-        description: "The highest expected points, no rival in the equation.",
+        // Not "the highest expected points": the solve maximises the eleven, the captain
+        // and the bench together, and the figure below the card is the eleven and the
+        // captain only. A banded plan that keeps a weaker bench can read higher on that
+        // figure. Measured on the 2026-27 GW4 capture: entry 3832237's pure-points plan
+        // publishes 46.5454 against its ortak-koru plan's 46.7016, both OPTIMAL, both
+        // free of hits.
+        description:
+          "Points alone, no rival in the equation. The plan is chosen on the eleven, the captain and the bench together, so another option can still show more expected points for the eleven and captain.",
       },
       "ortak-koru": {
         name: "Keep the shared core",
@@ -1188,7 +1195,8 @@ const tr: MessageSchema<typeof en> = {
     strategies: {
       "saf-puan": {
         name: "Saf puan",
-        description: "En yüksek beklenen puan; denklemde rakip yok.",
+        description:
+          "Yalnız puan; denklemde rakip yok. Plan, ilk on bir, kaptan ve yedek kulübesi birlikte değerlendirilerek seçilir; bu yüzden başka bir seçenek ilk on bir ve kaptan için daha yüksek beklenen puan gösterebilir.",
       },
       "ortak-koru": {
         name: "Ortak çekirdeği koru",

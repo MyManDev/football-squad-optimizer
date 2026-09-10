@@ -5,12 +5,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from numbers import Integral, Real
 from types import MappingProxyType
-from typing import Literal, TypeAlias
 
+from squadopt.contracts import POSITIONS as POSITIONS
+from squadopt.contracts import Position as Position
 from squadopt.optimization.models import InvalidConfigurationError
 
-Position: TypeAlias = Literal["GK", "DEF", "MID", "FWD"]
-POSITIONS: tuple[Position, ...] = ("GK", "DEF", "MID", "FWD")
 MAX_DETERMINISTIC_SEED = 2_147_483_647
 
 

@@ -54,8 +54,8 @@ from squadopt.evaluation import (
     EvaluationResult,
     evaluate_prepared_folds,
 )
-from squadopt.experiments import season_aware_moving_block_interval
-from squadopt.experiments.config import PromotionPolicy
+from squadopt.evaluation.promotion import PromotionPolicy
+from squadopt.evaluation.statistics import season_aware_moving_block_interval
 from squadopt.features import CrossSeasonConfig
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.prediction.learned import RidgeProjectionConfig

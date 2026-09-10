@@ -4,7 +4,9 @@ ADR 0006 does not ask for "a persistent disk". It names the primitives the queue
 cache were reviewed against and requires them to be **proven before ingress**: exclusive
 create (`O_EXCL`, the claim marker), hard-link create-once (`os.link` from a finished
 temporary file — cache entries, job submission, the open-job index), and mtime as a
-heartbeat. A mount that persists but silently does not honour those is not a smaller
+heartbeat. Queue metadata additionally requires OS-backed exclusion between independently
+opened lock descriptors, including release after the owner leaves. A mount that persists
+but silently does not honour those is not a smaller
 version of the right store; it is a store on which two workers can run one job and two
 writers can both win.
 
@@ -38,6 +40,8 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+
+from squadopt.platform._queue_lock import QueueFileLock, QueueLockTimeout
 
 __all__ = ["StoreProbeResult", "probe_store"]
 
@@ -89,6 +93,7 @@ def probe_store(root: Path | str, *, process_id: str | None = None) -> StoreProb
             ok=False,
             checks={
                 "mounted_root": False,
+                "queue_lock": False,
                 "exclusive_create": False,
                 "hard_link_no_overwrite": False,
                 "heartbeat_mtime": False,
@@ -100,6 +105,7 @@ def probe_store(root: Path | str, *, process_id: str | None = None) -> StoreProb
 
     marker = directory / f"{identity}.marker"
     try:
+        _check(checks, detail, "queue_lock", lambda: _queue_lock(directory / f"{identity}.lock"))
         _check(checks, detail, "exclusive_create", lambda: _exclusive_create(marker))
         _check(
             checks,
@@ -118,6 +124,24 @@ def probe_store(root: Path | str, *, process_id: str | None = None) -> StoreProb
         with contextlib.suppress(OSError):
             marker.unlink(missing_ok=True)
     return StoreProbeResult(ok=all(checks.values()), checks=checks, detail=detail)
+
+
+def _queue_lock(path: Path) -> None:
+    """Independent descriptors must conflict and release on this filesystem."""
+    try:
+        owner = QueueFileLock(path, timeout_seconds=0.01)
+        contender = QueueFileLock(path, timeout_seconds=0.01)
+        with owner.hold():
+            try:
+                with contender.hold():
+                    raise OSError("Queue metadata locks do not exclude an independent descriptor.")
+            except QueueLockTimeout:
+                pass
+        with contender.hold():
+            pass
+    finally:
+        # Only this probe's unique disposable file, never the queue's permanent lock.
+        path.unlink(missing_ok=True)
 
 
 def _check(

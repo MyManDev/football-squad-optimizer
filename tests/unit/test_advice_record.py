@@ -9,6 +9,7 @@ a member actually saw before the deadline, and a later page can score what it na
 re-solving anything.
 """
 
+import copy
 import datetime
 import hashlib
 import json
@@ -291,6 +292,10 @@ def test_rebuilding_the_identical_capture_is_a_no_op(world: dict[str, Any], tmp_
     This has actually happened, so it is the ordinary case rather than a hypothetical one.
     A no-op is also not a second record: the capture directory is written once and the
     rebuild leaves the week holding exactly one.
+
+    Both builds here share a clock, which is the easy half. The half a production caller
+    actually reaches is
+    :func:`test_republishing_one_capture_at_a_later_minute_is_still_a_no_op`.
     """
 
     records = tmp_path / "records"
@@ -302,6 +307,98 @@ def test_rebuilding_the_identical_capture_is_a_no_op(world: dict[str, Any], tmp_
     assert (directory / RECORD_FILE).read_bytes() == landed
     week = entry_directory(records, SEASON, 2, 101)
     assert [child.name for child in sorted(week.iterdir()) if child.is_dir()] == [world["gw2_id"]]
+
+
+def test_republishing_one_capture_at_a_later_minute_is_still_a_no_op(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The publish re-run for one snapshot id, which is the rebuild production performs.
+
+    Nothing in the site's build fixes the clock — ``build_league_views`` stamps its
+    envelopes with ``datetime.now`` and no production caller passes ``now`` — so a second
+    publish of one capture writes different bytes at every advice path while saying
+    exactly the same thing. The rebuild that fixes the clock is a test-only shape, and on
+    its own it left this, the reachable one, unpinned and failing.
+    """
+
+    records = tmp_path / "records"
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    _build(world, first, record_root=records)
+    directory = record_directory(records, SEASON, 2, 101, world["gw2_id"])
+    landed = (directory / RECORD_FILE).read_bytes()
+
+    _build(world, second, record_root=records, now=WHEN + datetime.timedelta(hours=1))
+
+    # The published bytes really did move and the advice really did not, so the no-op
+    # below is the claim it looks like rather than two identical builds compared.
+    published = "advice/101/saf-puan/1.json"
+    before = json.loads((first / published).read_text(encoding="utf-8"))
+    after = json.loads((second / published).read_text(encoding="utf-8"))
+    assert (first / published).read_bytes() != (second / published).read_bytes()
+    assert before["generated_at_utc"] != after["generated_at_utc"]
+    assert before["payload"] == after["payload"]
+
+    # The first record stands, byte for byte, and the week still holds exactly one.
+    assert (directory / RECORD_FILE).read_bytes() == landed
+    record = load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"])
+    assert record["generated_at_utc"] == "2026-08-23T12:00:00Z"
+    week = entry_directory(records, SEASON, 2, 101)
+    assert [child.name for child in sorted(week.iterdir()) if child.is_dir()] == [world["gw2_id"]]
+
+
+def test_a_replay_forgives_the_publication_clock_and_nothing_else(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Forgiving the clock must not become forgiving whatever rode along with it.
+
+    A re-publish moves ``generated_at_utc`` and every ``published_sha256`` taken over bytes
+    carrying it, and that alone is a replay. Each of the fields below is then moved on top
+    of exactly that, from the record that was really written rather than a hand-made one,
+    because the risk in this allowance is only ever that it is too wide.
+    """
+
+    records = tmp_path / "records"
+    _build(world, tmp_path / "site", record_root=records)
+    recorded = load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"])
+
+    def _replayed() -> dict[str, Any]:
+        """The same record, published again a minute later and nothing else changed."""
+
+        replay = copy.deepcopy(recorded)
+        replay["generated_at_utc"] = "2026-08-23T12:01:00Z"
+        for document in replay["advice"]:
+            document["published_sha256"] = "0" * 64
+        return replay
+
+    # On its own that is a replay: accepted, and the record it kept is the first one.
+    assert record_member_advice(records, _replayed()) == record_directory(
+        records, SEASON, 2, 101, world["gw2_id"]
+    )
+
+    # What the member was told, named field by field, still refuses to be rewritten.
+    said_otherwise = _replayed()
+    said_otherwise["advice"][0]["advice_sha256"] = "1" * 64
+    with pytest.raises(AdviceRecordConflictError, match="advice_sha256"):
+        record_member_advice(records, said_otherwise)
+
+    pointed_elsewhere = _replayed()
+    pointed_elsewhere["told"] = {"published_path": "advice/101/saf-puan/5.json"}
+    with pytest.raises(AdviceRecordConflictError, match="told"):
+        record_member_advice(records, pointed_elsewhere)
+
+    from_elsewhere = _replayed()
+    from_elsewhere["provenance"]["repository_commit"] = "0123456789abcdef"
+    with pytest.raises(AdviceRecordConflictError, match="repository_commit"):
+        record_member_advice(records, from_elsewhere)
+
+    dropped_a_document = _replayed()
+    dropped_a_document["advice"] = dropped_a_document["advice"][:1]
+    with pytest.raises(AdviceRecordConflictError, match="entries"):
+        record_member_advice(records, dropped_a_document)
+
+    # Through all of that, the record on disk is still the one the first publish wrote.
+    assert load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"]) == recorded
 
 
 def test_two_publishes_of_one_week_from_two_captures_each_keep_their_record(
@@ -439,43 +536,43 @@ def test_a_record_in_the_pre_capture_layout_is_refused_rather_than_ignored(
 def test_a_rebuild_of_one_capture_that_differs_is_refused_and_names_what_differed(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
-    """Different bytes over a recorded capture are refused, and the refusal is readable.
+    """Different advice over a recorded capture is refused, and the refusal is readable.
 
     This is the property the capture key must not lose. The capture is the whole input, so
-    the same capture producing different bytes is a non-determinism in our own code — which
-    is how a real one in the multi-week solves was found. A record that can be overwritten
-    proves nothing about what was published, so the second build loses rather than the
-    first. The message names the fields that moved: a re-run at a different minute and a
-    re-run that changed the advice are both refused, and an operator has to be able to tell
-    them apart without diffing two files by hand.
+    the same capture producing different advice is a non-determinism in our own code —
+    which is how a real one in the multi-week solves was found. A record that can be
+    overwritten proves nothing about what was published, so the second build loses rather
+    than the first, and the message names the fields that moved so an operator does not
+    have to diff two files by hand.
+
+    The clock moves here too, because in a real re-run it always does; forgiving it must
+    not become forgiving whatever moved beside it. It is also kept out of the listing, so
+    the fields that are the reason are not displaced by four that never are.
     """
 
     records = tmp_path / "records"
     _build(world, tmp_path / "first", record_root=records)
 
-    # Same advice, a later run: only the publication's own timestamp moved.
+    # A second free transfer the source did publish, at a later minute: the state read
+    # changed, the week's hit charge went with it, and the message names the input that
+    # moved and the published document that moved with it.
     later = WHEN + datetime.timedelta(hours=1)
-    with pytest.raises(AdviceRecordConflictError) as clock:
-        _build(world, tmp_path / "second", record_root=records, now=later)
-    assert "generated_at_utc" in str(clock.value)
-    assert "2026-08-23T12:00:00Z" in str(clock.value)
-    assert "2026-08-23T13:00:00Z" in str(clock.value)
-    # The refusal names the capture directory, so an operator can see it is one capture
-    # disagreeing with itself rather than two publishes colliding.
-    assert str(record_directory(records, SEASON, 2, 101, world["gw2_id"])) in str(clock.value)
-
-    # A second free transfer the source did publish: the state read changed, the week's
-    # hit charge went with it, and the message names the input that moved and the
-    # published document that moved with it.
     with pytest.raises(AdviceRecordConflictError) as changed:
-        _build(world, tmp_path / "third", record_root=records, free_transfers=2)
+        _build(world, tmp_path / "second", record_root=records, free_transfers=2, now=later)
     message = str(changed.value)
     assert "state.free_transfers: recorded 1, now 2" in message
     assert "state.free_transfers_known: recorded False, now True" in message
     assert "transfer_hit_points" in message
-    assert "published_sha256" in message
+    assert "advice_sha256" in message
+    # The clock moved with all of that and is deliberately not named: it is never the
+    # reason for a refusal, and naming it invites reading this one as a harmless re-run.
+    assert "generated_at_utc" not in message
+    assert "2026-08-23T13:00:00Z" not in message
+    # The refusal names the capture directory, so an operator can see it is one capture
+    # disagreeing with itself rather than two publishes colliding.
+    assert str(record_directory(records, SEASON, 2, 101, world["gw2_id"])) in message
 
-    # Neither refusal rewrote anything, and neither left a second record behind.
+    # The refusal rewrote nothing, and left no second record behind.
     week = entry_directory(records, SEASON, 2, 101)
     assert [child.name for child in sorted(week.iterdir()) if child.is_dir()] == [world["gw2_id"]]
     record = load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"])

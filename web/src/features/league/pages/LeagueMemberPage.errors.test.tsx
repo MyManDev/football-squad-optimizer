@@ -192,8 +192,12 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
       screen.getByRole("list", { name: MESSAGES[language].squad.pitchLabel }),
     ).toBeInTheDocument();
     expect(data.loadEntryAdvice).toHaveBeenCalledTimes(2);
-    expect(data.loadEntryAdvice).toHaveBeenNthCalledWith(1, ENTRY, "saf-puan", 1, null);
-    expect(data.loadEntryAdvice).toHaveBeenNthCalledWith(2, ENTRY, "saf-puan", 1, null);
+    expect(data.loadEntryAdvice).toHaveBeenNthCalledWith(1, ENTRY, "saf-puan", 1, null, {
+      signal: expect.any(AbortSignal),
+    });
+    expect(data.loadEntryAdvice).toHaveBeenNthCalledWith(2, ENTRY, "saf-puan", 1, null, {
+      signal: expect.any(AbortSignal),
+    });
     await act(async () => finish(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1)));
     expect(await screen.findByText(copy.lineupTitle)).toBeInTheDocument();
     expect(screen.queryByText(copy.adviceUnreadable)).not.toBeInTheDocument();

@@ -20,7 +20,8 @@ import pytest
 import tests.unit.test_advice_worker as worker_fixture
 import tests.unit.test_backend_runtime as deployment_fixture
 
-from squadopt.application.league_views import _entry_squad_payload, _envelope
+from squadopt.application.entries import EntryRegistration
+from squadopt.application.league_views import MemberStanding, build_league_views
 from squadopt.platform.backend_runtime import BackendConfig, build_backend
 
 pytestmark = pytest.mark.skipif(
@@ -108,31 +109,34 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
     capture = backend.contexts.capture(context)
     assert capture is not None
 
-    # Publish the actual captured squad without precomputing its advice. The worker
-    # must supply the first answer; a static plan cannot mask a broken backend.
+    # Generate a complete public fixture through the actual publisher. Remove its
+    # static advice only: the browser must request a new answer from the empty
+    # backend cache, while the index retains the declared selection capabilities.
     entry_id = deployment_fixture.ENTRY_ID
     league_id = deployment_fixture.LEAGUE_ID
-    picks = capture.provider.picks(entry_id, context.season, context.gameweek - 1)
-    squad = _entry_squad_payload(
-        picks,
+    report = build_league_views(
+        capture.provider,
+        (EntryRegistration(entry_id, "browser-member", capture.inputs.captured_at_utc),),
         capture.inputs,
         capture.projection,
+        capture.rules,
         league_id=league_id,
-        member_row={
-            "entry_id": entry_id,
-            "member_kind": "human",
-            "team_name": "Browser smoke team",
-            "manager_name": "Synthetic member",
+        league_name="Browser smoke league",
+        out_dir=config.site_data_root / "league",
+        standings={
+            entry_id: MemberStanding(
+                entry_id=entry_id,
+                team_name="Browser smoke team",
+                manager_name="Synthetic member",
+                rank=1,
+            )
         },
-        missing=[],
-        scored_gameweek=None,
     )
-    squad_path = config.site_data_root / "league" / "entries" / f"{entry_id}.json"
-    squad_path.parent.mkdir(parents=True)
-    squad_path.write_text(
-        json.dumps(_envelope(squad, generated_at_utc=capture.inputs.captured_at_utc)),
-        encoding="utf-8",
+    assert report.rendered_count == 1
+    baseline_path = (
+        config.site_data_root / "league" / "advice" / str(entry_id) / "saf-puan" / "1.json"
     )
+    baseline_path.unlink()
     environment = dict(
         os.environ,
         PYTHONPATH=str(REPOSITORY / "src"),

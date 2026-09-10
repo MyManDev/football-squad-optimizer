@@ -25,11 +25,12 @@ Two rules are load-bearing and tested rather than asserted:
 
 import functools
 import json
+import unicodedata
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import pandas as pd
 
@@ -64,7 +65,7 @@ from squadopt.application.mode_selection import (
     rival_squad_from_picks,
     select_member_modes,
 )
-from squadopt.application.strategies import STRATEGY_CATALOG
+from squadopt.application.strategies import FORBIDDEN_TEXT_PATTERN, STRATEGY_CATALOG
 from squadopt.application.strategies.rule import RIVAL_RULE_STRATEGIES, suggest_strategy
 from squadopt.data.errors import DataError
 from squadopt.experiments.config import ExperimentError
@@ -289,6 +290,96 @@ class MemberStanding:
     transfer_cost: int | None = None
 
 
+#: The longest team or manager name this publishes. Not a claim about what the game
+#: allows — a bound on what we put in a document, so one member's name cannot decide the
+#: size of a payload every other member downloads. Every name the real capture carries is
+#: far inside it; a name that is not is truncated to it and the build says so.
+PUBLISHED_NAME_LIMIT: Final = 64
+
+
+def _entry_stand_in(entry_id: int) -> str:
+    """The stand-in a refused name is published under. ``advice.py`` already labels a
+    rival it cannot name this way, so a reader meets one convention, not two."""
+
+    return f"entry-{int(entry_id)}"
+
+
+def published_member_name(raw: str | None, *, entry_id: int, field: str) -> tuple[str | None, str]:
+    """One member-typed name, and what had to be done to it to publish it.
+
+    A team name and a manager name come out of the game as text the member typed. They
+    are the only free text in this tree, and they land in ``members.json``, in
+    ``entries/{id}.json``, in the rival label and in the page's own ``<h1>``. The page is
+    React and escapes markup, but the page is not the only reader: these documents are
+    fetched by whatever wants them, and a document is not made safe by one of its
+    consumers. So the producer decides, once, what may be published — refusing at the
+    page would leave the file itself carrying whatever arrived.
+
+    Three rules, in order, and each returns the reason it fired so the build can state it:
+
+    - **Normalise.** Every character in Unicode's ``C`` classes becomes a space: the C0
+      and C1 controls (a NUL that truncates a C string, an ESC that a terminal reads as a
+      command, a newline that forges a second log line) and the format class, which is
+      where the bidi overrides live — ``U+202E`` reverses everything printed after it, so
+      a name carrying one rewrites the sentence it sits in. No real name contains any of
+      them. Whitespace runs collapse afterwards, so removing a newline never joins two
+      words. ``<`` and ``>`` go with them: our page is React and escapes markup — a
+      ``<script>`` in a team name renders as five visible words and injects no node, and
+      the probe confirmed it — but that is a property of one reader, and these files are
+      served to whoever asks. The two characters open every markup and template language
+      a name might be pasted into and mean nothing inside a name, so the producer does
+      not hand them on.
+    - **Bound.** Longer than ``PUBLISHED_NAME_LIMIT`` is truncated to it.
+    - **Refuse the value, never the member.** What survives is still text we publish, so
+      it is held to the same honesty envelope as everything else in the tree
+      (``FORBIDDEN_TEXT_PATTERN``): a member whose team is called ``%72 sans`` may not put
+      a percentage on our page. That name is replaced by the entry's own id — the batch
+      renders, the member keeps their advice, and the substitution is recorded rather than
+      passed off as the name they chose.
+
+    ``None`` in stays ``None`` out: an absent name and a refused one are different facts,
+    and only the second one gets a stand-in.
+    """
+
+    if raw is None:
+        return None, ""
+    notes: list[str] = []
+    cleaned = "".join(
+        " " if unicodedata.category(char).startswith("C") or char in "<>" else char for char in raw
+    )
+    cleaned = " ".join(cleaned.split())
+    if cleaned != raw:
+        notes.append(f"{field}: unprintable characters and markup delimiters removed")
+    if len(cleaned) > PUBLISHED_NAME_LIMIT:
+        cleaned = cleaned[:PUBLISHED_NAME_LIMIT].rstrip()
+        notes.append(f"{field}: truncated to {PUBLISHED_NAME_LIMIT} characters")
+    if FORBIDDEN_TEXT_PATTERN.search(cleaned):
+        return (
+            _entry_stand_in(entry_id),
+            f"{field}: replaced with {_entry_stand_in(entry_id)!r}; the name the capture "
+            "carries reads as a chance or a percentage, which this site does not publish",
+        )
+    if not cleaned:
+        # Nothing printable survived. The capture did carry something, so ``None`` — "no
+        # name was captured" — would be the wrong claim; the id says what we know.
+        return _entry_stand_in(entry_id), f"{field}: nothing printable survived normalisation"
+    return cleaned, "; ".join(notes)
+
+
+def _published_standing(placing: MemberStanding) -> tuple[MemberStanding, tuple[str, ...]]:
+    """One standings row with both of its free-text fields put through the rule above."""
+
+    entry_id = int(placing.entry_id)
+    team, team_note = published_member_name(placing.team_name, entry_id=entry_id, field="team_name")
+    manager, manager_note = published_member_name(
+        placing.manager_name, entry_id=entry_id, field="manager_name"
+    )
+    notes = tuple(note for note in (team_note, manager_note) if note)
+    # ``MemberStanding`` types both names as ``str``; only a name that was never captured
+    # is None, and this path is only reached for one the capture did carry.
+    return replace(placing, team_name=team or "", manager_name=manager or ""), notes
+
+
 @dataclass(frozen=True, slots=True)
 class LeagueViewsReport:
     league_id: int
@@ -493,17 +584,42 @@ def build_league_views(
     around this could only guess, because the weekly publish re-solves in a fresh worktree.
 
     The record is keyed by ``inputs``' capture, so the mid-week publish and the one taken
-    shortly before the deadline each write their own and neither refuses the other. What is
-    still refused is a *rebuild of one capture* that produces different bytes: the capture
-    is the whole input, so that is our own non-determinism, and it raises
-    ``AdviceRecordConflictError`` naming the difference.
+    shortly before the deadline each write their own and neither refuses the other. A
+    re-publish of *one* capture is a replay and keeps the record it already wrote: the
+    envelopes below are stamped with ``generated``, which moves whenever ``now`` is not
+    passed — and no caller here passes it — so the same advice re-published is never the
+    same bytes. What is still refused is a rebuild of one capture that produces different
+    *advice*: the capture is the whole input, so that is our own non-determinism, and it
+    raises ``AdviceRecordConflictError`` naming the difference.
 
     The records are written after every member's files are on disk, so a refusal can never
     stop the advice being published; the refusal is raised once, after every writable record
     has been written. The published bytes are identical with and without this argument.
     """
 
-    placings = dict(standings or {})
+    # Every member-typed name is filtered here, once, before anything reads a standings
+    # row: ``_row`` writes both names into ``members.json`` and into the ``entry`` block
+    # of ``entries/{id}.json``, and the rival label below is the same ``team_name`` again.
+    # Filtering at the source is what makes those three agree; filtering at each of them
+    # would be three chances to miss one.
+    name_notes: dict[int, tuple[str, ...]] = {}
+    placings: dict[int, MemberStanding] = {}
+    for entry_id, raw_placing in (standings or {}).items():
+        placings[entry_id], notes = _published_standing(raw_placing)
+        if notes:
+            name_notes[int(entry_id)] = notes
+    # The registry's label is the same free text by another route — ``seed_entry_registry``
+    # records each member's own team name as the label — and it is what every row falls
+    # back to when the capture holds no standings page, so it is filtered on the same rule.
+    labels: dict[int, str] = {}
+    for registration in registrations:
+        registered_id = int(registration.entry_id)
+        safe_label, label_note = published_member_name(
+            registration.label, entry_id=registered_id, field="label"
+        )
+        labels[registered_id] = safe_label or _entry_stand_in(registered_id)
+        if label_note:
+            name_notes[registered_id] = (*name_notes.get(registered_id, ()), label_note)
     if mode_paths is not None:
         window_weeks = tuple(int(week) for week in mode_paths.target.gameweeks)
         if window_weeks != (int(inputs.deadline.gameweek),):
@@ -569,7 +685,7 @@ def build_league_views(
         picks_or_error = fetched[entry_id]
         if isinstance(picks_or_error, EntryPicks):
             placing = placings.get(entry_id)
-            label = placing.team_name if placing is not None else registration.label
+            label = placing.team_name if placing is not None else labels[entry_id]
             rival_squads[entry_id] = rival_squad_from_picks(picks_or_error, label=label)
     ranks = {entry_id: placing.rank for entry_id, placing in placings.items()}
     prices = {
@@ -598,7 +714,7 @@ def build_league_views(
     tasks = [
         MemberRenderTask(
             entry_id=int(registration.entry_id),
-            label=registration.label,
+            label=labels[int(registration.entry_id)],
             season=season,
             gameweek=gameweek,
             league_id=int(league_id),
@@ -649,16 +765,23 @@ def build_league_views(
         picks_or_error = fetched[entry_id]
         render = renders[entry_id]
         if not isinstance(picks_or_error, EntryPicks) or render.baseline is None:
-            reason = (
-                render.reason if isinstance(picks_or_error, EntryPicks) else str(picks_or_error)
+            reason = "; ".join(
+                part
+                for part in (
+                    *name_notes.get(entry_id, ()),
+                    render.reason
+                    if isinstance(picks_or_error, EntryPicks)
+                    else str(picks_or_error),
+                )
+                if part
             )
-            results.append(MemberViewResult(entry_id, registration.label, False, reason=reason))
-            member_rows.append(_row(entry_id, registration.label, "empty"))
+            results.append(MemberViewResult(entry_id, labels[entry_id], False, reason=reason))
+            member_rows.append(_row(entry_id, labels[entry_id], "empty"))
             continue
         picks = picks_or_error
         advice = render.baseline
         quality = str(advice["data_quality"])
-        member_row = _row(entry_id, registration.label, quality)
+        member_row = _row(entry_id, labels[entry_id], quality)
         raw_missing = advice.get("missing_fields")
         missing = [str(field) for field in raw_missing] if isinstance(raw_missing, list) else []
 
@@ -869,7 +992,11 @@ def build_league_views(
         )
         publications.append((picks, render.transfer_config_fingerprint, emitted, told))
 
-        results.append(MemberViewResult(entry_id, registration.label, True, reason=mode_note))
+        # What was changed about this member's own name before it was published travels
+        # on their row of the report, so the operator running the publish sees it. A name
+        # we altered and never mentioned would be the quiet half of this fix.
+        note = "; ".join(part for part in (*name_notes.get(entry_id, ()), mode_note) if part)
+        results.append(MemberViewResult(entry_id, labels[entry_id], True, reason=note))
         member_rows.append(member_row)
     # The standings order is the league's order; registry order is arbitrary.
     if placings:

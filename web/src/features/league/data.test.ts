@@ -62,7 +62,10 @@ describe("loadScoreboard", () => {
 
     const envelope = await loadScoreboard();
 
-    expect(fetcher).toHaveBeenCalledWith("/data/league/scoreboard.json", { cache: "no-cache" });
+    expect(fetcher).toHaveBeenCalledWith("/data/league/scoreboard.json", {
+      cache: "no-cache",
+      signal: expect.any(AbortSignal),
+    });
     expect(envelope.payload.season).toBe("2026-27");
   });
 
@@ -147,7 +150,10 @@ describe("published league lookup", () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(publishedMembers)));
     vi.stubGlobal("fetch", fetcher);
     await expect(lookupPublishedLeague(352490)).resolves.toBe("connected");
-    expect(fetcher).toHaveBeenCalledWith("/data/league/members.json", { cache: "no-cache" });
+    expect(fetcher).toHaveBeenCalledWith("/data/league/members.json", {
+      cache: "no-cache",
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it("rejects any other ID without requesting a document or upstream API", async () => {

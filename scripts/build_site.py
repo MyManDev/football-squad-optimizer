@@ -11,21 +11,25 @@ and never plans a real action.
 
 import argparse
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
+from squadopt.application import UI_VIEW_SCHEMA_PATH, write_ui_view_schema
 from squadopt.application import (
-    UI_VIEW_SCHEMA_PATH,
-    TickRequest,
-    build_site,
-    plan_season_tick,
-    write_ui_view_schema,
+    TickRequest as TickRequest,
+)
+from squadopt.application import (
+    build_site as build_site,
+)
+from squadopt.application import (
+    plan_season_tick as plan_season_tick,
+)
+from squadopt.application.site_publication import (
+    SitePublicationRequest,
+    SiteSeasonUnavailableError,
+    publish_site,
 )
 from squadopt.data.errors import DataError
-from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
-from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.live import LedgerError
-from squadopt.live.tick import TickConfig
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HANDOFF_ROOT = REPOSITORY_ROOT / "data" / "handoffs"
@@ -63,50 +67,27 @@ def main() -> int:
     if arguments.schema_only:
         print(f"Wrote {write_ui_view_schema()}")
         return 0
-    now_utc = arguments.now or datetime.now(UTC).replace(microsecond=0).isoformat().replace(
-        "+00:00", "Z"
-    )
-    plan = None
-    season = arguments.season
     try:
-        if not arguments.no_status:
-            plan = plan_season_tick(
-                TickRequest(
-                    snapshot_root=arguments.snapshot_root,
-                    ledger_root=arguments.ledger_root,
-                    archive_root=REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl",
-                    handoff_root=arguments.handoff_root,
-                    summary_root=REPOSITORY_ROOT / "docs",
-                    now_utc=now_utc,
-                    season=arguments.season,
-                    config=TickConfig(),
-                ),
+        result = publish_site(
+            SitePublicationRequest(
+                snapshot_root=arguments.snapshot_root,
+                ledger_root=arguments.ledger_root,
+                archive_root=REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl",
+                handoff_root=arguments.handoff_root,
+                summary_root=REPOSITORY_ROOT / "docs",
+                log_root=arguments.log_root,
+                out_dir=arguments.out,
+                season=arguments.season,
+                now_utc=arguments.now,
+                include_status=not arguments.no_status,
+                include_league=not arguments.no_league,
+                horizon_manifest=arguments.horizon_manifest,
             )
-            season = season or plan.season
-        if season is None:
-            print("Season could not be inferred; pass --season.")
-            return 1
-        snapshot = None
-        if not arguments.no_league:
-            # By source, because this root is shared. The cohort collectors write here too
-            # and their identifiers sort after the live ones whatever their timestamps say,
-            # so an unfiltered listing handed the league and the provisional score a capture
-            # carrying neither's payloads. A root with no live capture stays None: the
-            # provisional view reads one capture and is never backfilled from another, so
-            # the honest answer there is unavailable.
-            identifiers = list_snapshot_ids(arguments.snapshot_root, source=FPL_LIVE_SOURCE)
-            if identifiers:
-                snapshot = read_snapshot(arguments.snapshot_root, identifiers[-1])
-        report = build_site(
-            ledger_root=arguments.ledger_root,
-            season=str(season),
-            out_dir=arguments.out,
-            plan=plan,
-            runlog_root=arguments.log_root,
-            snapshot=snapshot,
-            horizon_manifest=arguments.horizon_manifest,
-            now=datetime.fromisoformat(now_utc.replace("Z", "+00:00")),
         )
+        report = result.report
+    except SiteSeasonUnavailableError as error:
+        print(str(error))
+        return 1
     except (DataError, LedgerError) as error:
         print(f"Could not build the site:\n  {error}")
         return 1

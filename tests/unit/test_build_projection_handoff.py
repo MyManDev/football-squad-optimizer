@@ -12,19 +12,22 @@ reads fields those tests do not need: the cumulative counters, and a kick-off ti
 which the capture's season phase cannot be established.
 """
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import pytest
-from scripts import build_projection_handoff as producer
+from scripts import build_projection_handoff as command
 from tests.unit.test_live_transfers import EVENTS, SHAPE, TEAMS
 
+from squadopt.application import projection_handoff as producer
 from squadopt.data.errors import DataSourceError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD, FIXTURES_PAYLOAD
 from squadopt.live import CONTROL_MODEL_NAME, handoff_path_for, read_projection_handoff
+from squadopt.platform.projection_retention import publish_retained_handoff
 from squadopt.prediction.component_dataset import (
     FEATURE_CONTRACT_VERSION as COMPONENT_FEATURE_CONTRACT_VERSION,
 )
@@ -50,6 +53,21 @@ FIRST_KICKOFF = "2026-08-21T19:00:00Z"
 # is taken, and the only phase in which a capture carries in-season history.
 GW2_CAPTURED_AT = "2026-08-28T15:30:00Z"
 BEFORE_ANY_KICKOFF = "2026-08-20T17:00:00Z"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "COMPONENT_FEATURE_CONTRACT_VERSION",
+        "COMPONENT_HISTORY_WINDOW",
+        "COMPONENT_MODEL_VERSION",
+        "CONTROL_MODEL_NAME",
+        "_component_table",
+    ],
+)
+def test_legacy_live_caller_symbols_reexport_the_installed_owner(name: str) -> None:
+    assert getattr(command, name) is getattr(producer, name)
+
 
 COUNTERS = (
     "minutes",
@@ -178,7 +196,11 @@ def _world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
 def _build(world: dict[str, Any], **kwargs: Any) -> tuple[Any, Path | None, dict[str, object]]:
     return producer.build(
-        world["snapshot_root"], world["archive_root"], world["handoff_root"], **kwargs
+        world["snapshot_root"],
+        world["archive_root"],
+        world["handoff_root"],
+        writer=publish_retained_handoff,
+        **kwargs,
     )
 
 
@@ -200,6 +222,13 @@ def test_the_handoff_reads_back_through_the_consumers_own_reader(
     reread = read_projection_handoff(written)
     assert reread.fingerprint == projection.fingerprint
     assert reread.expected_points == projection.expected_points
+    retained = (
+        written.parent
+        / "by-capture"
+        / projection.source_snapshot_id
+        / f"{hashlib.sha256(written.read_bytes()).hexdigest()}.json"
+    )
+    assert retained.read_bytes() == written.read_bytes()
 
 
 def test_the_handoff_lands_on_the_path_the_tick_waits_at(world: dict[str, Any]) -> None:
@@ -350,7 +379,7 @@ def test_the_command_uses_the_component_path_without_evidence_arguments(
         assert kwargs["development_only"] is development_only
         raise Called
 
-    monkeypatch.setattr(producer, "build", fake_build)
+    monkeypatch.setattr(command, "build", fake_build)
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -364,7 +393,7 @@ def test_the_command_uses_the_component_path_without_evidence_arguments(
     )
 
     with pytest.raises(Called):
-        producer.main()
+        command.main()
 
 
 def test_the_command_forwards_the_verified_evidence_pair(
@@ -381,7 +410,7 @@ def test_the_command_forwards_the_verified_evidence_pair(
         assert kwargs["evidence_manifest_path"] == manifest_path
         raise Called
 
-    monkeypatch.setattr(producer, "build", fake_build)
+    monkeypatch.setattr(command, "build", fake_build)
     monkeypatch.setattr(
         "sys.argv",
         [
@@ -398,7 +427,7 @@ def test_the_command_forwards_the_verified_evidence_pair(
     )
 
     with pytest.raises(Called):
-        producer.main()
+        command.main()
 
 
 # --- refusals ---------------------------------------------------------------

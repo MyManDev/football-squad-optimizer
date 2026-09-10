@@ -271,3 +271,5 @@ docs/.*.json.tmp-*
 # right to care about untracked files that could be imported, and wrong to count these.
 .claude/
 .codex-tmp/
+# Local verification and recovery scratch, separate from committed evidence.
+.pt/

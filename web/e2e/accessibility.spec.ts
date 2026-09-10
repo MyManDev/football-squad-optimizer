@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 import { installLeagueMocks } from "./leagueMocks";
+import { MESSAGES } from "../src/i18n/messages";
 
 const ROUTES = [
   "/",
@@ -10,7 +11,7 @@ const ROUTES = [
   "/rivals",
   "/league",
   "/league/members",
-  "/league/members/35249001?mode=agresif&window=3",
+  "/league/members/35249001?mode=saf-puan&window=3",
   "/league/members/squadopt",
   "/analysis",
   "/status",
@@ -37,6 +38,14 @@ for (const language of ["tr", "en"] as const) {
       for (const route of ROUTES) {
         await page.goto(route);
         await waitForPage(page);
+        if (route.includes("mode=saf-puan&window=3")) {
+          await expect(page.locator('[aria-labelledby="entry-advice-title"]')).toBeVisible();
+          const plan = page.getByRole("region", {
+            name: MESSAGES[language].leagueMembers.windowTitle(3),
+          });
+          await expect(plan).toBeVisible();
+          await expect(plan.locator("tbody tr")).toHaveCount(3);
+        }
         const results = await new AxeBuilder({ page }).analyze();
         const blocking = results.violations.filter((violation) =>
           BLOCKING_IMPACTS.has(violation.impact ?? ""),

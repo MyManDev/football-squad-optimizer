@@ -15,6 +15,7 @@ from squadopt.platform.advice_read import (
     LeagueNotConnectedError,
     UnknownEntryError,
     UnknownStrategyError,
+    UnsupportedAdviceRequestError,
 )
 
 LEAGUE_ID = 352490
@@ -122,11 +123,15 @@ def test_a_hit_returns_the_exact_cached_bytes(tmp_path: Path) -> None:
     result = store.read_advice(league_id=LEAGUE_ID, entry_id=313686, strategy="saf-puan", window=1)
 
     assert result == _valid_advice_document()
-    # An ignored rival on a rival-less strategy hits the same entry: forced null.
-    with_rival = store.read_advice(
-        league_id=LEAGUE_ID, entry_id=313686, strategy="saf-puan", window=1, rival_entry_id=2199732
-    )
-    assert with_rival == result
+    # The reader and producer agree: a rival-free request cannot name a rival.
+    with pytest.raises(UnsupportedAdviceRequestError):
+        store.read_advice(
+            league_id=LEAGUE_ID,
+            entry_id=313686,
+            strategy="saf-puan",
+            window=1,
+            rival_entry_id=2199732,
+        )
 
 
 def test_every_refusal_is_typed(tmp_path: Path) -> None:
@@ -155,3 +160,34 @@ def test_no_context_is_not_ready_not_a_404(tmp_path: Path) -> None:
         store.read_advice(league_id=LEAGUE_ID, entry_id=313686, strategy="saf-puan", window=1)
     # League state needs no capture: the published tree alone answers it.
     assert store.league_state(LEAGUE_ID)["connected"] is True
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        b"not json",
+        b'{"payload": null}',
+        json.dumps(
+            {
+                "contract_version": "provisional_league_ui_v1",
+                "payload": {
+                    "league_id": LEAGUE_ID,
+                    "season": "2026-27",
+                    "gameweek": 3,
+                    "league_name": "League",
+                    "members": [{"member_kind": "human", "entry_id": True}],
+                },
+            }
+        ).encode(),
+    ],
+)
+def test_invalid_directory_is_not_ready_instead_of_disconnected(
+    tmp_path: Path,
+    broken: bytes,
+) -> None:
+    store = _store(tmp_path)
+    directory = FileLeagueDirectory(tmp_path / "site")
+    (tmp_path / "site" / "league" / "members.json").write_bytes(broken)
+    assert not directory.readable()
+    with pytest.raises(AdviceBackendNotReadyError):
+        store.league_state(LEAGUE_ID)
