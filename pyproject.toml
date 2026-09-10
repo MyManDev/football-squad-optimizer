@@ -32,6 +32,12 @@ api = [
     "uvicorn>=0.52,<1",
 ]
 dev = [
+    # Declared here as well as in `llm` for one reason: `mypy --strict src` is a gate, and a
+    # gate that cannot see the library it is checking is not checking it. Without this the
+    # SDK would resolve to `Any` in CI and the strictest check in the repository would be
+    # blind at the one call site where a wrong parameter costs a real request. Same reason
+    # fastapi and jsonschema appear twice below and above.
+    "anthropic>=1.4,<2",
     "fastapi>=0.141,<1",
     "httpx2>=2.12,<3",
     "import-linter>=2.0,<3",
@@ -42,6 +48,14 @@ dev = [
     "pytest-xdist>=3.6,<4",
     "ruff>=0.11,<1",
     "types-jsonschema>=4.26,<5",
+]
+# The model call in `squadopt.data.sources.club_news_anthropic`, and nothing else. Kept out of
+# the runtime dependencies so a research-only install stays free of a network SDK, and out of
+# `api` so the deployed image does not carry it: the backend answers from stored artifacts and
+# never asks a model anything. `docs/architecture/backend.md` puts cloud SDKs outside the
+# research engine, and this is where one goes when the weekly loop needs it.
+llm = [
+    "anthropic>=1.4,<2",
 ]
 
 [tool.setuptools.packages.find]
