@@ -184,8 +184,38 @@ def test_a_quote_that_is_not_in_the_document_is_refused() -> None:
 def test_a_quote_that_appears_twice_is_refused() -> None:
     """A span that might point at either of two places is not a span."""
 
-    with pytest.raises(ClubNewsError, match="appears 2 times"):
+    with pytest.raises(ClubNewsError, match=r"starts at \[3, 16\]"):
         locate_quote(b"He trained. She trained.", "trained", "A claim")
+
+
+def test_a_quote_whose_occurrences_overlap_is_refused() -> None:
+    """``bytes.count`` cannot see this, and the whole uniqueness claim rests on it.
+
+    It counts non-overlapping matches, so ``b"aaa".count(b"aa")`` is 1 while ``b"aa"`` in
+    fact starts at both 0 and 1. The old check called that unique and took the first, which
+    is a citation silently chosen between two candidates -- the one thing this function
+    exists to prevent. Not a corner case dressed up as one either: the prose below is the
+    kind of sentence a club actually publishes.
+    """
+
+    with pytest.raises(ClubNewsError, match=r"starts at \[10, 13\]"):
+        locate_quote(b"They said ha ha ha about it.", "ha ha", "A claim")
+
+
+def test_the_minimal_overlapping_case_is_refused() -> None:
+    """The defect in its smallest form, so the regression cannot come back disguised."""
+
+    assert b"aaa".count(b"aa") == 1  # what the old check believed
+
+    with pytest.raises(ClubNewsError, match=r"starts at \[0, 1\]"):
+        locate_quote(b"aaa", "aa", "A claim")
+
+
+def test_a_quote_occurring_three_times_names_all_three_starts() -> None:
+    """The refusal says where, because "somewhere else too" is not actionable."""
+
+    with pytest.raises(ClubNewsError, match=r"starts at \[0, 2, 4\]"):
+        locate_quote(b"ababab", "ab", "A claim")
 
 
 def test_an_empty_quote_is_refused() -> None:

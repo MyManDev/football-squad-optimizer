@@ -344,12 +344,25 @@ def locate_quote(content: bytes, quote: str, label: str) -> tuple[int, int]:
 
     Searched as bytes so that a quote containing anything outside ASCII lands on the same
     offsets the artifact stores and ``resolve_span`` later re-reads.
+
+    **Occurrences are counted with overlap, and ``bytes.count`` cannot do it.** It counts
+    non-overlapping matches, so ``b"aaa".count(b"aa")`` is 1 while ``b"aa"`` in fact starts
+    at both 0 and 1. That is not a corner case dressed up as one: a club writing "he was
+    laughing, ha ha ha" gives ``"ha ha"`` two starts, and the old check called that unique
+    and took the first. A citation silently chosen between two candidates is exactly what
+    this function exists to refuse, so the scan advances one byte past each hit rather than
+    one match length.
     """
 
     needle = quote.encode("utf-8")
     if not needle:
         raise ClubNewsError(f"{label} carries an empty quote; there is nothing to locate.")
-    occurrences = content.count(needle)
+    starts: list[int] = []
+    position = content.find(needle)
+    while position != -1:
+        starts.append(position)
+        position = content.find(needle, position + 1)
+    occurrences = len(starts)
     if occurrences == 0:
         raise ClubNewsError(
             f"{label} quotes {quote[:60]!r}, which does not appear in the document it cites. "
@@ -358,11 +371,11 @@ def locate_quote(content: bytes, quote: str, label: str) -> tuple[int, int]:
         )
     if occurrences > 1:
         raise ClubNewsError(
-            f"{label} quotes {quote[:60]!r}, which appears {occurrences} times in the "
-            "document it cites. The span would be a choice between them, so it is refused "
-            "rather than taken from the first."
+            f"{label} quotes {quote[:60]!r}, which starts at {starts} in the document it "
+            "cites. The span would be a choice between them, so it is refused rather than "
+            "taken from the first. Overlapping starts count: two of these may share bytes."
         )
-    start = content.find(needle)
+    start = starts[0]
     return start, start + len(needle)
 
 
