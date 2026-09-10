@@ -40,7 +40,7 @@ from typing import Final
 import pandas as pd
 
 from squadopt.application.evidence_io import write_json, write_text
-from squadopt.backtest.export_precision import write_export_table
+from squadopt.data.checksums import compute_table_sha256
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import BOOTSTRAP_PAYLOAD, FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import (
@@ -50,6 +50,7 @@ from squadopt.data.sources.fpl_live import (
     live_payload,
     scored_gameweeks,
 )
+from squadopt.data.tables import write_export_table
 from squadopt.data.timestamps import as_instant
 from squadopt.features.settled_outcomes import (
     ARTIFACT_CONTRACT_VERSION,
@@ -59,7 +60,6 @@ from squadopt.features.settled_outcomes import (
 )
 from squadopt.live import infer_season
 from squadopt.prediction.availability import apply_availability
-from squadopt.preflight.validator import compute_table_sha256
 
 DEFAULT_SNAPSHOT_ROOT: Final = Path("data/snapshots")
 DEFAULT_OUTPUT_DIR: Final = Path("artifacts/rotation")

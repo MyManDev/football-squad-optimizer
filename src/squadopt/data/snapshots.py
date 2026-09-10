@@ -25,6 +25,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Final
 
+from squadopt.data.checksums import sha256_of_bytes
 from squadopt.data.errors import (
     DataSourceError,
     SnapshotExistsError,
@@ -88,9 +89,13 @@ class CapturedSnapshot:
 
 
 def payload_checksum(content: bytes) -> str:
-    """Return the SHA-256 digest of one raw payload."""
+    """Return the SHA-256 digest of one raw payload.
 
-    return hashlib.sha256(content).hexdigest()
+    The same digest a table manifest records (`squadopt.data.checksums`), so a payload and
+    a table hash mean the same thing.
+    """
+
+    return sha256_of_bytes(content)
 
 
 def normalize_captured_at(value: str) -> str:
