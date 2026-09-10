@@ -201,6 +201,19 @@ belong to, and this section is again the two rows its first sentence describes.
 | `weekly_scorecard` (record) | Projection versus reality, one row per settled gameweek. **GW1 (`opening-carry-over-v1`): projected 56.08, realized XI 26, net 26, error −30.08.** The captain returned 4 points doubled — a 15% share of the realized XI, against a projection that had him as its largest single line. First entry of the series, so it establishes the sign convention (realized minus projected; negative means the projection was optimistic) and nothing about variance yet | #258 |
 | `season_ledger_2026-27` (record) | The `season_ledger_v1` summary of every live decision: GW1 from capture `fpl-live-20260821T143619Z-11bc603a8e1c`, solver `OPTIMAL`, 0 transfers, 0 hits, no chip, **96 players excluded as unavailable**. Settled gameweeks 1; mean realized 26.0; mean projection error −30.1. Raw entries stay local under `data/ledger/` with per-file checksums, so this file is the committed half of a record whose evidence is deliberately not committed | #258 |
 
+## Serving capacity
+
+**Not a model measurement.** One row for the serving path's own probe: request, queue,
+worker and cache under synthetic bursts. It measures no projection and no decision, and it
+selects nothing — the record itself says it does not pick a production replica count. It is
+here because rule 1 covers every committed artifact, and this one sits under
+`docs/architecture/` rather than `docs/`, where the rule's test did not look until this row
+was written.
+
+| Artifact | Finding | PR |
+| --- | --- | --- |
+| `architecture/advice_capacity_20260909` (+ `architecture/advice_capacity.md`) | **The local advice path completes every one of 18 burst scenarios, and the number that matters is the queue, not the workers.** Six cases (1 and 3 workers × 15, 30, 60 distinct members) on a synthetic 24-player captured world, one burst each, three request shapes per case. Deduplicated bursts return one job and byte-identical answers; cache-hit bursts create no job and complete in **0.048–0.211 s p95**; distinct bursts create exactly one job per request and are the only shape that queues — **60 distinct members on one worker: submit p95 1.940 s, complete p95 6.410 s, sampled queue peak 47**; the same burst on three workers completes at **4.675 s p95 with a sampled peak of 0**, so three workers buy a shorter tail rather than a proportionally faster one, and the record refuses to claim linear scaling. Peak RSS **196–210 MiB** for the API and **177–187 MiB** per worker, measured over each role's whole owned process tree. This is the fourth run: the first exposed a late duplicate admission and a Windows polling/replace race, both reproduced under control and fixed under the existing metadata lock; the second measured launcher processes only and its resource numbers are declared unusable; the third found a worker stopped by a timestamp sampled before lock acquisition, fixed by clocking after the lock. Eight stated limits, chief among them: a shared Windows development host with no CPU quota, one burst per configuration with no interval and no sustained-load claim, a rate limit of 5000 and a 0.05 s idle poll that are measurement settings rather than defaults, and a real roster's solver cost never exercised. **Selects no replica count and sets no latency target**; the same probe against the prepared host with its real limits and a representative roster is what would set one | #456 |
+
 ## Process references
 
 `handoff_acceptance_checklist.md` · `candidate_declaration_review.md` ·
