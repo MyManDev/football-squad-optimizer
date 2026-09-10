@@ -76,6 +76,41 @@ const alternative: Predicate = (value) =>
     { expected_points_cost_ceiling: finite },
   );
 
+const chipRecommendations: Predicate = (value) =>
+  fields(value, {
+    contract_version: oneOf("member_chip_recommendations_v1"),
+    planning_policy_id: text,
+    gameweeks: array(identity),
+    control_solver_status: text,
+    control_optimality_gap: nullable(finite),
+    comparisons: array((row) =>
+      fields(row, {
+        chip: oneOf("bboost", "3xc", "wildcard", "freehit"),
+        available_from_gameweek: identity,
+        last_usable_gameweek: identity,
+        remaining: identity,
+        action: oneOf("play", "hold"),
+        gameweek: nullable(identity),
+        expected_points_gain: nullable(finite),
+        reason: oneOf("window_gain", "no_positive_gain", "outside_horizon"),
+        solver_status: nullable(text),
+        optimality_gap: nullable(finite),
+        decision: nullable((decision) =>
+          fields(decision, {
+            gameweek: identity,
+            captain: player,
+            vice_captain: player,
+            starting_xi: array(player),
+            bench: array(player),
+            chip,
+            expected_own_points: finite,
+            transfer_hit_points: finite,
+          }),
+        ),
+      }),
+    ),
+  });
+
 export function isAdvicePayload(value: unknown): boolean {
   return fields(
     value,
@@ -113,6 +148,7 @@ export function isAdvicePayload(value: unknown): boolean {
       starting_xi: nullable(array(player)),
       bench: nullable(array(player)),
       chip,
+      chip_recommendations: chipRecommendations,
       plan_weeks: nullable(array(planWeek)),
       stated_limits: nullable(array(text)),
       plan_kind: planKind,

@@ -38,6 +38,13 @@ results, and `--expected-at <UTC instant>` additionally evaluates missed complet
 | publish | `scripts.publish_gameweek_site --league … --snapshot-id … --in-season-projection … --cohort-snapshot … --elite-snapshot … --workers …` (only with `--publish`) | a clean `origin/develop` | an owned `.codex-tmp/publications/gw<NN>-decision` worktree, a commit of `web/public/data` (league tree and scoreboard rebuilt there from the same capture), a push, a pull request; then the printed human steps: merge, release, tag, dispatch. The rebuild also writes this checkout's `data/advice_records/<season>/gw<NN>/entry-<id>/<snapshot id>/` — the immutable record of what each member was told, digests included, so the week can be reviewed after the site has been overwritten. One record per capture: publishing a week twice (mid-week, then again before the deadline from a fresher capture) records both, and the review page reads the last capture that preceded the deadline. What is **refused** is rebuilding *one* capture into different bytes — the capture is the whole input, so that difference is our own code's — with the differing fields named; if the deadline will not wait, `--no-advice-record` publishes without recording and leaves the first record and the difference to be reconciled afterwards |
 
 Existing captures can be named explicitly: `--cohort-snapshot` / `--elite-snapshot`
+reuse the Top-100 captures. For an optional final-24-hour information audit, take a
+second capture and run `squadopt.platform.capture_measurement` as described in
+[capture measurement](operations/capture_measurement.md); the output counts changed
+fields and does not establish a decision gain. Historical GW1–GW4 availability was
+lost, so that gain remains unmeasured until new paired captures accumulate.
+
+The Top-100 options
 reuse the Top-100 captures (an export already on disk for that picks capture is reused,
 and the named cohort capture also feeds the scoreboard), `--snapshot-id` reuses a live
 capture — then the Top-100 captures must be reused or skipped too, because the

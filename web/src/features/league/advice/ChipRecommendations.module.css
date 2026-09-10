@@ -1,0 +1,21 @@
+.section {
+  margin-block: 1.5rem;
+}
+
+.list {
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.list li {
+  display: grid;
+  gap: 0.25rem;
+  padding-block: 0.5rem;
+  border-bottom: 1px solid currentColor;
+}
+
+.list small {
+  opacity: 0.8;
+}

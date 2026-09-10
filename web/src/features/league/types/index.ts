@@ -271,6 +271,7 @@ export interface EntryAdvice {
   starting_xi?: AdvicePlayer[] | null;
   bench?: AdvicePlayer[] | null;
   chip?: AdviceChip | null;
+  chip_recommendations?: MemberChipRecommendations;
   /**
    * A three- or five-week window: one row per gameweek, and the sentences the
    * producer states about what the window assumes (the first week's projection
@@ -281,6 +282,38 @@ export interface EntryAdvice {
   stated_limits?: string[] | null;
   data_quality: EntryDataQuality;
   missing_fields: string[];
+}
+
+export interface MemberChipRecommendations {
+  contract_version: "member_chip_recommendations_v1";
+  planning_policy_id: string;
+  gameweeks: number[];
+  control_solver_status: string;
+  control_optimality_gap: number | null;
+  comparisons: {
+    chip: AdviceChip;
+    available_from_gameweek: number;
+    last_usable_gameweek: number;
+    remaining: number;
+    action: "play" | "hold";
+    gameweek: number | null;
+    expected_points_gain: number | null;
+    reason: "window_gain" | "no_positive_gain" | "outside_horizon";
+    solver_status: string | null;
+    optimality_gap: number | null;
+    decision:
+      | (Pick<
+          EntryAdvice,
+          | "captain"
+          | "vice_captain"
+          | "starting_xi"
+          | "bench"
+          | "chip"
+          | "expected_own_points"
+          | "transfer_hit_points"
+        > & { gameweek: number })
+      | null;
+  }[];
 }
 
 /**
@@ -303,8 +336,8 @@ export interface ScoreboardOurs {
    * decision names no vice-captain, so a captain who did not play is not recovered.
    * Both corrections only add points, so this reads low beside a real FPL entry's net.
    */
-  scoring_basis: "named_eleven_no_autosubs";
-  /** False on every decision the ledger holds: the frozen decision names no vice-captain. */
+  scoring_basis: "named_eleven_no_autosubs" | "official_autosub_captain_v2";
+  /** Legacy decisions may not have recorded a vice-captain. */
   vice_captain_named: boolean;
 }
 
@@ -349,6 +382,45 @@ export interface ScoreboardGameweek {
   members: ScoreboardMember[];
   members_mean_net: number | null;
   members_counted: number;
+  comparisons?: ScoreboardComparison[];
+  decision_record_status?: "missing" | "available";
+  chip_recommendations?: ScoreboardChipRecommendation[];
+}
+
+export interface ScoreboardChipRecommendation {
+  entry_id: number;
+  window: number;
+  chip: AdviceChip;
+  action: "play" | "hold";
+  gameweek: number | null;
+  available_from_gameweek: number;
+  last_usable_gameweek: number;
+  expected_points_gain: number | null;
+  realized_chip_week_net: number | null;
+  advice_sha256: string;
+  source_snapshot_id: string;
+  outcome_snapshot_id: string | null;
+}
+
+export interface ScoreboardComparison {
+  kind:
+    | "system"
+    | "base"
+    | "elite_xi"
+    | "ownership_template"
+    | "league_mean"
+    | "game_mean"
+    | "member_advice";
+  entry_id?: number;
+  net: number | null;
+  scoring_basis: string | null;
+  source_snapshot_id: string | null;
+  diagnostics: {
+    zero_minute_starters: number | null;
+    minutes_shortfall: number | null;
+    captain_shortfall: number | null;
+    autosub_recovery: number | null;
+  };
 }
 
 export interface ScoreboardCumulative {

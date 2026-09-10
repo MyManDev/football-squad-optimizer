@@ -263,7 +263,7 @@ def test_the_publish_records_what_each_member_was_told(
     assert provenance["model_version"] == world_module.IN_SEASON_VERSION
     assert provenance["feature_contract_version"]
     assert len(str(provenance["projection_handoff_fingerprint"])) == 64
-    assert provenance["planner_policy_id"] == "member_planning_policy_v2"
+    assert provenance["planner_policy_id"] == "member_planning_policy_v3"
     assert len(str(provenance["transfer_config_fingerprint"])) == 64
     assert record["league_view_contract_version"] == "provisional_league_ui_v1"
 

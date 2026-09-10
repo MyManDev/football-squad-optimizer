@@ -408,7 +408,7 @@ export const WINDOW_STATED_LIMITS: readonly string[] = [
   "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
   "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.",
   "Prices are held at the captured values; no price change is modelled.",
-  "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+  "The main window plan uses no chip. Chip alternatives are priced separately against it; holding a chip beyond this window has no assigned value.",
 ];
 
 /** One row per gameweek of a pure-points window: the first week's move, one paid

@@ -166,6 +166,12 @@ def test_a_recorded_decision_round_trips_with_full_provenance(
     assert entry.decision["snapshot_id"] == recommendation.snapshot_id
     assert entry.decision["prediction_fingerprint"] == recommendation.prediction_fingerprint
     assert entry.decision["captain_player_id"] == int(recommendation.captain["player_id"])
+    assert entry.decision["vice_captain_player_id"] != entry.decision["captain_player_id"]
+    assert entry.decision["vice_captain_player_id"] in entry.decision["starting_xi_player_ids"]
+    assert set(entry.decision["ordered_bench_player_ids"]) == set(
+        entry.decision["bench_player_ids"]
+    )
+    assert entry.decision["completion_policy"] == "optimizer_projection_order_v1"
     assert len(list(entry.decision["squad_player_ids"])) == 15  # type: ignore[arg-type]
     assert entry.outcome is None
     stored = pd.read_csv(directory / "projections.csv")

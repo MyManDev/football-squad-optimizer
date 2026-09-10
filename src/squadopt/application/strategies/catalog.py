@@ -76,6 +76,7 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         "starting_xi",
         "bench",
         "chip",
+        "chip_recommendations",
         "control_solver_status",
         "control_optimality_gap",
         "transfer_cap",
@@ -319,6 +320,7 @@ _BASELINE_PUBLISHES: Final = frozenset(
         "starting_xi",
         "bench",
         "chip",
+        "chip_recommendations",
     }
 )
 _RIVAL_PUBLISHES: Final = _BASELINE_PUBLISHES | frozenset(

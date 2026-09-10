@@ -785,7 +785,8 @@ def test_the_member_planning_hit_cost_reaches_the_published_bytes(
 # value is ``test_the_member_planning_hit_cost_reaches_the_published_bytes`` above, which
 # holds a discretionary member; the value itself is pinned in
 # ``tests/unit/test_live_transfers.py``.
-IN_SEASON_MEMBER_ADVICE_SHA256 = "cf3846bd66baba6938898a47b9d67b6a42ead8512f4653f4b0193d41a1441477"
+# v3 adds independently priced chip alternatives; the readable transfer pin below is unchanged.
+IN_SEASON_MEMBER_ADVICE_SHA256 = "423b70d105c9b1dd6eac7dc7cb80af9731588d68165c04ca44c481612379d8f1"
 # (player_out, player_in, expected_points_delta) per move, each pair one position. The
 # week's hit charge is not here because it is not a property of a move: this plan makes
 # two transfers and pays for one, and the payload states that once as
