@@ -20,6 +20,10 @@ from squadopt.application.league_views import (
     build_league_views,
 )
 from squadopt.application.mode_selection import build_mode_paths
+from squadopt.application.weekly_suggestion_eval import (
+    SUPPORTED_LEAGUE_ID,
+    publish_suggestion_histories,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -56,6 +60,7 @@ class LeaguePublicationRequest:
     record_root: Path | None = None
     rival_menu: bool = True
     now: datetime | None = None
+    history_record_root: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -259,6 +264,19 @@ def publish_prepared_league(
         now=request.now,
     )
     outputs = [out_dir / name for name in report.files]
+    history_root = request.history_record_root or request.record_root
+    if history_root is not None and request.league_id == SUPPORTED_LEAGUE_ID:
+        outputs.extend(
+            publish_suggestion_histories(
+                record_root=history_root,
+                snapshot_root=request.snapshot_root,
+                as_of_snapshot=snapshot,
+                season=season,
+                league_id=request.league_id,
+                entry_ids=[entry.entry_id for entry in prepared.registrations],
+                out_dir=out_dir,
+            )
+        )
     if request.record_root is not None:
         for member in report.members:
             if member.rendered:

@@ -113,6 +113,11 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
     assert all(path.is_file() for path in first.output_paths)
     assert any(path.name == "advice.json" for path in first.output_paths)
     assert any(path.name == "manifest.json" for path in first.output_paths)
+    history = request.out_dir / "data/league/history" / f"{member_fixture.ENTRY_ID}.json"
+    assert history in first.output_paths
+    document = json.loads(history.read_text(encoding="utf-8"))
+    assert document["payload"]["weeks"][0]["status"] == "unsettled"
+    assert document["payload"]["weeks"][0]["advice_generated_at_utc"] == "2026-08-27T10:00:00Z"
 
     parallel = replace(request, out_dir=tmp_path / "parallel")
     with league_mapper(parallel, workers=2) as mapper:
@@ -122,6 +127,12 @@ def test_installed_member_publication_and_pool_write_the_same_contracts(
         assert (request.out_dir / "data/league" / name).read_bytes() == (
             parallel.out_dir / "data/league" / name
         ).read_bytes()
+    assert (
+        history.read_bytes()
+        == (
+            parallel.out_dir / "data/league/history" / f"{member_fixture.ENTRY_ID}.json"
+        ).read_bytes()
+    )
 
 
 def test_scoreboard_service_uses_the_named_capture_and_returns_the_written_path(

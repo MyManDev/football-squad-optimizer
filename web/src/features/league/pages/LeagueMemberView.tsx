@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -48,6 +48,7 @@ function LeagueMemberContent({
   const view = squad.payload;
   const [searchParams] = useSearchParams();
   const { viewer, clear } = useViewerEntry();
+  const navigate = useNavigate();
   const {
     entryId,
     resolve,
@@ -76,6 +77,13 @@ function LeagueMemberContent({
           </div>
           <h1 className={styles.title}>{view.entry.team_name ?? copy.unknownTeam}</h1>
           <p className={styles.lede}>{view.entry.manager_name ?? copy.unknownMember}</p>
+          {view.league_id === 352490 && (
+            <p>
+              <Link to={`/league/members/${entryId}/history`}>
+                {messages.suggestionHistory.title}
+              </Link>
+            </p>
+          )}
         </div>
         <ExampleDataBadge sourceKind={squad.source_kind} />
       </header>
@@ -96,7 +104,14 @@ function LeagueMemberContent({
               )}
             </strong>{" "}
             <Link to="/league/members">{copy.viewerChange}</Link>{" "}
-            <button type="button" className={styles.viewerClear} onClick={clear}>
+            <button
+              type="button"
+              className={styles.viewerClear}
+              onClick={() => {
+                clear();
+                navigate("/league/members", { replace: true });
+              }}
+            >
               {copy.viewerClear}
             </button>
           </p>
