@@ -66,7 +66,7 @@ from squadopt.application.mode_selection import (
     rival_squad_from_picks,
     select_member_modes,
 )
-from squadopt.application.strategies import FORBIDDEN_TEXT_PATTERN, STRATEGY_CATALOG
+from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.application.strategies.rule import RIVAL_RULE_STRATEGIES, suggest_strategy
 from squadopt.data.errors import DataError
 from squadopt.experiments.config import ExperimentError
@@ -299,8 +299,9 @@ PUBLISHED_NAME_LIMIT: Final = 64
 
 
 def _entry_stand_in(entry_id: int) -> str:
-    """The stand-in a refused name is published under. ``advice.py`` already labels a
-    rival it cannot name this way, so a reader meets one convention, not two."""
+    """The stand-in a member with no readable name is published under. ``advice.py``
+    already labels a rival it cannot name this way, so a reader meets one convention,
+    not two."""
 
     return f"entry-{int(entry_id)}"
 
@@ -316,7 +317,19 @@ def published_member_name(raw: str | None, *, entry_id: int, field: str) -> tupl
     consumers. So the producer decides, once, what may be published — refusing at the
     page would leave the file itself carrying whatever arrived.
 
-    Three rules, in order, and each returns the reason it fired so the build can state it:
+    What the producer decides is a question of *safety and shape*, not of wording. A
+    member's team name is the member's own words, chosen inside the game and public there
+    the moment the deadline passes; it is not a claim this site is making, so the honesty
+    envelope — no probability, percentage, quantile, spread, likelihood or chance wording
+    on a member-facing surface — does not reach it. That envelope governs the text *we*
+    generate: strategy names, notes, badges, rule copy, everything in this tree that a
+    member did not type. It is still enforced there, unchanged. A name that reads as a
+    chance or a percentage in either language is published as captured, and the note that
+    used to accompany the substitution is gone with it;
+    ``tests/unit/test_public_probability_guards.py`` names the cases on both sides of
+    that line.
+
+    Two rules, in order, and each returns the reason it fired so the build can state it:
 
     - **Normalise.** Every character in Unicode's ``C`` classes becomes a space: the C0
       and C1 controls (a NUL that truncates a C string, an ESC that a terminal reads as a
@@ -331,15 +344,11 @@ def published_member_name(raw: str | None, *, entry_id: int, field: str) -> tupl
       a name might be pasted into and mean nothing inside a name, so the producer does
       not hand them on.
     - **Bound.** Longer than ``PUBLISHED_NAME_LIMIT`` is truncated to it.
-    - **Refuse the value, never the member.** What survives is still text we publish, so
-      it is held to the same honesty envelope as everything else in the tree
-      (``FORBIDDEN_TEXT_PATTERN``): a member whose team is called ``%72 sans`` may not put
-      a percentage on our page. That name is replaced by the entry's own id — the batch
-      renders, the member keeps their advice, and the substitution is recorded rather than
-      passed off as the name they chose.
 
-    ``None`` in stays ``None`` out: an absent name and a refused one are different facts,
-    and only the second one gets a stand-in.
+    ``None`` in stays ``None`` out: a name the capture never carried and a name that
+    normalised away to nothing are different facts, and only the second one gets the
+    entry's id as a stand-in — a member we hold no name for must read as unavailable
+    rather than as a blank.
     """
 
     if raw is None:
@@ -354,12 +363,6 @@ def published_member_name(raw: str | None, *, entry_id: int, field: str) -> tupl
     if len(cleaned) > PUBLISHED_NAME_LIMIT:
         cleaned = cleaned[:PUBLISHED_NAME_LIMIT].rstrip()
         notes.append(f"{field}: truncated to {PUBLISHED_NAME_LIMIT} characters")
-    if FORBIDDEN_TEXT_PATTERN.search(cleaned):
-        return (
-            _entry_stand_in(entry_id),
-            f"{field}: replaced with {_entry_stand_in(entry_id)!r}; the name the capture "
-            "carries reads as a chance or a percentage, which this site does not publish",
-        )
     if not cleaned:
         # Nothing printable survived. The capture did carry something, so ``None`` — "no
         # name was captured" — would be the wrong claim; the id says what we know.
@@ -657,11 +660,12 @@ def build_league_views(
     has been written. The published bytes are identical with and without this argument.
     """
 
-    # Every member-typed name is filtered here, once, before anything reads a standings
+    # Every member-typed name is normalised here, once, before anything reads a standings
     # row: ``_row`` writes both names into ``members.json`` and into the ``entry`` block
     # of ``entries/{id}.json``, and the rival label below is the same ``team_name`` again.
-    # Filtering at the source is what makes those three agree; filtering at each of them
-    # would be three chances to miss one.
+    # Normalising at the source is what makes those three agree; doing it at each of them
+    # would be three chances to miss one. The wording of a name is the member's own and is
+    # published as captured; only its shape is ours to decide.
     name_notes: dict[int, tuple[str, ...]] = {}
     placings: dict[int, MemberStanding] = {}
     for entry_id, raw_placing in (standings or {}).items():
