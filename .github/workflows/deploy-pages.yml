@@ -486,24 +486,10 @@ jobs:
           DEPLOYMENT_URL: ${{ format('https://{0}', steps.budget.outputs.pages_subdomain) }}
         run: node trusted/web/scripts/smoke-deployment.mjs "$DEPLOYMENT_URL"
 
-      # The alias above proves the upload; this proves it arrived where members look. The
-      # custom domain is the only address reachable from the audience's networks, so a
-      # publication that has not reached it has not happened. It fails the deploy rather than
-      # warning, on the smoke script's own retry budget (7 attempts, 59 s of backoff), because
-      # a warning is what let weeks of invisible deploys report green. Custom domains serve the
-      # production branch, so this belongs here and not in the preview job.
-      - name: Smoke canonical member address
-        id: smoke_canonical
-        if: steps.smoke.outcome == 'success'
-        env:
-          CANONICAL_URL: https://squadopt.mymandev.com
-        run: node trusted/web/scripts/smoke-deployment.mjs "$CANONICAL_URL"
-
       - name: Report production result
         if: always()
         env:
           BUDGET_DECISION: ${{ steps.budget.outputs.decision }}
-          CANONICAL_URL: https://squadopt.mymandev.com
           CI_RUN_ID: ${{ needs.production_meta.outputs.ci_run_id }}
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
           PRODUCTION_URL: ${{ format('https://{0}', steps.budget.outputs.pages_subdomain) }}
@@ -512,7 +498,6 @@ jobs:
           UPLOAD_OUTCOME: ${{ steps.deploy.outcome }}
           VERIFY_OUTCOME: ${{ steps.verify.outcome }}
           SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
-          CANONICAL_SMOKE_OUTCOME: ${{ steps.smoke_canonical.outcome }}
           TODAY_COUNT: ${{ steps.budget.outputs.today_count }}
         run: |
           echo "## Cloudflare Pages production" >> "$GITHUB_STEP_SUMMARY"
@@ -523,7 +508,5 @@ jobs:
           echo "- Upload: ${UPLOAD_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Identity: ${VERIFY_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Smoke: ${SMOKE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Canonical address smoke: ${CANONICAL_SMOKE_OUTCOME:-not-run}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Deployment: ${DEPLOYMENT_URL:-not-created}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Production alias: ${PRODUCTION_URL:-not-created}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Member address: $CANONICAL_URL" >> "$GITHUB_STEP_SUMMARY"

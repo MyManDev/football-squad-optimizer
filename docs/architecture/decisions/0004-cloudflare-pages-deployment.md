@@ -51,22 +51,6 @@ reads and validates the project's actual `*.pages.dev` subdomain; Cloudflare may
 when the preferred hostname is occupied. Preview and production identity checks use that API
 value rather than constructing a hostname from the project name.
 
-The canonical hostname is the custom domain **`squadopt.mymandev.com`**, not the `pages.dev`
-subdomain. `pages.dev` is filtered on the hostname from the audience's networks and cannot be
-the address given to members: measured 2026-09-09, TCP to `squadopt.pages.dev:443` completes in
-about 29 ms and the peer then resets before any TLS record — on the apex, on a per-deployment
-alias, and on an unrelated `*.pages.dev` site — while `developers.cloudflare.com` answers 200
-over the same path, including when that request is forced to the IP `squadopt.pages.dev`
-resolves to; sending SNI `squadopt.pages.dev` to an IP that had just answered 200 gets the
-reset. It is the name, not Cloudflare, the address, or the deployment, and no Cloudflare-side
-change fixes it. The same unreachability was recorded from a second network on 2026-08-23. The
-`pages.dev` subdomain therefore stays as the deployment alias — identity verification resolves
-it from the API and production still smokes it — and production smokes the custom domain as
-well, so a publication that has not reached the address members open fails rather than passing.
-The backend's CORS allowlist is both origins, canonical first (`SITE_ORIGINS` in
-`squadopt.platform.backend_runtime`), because the browser sending the request is on the custom
-domain.
-
 Production tags are phase-qualified, immutable, and never reused:
 
 - `site-2026-27-gw01-decision`

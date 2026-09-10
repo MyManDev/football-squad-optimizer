@@ -1,5 +1,7 @@
 # SquadOpt Product Roadmap
 
+Start with the [documentation guide](docs/README.md) for product, operations, research and architecture.
+
 This roadmap tracks the path from a correctly measured deterministic optimizer to a
 calibrated, evidence-aware and multi-gameweek football decision-support system.
 
