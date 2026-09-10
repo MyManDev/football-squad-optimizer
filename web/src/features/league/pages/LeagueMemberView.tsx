@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 
 import { Card } from "../../../design/components/Card";
 import { EmptyState } from "../../../design/components/EmptyState";
@@ -48,6 +48,7 @@ function LeagueMemberContent({
   const view = squad.payload;
   const [searchParams] = useSearchParams();
   const { viewer, clear } = useViewerEntry();
+  const navigate = useNavigate();
   const {
     entryId,
     resolve,
@@ -103,7 +104,14 @@ function LeagueMemberContent({
               )}
             </strong>{" "}
             <Link to="/league/members">{copy.viewerChange}</Link>{" "}
-            <button type="button" className={styles.viewerClear} onClick={clear}>
+            <button
+              type="button"
+              className={styles.viewerClear}
+              onClick={() => {
+                clear();
+                navigate("/league/members", { replace: true });
+              }}
+            >
               {copy.viewerClear}
             </button>
           </p>

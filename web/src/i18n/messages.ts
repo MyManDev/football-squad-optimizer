@@ -466,13 +466,13 @@ const en = {
     adviceRequestHint: "You can ask for it with Compute above.",
     viewerTitle: "Which one is you?",
     viewerBody:
-      "Pick your own row to get advice from your squad. This is a claim, not a login: anyone can pick anyone, and that is fine because everything shown here is already public after the deadline.",
+      "Pick your own row to get advice from your squad. Select again whenever you reopen or refresh the site. This is a claim, not a login: anyone can pick anyone, and that is fine because everything shown here is already public after the deadline.",
     viewerSelect: "This is me",
     viewerYouBadge: "You",
     viewerSelected: (name: string) =>
       `Viewing as ${name}. Advice pages will start from this squad.`,
-    viewerClear: "Clear selection",
-    viewerChange: "Change member",
+    viewerClear: "Clear Selection",
+    viewerChange: "Change Member",
     viewerMissing:
       "Your saved selection is not in the published member list. Choose another member or clear it.",
     viewerOpenMine: "Open my squad →",
@@ -1320,13 +1320,13 @@ const tr: MessageSchema<typeof en> = {
     adviceRequestHint: "Yukarıdaki Hesapla ile isteyebilirsin.",
     viewerTitle: "Hangisi sensin?",
     viewerBody:
-      "Kendi satırını seç ki tavsiye kendi kadrondan hesaplansın. Bu bir beyandır, giriş değil: herkes herkesi seçebilir ve bu sorun değil, çünkü burada gösterilen her şey son tarihten sonra zaten herkese açık.",
+      "Kendi satırını seç ki tavsiye kendi kadrondan hesaplansın. Siteyi yeniden açtığında veya yenilediğinde tekrar seçim yapmalısın. Bu bir beyandır, giriş değil: herkes herkesi seçebilir ve bu sorun değil, çünkü burada gösterilen her şey son tarihten sonra zaten herkese açık.",
     viewerSelect: "Bu benim",
     viewerYouBadge: "Sen",
     viewerSelected: (name: string) =>
       `${name} olarak bakıyorsun. Tavsiye sayfaları bu kadrodan başlayacak.`,
-    viewerClear: "Seçimi kaldır",
-    viewerChange: "Üyeyi değiştir",
+    viewerClear: "Seçimi Kaldır",
+    viewerChange: "Üyeyi Değiştir",
     viewerMissing:
       "Kayıtlı seçimin yayımlanan üye listesinde yok. Başka bir üye seç veya seçimi kaldır.",
     viewerOpenMine: "Kadromu aç →",

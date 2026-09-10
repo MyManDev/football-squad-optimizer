@@ -40,9 +40,8 @@ test("a browser computes through the worker, then reads the same answer from cac
   await expect(page).toHaveURL("/league/members");
   await page.getByRole("button", { name: "Bu benim", exact: true }).click();
   await expect(page).toHaveURL(`/league/members/${context.entryId}`);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("squadopt.viewer")!))).toEqual({
-    entryId: context.entryId,
-  });
+  expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
+  await expect(page.getByRole("button", { name: "Seçimi Kaldır" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText("Listelenen öneri dosyası bulunamadı.")).toBeVisible();
