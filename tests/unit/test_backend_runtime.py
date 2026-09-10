@@ -296,6 +296,14 @@ def test_a_capture_without_its_handoff_yields_no_context(deployment: dict[str, A
     assert checks["league_tree"] is True
 
 
+def test_existing_but_invalid_membership_is_not_ready(deployment: dict[str, Any]) -> None:
+    path = deployment["config"].site_data_root / "league" / "members.json"
+    path.write_text('{"payload": null}', encoding="utf-8")
+    ready, checks = build_backend(deployment["config"]).readiness()
+    assert not ready
+    assert checks["league_tree"] is False
+
+
 def test_the_context_names_the_capture_and_its_handoff(deployment: dict[str, Any]) -> None:
     backend = build_backend(deployment["config"])
     context = backend.contexts.current()

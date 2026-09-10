@@ -14,20 +14,26 @@ from squadopt.optimization import (
     SolverStatus,
 )
 from squadopt.optimization.coefficients import scale_expected_points, sort_players_by_id
+from squadopt.optimization.decisions import (
+    add_decision_constraints as _add_decision_constraints,
+)
+from squadopt.optimization.decisions import (
+    selected_indices as _selected_indices,
+)
+from squadopt.optimization.decisions import (
+    verify_solution as _verify_solution,
+)
 from squadopt.optimization.optimizer import (
     CP_SAT_SAFE_INTEGER_MAX,
     MIN_TIEBREAK_DETERMINISTIC_TIME,
     MIN_TIEBREAK_TIME_SECONDS,
-    _add_decision_constraints,
     _add_tiebreak_objective,
     _deterministic_time_used,
     _empty_result,
     _map_solver_status,
     _raw_status_name,
     _remaining_deterministic_time,
-    _selected_indices,
     _solve,
-    _verify_solution,
     configure_solver,
 )
 from squadopt.optimization.validation import validate_players

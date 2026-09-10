@@ -32,6 +32,7 @@ from squadopt.platform.advice_read import (
     LeagueNotConnectedError,
     UnknownEntryError,
     UnknownStrategyError,
+    UnsupportedAdviceRequestError,
 )
 from squadopt.platform.advice_submit import (
     AdviceSubmitService,
@@ -39,6 +40,7 @@ from squadopt.platform.advice_submit import (
     RateLimitedError,
 )
 from squadopt.platform.api_contract import BackendApiContractError
+from squadopt.platform.queue_contracts import AdviceQueueError, AdviceQueueIntegrityError
 
 DEFAULT_SITE_DATA_ROOT: Final = Path("web") / "public" / "data"
 _SEASON_PATTERN: Final = r"^[0-9]{4}-[0-9]{2}$"
@@ -190,6 +192,16 @@ def create_app(
     async def advice_not_computed(_request: Request, error: AdviceNotComputedError) -> JSONResponse:
         return _contract_error(404, "NOT_COMPUTED", str(error))
 
+    @application.exception_handler(UnsupportedAdviceRequestError)
+    async def unsupported_advice(
+        _request: Request, error: UnsupportedAdviceRequestError
+    ) -> JSONResponse:
+        return _contract_error(422, "UNSUPPORTED_ADVICE_REQUEST", str(error))
+
+    @application.exception_handler(AdviceQueueIntegrityError)
+    async def queue_integrity(_request: Request, _error: AdviceQueueIntegrityError) -> JSONResponse:
+        return _contract_error(503, "QUEUE_INTEGRITY_ERROR", "The stored job is unavailable.")
+
     @application.exception_handler(AdviceDocumentError)
     async def advice_document_invalid(request: Request, error: AdviceDocumentError) -> JSONResponse:
         _log_exception("api.advice_document_invalid", request, error)
@@ -317,7 +329,9 @@ def create_app(
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
         try:
             view = advice_submit.public_job_view(job_id)
-        except Exception:
+        except AdviceQueueIntegrityError:
+            raise
+        except AdviceQueueError:
             return _contract_error(404, "NOT_FOUND", "No such advice job.")
         if view is None:
             return _contract_error(404, "NOT_FOUND", "No such advice job.")

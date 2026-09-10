@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+import threading
 import time
 from bisect import bisect_left
 from collections.abc import Mapping
@@ -116,13 +117,16 @@ class AdviceMetrics:
     def __init__(self) -> None:
         self._counters: dict[tuple[str, tuple[tuple[str, str], ...]], int] = {}
         self._histograms: dict[str, _Histogram] = {}
+        self._lock = threading.RLock()
 
     def increment(self, name: str, **labels: str) -> None:
         key = (name, tuple(sorted(labels.items())))
-        self._counters[key] = self._counters.get(key, 0) + 1
+        with self._lock:
+            self._counters[key] = self._counters.get(key, 0) + 1
 
     def observe(self, name: str, value: float) -> None:
-        self._histograms.setdefault(name, _Histogram()).observe(value)
+        with self._lock:
+            self._histograms.setdefault(name, _Histogram()).observe(value)
 
     def cache_hit(self) -> None:
         self.increment("advice_cache_hits_total")
@@ -143,6 +147,10 @@ class AdviceMetrics:
         self.observe("advice_solve_seconds", seconds)
 
     def render(self, *, queue_depth: int | None = None) -> str:
+        with self._lock:
+            return self._render(queue_depth=queue_depth)
+
+    def _render(self, *, queue_depth: int | None = None) -> str:
         """The scrape body. Queue depth is read at scrape time by the caller that has
         the queue, because a gauge that counts events drifts from the store."""
 

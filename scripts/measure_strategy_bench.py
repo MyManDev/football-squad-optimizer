@@ -30,6 +30,7 @@ Instrument notes pinned before the numbers were read:
 import argparse
 import logging
 import sys
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -64,7 +65,7 @@ from squadopt.scenarios.rivals import template_rival_from_ownership
 
 LOGGER = logging.getLogger(__name__)
 
-STRATEGY_BENCH_CONTRACT_VERSION = "strategy_bench_v1"
+STRATEGY_BENCH_CONTRACT_VERSION = "strategy_bench_v2"
 DEVELOPMENT_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25")
 LOCKED_HOLDOUT_SEASON = "2025-26"
 # The panel needs one season of prior cross-season history ahead of the development
@@ -106,6 +107,45 @@ class BandOutcome:
     @property
     def wins_big(self) -> bool:
         return self.realized_points - self.rival_realized_points > WINS_BIG_MARGIN
+
+
+def _direction_gate(
+    rows: Mapping[str, Mapping[str, BandOutcome]],
+    eligible_fold_ids: Sequence[str],
+) -> tuple[dict[str, float | None], bool | None, dict[str, object]]:
+    """Compare all three bands on one population, reporting every exclusion separately."""
+
+    eligible = set(eligible_fold_ids)
+    if set(rows) - eligible:
+        raise ValueError("Scored folds must belong to the declared eligible population.")
+    paired = sorted(fold_id for fold_id, row in rows.items() if all(band in row for band in BANDS))
+    frequency = {
+        band: fmean(float(rows[fold_id][band].wins_big) for fold_id in paired) if paired else None
+        for band in BANDS
+    }
+    differential = frequency["differential"]
+    passes = (
+        all(differential >= value for value in frequency.values() if value is not None)
+        if differential is not None
+        else None
+    )
+    excluded_by_band = {
+        band: sorted(fold_id for fold_id in eligible if band not in rows.get(fold_id, {}))
+        for band in BANDS
+    }
+    coverage: dict[str, object] = {
+        "population": "same_folds_with_all_three_bands",
+        "eligible_fold_count": len(eligible),
+        "paired_fold_count": len(paired),
+        "paired_fold_ids": paired,
+        "paired_share": len(paired) / len(eligible) if eligible else None,
+        "feasible_fold_count_by_band": {
+            band: len(eligible) - len(excluded_by_band[band]) for band in BANDS
+        },
+        "excluded_fold_ids_by_band": excluded_by_band,
+        "excluded_fold_ids": sorted(eligible - set(paired)),
+    }
+    return frequency, passes, coverage
 
 
 def _parse_arguments() -> argparse.Namespace:
@@ -440,25 +480,9 @@ def main() -> int:
                 }
             )
 
-        wins_big = {
-            band: (
-                fmean(float(row[band].wins_big) for row in rows.values() if band in row)
-                if any(band in row for row in rows.values())
-                else None
-            )
-            for band in BANDS
-        }
-        direction_passes = None
-        if all(value is not None for value in wins_big.values()):
-            direction_passes = bool(
-                wins_big["differential"] is not None
-                and wins_big["differential"] == max(v for v in wins_big.values() if v is not None)
-                and all(
-                    wins_big["differential"] >= v
-                    for k, v in wins_big.items()
-                    if k != "differential" and v is not None
-                )
-            )
+        wins_big, direction_passes, direction_coverage = _direction_gate(
+            rows, [fold.fold_id for fold in folds]
+        )
 
         price: dict[str, dict[str, object]] = {}
         for band in ("high_overlap", "differential"):
@@ -489,6 +513,7 @@ def main() -> int:
             "gate1_separation": separation,
             "gate2_wins_big_frequency": wins_big,
             "gate2_direction_passes": direction_passes,
+            "gate2_coverage": direction_coverage,
             "gate3_price_honesty": price,
             "band_binding_diagnostics": binding,
             "gated": horizon in GATED_HORIZONS,
@@ -569,6 +594,7 @@ def _to_markdown(document: dict[str, object]) -> str:
             f"- Gate 2 (direction): frequencies {entry['gate2_wins_big_frequency']}, "
             f"passes: {entry['gate2_direction_passes']}"
         )
+        lines.append(f"- Gate 2 common population and exclusions: {entry['gate2_coverage']}")
         lines.append(f"- Gate 3 (price honesty): {entry['gate3_price_honesty']}")
         lines.append(f"- Band binding (diagnostic): {entry['band_binding_diagnostics']}")
         lines.append("")

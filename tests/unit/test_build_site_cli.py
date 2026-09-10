@@ -9,7 +9,7 @@ import pytest
 import scripts.build_site as cli
 from tests.unit.test_season_ledger import _capture, _panel
 
-from squadopt.application import UI_VIEW_CONTRACT_VERSION
+from squadopt.application import UI_VIEW_CONTRACT_VERSION, site_publication
 from squadopt.data.snapshots import write_snapshot
 from squadopt.live import build_recommendation, project, read_inputs, record_decision
 
@@ -118,9 +118,9 @@ def test_the_shell_selects_the_live_capture_from_a_root_the_cohorts_share(
     _ledger_from(live, tmp_path)
 
     read: list[str] = []
-    real = cli.read_snapshot
+    real = site_publication.read_snapshot
     monkeypatch.setattr(
-        cli,
+        site_publication,
         "read_snapshot",
         lambda snapshot_root, identifier: (
             read.append(identifier),
@@ -152,7 +152,7 @@ def test_the_shell_publishes_unavailable_rather_than_a_capture_of_another_kind(
 
     read: list[str] = []
     monkeypatch.setattr(
-        cli, "read_snapshot", lambda snapshot_root, identifier: read.append(identifier)
+        site_publication, "read_snapshot", lambda snapshot_root, identifier: read.append(identifier)
     )
     monkeypatch.setattr(cli, "write_ui_view_schema", lambda: tmp_path / "schema.json")
     monkeypatch.setattr(sys, "argv", _argv(tmp_path))

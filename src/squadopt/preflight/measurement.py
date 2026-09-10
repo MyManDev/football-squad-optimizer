@@ -76,6 +76,26 @@ MEASUREMENT_KINDS: Final[Mapping[str, tuple[str, ...]]] = {
     ),
 }
 
+# Required declarations follow the existing producers, not a blanket policy retrofitted
+# onto descriptive reports. Fields absent from a kind's tuple are optional; whenever
+# supplied, including inside nested diagnostics, they must have the declared boolean value.
+MEASUREMENT_DECLARATIONS: Final[Mapping[str, tuple[str, ...]]] = {
+    "baseline_bayesopt": ("locked_holdout_accessed", "automatic_promotion", "recommendation_only"),
+    "policy_grid": ("locked_holdout_accessed", "automatic_promotion", "recommendation_only"),
+    "scenario_bayesopt": ("locked_holdout_accessed", "automatic_promotion", "recommendation_only"),
+    "risk_frontier": ("locked_holdout_accessed", "automatic_promotion", "recommendation_only"),
+    "scenario_audit": ("locked_holdout_accessed",),
+    "multi_gw_rehearsal": ("locked_holdout_accessed", "recommendation_only"),
+    "control_uncertainty": ("locked_holdout_accessed",),
+    "rotation_evidence": ("locked_holdout_accessed",),
+}
+
+_DECLARATION_CHECKS: Final = {
+    "locked_holdout_accessed": (False, "artifact_no_holdout_access"),
+    "automatic_promotion": (False, "artifact_no_automatic_promotion"),
+    "recommendation_only": (True, "artifact_recommendation_only"),
+}
+
 
 def _finding(check: str, passed: bool, detail: str) -> PreflightFinding:
     return PreflightFinding(check=check, passed=passed, detail=detail)
@@ -92,6 +112,51 @@ def _walk(value: object, path: str) -> list[tuple[str, object]]:
     else:
         items.append((path, value))
     return items
+
+
+def _declarations(value: object, name: str, path: str = "") -> list[tuple[str, object]]:
+    """Include container-valued declarations too: an empty mapping is not false."""
+
+    found: list[tuple[str, object]] = []
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            location = f"{path}.{key}" if path else str(key)
+            if key == name:
+                found.append((location, item))
+            found.extend(_declarations(item, name, location))
+    elif isinstance(value, Sequence) and not isinstance(value, str | bytes):
+        for index, item in enumerate(value):
+            found.extend(_declarations(item, name, f"{path}[{index}]"))
+    return found
+
+
+def _check_declaration(
+    document: Mapping[str, object], kind: str, name: str, expected: bool, check: str
+) -> PreflightFinding:
+    declarations = _declarations(document, name)
+    required = name in MEASUREMENT_DECLARATIONS[kind]
+    missing = required and name not in document
+    violations = [path for path, value in declarations if value is not expected]
+    if missing or violations:
+        detail = (
+            f"Missing required root declaration {name!r} for kind {kind!r}. " if missing else ""
+        )
+        if violations:
+            detail += f"{name} must be {expected!r} at: {violations[:5]!r}."
+        return _finding(check, False, detail.strip())
+    if not declarations:
+        return _finding(
+            check,
+            True,
+            f"{name} is optional for kind {kind!r} and undeclared; "
+            "this check asserts no evidence about the absent declaration.",
+        )
+    return _finding(
+        check,
+        True,
+        f"{'Required root and all' if required else 'All supplied'} {name} "
+        f"declarations are {expected!r} ({len(declarations)} checked).",
+    )
 
 
 def check_measurement_artifact(
@@ -170,34 +235,8 @@ def check_measurement_artifact(
         )
 
     leaves = _walk(document, "")
-    holdout_violations = [
-        path
-        for path, value in leaves
-        if path.split(".")[-1].split("[")[0] == "locked_holdout_accessed" and value is not False
-    ]
-    findings.append(
-        _finding(
-            "artifact_no_holdout_access",
-            not holdout_violations,
-            "Every locked_holdout_accessed flag is false."
-            if not holdout_violations
-            else f"locked_holdout_accessed is not false at: {holdout_violations[:5]!r}.",
-        )
-    )
-    promotion_violations = [
-        path
-        for path, value in leaves
-        if path.split(".")[-1].split("[")[0] == "automatic_promotion" and value is not False
-    ]
-    findings.append(
-        _finding(
-            "artifact_no_automatic_promotion",
-            not promotion_violations,
-            "Every automatic_promotion flag is false."
-            if not promotion_violations
-            else f"automatic_promotion is not false at: {promotion_violations[:5]!r}.",
-        )
-    )
+    for name, (expected, check) in _DECLARATION_CHECKS.items():
+        findings.append(_check_declaration(document, kind, name, expected, check))
 
     bad_digests: list[str] = []
     for path, value in leaves:

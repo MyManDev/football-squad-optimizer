@@ -1,0 +1,69 @@
+name: squadopt
+
+x-backend: &backend
+  image: ${SQUADOPT_BACKEND_IMAGE:?Set the tested image digest}
+  platform: linux/amd64
+  init: true
+  read_only: true
+  restart: unless-stopped
+  stop_grace_period: 180s
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=256m
+  environment: &environment
+    SQUADOPT_BACKEND_STORE_ROOT: /mnt/store
+    SQUADOPT_BACKEND_SITE_DATA_ROOT: /mnt/site
+    SQUADOPT_BACKEND_SNAPSHOT_ROOT: /mnt/snapshots
+    SQUADOPT_BACKEND_HANDOFF_ROOT: /mnt/handoffs
+    SQUADOPT_BACKEND_ALLOWED_ORIGINS: ${SQUADOPT_BACKEND_ALLOWED_ORIGINS:?Set the public site origin}
+  volumes:
+    - type: bind
+      source: ${SQUADOPT_STORE_PATH:?Set the existing durable store path}
+      target: /mnt/store
+      bind:
+        create_host_path: false
+    - type: bind
+      source: ${SQUADOPT_SITE_PATH:?Set the published data path}
+      target: /mnt/site
+      read_only: true
+      bind:
+        create_host_path: false
+    - type: bind
+      source: ${SQUADOPT_SNAPSHOT_PATH:?Set the captured inputs path}
+      target: /mnt/snapshots
+      read_only: true
+      bind:
+        create_host_path: false
+    - type: bind
+      source: ${SQUADOPT_HANDOFF_PATH:?Set the handoff path}
+      target: /mnt/handoffs
+      read_only: true
+      bind:
+        create_host_path: false
+
+services:
+  api:
+    <<: *backend
+    command: [uvicorn, --factory, squadopt.api.runtime:build_app, --host, 0.0.0.0, --port, "8000"]
+    cpus: 0.5
+    mem_limit: 1g
+    ports:
+      - "127.0.0.1:${SQUADOPT_API_PORT:-8000}:8000"
+    healthcheck:
+      test: [CMD, python, -c, "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=2).close()"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+  worker:
+    <<: *backend
+    command: [python, -m, squadopt.platform.advice_worker, --metrics-host, 0.0.0.0, --metrics-port, "9091"]
+    cpus: 1
+    mem_limit: 2g
+    ports:
+      - "127.0.0.1:${SQUADOPT_WORKER_METRICS_PORT:-9091}:9091"
+    healthcheck:
+      test: [CMD, python, -c, "from urllib.request import urlopen; urlopen('http://127.0.0.1:9091/health', timeout=2).close()"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s

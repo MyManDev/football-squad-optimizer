@@ -80,6 +80,7 @@ def test_the_store_passes_the_primitives_the_adapters_were_built_on(tmp_path: Pa
     assert result.ok, result.detail
     assert set(result.checks) == {
         "mounted_root",
+        "queue_lock",
         "exclusive_create",
         "hard_link_no_overwrite",
         "heartbeat_mtime",
@@ -113,6 +114,7 @@ def test_a_store_root_that_does_not_exist_is_a_forgotten_volume(tmp_path: Path) 
         "hard_link_no_overwrite",
         "heartbeat_mtime",
         "mounted_root",
+        "queue_lock",
         "shared_listing",
     )
     assert not (tmp_path / "never-mounted").exists(), "the probe created the mount point"

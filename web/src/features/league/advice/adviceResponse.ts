@@ -1,6 +1,7 @@
 import { LeagueDataError } from "../data";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 import type { AdviceRequest } from "./adviceClient";
+import { isAdvicePayload } from "./adviceShape";
 
 export class AdviceResponseError extends LeagueDataError {}
 
@@ -21,8 +22,9 @@ export function checkedAdvice(
   const payload = value.payload;
   if (
     !record(payload) ||
-    !Array.isArray(payload.moves) ||
+    !isAdvicePayload(payload) ||
     typeof value.generated_at_utc !== "string" ||
+    !value.generated_at_utc.endsWith("Z") ||
     (value.source_kind !== "live" && value.source_kind !== "example") ||
     typeof payload.league_id !== "number" ||
     typeof payload.entry_id !== "number" ||

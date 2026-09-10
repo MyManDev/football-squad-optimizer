@@ -172,6 +172,31 @@ def test_the_catalogue_is_immutable() -> None:
         STRATEGY_CATALOG["yeni"] = strategy("saf-puan")  # type: ignore[index]
 
 
+def test_no_tagline_ranks_its_own_strategy_above_the_others() -> None:
+    """A tagline may describe the constraint; it may not claim to beat the catalogue.
+
+    ``saf-puan`` said "the highest expected points". Nothing enforces that. The number the
+    member is shown, ``expected_own_points``, is the eleven plus the captain; the solve
+    maximises the eleven, the captain and the bench together
+    (``planning/optimizer.py``: ``projected_score + bench_weight * projected_bench -
+    hits``), and the two have different maximisers. Measured on the 2026-27 GW4 capture,
+    entry 3832237's ``saf-puan`` plan publishes 46.5454 with a 7.1846 bench while its
+    ``ortak-koru`` plan against 4287206 publishes 46.7016 with a 4.3379 bench: the banded
+    plan is *higher* on the published figure and lower on the objective. Both are OPTIMAL
+    and neither number is wrong — the superlative is.
+
+    This is the same rule as ``_SAFETY_LANGUAGE`` one line up in the catalogue: a name may
+    describe what a strategy does, never how it places.
+    """
+
+    superlative = re.compile(r"highest|lowest|\bbest\b|\bmost\b|en yüksek|en iyi", re.IGNORECASE)
+    for slug, entry in STRATEGY_CATALOG.items():
+        assert not superlative.search(entry.tagline), (
+            f"{slug}'s tagline ranks it: {entry.tagline!r}. No solve maximises "
+            "expected_own_points, so no tagline may say it does."
+        )
+
+
 def test_the_meta_gate_catches_the_probability_prefix_convention() -> None:
     """``p_ahead`` is the shape a probability arrives under, and the pattern's last
     alternative exists to stop it. The word boundary is load-bearing in both directions:
