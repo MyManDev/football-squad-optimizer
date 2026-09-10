@@ -42,6 +42,7 @@ from squadopt.application.live_score import (
 )
 from squadopt.application.views import (
     JsonValue,
+    LedgerRowView,
     LedgerView,
     SiteIndex,
     StatusView,
@@ -68,6 +69,9 @@ class SiteBuildReport:
     status_written: bool
     league_written: bool
     horizon_evidence_gameweek: int | None
+    ledger_kept_from_published: bool = False
+    """The ledger root held no entry while ``ledger.json`` in the output tree already held
+    decisions, so that file was left as it was rather than overwritten with zero rows."""
 
 
 def _write_json(path: Path, payload: dict[str, JsonValue]) -> None:
@@ -84,6 +88,40 @@ def _write_json(path: Path, payload: dict[str, JsonValue]) -> None:
 
 def _envelope(payload: dict[str, JsonValue], generated_at_utc: str) -> dict[str, JsonValue]:
     return ViewEnvelope(payload=payload, generated_at_utc=generated_at_utc).to_dict()
+
+
+def _published_ledger(path: Path, season: str) -> LedgerView | None:
+    """The ledger view already published at ``path``, when it holds rows of ``season``.
+
+    ``None`` when there is no such file, when it is not a ``ui_view_v1`` ledger of this
+    season with at least one row, or when its rows do not read as this build's
+    ``LedgerRowView`` — a file this build cannot vouch for is not kept.
+    """
+
+    try:
+        document = json.loads(path.read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(document, dict):
+        return None
+    if document.get("contract_version") != UI_VIEW_CONTRACT_VERSION:
+        return None
+    payload = document.get("payload")
+    if not isinstance(payload, dict) or payload.get("season") != season:
+        return None
+    rows = payload.get("rows")
+    if not isinstance(rows, list) or not rows:
+        return None
+    try:
+        return LedgerView(
+            **{
+                **payload,
+                "rows": tuple(LedgerRowView(**row) for row in rows),
+                "chips_played": tuple(payload["chips_played"]),
+            }
+        )
+    except (TypeError, KeyError):
+        return None
 
 
 def build_site(
@@ -149,8 +187,28 @@ def build_site(
         )
         written.append(live_path)
 
-    ledger: LedgerView = ledger_view(Path(ledger_root), season)
-    emit(f"{season}/ledger.json", ledger.to_dict())
+    ledger_path = f"{season}/ledger.json"
+    kept = _published_ledger(data_dir / ledger_path, season) if not entries else None
+    ledger: LedgerView
+    if kept is None:
+        ledger = ledger_view(Path(ledger_root), season)
+        emit(ledger_path, ledger.to_dict())
+    else:
+        # The ledger root holds no entry of this season while the tree already publishes
+        # decisions. Absent locally is not zero: the published file stays as it is, byte
+        # for byte, and the gameweek views beside it are listed where they still exist.
+        ledger = kept
+        written.append(ledger_path)
+        for row in kept.rows:
+            for name in ("recommendation.json", "pool.json", "live.json"):
+                relative = f"{season}/gw{row.gameweek:02d}/{name}"
+                if (data_dir / relative).is_file():
+                    written.append(relative)
+        print(
+            f"Ledger root {Path(ledger_root)} holds no {season} entry; kept the published "
+            f"{ledger_path} ({len(kept.rows)} rows, gameweeks "
+            f"{[row.gameweek for row in kept.rows]}) rather than publishing zero decisions."
+        )
 
     league_written = False
     if snapshot is not None:
@@ -213,4 +271,5 @@ def build_site(
         status_written=status_written,
         league_written=league_written,
         horizon_evidence_gameweek=(evidence.gameweek if evidence is not None else None),
+        ledger_kept_from_published=kept is not None,
     )
