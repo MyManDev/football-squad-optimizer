@@ -119,7 +119,10 @@ def test_api_picks_use_codes_and_multipliers_and_require_reconciliation(
         assert rows[8]["multiplier"] == 2
 
 
-def test_regular_publication_uses_surviving_gw1_without_private_ledger(tmp_path: Path) -> None:
+@pytest.mark.parametrize("prior_publication", [False, True])
+def test_regular_publication_uses_surviving_gw1_without_private_ledger(
+    tmp_path: Path, prior_publication: bool
+) -> None:
     source = recovery_world(tmp_path)
     snapshots = tmp_path / "snapshots"
     stored = write_snapshot(
@@ -137,6 +140,22 @@ def test_regular_publication_uses_surviving_gw1_without_private_ledger(tmp_path:
             }
         )
     )
+    if prior_publication:
+        target = tmp_path / "site/data/league/scoreboard.json"
+        target.parent.mkdir(parents=True)
+        target.write_text(
+            json.dumps(
+                {
+                    "payload": {
+                        "season": "2026-27",
+                        "gameweeks": [
+                            {"gameweek": 1, "ours": {"net": 999}},
+                            {"gameweek": 2, "ours": {"net": 999}},
+                        ],
+                    }
+                }
+            )
+        )
     result = publish_scoreboard(
         ScoreboardPublicationRequest(
             snapshots,
@@ -152,6 +171,7 @@ def test_regular_publication_uses_surviving_gw1_without_private_ledger(tmp_path:
     payload = result.document["payload"]
     assert payload["gameweeks"][0]["ours"]["net"] == 81
     assert payload["gameweeks"][1]["decision_record_status"] == "missing"
+    assert payload["gameweeks"][1]["ours"] is None
     assert payload["cumulative"]["ours_gameweeks"] == [1]
     assert not (tmp_path / "lost-ledger").exists()
 

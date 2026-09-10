@@ -393,7 +393,8 @@ def scoreboard_payload(
                     "net": row["net"] if settled and row else None,
                     "diagnostics": (
                         row.get("diagnostics", empty_diagnostics())
-                        if settled and row else empty_diagnostics()
+                        if settled and row
+                        else empty_diagnostics()
                     ),
                     "scoring_basis": row.get("scoring_basis") if row else None,
                     "source_snapshot_id": row.get("outcome_snapshot_id") if row else None,
