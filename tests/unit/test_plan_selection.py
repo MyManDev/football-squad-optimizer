@@ -12,7 +12,7 @@ import pandas as pd
 import pytest
 
 from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
-from squadopt.experiments.plan_selection import (
+from squadopt.live.plan_selection import (
     MODES,
     CandidatePlan,
     rival_window_scores,

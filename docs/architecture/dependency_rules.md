@@ -90,11 +90,13 @@ are resolved by these shared owners:
 | `data.schema` to `optimization.config` / `optimization.validation` | `contracts.players`: `Position`, `POSITIONS`, `REQUIRED_COLUMNS` | Original optimization locations and `data.schema` still expose the same objects. |
 | `prediction.integration` to `optimization.coefficients` | `contracts.players.sort_players_by_id` | `optimization.coefficients.sort_players_by_id` re-exports the same function. |
 | `backtest.production_benchmark` to `experiments` / `experiments.config` | `evaluation.promotion.PromotionPolicy` and `evaluation.statistics` | Original experiment locations re-export the policy and bootstrap helpers. |
+| `application.mode_selection` to `experiments.plan_selection` | `live.plan_selection` (the product's per-member plan chooser, `mode_plan_selection_v1`); its `ExperimentExecutionError` joins its siblings in `evaluation.promotion` | None at the old location: `experiments` sits below `live`, so a re-export there would invert the layers contract (rule 1 outranks rule 2). The laboratory callers (barrel, `scripts/measure_mode_plan_selection.py`, `tests/unit/test_plan_selection.py`) import `squadopt.live.plan_selection` directly (moved 2026-09-10); `experiments.config` re-exports the execution error like the other two. |
 
 The policy's two exception base classes also live in `evaluation.promotion`, keeping their
 existing `ExperimentError` / `ExperimentConfigurationError` names and inheritance so callers
-can keep catching the old experiment imports. Experiment execution errors, candidate/design
-types, comparisons and factorial effects remain in `experiments`.
+can keep catching the old experiment imports. `ExperimentExecutionError` joined them there
+when `plan_selection` moved to `live`. Candidate/design types, comparisons and factorial
+effects remain in `experiments`.
 
 The extraction changes no policy defaults, normalization, error messages, seed derivation,
 resampling order, percentile arithmetic, canonical player ordering or fingerprint payload.
@@ -209,6 +211,7 @@ was loading 43 laboratory modules, and a product decision (`plan_selection`) was
 lab. The contract `Product does not import the laboratory` in `pyproject.toml` states the rule
 directly; the layers contract stays unchanged as the tie-break within each group.
 
-That contract carries eight `ignore_imports` entries, all in `application`, each annotated with
-the follow-up PR that removes it. The same rule applies as to the layers baseline: the list may
-only shrink, and a new violation fails the gate.
+That contract started with eight `ignore_imports` entries, all in `application`, each annotated
+with the follow-up PR that removed it. The last (`mode_selection` to `experiments.plan_selection`)
+left with the `plan_selection` move to `live`, and the list is gone: like the layers contract, it
+carries **zero** `ignore_imports` entries, and a new violation fails the gate.

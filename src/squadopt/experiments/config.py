@@ -17,6 +17,9 @@ from squadopt.evaluation.promotion import (
     ExperimentError as ExperimentError,
 )
 from squadopt.evaluation.promotion import (
+    ExperimentExecutionError as ExperimentExecutionError,
+)
+from squadopt.evaluation.promotion import (
     PromotionPolicy as PromotionPolicy,
 )
 from squadopt.features import CrossSeasonConfig, FeatureConfigurationError
@@ -28,10 +31,6 @@ DEFAULT_DEVELOPMENT_SEASONS: Final = ("2021-22", "2022-23", "2023-24", "2024-25"
 DEFAULT_HOLDOUT_SEASONS: Final = ("2025-26",)
 DEFAULT_FORM_WINDOWS: Final = (3, 5, 7, 10)
 DEFAULT_BENCH_WEIGHTS: Final = (0.0, 0.1, 0.25)
-
-
-class ExperimentExecutionError(ExperimentError):
-    """Raised when an experiment cannot produce a trustworthy comparison."""
 
 
 class FrozenCandidateError(ExperimentError):
