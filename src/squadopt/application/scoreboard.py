@@ -31,7 +31,9 @@ Where each number comes from, and what it is:
   member's ``points - event_transfers_cost``. Neither is computable from what the ledger
   holds — the frozen decision records the bench as a set, not in the order the game's
   autosubs walk it, and it names no vice-captain — so the basis is published rather than
-  guessed.
+  guessed. When the ledger root holds no entry at all while the scoreboard already
+  published at ``<out>`` carries our rows, those rows are kept as they are: a decision
+  whose local record was lost is not the absence of a decision.
 - ``top100``: the Top-100 cohort's mean week, for the cohort capture's current gameweek
   only. The cohort is re-ranked every week, so a total is never differenced across
   captures; ``final`` says whether the gameweek was finished and checked in the cohort
@@ -243,6 +245,32 @@ def _ours(entry: LedgerEntry) -> dict[str, object]:
     }
 
 
+def _published_ours(path: Path, season: str) -> dict[int, dict[str, object]]:
+    """Our rows the scoreboard at ``path`` already publishes for ``season``, by gameweek.
+
+    Empty when there is no such file or it describes another season; a row is taken only
+    where the published ``ours`` is an object, never made up for a gameweek without one.
+    """
+
+    try:
+        document = json.loads(path.read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
+    payload = document.get("payload") if isinstance(document, dict) else None
+    if not isinstance(payload, dict) or payload.get("season") != season:
+        return {}
+    rows = payload.get("gameweeks")
+    if not isinstance(rows, list):
+        return {}
+    return {
+        int(row["gameweek"]): dict(row["ours"])
+        for row in rows
+        if isinstance(row, dict)
+        and isinstance(row.get("gameweek"), int)
+        and isinstance(row.get("ours"), dict)
+    }
+
+
 def _member_row(entry_id: int, week: EntryGameweekPoints) -> dict[str, object]:
     return {
         "entry_id": entry_id,
@@ -269,9 +297,14 @@ def scoreboard_payload(
     ledger_entries: Sequence[LedgerEntry],
     cohort: CohortCapture | None,
     cohort_picks: CohortPicks | None = None,
+    published_ours: Mapping[int, Mapping[str, object]] | None = None,
     generated_at_utc: str,
 ) -> dict[str, object]:
-    """The scoreboard envelope, from bytes and ledger entries alone; pure, so testable."""
+    """The scoreboard envelope, from bytes and ledger entries alone; pure, so testable.
+
+    ``published_ours`` is our row per gameweek as already published, used only for a
+    gameweek ``ledger_entries`` does not cover; the ledger entry wins where there is one.
+    """
 
     events = _events(bootstrap)
     played = played_gameweeks(bootstrap, as_of_utc=captured_at_utc)
@@ -313,6 +346,11 @@ def scoreboard_payload(
         ]
         nets = [float(str(row["net"])) for row in members if row["net"] is not None]
         entry = ledger.get(gameweek)
+        our_row: dict[str, object] | None = None
+        if entry is not None:
+            our_row = _ours(entry)
+        elif published_ours is not None and gameweek in published_ours:
+            our_row = dict(published_ours[gameweek])
         rows.append(
             {
                 "gameweek": gameweek,
@@ -323,7 +361,7 @@ def scoreboard_payload(
                     _number(event.get("average_entry_score")) if finished else None
                 ),
                 "highest_score": _number(event.get("highest_score")) if finished else None,
-                "ours": None if entry is None else _ours(entry),
+                "ours": our_row,
                 "top100": top100 if top100 is not None and top100["gameweek"] == gameweek else None,
                 "members": members,
                 "members_mean_net": _mean(nets),
@@ -494,6 +532,9 @@ class ScoreboardPublicationResult:
     document: Mapping[str, Any]
     histories_held: int
     registered_members: int
+    ours_kept_from_published: tuple[int, ...] = ()
+    """Gameweeks whose ``ours`` row came from the scoreboard already at ``target`` because
+    the ledger root held no entry of the season."""
 
     @property
     def output_paths(self) -> tuple[Path, ...]:
@@ -521,6 +562,10 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         if (name := f"entry-{entry_id}-history.json") in snapshot.payloads
     }
     entries = load_ledger(request.ledger_root, season)
+    target = Path(request.out_dir) / "data" / "league" / SCOREBOARD_FILE
+    # An empty ledger root beside a scoreboard that already publishes our rows: the
+    # decisions were made, their local record is what is missing. Keep the rows.
+    published_ours = _published_ours(target, season) if not entries else {}
     cohort = (
         read_cohort(request.snapshot_root, request.cohort_snapshot_id)
         if request.cohort_snapshot_id
@@ -542,10 +587,24 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         ledger_entries=entries,
         cohort=cohort,
         cohort_picks=cohort_picks,
+        published_ours=published_ours or None,
         generated_at_utc=request.now_utc
         or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     )
-    target = Path(request.out_dir) / "data" / "league" / SCOREBOARD_FILE
+    payload = document["payload"]
+    published_rows: list[object] = payload["gameweeks"] if isinstance(payload, dict) else []
+    kept = tuple(
+        int(str(row["gameweek"]))
+        for row in published_rows
+        if isinstance(row, dict)
+        and row.get("ours") is not None
+        and int(str(row["gameweek"])) in published_ours
+    )
+    if kept:
+        print(
+            f"Ledger root {request.ledger_root} holds no {season} entry; kept our published "
+            f"scoreboard rows for gameweeks {list(kept)} rather than publishing none."
+        )
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(
         json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n",
@@ -558,4 +617,5 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         document,
         len(histories),
         len(registered),
+        kept,
     )

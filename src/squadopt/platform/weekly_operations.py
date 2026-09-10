@@ -504,7 +504,13 @@ class WeeklyOperations:
                 snapshot_id=self._capture_id(),
             )
         )
-        return WeeklyStageResult(result.output_paths, {"snapshot_id": result.snapshot_id})
+        return WeeklyStageResult(
+            result.output_paths,
+            {
+                "snapshot_id": result.snapshot_id,
+                "ledger_kept_from_published": result.report.ledger_kept_from_published,
+            },
+        )
 
     def _scoreboard(self, out: Path | None = None) -> WeeklyStageResult:
         result = publish_scoreboard(
@@ -520,7 +526,13 @@ class WeeklyOperations:
                 elite_snapshot_id=self._elite_id(),
             )
         )
-        return WeeklyStageResult(result.output_paths, {"snapshot_id": result.snapshot_id})
+        return WeeklyStageResult(
+            result.output_paths,
+            {
+                "snapshot_id": result.snapshot_id,
+                "ours_kept_from_published": list(result.ours_kept_from_published),
+            },
+        )
 
     def _publish(self) -> WeeklyStageResult:
         proof: dict[str, object] = {}

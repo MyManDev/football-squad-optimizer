@@ -96,12 +96,16 @@ def main() -> int:
         if report.horizon_evidence_gameweek is not None
         else ""
     )
+    kept_note = (
+        "; ledger.json kept from the published tree" if report.ledger_kept_from_published else ""
+    )
     print(
         f"Wrote {len(report.files)} files under {report.out_dir / 'data'} for {report.season}: "
         f"gameweeks {list(report.decided_gameweeks)} (settled {list(report.settled_gameweeks)})"
         f"{'; status.json' if report.status_written else ''}"
         f"{'; league.json' if report.league_written else ''}"
         f"{horizon_note}"
+        f"{kept_note}"
     )
     write_ui_view_schema()
     return 0
