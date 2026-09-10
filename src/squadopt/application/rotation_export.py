@@ -22,6 +22,7 @@ from squadopt.data.sources.club_news_claims import ParsedClaim, parse_claim_resp
 from squadopt.experiments.shadow_report import write_document_once
 from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION,
+    ClubModelProvenance,
     ModelProvenance,
     build_rotation_evidence_table,
 )
@@ -55,7 +56,7 @@ class _ClubNewsInputs:
 
     documents: tuple[RawDocument, ...]
     claims: tuple[ParsedClaim, ...]
-    model: ModelProvenance
+    model: ClubModelProvenance
     clubs_declared: tuple[str, ...]
     clubs_covered: tuple[str, ...]
 
@@ -73,21 +74,29 @@ def _club_news_inputs(fixture_path: Path) -> _ClubNewsInputs:
 
     response = provider.code(documents, provider.roster())
     claims = parse_claim_response(response, documents)
-    model = ModelProvenance(
+    covered = provider.clubs_covered()
+    provenance = ModelProvenance(
         identifier=response.model_identifier,
         version=response.model_version,
-        # The prompt is a versioned constant in the repository from A6 onward. Until a real
-        # call exists there is no prompt, so the stub's own response stands in for both
-        # digests rather than a zeroed placeholder pretending to be one.
+        # A6's prompt is a versioned constant, but it is not the question *this* response was
+        # produced from: the fixture serves a canned answer that no prompt ever asked for.
+        # Stamping it with `coding_prompt_sha256()` would claim the frozen prompt produced it,
+        # which is a stronger and falser statement than a placeholder that says so plainly.
         prompt_sha256=hashlib.sha256(b"fixture-provider-has-no-prompt").hexdigest(),
         response_sha256=hashlib.sha256(response.text.encode("utf-8")).hexdigest(),
     )
+    # Every covered club maps to this one response, which is what actually happened: the
+    # fixture answers once for all of them, and saying so is not the same as pretending
+    # there was a call per club. A real provider called per club builds this mapping from
+    # its own responses and the digests then differ -- which is the case the table is now
+    # able to record.
+    model = ClubModelProvenance(by_club={club: provenance for club in covered})
     return _ClubNewsInputs(
         documents=documents,
         claims=claims,
         model=model,
         clubs_declared=provider.clubs_declared(),
-        clubs_covered=provider.clubs_covered(),
+        clubs_covered=covered,
     )
 
 

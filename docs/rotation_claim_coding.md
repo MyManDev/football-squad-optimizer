@@ -161,12 +161,13 @@ Nothing under `data/sample/` is any club's captured bytes. Real captures stay un
 
 ## Open for review
 
-- **`ModelProvenance` is still per-call, not per-club.** `rotation_evidence.py` says in so
-  many words that production calls a model once per club and that the manifest already spells
-  its response digests as a list for that reason. This deliverable does not make that change:
-  `code(documents, roster)` is already club-agnostic, so a caller can pass one club's document
-  and get one club's response with no change here, and fanning the exporter out per club is its
-  own topic with its own effect on the manifest.
+- **Provenance is now per club; the exporter's call granularity is not.** `ModelProvenance` is
+  the per-club record and `ClubModelProvenance` collects one per club, so a row's
+  `model_response_sha256` is the digest of that player's club's response and the manifest lists
+  every response the week holds. What has not moved is how many calls the exporter makes: it
+  still asks once. `code(documents, roster)` is already club-agnostic, so calling it per club
+  is a change in the caller and none here: what the caller needs is documents that know their
+  own club, and the fetch adapter that assigns one is where that comes from.
 - **The runbook does not yet mention the key.** `docs/weekly_runbook.md` is shared, so the
   operator-facing note about `ANTHROPIC_API_KEY` and the `llm` extra is left for whoever owns
   that page rather than added unilaterally.
