@@ -112,15 +112,39 @@ FORBIDDEN_FIELD_PATTERN: Final = re.compile(r"probab|olas.l.k|quantile|spread|\b
 #: sweep applies to every string in the tree.
 #:
 #: This is the web guard's ``AS_A_CHANCE`` set (``MemberDecisionControls.test.tsx``)
-#: with the repository's own ``P(`` and ``quantile`` beside it. The English words carry
-#: word boundaries because ``odds`` and ``chance`` are substrings of real surnames; the
-#: Turkish stems do not need them. The stem written ``olas\u0131l`` here — with the
-#: dotless i, which is why it is escaped — covers both the noun and the inflected form
-#: the narrower ``olas.l.k`` missed, and a Latin-alphabet name that merely contains
-#: "olas" cannot match it.
+#: with the repository's own ``P(`` and ``quantile`` beside it: one rule written twice,
+#: and deliberately not the same width. That guard reads two copy strings this repository
+#: wrote itself, so it needs no word boundaries and carries none. This one reads text a
+#: member typed, so a forbidden word that also opens a real name has to match as a whole
+#: word, or a name gets refused in its place.
+#:
+#: The bounded alternatives are therefore the ones that are whole words: ``chances?``,
+#: ``likelihood`` and ``odds``, each a substring of a real surname, and — for exactly the
+#: same reason — ``\u015fans``, which opens the adjective ``\u015eansl\u0131`` ("lucky")
+#: and the surname ``\u015eansal``, and ``y\u00fczde``, which sits inside ``y\u00fczden``
+#: ("for that reason", not a percentage). Those three names were published as
+#: ``entry-<id>`` until the trailing boundaries were added. A boundary has a price: it
+#: stops refusing the word's own inflections, so a name reading ``\u015fans\u0131`` or
+#: ``y\u00fczdesi`` now reaches the tree where ``\u015fans`` and ``y\u00fczde`` do not.
+#: These two pay it because each opens a real name and the stems below do not; our own
+#: wording never relies on it, being held by the unbounded sweeps in the web tests, which
+#: no member's text ever reaches.
+#:
+#: ``ihtimal`` and ``olas\u0131l`` stay stems, because what a stem also reaches here is
+#: not a name but the same word inflected: ``ihtimali``, ``ihtimalle`` and
+#: ``olas\u0131l\u0131\u011f\u0131`` — the form the narrower ``olas.l.k`` once missed —
+#: all stay refused, and a Latin-alphabet name that merely contains "olas" still cannot
+#: match. The dotless i and the soft g are escaped wherever they appear, here and in the
+#: pattern, because they are easy to misread as ``i`` and ``g``.
+#:
+#: The pattern is compiled from ``str``, so ``\b`` is the Unicode boundary and counts
+#: ``\u0131``, ``\u015f``, ``\u011f`` and ``\u00fc`` as word characters — measured, not
+#: assumed: under ``re.ASCII`` it would fall *inside* these words, and bare ``\u015fans``
+#: would pass. ``tests/unit/test_public_probability_guards.py`` pins both halves of the
+#: rule: the three names publish unchanged, the bare words and inflections stay refused.
 FORBIDDEN_TEXT_PATTERN: Final = re.compile(
     r"%|\bP\(|probabilit|quantile|\bchances?\b|\blikelihood\b|\bodds\b"
-    "|\\bihtimal|\\b\u015fans|\\by\u00fczde|olas\u0131l",
+    "|\\bihtimal|\\b\u015fans\\b|\\by\u00fczde\\b|olas\u0131l",
     re.IGNORECASE,
 )
 

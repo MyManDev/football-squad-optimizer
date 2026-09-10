@@ -9,6 +9,7 @@ import pytest
 
 from squadopt.live import InSeasonProjection, read_projection_handoff, write_projection_handoff
 from squadopt.platform import projection_retention as retention
+from squadopt.platform._long_paths import addressable
 
 
 def _projection(capture: str = "fpl-live-test-a") -> InSeasonProjection:
@@ -88,6 +89,46 @@ def test_corrupt_existing_archive_is_refused_before_replacing_alias(tmp_path: Pa
     with pytest.raises(retention.ProjectionRetentionError, match="corrupt"):
         retention.publish_retained_handoff(alias, _projection("fpl-live-test-b"))
     assert alias.read_bytes() == before
+
+
+def test_retention_root_past_windows_max_path_still_retains_create_once(tmp_path: Path) -> None:
+    """A "<sha256>.json" target over MAX_PATH must still be retained exactly once.
+
+    Windows caps path-based calls at 260 characters (measured on the owner's machine).
+    The 69-character retained name pushes the target past the cap while the 17-character
+    ".retain-XXXXXXXX" temporary beside it stays under - so the temporary is created and
+    only the link into place fails. This test pins that asymmetry.
+    """
+
+    capture = "fpl-live-test-a"
+    root = tmp_path.absolute()
+    overhead = len(f"\\by-capture\\{capture}\\") + len(f"{'0' * 64}.json")
+    while len(str(root)) + overhead <= 274:
+        root = root / "deeper"
+    root.mkdir(parents=True, exist_ok=True)
+    alias = root / "2026-27-gw04.json"
+    first = _projection(capture)
+
+    assert retention.publish_retained_handoff(alias, first) == alias
+    raw = alias.read_bytes()
+    retained = retention.retained_handoff_path(root, capture, hashlib.sha256(raw).hexdigest())
+    assert len(str(retained)) > 260, "target must exceed MAX_PATH for this to be a regression test"
+    assert len(str(retained.parent)) + len("\\.retain-XXXXXXXX") < 260, (
+        "the temporary must stay under MAX_PATH, or the failure is not the one being fixed"
+    )
+    assert len(str(alias)) < 260
+    assert Path(addressable(retained)).read_bytes() == raw
+
+    # Retaining identical bytes again is a no-op that keeps addressing the same target.
+    assert retention.publish_retained_handoff(alias, first) == alias
+    assert alias.read_bytes() == raw
+    assert len(list((root / "by-capture" / capture).iterdir())) == 1
+
+    # Differing bytes under an already-taken target are still refused, not overwritten.
+    Path(addressable(retained)).write_bytes(b"corrupt")
+    with pytest.raises(retention.ProjectionRetentionError, match="corrupt"):
+        retention.publish_retained_handoff(alias, _projection("fpl-live-test-b"))
+    assert alias.read_bytes() == raw
 
 
 def test_capture_path_cannot_escape_retention_root(tmp_path: Path) -> None:

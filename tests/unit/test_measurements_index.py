@@ -104,9 +104,25 @@ def _committed_artifacts() -> list[str]:
     test that asserts the limit rather than leaving it implied.
     """
 
-    json_names = sorted(path.name for path in DOCS.glob("*.json"))
-    stems = {Path(name).stem for name in json_names}
-    twinned = sorted(path.name for path in DOCS.glob("*.md") if path.stem in stems)
+    # ``docs/`` and ``docs/architecture/``, not ``docs/**``: rule 1 has no directory clause,
+    # but ``docs/contracts/*.schema.json`` are schemas the code validates against, not
+    # measurements, and a recursive glob would demand rows for them. The first artifact to
+    # land outside ``docs/`` was a serving-capacity record under ``docs/architecture/``, and
+    # this glob missed it for a day; the record tier is named by content, not by directory.
+    json_paths = sorted(
+        path
+        for pattern in ("*.json", "architecture/*.json")
+        for path in DOCS.glob(pattern)
+        if not path.name.endswith(".schema.json")
+    )
+    json_names = [path.name for path in json_paths]
+    stems = {path.stem for path in json_paths}
+    twinned = sorted(
+        path.name
+        for pattern in ("*.md", "architecture/*.md")
+        for path in DOCS.glob(pattern)
+        if path.stem in stems
+    )
     return json_names + twinned + sorted(TWINLESS_RECORDS_PINNED_BY_NAME)
 
 
