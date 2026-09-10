@@ -266,6 +266,8 @@ def _verify_manifest(directory: Path) -> None:
 # call sites read better with them.
 digest_bytes = _digest
 """SHA-256 of some bytes, lowercase hex — the digest every manifest here records."""
+replace_retrying = _replace_retrying
+"""Replace a staged path with bounded retries for transient permission errors."""
 write_atomic = _write_atomic
 """Write bytes through a sibling temporary file and one rename."""
 staging_directory = _staging_directory

@@ -64,6 +64,7 @@ from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live.ledger import (
     prune_stale_staging,
     record_lock,
+    replace_retrying,
     staging_directory,
     verify_manifest,
     write_manifest,
@@ -896,7 +897,7 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
             write_manifest(staging, contract_version=MEMBER_ADVICE_RECORD_CONTRACT_VERSION)
             verify_manifest(staging)
             # One rename: the record exists complete or does not exist at all.
-            os.replace(staging, directory)
+            replace_retrying(staging, directory)
         except BaseException:
             shutil.rmtree(staging, ignore_errors=True)
             raise

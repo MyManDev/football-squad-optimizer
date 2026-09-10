@@ -631,3 +631,40 @@ def test_the_record_alone_reconstructs_the_advised_squads_multipliers(
         if item["published_path"] == told["published_path"]
     )
     assert players[str(document["bench"][0])]["position"] == "GK"
+
+
+@pytest.mark.parametrize("failures", [2, 5])
+def test_record_rename_retries_transient_errors_and_refuses_exhaustion(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failures: int
+) -> None:
+    from squadopt.live import ledger
+    from squadopt.live.errors import LedgerError
+
+    records = tmp_path / "records"
+    destination = record_directory(records, SEASON, 2, 101, world["gw2_id"])
+    original = ledger.os.replace
+    calls = 0
+    pauses: list[float] = []
+
+    def replace(source: Path, target: Path) -> None:
+        nonlocal calls
+        if Path(target) == destination:
+            calls += 1
+            if calls <= failures:
+                raise PermissionError("injected record rename refusal")
+        original(source, target)
+
+    monkeypatch.setattr(ledger.os, "replace", replace)
+    monkeypatch.setattr(ledger.time, "sleep", pauses.append)
+    if failures == 5:
+        with pytest.raises(LedgerError, match="all 5 attempts"):
+            _build(world, tmp_path / "site", record_root=records)
+        assert not destination.exists()
+        assert calls == 5
+    else:
+        _build(world, tmp_path / "site", record_root=records)
+        assert load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"])
+        assert 3 <= calls <= 5
+    assert pauses[:2] == [0.05, 0.1]
+    assert not list(destination.parent.glob("*.lock"))
+    assert not list(destination.parent.glob("*.staging-*"))

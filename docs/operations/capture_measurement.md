@@ -56,3 +56,8 @@ Scoreboard, recovery and measurement outputs are serialized completely and repla
 through the existing atomic-write primitive. A failed replacement preserves the last
 complete public file and removes the temporary file. This is atomic replacement,
 not a promise of durability after power loss or an archive backup.
+
+Immutable advice records use the same bounded rename retry as the ledger: five
+attempts for transient permission errors, with 0.75 seconds total scheduled waiting.
+An existing destination directory is refused immediately. Exhaustion raises an error
+and removes staging and lock files; it never presents a partial record as complete.
