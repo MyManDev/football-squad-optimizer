@@ -60,15 +60,18 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--club-news-fixture",
         type=Path,
-        default=DEFAULT_CLUB_NEWS_FIXTURE,
-        help="the committed synthetic fixture standing in for a real club-news source",
+        default=None,
+        help=(
+            "the committed synthetic fixture standing in for a real club-news source; "
+            f"defaults to {DEFAULT_CLUB_NEWS_FIXTURE} unless --club-news-snapshot is given"
+        ),
     )
     parser.add_argument(
         "--club-news-snapshot",
         default=None,
         help=(
-            "the capture the claims were read from, recorded per row and used to name the "
-            "artifact; omit while the fixture stands in for it"
+            "the club-news capture the claims are read from, recorded per row and used to "
+            "name the artifact; omit to read the fixture instead"
         ),
     )
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -78,6 +81,12 @@ def _parse_arguments(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = _parse_arguments(argv)
+    # The fixture default is applied here rather than by argparse, so that naming a capture
+    # does not silently arrive alongside a fixture nobody asked for. Every invocation that
+    # worked before this flag existed still works: omitting both reads the fixture, and
+    # naming both is the one case that refuses.
+    if arguments.club_news_snapshot is None and arguments.club_news_fixture is None:
+        arguments.club_news_fixture = DEFAULT_CLUB_NEWS_FIXTURE
     revision, dirty = _git_revision()
     if dirty:
         print(
