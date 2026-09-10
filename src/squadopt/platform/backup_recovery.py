@@ -20,6 +20,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from squadopt.platform._long_paths import addressable
+
 BACKUP_SCHEMA_VERSION = "private_backup_v1"
 MANIFEST_NAME = "manifest.json"
 _NAME = re.compile(r"[a-z][a-z0-9_-]{0,63}")
@@ -87,11 +89,12 @@ def _disjoint(paths: Sequence[Path]) -> None:
 
 def _hash(path: Path) -> tuple[int, str]:
     _safe_path(path)
-    if not stat.S_ISREG(path.stat().st_mode):
+    reachable = Path(addressable(path))
+    if not stat.S_ISREG(reachable.stat().st_mode):
         raise BackupError(f"Only regular files can be copied: {path}.")
     digest = hashlib.sha256()
     size = 0
-    with path.open("rb") as stream:
+    with reachable.open("rb") as stream:
         while block := stream.read(_CHUNK):
             digest.update(block)
             size += len(block)
@@ -137,7 +140,14 @@ def _copy(source: Path, destination: Path, row: Mapping[str, Any]) -> None:
     _safe_path(destination)
     digest = hashlib.sha256()
     size = 0
-    with source.open("rb") as reader, destination.open("xb") as writer:
+    # "xb" stays the mode: refusing an existing destination is the guarantee here, and
+    # addressable() only makes a name too long for Windows' MAX_PATH reachable. A backup
+    # re-roots every source path under "<destination>/files/", so a retained handoff name
+    # already close to the cap crosses it once copied.
+    with (
+        Path(addressable(source)).open("rb") as reader,
+        Path(addressable(destination)).open("xb") as writer,
+    ):
         while block := reader.read(_CHUNK):
             writer.write(block)
             digest.update(block)
