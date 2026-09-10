@@ -83,8 +83,22 @@ class RawDocument:
     ``fetched_at_utc`` is when *we* looked. It is never used as the document's own
     dateline: what the source said about its own publication time is a separate field on
     the claim, and absent there means absent.
+
+    ``club`` is which club's words these are, and it travels with the bytes rather than
+    being remembered by the caller. A document whose club is inferred later is a document
+    whose claims can be joined to the wrong squad, and the join is on the club the capture
+    itself spells -- so the fetch that knows which source it was reading is the only place
+    that can say it without guessing.
+
+    ``last_modified_utc`` is the **transport's** claim about publication, from the response
+    header, and it is a third clock beside the other two. It is not the document's own
+    dateline: a server can serve yesterday's words with today's header, and the dateline the
+    source printed is read from the words themselves. Absent when the response carried no
+    such header, and never filled in from ``fetched_at_utc`` -- substituting when we looked
+    for when it was published is the one thing this lane will not do.
     """
 
+    club: str
     requested_url: str
     final_url: str
     http_status: int
@@ -92,8 +106,14 @@ class RawDocument:
     byte_length: int
     fetched_at_utc: str
     content: bytes
+    last_modified_utc: str | None = None
 
     def __post_init__(self) -> None:
+        if not self.club.strip():
+            raise InvalidValueError(
+                "A fetched document must name the club whose words it carries; a document "
+                "without one cannot be joined to a squad."
+            )
         if not self.requested_url or not self.final_url:
             raise InvalidValueError("A fetched document must name both URLs.")
         if self.byte_length != len(self.content):
@@ -103,6 +123,8 @@ class RawDocument:
                 "not disagree with the bytes it describes."
             )
         normalize_utc_timestamp(self.fetched_at_utc, label="fetched_at_utc")
+        if self.last_modified_utc is not None:
+            normalize_utc_timestamp(self.last_modified_utc, label="last_modified_utc")
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,6 +309,7 @@ class FixtureClubNewsProvider:
                 continue
             content = _require_text(record, "content", "A fixture document").encode("utf-8")
             return RawDocument(
+                club=_require_text(record, "club", "A fixture document"),
                 requested_url=url,
                 final_url=_require_text(record, "final_url", "A fixture document"),
                 http_status=_require_integer(record, "http_status", "A fixture document"),
