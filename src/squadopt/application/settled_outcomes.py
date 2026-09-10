@@ -302,13 +302,45 @@ def _publish(temporary: Path, final: Path) -> None:
             return
         raise SettledOutcomeExportError(
             f"{final} already exists with different content; an artifact is never "
-            "overwritten in place. Remove it deliberately, or name another output."
+            f"overwritten in place. On disk: sha256 {compute_table_sha256(final)}; this run: "
+            f"sha256 {compute_table_sha256(temporary)}. Remove it deliberately, or name "
+            "another output."
         )
     os.replace(temporary, final)
 
 
+#: The manifest fields that say who wrote the artifact and when, not what it is.
+#: ``generated_at_utc`` is the wall clock of the run that wrote first; ``repository_commit``
+#: is the revision that ran the join. Every later run of the week is at a different commit
+#: from Friday's, and the table bytes -- compared first, byte for byte, in :func:`_publish` --
+#: are the whole of what the pair says, so a manifest describing identical bytes is a replay
+#: whatever commit produced it, exactly as the advice record's ``_is_replay`` treats its
+#: clock. Everything else is identity: the contract versions, the season and gameweek, the
+#: two captures with their timestamps and the deadline between them, the table's name,
+#: digest and row count, and the counts read off the table. A manifest differing in one of
+#: those describes a different artifact and is refused with the field named.
+_PROVENANCE_FIELDS: Final = frozenset({"generated_at_utc", "repository_commit"})
+
+
 def _canonical(manifest: Mapping[str, object]) -> dict[str, object]:
-    return {key: value for key, value in manifest.items() if key != "generated_at_utc"}
+    """The manifest's identity: every field except the provenance ones."""
+
+    return {key: value for key, value in manifest.items() if key not in _PROVENANCE_FIELDS}
+
+
+def _differences(existing: Mapping[str, object], incoming: Mapping[str, object]) -> list[str]:
+    """The identity fields two manifests disagree on, each with both values."""
+
+    absent = object()
+    lines: list[str] = []
+    for key in sorted(set(existing) | set(incoming)):
+        before, after = existing.get(key, absent), incoming.get(key, absent)
+        if before != after:
+            shown = tuple(
+                "<absent>" if value is absent else repr(value) for value in (before, after)
+            )
+            lines.append(f"{key}: on disk {shown[0]}, this run {shown[1]}")
+    return lines
 
 
 def table_name(season: str, pair: _Pair) -> str:
@@ -374,11 +406,20 @@ def write_artifact(
     }
     if manifest_path.exists():
         existing = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if not isinstance(existing, dict) or _canonical(existing) != _canonical(manifest):
+        if not isinstance(existing, dict):
+            raise SettledOutcomeExportError(
+                f"{manifest_path} already exists and is not a manifest; refusing to overwrite it."
+            )
+        differences = _differences(_canonical(existing), _canonical(manifest))
+        if differences:
             raise SettledOutcomeExportError(
                 f"{manifest_path} already exists and describes a different artifact; "
-                "refusing to overwrite it."
+                "refusing to overwrite it. The fields that differ (the clock and the commit "
+                "are provenance and are not compared):\n"
+                + "\n".join(f"  {line}" for line in differences)
             )
+        # The first manifest stands, its clock and its commit included: the same bytes
+        # written again at a later minute from a later revision are a replay of it.
         return existing
     temporary_manifest = _temporary(manifest_path)
     try:

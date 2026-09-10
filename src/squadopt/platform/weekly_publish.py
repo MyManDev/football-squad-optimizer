@@ -31,19 +31,44 @@ import json
 import subprocess
 import sys
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-REPOSITORY_ROOT = Path.cwd()
-
 KINDS = ("decision", "settled")
+
+
+def repository_root() -> Path:
+    """The checkout the legacy publish reads its data from and writes its record into.
+
+    Resolved when it is asked for -- at the construction of a :class:`LeaguePublish` or at
+    the publish itself -- never at import. A default bound to the working directory at
+    import time anchored every root under whatever subdirectory the operator started from
+    (measured: ``docs/data/snapshots`` and its four siblings), while the Git commands, run
+    from the same place, found the checkout on their own. The Git top level is the
+    checkout; outside any checkout, the working directory is all there is.
+    """
+
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True
+        )
+    except OSError:
+        return Path.cwd().resolve()
+    if completed.returncode != 0:
+        return Path.cwd().resolve()
+    return Path(completed.stdout.strip()).resolve()
+
+
+def _data(*parts: str) -> Path:
+    return repository_root().joinpath("data", *parts)
 
 
 @dataclass(frozen=True, slots=True)
 class LeaguePublish:
     """The league tree beside the season views: which capture, which projection, how many
     solver processes. Paths are absolute because the build runs in a fresh worktree that
-    holds no data of its own."""
+    holds no data of its own; the defaults are resolved at construction, from the checkout,
+    not from the working directory this module was imported in."""
 
     league_id: int
     snapshot_id: str
@@ -51,14 +76,14 @@ class LeaguePublish:
     workers: int = 1
     cohort_snapshot: str | None = None
     elite_snapshot: str | None = None
-    snapshot_root: Path = REPOSITORY_ROOT / "data" / "snapshots"
-    registry: Path = REPOSITORY_ROOT / "data" / "entries" / "registry.json"
-    archive_root: Path = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
-    ledger_root: Path = REPOSITORY_ROOT / "data" / "ledger"
+    snapshot_root: Path = field(default_factory=lambda: _data("snapshots"))
+    registry: Path = field(default_factory=lambda: _data("entries", "registry.json"))
+    archive_root: Path = field(default_factory=lambda: _data("raw", "vaastav-fpl"))
+    ledger_root: Path = field(default_factory=lambda: _data("ledger"))
     #: Where the rebuild's immutable advice record lands. Absolute and rooted in *this*
     #: checkout for the same reason as the roots above: the build runs in a throwaway
     #: worktree, so a record left at the build's own default would be deleted with it.
-    advice_record_root: Path = REPOSITORY_ROOT / "data" / "advice_records"
+    advice_record_root: Path = field(default_factory=lambda: _data("advice_records"))
     #: False passes ``--no-advice-record`` through: the escape when a rebuild of the same
     #: capture differs from that capture's record and the deadline will not wait for the
     #: difference to be reconciled. The first record is kept; this publish adds none.
@@ -204,6 +229,29 @@ def _run(arguments: list[str], *, cwd: Path, check: bool = True) -> str:
     return completed.stdout.strip()
 
 
+def check_publication_base(root: Path, expected_commit: str) -> None:
+    """Refuse a publication whose base is not the run's own source revision.
+
+    A week is published from the revision the fresh ``origin/develop`` holds, so the site
+    PR carries generated data on top of code develop already has and nothing else. Checked
+    twice on purpose: by the weekly preflight, before a capture or a solve is spent on a run
+    this stage would refuse hours later, and again here as the backstop, because develop can
+    move while the run is under way.
+    """
+
+    _run(["git", "fetch", "origin"], cwd=root)
+    base = _run(["git", "rev-parse", "origin/develop"], cwd=root)
+    if base != expected_commit:
+        raise PublishError(
+            f"The publication base origin/develop is at {base[:12]} but this run's source "
+            f"revision is {expected_commit[:12]}; a week is published only from the revision "
+            "develop holds. Recovery: merge the pending change into develop, or check out "
+            "the fresh origin/develop (git fetch origin && git switch develop && git pull "
+            "--ff-only) and confirm the checkout is clean; then start a new run -- a resumed "
+            "run keeps its recorded source revision."
+        )
+
+
 def next_steps(names: PublishNames, pr_url: str) -> str:
     """The outward half, printed for a person rather than performed."""
 
@@ -234,7 +282,7 @@ def publish(
     expected_commit: str | None = None,
     on_published: Callable[[Mapping[str, object]], None] | None = None,
 ) -> int:
-    root = (workspace or REPOSITORY_ROOT).resolve()
+    root = (workspace or repository_root()).resolve()
     worktree = (root / names.worktree_directory).resolve()
     if worktree == root or root not in worktree.parents:
         raise PublishError("Publication worktree must remain inside its explicit workspace.")
@@ -243,12 +291,12 @@ def publish(
             f"{worktree} already exists. Finish or remove it first:\n"
             f"  git worktree remove {names.worktree_directory} --force"
         )
-    _run(["git", "fetch", "origin"], cwd=root)
-    if (
-        expected_commit is not None
-        and _run(["git", "rev-parse", "origin/develop"], cwd=root) != expected_commit
-    ):
-        raise PublishError("The publication base differs from the run's recorded source commit.")
+    if expected_commit is not None:
+        # The backstop of the weekly preflight's check; the fetch it does is the one the
+        # worktree below is created from.
+        check_publication_base(root, expected_commit)
+    else:
+        _run(["git", "fetch", "origin"], cwd=root)
     branch_exists = (
         _run(
             ["git", "ls-remote", "--heads", "origin", names.branch],

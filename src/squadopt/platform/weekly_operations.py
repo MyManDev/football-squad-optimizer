@@ -20,7 +20,11 @@ from squadopt.application.player_evidence import PlayerEvidenceRequest, export_p
 from squadopt.application.projection_handoff import build as build_handoff
 from squadopt.application.rotation_export import RotationExportRequest, export_rotation_evidence
 from squadopt.application.scoreboard import ScoreboardPublicationRequest, publish_scoreboard
-from squadopt.application.settled_outcomes import SettledOutcomesRequest, export_settled_outcomes
+from squadopt.application.settled_outcomes import (
+    SettledOutcomeExportError,
+    SettledOutcomesRequest,
+    export_settled_outcomes,
+)
 from squadopt.application.site_publication import SitePublicationRequest, publish_site
 from squadopt.application.weekly_plan import (
     CHIP_CHOICES,
@@ -53,7 +57,12 @@ from squadopt.platform.weekly_journal import (
     inspect_run,
     read_run_request,
 )
-from squadopt.platform.weekly_publish import PublishNames, publish
+from squadopt.platform.weekly_publish import (
+    PublishError,
+    PublishNames,
+    check_publication_base,
+    publish,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,6 +202,14 @@ class WeeklyOperations:
             rotation_root=self.paths.rotation,
             rules=rules,
         )
+        if self.request.publish:
+            # The publish stage checks this too, but only after every capture and solve
+            # has been spent; asked here first so a run off the fresh origin/develop
+            # refuses before it spends anything.
+            try:
+                check_publication_base(self.paths.workspace, self.repository_commit)
+            except PublishError as error:
+                raise WeekError(str(error)) from error
         return self._receipt(
             "preflight",
             {
@@ -756,7 +773,18 @@ def main(argv: list[str] | None = None) -> int:
                 "explicitly with --publish."
             )
         return 0
-    except (WeeklyJournalError, WeekError, DataError, OSError, ValueError, KeyError) as error:
+    except (
+        WeeklyJournalError,
+        WeekError,
+        DataError,
+        SettledOutcomeExportError,
+        PublishError,
+        OSError,
+        ValueError,
+        KeyError,
+    ) as error:
+        # A stage's own refusal is stated here, at the run's boundary, rather than escaping
+        # as a traceback; the journal already holds which stage stopped and why.
         print(f"run_week stopped: {error}", file=sys.stderr)
         return 1
 
