@@ -11,6 +11,7 @@ from typing import Final
 
 import pandas as pd
 
+from squadopt.data.atomic import write_document_once
 from squadopt.data.errors import DataError, InvalidValueError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot
 from squadopt.data.sources.club_news import (
@@ -21,7 +22,6 @@ from squadopt.data.sources.club_news_capture import CodedClub, read_club_news_ca
 from squadopt.data.sources.club_news_claims import ParsedClaim, parse_claim_response
 from squadopt.data.sources.club_news_coding import locate_claim_response
 from squadopt.data.tables import EXPORT_LINE_TERMINATOR
-from squadopt.experiments.shadow_report import write_document_once
 from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION,
     ClubModelProvenance,
@@ -253,6 +253,16 @@ def _publish_once(payload: bytes, destination: Path) -> str:
         temporary.unlink(missing_ok=True)
 
 
+def _manifest_identity(document: Mapping[str, object]) -> dict[str, object]:
+    """What two exports of the same table must agree on: everything but the wall clock.
+
+    A rerun within the week writes the same table and the same manifest except for
+    ``generated_at_utc``; it is a replay, and the occupant's own stamp is the record.
+    """
+
+    return {key: value for key, value in document.items() if key != "generated_at_utc"}
+
+
 def _table_bytes(table: pd.DataFrame) -> bytes:
     """The exact bytes the digest is taken over.
 
@@ -345,7 +355,9 @@ def _export(arguments: RotationExportRequest, *, repository_commit: str) -> Mapp
         repository_commit=repository_commit,
         generated_at_utc=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
-    manifest_outcome = write_document_once(manifest, manifest_path)
+    manifest_outcome = write_document_once(
+        manifest, manifest_path, replay_identity=_manifest_identity
+    )
     return {
         "table_path": table_path,
         "manifest_path": manifest_path,
