@@ -272,17 +272,13 @@ function WeekResult({ week }: { week: WeekReview }) {
             <table className={styles.players}>
               <thead>
                 <tr>
-                  {[
-                    copy.player,
-                    copy.role,
-                    copy.forecast,
-                    copy.realized,
-                    copy.error,
-                  ].map((label) => (
-                    <th scope="col" key={label}>
-                      {label}
-                    </th>
-                  ))}
+                  {[copy.player, copy.role, copy.forecast, copy.realized, copy.error].map(
+                    (label) => (
+                      <th scope="col" key={label}>
+                        {label}
+                      </th>
+                    ),
+                  )}
                 </tr>
               </thead>
               <tbody>
