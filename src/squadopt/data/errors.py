@@ -68,3 +68,15 @@ class SnapshotIntegrityError(SnapshotError):
     A replayed decision is only evidence if the bytes it replays are provably the
     bytes that were captured, so a mismatch is an error rather than a warning.
     """
+
+
+class AtomicWriteError(DataError):
+    """Raised when a create-once write cannot be completed or its occupant cannot be read."""
+
+
+class ConflictingBytesError(AtomicWriteError):
+    """Raised when a create-once destination already holds a different document.
+
+    Distinct from a failure to write: the filesystem did its job, and the writer is
+    refusing to let a recorded artifact be replaced in place.
+    """

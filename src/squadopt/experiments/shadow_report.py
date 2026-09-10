@@ -39,13 +39,14 @@ import contextlib
 import hashlib
 import json
 import math
-import os
 import re
-import secrets
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+
+from squadopt.data import atomic
+from squadopt.data.errors import AtomicWriteError, ConflictingBytesError
 
 SHADOW_CALIBRATION_CONTRACT_V1 = "shadow_calibration_report_v1"
 SHADOW_CALIBRATION_CONTRACT_V2 = "shadow_calibration_report_v2"
@@ -526,16 +527,15 @@ def write_document_once(document: Mapping[str, object], path: Path) -> str:
     """Publish one plain measurement document under the same create-once rule.
 
     Experiment artifacts that are not gate reports still have to be written exactly
-    once, atomically, and never silently replaced. They share this module's writer
-    rather than growing a second, weaker copy of it; what they do not share is the
-    report contract, so an occupant here is compared as JSON.
+    once, atomically, and never silently replaced. The writer is the data layer's
+    ``write_document_once``; what this wrapper adds is the laboratory's own rules --
+    the published site tree is refused, only the wall clock may differ between a
+    record and its replay, and every refusal is a ``ShadowReportError``.
     """
 
     resolved = _internal_destination(path, "measurement artifacts")
-    payload = (json.dumps(dict(document), indent=2, sort_keys=True, allow_nan=False) + "\n").encode(
-        "utf-8"
-    )
-    return _publish_once(payload, resolved, parse=lambda raw: json.loads(raw))
+    with _shadow_errors(resolved):
+        return atomic.write_document_once(document, resolved, replay_identity=replay_identity_of)
 
 
 def _internal_destination(path: Path, what: str) -> Path:
@@ -554,50 +554,39 @@ def _publish_once(
 ) -> str:
     """Create a file exactly once, atomically, and say which of two happened.
 
-    The corrective amendment requires a writer that is crash-safe and safe under
-    concurrent writers: the bytes are completed and fsynced in a sibling temporary
-    file, published with a no-overwrite hard link, and the temporary removed on every
-    path. A losing writer compares its own bytes with the winner's and reports a replay
-    when they agree, falling back to ``replay_identity_of`` when only the wall clock
-    differs. ``parse`` decides how an occupant is read back.
+    The writer itself is ``squadopt.data.atomic.write_bytes_once``: bytes completed and
+    fsynced in a sibling temporary, published with a no-overwrite hard link, the
+    temporary removed on every path. What this module adds is the meaning of "the same
+    measurement": a losing writer whose bytes differ from the winner's still reports a
+    replay when only the wall clock differs (``replay_identity_of``). ``parse`` decides
+    how an occupant is read back.
     """
 
-    resolved.parent.mkdir(parents=True, exist_ok=True)
-    temporary = resolved.with_name(f".{resolved.name}.tmp-{os.getpid()}-{secrets.token_hex(8)}")
-    try:
-        with temporary.open("xb") as handle:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
+    def identity(raw: bytes) -> dict[str, object]:
         try:
-            os.link(temporary, resolved)
-            return "written"
-        except FileExistsError:
-            try:
-                existing_bytes = resolved.read_bytes()
-            except OSError as error:
-                raise ShadowReportError(
-                    f"{resolved} is occupied by something this contract cannot read: {error}"
-                ) from error
-            if existing_bytes == payload:
-                return "replay"
-            try:
-                existing = parse(existing_bytes)
-            except (UnicodeDecodeError, json.JSONDecodeError) as error:
-                raise ShadowReportError(
-                    f"{resolved} already exists but is not readable JSON."
-                ) from error
-            if replay_identity_of(existing) == replay_identity_of(json.loads(payload)):
-                return "replay"
+            return replay_identity_of(parse(raw))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
             raise ShadowReportError(
-                f"{resolved} already holds a different measurement. A recorded result is "
-                "not overwritten; move or delete it deliberately if it is superseded."
-            ) from None
-        except OSError as error:
-            raise ShadowReportError(f"{resolved} could not be published: {error}") from error
-    finally:
-        with contextlib.suppress(OSError):
-            temporary.unlink()
+                f"{resolved} already exists but is not readable JSON."
+            ) from error
+
+    with _shadow_errors(resolved):
+        return atomic.write_bytes_once(payload, resolved, parse=identity)
+
+
+@contextlib.contextmanager
+def _shadow_errors(resolved: Path) -> Iterator[None]:
+    """Every refusal of the create-once writer is a contract error here."""
+
+    try:
+        yield
+    except ConflictingBytesError:
+        raise ShadowReportError(
+            f"{resolved} already holds a different measurement. A recorded result is "
+            "not overwritten; move or delete it deliberately if it is superseded."
+        ) from None
+    except AtomicWriteError as error:
+        raise ShadowReportError(str(error)) from error
 
 
 def _validated_payload(report: ShadowCalibrationReport) -> bytes:

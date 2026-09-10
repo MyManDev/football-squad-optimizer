@@ -149,8 +149,6 @@ allow_indirect_imports = false
 # Baseline, same rule as the layers contract (ADR 0001): this list may only shrink; a new
 # violation fails the gate; each entry names the follow-up PR that removes it.
 ignore_imports = [
-    # write_document_once -> atomic-write helper in squadopt.data (atomic-write PR)
-    "squadopt.application.rotation_export -> squadopt.experiments.shadow_report",
     # CandidatePlan / select_plan / selection_to_dict -> squadopt.live (plan_selection PR)
     "squadopt.application.mode_selection -> squadopt.experiments.plan_selection",
 ]
