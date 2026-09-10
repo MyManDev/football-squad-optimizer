@@ -76,6 +76,13 @@ function LeagueMemberContent({
           </div>
           <h1 className={styles.title}>{view.entry.team_name ?? copy.unknownTeam}</h1>
           <p className={styles.lede}>{view.entry.manager_name ?? copy.unknownMember}</p>
+          {view.league_id === 352490 && (
+            <p>
+              <Link to={`/league/members/${entryId}/history`}>
+                {messages.suggestionHistory.title}
+              </Link>
+            </p>
+          )}
         </div>
         <ExampleDataBadge sourceKind={squad.source_kind} />
       </header>
