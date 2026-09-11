@@ -28,8 +28,8 @@ week's prompt digest changed because a club published a longer page, which tells
 nothing about whether the question changed.
 
 Nothing here reaches a network or imports a network library. The provider that does lives in
-``club_news_anthropic``; this module is what that provider says and what reads it back, and it
-is testable with no key, no network and no SDK installed.
+``platform.club_news_model``; this module is what that provider says and what reads it back,
+and it is testable with no key, no network and no SDK installed.
 """
 
 import hashlib

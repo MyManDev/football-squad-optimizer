@@ -10,7 +10,7 @@ Two files:
 | File | What it is |
 | --- | --- |
 | `src/squadopt/data/sources/club_news_coding.py` | The frozen prompt, the response schema, and the deterministic locator. No network, no SDK. |
-| `src/squadopt/data/sources/club_news_anthropic.py` | The one place in the repository that calls a model. |
+| `src/squadopt/platform/club_news_model.py` | The one place in the repository that calls a model. |
 
 ## The problem this is shaped around
 

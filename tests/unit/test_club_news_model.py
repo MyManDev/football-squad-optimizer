@@ -25,15 +25,6 @@ from squadopt.data.sources.club_news import (
     FixtureClubNewsProvider,
     RawDocument,
 )
-from squadopt.data.sources.club_news_anthropic import (
-    API_KEY_ENVIRONMENT_VARIABLE,
-    MAX_OUTPUT_TOKENS,
-    MAX_TRANSPORT_RETRIES,
-    REQUEST_TIMEOUT_SECONDS,
-    AnthropicClubNewsProvider,
-    ClubNewsModelError,
-    read_api_key,
-)
 from squadopt.data.sources.club_news_claims import parse_claim_response
 from squadopt.data.sources.club_news_coding import (
     CODING_EFFORT,
@@ -42,6 +33,15 @@ from squadopt.data.sources.club_news_coding import (
     CodingFixture,
     locate_claim_response,
     response_schema,
+)
+from squadopt.platform.club_news_model import (
+    API_KEY_ENVIRONMENT_VARIABLE,
+    MAX_OUTPUT_TOKENS,
+    MAX_TRANSPORT_RETRIES,
+    REQUEST_TIMEOUT_SECONDS,
+    AnthropicClubNewsProvider,
+    ClubNewsModelError,
+    read_api_key,
 )
 
 SAMPLE_DIR = Path(__file__).resolve().parents[2] / "data" / "sample"

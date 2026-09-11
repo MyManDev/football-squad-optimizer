@@ -39,7 +39,6 @@ from squadopt.data.errors import DataError
 from squadopt.data.sources.club_news import (
     ClubNewsError,
 )
-from squadopt.experiments.shadow_report import ShadowReportError
 
 DEFAULT_SNAPSHOT_ROOT: Final = REPOSITORY_ROOT / "data" / "snapshots"
 
@@ -96,7 +95,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     try:
         result = _export(arguments, repository_commit=revision)
-    except (ClubNewsError, DataError, ShadowReportError, OSError, ValueError) as error:
+    except (ClubNewsError, DataError, OSError, ValueError) as error:
         print(f"Refused: {error}")
         return 1
 
