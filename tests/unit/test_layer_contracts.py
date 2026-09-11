@@ -1,9 +1,12 @@
 """Compatibility and deterministic evidence across the shared-layer extraction."""
 
+from pathlib import Path
+
 import pandas as pd
 import pytest
 from pandas.testing import assert_frame_equal
 
+import squadopt
 from squadopt import OptimizationConfig
 from squadopt.backtest.production_benchmark import ProductionBenchmarkConfig
 from squadopt.contracts import POSITIONS, REQUIRED_COLUMNS, Position, sort_players_by_id
@@ -117,4 +120,45 @@ def test_projection_and_policy_fingerprints_preserve_pre_extraction_values() -> 
     )
     assert ProductionBenchmarkConfig().configuration_fingerprint == (
         "34a94f823b0fa2ef485199d7a9325a16aa607316fd57cc12904e882c4f420641"
+    )
+
+
+def test_the_data_layer_imports_no_network_or_vendor_sdk() -> None:
+    """The rule `lint-imports` cannot see, because it does not look outside the package.
+
+    `include_external_packages = false` in the import contract, so the three contracts check
+    how `squadopt` modules import each other and say nothing about what any of them imports
+    from outside. That leaves the architecture's own rule — vendor and cloud SDKs stay
+    outside the research engine (`docs/architecture/backend.md`,
+    `docs/architecture/platform_runtime.md`) — with no gate at all, which is how the model
+    call came to sit in `squadopt.data`, the bottom layer, while the club-page reader beside
+    it sat correctly in `squadopt.platform`.
+
+    Read as source text rather than by importing: an adapter that defers its SDK import into
+    a constructor — which this repository's does, so a missing optional install is a typed
+    domain error rather than a crash at import time — is invisible to any check that only
+    looks at module attributes.
+    """
+
+    network_libraries = ("anthropic", "httpx", "httpx2", "requests", "urllib.request", "aiohttp")
+    data_root = Path(squadopt.__file__).resolve().parent / "data"
+    offenders: list[str] = []
+
+    for module in sorted(data_root.rglob("*.py")):
+        source = module.read_text(encoding="utf-8")
+        for line in source.splitlines():
+            statement = line.strip()
+            if not statement.startswith(("import ", "from ")):
+                continue
+            for library in network_libraries:
+                if statement.startswith(f"import {library}") or statement.startswith(
+                    f"from {library}"
+                ):
+                    offenders.append(f"{module.name}: {statement}")
+
+    assert offenders == [], (
+        "The data layer is the bottom of the engine and is meant to be source-independent; "
+        f"these lines reach a network library from inside it: {offenders}. An adapter that "
+        "speaks to something outside this process belongs in squadopt.platform, beside "
+        "club_news_fetch and club_news_model."
     )

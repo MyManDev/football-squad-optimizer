@@ -6,6 +6,19 @@ other half of that seam: it implements ``ClubNewsProvider.code`` against the rea
 changes nothing else. Every test downstream of it still runs offline, because none of them
 go through here.
 
+**The layer boundary decides where this lives**, in the same words as ``club_news_fetch``
+beside it: ``platform`` owns the adapters that speak to something outside this process, and
+the architecture puts vendor and cloud SDKs outside ``application`` and the research engine
+(``docs/architecture/backend.md``, ``docs/architecture/platform_runtime.md``). The model call
+was the last external adapter still sitting in ``data``, the bottom layer -- so a package
+whose whole job is to be source-independent was the one importing a network SDK. It is handed
+to the evidence path as an operation rather than imported by it, which is why moving it
+changes no caller in ``application``: there was never one.
+
+The pure half stayed behind. ``data.sources.club_news_coding`` holds the frozen prompt, the
+response schema and the locator -- vocabulary and arithmetic, no network -- and this module
+is what says it out loud.
+
 **What it does not do, listed because each one is a decision:**
 
 - *No tools.* No web search, no fetch, no code execution. The request carries no ``tools``
@@ -116,9 +129,9 @@ def read_api_key(environ: Mapping[str, str] | None = None) -> str:
 
     ``environ`` is injectable so tests never touch the real environment. The refusal names
     the variable and says what it is for, in the house style of ``BackendConfig``'s reader --
-    which this deliberately does not reuse: that reader lives in ``squadopt.platform`` and
-    ``squadopt.data`` is the bottom layer, so importing it would invert the layering the
-    import contract exists to hold.
+    which this does not reuse because there is nothing to reuse: that reader takes the
+    backend's four path variables and returns a ``BackendConfig``. The style is shared; the
+    reader is not the same reader.
     """
 
     source = os.environ if environ is None else environ

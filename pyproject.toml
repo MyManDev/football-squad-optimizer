@@ -49,7 +49,7 @@ dev = [
     "ruff>=0.11,<1",
     "types-jsonschema>=4.26,<5",
 ]
-# The model call in `squadopt.data.sources.club_news_anthropic`, and nothing else. Kept out of
+# The model call in `squadopt.platform.club_news_model`, and nothing else. Kept out of
 # the runtime dependencies so a research-only install stays free of a network SDK, and out of
 # `api` so the deployed image does not carry it: the backend answers from stored artifacts and
 # never asks a model anything. `docs/architecture/backend.md` puts cloud SDKs outside the
