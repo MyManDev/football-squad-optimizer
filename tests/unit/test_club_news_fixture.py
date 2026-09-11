@@ -256,6 +256,7 @@ def test_a_document_whose_declared_length_disagrees_with_its_bytes_is_rejected()
             byte_length=5,
             fetched_at_utc="2026-09-12T14:05:00Z",
             content=b"abc",
+            readable=b"abc",
         )
 
 
@@ -277,6 +278,7 @@ def test_a_document_that_names_no_club_is_rejected() -> None:
             byte_length=3,
             fetched_at_utc="2026-09-12T14:05:00Z",
             content=b"abc",
+            readable=b"abc",
         )
 
 
@@ -298,6 +300,7 @@ def test_a_document_carries_no_transport_publication_claim_by_default() -> None:
         byte_length=3,
         fetched_at_utc="2026-09-12T14:05:00Z",
         content=b"abc",
+        readable=b"abc",
     )
 
     assert document.last_modified_utc is None
@@ -317,6 +320,7 @@ def test_a_transport_publication_claim_must_be_an_instant() -> None:
             byte_length=3,
             fetched_at_utc="2026-09-12T14:05:00Z",
             content=b"abc",
+            readable=b"abc",
             last_modified_utc="Thu, 12 Sep 2026 13:00:00 GMT",
         )
 
@@ -343,6 +347,7 @@ def test_a_document_with_a_local_fetch_instant_is_rejected() -> None:
             byte_length=3,
             fetched_at_utc="2026-09-12 14:05:00",
             content=b"abc",
+            readable=b"abc",
         )
 
 

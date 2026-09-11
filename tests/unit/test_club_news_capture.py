@@ -295,10 +295,17 @@ def test_a_capture_without_its_index_is_refused(tmp_path: Path) -> None:
 
 
 def test_a_capture_under_another_layout_is_refused(tmp_path: Path) -> None:
-    """A capture written under one layout is not readable under another."""
+    """A capture written under one layout is not readable under another.
+
+    ``club_news_capture_v1`` is the real case rather than an invented one: v1 stored one
+    payload per document and v2 stores the served bytes and the extracted text side by
+    side, so a v1 capture has no readable payload for its offsets to index. Re-extracting
+    it here would resolve stored offsets into bytes produced by a later extractor, which is
+    the failure the digest check exists to prevent -- so it is refused instead.
+    """
 
     index = json.dumps(
-        {"contract_version": "club_news_capture_v2", "documents": [], "responses": []}
+        {"contract_version": "club_news_capture_v1", "documents": [], "responses": []}
     ).encode("utf-8")
     metadata = write_snapshot(
         tmp_path,

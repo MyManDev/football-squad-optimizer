@@ -402,6 +402,7 @@ def test_documents_fetched_after_the_decision_capture_refuse_the_week(tmp_path: 
             byte_length=document.byte_length,
             fetched_at_utc="2026-09-12T16:00:00Z",
             content=document.content,
+            readable=document.readable,
             last_modified_utc=document.last_modified_utc,
         )
         for document in _documents()
