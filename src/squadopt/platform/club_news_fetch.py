@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from squadopt.data.sources.club_news import ClubNewsError, RawDocument
+from squadopt.data.sources.club_news_readable import ReadableTextError, extract_readable_text
 
 # One program, one identity. Imported rather than restated: a second user-agent string
 # would make us two callers to anyone reading their logs, and the politeness policy this
@@ -345,6 +346,13 @@ def fetch_club_document(
             f"{source.url} served no bytes. An empty document is not a club that published "
             "nothing; it is a read that did not work."
         )
+    try:
+        readable = extract_readable_text(read.content, read.content_type)
+    except ReadableTextError as error:
+        # One unreadable page costs one club, not the week: the caller separates a club it
+        # could not read from a club that said nothing, and that only works if this refusal
+        # arrives in the same currency as every other per-source refusal here.
+        raise ClubNewsFetchError(f"{source.url} has no readable text: {error}") from error
     return RawDocument(
         club=source.club,
         requested_url=source.url,
@@ -354,6 +362,7 @@ def fetch_club_document(
         byte_length=len(read.content),
         fetched_at_utc=_instant(now()),
         content=read.content,
+        readable=readable,
         last_modified_utc=read.last_modified,
     )
 

@@ -41,17 +41,22 @@ from squadopt.data.sources.club_news import (
     ClubNewsError,
     RawDocument,
 )
+from squadopt.data.sources.club_news_readable import READABLE_TEXT_CONTRACT_VERSION
 
 #: The capture layout's own contract. Bumped when the payload names or the index shape
 #: move, because a capture written under one layout is not readable under another -- and
 #: being readable years later is the only reason it is written at all.
-CLUB_NEWS_CAPTURE_CONTRACT_VERSION: Final = "club_news_capture_v1"
+CLUB_NEWS_CAPTURE_CONTRACT_VERSION: Final = "club_news_capture_v2"
 
 #: The index payload. Named so a person listing the directory can see where to start.
 INDEX_PAYLOAD: Final = "index.json"
 
 _DOCUMENT_PREFIX: Final = "document"
 _RESPONSE_PREFIX: Final = "response"
+#: The extracted text beside the served bytes. Both are kept: the served bytes are what the
+#: host sent and what makes the extraction auditable, the extracted ones are what the model
+#: was shown and what a claim's offsets index.
+_READABLE_PREFIX: Final = "readable"
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,6 +99,10 @@ def _response_payload(position: int) -> str:
     return f"{_RESPONSE_PREFIX}-{position:02d}"
 
 
+def _readable_payload(position: int) -> str:
+    return f"{_READABLE_PREFIX}-{position:02d}"
+
+
 def capture_payloads(
     documents: Sequence[RawDocument],
     coded: Sequence[CodedClub],
@@ -128,10 +137,13 @@ def capture_payloads(
     document_index: list[dict[str, object]] = []
     for position, document in enumerate(documents, start=1):
         name = _document_payload(position)
+        readable_name = _readable_payload(position)
         payloads[name] = document.content
+        payloads[readable_name] = document.readable
         document_index.append(
             {
                 "payload": name,
+                "readable_payload": readable_name,
                 "club": document.club,
                 "requested_url": document.requested_url,
                 "final_url": document.final_url,
@@ -161,6 +173,7 @@ def capture_payloads(
         json.dumps(
             {
                 "contract_version": CLUB_NEWS_CAPTURE_CONTRACT_VERSION,
+                "readable_text_contract_version": READABLE_TEXT_CONTRACT_VERSION,
                 "clubs_declared": sorted(set(clubs_declared)),
                 "clubs_covered": sorted(set(clubs_covered)),
                 "documents": document_index,
@@ -287,6 +300,7 @@ def read_captured_documents(snapshot: CapturedSnapshot) -> tuple[RawDocument, ..
     for entry in _entries(document, "documents"):
         name = _text(entry, "payload")
         content = _payload_bytes(snapshot, name)
+        readable = _payload_bytes(snapshot, _text(entry, "readable_payload"))
         status = entry.get("http_status")
         if isinstance(status, bool) or not isinstance(status, int):
             raise DataSourceError(f"{INDEX_PAYLOAD} entry {name!r} has no integer status.")
@@ -305,6 +319,7 @@ def read_captured_documents(snapshot: CapturedSnapshot) -> tuple[RawDocument, ..
                 byte_length=len(content),
                 fetched_at_utc=_text(entry, "fetched_at_utc"),
                 content=content,
+                readable=readable,
                 last_modified_utc=modified,
             )
         )
@@ -376,9 +391,11 @@ def read_club_news_capture(
         )
     documents = read_captured_documents(snapshot)
     coded = read_captured_responses(snapshot)
+    described = _entries(_index(snapshot), "documents")
     _require_every_payload_is_indexed(
         snapshot,
-        [_text(entry, "payload") for entry in _entries(_index(snapshot), "documents")]
+        [_text(entry, "payload") for entry in described]
+        + [_text(entry, "readable_payload") for entry in described]
         + [_text(entry, "payload") for entry in _entries(_index(snapshot), "responses")],
     )
     declared, covered = read_captured_coverage(snapshot)

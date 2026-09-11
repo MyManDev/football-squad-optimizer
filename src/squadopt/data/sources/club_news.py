@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Final, Protocol
 
 from squadopt.data.errors import DataSourceError, InvalidValueError
+from squadopt.data.sources.club_news_readable import extract_readable_text
 from squadopt.data.timestamps import normalize_utc_timestamp
 
 #: Recorded in a snapshot's metadata as the source of captured club documents.
@@ -90,6 +91,12 @@ class RawDocument:
     itself spells -- so the fetch that knows which source it was reading is the only place
     that can say it without guessing.
 
+    ``readable`` is the text a person reads, extracted from ``content`` by
+    ``club_news_readable`` and carried beside it rather than instead of it. It is what the
+    model is shown and what a claim's byte offsets index; ``content`` stays exactly as the
+    host served it, which is what makes the extraction auditable. Both are stored, because
+    a citation into markup is not a citation and bytes nobody kept are not evidence.
+
     ``last_modified_utc`` is the **transport's** claim about publication, from the response
     header, and it is a third clock beside the other two. It is not the document's own
     dateline: a server can serve yesterday's words with today's header, and the dateline the
@@ -106,6 +113,7 @@ class RawDocument:
     byte_length: int
     fetched_at_utc: str
     content: bytes
+    readable: bytes
     last_modified_utc: str | None = None
 
     def __post_init__(self) -> None:
@@ -116,6 +124,11 @@ class RawDocument:
             )
         if not self.requested_url or not self.final_url:
             raise InvalidValueError("A fetched document must name both URLs.")
+        if not self.readable.strip():
+            raise InvalidValueError(
+                f"{self.requested_url} carries no readable text. A document nobody can be "
+                "quoted from is a club that was not covered, not a club that said nothing."
+            )
         if self.byte_length != len(self.content):
             raise InvalidValueError(
                 f"{self.requested_url} declares {self.byte_length} bytes and carries "
@@ -308,15 +321,17 @@ class FixtureClubNewsProvider:
             if _require_text(record, "requested_url", "A fixture document") != url:
                 continue
             content = _require_text(record, "content", "A fixture document").encode("utf-8")
+            content_type = _require_text(record, "content_type", "A fixture document")
             return RawDocument(
                 club=_require_text(record, "club", "A fixture document"),
                 requested_url=url,
                 final_url=_require_text(record, "final_url", "A fixture document"),
                 http_status=_require_integer(record, "http_status", "A fixture document"),
-                content_type=_require_text(record, "content_type", "A fixture document"),
+                content_type=content_type,
                 byte_length=len(content),
                 fetched_at_utc=_require_text(record, "fetched_at_utc", "A fixture document"),
                 content=content,
+                readable=extract_readable_text(content, content_type),
             )
         raise ClubNewsError(
             f"The club-news fixture at {self._path} carries no document for {url!r}. It "

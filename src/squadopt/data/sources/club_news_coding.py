@@ -293,7 +293,7 @@ def build_user_content(documents: Sequence[RawDocument], roster: Sequence[Roster
     parts.append("# Documents")
     for document in documents:
         try:
-            text = document.content.decode("utf-8")
+            text = document.readable.decode("utf-8")
         except UnicodeDecodeError as error:
             raise ClubNewsError(
                 f"{document.requested_url} is not UTF-8 ({error}). It is not offered to the "
@@ -365,12 +365,12 @@ def _quoted_bytes(documents: Sequence[RawDocument]) -> dict[str, bytes]:
     for document in documents:
         for url in (document.requested_url, document.final_url):
             existing = indexed.get(url)
-            if existing is not None and existing != document.content:
+            if existing is not None and existing != document.readable:
                 raise ClubNewsError(
                     f"Two fetched documents answer for {url!r} with different bytes; a quote "
                     "could be located in either."
                 )
-            indexed[url] = document.content
+            indexed[url] = document.readable
     return indexed
 
 

@@ -422,6 +422,7 @@ def test_a_document_that_is_not_utf8_is_refused_rather_than_decoded_lossily() ->
         byte_length=13,
         fetched_at_utc="2026-09-11T12:00:00Z",
         content="Kant\xe9 is fit.".encode("latin-1"),
+        readable="Kant\xe9 is fit.".encode("latin-1"),
     )
     roster = (RosterPlayer(player_id=1, web_name="Kante", team_name="Chelsea"),)
 
@@ -441,6 +442,7 @@ def _oversized_document(byte_length: int) -> RawDocument:
         byte_length=byte_length,
         fetched_at_utc="2026-09-11T12:00:00Z",
         content=b"a" * byte_length,
+        readable=b"a" * byte_length,
     )
 
 

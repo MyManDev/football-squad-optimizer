@@ -9,6 +9,7 @@ Two files:
 
 | File | What it is |
 | --- | --- |
+| `src/squadopt/data/sources/club_news_readable.py` | The text a person reads, taken from the bytes a host served. Pure, versioned, stdlib only. |
 | `src/squadopt/data/sources/club_news_coding.py` | The frozen prompt, the response schema, and the deterministic locator. No network, no SDK. |
 | `src/squadopt/platform/club_news_model.py` | The one place in the repository that calls a model. |
 
@@ -24,6 +25,38 @@ citation at all.
 
 So the model is never asked to count. It is asked for the sentence, verbatim, and this
 repository finds it.
+
+## What the offsets index, and why it is not the served bytes
+
+A citation is an exact byte range, and for as long as documents were plain text the served
+bytes were the obvious thing to index. HTML ends that. Measured on a page written the way a
+club writes one, five sentences a person would read off the screen and **four could not be
+located** in the source: `Saturday's` is `&rsquo;` in the bytes, `&` is `&amp;`, an em dash is
+`&mdash;`, and `Bukayo is fit` has a `<strong>` through the middle of it.
+
+Neither outcome is a citation. A model shown HTML either quotes the markup — and a member is
+then shown `Bukayo <strong>is</strong> fit` as the club's own words — or quotes what it read
+and the span cannot be found.
+
+So a document carries two payloads. `readable_text_v1` turns served bytes into the text a
+person reads, and **that** is what the model is shown and what the offsets index. The served
+bytes stay beside it: they are what the host actually sent and what makes the extraction
+auditable, and dropping them to save a payload would discard the only evidence that this step
+is faithful. The invariant is one sentence:
+
+> the bytes handed to the model are the bytes the locator searches.
+
+Plain text passes through unchanged. Not a convenience — there is nothing to extract from text
+that is already the text, and a transformation would move every offset already written.
+
+The extraction is versioned for the same reason the prompt is. A capture written under one
+extractor and read under another would resolve its stored offsets into different words, which
+is the failure the digest check exists to prevent, so the version travels in the capture index
+and `club_news_capture_v1` is refused rather than re-extracted.
+
+**The rule was not loosened.** Resolving `&rsquo;` into the character the page shows is not the
+same as making the locator forgiving: a quote that tidies that curly apostrophe into a straight
+one is still refused, because a model that tidies has not copied the document.
 
 ## Two formats
 

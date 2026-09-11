@@ -229,12 +229,12 @@ def _fetched_bytes(documents: Sequence[RawDocument]) -> dict[str, bytes]:
     for document in documents:
         for url in (document.requested_url, document.final_url):
             existing = indexed.get(url)
-            if existing is not None and existing != document.content:
+            if existing is not None and existing != document.readable:
                 raise ClubNewsError(
                     f"Two fetched documents answer for {url!r} with different bytes; the "
                     "citation would be ambiguous."
                 )
-            indexed[url] = document.content
+            indexed[url] = document.readable
     return indexed
 
 
