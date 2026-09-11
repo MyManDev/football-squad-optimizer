@@ -420,6 +420,148 @@ def locate_quote(content: bytes, quote: str, label: str) -> tuple[int, int]:
     return start, start + len(needle)
 
 
+@dataclass(frozen=True, slots=True)
+class UnlocatableClaim:
+    """One claim whose citation could not be verified, and who it was about.
+
+    Carried out of the locator rather than raised, so the caller can record it as what it is:
+    a **source error**. The player was written about and the quote could not be found in the
+    bytes it cites -- which is a different fact from "his club said nothing about him" and a
+    very different fact from "his club was never read". Collapsing the three is what this
+    whole lane exists to prevent, and until this type existed the first one had nowhere to go.
+    """
+
+    player_name: str
+    team_name: str
+    source_url: str
+    why: str
+
+
+def _located_entries(
+    document: Mapping[str, object],
+    available: Mapping[str, bytes],
+    *,
+    report_unverifiable: bool,
+) -> tuple[list[dict[str, object]], list[UnlocatableClaim]]:
+    """Locate every coded claim, and either refuse or report the ones that will not locate.
+
+    The line between the two outcomes is what can still be *said* about the failure. A claim
+    whose quote is absent or ambiguous, or which cites a document nobody fetched, can be named
+    -- the player, the club, the URL -- so it can be dropped and recorded. A claim missing a
+    required field cannot: there is no identity to report, and a response shaped like that is
+    a broken answer rather than one bad citation, so it refuses the whole response either way.
+    """
+
+    located: list[dict[str, object]] = []
+    dropped: list[UnlocatableClaim] = []
+    for entry in _list(document, "claims"):
+        record = _mapping(entry, "A coded claim")
+        missing = [key for key in _CODING_CLAIM_KEYS if key not in record]
+        if missing:
+            raise ClubNewsError(f"A coded claim is missing required field(s) {missing!r}.")
+        player_name = _text(record, "player_name", "A coded claim")
+        label = f"The claim about {player_name!r}"
+        source_url = _text(record, "source_url", label)
+        team_name = _text(record, "team_name", label)
+        content = available.get(source_url)
+        try:
+            if content is None:
+                raise ClubNewsError(
+                    f"{label} cites {source_url!r}, which is not among the fetched documents; "
+                    "there are no bytes to locate its quote in."
+                )
+            span_start, span_end = locate_quote(content, _text(record, "quote", label), label)
+        except ClubNewsError as error:
+            if not report_unverifiable:
+                raise
+            dropped.append(
+                UnlocatableClaim(
+                    player_name=player_name,
+                    team_name=team_name,
+                    source_url=source_url,
+                    why=str(error),
+                )
+            )
+            continue
+        located.append(
+            {
+                "player_name": player_name,
+                "team_name": team_name,
+                "disposition": _text(record, "disposition", label),
+                "speaker": _text(record, "speaker", label),
+                "source_url": source_url,
+                "span_start": span_start,
+                "span_end": span_end,
+                "paraphrase": _text(record, "paraphrase", label),
+            }
+        )
+    return located, dropped
+
+
+def _response_of(
+    document: Mapping[str, object], located: Sequence[Mapping[str, object]], response: ClaimResponse
+) -> ClaimResponse:
+    """Render located claims as the parser's format, keeping the response's identity."""
+
+    parsed_text = json.dumps(
+        {
+            "contract_version": ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
+            "documents": _list(document, "documents"),
+            "claims": list(located),
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return ClaimResponse(
+        text=parsed_text,
+        model_identifier=response.model_identifier,
+        model_version=response.model_version,
+    )
+
+
+def _coding_document(
+    response: ClaimResponse, documents: Sequence[RawDocument]
+) -> tuple[Mapping[str, object], dict[str, bytes]]:
+    """Read a coding response and index the bytes its quotes must be found in."""
+
+    if not documents:
+        raise ClubNewsError(
+            "Locating needs the fetched documents: a quote becomes a span only inside the "
+            "bytes it was copied from."
+        )
+    document = _object(response.text)
+    version = document.get("contract_version")
+    if version != ROTATION_CLAIM_CODING_CONTRACT_VERSION:
+        raise ClubNewsError(
+            f"The coding response declares contract {version!r}, not "
+            f"{ROTATION_CLAIM_CODING_CONTRACT_VERSION!r}. A response produced under one "
+            "prompt version is not readable under another."
+        )
+    return document, _quoted_bytes(documents)
+
+
+def locate_claims_reporting(
+    response: ClaimResponse, documents: Sequence[RawDocument]
+) -> tuple[ClaimResponse, tuple[UnlocatableClaim, ...]]:
+    """Locate what can be located, and report the rest instead of losing the week.
+
+    The strict :func:`locate_claim_response` raises on the first quote that will not locate.
+    That is the right rule for a capture being written -- a response that cannot be rendered
+    whole should not be stored as if it had been -- and the wrong one at the far end of a
+    deadline, where it means one unverifiable citation out of twenty discards the other
+    nineteen and the week produces no evidence at all.
+
+    So this returns both halves. The caller records the dropped claims as source errors, which
+    is the one thing they must not silently become: a player whose citation could not be
+    verified is not a player nobody wrote about.
+    """
+
+    document, available = _coding_document(response, documents)
+    located, dropped = _located_entries(document, available, report_unverifiable=True)
+    return _response_of(document, located, response), tuple(dropped)
+
+
 def locate_claim_response(
     response: ClaimResponse, documents: Sequence[RawDocument]
 ) -> ClaimResponse:
@@ -438,65 +580,9 @@ def locate_claim_response(
     them here as well would put the same rule in two places and let the copies disagree.
     """
 
-    if not documents:
-        raise ClubNewsError(
-            "Locating needs the fetched documents: a quote becomes a span only inside the "
-            "bytes it was copied from."
-        )
-    document = _object(response.text)
-    version = document.get("contract_version")
-    if version != ROTATION_CLAIM_CODING_CONTRACT_VERSION:
-        raise ClubNewsError(
-            f"The coding response declares contract {version!r}, not "
-            f"{ROTATION_CLAIM_CODING_CONTRACT_VERSION!r}. A response produced under one "
-            "prompt version is not readable under another."
-        )
-    available = _quoted_bytes(documents)
-
-    located: list[dict[str, object]] = []
-    for entry in _list(document, "claims"):
-        record = _mapping(entry, "A coded claim")
-        missing = [key for key in _CODING_CLAIM_KEYS if key not in record]
-        if missing:
-            raise ClubNewsError(f"A coded claim is missing required field(s) {missing!r}.")
-        player_name = _text(record, "player_name", "A coded claim")
-        label = f"The claim about {player_name!r}"
-        source_url = _text(record, "source_url", label)
-        content = available.get(source_url)
-        if content is None:
-            raise ClubNewsError(
-                f"{label} cites {source_url!r}, which is not among the fetched documents; "
-                "there are no bytes to locate its quote in."
-            )
-        span_start, span_end = locate_quote(content, _text(record, "quote", label), label)
-        located.append(
-            {
-                "player_name": player_name,
-                "team_name": _text(record, "team_name", label),
-                "disposition": _text(record, "disposition", label),
-                "speaker": _text(record, "speaker", label),
-                "source_url": source_url,
-                "span_start": span_start,
-                "span_end": span_end,
-                "paraphrase": _text(record, "paraphrase", label),
-            }
-        )
-
-    parsed_text = json.dumps(
-        {
-            "contract_version": ROTATION_CLAIM_RESPONSE_CONTRACT_VERSION,
-            "documents": _list(document, "documents"),
-            "claims": located,
-        },
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
-    return ClaimResponse(
-        text=parsed_text,
-        model_identifier=response.model_identifier,
-        model_version=response.model_version,
-    )
+    document, available = _coding_document(response, documents)
+    located, _ = _located_entries(document, available, report_unverifiable=False)
+    return _response_of(document, located, response)
 
 
 @dataclass(frozen=True, slots=True)
@@ -607,9 +693,11 @@ __all__ = [
     "SYSTEM_PROMPT",
     "CodingFixture",
     "UnlocatableCase",
+    "UnlocatableClaim",
     "build_user_content",
     "coding_prompt_sha256",
     "locate_claim_response",
+    "locate_claims_reporting",
     "locate_quote",
     "response_schema",
 ]

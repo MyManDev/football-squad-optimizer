@@ -54,6 +54,7 @@ from squadopt.data.sources.club_news import (
     RawDocument,
 )
 from squadopt.data.sources.club_news_claims import ParsedClaim
+from squadopt.data.sources.club_news_coding import UnlocatableClaim
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
@@ -68,7 +69,7 @@ from squadopt.data.sources.fpl_live import (
 from squadopt.data.timestamps import as_instant
 
 #: This table's contract. A row written under one version is not readable under another.
-CONTRACT_VERSION: Final = "rotation_evidence_v1"
+CONTRACT_VERSION: Final = "rotation_evidence_v2"
 
 #: The locked holdout. Evidence for it is not built, listed or fingerprinted.
 LOCKED_HOLDOUT_SEASON: Final = "2025-26"
@@ -105,6 +106,7 @@ ROTATION_EVIDENCE_COLUMNS: Final[tuple[str, ...]] = (
     "feed_scout_news_link_present",
     "club_source_covered",
     "rotation_claim_observed",
+    "rotation_claim_unresolved",
     "rotation_disposition",
     "rotation_claim_source_sha256",
     "rotation_claim_span_start",
@@ -140,6 +142,7 @@ _ROTATION_EVIDENCE_DTYPES: Final[Mapping[str, str]] = {
     "feed_scout_news_link_present": "boolean",
     "club_source_covered": "boolean",
     "rotation_claim_observed": "boolean",
+    "rotation_claim_unresolved": "boolean",
     "rotation_disposition": "string",
     "rotation_claim_source_sha256": "string",
     "rotation_claim_span_start": "Int64",
@@ -444,6 +447,26 @@ def _resolved_claims(
     return placed, unresolved
 
 
+def _unverifiable_players(
+    dropped: Sequence[UnlocatableClaim], roster: pd.DataFrame
+) -> frozenset[int]:
+    """Which roster players had a claim whose citation could not be verified.
+
+    Resolved through the same seam the placed claims use, so "the model wrote about him" is
+    decided the same way whichever side of the locator the claim came out on. A dropped claim
+    naming somebody the roster does not carry is itself dropped: it would be a source error
+    about a player this week never had, and the table has no row to put it on.
+    """
+
+    seam_roster = roster_from_short_names(roster)
+    players: set[int] = set()
+    for claim in dropped:
+        identity = resolve_claim_player(claim.player_name, claim.team_name, seam_roster)
+        if isinstance(identity, ResolvedClaim):
+            players.add(identity.player_id)
+    return frozenset(players)
+
+
 def _timing_verified(
     *,
     captured_at_utc: str,
@@ -545,6 +568,7 @@ def build_rotation_evidence_table(
     clubs_declared: Sequence[str],
     clubs_covered: Sequence[str],
     model: ClubModelProvenance | None,
+    unverifiable_claims: Sequence[UnlocatableClaim] = (),
     club_news_snapshot_id: str | None = None,
 ) -> pd.DataFrame:
     """Build one week's rotation evidence: one row per roster player, always.
@@ -614,6 +638,7 @@ def build_rotation_evidence_table(
     )
     code_by_name = _team_code_by_name(bootstrap)
     placed, unresolved = _resolved_claims(claims, roster)
+    unverifiable = _unverifiable_players(unverifiable_claims, roster)
     if model is not None:
         _require_provenance_covers_claimed_clubs(model, roster, placed)
 
@@ -676,6 +701,11 @@ def build_rotation_evidence_table(
                 # Never NA. False says the process ran and produced no disposition for him,
                 # which is a different fact from his club never having been read.
                 "rotation_claim_observed": claim is not None,
+                # Never NA either, and the reason this column exists: True says a claim was
+                # made about him and its citation could not be verified. Without it that
+                # player reads as "his club was read and said nothing about him", which is
+                # false -- something was said, and we could not stand behind the quote.
+                "rotation_claim_unresolved": identifier in unverifiable,
                 "rotation_disposition": pd.NA if claim is None else claim.disposition,
                 "rotation_claim_source_sha256": pd.NA if claim is None else claim.source_sha256,
                 "rotation_claim_span_start": pd.NA if claim is None else claim.span_start,
@@ -726,7 +756,13 @@ def build_rotation_evidence_table(
                 sorted({claim.source_sha256 for claim in claims}),
             ),
             "claims_coded": len(placed),
+            # Two different "unresolved". This one counts claims whose *player* could not be
+            # resolved -- a name matching nobody, or two footballers. The one below counts
+            # claims whose *citation* could not be verified, which is a source error about a
+            # player we did identify. Near names, unrelated facts.
             "claims_unresolved": tuple(sorted(unresolved.items())),
+            "claims_unverifiable_citation": len(unverifiable_claims),
+            "players_with_unverifiable_citation": tuple(sorted(unverifiable)),
             "claims_ambiguous": unresolved.get("ambiguous", 0),
             "players_not_addressed": len(roster) - len(placed),
             "model_identifier": None if model is None else model.identifier,

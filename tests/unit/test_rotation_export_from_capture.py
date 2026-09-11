@@ -41,6 +41,7 @@ from squadopt.data.errors import DataError, DataSourceError, InvalidValueError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.data.sources.club_news import (
     ClaimResponse,
+    ClubNewsError,
     FixtureClubNewsProvider,
     RawDocument,
 )
@@ -410,3 +411,185 @@ def test_documents_fetched_after_the_decision_capture_refuse_the_week(tmp_path: 
 
     with pytest.raises(DataSourceError, match="frozen before the capture"):
         _export(tmp_path, from_capture=True, documents=late)
+
+
+# --- one bad citation costs one claim ---------------------------------------
+
+
+def _response_with_a_broken_quote(player: str) -> ClaimResponse:
+    """The committed coding response with one player's quote tidied into nonsense.
+
+    Tidied rather than mangled, because that is the realistic failure: a model that rewrites
+    a dash or drops a comma has not copied the document, and its quote will not locate.
+    """
+
+    fixture = json.loads(CodingFixture(CODING_FIXTURE).response().text)
+    for claim in fixture["claims"]:
+        if claim["player_name"] == player:
+            claim["quote"] = claim["quote"].replace(" ", " even ", 1)
+            break
+    else:  # pragma: no cover - the fixture is expected to name him
+        raise AssertionError(f"The coding fixture carries no claim about {player!r}.")
+    return ClaimResponse(
+        text=json.dumps(fixture, ensure_ascii=False),
+        model_identifier="synthetic-stub",
+        model_version="fixture-1",
+    )
+
+
+def _broken_export(tmp_path: Path, player: str) -> pd.DataFrame:
+    response = _response_with_a_broken_quote(player)
+    covered = FixtureClubNewsProvider(FIXTURE).clubs_covered()
+    coded = tuple(
+        CodedClub(
+            club=club,
+            response=response,
+            prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(),
+        )
+        for club in covered
+    )
+    return _export(tmp_path, from_capture=True, coded=coded)
+
+
+def _claimed_player() -> tuple[str, int]:
+    """One player the committed response makes a claim about, with his roster id."""
+
+    fixture = json.loads(CodingFixture(CODING_FIXTURE).response().text)
+    name = str(fixture["claims"][0]["player_name"])
+    team = str(fixture["claims"][0]["team_name"])
+    for entry in roster_entries():
+        if entry["web_name"] == name and entry["team_name"] == team:
+            return name, int(entry["player_id"])
+    raise AssertionError(f"The roster carries no {name!r} of {team!r}.")
+
+
+def test_one_unlocatable_quote_no_longer_costs_the_whole_week(tmp_path: Path) -> None:
+    """The failure this change is about: the week used to produce no table at all.
+
+    `locate_claim_response` raises on the first quote that will not locate and the exporter
+    did not catch it, so one unverifiable citation out of many discarded every verified one --
+    on a deadline, with nothing to show for the pages that were read.
+    """
+
+    name, _ = _claimed_player()
+    whole = _export(tmp_path / "whole", from_capture=True)
+
+    damaged = _broken_export(tmp_path / "damaged", name)
+
+    assert len(damaged) == len(whole), "every roster player still gets a row"
+    surviving = damaged["rotation_claim_observed"].sum()
+    assert surviving == whole["rotation_claim_observed"].sum() - 1
+
+
+def test_the_dropped_claim_is_a_source_error_and_not_a_silence(tmp_path: Path) -> None:
+    """The whole point of the new column.
+
+    Without it this player reads as "his club was read and said nothing about him", which is
+    false twice over: something was said, and what failed was our ability to stand behind the
+    quote. He must carry no disposition either -- an unverifiable citation does not get to
+    contribute a disposition by another route.
+    """
+
+    name, player_id = _claimed_player()
+
+    damaged = _broken_export(tmp_path, name)
+
+    row = damaged.set_index("player_id").loc[player_id]
+    assert bool(row["rotation_claim_unresolved"]) is True
+    assert bool(row["rotation_claim_observed"]) is False
+    assert pd.isna(row["rotation_disposition"])
+    assert pd.isna(row["rotation_claim_span_start"])
+
+
+def test_every_other_player_is_untouched_by_one_bad_citation(tmp_path: Path) -> None:
+    """A source error is about one claim, so it must not mark anybody else."""
+
+    name, player_id = _claimed_player()
+
+    damaged = _broken_export(tmp_path, name)
+
+    others = damaged[damaged["player_id"] != player_id]
+    assert not others["rotation_claim_unresolved"].any()
+
+
+def test_the_unresolved_flag_is_never_missing(tmp_path: Path) -> None:
+    """Never NA, like `rotation_claim_observed`: absent and False are different facts."""
+
+    table = _export(tmp_path, from_capture=True)
+
+    assert table["rotation_claim_unresolved"].notna().all()
+    assert not table["rotation_claim_unresolved"].any()
+
+
+def test_a_format_breach_still_refuses_the_whole_response(tmp_path: Path) -> None:
+    """The reporting sibling drops citations, not shapes.
+
+    A claim missing a required field cannot be reported -- there is no identity to name -- and
+    a response shaped like that is a broken answer rather than one bad quote, so it refuses
+    the week exactly as it did before.
+    """
+
+    fixture = json.loads(CodingFixture(CODING_FIXTURE).response().text)
+    del fixture["claims"][0]["disposition"]
+    response = ClaimResponse(
+        text=json.dumps(fixture, ensure_ascii=False),
+        model_identifier="synthetic-stub",
+        model_version="fixture-1",
+    )
+    coded = tuple(
+        CodedClub(
+            club=club,
+            response=response,
+            prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(),
+        )
+        for club in FixtureClubNewsProvider(FIXTURE).clubs_covered()
+    )
+
+    with pytest.raises(ClubNewsError, match="missing required field"):
+        _export(tmp_path, from_capture=True, coded=coded)
+
+
+def test_a_club_whose_every_claim_lost_its_citation_is_no_longer_covered(
+    tmp_path: Path,
+) -> None:
+    """Nothing that club said survives into evidence, so calling it covered would assert
+    that its page was read into the table when none of it was.
+
+    Distinct from a club that was read and genuinely said nothing: that one has no claims
+    either way and stays covered, which is the difference the coverage list carries.
+    """
+
+    fixture = json.loads(CodingFixture(CODING_FIXTURE).response().text)
+    club = str(fixture["claims"][0]["team_name"])
+    for claim in fixture["claims"]:
+        if claim["team_name"] == club:
+            claim["quote"] = claim["quote"].replace(" ", " even ", 1)
+    response = ClaimResponse(
+        text=json.dumps(fixture, ensure_ascii=False),
+        model_identifier="synthetic-stub",
+        model_version="fixture-1",
+    )
+    coded = tuple(
+        CodedClub(
+            club=name,
+            response=response,
+            prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+            prompt_sha256=coding_prompt_sha256(),
+        )
+        for name in FixtureClubNewsProvider(FIXTURE).clubs_covered()
+    )
+
+    table = _export(tmp_path, from_capture=True, coded=coded).set_index("player_id")
+
+    for player_id in _players_of(club):
+        assert bool(table.loc[player_id, "club_source_covered"]) is False
+
+    # Which of the club's players carry a source error is the identity seam's answer, not
+    # this test's: the fixture writes "Martinez" where the roster spells "Martínez", and
+    # re-deriving that here would be a second copy of the resolver that could disagree with
+    # the first. What must hold is that the flag lands inside this club and nowhere else.
+    flagged = set(table.index[table["rotation_claim_unresolved"].fillna(False)])
+    assert flagged, "the club's claims all failed, so somebody must be flagged"
+    assert flagged <= set(_players_of(club))

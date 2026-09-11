@@ -110,7 +110,7 @@ def _table(provider: FixtureClubNewsProvider, claims: tuple[ParsedClaim, ...]) -
 
 def test_the_table_carries_exactly_the_declared_columns_in_order(table: pd.DataFrame) -> None:
     assert tuple(table.columns) == ROTATION_EVIDENCE_COLUMNS
-    assert len(ROTATION_EVIDENCE_COLUMNS) == 28
+    assert len(ROTATION_EVIDENCE_COLUMNS) == 29
 
 
 def test_there_is_one_row_per_roster_player_always(table: pd.DataFrame) -> None:
