@@ -10,6 +10,9 @@ from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.fpl_live import gameweek_deadlines, next_open_deadline
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
+from squadopt.features.rotation_evidence import (
+    CONTRACT_VERSION as ROTATION_EVIDENCE_CONTRACT_VERSION,
+)
 from squadopt.live import (
     CHIP_NAMES,
     LedgerError,
@@ -251,7 +254,11 @@ def rotation_artifact(
     from Friday's and an export already on disk for that capture is the same one.
     """
 
-    name = f"rotation_evidence_v1_{season}_gw{gameweek:02d}_{snapshot_id[-12:]}"
+    # Built from the contract constant rather than spelled out, because the docstring above
+    # promises the two cannot diverge and a literal is exactly how they would: a contract
+    # bump would leave this looking for last version's file while the export writes the new
+    # one, and the reuse check would silently stop finding anything.
+    name = f"{ROTATION_EVIDENCE_CONTRACT_VERSION}_{season}_gw{gameweek:02d}_{snapshot_id[-12:]}"
     return root / f"{name}.csv", root / f"{name}.manifest.json"
 
 
@@ -261,7 +268,7 @@ def check_rotation_for_reused_capture(
     """Refuse a reused live capture whose rotation export is not already on disk.
 
     The same shape as :func:`check_evidence_for_reused_capture` and the same argument, from
-    this artifact's own contract rather than from Phase B's. ``rotation_evidence_v1`` records
+    this artifact's own contract rather than from Phase B's. ``rotation_evidence_v2`` records
     ``generated_at_utc``, and the lane's ordering constraint is that the claim chain is frozen
     before the decision capture: re-exporting now for a capture already taken stamps the
     artifact after it, always, and no amount of promptness escapes that. Said here, before

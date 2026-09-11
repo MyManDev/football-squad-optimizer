@@ -209,8 +209,8 @@ def test_the_rotation_artifact_is_named_for_the_capture_it_covers() -> None:
         "fpl-live-20260911T100000Z-abc123def456",
     )
 
-    assert table.name == "rotation_evidence_v1_2026-27_gw04_abc123def456.csv"
-    assert manifest.name == "rotation_evidence_v1_2026-27_gw04_abc123def456.manifest.json"
+    assert table.name == "rotation_evidence_v2_2026-27_gw04_abc123def456.csv"
+    assert manifest.name == "rotation_evidence_v2_2026-27_gw04_abc123def456.manifest.json"
 
 
 def test_a_reused_capture_refuses_when_its_rotation_export_is_not_on_disk(

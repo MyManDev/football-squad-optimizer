@@ -20,7 +20,10 @@ from squadopt.data.sources.club_news import (
 )
 from squadopt.data.sources.club_news_capture import CodedClub, read_club_news_capture
 from squadopt.data.sources.club_news_claims import ParsedClaim, parse_claim_response
-from squadopt.data.sources.club_news_coding import locate_claim_response
+from squadopt.data.sources.club_news_coding import (
+    UnlocatableClaim,
+    locate_claims_reporting,
+)
 from squadopt.data.tables import EXPORT_LINE_TERMINATOR
 from squadopt.features.rotation_evidence import (
     CONTRACT_VERSION,
@@ -78,6 +81,7 @@ class _ClubNewsInputs:
     model: ClubModelProvenance
     clubs_declared: tuple[str, ...]
     clubs_covered: tuple[str, ...]
+    unverifiable: tuple[UnlocatableClaim, ...] = ()
 
 
 def _club_news_inputs(request: RotationExportRequest) -> _ClubNewsInputs:
@@ -128,17 +132,44 @@ def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
         )
 
     claims: list[ParsedClaim] = []
+    unverifiable: list[UnlocatableClaim] = []
     for text in dict.fromkeys(entry.response.text for entry in coded):
         response = next(entry.response for entry in coded if entry.response.text == text)
-        claims.extend(parse_claim_response(locate_claim_response(response, documents), documents))
+        located, dropped = locate_claims_reporting(response, documents)
+        claims.extend(parse_claim_response(located, documents))
+        unverifiable.extend(dropped)
 
+    covered = _clubs_still_covered(clubs_covered, claims=claims, unverifiable=unverifiable)
     return _ClubNewsInputs(
         documents=documents,
         claims=tuple(claims),
         model=_provenance_from_capture(coded),
         clubs_declared=clubs_declared,
-        clubs_covered=clubs_covered,
+        clubs_covered=covered,
+        unverifiable=tuple(unverifiable),
     )
+
+
+def _clubs_still_covered(
+    clubs_covered: Sequence[str],
+    *,
+    claims: Sequence[ParsedClaim],
+    unverifiable: Sequence[UnlocatableClaim],
+) -> tuple[str, ...]:
+    """Drop a club whose every claim lost its citation, and keep the rest covered.
+
+    One unverifiable quote costs one claim. A club where *all* of them failed is a different
+    state: nothing it said survives into evidence, so calling it covered would assert that its
+    page was read into the table when none of it was. A club that was read and genuinely said
+    nothing has no claims either way and stays covered, which is the distinction the coverage
+    list exists to carry -- so only clubs that lost claims are reconsidered here.
+    """
+
+    lost = {claim.team_name for claim in unverifiable}
+    if not lost:
+        return tuple(clubs_covered)
+    kept = {claim.team_name for claim in claims}
+    return tuple(club for club in clubs_covered if club not in lost or club in kept)
 
 
 def _provenance_from_capture(coded: Sequence[CodedClub]) -> ClubModelProvenance:
@@ -330,6 +361,7 @@ def _export(arguments: RotationExportRequest, *, repository_commit: str) -> Mapp
         clubs_declared=club_news.clubs_declared,
         clubs_covered=club_news.clubs_covered,
         model=club_news.model,
+        unverifiable_claims=club_news.unverifiable,
         club_news_snapshot_id=arguments.club_news_snapshot,
     )
     name = arguments.table_name or _artifact_name(
