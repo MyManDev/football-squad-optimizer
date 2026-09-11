@@ -103,12 +103,36 @@ settings can be changed underneath it is not frozen.
   transport failure. Asking again until the answer parses is how a pipeline starts selecting
   its own evidence. Transport retries (connection errors, 429, 5xx) are the SDK's and are
   bounded at four.
+- **No default timeout.** One attempt is allowed three minutes, written down rather than left
+  to the SDK's ten, *because* the retries above were raised: a timeout is itself retried, so
+  ten minutes beside four retries is fifty minutes of wall clock in front of a deadline.
+  Three times five attempts is fifteen, which an operator can absorb and still act on.
 - **No prompt caching.** One call per club per week is not a cache-hit pattern worth a
   request-shape change, and the shape has to be replayable byte for byte.
 - **No streaming.** A club's page plus a squad list is a few thousand input tokens and its
   claims a few thousand out. Neither end is long, 16 000 output tokens is the documented
   ceiling below which one request will not hit an HTTP timeout, and one unstreamed request is a
   simpler shape to freeze.
+
+## What the call refuses to attempt
+
+One call's documents and roster are capped at **2 000 000 UTF-8 bytes**, refused while the
+request is being assembled rather than by the API after it arrives. The number is arithmetic
+over two stated facts: a 1 000 000-token context window and a deliberately pessimistic two
+bytes per token — prose runs nearer four, and markup, character entities and attribute soup
+tokenise worse, which is the case a guard has to hold. The exact count is only knowable from
+the tokeniser, and the endpoint that knows it is itself a network call, so it cannot be the
+thing that stops a request from being made.
+
+This is not the fetch adapter's per-response cap and does not replace it. That one stops an
+adapter being made to read a stream of arbitrary length; this one covers the *assembled call*,
+where the real hazard is — one call carrying twenty clubs' pages is twenty times a document
+the per-response cap thought was fine. The refusal names the size, the budget and how many
+documents, because the remedy is the caller's: ask about fewer clubs in one call.
+
+Refusing here rather than at the API is the whole point. A week's pages are fetched on a
+deadline; a request that cannot fit is rejected only after every page has been read and the
+clock spent, and the rejection says nothing about which club to drop.
 
 Four states are refused on the reading side, because each one must not become "the model
 produced no disposition for these players" — a sentence this pipeline publishes, which has to

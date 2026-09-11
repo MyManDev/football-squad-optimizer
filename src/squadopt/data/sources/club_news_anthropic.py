@@ -68,6 +68,15 @@ MAX_OUTPUT_TOKENS: Final = 16_000
 #: rate limit an hour before it is not a reason to lose the week.
 MAX_TRANSPORT_RETRIES: Final = 4
 
+#: Seconds allowed for one attempt, written down because **retries multiply it**. The SDK's
+#: default is ten minutes and a timeout is itself retried, so the four retries above would
+#: have made the worst case fifty minutes of wall clock -- on a call whose whole reason for
+#: having extra retries is that it sits in front of a deadline. Three minutes times five
+#: attempts is fifteen, which is a delay an operator can absorb and still act on. It is
+#: generous for the work itself: one club's page and a squad list is a few thousand tokens
+#: in and a few thousand out.
+REQUEST_TIMEOUT_SECONDS: Final = 180.0
+
 
 class ClubNewsModelError(ClubNewsError):
     """The model could not be asked, or did not answer in a form worth storing."""
@@ -161,7 +170,11 @@ class AnthropicClubNewsProvider:
                 "of this project (install it with the 'llm' extra: pip install -c "
                 f"constraints.txt -e '.[llm]'): {error}"
             ) from error
-        self._client = anthropic.Anthropic(api_key=api_key, max_retries=MAX_TRANSPORT_RETRIES)
+        self._client = anthropic.Anthropic(
+            api_key=api_key,
+            max_retries=MAX_TRANSPORT_RETRIES,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
 
     def fetch(self, url: str) -> RawDocument:
         """Refuse: this provider codes documents, it does not go and get them."""
@@ -256,6 +269,7 @@ __all__ = [
     "API_KEY_ENVIRONMENT_VARIABLE",
     "MAX_OUTPUT_TOKENS",
     "MAX_TRANSPORT_RETRIES",
+    "REQUEST_TIMEOUT_SECONDS",
     "AnthropicClubNewsProvider",
     "ClubNewsModelError",
     "CodingClient",

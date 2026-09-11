@@ -13,6 +13,7 @@ this pipeline publishes and it has to be true when it appears.
 """
 
 import json
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,7 @@ from squadopt.data.sources.club_news_anthropic import (
     API_KEY_ENVIRONMENT_VARIABLE,
     MAX_OUTPUT_TOKENS,
     MAX_TRANSPORT_RETRIES,
+    REQUEST_TIMEOUT_SECONDS,
     AnthropicClubNewsProvider,
     ClubNewsModelError,
     read_api_key,
@@ -342,3 +344,49 @@ def test_transport_retries_are_bounded_and_deliberate() -> None:
     """More than the SDK default because the call sits on a deadline, not unbounded."""
 
     assert MAX_TRANSPORT_RETRIES == 4
+
+
+class _RecordingSdk:
+    """A stand-in for the ``anthropic`` module, recording how the client was built."""
+
+    def __init__(self) -> None:
+        self.kwargs: dict[str, Any] = {}
+
+    def Anthropic(self, **kwargs: Any) -> object:
+        self.kwargs = kwargs
+        return _Recorder(message=_coded_message())
+
+
+def test_the_client_is_built_with_the_key_the_retries_and_a_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """All three reach the SDK, and none of them is left to its defaults.
+
+    The key is read from one named variable rather than resolved implicitly, the retries are
+    raised above the SDK's two, and the timeout is set *because* they were raised: a timeout
+    is itself retried, so leaving the ten-minute default beside four retries would have put
+    fifty minutes of wall clock in front of a deadline.
+    """
+
+    sdk = _RecordingSdk()
+    monkeypatch.setitem(sys.modules, "anthropic", sdk)
+
+    AnthropicClubNewsProvider(environ={API_KEY_ENVIRONMENT_VARIABLE: "sk-test"})
+
+    assert sdk.kwargs == {
+        "api_key": "sk-test",
+        "max_retries": MAX_TRANSPORT_RETRIES,
+        "timeout": REQUEST_TIMEOUT_SECONDS,
+    }
+
+
+def test_the_worst_case_wall_clock_is_bounded_by_the_deadline_it_sits_in_front_of() -> None:
+    """Retries multiply the timeout, so the two constants are only sound together.
+
+    Pinned as one fact rather than two: raising the retries without lowering the timeout is
+    the mistake this check exists to catch, and it cannot be seen in either constant alone.
+    """
+
+    attempts = MAX_TRANSPORT_RETRIES + 1
+
+    assert REQUEST_TIMEOUT_SECONDS * attempts <= 15 * 60
