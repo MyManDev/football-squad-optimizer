@@ -70,6 +70,31 @@ CODING_MODEL_IDENTIFIER: Final = "claude-opus-5"
 #: measurement as a week coded at another.
 CODING_EFFORT: Final = "high"
 
+#: The context window of the model named above, in tokens. Written down here rather than
+#: looked up at call time because the budget below is derived from it, and a budget whose
+#: basis can move without anyone noticing is not a budget.
+CODING_CONTEXT_TOKENS: Final = 1_000_000
+
+#: Bytes assumed per input token, deliberately pessimistic. English prose runs nearer four
+#: bytes to the token; markup, character entities and attribute soup tokenise far worse, and
+#: a page's worst case is what a guard has to hold. The number this budget is honest about
+#: estimating: an exact count is only knowable from the tokeniser, and the endpoint that
+#: knows it is itself a network call, so it cannot be the thing that stops a request from
+#: being made. Nothing is reserved for the output ceiling -- sixteen thousand tokens against
+#: a million-token window is inside the rounding this estimate already carries.
+CODING_BYTES_PER_TOKEN: Final = 2
+
+#: The most one call's documents and roster may come to, in UTF-8 bytes. Refused by
+#: :func:`build_user_content` **before** a request is assembled, which is the whole point:
+#: a week's pages are fetched on a deadline, and discovering that the call cannot fit only
+#: when the API rejects it spends the pages, the clock and nothing else.
+#:
+#: This is not the fetch adapter's ``MAXIMUM_DOCUMENT_BYTES`` and does not replace it. That
+#: one caps a single response so an adapter cannot be made to read a stream of arbitrary
+#: length; this one caps the *assembled call*, which is where the real hazard is: one call
+#: carrying twenty clubs' pages is twenty times a document the other cap thought was fine.
+MAXIMUM_USER_CONTENT_BYTES: Final = CODING_CONTEXT_TOKENS * CODING_BYTES_PER_TOKEN
+
 #: The frozen question. A versioned constant in the repository, not a string assembled at
 #: request time: the only thing that varies between two weeks' calls is the documents and the
 #: roster, so the digest of this text is a fact about the instrument rather than about a week.
@@ -249,6 +274,11 @@ def build_user_content(documents: Sequence[RawDocument], roster: Sequence[Roster
     The document is inserted as decoded text. A document whose bytes are not UTF-8 is refused
     rather than replaced with question marks: the model would be quoting characters that are
     not in the bytes the quote is later matched against.
+
+    A call larger than :data:`MAXIMUM_USER_CONTENT_BYTES` is refused here, before anything is
+    sent. The refusal names the size, the budget and the documents, because the remedy is the
+    caller's -- ask about fewer clubs in one call -- and an operator on a deadline needs to
+    know which of the two it is.
     """
 
     if not documents:
@@ -274,7 +304,18 @@ def build_user_content(documents: Sequence[RawDocument], roster: Sequence[Roster
         parts.append(f"## {document.final_url}")
         parts.append("")
         parts.append(text)
-    return "\n".join(parts) + "\n"
+    content = "\n".join(parts) + "\n"
+
+    size = len(content.encode("utf-8"))
+    if size > MAXIMUM_USER_CONTENT_BYTES:
+        raise ClubNewsError(
+            f"One call's {len(documents)} document(s) and {len(roster)} roster entries come "
+            f"to {size} UTF-8 bytes, over the {MAXIMUM_USER_CONTENT_BYTES}-byte budget for a "
+            f"{CODING_CONTEXT_TOKENS}-token window. Refused before the request is sent: ask "
+            "about fewer clubs in one call rather than spending the week's pages on a "
+            "request that cannot fit."
+        )
+    return content
 
 
 def _object(text: str) -> Mapping[str, object]:
@@ -555,10 +596,13 @@ class CodingFixture:
 
 
 __all__ = [
+    "CODING_BYTES_PER_TOKEN",
+    "CODING_CONTEXT_TOKENS",
     "CODING_DISPOSITIONS",
     "CODING_EFFORT",
     "CODING_FIXTURE_CONTRACT_VERSION",
     "CODING_MODEL_IDENTIFIER",
+    "MAXIMUM_USER_CONTENT_BYTES",
     "ROTATION_CLAIM_CODING_CONTRACT_VERSION",
     "SYSTEM_PROMPT",
     "CodingFixture",

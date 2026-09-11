@@ -31,9 +31,12 @@ from squadopt.data.sources.club_news import (
 )
 from squadopt.data.sources.club_news_claims import parse_claim_response
 from squadopt.data.sources.club_news_coding import (
+    CODING_BYTES_PER_TOKEN,
+    CODING_CONTEXT_TOKENS,
     CODING_DISPOSITIONS,
     CODING_EFFORT,
     CODING_MODEL_IDENTIFIER,
+    MAXIMUM_USER_CONTENT_BYTES,
     ROTATION_CLAIM_CODING_CONTRACT_VERSION,
     SYSTEM_PROMPT,
     CodingFixture,
@@ -424,3 +427,104 @@ def test_a_document_that_is_not_utf8_is_refused_rather_than_decoded_lossily() ->
 
     with pytest.raises(ClubNewsError, match="not UTF-8"):
         build_user_content((document,), roster)
+
+
+def _oversized_document(byte_length: int) -> RawDocument:
+    """One document whose readable bytes come to ``byte_length``, and nothing clever."""
+
+    return RawDocument(
+        club="Chelsea",
+        requested_url="https://club.example/long",
+        final_url="https://club.example/long",
+        http_status=200,
+        content_type="text/plain; charset=utf-8",
+        byte_length=byte_length,
+        fetched_at_utc="2026-09-11T12:00:00Z",
+        content=b"a" * byte_length,
+    )
+
+
+def test_a_call_within_the_budget_is_assembled() -> None:
+    """The guard is a ceiling, not a tax: an ordinary week must pass it untouched."""
+
+    documents = _documents()
+    roster = FixtureClubNewsProvider(FIXTURE_PATH).roster()
+
+    content = build_user_content(documents, roster)
+
+    assert len(content.encode("utf-8")) <= MAXIMUM_USER_CONTENT_BYTES
+
+
+def test_a_call_over_the_budget_is_refused_before_anything_is_sent() -> None:
+    """The whole value of this refusal is where it happens.
+
+    A week's pages are fetched on a deadline. A request that cannot fit the context window
+    is rejected by the API *after* every page has been read and the clock spent, and the
+    rejection says nothing about which club to drop. Refusing during assembly costs one
+    pure function call and names the remedy.
+    """
+
+    document = _oversized_document(MAXIMUM_USER_CONTENT_BYTES + 1)
+    roster = (RosterPlayer(player_id=1, web_name="Kante", team_name="Chelsea"),)
+
+    with pytest.raises(ClubNewsError, match="over the"):
+        build_user_content((document,), roster)
+
+
+def test_the_budget_refusal_names_the_size_the_budget_and_the_documents() -> None:
+    """An operator on a deadline needs to know whether to drop a club or a page."""
+
+    document = _oversized_document(MAXIMUM_USER_CONTENT_BYTES + 1)
+    roster = (RosterPlayer(player_id=1, web_name="Kante", team_name="Chelsea"),)
+
+    with pytest.raises(ClubNewsError) as refusal:
+        build_user_content((document,), roster)
+
+    message = str(refusal.value)
+    assert str(MAXIMUM_USER_CONTENT_BYTES) in message
+    assert str(CODING_CONTEXT_TOKENS) in message
+    assert "1 document(s)" in message
+    assert "fewer clubs" in message
+
+
+def test_the_budget_counts_the_whole_call_and_not_one_document() -> None:
+    """The hazard this guard exists for is twenty clubs in one call, not one long page.
+
+    Each of these documents is comfortably inside the fetch adapter's own per-response cap,
+    and inside this budget on its own. Together they are not, which is exactly the case the
+    per-document cap cannot see.
+    """
+
+    half = MAXIMUM_USER_CONTENT_BYTES // 2 + 1
+    documents = (_oversized_document(half), _oversized_document(half))
+    roster = (RosterPlayer(player_id=1, web_name="Kante", team_name="Chelsea"),)
+
+    for document in documents:
+        assert len(document.content) < MAXIMUM_USER_CONTENT_BYTES
+
+    with pytest.raises(ClubNewsError, match="2 document"):
+        build_user_content(documents, roster)
+
+
+def test_the_budget_is_derived_from_the_window_and_a_pessimistic_ratio() -> None:
+    """The number is arithmetic over two stated facts, not a figure someone liked.
+
+    Pinned so that moving the window or the ratio without moving the budget fails here,
+    rather than silently leaving a budget whose stated basis is no longer its basis.
+    """
+
+    assert MAXIMUM_USER_CONTENT_BYTES == CODING_CONTEXT_TOKENS * CODING_BYTES_PER_TOKEN
+    assert CODING_BYTES_PER_TOKEN < 4
+
+
+def test_the_input_budget_does_not_move_the_prompt_digest() -> None:
+    """A guard on the request's size is not a change to the question asked.
+
+    The instrument's digest covers the contract version, the effort, the model, the prompt
+    and the schema. If adding a budget had moved it, every stored response would have been
+    filed under a prompt version that no longer exists.
+    """
+
+    assert (
+        coding_prompt_sha256() == "e755c70b96cef2dda4523d04e46292913bf3f8638d6b39261ee4ebd144ffbf5d"
+    )
