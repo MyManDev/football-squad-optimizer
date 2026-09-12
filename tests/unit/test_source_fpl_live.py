@@ -20,11 +20,13 @@ from squadopt.data.sources.fpl_live import (
     POSITION_CODES,
     SCOUT_COLUMNS,
     SNAPSHOT_COLUMNS,
+    BankedFreeTransfers,
     EntryPicksRecord,
     GameweekDeadline,
     LeagueStanding,
     LiveEventPoints,
     availability_snapshot,
+    banked_free_transfers,
     entry_endpoint_paths,
     entry_history_payload,
     entry_label,
@@ -35,6 +37,7 @@ from squadopt.data.sources.fpl_live import (
     fpl_league_standings,
     fpl_league_standings_page,
     fpl_live_event_points,
+    free_transfer_cap,
     gameweek_deadlines,
     league_standings_endpoint_path,
     league_standings_page_endpoint_path,
@@ -887,6 +890,7 @@ def _history_payload(
                     "points": 64,
                     "total_points": 64,
                     "event_transfers": 0,
+                    "event_transfers_cost": 0,
                     "points_on_bench": 3,
                     "bank": 5,
                 }
@@ -1099,6 +1103,8 @@ def test_the_picks_document_becomes_a_fifteen_player_squad_starting_eleven() -> 
 
 
 def test_the_two_limits_the_public_endpoints_impose_are_flagged_not_guessed() -> None:
+    """Without the season's cap the count cannot be derived, so it stays the floor."""
+
     record = fpl_entry_picks(
         _picks_payload(), _history_payload(), entry_id=11, season="2026-27", gameweek=1
     )
@@ -1230,6 +1236,164 @@ def test_the_twin_carries_exactly_the_application_seams_fields() -> None:
     assert {field.name for field in dataclasses.fields(EntryPicksRecord)} == {
         field.name for field in dataclasses.fields(EntryPicks)
     }
+
+
+# --- the banked free transfers ------------------------------------------------------
+#
+# The endpoints never state the count, so it is derived from the history under one model
+# (docstring of ``banked_free_transfers``); every test here is a case of that model, and
+# the last one is the real GW3 capture, whose 45 recorded hits the model has to reproduce.
+
+
+def _row(event: int, transfers: int = 0, cost: int = 0) -> dict[str, Any]:
+    return {
+        "event": event,
+        "points": 50,
+        "total_points": 50 * event,
+        "event_transfers": transfers,
+        "event_transfers_cost": cost,
+    }
+
+
+def _banked(
+    rows: list[dict[str, Any]],
+    *,
+    gameweek: int,
+    chips: list[dict[str, Any]] | None = None,
+    cap: int | None = 5,
+    active_chip: str | None = None,
+) -> BankedFreeTransfers:
+    return banked_free_transfers(
+        _history_payload(current=rows, chips=chips),
+        entry_id=11,
+        gameweek=gameweek,
+        max_free_transfers=cap,
+        active_chip=active_chip,
+    )
+
+
+def test_free_transfers_accrue_one_a_week_from_gameweek_two_up_to_the_cap() -> None:
+    rows = [_row(week) for week in range(1, 8)]
+    # None at the GW1 deadline, one for GW2, two for GW3 ... five for GW6 and held there.
+    assert [_banked(rows, gameweek=week).count for week in range(1, 8)] == [1, 2, 3, 4, 5, 5, 5]
+    assert _banked(rows, gameweek=7).known is True
+
+
+def test_transfers_consume_the_bank_before_any_hit_is_paid() -> None:
+    rows = [_row(1), _row(2, transfers=1), _row(3), _row(4, transfers=3, cost=4)]
+    assert _banked(rows, gameweek=2) == BankedFreeTransfers(1, True)  # spent the one
+    assert _banked(rows, gameweek=3) == BankedFreeTransfers(2, True)
+    assert _banked(rows, gameweek=4) == BankedFreeTransfers(1, True)  # two free, one paid
+
+
+@pytest.mark.parametrize("chip", ["freehit", "wildcard"])
+def test_a_transfer_chip_week_consumes_nothing_and_the_bank_keeps_growing(chip: str) -> None:
+    rows = [_row(1), _row(2), _row(3, transfers=9), _row(4)]
+    chips = [{"name": chip, "event": 3}]
+    assert _banked(rows, gameweek=3, chips=chips) == BankedFreeTransfers(3, True)
+    assert _banked(rows, gameweek=4, chips=chips) == BankedFreeTransfers(4, True)
+    # The captured week's own chip is read from the picks document as well.
+    assert _banked(rows, gameweek=3, active_chip=chip) == BankedFreeTransfers(3, True)
+
+
+def test_bench_boost_and_triple_captain_leave_the_banking_untouched() -> None:
+    rows = [_row(1), _row(2, transfers=1), _row(3, transfers=2, cost=4)]
+    chips = [{"name": "bboost", "event": 2}, {"name": "3xc", "event": 3}]
+    assert _banked(rows, gameweek=3, chips=chips) == BankedFreeTransfers(1, True)
+
+
+def test_a_late_joiner_and_a_missing_week_are_unknown_not_guessed() -> None:
+    late = _banked([_row(2), _row(3)], gameweek=3)
+    assert (late.count, late.known) == (1, False)
+    assert "gameweek 1" in str(late.reason)
+    gap = _banked([_row(1), _row(3)], gameweek=3)
+    assert (gap.count, gap.known) == (1, False)
+    assert "gameweek 2" in str(gap.reason)
+    assert _banked([_row(1), _row(2)], gameweek=3).known is False
+
+
+def test_a_recorded_hit_the_model_does_not_reproduce_is_unknown_not_trusted() -> None:
+    # Two transfers with one free should have cost 4; a zero means the model is wrong.
+    result = _banked([_row(1), _row(2, transfers=2)], gameweek=2)
+    assert (result.count, result.known) == (1, False)
+    assert "gameweek 2" in str(result.reason) and "expects 4" in str(result.reason)
+    # A chip week that charged points contradicts the chip rule the same way.
+    charged = _banked(
+        [_row(1), _row(2, transfers=2, cost=4)],
+        gameweek=2,
+        chips=[{"name": "wildcard", "event": 2}],
+    )
+    assert charged.known is False
+
+
+def test_without_the_seasons_cap_the_count_is_the_floor_and_says_so() -> None:
+    result = _banked([_row(1), _row(2)], gameweek=2, cap=None)
+    assert (result.count, result.known) == (1, False)
+    assert "cap" in str(result.reason)
+
+
+def test_the_cap_is_read_from_the_bootstrap_block_the_season_rules_read() -> None:
+    both = {"game_config": {"rules": {"max_extra_free_transfers": 4}}}
+    assert free_transfer_cap(json.dumps(both).encode("utf-8")) == 5
+    settings = {"game_settings": {"max_extra_free_transfers": 1}}
+    assert free_transfer_cap(json.dumps(settings).encode("utf-8")) == 2
+    assert free_transfer_cap(b"{}") is None
+
+
+def test_the_parser_carries_the_derived_count_for_the_coming_deadline() -> None:
+    record = fpl_entry_picks(
+        _picks_payload(),
+        _history_payload(current=[_row(1), _row(2), _row(3, transfers=1)]),
+        entry_id=11,
+        season="2026-27",
+        gameweek=3,
+        max_free_transfers=5,
+    )
+    assert (record.free_transfers, record.free_transfers_known) == (2, True)
+
+
+# The fifteen members of the real GW3 capture (fpl-live-20260910T190430Z-369360398135):
+# per week (transfers, cost), the chips played, and the count the model derives for the
+# GW4 deadline. Every recorded hit, including the two paid ones (7018833 GW3 with two free
+# and 8548384 GW2 with one), is reproduced by the model, which is the cross-check that
+# earns the flag. Eight of the fifteen held two or three, not the one assumed before.
+REAL_GW3_CAPTURE = (
+    (2199732, ((0, 0), (1, 0), (0, 0)), (), 2),
+    (2281624, ((0, 0), (1, 0), (1, 0)), (("bboost", 1), ("3xc", 3)), 1),
+    (313686, ((0, 0), (0, 0), (1, 0)), (("bboost", 1),), 2),
+    (3832237, ((0, 0), (0, 0), (0, 0)), (("3xc", 1),), 3),
+    (4287206, ((0, 0), (0, 0), (0, 0)), (("freehit", 3),), 3),
+    (5081114, ((0, 0), (1, 0), (1, 0)), (), 1),
+    (5349883, ((0, 0), (1, 0), (0, 0)), (("bboost", 1),), 2),
+    (5662073, ((0, 0), (0, 0), (0, 0)), (("freehit", 3),), 3),
+    (6654210, ((0, 0), (0, 0), (2, 0)), (("3xc", 3),), 1),
+    (6879786, ((0, 0), (1, 0), (0, 0)), (), 2),
+    (6880255, ((0, 0), (0, 0), (2, 0)), (), 1),
+    (7018833, ((0, 0), (0, 0), (3, 4)), (("bboost", 3),), 1),
+    (7252721, ((0, 0), (0, 0), (2, 0)), (), 1),
+    (8548384, ((0, 0), (2, 4), (1, 0)), (("3xc", 3),), 1),
+    (8883467, ((0, 0), (0, 0), (0, 0)), (("wildcard", 2), ("3xc", 3)), 3),
+)
+
+
+@pytest.mark.parametrize(("entry", "weeks", "chips", "expected"), REAL_GW3_CAPTURE)
+def test_the_model_reproduces_every_hit_of_the_real_gw3_capture(
+    entry: int,
+    weeks: tuple[tuple[int, int], ...],
+    chips: tuple[tuple[str, int], ...],
+    expected: int,
+) -> None:
+    rows = [_row(week, transfers, cost) for week, (transfers, cost) in enumerate(weeks, 1)]
+    result = banked_free_transfers(
+        _history_payload(
+            current=rows,
+            chips=[{"name": name, "event": event} for name, event in chips],
+        ),
+        entry_id=entry,
+        gameweek=3,
+        max_free_transfers=5,
+    )
+    assert result == BankedFreeTransfers(expected, True)
 
 
 # --- live gameweek points -----------------------------------------------------------
@@ -1426,7 +1590,8 @@ def test_the_history_points_are_gross_and_the_transfer_cost_travels_beside_them(
 def test_a_history_row_without_a_transfer_cost_reads_none_rather_than_zero() -> None:
     from squadopt.data.sources.fpl_live import fpl_entry_history_points
 
-    weeks = fpl_entry_history_points(_history_payload(), entry_id=11)
+    row = {"event": 1, "points": 64, "total_points": 64, "event_transfers": 0}
+    weeks = fpl_entry_history_points(_history_payload(current=[row]), entry_id=11)
 
     assert weeks[0].transfer_cost is None
 

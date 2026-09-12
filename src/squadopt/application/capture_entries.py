@@ -13,7 +13,12 @@ from squadopt.application.entries import (
     pre_free_hit_basis,
 )
 from squadopt.data.errors import DataError
-from squadopt.data.sources.fpl_live import FREE_HIT_CHIP, EntryPicksRecord, fpl_entry_picks
+from squadopt.data.sources.fpl_live import (
+    FREE_HIT_CHIP,
+    EntryPicksRecord,
+    fpl_entry_picks,
+    free_transfer_cap,
+)
 
 
 def capture_element_codes(payloads: object) -> dict[int, int]:
@@ -41,6 +46,8 @@ class CapturePicksProvider:
         self._payloads = getattr(snapshot, "payloads", {})
         self._snapshot_id = snapshot_id
         self._code_by_element = capture_element_codes(self._payloads)
+        # The banking cap the season's settings state; None leaves the count unknown.
+        self._max_free_transfers = free_transfer_cap(self._payloads["bootstrap-static.json"])
 
     def _code(self, element: int) -> int:
         code = self._code_by_element.get(int(element))
@@ -64,6 +71,7 @@ class CapturePicksProvider:
             season=season,
             gameweek=gameweek,
             source_snapshot_id=self._snapshot_id,
+            max_free_transfers=self._max_free_transfers,
         )
 
     def _basis(self, captured: EntryPicksRecord) -> tuple[EntryPicksRecord, str]:
@@ -108,9 +116,11 @@ class CapturePicksProvider:
         basis, squad_basis = self._basis(record)
         # The data record and the application type are twins by design: same field names,
         # no translation table, so a drift on either side is a type error rather than a
-        # silently wrong squad. Identity, chips and the active chip come from the captured
-        # week; the squad and bank from the basis week (the same record unless a Free Hit
-        # voided the captured one).
+        # silently wrong squad. Identity, chips, the active chip and the free transfers
+        # come from the captured week (the bank of free transfers runs through a Free Hit
+        # week untouched, so the captured week's derivation is the one for the coming
+        # deadline); the squad and bank from the basis week (the same record unless a
+        # Free Hit voided the captured one).
         return EntryPicks(
             entry_id=record.entry_id,
             season=record.season,
@@ -120,8 +130,8 @@ class CapturePicksProvider:
             captain=self._code(basis.captain),
             vice_captain=self._code(basis.vice_captain),
             bank_tenths=basis.bank_tenths,
-            free_transfers=basis.free_transfers,
-            free_transfers_known=basis.free_transfers_known,
+            free_transfers=record.free_transfers,
+            free_transfers_known=record.free_transfers_known,
             chips_used=record.chips_used,
             purchase_prices={
                 self._code(player): price for player, price in basis.purchase_prices.items()

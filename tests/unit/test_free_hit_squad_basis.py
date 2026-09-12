@@ -61,6 +61,7 @@ def _history(chips: list[tuple[str, int]]) -> bytes:
                 "points": 50,
                 "total_points": 50 * event,
                 "event_transfers": 0,
+                "event_transfers_cost": 0,
                 "points_on_bench": 3,
                 "bank": bank,
             }
@@ -316,6 +317,31 @@ def test_a_capture_stores_the_pre_free_hit_picks_beside_the_played_week(
         written.snapshot_id,
     )
     assert provider.picks(11, "2026-27", 3).squad_basis == "pre_free_hit_gw02"
+
+
+def test_the_free_transfers_are_the_captured_weeks_not_the_basis_weeks() -> None:
+    """A Free Hit voids the squad, not the bank of free transfers: the count for the GW4
+    deadline is derived through the chip week (none, one, two, kept, three), while the
+    GW2 basis document would only know the two held at the GW3 deadline."""
+
+    bootstrap = {
+        **json.loads(_bootstrap()),
+        "game_config": {"rules": {"max_extra_free_transfers": 4}},
+    }
+    provider = CapturePicksProvider(
+        SimpleNamespace(
+            payloads={
+                "bootstrap-static.json": json.dumps(bootstrap).encode("utf-8"),
+                f"entry-{ENTRY}-picks-gw03.json": _picks(FREE_HIT_SQUAD, chip="freehit", bank=5),
+                f"entry-{ENTRY}-picks-gw02.json": _picks(HELD_SQUAD, chip=None, bank=20),
+                f"entry-{ENTRY}-history.json": _history([("freehit", 3)]),
+            }
+        ),
+        SNAPSHOT,
+    )
+    picks = provider.picks(ENTRY, "2026-27", 3)
+    assert picks.squad_basis == pre_free_hit_basis(2)
+    assert (picks.free_transfers, picks.free_transfers_known) == (3, True)
 
 
 # --- one member's refusal does not sink the league ------------------------------------
