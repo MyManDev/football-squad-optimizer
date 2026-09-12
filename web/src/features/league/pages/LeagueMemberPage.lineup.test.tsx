@@ -107,12 +107,32 @@ describe("the published Free Hit squad basis", () => {
     squad.payload.squad_basis = "pre_free_hit_gw02";
     squad.payload.active_chip = "freehit";
     renderAdvice(
-      { ...base, payload: { ...base.payload, squad_basis: "captured" } },
+      { ...base, payload: { ...base.payload, squad_basis: "pre_free_hit_gw02" } },
       language,
       squad,
     );
     expect(screen.getAllByText(expected)).toHaveLength(1);
   });
+
+  it.each([undefined, "captured", "pre_free_hit_gw03"])(
+    "shows the entry note only when advice basis %s does not contradict it",
+    (basis) => {
+      const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+      const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+      squad.payload.squad_basis = "pre_free_hit_gw02";
+      const payload = { ...advice.payload };
+      delete payload.squad_basis;
+      if (basis !== undefined) payload.squad_basis = basis;
+      renderAdvice({ ...advice, payload }, "en", squad);
+      if (basis === undefined) {
+        expect(
+          screen.getByText("Free Hit played; this advice stands on your GW 2 squad."),
+        ).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText(/Free Hit played;/)).not.toBeInTheDocument();
+      }
+    },
+  );
 
   it.each([undefined, "captured", "pre_free_hit_gw2", "pre_free_hit_gw002", "other"])(
     "ignores advice basis when entry basis is %s, including Wildcard and older entries",
