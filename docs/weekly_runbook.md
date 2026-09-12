@@ -8,6 +8,10 @@ own squad on the way:
 python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 4 --league 352490 --workers 8 --decide --run-id 2026-27-gw04-decision
 ```
 
+`--run-id` is optional. Left out, the runner generates
+`week-<season>-gw<NN>-<UTC stamp>-<hex>` and prints it; an explicit id such as the one above
+is accepted as given. Either way it is the id `--resume` needs back.
+
 Run the installed package from the clean checkout you mean to publish from (or pass
 `--workspace`). The legacy `python -m scripts.run_week` flags still delegate to this runner.
 Start after the previous gameweek's picks are public and inside the lead-time window below — "before the deadline" is a floor, not the policy.

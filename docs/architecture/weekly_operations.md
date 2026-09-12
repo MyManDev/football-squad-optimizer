@@ -4,7 +4,11 @@ The installed entry point is `python -m squadopt.platform.weekly_operations`.
 `python -m scripts.run_week` preserves the existing flags and delegates to it. The
 domain planning, preflight, handoff, player evidence, rotation export and settled-outcome
 export live in `application`; HTTP capture, process pools, Git publication and execution
-journals live in `platform`. The installed path does not import `scripts`.
+journals live in `platform`. The installed runner does not import `scripts`: its `publish`
+stage hands `platform.weekly_publish` a typed builder for the site, league and scoreboard
+views. The manual `python -m scripts.publish_gameweek_site` path supplies no builder and
+still runs the `scripts.build_site`, `scripts.build_league_site` and
+`scripts.build_scoreboard` shells in a subprocess (`_legacy_build`).
 
 Use short Windows workspace and handoff roots on hosts with the legacy path limit.
 Retained content-addressed paths add directories and a 69-character filename; a

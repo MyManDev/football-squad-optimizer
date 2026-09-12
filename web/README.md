@@ -1,35 +1,34 @@
-# React + TypeScript + Vite
+# SquadOpt member website
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React + TypeScript + Vite front end for the published league-member views. It reads the
+static `ui_view_v1` data tree that `python -m scripts.build_site` (a thin CLI over
+`squadopt.application.site_publication`) writes under `public/`, and, when an advice
+backend is configured, requests advice from it.
 
-Currently, two official plugins are available:
+## Checks CI runs
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The `web (node 22)` job in `.github/workflows/ci.yml` runs these from `web/`, in this
+order, after `npm ci` and a Python `.[api,dev]` install for the last step:
 
-## React Compiler
+| Step                                          | Command                                                                |
+| --------------------------------------------- | ---------------------------------------------------------------------- |
+| Types match the committed contract            | `npm run gen:types`, then `git diff --exit-code -- src/data/schema.ts` |
+| Lint and format                               | `npm run lint` and `npm run format:check`                              |
+| Typecheck                                     | `npm run typecheck`                                                    |
+| Unit tests                                    | `npx vitest run`                                                       |
+| Build                                         | `npm run build`                                                        |
+| Deployment assets                             | `npm run check:deployment`                                             |
+| Bundle budget                                 | `npm run size`                                                         |
+| Playwright smoke                              | `npm run e2e` (after `npx playwright install chromium`)                |
+| Publication and browser API worker acceptance | the pytest run below, from the repository root                         |
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The last row runs, with `SQUADOPT_PUBLICATION_CONTRACT=1` and `SQUADOPT_BROWSER_SMOKE=1` set:
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+python -m pytest tests/integration/test_publication_contract.py tests/integration/test_advice_browser.py -q
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Run the same list locally before opening a PR; the browser half is described below.
 
 ## Browser check with the real advice backend
 
