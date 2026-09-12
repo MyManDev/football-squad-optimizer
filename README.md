@@ -6,9 +6,9 @@ and an optional advice API with independent workers.
 
 Start with the [documentation guide](docs/README.md), the
 [current system map](docs/architecture/system_map.md) or the
-[product and research roadmap](docs/product/roadmap.md). The
-[enterprise transition record](docs/architecture/enterprise_transition.md) distinguishes
-implemented changes, completed checks and outstanding operational acceptance.
+[product and research roadmap](docs/product/roadmap.md).
+[ADR 0007](docs/architecture/decisions/0007-enterprise-transition.md) records the enterprise
+transition: what it changed, what was accepted and what still waits on a real environment.
 
 ## Repository layout
 

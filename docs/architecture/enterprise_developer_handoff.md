@@ -1,13 +1,17 @@
 # Enterprise geçişi: geliştirici devir notu
 
+Dated 2026-09-10; the decision and current status are
+[ADR 0007](decisions/0007-enterprise-transition.md).
+
 Hazırlanma tarihi: **10 Eylül 2026**. Bu belge, ertesi gün çalışmaya başlayacak
 geliştiricinin mevcut sistemi koruyarak devam etmesi içindir. Yeni bir mimari veya
 araştırma programı önermiyor. Kodun uygulanmış olması, bir testin belirli ortamda
 geçmesi ve canlı sistemin kabul edilmesi ayrı durumlardır.
 
-Çalışmanın dalı `codex/enterprise-software-transition`; entegrasyon kaydı
-[geçiş belgesinde](enterprise_transition.md), testlerin kapsamı ve bilinen başarısızlıklar
-[kabul kaydında](enterprise_acceptance.md) bulunur. Başlangıç revizyonları ve arşiv
+Çalışmanın dalı `codex/enterprise-software-transition` idi; `e95d2cd3` olarak merge
+edildi. Karar ve güncel durum [ADR 0007](decisions/0007-enterprise-transition.md)'dedir;
+o günkü geçiş ve kabul kayıtları silindi, metinleri
+`git show e95d2cd3:docs/architecture/enterprise_acceptance.md` ile okunur. Başlangıç revizyonları ve arşiv
 karşılaştırmaları tarihsel bağlamdır; onları yarınki çalışma HEAD'i gibi kullanma.
 Önce yerel durumu, PR'ın güncel revizyonunu ve İbo'nun devam eden işini kontrol et.
 
@@ -24,12 +28,12 @@ Devam eden bir kontrolün sonucu önceki koşudan türetilmemelidir.
 | Tamamlanan CI sonuçları | İlk kaynak kabulünde Python 3.11 ve 3.13 ayrı ayrı **4.778 geçti, 14 atlandı**. Web: 491 birim ve 70 Playwright geçti. Container/browser kabulü eksik `.pt` üst dizininde durdu; bu workflow düzeltildi. Son revizyonun bütün CI sonucu PR'dan doğrulanmalı |
 | Son E2E ortamı ve veriler | Yerel production web bundle, gerçek Chromium/API/worker/solver; sentetik capture ve gerçek publisher çıktısı. Canlı veri değil |
 | Son E2E adımları | TR: 123 fetchsiz ret → 352490 → Bu benim/localStorage → saf-puan1 hesap → 202/worker completed → sonuç → reload/cache200. **1 geçti, 22.54 s**. Diğer dil/rakip/pencere/hata akışları ayrı UI/API testleriyle kapsanır |
-| E2E kanıtı ve image kimliği | `.pt/enterprise/e2e-final-03.log`; önceki kontrast bulgusu `e2e-final-02.log`. Linux image/Compose **4 geçti**; tam image ID ve revision [kabul kaydında](enterprise_acceptance.md) |
+| E2E kanıtı ve image kimliği | `.pt/enterprise/e2e-final-03.log`; önceki kontrast bulgusu `e2e-final-02.log`. Linux image/Compose **4 geçti**; tam image ID ve revision silinen kabul kaydında (`git show e95d2cd3:docs/architecture/enterprise_acceptance.md`) |
 | Canlı yayın | Bu geçiş yayımlanmadı veya merge edilmedi. Son GitHub deployment kaydı `6350426966`, `a85c7bdd`, 9 Eylül 13:06 UTC, `https://squadopt.pages.dev`; bu branch'in deployment'ı değil. Bu makineden tek denemelik güncel HTTP smoke timeout verdi; sitenin genel olarak kapalı olduğu sonucu çıkarılmadı |
 | Kalan ortam sınırları | Üç Windows rename hatası tekrar edilmedi; uzun Windows kökleri desteklenmiş sayılmıyor. Uzak host, bağımsız backup, live scheduler, restored-host browser kabulü yok. R07/R09/R10 şartları aşağıda |
 | Kanıt tarihi | 10 Eylül 2026 Türkiye saati; CI ve E2E kapanış durumunu yukarıdaki sürüm/linklerden doğrula |
 
-[Kabul kaydındaki](enterprise_acceptance.md) tarihsel tam Python koşusu 4.755 geçti,
+Silinen kabul kaydındaki tarihsel tam Python koşusu 4.755 geçti,
 19 hata, 13 atlama sonucuyla bitmiştir; “tam paket yeşil” değildir. On dört hata için
 uyumluluk/beklenti/bağımlılık düzeltmeleri ve odaklı kontroller kaydedilmiştir. İki uzun
 yol hatası değişmeyen kaynakla kısa kökte doğrulanmış, üç Windows izin hatası ise
@@ -66,7 +70,7 @@ model davranışını değiştirmez.
 ## Sistemi nereden okumalı?
 
 İlk okuma sırası: [sistem haritası](system_map.md), [bağımlılık kuralları](dependency_rules.md),
-[geçiş kaydı](enterprise_transition.md), [kabul kaydı](enterprise_acceptance.md),
+[ADR 0007](decisions/0007-enterprise-transition.md),
 [işletme envanteri](operations_inventory.md), [arşiv uzlaştırması](archive_integration.md).
 `docs/product/roadmap.md` ürün/araştırma yönünü taşır; bu belgedeki işletme kabulüyle
 bilimsel terfi koşullarını birbirine karıştırma.
@@ -281,17 +285,7 @@ kullanılmalı. Python 3.13'te `constraints.txt` ile `.[api,dev]`; kapasite öl�
 kurulmaz. Web için Node 22 ve kilit dosyasına uygun `npm ci` kullanılır.
 
 Değişen alana göre önce odaklı testi, sonra gereken entegrasyon kapısını seç. Normal Python
-kapıları:
-
-```powershell
-.venv/Scripts/python -m ruff check .
-.venv/Scripts/python -m ruff format --check .
-.venv/Scripts/python -m mypy
-.venv/Scripts/lint-imports
-.venv/Scripts/python -m pytest -n auto --dist loadscope --basetemp .pt/dev1
-```
-
-`.pt` üst dizini mevcut olmalı; `dev1` daha önce kullanılmamış kısa bir test kökü örneğidir.
+kapıları [CONTRIBUTING](../../CONTRIBUTING.md) içindedir; `lint-imports` de onlara eklenir.
 Windows sandbox başlangıç izni ile domain test hatasını ayrı sınıflandır. Sonuca bakmadan
 full suite'i sürekli yeniden başlatma. Kullanılan komut, exit code, source revision ve
 ortam kanıta yazılmalı.
