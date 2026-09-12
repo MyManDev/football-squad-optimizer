@@ -273,3 +273,6 @@ docs/.*.json.tmp-*
 .codex-tmp/
 # Local verification and recovery scratch, separate from committed evidence.
 .pt/
+# The backend runbook's local two-process run puts its store at .local/store; the weekly
+# runner's preflight (`git status --porcelain`) would otherwise count it as a dirty tree.
+.local/

@@ -22,20 +22,11 @@ It does not buy infrastructure, add credentials or declare an untested recovery 
 
 ## One-command host deployment
 
-`deploy/compose.yaml` preserves separate API and worker containers, one tested image,
-one shared writable store and read-only publication/capture/handoff mounts. Copy
-`deploy/backend.env.example` to an operator-owned file, set a tested image digest and
-existing absolute paths, then run:
-
-```text
-docker compose --env-file /path/to/backend.env -f deploy/compose.yaml up -d
-```
-
-The image already carries its source commit; do not override it with an unrelated commit.
-The store must allow image UID/GID 10001 to write. Missing bind sources are refused rather
-than created as empty directories. API and metrics ports bind to host loopback; public
-HTTPS ingress is an explicit host/proxy configuration. The mount and container filesystem
-options follow the [Docker Compose service specification](https://docs.docker.com/reference/compose-file/services/).
+The start procedure for `deploy/compose.yaml` lives in the
+[backend runbook](../backend_runbook.md#one-host-with-compose); this section records what to
+verify once it is up. The image already carries its source commit; do not override it with an
+unrelated commit. The mount and container filesystem options follow the
+[Docker Compose service specification](https://docs.docker.com/reference/compose-file/services/).
 
 Verify API `/health`, `/ready`, `/metrics`, and worker port 9091 `/health` and `/metrics`.
 Worker solve/job counters belong to the worker listener; API cache/request counters belong
