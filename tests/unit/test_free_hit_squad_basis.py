@@ -365,3 +365,33 @@ def test_a_members_free_hit_refusal_renders_as_unavailable_with_its_reason(
     rows = {row["entry_id"]: row for row in members["payload"]["members"]}
     assert rows[999]["data_quality"] == "empty"
     assert rows[101]["data_quality"] != "empty"
+
+
+def test_the_squad_basis_travels_to_the_published_advice_document(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The page needs to say which squad the advice stands on; the record carries it."""
+
+    from dataclasses import replace
+
+    from squadopt.platform.advice_documents import validate_advice_document
+
+    inputs, projection, rules = league_module._world_context(world)
+    picks = replace(
+        league_module._member_picks(world, 101, league_module._legal_squad(world)),
+        active_chip="freehit",
+        squad_basis="pre_free_hit_gw01",
+    )
+    build_league_views(
+        league_module._Provider({101: picks}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+    )
+    raw = (tmp_path / "league" / "advice" / "101" / "saf-puan" / "1.json").read_bytes()
+    validate_advice_document(raw)
+    assert json.loads(raw)["payload"]["squad_basis"] == "pre_free_hit_gw01"

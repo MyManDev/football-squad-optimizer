@@ -104,6 +104,7 @@ def advice_read_schema() -> dict[str, Any]:
             "chip": chip,
             "plan_weeks": {"type": ["array", "null"], "items": plan_week},
             "stated_limits": {"type": ["array", "null"], "items": {"type": "string"}},
+            "squad_basis": {"type": "string"},
             "plan_kind": {"enum": ["within_free_transfers", "with_hits"]},
             "alternative_plan": {
                 "type": ["object", "null"],

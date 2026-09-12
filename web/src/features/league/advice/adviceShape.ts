@@ -115,6 +115,7 @@ export function isAdvicePayload(value: unknown): boolean {
       chip,
       plan_weeks: nullable(array(planWeek)),
       stated_limits: nullable(array(text)),
+      squad_basis: text,
       plan_kind: planKind,
       alternative_plan: nullable(alternative),
     },
