@@ -650,6 +650,8 @@ const en = {
     adviceUnreadable: "This member's advice could not be read.",
     adviceUnreadableBody:
       "The squad above came from this build and the advice document did not answer, so this is a fault in reading the site rather than a combination nobody solved. Reloading, or reporting it, is the right move.",
+    freeHitSquadBasis: (week: number) =>
+      `Free Hit played; this advice stands on your GW ${week} squad.`,
     entryNotAvailable: "This member’s squad document is not published.",
     entryNotAvailableBody: "Return to the member list or try again after the next publication.",
     invalidEntry: "This entry ID is not valid.",
@@ -1495,6 +1497,7 @@ const tr: MessageSchema<typeof en> = {
     adviceUnreadable: "Bu üyenin önerisi okunamadı.",
     adviceUnreadableBody:
       "Yukarıdaki kadro bu yayından geldi, öneri belgesi ise yanıt vermedi; yani bu, kimsenin çözmediği bir kombinasyon değil, siteyi okurken çıkan bir arıza. Sayfayı yenilemek ya da bildirmek doğru olan.",
+    freeHitSquadBasis: (week: number) => `Free Hit oynadın; bu öneri GW ${week} kadrona göre.`,
     entryNotAvailable: "Bu üyenin kadro belgesi yayımlanmamış.",
     entryNotAvailableBody: "Üye listesine dönebilir veya sonraki yayında yeniden deneyebilirsin.",
     invalidEntry: "Bu üye numarası geçerli değil.",

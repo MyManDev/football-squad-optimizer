@@ -92,6 +92,7 @@ export function isAdvicePayload(value: unknown): boolean {
     },
     {
       source_snapshot_id: nullable(text),
+      squad_basis: text,
       rival_entry_id: identity,
       rival_label: nullable(text),
       transfer_hit_points: finite,
