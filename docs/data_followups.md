@@ -228,8 +228,8 @@ ask how often the call happens.
 **Once per run.** Every caller loads the panel at the top and then iterates folds over the
 frame in memory: the `measure_*` and `export_*` scripts, `build_projection_handoff`,
 `recommend_current_squad`, the four `experiments/` studies, and `fpl_capture`'s identity
-check. The other entry point, `build_canonical_dataset`, is reached only by
-`scripts/run_pipeline_demo.py` and the tests, over the committed synthetic sample.
+check. The other entry point, `build_canonical_dataset`, is reached only by the tests
+(`tests/integration/test_end_to_end.py`), over the committed synthetic sample.
 
 So a perfect vectorization has a **ceiling of about one second per run**, against walk-forward
 benchmarks measured in hours. Against that, the change would edit the one module whose own
