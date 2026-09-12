@@ -22,7 +22,7 @@ without saying what they are accountable for producing.
 | **data / data mining**<br>Data & Predictive Modeling | How do we produce the best available, leakage-safe, calibrated future information for the optimizer? | `data/`, `features/`, `prediction/` |
 | **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`; `live/`'s measurement and decision logic; core CI, dependency enforcement, and the current `application/` pilot |
 | **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | `platform/`, `live/`'s operational surface (`ledger.py`, `tick.py`, `recommendation.py`) since the handover below, runtime registries and adapters, installed CLI, API, workers, persistence adapters, deployment, and observability |
-| **shared — all three** | — | `contracts/`, `data/schema.py`, `optimization/config.py`, `backtest/` |
+| **shared, all three** | (none) | `contracts/`, `data/schema.py`, `optimization/config.py`, `backtest/` |
 
 The middle column is the useful half when a piece of work does not obviously belong to a
 directory. "Does the residual export cross machines byte for byte?" is a data-side question

@@ -299,8 +299,8 @@ explicit, reviewable state change backed by the gate artifacts and sign-offs.
 
 ## First delivery sequence
 
-The runtime landed contract-first — run context and manifest, artifact registry, runtime
-orchestration, application command services, then the unified CLI — followed by the
+The runtime landed contract-first: run context and manifest, artifact registry, runtime
+orchestration, application command services, then the unified CLI, followed by the
 persistence decision ([ADR 0005](decisions/0005-persistence-boundaries.md)) and the
 [HTTP boundary](backend.md); the installed adapters in the table above came after those
 contracts, and PostgreSQL, Redis and authentication have not.
