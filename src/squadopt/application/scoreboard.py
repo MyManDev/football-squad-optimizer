@@ -55,6 +55,7 @@ from typing import Any, Final
 
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.application.scoreboard_baselines import human_baseline_rows
 from squadopt.application.scoreboard_diagnostics import empty_diagnostics
 from squadopt.application.scoreboard_history import settled_scoreboard_entries
 from squadopt.data.errors import DataError
@@ -75,6 +76,7 @@ from squadopt.live import (
     load_ledger,
     season_from_bootstrap,
 )
+from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 
 SCOREBOARD_FILE: Final = "scoreboard.json"
 TOP100_SIZE: Final = 100
@@ -311,6 +313,8 @@ def scoreboard_payload(
     cohort_picks: CohortPicks | None = None,
     published_ours: Mapping[int, Mapping[str, object]] | None = None,
     generated_at_utc: str,
+    baseline_entries: Sequence[LedgerEntry] = (),
+    human_baselines: Mapping[int, Mapping[str, Mapping[str, object]]] | None = None,
 ) -> dict[str, object]:
     """The scoreboard envelope, from bytes and ledger entries alone; pure, so testable.
 
@@ -327,6 +331,7 @@ def scoreboard_payload(
         for entry_id, payload in histories.items()
     }
     ledger = {entry.gameweek: entry for entry in ledger_entries}
+    baseline = {entry.gameweek: entry for entry in baseline_entries}
     if cohort is not None:
         # A gameweek number repeats every season, so the week check below proves the two
         # captures are from the same week only once they are known to be from the same
@@ -383,6 +388,47 @@ def scoreboard_payload(
                 scoring_basis=our_row.get("scoring_basis"),
                 source_snapshot_id=our_row.get("outcome_snapshot_id"),
             )
+        control = baseline.get(gameweek)
+        if control is not None:
+            if (
+                entry is None
+                or control.season != season
+                or control.decision.get("snapshot_id") != entry.decision.get("snapshot_id")
+                or not control.decision.get("snapshot_id")
+                or not control.decision.get("deadline_utc")
+                or control.decision.get("deadline_utc") != entry.decision.get("deadline_utc")
+            ):
+                raise DataError(
+                    "Paired base decision must use the system's same season and capture."
+                )
+            if control.decision.get("model_version") != COMPONENT_MODEL_VERSION:
+                raise DataError("The bare component row needs a frozen component-only decision.")
+            base_row = _ours(control)
+            comparisons[1].update(
+                net=base_row["net"] if settled else None,
+                diagnostics=base_row.get("diagnostics", empty_diagnostics())
+                if settled
+                else empty_diagnostics(),
+                scoring_basis=base_row.get("scoring_basis"),
+                source_snapshot_id=base_row.get("outcome_snapshot_id"),
+            )
+        if settled:
+            for index, kind in ((2, "elite_xi"), (3, "ownership_template")):
+                human = (human_baselines or {}).get(gameweek, {}).get(kind)
+                if human is not None:
+                    comparisons[index].update(
+                        {
+                            key: human[key]
+                            for key in (
+                                "net",
+                                "diagnostics",
+                                "scoring_basis",
+                                "source_snapshot_id",
+                                "outcome_snapshot_id",
+                                "construction",
+                            )
+                        }
+                    )
         for index, value, basis in (
             (4, _mean(nets), "net"),
             (5, _number(event.get("average_entry_score")), "source_average"),
@@ -564,6 +610,8 @@ class ScoreboardPublicationRequest:
     cohort_snapshot_id: str | None = None
     elite_snapshot_id: str | None = None
     now_utc: str | None = None
+    baseline_ledger_root: Path | None = None
+    evidence_root: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -603,13 +651,41 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         for entry_id in registered
         if (name := f"entry-{entry_id}-history.json") in snapshot.payloads
     }
-    entries = settled_scoreboard_entries(
-        load_ledger(request.ledger_root, season),
+    ledger = load_ledger(request.ledger_root, season)
+    controls = (
+        load_ledger(request.baseline_ledger_root, season)
+        if request.baseline_ledger_root is not None
+        else ()
+    )
+    snapshot_ids = list_snapshot_ids(request.snapshot_root, source=FPL_LIVE_SOURCE)
+    settled_entries = settled_scoreboard_entries(
+        (*ledger, *controls),
         (
             snapshot if name == snapshot_id else read_snapshot(request.snapshot_root, name)
-            for name in list_snapshot_ids(request.snapshot_root, source=FPL_LIVE_SOURCE)
+            for name in snapshot_ids
         ),
         season=season,
+        as_of_utc=snapshot.metadata.captured_at_utc,
+    )
+    entries, baseline_entries = settled_entries[: len(ledger)], settled_entries[len(ledger) :]
+    # Retain only decision and selected outcome captures, not the entire archive.
+    needed_ids = {
+        str(identifier)
+        for entry in entries
+        for identifier in (
+            entry.decision.get("snapshot_id"),
+            (entry.outcome or {}).get("source_snapshot_id"),
+        )
+        if identifier
+    }
+    baseline_snapshots = tuple(
+        snapshot if name == snapshot_id else read_snapshot(request.snapshot_root, name)
+        for name in sorted(needed_ids & set(snapshot_ids))
+    )
+    human_baselines = human_baseline_rows(
+        entries,
+        baseline_snapshots,
+        evidence_root=request.evidence_root,
         as_of_utc=snapshot.metadata.captured_at_utc,
     )
     target = Path(request.out_dir) / "data" / "league" / SCOREBOARD_FILE
@@ -635,6 +711,8 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         histories=histories,
         registered=registered,
         ledger_entries=entries,
+        baseline_entries=baseline_entries,
+        human_baselines=human_baselines,
         cohort=cohort,
         cohort_picks=cohort_picks,
         published_ours=published_ours or None,

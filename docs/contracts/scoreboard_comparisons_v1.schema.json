@@ -236,6 +236,12 @@
         },
         "diagnostics": {
           "$ref": "#/$defs/diagnostics"
+        },
+        "construction": {
+          "const": "constrained_ownership_template_v2_replay"
+        },
+        "outcome_snapshot_id": {
+          "type": "string"
         }
       }
     }
