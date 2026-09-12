@@ -47,6 +47,11 @@ stops at the first refusal and records what refused. An explicit `--handoff` reu
 prebuilt projection for this exact capture and week; it requires `--skip-top100`, bypasses
 `--projection` build selection, and records that no new evidence was applied.
 
+An optional second live capture in the final 24 hours before the deadline can be
+compared with the earlier capture using `squadopt.platform.capture_measurement`
+([commands and interpretation](operations/capture_measurement.md)). This offline
+audit counts availability and news changes; it does not change the weekly decision.
+
 **`rotation` is the one step that works the other way round: it is off unless `--rotation`
 asks for it.** That is deliberate and it is about honesty of the record, not convenience.
 The only club-news source wired up today is the committed *synthetic* fixture under
