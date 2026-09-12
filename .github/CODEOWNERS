@@ -31,6 +31,8 @@
 /src/squadopt/__init__.py          @tunayaslan @ErtugrulS32175
 /src/squadopt/integration.py       @tunayaslan @ErtugrulS32175
 /src/squadopt/application/         @tunayaslan @ErtugrulS32175
+# Thin CLI over application/site_publication.py; owned with the module it delegates to.
+/scripts/build_site.py             @tunayaslan @ErtugrulS32175
 /scripts/_experiment_cli.py        @tunayaslan @ErtugrulS32175
 /docs/architecture/                @tunayaslan @ErtugrulS32175
 /web/                              @ErtugrulS32175
@@ -41,7 +43,7 @@
 /Dockerfile                        @SpeedyV5 @tunayaslan @ErtugrulS32175
 /.dockerignore                     @SpeedyV5 @tunayaslan @ErtugrulS32175
 /docs/backend_runbook.md            @SpeedyV5 @tunayaslan @ErtugrulS32175
-/scripts/build_site.py              @SpeedyV5 @tunayaslan @ErtugrulS32175
+/deploy/                            @SpeedyV5 @tunayaslan @ErtugrulS32175
 # The operational handover is complete; other live/ files retain their owner above.
 /src/squadopt/live/ledger.py        @SpeedyV5 @tunayaslan @ErtugrulS32175
 /src/squadopt/live/tick.py          @SpeedyV5 @tunayaslan @ErtugrulS32175

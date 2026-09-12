@@ -2,8 +2,9 @@
 
 Cloudflare Pages publishes only the static `web/dist` artifact produced by the successful
 `web (node 22)` CI job. The deployment workflow downloads those already-tested bytes and never
-rebuilds them. It does **not** host the FastAPI application in `src/squadopt/api`; backend
-hosting is a separate future decision.
+rebuilds them. It does **not** host the FastAPI application in `src/squadopt/api`; the backend
+is hosted beside Pages, not inside it ([ADR 0006](architecture/decisions/0006-backend-hosting.md),
+`deploy/compose.yaml`), and has its own runbook, [backend_runbook.md](backend_runbook.md).
 
 The current site fits the Cloudflare Pages Free plan. Static asset requests are free and
 unlimited; the operating budget assumes 500 deployments per month, 20,000 files per site, and
@@ -37,12 +38,13 @@ tool in plaintext.
 
 ## One-time setup
 
-1. Create a **Direct Upload** Pages project. `squadopt` is the suggested project name if it is
-   available, and `main` must be the production branch:
+1. Create a **Direct Upload** Pages project. The project is named `football-squad-optimizer`
+   (its `*.pages.dev` alias is `squadopt.pages.dev` — the project name and the hostname
+   differ), and `main` must be the production branch:
 
    ```console
    npx wrangler@4.123.0 login
-   npx wrangler@4.123.0 pages project create squadopt --production-branch main
+   npx wrangler@4.123.0 pages project create football-squad-optimizer --production-branch main
    ```
 
    Cloudflare does not connect to the repository or build the application. Direct Upload
@@ -62,7 +64,7 @@ tool in plaintext.
    ```console
    gh secret set CLOUDFLARE_ACCOUNT_ID --env cloudflare-pages
    gh secret set CLOUDFLARE_API_TOKEN --env cloudflare-pages
-   gh variable set CLOUDFLARE_PAGES_PROJECT --body squadopt
+   gh variable set CLOUDFLARE_PAGES_PROJECT --body football-squad-optimizer
    ```
 
 5. Merge the deployment workflow before adding secrets. Confirm a same-repository PR against
