@@ -4,7 +4,7 @@
 api and the static site serve re-spells those names by hand, and its payload keeps
 ``additionalProperties`` open. This is the seam between the two: a name the schema
 declares is either publishable or one of the envelope names admitted below, by hand,
-each with its reason — so a field can only reach the contract on purpose.
+each with its reason, so a field can only reach the contract on purpose.
 """
 
 import json
