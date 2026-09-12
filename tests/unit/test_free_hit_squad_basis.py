@@ -13,12 +13,14 @@ A Wildcard, Bench Boost or Triple Captain week keeps the captured squad.
 """
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import tests.unit.test_league_views as league_module
+import tests.unit.test_public_probability_guards as guards_module
 import tests.unit.test_source_fpl_live as payload_module
 
 from squadopt.application.capture_entries import CapturePicksProvider
@@ -360,11 +362,117 @@ def test_a_members_free_hit_refusal_renders_as_unavailable_with_its_reason(
     assert not by_entry[999].rendered
     assert "entry-999-picks-gw02.json" in by_entry[999].reason
     assert (tmp_path / "league" / "advice" / "101" / "saf-puan" / "1.json").is_file()
-    assert not (tmp_path / "league" / "advice" / "999").exists()
+    # The refused member used to get no advice directory at all, so the page could only
+    # say "unavailable". Now it gets an index and nothing else: the index is where the
+    # page reads reasons, and the reason it carries is the one the build report names.
+    refused_dir = tmp_path / "league" / "advice" / "999"
+    assert sorted(path.name for path in refused_dir.iterdir()) == ["index.json"]
+    index = json.loads((refused_dir / "index.json").read_text(encoding="utf-8"))["payload"]
+    assert {item["reason"] for item in index["unavailable"]} == {by_entry[999].reason}
+    assert index["computed"] == []
     members = json.loads((tmp_path / "league" / "members.json").read_text(encoding="utf-8"))
     rows = {row["entry_id"]: row for row in members["payload"]["members"]}
     assert rows[999]["data_quality"] == "empty"
     assert rows[101]["data_quality"] != "empty"
+
+
+def _assert_index_under_contract(index: dict[str, Any], entry_id: int) -> None:
+    """The rules ``web/src/features/league/publicationShape.ts`` ``assertAdviceIndex`` applies."""
+
+    def positive(value: object) -> bool:
+        return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+    assert index["entry_id"] == entry_id
+    assert positive(index["league_id"]) and positive(index["gameweek"])
+    assert isinstance(index["season"], str)
+    assert index["window"] in (1, 3, 5)
+    assert index["strategies"] and all(isinstance(s, str) for s in index["strategies"])
+    assert all(positive(rival) for rival in index["rival_entry_ids"])
+    assert index["default_rival_entry_id"] is None or positive(index["default_rival_entry_id"])
+    assert isinstance(index["computed"], list)
+    for item in index["unavailable"]:
+        assert isinstance(item["strategy"], str) and isinstance(item["reason"], str)
+        assert item["rival_entry_id"] is None or positive(item["rival_entry_id"])
+        assert item.get("window", 1) in (1, 3, 5)
+    assert all(
+        isinstance(windows, list) and all(w in (1, 3, 5) for w in windows)
+        for windows in index["windows"].values()
+    )
+    assert index["suggested_strategy"] is None
+
+
+def _build_with_refusal(world: dict[str, Any], out: Path, *members: int) -> Any:
+    inputs, projection, rules = league_module._world_context(world)
+    provider = _RefusingProvider(
+        league_module._member_picks(world, 101, league_module._legal_squad(world))
+    )
+    return build_league_views(
+        provider,
+        tuple(EntryRegistration(m, f"member-{m}", "2026-08-23T00:00:00Z") for m in members),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=out,
+        now=datetime(2026, 8, 23, 12, tzinfo=UTC),
+    )
+
+
+def test_a_refused_members_index_keeps_the_published_contract_and_the_sweep(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """One entry per declared strategy, no rival, nothing computed, no window promised;
+    the reason is text we generated, so it must pass the tree's own honesty sweep."""
+
+    out = tmp_path / "league"
+    _build_with_refusal(world, out, 101, 999)
+    index = json.loads((out / "advice" / "999" / "index.json").read_text(encoding="utf-8"))
+    assert index["contract_version"] == "provisional_league_ui_v1"
+    payload = index["payload"]
+    _assert_index_under_contract(payload, 999)
+    assert [item["strategy"] for item in payload["unavailable"]] == payload["strategies"]
+    assert all(item["rival_entry_id"] is None for item in payload["unavailable"])
+    assert payload["windows"] == {strategy: [] for strategy in payload["strategies"]}
+    assert payload["rival_entry_ids"] == [101]
+    assert guards_module._sweep(out) == []
+
+
+def test_pruning_keeps_the_refused_index_and_removes_last_weeks_documents(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """A publish into last week's tree: the refused member's old documents go, the index stays."""
+
+    out = tmp_path / "league"
+    stale = out / "advice" / "999" / "saf-puan" / "1.json"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("{}", encoding="utf-8")
+    (out / "entries").mkdir()
+    (out / "entries" / "999.json").write_text("{}", encoding="utf-8")
+    report = _build_with_refusal(world, out, 101, 999)
+    assert report.removed == ("entries/999.json", "advice/999/saf-puan/")
+    assert sorted(p.name for p in (out / "advice" / "999").iterdir()) == ["index.json"]
+    assert not (out / "entries" / "999.json").exists()
+
+
+def test_a_refusal_beside_a_member_leaves_that_members_documents_byte_identical(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Publishing a refused member's index changes nothing a rendered member is served."""
+
+    alone = tmp_path / "alone"
+    _build_with_refusal(world, alone, 101)
+    beside = tmp_path / "beside"
+    _build_with_refusal(world, beside, 101, 999)
+    documents = [
+        path.relative_to(alone)
+        for path in sorted(alone.rglob("*.json"))
+        if path.relative_to(alone).parts[:2] in (("advice", "101"), ("entries", "101.json"))
+    ]
+    assert Path("advice", "101", "saf-puan", "1.json") in documents
+    assert Path("entries", "101.json") in documents
+    for relative in documents:
+        assert (alone / relative).read_bytes() == (beside / relative).read_bytes(), relative
 
 
 def test_the_squad_basis_travels_to_the_published_advice_document(
