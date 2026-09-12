@@ -1,4 +1,4 @@
-# ADR 0007 — Move the operational scripts into the installed package, in one change
+# ADR 0007: Move the operational scripts into the installed package, in one change
 
 - **Status:** accepted (merged 2026-09-10 as `e95d2cd3`, [PR #456](https://github.com/MyManDev/football-squad-optimizer/pull/456))
 - **Date:** 2026-09-10; recorded as an ADR on 2026-09-12
