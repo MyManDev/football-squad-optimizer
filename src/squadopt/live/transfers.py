@@ -26,7 +26,7 @@ import pandas as pd
 from squadopt.data.errors import DataSourceError
 from squadopt.live.errors import LedgerError
 from squadopt.live.recommendation import Projection, RecommendationInputs
-from squadopt.live.rules import SeasonRules, chip_availability_for
+from squadopt.live.rules import TRANSFER_HIT_POINTS, SeasonRules, chip_availability_for
 from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import (
     CHIP_NAMES,
@@ -186,7 +186,7 @@ class _MemberPlanningPolicy(TypedDict):
 MEMBER_PLANNING_POLICY_ID: Final = "member_planning_policy_v2"
 _MEMBER_PLANNING_POLICY_VALUES: Final[_MemberPlanningPolicy] = {
     "transfer_hit_cost_points": 8.0,
-    "hit_points_charged": 4.0,
+    "hit_points_charged": float(TRANSFER_HIT_POINTS),
     "banked_transfer_value_points": 0.0,
     "horizon_discount_factor": 1.0,
     "chip_holding_value_points": MappingProxyType({}),
@@ -205,7 +205,9 @@ holding value because the member path offers no chip unless the operator names o
 
 The two hit numbers are the policy's one departure from the dataclass defaults, and they
 mean different things. ``hit_points_charged`` is 4.0, the points the game takes off the
-sheet, and it is what every reported hit is counted at: the advice payload's
+sheet (``TRANSFER_HIT_POINTS`` in ``live/rules.py``, the one definition, which the
+banking model that derives a member's free transfers checks recorded costs against),
+and it is what every reported hit is counted at: the advice payload's
 ``transfer_hit_points`` (the week's charge, published once beside ``moves`` because it
 belongs to the week and not to any one move), ``plan_weeks[].transfer_hit_points``,
 ``net_expected_points``, the decision the ledger records. ``transfer_hit_cost_points`` is

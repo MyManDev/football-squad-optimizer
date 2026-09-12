@@ -16,9 +16,11 @@ from squadopt.data.errors import DataError
 from squadopt.data.sources.fpl_live import (
     FREE_HIT_CHIP,
     EntryPicksRecord,
+    entry_transfer_history,
     fpl_entry_picks,
-    free_transfer_cap,
 )
+from squadopt.live.banking import BankedFreeTransfers, banked_free_transfers
+from squadopt.live.rules import free_transfer_cap
 
 
 def capture_element_codes(payloads: object) -> dict[int, int]:
@@ -71,7 +73,23 @@ class CapturePicksProvider:
             season=season,
             gameweek=gameweek,
             source_snapshot_id=self._snapshot_id,
+        )
+
+    def _banked(self, record: EntryPicksRecord) -> BankedFreeTransfers:
+        """The free transfers the member holds at the deadline after the captured week.
+
+        The parser reports the rule floor with the flag down; the banking model derives
+        the count from the same history under the season's cap, and the captured week's
+        own chip is read from the picks document because the history lists a chip only
+        once its week is over.
+        """
+
+        history = self._payloads[f"entry-{record.entry_id}-history.json"]
+        return banked_free_transfers(
+            entry_transfer_history(history, entry_id=record.entry_id),
+            gameweek=record.gameweek,
             max_free_transfers=self._max_free_transfers,
+            active_chip=record.active_chip,
         )
 
     def _basis(self, captured: EntryPicksRecord) -> tuple[EntryPicksRecord, str]:
@@ -114,13 +132,15 @@ class CapturePicksProvider:
     def picks(self, entry_id: int, season: str, gameweek: int) -> EntryPicks:
         record = self._record(entry_id, season, gameweek)
         basis, squad_basis = self._basis(record)
+        banked = self._banked(record)
         # The data record and the application type are twins by design: same field names,
         # no translation table, so a drift on either side is a type error rather than a
-        # silently wrong squad. Identity, chips, the active chip and the free transfers
-        # come from the captured week (the bank of free transfers runs through a Free Hit
-        # week untouched, so the captured week's derivation is the one for the coming
-        # deadline); the squad and bank from the basis week (the same record unless a
-        # Free Hit voided the captured one).
+        # silently wrong squad. Identity, chips and the active chip come from the captured
+        # week, and so do the free transfers, derived here rather than read off the record
+        # (the bank of free transfers runs through a Free Hit week untouched, so the
+        # captured week's derivation is the one for the coming deadline); the squad and
+        # bank from the basis week (the same record unless a Free Hit voided the captured
+        # one).
         return EntryPicks(
             entry_id=record.entry_id,
             season=record.season,
@@ -130,8 +150,8 @@ class CapturePicksProvider:
             captain=self._code(basis.captain),
             vice_captain=self._code(basis.vice_captain),
             bank_tenths=basis.bank_tenths,
-            free_transfers=record.free_transfers,
-            free_transfers_known=record.free_transfers_known,
+            free_transfers=banked.count,
+            free_transfers_known=banked.known,
             chips_used=record.chips_used,
             purchase_prices={
                 self._code(player): price for player, price in basis.purchase_prices.items()
