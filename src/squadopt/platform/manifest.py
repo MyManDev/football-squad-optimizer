@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Final
 
-from squadopt.platform.context import RunContext
+from squadopt.platform.context import RUN_CONTEXT_CONTRACT_VERSION, RunContext
 
 RUN_MANIFEST_CONTRACT_VERSION: Final = "run_manifest_v1"
 RUN_MANIFEST_SCHEMA_PATH: Final = Path("docs") / "contracts" / "run_manifest_v1.schema.json"
@@ -120,7 +120,7 @@ def run_manifest_schema() -> dict[str, object]:
     context = {
         "type": "object",
         "properties": {
-            "contract_version": {"type": "string", "const": "run_context_v1"},
+            "contract_version": {"type": "string", "const": RUN_CONTEXT_CONTRACT_VERSION},
             "run_id": {
                 "type": "string",
                 "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$",

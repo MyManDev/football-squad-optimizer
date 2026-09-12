@@ -30,6 +30,7 @@ from squadopt.application.advice_capabilities import (
     validate_advice_selection,
 )
 from squadopt.application.entries import EntryError
+from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import (
     LEAGUE_STATE_CONTRACT_VERSION,
@@ -37,7 +38,7 @@ from squadopt.platform.advice_documents import (
     validate_league_state,
 )
 
-LEAGUE_TREE_CONTRACT_VERSION: Final = "provisional_league_ui_v1"
+LEAGUE_TREE_CONTRACT_VERSION: Final = LEAGUE_VIEW_CONTRACT_VERSION
 
 
 class AdviceReadError(ValueError):
