@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import secrets
+import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, replace
@@ -53,7 +54,6 @@ from squadopt.platform.weekly_journal import (
     WeeklyJournalError,
     WeeklyRun,
     WeeklyStageResult,
-    fingerprint_paths,
     inspect_run,
     read_run_request,
 )
@@ -113,6 +113,30 @@ def package_fingerprint() -> str:
     return digest.hexdigest()
 
 
+def tree_digests(root: Path) -> dict[str, str]:
+    """Every file under ``root`` by its relative path, with the SHA-256 of its bytes."""
+
+    return {
+        path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def recorded_capture_directories(root: Path, season: str) -> list[Path]:
+    """The advice records the season's history documents read, as the run found them.
+
+    One directory per member, week and capture. A hidden sibling is a writer's staging
+    directory, never a record, and the week this run records itself is its own output.
+    """
+
+    return sorted(
+        path
+        for path in (root / season).glob("gw[0-9][0-9]/entry-*/*")
+        if path.is_dir() and not path.name.startswith(".")
+    )
+
+
 class WeeklyOperations:
     def __init__(
         self,
@@ -149,12 +173,14 @@ class WeeklyOperations:
             self.stages.append("publish")
         self.rule_snapshot = request.snapshot_id or latest_live_snapshot(paths.snapshots)
         self.ledger_inputs = sorted((paths.ledger / request.season).glob("gw*"))
+        self.record_inputs = recorded_capture_directories(paths.records, request.season)
         if resume:
             prior = read_run_request(paths.journal, run_id)
             # Derived reads belong to the original preflight, even after this run captures
             # a newer snapshot or writes its own decision during an earlier invocation.
             self.rule_snapshot = prior["rule_snapshot"]
             self.ledger_inputs = [Path(value) for value in prior["ledger_inputs"]]
+            self.record_inputs = [Path(value) for value in prior["record_inputs"]]
         declaration = {
             "request": asdict(request),
             "paths": {key: str(value) for key, value in asdict(paths).items()},
@@ -163,6 +189,7 @@ class WeeklyOperations:
             "supplied_handoff": str(handoff) if handoff else None,
             "rule_snapshot": self.rule_snapshot,
             "ledger_inputs": list(map(str, self.ledger_inputs)),
+            "record_inputs": list(map(str, self.record_inputs)),
         }
         self.run = WeeklyRun(paths.journal, run_id, declaration, self.stages, resume=resume)
 
@@ -465,13 +492,17 @@ class WeeklyOperations:
             "decide", {"snapshot_id": result.snapshot_id, "mode": result.mode}, result.output_paths
         )
 
-    def _league(self, out: Path | None = None, *, record: bool = False) -> WeeklyStageResult:
+    def _league(self) -> WeeklyStageResult:
+        # A run that will publish records here, from the solve whose bytes ship: the
+        # publish stage copies this preview rather than solving again, and the history
+        # documents built below read the record, so it has to exist before they do.
+        record = self.request.publish
         request = LeaguePublicationRequest(
             self.paths.snapshots,
             self._capture_id(),
             self.paths.archive,
             self.paths.registry,
-            out or self.paths.out,
+            self.paths.out,
             self.request.league_id,
             season=self.request.season,
             gameweek=self.request.gameweek,
@@ -490,7 +521,7 @@ class WeeklyOperations:
             },
         )
 
-    def _site(self, out: Path | None = None) -> WeeklyStageResult:
+    def _site(self) -> WeeklyStageResult:
         result = publish_site(
             SitePublicationRequest(
                 self.paths.snapshots,
@@ -499,7 +530,7 @@ class WeeklyOperations:
                 self.paths.handoffs,
                 self.run.directory,
                 self.paths.log,
-                out or self.paths.out,
+                self.paths.out,
                 season=self.request.season,
                 snapshot_id=self._capture_id(),
             )
@@ -512,14 +543,14 @@ class WeeklyOperations:
             },
         )
 
-    def _scoreboard(self, out: Path | None = None) -> WeeklyStageResult:
+    def _scoreboard(self) -> WeeklyStageResult:
         result = publish_scoreboard(
             ScoreboardPublicationRequest(
                 self.paths.snapshots,
                 self._capture_id(),
                 self.paths.registry,
                 self.paths.ledger,
-                out or self.paths.out,
+                self.paths.out,
                 self.request.league_id,
                 season=self.request.season,
                 cohort_snapshot_id=self._cohort_id(),
@@ -534,16 +565,45 @@ class WeeklyOperations:
             },
         )
 
+    def _published_tree(self) -> Path:
+        return self.paths.workspace / "web" / "public" / "data"
+
+    def _seed_preview(self) -> None:
+        """Start the preview from the tree develop publishes, as the worktree build did.
+
+        The builders overlay that tree and prune it, and two of them read it: the site
+        keeps the published ``ledger.json`` and the scoreboard keeps its published rows when
+        the ledger holds nothing. An empty preview answers those differently from a
+        publication, so the preview starts where the publication starts.
+        """
+
+        target = self.paths.out / "data"
+        source = self._published_tree()
+        if target.exists() or not source.is_dir():
+            return
+        shutil.copytree(source, target)
+
     def _publish(self) -> WeeklyStageResult:
         proof: dict[str, object] = {}
-        private_records: list[Path] = []
+        preview = self.paths.out / "data"
+        copied: dict[str, object] = {}
 
         def build(out: Path) -> None:
-            for result in (self._site(out), self._league(out, record=True), self._scoreboard(out)):
-                fingerprint_paths(result.output_paths)
-                private_records.extend(
-                    path for path in result.output_paths if out not in path.parents
+            # The preview is the publication. The tree the worktree carries from
+            # origin/develop goes first, so nothing under it outlives the preview, and the
+            # copy is then read back against the preview before a commit can name it.
+            target = out / "data"
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(preview, target)
+            expected, actual = tree_digests(preview), tree_digests(target)
+            names = expected.keys() | actual.keys()
+            differing = sorted(name for name in names if expected.get(name) != actual.get(name))
+            if differing:
+                raise WeekError(
+                    "The publication copy differs from the preview: " + ", ".join(differing[:12])
                 )
+            copied["published_files"] = len(actual)
 
         exit_code = publish(
             PublishNames(self.request.season, self.request.gameweek, "decision"),
@@ -556,7 +616,7 @@ class WeeklyOperations:
         )
         if exit_code != 0 or not proof:
             raise WeekError("Publication did not return a verified PR/no-change receipt.")
-        return self._receipt("publish", dict(proof), tuple(private_records))
+        return self._receipt("publish", {**proof, **copied, "preview": str(preview)})
 
     def execute(self) -> Path:
         p = self.paths
@@ -630,10 +690,17 @@ class WeeklyOperations:
                         operation=self._decide,
                     ).value
                 )
-            common = [selected, held_handoff, p.registry]
-            publication_inputs = [*common, p.archive]
+            self._seed_preview()
+            common = [selected, held_handoff, p.registry, self._published_tree()]
+            # The history documents read every record of the season; the record this run
+            # writes for its own capture is the stage's output, so a week whose records
+            # moved between runs is visible as changed inputs rather than as changed bytes.
             self.values["league"] = dict(
-                self.run.stage("league", inputs=publication_inputs, operation=self._league).value
+                self.run.stage(
+                    "league",
+                    inputs=[*common, p.archive, *self.record_inputs],
+                    operation=self._league,
+                ).value
             )
             self.values["site"] = dict(
                 self.run.stage(
@@ -653,10 +720,11 @@ class WeeklyOperations:
                 ).value
             )
             if self.request.publish:
+                # What ships is the preview tree, so that is the stage's whole input.
                 self.values["publish"] = dict(
                     self.run.stage(
                         "publish",
-                        inputs=[*publication_inputs, p.ledger, *cohort_inputs],
+                        inputs=[p.out / "data"],
                         operation=self._publish,
                         repeatable=False,
                     ).value
