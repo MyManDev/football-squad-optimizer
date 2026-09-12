@@ -12,6 +12,16 @@ moved, what it cost, the bank and free transfers after, the purchase prices the 
 week sells at, and the chip played. The opening entry has none; the state a second
 deadline starts from is read out of the opening entry's own record.
 
+New decisions also freeze ``vice_captain_player_id``, ``ordered_bench_player_ids``
+and ``completion_policy``. These are additive fields within ``season_ledger_v1``:
+existing fields keep their meanings, including the original ``bench_player_ids`` order.
+``optimizer_projection_order_v1`` uses decision-time expected points (descending,
+player ID to break ties), places the bench goalkeeper first, and chooses the best
+non-captain starter as vice. It reads no realized outcome. Older records without these
+fields remain valid and are never backfilled on read: absence means the completion
+was not recorded, not that the original bench order was the declared substitution order.
+Named-eleven outcome scoring is unchanged; recording completion does not apply autosubs.
+
 Writes are crash-safe. A decision is assembled in a hidden staging directory next to
 its final place, verified against its own manifest, and then moved into place with one
 rename, so a gameweek directory either exists complete or does not exist at all; a
@@ -46,10 +56,13 @@ import pandas as pd
 
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
+from squadopt.evaluation.models import EvaluationValidationError
+from squadopt.evaluation.scoring import complete_optimization_decision
 from squadopt.live.errors import LedgerError as LedgerError
 from squadopt.live.recommendation import Projection
 from squadopt.live.report import Recommendation
 from squadopt.live.transfers import FREE_TRANSFERS_AFTER_OPENING, HeldSquad
+from squadopt.optimization import OptimizationResult, SolverStatus
 
 SEASON_LEDGER_CONTRACT_VERSION: Final = "season_ledger_v1"
 LOGGER = logging.getLogger(__name__)
@@ -299,6 +312,25 @@ def record_decision(
             "immutable. A revised decision needs an explicit, separate record."
         )
 
+    try:
+        frozen = complete_optimization_decision(
+            OptimizationResult(
+                solver_status=SolverStatus[recommendation.solver_status],
+                selected_squad=recommendation.squad,
+                starting_xi=recommendation.starting_xi,
+                bench=recommendation.bench,
+                captain=recommendation.captain,
+                total_cost_tenths=recommendation.total_cost_tenths,
+                projected_score=recommendation.projected_score,
+                objective_value=None,
+                diagnostics=recommendation.diagnostics,
+            )
+        )
+    except (EvaluationValidationError, KeyError) as error:
+        raise LedgerError(
+            f"Cannot freeze the decision's vice-captain and bench order: {error}"
+        ) from error
+
     decision = {
         "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
         "snapshot_id": recommendation.snapshot_id,
@@ -316,6 +348,9 @@ def record_decision(
         "starting_xi_player_ids": [int(value) for value in recommendation.starting_xi["player_id"]],
         "bench_player_ids": [int(value) for value in recommendation.bench["player_id"]],
         "captain_player_id": int(recommendation.captain["player_id"]),
+        "vice_captain_player_id": int(str(frozen.vice_captain_id)),
+        "ordered_bench_player_ids": [int(str(player)) for player in frozen.bench],
+        "completion_policy": frozen.completion_policy,
         "total_cost_tenths": int(recommendation.total_cost_tenths),
         "projected_score": float(recommendation.projected_score),
         "unavailable_player_count": len(projection.unavailable_players),
