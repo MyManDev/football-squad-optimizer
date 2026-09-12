@@ -1,0 +1,33 @@
+.count {
+  margin: 0;
+  font-size: var(--step-2);
+  font-variant-numeric: tabular-nums;
+}
+.chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-4);
+}
+.name {
+  margin: 0 0 var(--space-2);
+}
+.windows {
+  margin: 0;
+}
+.windows > div {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.windows dt {
+  color: var(--color-text-muted);
+}
+.windows dd {
+  margin: 0;
+}
+.windows span {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--step--1);
+}

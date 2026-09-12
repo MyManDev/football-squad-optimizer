@@ -114,7 +114,9 @@ describe("the published Free Hit squad basis", () => {
       if (basis !== undefined) payload.squad_basis = basis;
       renderAdvice({ ...base, payload }, "en");
       expect(screen.queryByText(/Free Hit played;/)).not.toBeInTheDocument();
-      expect(screen.getByText("Wildcard")).toBeInTheDocument();
+      expect(
+        within(screen.getByRole("region", { name: "Your gameweek" })).getByText("Wildcard"),
+      ).toBeInTheDocument();
     },
   );
 });
