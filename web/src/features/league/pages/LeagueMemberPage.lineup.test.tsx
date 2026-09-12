@@ -92,3 +92,29 @@ describe("the advice card carries the whole decision", () => {
     expect(screen.queryByRole("region", { name: "Bu haftaki kadron" })).toBeNull();
   });
 });
+
+describe("the published Free Hit squad basis", () => {
+  it.each([
+    ["tr", "Free Hit oynadın; bu öneri GW 2 kadrona göre."],
+    ["en", "Free Hit played; this advice stands on your GW 2 squad."],
+  ] as const)("names the prior squad in %s", (language, expected) => {
+    const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    renderAdvice(
+      { ...base, payload: { ...base.payload, squad_basis: "pre_free_hit_gw02" } },
+      language,
+    );
+    expect(screen.getAllByText(expected)).toHaveLength(1);
+  });
+
+  it.each([undefined, "captured", "pre_free_hit_gw2", "pre_free_hit_gw002", "other"])(
+    "shows no basis note for %s, including Wildcard and legacy advice",
+    (basis) => {
+      const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+      const payload: EntryAdvice = { ...base.payload, chip: "wildcard" };
+      if (basis !== undefined) payload.squad_basis = basis;
+      renderAdvice({ ...base, payload }, "en");
+      expect(screen.queryByText(/Free Hit played;/)).not.toBeInTheDocument();
+      expect(screen.getByText("Wildcard")).toBeInTheDocument();
+    },
+  );
+});

@@ -92,6 +92,7 @@ export function AdviceCard({
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
   const view = envelope.payload;
+  const basisWeek = /^pre_free_hit_gw(\d{2})$/.exec(view.squad_basis ?? "")?.[1];
   const rival =
     view.rival_entry_id === undefined
       ? null
@@ -132,6 +133,9 @@ export function AdviceCard({
       ) : null}
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      {basisWeek ? (
+        <p className={styles.honesty}>{copy.freeHitSquadBasis(Number(basisWeek))}</p>
+      ) : null}
       {view.solver_status === "FEASIBLE" ? (
         <p className={styles.honesty}>
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}

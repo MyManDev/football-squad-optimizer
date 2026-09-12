@@ -15,6 +15,8 @@ describe("nested published advice", () => {
     { expected_points_cost: Infinity },
     { data_quality: "invented" },
     { window: 1.5 },
+    { squad_basis: null },
+    { squad_basis: 2 },
     { alternative_plan: { kind: "with_hits" } },
   ])("refuses malformed nested fields %j", (patch) => {
     const envelope = mockEntryAdviceEnvelope(101, "saf-puan", 3);
