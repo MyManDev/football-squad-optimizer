@@ -138,6 +138,11 @@ def _git_checkout(tmp_path: Path) -> tuple[Path, weekly.WeeklyPaths, list[str]]:
     public.parent.mkdir(parents=True)
     public.write_text("previous publication")
     _git(checkout, "init", "-q")
+    # The publish stage commits from a worktree of this repository; the identity has to
+    # live in the repository, not in this helper's command line, or a runner without a
+    # global identity refuses that commit.
+    _git(checkout, "config", "user.name", "Synthetic")
+    _git(checkout, "config", "user.email", "synthetic@example.invalid")
     _git(checkout, "add", ".")
     _git(checkout, "commit", "-qm", "fixture")
     args = [
