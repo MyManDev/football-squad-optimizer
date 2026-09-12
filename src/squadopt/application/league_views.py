@@ -58,6 +58,7 @@ from squadopt.application.entries import (
     EntryPicks,
     EntryPicksProvider,
     EntryRegistration,
+    chip_states,
     held_squad_from_picks,
 )
 from squadopt.application.mode_selection import (
@@ -534,6 +535,7 @@ def _entry_squad_payload(
     picks: EntryPicks,
     inputs: RecommendationInputs,
     projection: Projection,
+    rules: SeasonRules,
     *,
     league_id: int,
     member_row: Mapping[str, object],
@@ -576,6 +578,21 @@ def _entry_squad_payload(
         "free_transfers": int(picks.free_transfers),
         "free_transfers_known": bool(picks.free_transfers_known),
         "chips_used": {name: list(weeks) for name, weeks in picks.chips_used.items()},
+        # What is still playable, per half, read before the upcoming deadline. ``known`` is
+        # true here because an EntryPicks always carries the history (the capture reader
+        # refuses a payload without its chips list); the flag is published so a reader of a
+        # future provider that lacks the history sees the same shape, states "unknown".
+        "chips": {
+            "known": True,
+            "gameweek": picks.gameweek + 1,
+            "states": {
+                name: {
+                    half: None if window is None else window.to_dict()
+                    for half, window in halves.items()
+                }
+                for name, halves in chip_states(rules, picks.gameweek + 1, picks.chips_used).items()
+            },
+        },
         "purchase_prices_known": bool(picks.purchase_prices_known),
         "source_snapshot_id": picks.source_snapshot_id,
         # Comparing a member's gameweek score with ours needs both scores; the standings
@@ -909,6 +926,7 @@ def build_league_views(
             picks,
             inputs,
             projection,
+            rules,
             league_id=league_id,
             member_row=member_row,
             missing=missing,

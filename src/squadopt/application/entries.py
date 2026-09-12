@@ -21,12 +21,13 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Final, Protocol
 
 import pandas as pd
 
 from squadopt.application.views import _View
 from squadopt.evaluation import FrozenSquadDecision
+from squadopt.live.rules import CHIP_NAMES, SeasonRules
 from squadopt.live.transfers import HeldSquad
 
 ENTRY_REGISTRY_CONTRACT_VERSION = "entry_registry_v1"
@@ -212,6 +213,81 @@ def held_squad_from_picks(picks: EntryPicks, *, current_prices: Mapping[int, int
             str(name): tuple(int(w) for w in weeks) for name, weeks in picks.chips_used.items()
         },
     )
+
+
+CHIP_HALF_LABELS: Final = ("first_half", "second_half")
+"""The halves a chip's windows belong to, in the order the source publishes them: the
+2026-27 bootstrap lists each of the four chips twice, once ending at gameweek 19 and
+once starting at 20 (``live/rules.py`` reads them; nothing here fixes the boundary)."""
+
+
+@dataclass(frozen=True, slots=True)
+class ChipWindowState:
+    """One published window of one chip, as the member stands before ``gameweek``.
+
+    ``state`` is ``used`` (with ``gameweek`` the week it was played), ``expired`` (the
+    window closed unplayed), ``not_yet`` (the window has not opened), ``available``, or
+    ``unknown`` when the member's chip history was not captured at all: no history is
+    not the same thing as no chips played.
+    """
+
+    state: str
+    start_event: int
+    stop_event: int
+    gameweek: int | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "state": self.state,
+            "gameweek": self.gameweek,
+            "start_event": self.start_event,
+            "stop_event": self.stop_event,
+        }
+
+
+def chip_states(
+    rules: SeasonRules,
+    gameweek: int,
+    chips_used: Mapping[str, Sequence[int]] | None,
+) -> dict[str, dict[str, ChipWindowState | None]]:
+    """Each chip's windows by half, read before ``gameweek``'s deadline.
+
+    A window counts as spent once ``number`` plays fall inside it (``chip_availability_for``
+    applies the same reading to the planner's horizon); a play outside every window is a
+    history the rules cannot place and is refused. A chip the season lists once carries
+    ``None`` for its second half; more windows than halves is a rule set this shape
+    cannot state.
+    """
+
+    played = (
+        None
+        if chips_used is None
+        else {name: sorted(int(week) for week in weeks) for name, weeks in chips_used.items()}
+    )
+    states: dict[str, dict[str, ChipWindowState | None]] = {}
+    for name in CHIP_NAMES:
+        windows = sorted((w for w in rules.chips if w.name == name), key=lambda w: w.start_event)
+        if len(windows) > len(CHIP_HALF_LABELS):
+            raise EntryError(f"Chip {name!r} has {len(windows)} windows; halves cannot name them.")
+        weeks = None if played is None else played.get(name, [])
+        if weeks and not all(any(w.covers(week) for w in windows) for week in weeks):
+            raise EntryError(f"Chip {name!r} was played in {weeks!r}, outside every window.")
+        by_half: dict[str, ChipWindowState | None] = dict.fromkeys(CHIP_HALF_LABELS)
+        for half, window in zip(CHIP_HALF_LABELS, windows, strict=False):
+            inside = None if weeks is None else [week for week in weeks if window.covers(week)]
+            if inside is None:
+                state, when = "unknown", None
+            elif len(inside) >= window.number:
+                state, when = "used", inside[0]
+            elif gameweek > window.stop_event:
+                state, when = "expired", None
+            elif gameweek < window.start_event:
+                state, when = "not_yet", None
+            else:
+                state, when = "available", None
+            by_half[half] = ChipWindowState(state, window.start_event, window.stop_event, when)
+        states[name] = by_half
+    return states
 
 
 def frozen_decision_from_picks(

@@ -346,6 +346,17 @@ def test_the_entry_page_gets_the_members_own_squad_not_our_advice(
     assert "free_transfers" in payload["missing_fields"]
     # No score comparison is claimed while the standings view carries no points.
     assert payload["squadopt_comparison"] is None
+    # What the member can still play, by half, read from this world's rules (one window
+    # per chip: the 3xc window opens at gameweek 20) before gameweek 2's deadline.
+    chips = payload["chips"]
+    assert chips["known"] is True and chips["gameweek"] == 2
+    assert {name: halves["first_half"]["state"] for name, halves in chips["states"].items()} == {
+        "wildcard": "available",
+        "freehit": "available",
+        "bboost": "available",
+        "3xc": "not_yet",
+    }
+    assert all(halves["second_half"] is None for halves in chips["states"].values())
 
 
 def test_only_the_computed_mode_and_window_are_published(
