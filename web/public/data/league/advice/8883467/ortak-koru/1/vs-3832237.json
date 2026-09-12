@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 448047,
-          "name": "Enzo Fern\u00e1ndez",
-          "short_name": "Fern\u00e1ndez",
+          "player_id": 166989,
+          "name": "Youri Tielemans",
+          "short_name": "Tielemans",
           "position": "MID",
-          "team": "Man City"
+          "team": "Man Utd"
         },
         "player_in": {
           "player_id": 84450,
@@ -27,16 +27,54 @@
           "position": "MID",
           "team": "Sunderland"
         },
-        "expected_points_delta": 1.6962865332629415,
+        "expected_points_delta": 0.4967606007054246,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
+        "player_out": {
+          "player_id": 216094,
+          "name": "Jeremie Frimpong",
+          "short_name": "Frimpong",
+          "position": "DEF",
+          "team": "Liverpool"
+        },
+        "player_in": {
+          "player_id": 231416,
+          "name": "Ferdi Kad\u0131o\u011flu",
+          "short_name": "Kad\u0131o\u011flu",
+          "position": "DEF",
+          "team": "Brighton"
+        },
+        "expected_points_delta": -0.4761817421306509,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-3",
+        "player_out": {
+          "player_id": 448047,
+          "name": "Enzo Fern\u00e1ndez",
+          "short_name": "Fern\u00e1ndez",
+          "position": "MID",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 446008,
+          "name": "Bryan Mbeumo",
+          "short_name": "Mbeumo",
+          "position": "MID",
+          "team": "Man Utd"
+        },
+        "expected_points_delta": 2.952284416883156,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.5275793075591366,
+    "expected_points_cost": 0.720012098095907,
     "rival_label": "entry-3832237",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.34495710721184,
+    "expected_own_points": 56.18129420347829,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -51,7 +89,7 @@
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 5.583557313963405
+      "expected_points": 5.626690076810005
     },
     "starting_xi": [
       {
@@ -60,7 +98,7 @@
         "short_name": "Tzolakis",
         "position": "GK",
         "team": "Hull City",
-        "expected_points": 3.4563272913156653
+        "expected_points": 3.4546051551465986
       },
       {
         "player_id": 226597,
@@ -84,7 +122,7 @@
         "short_name": "Mendy",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 2.6989274408504094
+        "expected_points": 2.7410954261136893
       },
       {
         "player_id": 244851,
@@ -92,7 +130,15 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 5.583557313963405
+        "expected_points": 5.626690076810005
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.934679467666494
       },
       {
         "player_id": 84450,
@@ -109,14 +155,6 @@
         "position": "MID",
         "team": "Brentford",
         "expected_points": 3.3415964350362355
-      },
-      {
-        "player_id": 166989,
-        "name": "Youri Tielemans",
-        "short_name": "Tielemans",
-        "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 3.181920983340855
       },
       {
         "player_id": 223094,
@@ -169,35 +207,35 @@
         "expected_points": 2.073447854398327
       },
       {
-        "player_id": 216094,
-        "name": "Jeremie Frimpong",
-        "short_name": "Frimpong",
+        "player_id": 231416,
+        "name": "Ferdi Kad\u0131o\u011flu",
+        "short_name": "Kad\u0131o\u011flu",
         "position": "DEF",
-        "team": "Liverpool",
-        "expected_points": 1.7285447287971472
+        "team": "Brighton",
+        "expected_points": 1.2523629866664963
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 3832237,
-    "expected_points_cost_ceiling": 0.5275793075591366,
-    "overlap_count": 4,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 0.720012098095907,
+    "overlap_count": 6,
+    "transfer_cap": 3,
     "overlap_target": 9,
-    "overlap_applied": 4,
+    "overlap_applied": 6,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 20.0,
-      "expected_points_cost": 20.031257543824452,
-      "expected_points_cost_ceiling": 20.031257543824452
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 13.78358290927089,
+      "expected_points_cost_ceiling": 13.78358290927089
     },
-    "expected_gap_vs_rival": 11.543880734082968,
+    "expected_gap_vs_rival": 13.937095136648672,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

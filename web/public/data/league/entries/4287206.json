@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -22,119 +22,119 @@
     },
     "starting_xi": [
       {
-        "player_id": 200720,
-        "name": "Caoimh\u00edn Kelleher",
-        "short_name": "Kelleher",
+        "player_id": 485055,
+        "name": "Anton\u00edn Kinsk\u00fd",
+        "short_name": "Kinsk\u00fd",
         "position": "GK",
-        "team": "Brentford",
-        "price_tenths": 50,
-        "expected_points": 2.846900765526145,
-        "event_points": null,
-        "is_captain": false,
-        "bench_order": null,
-        "role": "starter"
-      },
-      {
-        "player_id": 191866,
-        "name": "Kristoffer Ajer",
-        "short_name": "Ajer",
-        "position": "DEF",
-        "team": "Brentford",
+        "team": "Spurs",
         "price_tenths": 45,
-        "expected_points": 2.727628454292313,
+        "expected_points": 2.7614331096395786,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
         "role": "starter"
       },
       {
-        "player_id": 97032,
-        "name": "Virgil van Dijk",
-        "short_name": "Dijk",
+        "player_id": 223827,
+        "name": "Daniel Ballard",
+        "short_name": "Ballard",
         "position": "DEF",
-        "team": "Liverpool",
-        "price_tenths": 65,
-        "expected_points": 3.668738526053537,
+        "team": "Sunderland",
+        "price_tenths": 49,
+        "expected_points": 3.0918108597344838,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
         "role": "starter"
       },
       {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
         "position": "DEF",
-        "team": "Brighton",
-        "price_tenths": 48,
-        "expected_points": 3.2356844156410305,
+        "team": "Arsenal",
+        "price_tenths": 58,
+        "expected_points": 3.6111564244775165,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
         "role": "starter"
       },
       {
-        "player_id": 466052,
-        "name": "Rayan Cherki",
-        "short_name": "Cherki",
+        "player_id": 500040,
+        "name": "Cristhian Mosquera",
+        "short_name": "Mosquera",
+        "position": "DEF",
+        "team": "Arsenal",
+        "price_tenths": 54,
+        "expected_points": 1.0632540167674784,
+        "event_points": null,
+        "is_captain": false,
+        "bench_order": null,
+        "role": "starter"
+      },
+      {
+        "player_id": 244851,
+        "name": "Cole Palmer",
+        "short_name": "Palmer",
         "position": "MID",
-        "team": "Man City",
-        "price_tenths": 78,
-        "expected_points": 4.391694024990014,
+        "team": "Chelsea",
+        "price_tenths": 97,
+        "expected_points": 5.626690076810005,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
         "role": "starter"
       },
       {
-        "player_id": 209244,
-        "name": "Phil Foden",
-        "short_name": "Foden",
+        "player_id": 430871,
+        "name": "Matheus Santos Carneiro da Cunha",
+        "short_name": "Cunha",
         "position": "MID",
-        "team": "Man City",
-        "price_tenths": 70,
-        "expected_points": 3.34397088815176,
+        "team": "Man Utd",
+        "price_tenths": 79,
+        "expected_points": 4.285006658813828,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
         "role": "starter"
       },
       {
-        "player_id": 494595,
-        "name": "Florian Wirtz",
-        "short_name": "Wirtz",
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
         "position": "MID",
-        "team": "Liverpool",
-        "price_tenths": 74,
-        "expected_points": 3.9064546586328905,
+        "team": "Chelsea",
+        "price_tenths": 76,
+        "expected_points": 4.585626518790779,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
         "role": "starter"
       },
       {
-        "player_id": 449434,
-        "name": "Anthony Elanga",
-        "short_name": "Elanga",
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
         "position": "MID",
-        "team": "Newcastle",
-        "price_tenths": 61,
-        "expected_points": 3.4735053102667206,
+        "team": "Man Utd",
+        "price_tenths": 79,
+        "expected_points": 4.934679467666494,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
         "role": "starter"
       },
       {
-        "player_id": 219168,
-        "name": "Alexander Isak",
-        "short_name": "Isak",
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
         "position": "FWD",
-        "team": "Liverpool",
-        "price_tenths": 91,
-        "expected_points": 5.621733713745486,
+        "team": "Chelsea",
+        "price_tenths": 77,
+        "expected_points": 4.8089656617809755,
         "event_points": null,
-        "is_captain": false,
+        "is_captain": true,
         "bench_order": null,
         "role": "starter"
       },
@@ -147,18 +147,18 @@
         "price_tenths": 155,
         "expected_points": 8.360382282553875,
         "event_points": null,
-        "is_captain": true,
+        "is_captain": false,
         "bench_order": null,
         "role": "starter"
       },
       {
-        "player_id": 216646,
-        "name": "Yoane Wissa",
-        "short_name": "Wissa",
+        "player_id": 177815,
+        "name": "Dominic Calvert-Lewin",
+        "short_name": "Calvert-Lewin",
         "position": "FWD",
-        "team": "Newcastle",
-        "price_tenths": 62,
-        "expected_points": 3.395892087178864,
+        "team": "Leeds",
+        "price_tenths": 60,
+        "expected_points": 3.3708129722259215,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
@@ -180,39 +180,39 @@
         "role": "bench"
       },
       {
-        "player_id": 466075,
-        "name": "Riccardo Calafiori",
-        "short_name": "Calafiori",
+        "player_id": 451284,
+        "name": "Milan van Ewijk",
+        "short_name": "Ewijk",
         "position": "DEF",
-        "team": "Arsenal",
-        "price_tenths": 57,
-        "expected_points": 3.5661358939542867,
+        "team": "Coventry City",
+        "price_tenths": 40,
+        "expected_points": 2.3873312073209636,
         "event_points": null,
         "is_captain": false,
         "bench_order": 2,
         "role": "bench"
       },
       {
-        "player_id": 60307,
-        "name": "Pascal Gro\u00df",
-        "short_name": "Gro\u00df",
+        "player_id": 108413,
+        "name": "Will Hughes",
+        "short_name": "Hughes",
         "position": "MID",
-        "team": "Brighton",
-        "price_tenths": 55,
-        "expected_points": 3.296421745499964,
+        "team": "Crystal Palace",
+        "price_tenths": 45,
+        "expected_points": 0.3967341204745354,
         "event_points": null,
         "is_captain": false,
         "bench_order": 3,
         "role": "bench"
       },
       {
-        "player_id": 434752,
-        "name": "Jaka Bijol",
-        "short_name": "Bijol",
+        "player_id": 455084,
+        "name": "Leif Davis",
+        "short_name": "Davis",
         "position": "DEF",
-        "team": "Leeds",
-        "price_tenths": 50,
-        "expected_points": 2.615329960798637,
+        "team": "Ipswich Town",
+        "price_tenths": 40,
+        "expected_points": 2.273642705083306,
         "event_points": null,
         "is_captain": false,
         "bench_order": 4,
@@ -220,19 +220,80 @@
       }
     ],
     "bank_tenths": 5,
-    "free_transfers": 1,
-    "free_transfers_known": false,
+    "free_transfers": 3,
+    "free_transfers_known": true,
     "chips_used": {
       "freehit": [
         3
       ]
     },
+    "chips": {
+      "known": true,
+      "gameweek": 4,
+      "states": {
+        "wildcard": {
+          "first_half": {
+            "state": "available",
+            "gameweek": null,
+            "start_event": 2,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "freehit": {
+          "first_half": {
+            "state": "used",
+            "gameweek": 3,
+            "start_event": 2,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "bboost": {
+          "first_half": {
+            "state": "available",
+            "gameweek": null,
+            "start_event": 1,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "3xc": {
+          "first_half": {
+            "state": "available",
+            "gameweek": null,
+            "start_event": 1,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        }
+      }
+    },
     "purchase_prices_known": false,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "squadopt_comparison": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ]
   }

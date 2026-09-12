@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,16 +27,35 @@
           "position": "FWD",
           "team": "Sunderland"
         },
-        "expected_points_delta": -0.4294816408957609,
+        "expected_points_delta": -0.4720110447047312,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
+        "player_out": {
+          "player_id": 199798,
+          "name": "Ezri Konsa Ngoyo",
+          "short_name": "Ngoyo",
+          "position": "DEF",
+          "team": "Arsenal"
+        },
+        "player_in": {
+          "player_id": 191866,
+          "name": "Kristoffer Ajer",
+          "short_name": "Ajer",
+          "position": "DEF",
+          "team": "Brentford"
+        },
+        "expected_points_delta": 1.5813320236562245,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.38225983854631806,
+    "expected_points_cost": 0.9102387419312947,
     "rival_label": "entry-5349883",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 57.05089062295011,
+    "expected_own_points": 57.097310778798686,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -76,7 +95,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 465730,
@@ -84,7 +103,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.2356844156410305
+        "expected_points": 3.237246793437091
       },
       {
         "player_id": 141746,
@@ -108,7 +127,7 @@
         "short_name": "F\u00e9e",
         "position": "MID",
         "team": "Sunderland",
-        "expected_points": 3.5158402140096534
+        "expected_points": 3.4728706842808976
       },
       {
         "player_id": 440993,
@@ -124,7 +143,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 223094,
@@ -158,7 +177,15 @@
         "short_name": "Brobbey",
         "position": "FWD",
         "team": "Sunderland",
-        "expected_points": 2.9413313313301606
+        "expected_points": 2.8988019275211903
+      },
+      {
+        "player_id": 191866,
+        "name": "Kristoffer Ajer",
+        "short_name": "Ajer",
+        "position": "DEF",
+        "team": "Brentford",
+        "expected_points": 2.727628454292313
       },
       {
         "player_id": 219924,
@@ -167,37 +194,29 @@
         "position": "DEF",
         "team": "Ipswich Town",
         "expected_points": 2.166625794419491
-      },
-      {
-        "player_id": 199798,
-        "name": "Ezri Konsa Ngoyo",
-        "short_name": "Ngoyo",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 1.1128992923687029
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 5349883,
-    "expected_points_cost_ceiling": 0.38225983854631806,
-    "overlap_count": 4,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 0.9102387419312947,
+    "overlap_count": 5,
+    "transfer_cap": 2,
     "overlap_target": 9,
-    "overlap_applied": 4,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 20.0,
-      "expected_points_cost": 20.493241537221365,
-      "expected_points_cost_ceiling": 20.493241537221365
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 17.020908606319864,
+      "expected_points_cost_ceiling": 17.020908606319864
     },
-    "expected_gap_vs_rival": 3.937393233720826,
+    "expected_gap_vs_rival": 3.9798720241695946,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

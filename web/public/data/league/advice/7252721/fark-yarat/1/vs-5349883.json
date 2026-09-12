@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -36,7 +36,7 @@
     "rival_label": "entry-5349883",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 57.98431394155085,
+    "expected_own_points": 58.06751900389946,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -71,20 +71,20 @@
         "expected_points": 3.64230933799311
       },
       {
+        "player_id": 146426,
+        "name": "Semi Ajayi",
+        "short_name": "Ajayi",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 3.0983922428810176
+      },
+      {
         "player_id": 244723,
         "name": "Tyrick Mitchell",
         "short_name": "Mitchell",
         "position": "DEF",
         "team": "Crystal Palace",
         "expected_points": 3.056313305016537
-      },
-      {
-        "player_id": 146426,
-        "name": "Semi Ajayi",
-        "short_name": "Ajayi",
-        "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 3.0557842715324486
       },
       {
         "player_id": 141746,
@@ -108,7 +108,7 @@
         "short_name": "Gibbs-White",
         "position": "MID",
         "team": "Nott'm Forest",
-        "expected_points": 4.472404986183817
+        "expected_points": 4.470195299925821
       },
       {
         "player_id": 437730,
@@ -124,7 +124,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 223094,
@@ -180,9 +180,9 @@
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 5349883,
     "expected_points_cost_ceiling": 0.0,
     "overlap_count": 4,
@@ -197,7 +197,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 4.870816552321571,
+    "expected_gap_vs_rival": 4.950080249270371,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

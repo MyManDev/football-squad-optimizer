@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,25 +9,25 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 154561,
-          "name": "David Raya Mart\u00edn",
-          "short_name": "Mart\u00edn",
-          "position": "GK",
+          "player_id": 199798,
+          "name": "Ezri Konsa Ngoyo",
+          "short_name": "Ngoyo",
+          "position": "DEF",
           "team": "Arsenal"
         },
         "player_in": {
-          "player_id": 473284,
-          "name": "Konstantinos Tzolakis",
-          "short_name": "Tzolakis",
-          "position": "GK",
+          "player_id": 108416,
+          "name": "John Egan",
+          "short_name": "Egan",
+          "position": "DEF",
           "team": "Hull City"
         },
-        "expected_points_delta": 0.005747394274250084,
+        "expected_points_delta": 1.9382994404416227,
         "reason_code": "window_value"
       }
     ],
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 31.759000000000015,
-    "expected_own_points": 57.13102924395032,
+    "optimality_gap": 33.924000000000035,
+    "expected_own_points": 57.1288952282666,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -55,12 +55,12 @@
     },
     "starting_xi": [
       {
-        "player_id": 473284,
-        "name": "Konstantinos Tzolakis",
-        "short_name": "Tzolakis",
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
         "position": "GK",
-        "team": "Hull City",
-        "expected_points": 3.4563272913156653
+        "team": "Arsenal",
+        "expected_points": 3.450579897041415
       },
       {
         "player_id": 209036,
@@ -76,7 +76,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 465730,
@@ -84,7 +84,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.2356844156410305
+        "expected_points": 3.237246793437091
       },
       {
         "player_id": 141746,
@@ -108,7 +108,7 @@
         "short_name": "F\u00e9e",
         "position": "MID",
         "team": "Sunderland",
-        "expected_points": 3.5158402140096534
+        "expected_points": 3.4728706842808976
       },
       {
         "player_id": 440993,
@@ -158,7 +158,15 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
+        "expected_points": 3.339228522758007
+      },
+      {
+        "player_id": 108416,
+        "name": "John Egan",
+        "short_name": "Egan",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 3.084595871077711
       },
       {
         "player_id": 219924,
@@ -167,72 +175,12 @@
         "position": "DEF",
         "team": "Ipswich Town",
         "expected_points": 2.166625794419491
-      },
-      {
-        "player_id": 199798,
-        "name": "Ezri Konsa Ngoyo",
-        "short_name": "Ngoyo",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 1.1128992923687029
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
         "gameweek": 4,
-        "transfers_in": [
-          {
-            "player_id": 473284,
-            "name": "Konstantinos Tzolakis",
-            "short_name": "Tzolakis",
-            "position": "GK",
-            "team": "Hull City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 154561,
-            "name": "David Raya Mart\u00edn",
-            "short_name": "Mart\u00edn",
-            "position": "GK",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 57.13102924395032
-      },
-      {
-        "gameweek": 5,
-        "transfers_in": [
-          {
-            "player_id": 243298,
-            "name": "Cody Gakpo",
-            "short_name": "Gakpo",
-            "position": "MID",
-            "team": "Liverpool"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 484420,
-            "name": "Enzo Le F\u00e9e",
-            "short_name": "F\u00e9e",
-            "position": "MID",
-            "team": "Sunderland"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 58.601974905146804
-      },
-      {
-        "gameweek": 6,
         "transfers_in": [
           {
             "player_id": 108416,
@@ -253,38 +201,12 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 58.601974905146804
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 57.1288952282666
       },
       {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 146426,
-            "name": "Semi Ajayi",
-            "short_name": "Ajayi",
-            "position": "DEF",
-            "team": "Hull City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 219924,
-            "name": "Issa Diop",
-            "short_name": "Diop",
-            "position": "DEF",
-            "team": "Ipswich Town"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 58.601974905146804
-      },
-      {
-        "gameweek": 8,
+        "gameweek": 5,
         "transfers_in": [
           {
             "player_id": 503139,
@@ -305,9 +227,87 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 59.372075771514986
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 57.94220246771866
+      },
+      {
+        "gameweek": 6,
+        "transfers_in": [
+          {
+            "player_id": 477424,
+            "name": "Jo\u0161ko Gvardiol",
+            "short_name": "Gvardiol",
+            "position": "DEF",
+            "team": "Man City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 466075,
+            "name": "Riccardo Calafiori",
+            "short_name": "Calafiori",
+            "position": "DEF",
+            "team": "Arsenal"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 57.973355381234256
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 97846,
+            "name": "Alex Cairns",
+            "short_name": "Cairns",
+            "position": "GK",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 112520,
+            "name": "Alex Palmer",
+            "short_name": "Palmer",
+            "position": "GK",
+            "team": "Ipswich Town"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 57.973355381234256
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 198869,
+            "name": "Benjamin White",
+            "short_name": "White",
+            "position": "DEF",
+            "team": "Arsenal"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 477424,
+            "name": "Jo\u0161ko Gvardiol",
+            "short_name": "Gvardiol",
+            "position": "DEF",
+            "team": "Man City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 57.838373339230415
       }
     ],
     "stated_limits": [
@@ -320,8 +320,8 @@
     ],
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

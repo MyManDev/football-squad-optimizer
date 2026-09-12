@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 247348,
-          "name": "Daniel Mu\u00f1oz Mej\u00eda",
-          "short_name": "Mej\u00eda",
+          "player_id": 199798,
+          "name": "Ezri Konsa Ngoyo",
+          "short_name": "Ngoyo",
           "position": "DEF",
-          "team": "Nott'm Forest"
+          "team": "Arsenal"
         },
         "player_in": {
           "player_id": 487676,
@@ -27,16 +27,16 @@
           "position": "DEF",
           "team": "Sunderland"
         },
-        "expected_points_delta": 1.1843614146760142,
+        "expected_points_delta": 1.2068937336882615,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.8544798455329641,
+    "expected_points_cost": 0.9375373220698009,
     "rival_label": "entry-313686",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.12511059669612,
+    "expected_own_points": 53.01295326441934,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -63,28 +63,28 @@
         "expected_points": 3.450579897041415
       },
       {
-        "player_id": 463726,
-        "name": "Amar Dedic",
-        "short_name": "Dedic",
-        "position": "DEF",
-        "team": "Newcastle",
-        "expected_points": 2.702023246470399
-      },
-      {
-        "player_id": 106760,
-        "name": "Luke Shaw",
-        "short_name": "Shaw",
-        "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.521244083180876
-      },
-      {
         "player_id": 487676,
         "name": "Trai Hume",
         "short_name": "Hume",
         "position": "DEF",
         "team": "Sunderland",
-        "expected_points": 2.394858537183296
+        "expected_points": 2.35319016432435
+      },
+      {
+        "player_id": 219924,
+        "name": "Issa Diop",
+        "short_name": "Diop",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 2.166625794419491
+      },
+      {
+        "player_id": 463726,
+        "name": "Amar Dedic",
+        "short_name": "Dedic",
+        "position": "DEF",
+        "team": "Newcastle",
+        "expected_points": 2.0265174348527992
       },
       {
         "player_id": 141746,
@@ -100,7 +100,7 @@
         "short_name": "Saka",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 5.232783416028531
+        "expected_points": 5.235388086718441
       },
       {
         "player_id": 484420,
@@ -108,7 +108,7 @@
         "short_name": "F\u00e9e",
         "position": "MID",
         "team": "Sunderland",
-        "expected_points": 3.5158402140096534
+        "expected_points": 3.4728706842808976
       },
       {
         "player_id": 577725,
@@ -153,20 +153,20 @@
         "expected_points": 0.10027015579447286
       },
       {
-        "player_id": 219924,
-        "name": "Issa Diop",
-        "short_name": "Diop",
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
         "position": "DEF",
-        "team": "Ipswich Town",
-        "expected_points": 2.166625794419491
+        "team": "Man Utd",
+        "expected_points": 1.8909330623856568
       },
       {
-        "player_id": 199798,
-        "name": "Ezri Konsa Ngoyo",
-        "short_name": "Ngoyo",
+        "player_id": 247348,
+        "name": "Daniel Mu\u00f1oz Mej\u00eda",
+        "short_name": "Mej\u00eda",
         "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 1.1128992923687029
+        "team": "Nott'm Forest",
+        "expected_points": 1.210497122507282
       },
       {
         "player_id": 153366,
@@ -180,11 +180,11 @@
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 313686,
-    "expected_points_cost_ceiling": 0.8544798455329641,
+    "expected_points_cost_ceiling": 0.9375373220698009,
     "overlap_count": 6,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -194,10 +194,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 12.0,
-      "expected_points_cost": 11.26446909670912,
-      "expected_points_cost_ceiling": 11.26446909670912
+      "expected_points_cost": 10.89380008135339,
+      "expected_points_cost_ceiling": 10.89380008135339
     },
-    "expected_gap_vs_rival": 6.807154474115158,
+    "expected_gap_vs_rival": 6.283435898306678,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

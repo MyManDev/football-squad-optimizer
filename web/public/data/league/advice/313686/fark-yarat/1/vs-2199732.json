@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,34 +9,53 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 60307,
-          "name": "Pascal Gro\u00df",
-          "short_name": "Gro\u00df",
-          "position": "MID",
-          "team": "Brighton"
+          "player_id": 154561,
+          "name": "David Raya Mart\u00edn",
+          "short_name": "Mart\u00edn",
+          "position": "GK",
+          "team": "Arsenal"
         },
         "player_in": {
-          "player_id": 243298,
-          "name": "Cody Gakpo",
-          "short_name": "Gakpo",
-          "position": "MID",
+          "player_id": 473284,
+          "name": "Konstantinos Tzolakis",
+          "short_name": "Tzolakis",
+          "position": "GK",
+          "team": "Hull City"
+        },
+        "expected_points_delta": 0.0040252581051833936,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
+        "player_out": {
+          "player_id": 177815,
+          "name": "Dominic Calvert-Lewin",
+          "short_name": "Calvert-Lewin",
+          "position": "FWD",
+          "team": "Leeds"
+        },
+        "player_in": {
+          "player_id": 219168,
+          "name": "Alexander Isak",
+          "short_name": "Isak",
+          "position": "FWD",
           "team": "Liverpool"
         },
-        "expected_points_delta": 1.6903641297061651,
+        "expected_points_delta": 2.2509207415195642,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.3046357253213543,
+    "expected_points_cost": 1.0853125839251518,
     "rival_label": "entry-2199732",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 53.97157967026941,
+    "expected_own_points": 54.485376043282955,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -46,21 +65,21 @@
       "expected_points": 7.066032835980204
     },
     "vice_captain": {
-      "player_id": 243298,
-      "name": "Cody Gakpo",
-      "short_name": "Gakpo",
-      "position": "MID",
+      "player_id": 219168,
+      "name": "Alexander Isak",
+      "short_name": "Isak",
+      "position": "FWD",
       "team": "Liverpool",
-      "expected_points": 4.986785875206129
+      "expected_points": 5.621733713745486
     },
     "starting_xi": [
       {
-        "player_id": 154561,
-        "name": "David Raya Mart\u00edn",
-        "short_name": "Mart\u00edn",
+        "player_id": 473284,
+        "name": "Konstantinos Tzolakis",
+        "short_name": "Tzolakis",
         "position": "GK",
-        "team": "Arsenal",
-        "expected_points": 3.450579897041415
+        "team": "Hull City",
+        "expected_points": 3.4546051551465986
       },
       {
         "player_id": 466075,
@@ -68,7 +87,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 522047,
@@ -79,12 +98,12 @@
         "expected_points": 3.2456264546203446
       },
       {
-        "player_id": 106760,
-        "name": "Luke Shaw",
-        "short_name": "Shaw",
+        "player_id": 487676,
+        "name": "Trai Hume",
+        "short_name": "Hume",
         "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.521244083180876
+        "team": "Sunderland",
+        "expected_points": 2.35319016432435
       },
       {
         "player_id": 141746,
@@ -93,14 +112,6 @@
         "position": "MID",
         "team": "Man Utd",
         "expected_points": 7.066032835980204
-      },
-      {
-        "player_id": 243298,
-        "name": "Cody Gakpo",
-        "short_name": "Gakpo",
-        "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 4.986785875206129
       },
       {
         "player_id": 446008,
@@ -116,7 +127,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.391694024990014
+        "expected_points": 4.389550689692313
       },
       {
         "player_id": 424876,
@@ -125,6 +136,14 @@
         "position": "MID",
         "team": "Liverpool",
         "expected_points": 4.232677554424536
+      },
+      {
+        "player_id": 219168,
+        "name": "Alexander Isak",
+        "short_name": "Isak",
+        "position": "FWD",
+        "team": "Liverpool",
+        "expected_points": 5.621733713745486
       },
       {
         "player_id": 475168,
@@ -153,20 +172,12 @@
         "expected_points": 2.495351765499311
       },
       {
-        "player_id": 177815,
-        "name": "Dominic Calvert-Lewin",
-        "short_name": "Calvert-Lewin",
-        "position": "FWD",
-        "team": "Leeds",
-        "expected_points": 3.3708129722259215
-      },
-      {
-        "player_id": 487676,
-        "name": "Trai Hume",
-        "short_name": "Hume",
-        "position": "DEF",
-        "team": "Sunderland",
-        "expected_points": 2.394858537183296
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 472769,
@@ -174,30 +185,38 @@
         "short_name": "O'Reilly",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 1.550337345902003
+        "expected_points": 2.026527638301547
+      },
+      {
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
+        "position": "DEF",
+        "team": "Man Utd",
+        "expected_points": 1.8909330623856568
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 2199732,
-    "expected_points_cost_ceiling": 0.3046357253213543,
-    "overlap_count": 6,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 1.0853125839251518,
+    "overlap_count": 5,
+    "transfer_cap": 2,
     "overlap_target": 5,
-    "overlap_applied": 6,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 5,
-      "transfer_hit_points": 4.0,
-      "expected_points_cost": 3.6639404925077415,
-      "expected_points_cost_ceiling": 3.6639404925077415
+      "transfer_hit_points": 0.0,
+      "expected_points_cost": 1.0853125839251518,
+      "expected_points_cost_ceiling": 1.0853125839251518
     },
-    "expected_gap_vs_rival": -3.0139638996693847,
+    "expected_gap_vs_rival": -2.5465876825044234,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

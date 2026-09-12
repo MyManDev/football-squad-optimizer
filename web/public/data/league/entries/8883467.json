@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -28,7 +28,7 @@
         "position": "GK",
         "team": "Hull City",
         "price_tenths": 46,
-        "expected_points": 3.4563272913156653,
+        "expected_points": 3.4546051551465986,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
@@ -66,8 +66,8 @@
         "short_name": "Mendy",
         "position": "DEF",
         "team": "Hull City",
-        "price_tenths": 40,
-        "expected_points": 2.6989274408504094,
+        "price_tenths": 41,
+        "expected_points": 2.7410954261136893,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
@@ -118,8 +118,8 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "price_tenths": 96,
-        "expected_points": 5.583557313963405,
+        "price_tenths": 97,
+        "expected_points": 5.626690076810005,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
@@ -220,8 +220,8 @@
       }
     ],
     "bank_tenths": 0,
-    "free_transfers": 1,
-    "free_transfers_known": false,
+    "free_transfers": 3,
+    "free_transfers_known": true,
     "chips_used": {
       "wildcard": [
         2
@@ -230,12 +230,73 @@
         3
       ]
     },
+    "chips": {
+      "known": true,
+      "gameweek": 4,
+      "states": {
+        "wildcard": {
+          "first_half": {
+            "state": "used",
+            "gameweek": 2,
+            "start_event": 2,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "freehit": {
+          "first_half": {
+            "state": "available",
+            "gameweek": null,
+            "start_event": 2,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "bboost": {
+          "first_half": {
+            "state": "available",
+            "gameweek": null,
+            "start_event": 1,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "3xc": {
+          "first_half": {
+            "state": "used",
+            "gameweek": 3,
+            "start_event": 1,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        }
+      }
+    },
     "purchase_prices_known": false,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "squadopt_comparison": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ]
   }

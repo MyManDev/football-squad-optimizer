@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -21,13 +21,13 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 424876,
-          "name": "Dominik Szoboszlai",
-          "short_name": "Szoboszlai",
+          "player_id": 503139,
+          "name": "Alex Scott",
+          "short_name": "Scott",
           "position": "MID",
-          "team": "Liverpool"
+          "team": "Bournemouth"
         },
-        "expected_points_delta": 0.8887066662727765,
+        "expected_points_delta": 0.9038555664844674,
         "reason_code": "mode_tradeoff"
       }
     ],
@@ -36,7 +36,7 @@
     "rival_label": "entry-7018833",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 55.60335549169234,
+    "expected_own_points": 55.66145744298164,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -76,7 +76,7 @@
         "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 3.668738526053537
+        "expected_points": 3.666932155533569
       },
       {
         "player_id": 477424,
@@ -103,12 +103,12 @@
         "expected_points": 4.934679467666494
       },
       {
-        "player_id": 424876,
-        "name": "Dominik Szoboszlai",
-        "short_name": "Szoboszlai",
+        "player_id": 503139,
+        "name": "Alex Scott",
+        "short_name": "Scott",
         "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 4.232677554424536
+        "team": "Bournemouth",
+        "expected_points": 4.2494672646892955
       },
       {
         "player_id": 184029,
@@ -116,7 +116,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9670189854400513
+        "expected_points": 4.010137596984558
       },
       {
         "player_id": 577725,
@@ -180,9 +180,9 @@
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 7018833,
     "expected_points_cost_ceiling": 0.0,
     "overlap_count": 3,
@@ -197,7 +197,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 2.8428192825630134,
+    "expected_gap_vs_rival": 2.9027276043722736,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
