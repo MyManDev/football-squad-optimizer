@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -21,13 +21,13 @@
           "team": "Leeds"
         },
         "player_in": {
-          "player_id": 243298,
-          "name": "Cody Gakpo",
-          "short_name": "Gakpo",
+          "player_id": 503139,
+          "name": "Alex Scott",
+          "short_name": "Scott",
           "position": "MID",
-          "team": "Liverpool"
+          "team": "Bournemouth"
         },
-        "expected_points_delta": 2.436014932634953,
+        "expected_points_delta": 1.6986963221181193,
         "reason_code": "window_value"
       }
     ],
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 19.47800000000001,
-    "expected_own_points": 55.7482328824718,
+    "optimality_gap": 23.210000000000008,
+    "expected_own_points": 55.09905341402269,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -46,12 +46,12 @@
       "expected_points": 8.360382282553875
     },
     "vice_captain": {
-      "player_id": 243298,
-      "name": "Cody Gakpo",
-      "short_name": "Gakpo",
+      "player_id": 446008,
+      "name": "Bryan Mbeumo",
+      "short_name": "Mbeumo",
       "position": "MID",
-      "team": "Liverpool",
-      "expected_points": 4.986785875206129
+      "team": "Man Utd",
+      "expected_points": 4.934679467666494
     },
     "starting_xi": [
       {
@@ -68,7 +68,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 469142,
@@ -87,14 +87,6 @@
         "expected_points": 2.727628454292313
       },
       {
-        "player_id": 243298,
-        "name": "Cody Gakpo",
-        "short_name": "Gakpo",
-        "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 4.986785875206129
-      },
-      {
         "player_id": 446008,
         "name": "Bryan Mbeumo",
         "short_name": "Mbeumo",
@@ -111,12 +103,20 @@
         "expected_points": 4.435285999290234
       },
       {
+        "player_id": 503139,
+        "name": "Alex Scott",
+        "short_name": "Scott",
+        "position": "MID",
+        "team": "Bournemouth",
+        "expected_points": 4.2494672646892955
+      },
+      {
         "player_id": 184029,
         "name": "Martin \u00d8degaard",
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9670189854400513
+        "expected_points": 4.010137596984558
       },
       {
         "player_id": 215413,
@@ -158,15 +158,7 @@
         "short_name": "Brobbey",
         "position": "FWD",
         "team": "Sunderland",
-        "expected_points": 2.9413313313301606
-      },
-      {
-        "player_id": 106760,
-        "name": "Luke Shaw",
-        "short_name": "Shaw",
-        "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.521244083180876
+        "expected_points": 2.8988019275211903
       },
       {
         "player_id": 487676,
@@ -174,7 +166,15 @@
         "short_name": "Hume",
         "position": "DEF",
         "team": "Sunderland",
-        "expected_points": 2.394858537183296
+        "expected_points": 2.35319016432435
+      },
+      {
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
+        "position": "DEF",
+        "team": "Man Utd",
+        "expected_points": 1.8909330623856568
       }
     ],
     "chip": null,
@@ -183,11 +183,11 @@
         "gameweek": 4,
         "transfers_in": [
           {
-            "player_id": 243298,
-            "name": "Cody Gakpo",
-            "short_name": "Gakpo",
+            "player_id": 503139,
+            "name": "Alex Scott",
+            "short_name": "Scott",
             "position": "MID",
-            "team": "Liverpool"
+            "team": "Bournemouth"
           }
         ],
         "transfers_out": [
@@ -201,9 +201,9 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.7482328824718
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.09905341402269
       },
       {
         "gameweek": 5,
@@ -227,19 +227,19 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.243561768622385
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.59266016400423
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 503139,
-            "name": "Alex Scott",
-            "short_name": "Scott",
+            "player_id": 244850,
+            "name": "Morgan Rogers",
+            "short_name": "Rogers",
             "position": "MID",
-            "team": "Bournemouth"
+            "team": "Chelsea"
           }
         ],
         "transfers_out": [
@@ -253,9 +253,9 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.79399257220916
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 56.52245659477636
       }
     ],
     "stated_limits": [
@@ -268,8 +268,8 @@
     ],
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

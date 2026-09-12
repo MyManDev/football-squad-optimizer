@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,10 +9,48 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
+        "player_out": {
+          "player_id": 216094,
+          "name": "Jeremie Frimpong",
+          "short_name": "Frimpong",
+          "position": "DEF",
+          "team": "Liverpool"
+        },
+        "player_in": {
+          "player_id": 463726,
+          "name": "Amar Dedic",
+          "short_name": "Dedic",
+          "position": "DEF",
+          "team": "Newcastle"
+        },
+        "expected_points_delta": 0.29797270605565207,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
+        "player_out": {
+          "player_id": 244851,
+          "name": "Cole Palmer",
+          "short_name": "Palmer",
+          "position": "MID",
+          "team": "Chelsea"
+        },
+        "player_in": {
+          "player_id": 141746,
+          "name": "Bruno Borges Fernandes",
+          "short_name": "Fernandes",
+          "position": "MID",
+          "team": "Man Utd"
+        },
+        "expected_points_delta": 1.4393427591701986,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-3",
         "player_out": {
           "player_id": 448047,
           "name": "Enzo Fern\u00e1ndez",
@@ -21,22 +59,22 @@
           "team": "Man City"
         },
         "player_in": {
-          "player_id": 484420,
-          "name": "Enzo Le F\u00e9e",
-          "short_name": "F\u00e9e",
+          "player_id": 577725,
+          "name": "Josh King",
+          "short_name": "King",
           "position": "MID",
-          "team": "Sunderland"
+          "team": "Fulham"
         },
-        "expected_points_delta": 1.5334451632263155,
+        "expected_points_delta": 1.466650693240795,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.6904206775957675,
+    "expected_points_cost": 1.263063663273499,
     "rival_label": "entry-5081114",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.18211573717521,
+    "expected_own_points": 55.63824263830071,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -46,12 +84,12 @@
       "expected_points": 8.360382282553875
     },
     "vice_captain": {
-      "player_id": 244851,
-      "name": "Cole Palmer",
-      "short_name": "Palmer",
+      "player_id": 141746,
+      "name": "Bruno Borges Fernandes",
+      "short_name": "Fernandes",
       "position": "MID",
-      "team": "Chelsea",
-      "expected_points": 5.583557313963405
+      "team": "Man Utd",
+      "expected_points": 7.066032835980204
     },
     "starting_xi": [
       {
@@ -60,7 +98,7 @@
         "short_name": "Tzolakis",
         "position": "GK",
         "team": "Hull City",
-        "expected_points": 3.4563272913156653
+        "expected_points": 3.4546051551465986
       },
       {
         "player_id": 226597,
@@ -84,23 +122,23 @@
         "short_name": "Mendy",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 2.6989274408504094
+        "expected_points": 2.7410954261136893
       },
       {
-        "player_id": 244851,
-        "name": "Cole Palmer",
-        "short_name": "Palmer",
+        "player_id": 141746,
+        "name": "Bruno Borges Fernandes",
+        "short_name": "Fernandes",
         "position": "MID",
-        "team": "Chelsea",
-        "expected_points": 5.583557313963405
+        "team": "Man Utd",
+        "expected_points": 7.066032835980204
       },
       {
-        "player_id": 484420,
-        "name": "Enzo Le F\u00e9e",
-        "short_name": "F\u00e9e",
+        "player_id": 577725,
+        "name": "Josh King",
+        "short_name": "King",
         "position": "MID",
-        "team": "Sunderland",
-        "expected_points": 3.5158402140096534
+        "team": "Fulham",
+        "expected_points": 3.449045744024133
       },
       {
         "player_id": 204580,
@@ -169,35 +207,35 @@
         "expected_points": 2.073447854398327
       },
       {
-        "player_id": 216094,
-        "name": "Jeremie Frimpong",
-        "short_name": "Frimpong",
+        "player_id": 463726,
+        "name": "Amar Dedic",
+        "short_name": "Dedic",
         "position": "DEF",
-        "team": "Liverpool",
-        "expected_points": 1.7285447287971472
+        "team": "Newcastle",
+        "expected_points": 2.0265174348527992
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 5081114,
-    "expected_points_cost_ceiling": 0.6904206775957675,
-    "overlap_count": 3,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 1.263063663273499,
+    "overlap_count": 5,
+    "transfer_cap": 3,
     "overlap_target": 9,
-    "overlap_applied": 3,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 24.0,
-      "expected_points_cost": 23.245980541514143,
-      "expected_points_cost_ceiling": 23.245980541514143
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 17.555865937710877,
+      "expected_points_cost_ceiling": 17.555865937710877
     },
-    "expected_gap_vs_rival": 1.2413665551551105,
+    "expected_gap_vs_rival": 4.043675147732273,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

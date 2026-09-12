@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -41,7 +41,7 @@
         "position": "DEF",
         "team": "Liverpool",
         "price_tenths": 65,
-        "expected_points": 3.668738526053537,
+        "expected_points": 3.666932155533569,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
@@ -131,8 +131,8 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "price_tenths": 55,
-        "expected_points": 3.296421745499964,
+        "price_tenths": 56,
+        "expected_points": 3.339228522758007,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
@@ -221,18 +221,79 @@
     ],
     "bank_tenths": 2,
     "free_transfers": 1,
-    "free_transfers_known": false,
+    "free_transfers_known": true,
     "chips_used": {
       "3xc": [
         3
       ]
     },
+    "chips": {
+      "known": true,
+      "gameweek": 4,
+      "states": {
+        "wildcard": {
+          "first_half": {
+            "state": "available",
+            "gameweek": null,
+            "start_event": 2,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "freehit": {
+          "first_half": {
+            "state": "available",
+            "gameweek": null,
+            "start_event": 2,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "bboost": {
+          "first_half": {
+            "state": "available",
+            "gameweek": null,
+            "start_event": 1,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        },
+        "3xc": {
+          "first_half": {
+            "state": "used",
+            "gameweek": 3,
+            "start_event": 1,
+            "stop_event": 19
+          },
+          "second_half": {
+            "state": "not_yet",
+            "gameweek": null,
+            "start_event": 20,
+            "stop_event": 38
+          }
+        }
+      }
+    },
     "purchase_prices_known": false,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "squadopt_comparison": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ]
   }

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 448047,
-          "name": "Enzo Fern\u00e1ndez",
-          "short_name": "Fern\u00e1ndez",
+          "player_id": 200089,
+          "name": "Joe Willock",
+          "short_name": "Willock",
           "position": "MID",
-          "team": "Man City"
+          "team": "Newcastle"
         },
         "player_in": {
           "player_id": 184029,
@@ -27,16 +27,54 @@
           "position": "MID",
           "team": "Arsenal"
         },
-        "expected_points_delta": 1.9846239346567134,
+        "expected_points_delta": 1.7124994179720372,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
+        "player_out": {
+          "player_id": 216094,
+          "name": "Jeremie Frimpong",
+          "short_name": "Frimpong",
+          "position": "DEF",
+          "team": "Liverpool"
+        },
+        "player_in": {
+          "player_id": 106760,
+          "name": "Luke Shaw",
+          "short_name": "Shaw",
+          "position": "DEF",
+          "team": "Man Utd"
+        },
+        "expected_points_delta": 0.16238833358850968,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-3",
+        "player_out": {
+          "player_id": 448047,
+          "name": "Enzo Fern\u00e1ndez",
+          "short_name": "Fern\u00e1ndez",
+          "position": "MID",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 449434,
+          "name": "Anthony Elanga",
+          "short_name": "Elanga",
+          "position": "MID",
+          "team": "Newcastle"
+        },
+        "expected_points_delta": 1.5340164539176233,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.23924190616536123,
+    "expected_points_cost": 1.4716274360486068,
     "rival_label": "entry-6880255",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.633294508605616,
+    "expected_own_points": 55.42967886552559,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -51,7 +89,7 @@
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 5.583557313963405
+      "expected_points": 5.626690076810005
     },
     "starting_xi": [
       {
@@ -60,7 +98,7 @@
         "short_name": "Tzolakis",
         "position": "GK",
         "team": "Hull City",
-        "expected_points": 3.4563272913156653
+        "expected_points": 3.4546051551465986
       },
       {
         "player_id": 226597,
@@ -84,7 +122,7 @@
         "short_name": "Mendy",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 2.6989274408504094
+        "expected_points": 2.7410954261136893
       },
       {
         "player_id": 244851,
@@ -92,7 +130,7 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 5.583557313963405
+        "expected_points": 5.626690076810005
       },
       {
         "player_id": 184029,
@@ -100,7 +138,15 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9670189854400513
+        "expected_points": 4.010137596984558
+      },
+      {
+        "player_id": 449434,
+        "name": "Anthony Elanga",
+        "short_name": "Elanga",
+        "position": "MID",
+        "team": "Newcastle",
+        "expected_points": 3.516411504700961
       },
       {
         "player_id": 204580,
@@ -133,14 +179,6 @@
         "position": "FWD",
         "team": "Chelsea",
         "expected_points": 4.8089656617809755
-      },
-      {
-        "player_id": 169432,
-        "name": "Oli McBurnie",
-        "short_name": "McBurnie",
-        "position": "FWD",
-        "team": "Hull City",
-        "expected_points": 2.846724371266304
       }
     ],
     "bench": [
@@ -153,12 +191,12 @@
         "expected_points": 3.450579897041415
       },
       {
-        "player_id": 200089,
-        "name": "Joe Willock",
-        "short_name": "Willock",
-        "position": "MID",
-        "team": "Newcastle",
-        "expected_points": 2.297638179012521
+        "player_id": 169432,
+        "name": "Oli McBurnie",
+        "short_name": "McBurnie",
+        "position": "FWD",
+        "team": "Hull City",
+        "expected_points": 2.846724371266304
       },
       {
         "player_id": 491279,
@@ -169,35 +207,35 @@
         "expected_points": 2.073447854398327
       },
       {
-        "player_id": 216094,
-        "name": "Jeremie Frimpong",
-        "short_name": "Frimpong",
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
         "position": "DEF",
-        "team": "Liverpool",
-        "expected_points": 1.7285447287971472
+        "team": "Man Utd",
+        "expected_points": 1.8909330623856568
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 6880255,
-    "expected_points_cost_ceiling": 0.23924190616536123,
-    "overlap_count": 3,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 1.4716274360486068,
+    "overlap_count": 5,
+    "transfer_cap": 3,
     "overlap_target": 9,
-    "overlap_applied": 3,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 24.0,
-      "expected_points_cost": 21.910136564483523,
-      "expected_points_cost_ceiling": 21.910136564483523
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 15.93750820089015,
+      "expected_points_cost_ceiling": 15.93750820089015
     },
-    "expected_gap_vs_rival": 2.80864252385949,
+    "expected_gap_vs_rival": 4.149313095595929,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

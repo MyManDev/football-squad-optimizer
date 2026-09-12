@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,25 +9,25 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 204936,
-          "name": "Gianluigi Donnarumma",
-          "short_name": "Donnarumma",
-          "position": "GK",
-          "team": "Man City"
+          "player_id": 153682,
+          "name": "Harry Wilson",
+          "short_name": "Wilson",
+          "position": "MID",
+          "team": "Leeds"
         },
         "player_in": {
-          "player_id": 473284,
-          "name": "Konstantinos Tzolakis",
-          "short_name": "Tzolakis",
-          "position": "GK",
-          "team": "Hull City"
+          "player_id": 503139,
+          "name": "Alex Scott",
+          "short_name": "Scott",
+          "position": "MID",
+          "team": "Bournemouth"
         },
-        "expected_points_delta": 0.49532888615059134,
+        "expected_points_delta": 1.6986963221181193,
         "reason_code": "window_value"
       }
     ],
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 38.926999999999964,
-    "expected_own_points": 54.19810722474642,
+    "optimality_gap": 39.141999999999996,
+    "expected_own_points": 55.09905341402269,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -55,12 +55,12 @@
     },
     "starting_xi": [
       {
-        "player_id": 473284,
-        "name": "Konstantinos Tzolakis",
-        "short_name": "Tzolakis",
+        "player_id": 204936,
+        "name": "Gianluigi Donnarumma",
+        "short_name": "Donnarumma",
         "position": "GK",
-        "team": "Hull City",
-        "expected_points": 3.4563272913156653
+        "team": "Man City",
+        "expected_points": 2.960998405165074
       },
       {
         "player_id": 466075,
@@ -68,7 +68,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 469142,
@@ -103,12 +103,20 @@
         "expected_points": 4.435285999290234
       },
       {
+        "player_id": 503139,
+        "name": "Alex Scott",
+        "short_name": "Scott",
+        "position": "MID",
+        "team": "Bournemouth",
+        "expected_points": 4.2494672646892955
+      },
+      {
         "player_id": 184029,
         "name": "Martin \u00d8degaard",
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9670189854400513
+        "expected_points": 4.010137596984558
       },
       {
         "player_id": 215413,
@@ -133,14 +141,6 @@
         "position": "FWD",
         "team": "Chelsea",
         "expected_points": 4.8089656617809755
-      },
-      {
-        "player_id": 441264,
-        "name": "Brian Brobbey",
-        "short_name": "Brobbey",
-        "position": "FWD",
-        "team": "Sunderland",
-        "expected_points": 2.9413313313301606
       }
     ],
     "bench": [
@@ -153,20 +153,12 @@
         "expected_points": 0.10027015579447286
       },
       {
-        "player_id": 153682,
-        "name": "Harry Wilson",
-        "short_name": "Wilson",
-        "position": "MID",
-        "team": "Leeds",
-        "expected_points": 2.550770942571176
-      },
-      {
-        "player_id": 106760,
-        "name": "Luke Shaw",
-        "short_name": "Shaw",
-        "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.521244083180876
+        "player_id": 441264,
+        "name": "Brian Brobbey",
+        "short_name": "Brobbey",
+        "position": "FWD",
+        "team": "Sunderland",
+        "expected_points": 2.8988019275211903
       },
       {
         "player_id": 487676,
@@ -174,7 +166,15 @@
         "short_name": "Hume",
         "position": "DEF",
         "team": "Sunderland",
-        "expected_points": 2.394858537183296
+        "expected_points": 2.35319016432435
+      },
+      {
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
+        "position": "DEF",
+        "team": "Man Utd",
+        "expected_points": 1.8909330623856568
       }
     ],
     "chip": null,
@@ -183,37 +183,11 @@
         "gameweek": 4,
         "transfers_in": [
           {
-            "player_id": 473284,
-            "name": "Konstantinos Tzolakis",
-            "short_name": "Tzolakis",
-            "position": "GK",
-            "team": "Hull City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 204936,
-            "name": "Gianluigi Donnarumma",
-            "short_name": "Donnarumma",
-            "position": "GK",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 54.19810722474641
-      },
-      {
-        "gameweek": 5,
-        "transfers_in": [
-          {
-            "player_id": 243298,
-            "name": "Cody Gakpo",
-            "short_name": "Gakpo",
+            "player_id": 503139,
+            "name": "Alex Scott",
+            "short_name": "Scott",
             "position": "MID",
-            "team": "Liverpool"
+            "team": "Bournemouth"
           }
         ],
         "transfers_out": [
@@ -227,87 +201,113 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.243561768622385
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.09905341402269
+      },
+      {
+        "gameweek": 5,
+        "transfers_in": [
+          {
+            "player_id": 473284,
+            "name": "Konstantinos Tzolakis",
+            "short_name": "Tzolakis",
+            "position": "GK",
+            "team": "Hull City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 67089,
+            "name": "Martin Dubravka",
+            "short_name": "Dubravka",
+            "position": "GK",
+            "team": "Spurs"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.59266016400423
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 201658,
-            "name": "Marcus Tavernier",
-            "short_name": "Tavernier",
-            "position": "MID",
-            "team": "Bournemouth"
+            "player_id": 198869,
+            "name": "Benjamin White",
+            "short_name": "White",
+            "position": "DEF",
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 437730,
-            "name": "Antoine Semenyo",
-            "short_name": "Semenyo",
-            "position": "MID",
-            "team": "Man City"
+            "player_id": 106760,
+            "name": "Luke Shaw",
+            "short_name": "Shaw",
+            "position": "DEF",
+            "team": "Man Utd"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.860436960992516
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 56.372359005701185
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 219168,
-            "name": "Alexander Isak",
-            "short_name": "Isak",
-            "position": "FWD",
-            "team": "Liverpool"
+            "player_id": 108416,
+            "name": "John Egan",
+            "short_name": "Egan",
+            "position": "DEF",
+            "team": "Hull City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 441264,
-            "name": "Brian Brobbey",
-            "short_name": "Brobbey",
-            "position": "FWD",
-            "team": "Sunderland"
+            "player_id": 469142,
+            "name": "Jan Paul van Hecke",
+            "short_name": "Hecke",
+            "position": "DEF",
+            "team": "Spurs"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 57.826340586719354
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 56.472815390229044
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 487838,
-            "name": "Lewis Hall",
-            "short_name": "Hall",
-            "position": "DEF",
-            "team": "Newcastle"
+            "player_id": 424876,
+            "name": "Dominik Szoboszlai",
+            "short_name": "Szoboszlai",
+            "position": "MID",
+            "team": "Liverpool"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 487676,
-            "name": "Trai Hume",
-            "short_name": "Hume",
-            "position": "DEF",
-            "team": "Sunderland"
+            "player_id": 215413,
+            "name": "Kiernan Dewsbury-Hall",
+            "short_name": "Dewsbury-Hall",
+            "position": "MID",
+            "team": "Everton"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 58.34805051514331
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 57.04966285663494
       }
     ],
     "stated_limits": [
@@ -320,8 +320,8 @@
     ],
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

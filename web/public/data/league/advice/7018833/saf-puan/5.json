@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,25 +9,25 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 204936,
-          "name": "Gianluigi Donnarumma",
-          "short_name": "Donnarumma",
-          "position": "GK",
-          "team": "Man City"
+          "player_id": 441164,
+          "name": "Pedro Porro Sauceda",
+          "short_name": "Sauceda",
+          "position": "DEF",
+          "team": "Spurs"
         },
         "player_in": {
-          "player_id": 473284,
-          "name": "Konstantinos Tzolakis",
-          "short_name": "Tzolakis",
-          "position": "GK",
-          "team": "Hull City"
+          "player_id": 198869,
+          "name": "Benjamin White",
+          "short_name": "White",
+          "position": "DEF",
+          "team": "Arsenal"
         },
-        "expected_points_delta": 0.49532888615059134,
+        "expected_points_delta": 1.836695377091493,
         "reason_code": "window_value"
       }
     ],
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 35.21800000000002,
-    "expected_own_points": 55.239186524254464,
+    "optimality_gap": 37.676999999999964,
+    "expected_own_points": 55.01369414793214,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -55,12 +55,12 @@
     },
     "starting_xi": [
       {
-        "player_id": 473284,
-        "name": "Konstantinos Tzolakis",
-        "short_name": "Tzolakis",
+        "player_id": 204936,
+        "name": "Gianluigi Donnarumma",
+        "short_name": "Donnarumma",
         "position": "GK",
-        "team": "Hull City",
-        "expected_points": 3.4563272913156653
+        "team": "Man City",
+        "expected_points": 2.960998405165074
       },
       {
         "player_id": 209036,
@@ -76,15 +76,15 @@
         "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 3.668738526053537
+        "expected_points": 3.666932155533569
       },
       {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
+        "player_id": 198869,
+        "name": "Benjamin White",
+        "short_name": "White",
         "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.2356844156410305
+        "team": "Arsenal",
+        "expected_points": 3.507327295989268
       },
       {
         "player_id": 244850,
@@ -153,20 +153,20 @@
         "expected_points": 2.495351765499311
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.237246793437091
+      },
+      {
         "player_id": 540324,
         "name": "Mohamed Belloumi",
         "short_name": "Belloumi",
         "position": "MID",
         "team": "Hull City",
         "expected_points": 2.877905422562655
-      },
-      {
-        "player_id": 441164,
-        "name": "Pedro Porro Sauceda",
-        "short_name": "Sauceda",
-        "position": "DEF",
-        "team": "Spurs",
-        "expected_points": 2.227509225197033
       },
       {
         "player_id": 231416,
@@ -181,6 +181,84 @@
     "plan_weeks": [
       {
         "gameweek": 4,
+        "transfers_in": [
+          {
+            "player_id": 198869,
+            "name": "Benjamin White",
+            "short_name": "White",
+            "position": "DEF",
+            "team": "Arsenal"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 441164,
+            "name": "Pedro Porro Sauceda",
+            "short_name": "Sauceda",
+            "position": "DEF",
+            "team": "Spurs"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 55.01369414793213
+      },
+      {
+        "gameweek": 5,
+        "transfers_in": [
+          {
+            "player_id": 146426,
+            "name": "Semi Ajayi",
+            "short_name": "Ajayi",
+            "position": "DEF",
+            "team": "Hull City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 231416,
+            "name": "Ferdi Kad\u0131o\u011flu",
+            "short_name": "Kad\u0131o\u011flu",
+            "position": "DEF",
+            "team": "Brighton"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 55.01369414793213
+      },
+      {
+        "gameweek": 6,
+        "transfers_in": [
+          {
+            "player_id": 503139,
+            "name": "Alex Scott",
+            "short_name": "Scott",
+            "position": "MID",
+            "team": "Bournemouth"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 204480,
+            "name": "Declan Rice",
+            "short_name": "Rice",
+            "position": "MID",
+            "team": "Arsenal"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 55.473479650076655
+      },
+      {
+        "gameweek": 7,
         "transfers_in": [
           {
             "player_id": 473284,
@@ -203,69 +281,17 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.23918652425445
+        "expected_points": 55.96708640005818
       },
       {
-        "gameweek": 5,
+        "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 446008,
-            "name": "Bryan Mbeumo",
-            "short_name": "Mbeumo",
-            "position": "MID",
-            "team": "Man Utd"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 204480,
-            "name": "Declan Rice",
-            "short_name": "Rice",
+            "player_id": 223340,
+            "name": "Bukayo Saka",
+            "short_name": "Saka",
             "position": "MID",
             "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.384184229376174
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 108416,
-            "name": "John Egan",
-            "short_name": "Egan",
-            "position": "DEF",
-            "team": "Hull City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 441164,
-            "name": "Pedro Porro Sauceda",
-            "short_name": "Sauceda",
-            "position": "DEF",
-            "team": "Spurs"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.384184229376174
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 243298,
-            "name": "Cody Gakpo",
-            "short_name": "Gakpo",
-            "position": "MID",
-            "team": "Liverpool"
           }
         ],
         "transfers_out": [
@@ -281,33 +307,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.46451544594943
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 424876,
-            "name": "Dominik Szoboszlai",
-            "short_name": "Szoboszlai",
-            "position": "MID",
-            "team": "Liverpool"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 540324,
-            "name": "Mohamed Belloumi",
-            "short_name": "Belloumi",
-            "position": "MID",
-            "team": "Hull City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 58.30130091319509
+        "expected_points": 57.29601982814373
       }
     ],
     "stated_limits": [
@@ -320,8 +320,8 @@
     ],
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,10 +9,29 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
+        "player_out": {
+          "player_id": 472769,
+          "name": "Nico O'Reilly",
+          "short_name": "O'Reilly",
+          "position": "DEF",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 17761,
+          "name": "James Tarkowski",
+          "short_name": "Tarkowski",
+          "position": "DEF",
+          "team": "Everton"
+        },
+        "expected_points_delta": 1.7463124812711541,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
         "player_out": {
           "player_id": 502500,
           "name": "Igor Thiago Nascimento Rodrigues",
@@ -36,7 +55,7 @@
     "rival_label": "entry-8548384",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.276215395590754,
+    "expected_own_points": 55.570688627208106,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -63,12 +82,20 @@
         "expected_points": 3.450579897041415
       },
       {
+        "player_id": 17761,
+        "name": "James Tarkowski",
+        "short_name": "Tarkowski",
+        "position": "DEF",
+        "team": "Everton",
+        "expected_points": 3.772840119572701
+      },
+      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 522047,
@@ -77,14 +104,6 @@
         "position": "DEF",
         "team": "Leeds",
         "expected_points": 3.2456264546203446
-      },
-      {
-        "player_id": 106760,
-        "name": "Luke Shaw",
-        "short_name": "Shaw",
-        "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.521244083180876
       },
       {
         "player_id": 141746,
@@ -108,7 +127,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.391694024990014
+        "expected_points": 4.389550689692313
       },
       {
         "player_id": 424876,
@@ -158,7 +177,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 487676,
@@ -166,27 +185,27 @@
         "short_name": "Hume",
         "position": "DEF",
         "team": "Sunderland",
-        "expected_points": 2.394858537183296
+        "expected_points": 2.35319016432435
       },
       {
-        "player_id": 472769,
-        "name": "Nico O'Reilly",
-        "short_name": "O'Reilly",
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
         "position": "DEF",
-        "team": "Man City",
-        "expected_points": 1.550337345902003
+        "team": "Man Utd",
+        "expected_points": 1.8909330623856568
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 8548384,
     "expected_points_cost_ceiling": 0.0,
     "overlap_count": 3,
-    "transfer_cap": 1,
+    "transfer_cap": 2,
     "overlap_target": 5,
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
@@ -197,7 +216,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": -0.4384334298288195,
+    "expected_gap_vs_rival": 0.8130867507109301,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

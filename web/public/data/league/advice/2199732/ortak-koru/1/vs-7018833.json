@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,16 +27,35 @@
           "position": "DEF",
           "team": "Brighton"
         },
-        "expected_points_delta": 0.13946369429779337,
+        "expected_points_delta": 0.10606655603040793,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
+        "player_out": {
+          "player_id": 440993,
+          "name": "Iliman Ndiaye",
+          "short_name": "Ndiaye",
+          "position": "MID",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 466525,
+          "name": "Anton Stach",
+          "short_name": "Stach",
+          "position": "MID",
+          "team": "Leeds"
+        },
+        "expected_points_delta": 0.513263197697897,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.3078686118203535,
+    "expected_points_cost": 0.3653910947654708,
     "rival_label": "entry-7018833",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 57.12528184967607,
+    "expected_own_points": 57.642158425964496,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -76,7 +95,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 465730,
@@ -84,7 +103,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.2356844156410305
+        "expected_points": 3.237246793437091
       },
       {
         "player_id": 141746,
@@ -103,20 +122,20 @@
         "expected_points": 4.232677554424536
       },
       {
+        "player_id": 466525,
+        "name": "Anton Stach",
+        "short_name": "Stach",
+        "position": "MID",
+        "team": "Leeds",
+        "expected_points": 3.949423222935136
+      },
+      {
         "player_id": 484420,
         "name": "Enzo Le F\u00e9e",
         "short_name": "F\u00e9e",
         "position": "MID",
         "team": "Sunderland",
-        "expected_points": 3.5158402140096534
-      },
-      {
-        "player_id": 440993,
-        "name": "Iliman Ndiaye",
-        "short_name": "Ndiaye",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 3.436160025237239
+        "expected_points": 3.4728706842808976
       },
       {
         "player_id": 223094,
@@ -158,7 +177,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 219924,
@@ -180,24 +199,24 @@
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 7018833,
-    "expected_points_cost_ceiling": 0.3078686118203535,
-    "overlap_count": 4,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 0.3653910947654708,
+    "overlap_count": 5,
+    "transfer_cap": 2,
     "overlap_target": 9,
-    "overlap_applied": 4,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 20.0,
-      "expected_points_cost": 21.306315934492403,
-      "expected_points_cost_ceiling": 21.306315934492403
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 17.957448960553492,
+      "expected_points_cost_ceiling": 17.957448960553492
     },
-    "expected_gap_vs_rival": 4.364745640546744,
+    "expected_gap_vs_rival": 4.883428587355127,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -29,14 +29,52 @@
         },
         "expected_points_delta": 4.8089656617809755,
         "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
+        "player_out": {
+          "player_id": 441164,
+          "name": "Pedro Porro Sauceda",
+          "short_name": "Sauceda",
+          "position": "DEF",
+          "team": "Spurs"
+        },
+        "player_in": {
+          "player_id": 97032,
+          "name": "Virgil van Dijk",
+          "short_name": "Dijk",
+          "position": "DEF",
+          "team": "Liverpool"
+        },
+        "expected_points_delta": 1.9963002366357945,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-3",
+        "player_out": {
+          "player_id": 472769,
+          "name": "Nico O'Reilly",
+          "short_name": "O'Reilly",
+          "position": "DEF",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 209036,
+          "name": "Marc Gu\u00e9hi",
+          "short_name": "Gu\u00e9hi",
+          "position": "DEF",
+          "team": "Man City"
+        },
+        "expected_points_delta": 1.695100175971512,
+        "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.0,
+    "expected_points_cost": 1.7445663991175238,
     "rival_label": "entry-7018833",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 46.54539159350413,
+    "expected_own_points": 50.156104992211716,
     "captain": {
       "player_id": 446008,
       "name": "Bryan Mbeumo",
@@ -71,20 +109,20 @@
         "expected_points": 4.305863646230902
       },
       {
-        "player_id": 441164,
-        "name": "Pedro Porro Sauceda",
-        "short_name": "Sauceda",
-        "position": "DEF",
-        "team": "Spurs",
-        "expected_points": 2.227509225197033
-      },
-      {
-        "player_id": 472769,
-        "name": "Nico O'Reilly",
-        "short_name": "O'Reilly",
+        "player_id": 209036,
+        "name": "Marc Gu\u00e9hi",
+        "short_name": "Gu\u00e9hi",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 1.550337345902003
+        "expected_points": 3.721627814273059
+      },
+      {
+        "player_id": 97032,
+        "name": "Virgil van Dijk",
+        "short_name": "Dijk",
+        "position": "DEF",
+        "team": "Liverpool",
+        "expected_points": 3.666932155533569
       },
       {
         "player_id": 446008,
@@ -180,24 +218,24 @@
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 7018833,
-    "expected_points_cost_ceiling": 0.0,
-    "overlap_count": 3,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 1.7445663991175238,
+    "overlap_count": 5,
+    "transfer_cap": 3,
     "overlap_target": 9,
-    "overlap_applied": 3,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 24.0,
-      "expected_points_cost": 20.447574625963348,
-      "expected_points_cost_ceiling": 20.447574625963348
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 17.702036240909052,
+      "expected_points_cost_ceiling": 17.702036240909052
     },
-    "expected_gap_vs_rival": -6.215144615625199,
+    "expected_gap_vs_rival": -2.602624846397653,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

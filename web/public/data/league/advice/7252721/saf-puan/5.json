@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,25 +9,25 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 489639,
-          "name": "Bart Verbruggen",
-          "short_name": "Verbruggen",
-          "position": "GK",
-          "team": "Brighton"
+          "player_id": 661313,
+          "name": "Juan Angulo",
+          "short_name": "Angulo",
+          "position": "FWD",
+          "team": "Sunderland"
         },
         "player_in": {
-          "player_id": 473284,
-          "name": "Konstantinos Tzolakis",
-          "short_name": "Tzolakis",
-          "position": "GK",
-          "team": "Hull City"
+          "player_id": 219168,
+          "name": "Alexander Isak",
+          "short_name": "Isak",
+          "position": "FWD",
+          "team": "Liverpool"
         },
-        "expected_points_delta": 0.9609755258163544,
+        "expected_points_delta": 4.274408305127357,
         "reason_code": "window_value"
       }
     ],
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 33.476,
-    "expected_own_points": 56.111934185811535,
+    "optimality_gap": 32.910000000000025,
+    "expected_own_points": 57.51666891333127,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -46,21 +46,21 @@
       "expected_points": 8.360382282553875
     },
     "vice_captain": {
-      "player_id": 446008,
-      "name": "Bryan Mbeumo",
-      "short_name": "Mbeumo",
-      "position": "MID",
-      "team": "Man Utd",
-      "expected_points": 4.934679467666494
+      "player_id": 219168,
+      "name": "Alexander Isak",
+      "short_name": "Isak",
+      "position": "FWD",
+      "team": "Liverpool",
+      "expected_points": 5.621733713745486
     },
     "starting_xi": [
       {
-        "player_id": 473284,
-        "name": "Konstantinos Tzolakis",
-        "short_name": "Tzolakis",
+        "player_id": 489639,
+        "name": "Bart Verbruggen",
+        "short_name": "Verbruggen",
         "position": "GK",
-        "team": "Hull City",
-        "expected_points": 3.4563272913156653
+        "team": "Brighton",
+        "expected_points": 2.495351765499311
       },
       {
         "player_id": 477424,
@@ -71,20 +71,20 @@
         "expected_points": 3.64230933799311
       },
       {
+        "player_id": 146426,
+        "name": "Semi Ajayi",
+        "short_name": "Ajayi",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 3.0983922428810176
+      },
+      {
         "player_id": 244723,
         "name": "Tyrick Mitchell",
         "short_name": "Mitchell",
         "position": "DEF",
         "team": "Crystal Palace",
         "expected_points": 3.056313305016537
-      },
-      {
-        "player_id": 146426,
-        "name": "Semi Ajayi",
-        "short_name": "Ajayi",
-        "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 3.0557842715324486
       },
       {
         "player_id": 446008,
@@ -100,7 +100,7 @@
         "short_name": "Gibbs-White",
         "position": "MID",
         "team": "Nott'm Forest",
-        "expected_points": 4.472404986183817
+        "expected_points": 4.470195299925821
       },
       {
         "player_id": 437730,
@@ -119,20 +119,20 @@
         "expected_points": 4.232677554424536
       },
       {
-        "player_id": 60307,
-        "name": "Pascal Gro\u00df",
-        "short_name": "Gro\u00df",
-        "position": "MID",
-        "team": "Brighton",
-        "expected_points": 3.296421745499964
-      },
-      {
         "player_id": 223094,
         "name": "Erling Haaland",
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
         "expected_points": 8.360382282553875
+      },
+      {
+        "player_id": 219168,
+        "name": "Alexander Isak",
+        "short_name": "Isak",
+        "position": "FWD",
+        "team": "Liverpool",
+        "expected_points": 5.621733713745486
       },
       {
         "player_id": 475168,
@@ -153,6 +153,14 @@
         "expected_points": 0.10027015579447286
       },
       {
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 3.339228522758007
+      },
+      {
         "player_id": 451284,
         "name": "Milan van Ewijk",
         "short_name": "Ewijk",
@@ -167,46 +175,12 @@
         "position": "DEF",
         "team": "Ipswich Town",
         "expected_points": 2.166625794419491
-      },
-      {
-        "player_id": 661313,
-        "name": "Juan Angulo",
-        "short_name": "Angulo",
-        "position": "FWD",
-        "team": "Sunderland",
-        "expected_points": 1.3473254086181279
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
         "gameweek": 4,
-        "transfers_in": [
-          {
-            "player_id": 473284,
-            "name": "Konstantinos Tzolakis",
-            "short_name": "Tzolakis",
-            "position": "GK",
-            "team": "Hull City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 489639,
-            "name": "Bart Verbruggen",
-            "short_name": "Verbruggen",
-            "position": "GK",
-            "team": "Brighton"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.111934185811535
-      },
-      {
-        "gameweek": 5,
         "transfers_in": [
           {
             "player_id": 219168,
@@ -229,69 +203,43 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.43724615405705
+        "expected_points": 57.51666891333127
+      },
+      {
+        "gameweek": 5,
+        "transfers_in": [
+          {
+            "player_id": 473284,
+            "name": "Konstantinos Tzolakis",
+            "short_name": "Tzolakis",
+            "position": "GK",
+            "team": "Hull City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 489639,
+            "name": "Bart Verbruggen",
+            "short_name": "Verbruggen",
+            "position": "GK",
+            "team": "Brighton"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 58.47592230297856
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 577285,
-            "name": "George Hemmings",
-            "short_name": "Hemmings",
+            "player_id": 204580,
+            "name": "Vitaly Janelt",
+            "short_name": "Janelt",
             "position": "MID",
-            "team": "Aston Villa"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 437730,
-            "name": "Antoine Semenyo",
-            "short_name": "Semenyo",
-            "position": "MID",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 57.29838190026679
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 141746,
-            "name": "Bruno Borges Fernandes",
-            "short_name": "Fernandes",
-            "position": "MID",
-            "team": "Man Utd"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 222531,
-            "name": "Morgan Gibbs-White",
-            "short_name": "Gibbs-White",
-            "position": "MID",
-            "team": "Nott'm Forest"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 59.89200975006317
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 84450,
-            "name": "Granit Xhaka",
-            "short_name": "Xhaka",
-            "position": "MID",
-            "team": "Sunderland"
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
@@ -307,7 +255,59 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 60.274269588609485
+        "expected_points": 58.47592230297856
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 108416,
+            "name": "John Egan",
+            "short_name": "Egan",
+            "position": "DEF",
+            "team": "Hull City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 219924,
+            "name": "Issa Diop",
+            "short_name": "Diop",
+            "position": "DEF",
+            "team": "Ipswich Town"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 58.504204869039725
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 465642,
+            "name": "Malick Thiaw",
+            "short_name": "Thiaw",
+            "position": "DEF",
+            "team": "Newcastle"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 244723,
+            "name": "Tyrick Mitchell",
+            "short_name": "Mitchell",
+            "position": "DEF",
+            "team": "Crystal Palace"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 58.504204869039725
       }
     ],
     "stated_limits": [
@@ -320,8 +320,8 @@
     ],
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

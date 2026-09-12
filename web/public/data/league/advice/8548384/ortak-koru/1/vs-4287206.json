@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -21,22 +21,22 @@
           "team": "Liverpool"
         },
         "player_in": {
-          "player_id": 465730,
-          "name": "Maxim De Cuyper",
-          "short_name": "Cuyper",
+          "player_id": 223827,
+          "name": "Daniel Ballard",
+          "short_name": "Ballard",
           "position": "DEF",
-          "team": "Brighton"
+          "team": "Sunderland"
         },
-        "expected_points_delta": 0.8129723097115868,
+        "expected_points_delta": 0.6690987538050401,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.07573435656118477,
+    "expected_points_cost": 0.2347568126794215,
     "rival_label": "entry-4287206",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 55.527621135131156,
+    "expected_own_points": 55.42670063030222,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -76,7 +76,7 @@
         "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 3.668738526053537
+        "expected_points": 3.666932155533569
       },
       {
         "player_id": 477424,
@@ -87,12 +87,12 @@
         "expected_points": 3.64230933799311
       },
       {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
+        "player_id": 223827,
+        "name": "Daniel Ballard",
+        "short_name": "Ballard",
         "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.2356844156410305
+        "team": "Sunderland",
+        "expected_points": 3.0918108597344838
       },
       {
         "player_id": 446008,
@@ -108,7 +108,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9670189854400513
+        "expected_points": 4.010137596984558
       },
       {
         "player_id": 577725,
@@ -124,7 +124,7 @@
         "short_name": "Foden",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 3.34397088815176
+        "expected_points": 3.345611698204828
       },
       {
         "player_id": 223094,
@@ -180,11 +180,11 @@
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 4287206,
-    "expected_points_cost_ceiling": 0.07573435656118477,
+    "expected_points_cost_ceiling": 0.2347568126794215,
     "overlap_count": 4,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -194,11 +194,11 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 20.0,
-      "expected_points_cost": 19.399648181126437,
-      "expected_points_cost_ceiling": 19.399648181126437
+      "expected_points_cost": 18.48304140893181,
+      "expected_points_cost_ceiling": 18.48304140893181
     },
-    "expected_gap_vs_rival": 2.19465372554464,
-    "captain_agreement": true,
+    "expected_gap_vs_rival": 4.11791691926031,
+    "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
   }

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,7 +27,7 @@
           "position": "DEF",
           "team": "Hull City"
         },
-        "expected_points_delta": 0.6330721656030049,
+        "expected_points_delta": 0.6756801369515739,
         "reason_code": "window_value"
       }
     ],
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 38.903999999999996,
-    "expected_own_points": 55.34772099102257,
+    "optimality_gap": 40.593999999999994,
+    "expected_own_points": 55.433282013448746,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -76,7 +76,7 @@
         "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 3.668738526053537
+        "expected_points": 3.666932155533569
       },
       {
         "player_id": 477424,
@@ -92,7 +92,7 @@
         "short_name": "Ajayi",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 3.0557842715324486
+        "expected_points": 3.0983922428810176
       },
       {
         "player_id": 446008,
@@ -108,7 +108,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9670189854400513
+        "expected_points": 4.010137596984558
       },
       {
         "player_id": 577725,
@@ -124,7 +124,7 @@
         "short_name": "Foden",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 3.34397088815176
+        "expected_points": 3.345611698204828
       },
       {
         "player_id": 223094,
@@ -203,62 +203,10 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.34772099102257
+        "expected_points": 55.433282013448746
       },
       {
         "gameweek": 5,
-        "transfers_in": [
-          {
-            "player_id": 209036,
-            "name": "Marc Gu\u00e9hi",
-            "short_name": "Gu\u00e9hi",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 477424,
-            "name": "Jo\u0161ko Gvardiol",
-            "short_name": "Gvardiol",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.42703946730252
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 243298,
-            "name": "Cody Gakpo",
-            "short_name": "Gakpo",
-            "position": "MID",
-            "team": "Liverpool"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 209244,
-            "name": "Phil Foden",
-            "short_name": "Foden",
-            "position": "MID",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 57.069854454356886
-      },
-      {
-        "gameweek": 7,
         "transfers_in": [
           {
             "player_id": 444102,
@@ -281,33 +229,85 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.39363694010626
+        "expected_points": 55.71445652784956
       },
       {
-        "gameweek": 8,
+        "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 503139,
-            "name": "Alex Scott",
-            "short_name": "Scott",
-            "position": "MID",
-            "team": "Bournemouth"
+            "player_id": 473284,
+            "name": "Konstantinos Tzolakis",
+            "short_name": "Tzolakis",
+            "position": "GK",
+            "team": "Hull City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 577725,
-            "name": "Josh King",
-            "short_name": "King",
-            "position": "MID",
-            "team": "Fulham"
+            "player_id": 67089,
+            "name": "Martin Dubravka",
+            "short_name": "Dubravka",
+            "position": "GK",
+            "team": "Spurs"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 58.150852087687554
+        "expected_points": 55.71848178595474
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 204580,
+            "name": "Vitaly Janelt",
+            "short_name": "Janelt",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 108413,
+            "name": "Will Hughes",
+            "short_name": "Hughes",
+            "position": "MID",
+            "team": "Crystal Palace"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 55.714466522786154
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 215413,
+            "name": "Kiernan Dewsbury-Hall",
+            "short_name": "Dewsbury-Hall",
+            "position": "MID",
+            "team": "Everton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 209244,
+            "name": "Phil Foden",
+            "short_name": "Foden",
+            "position": "MID",
+            "team": "Man City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 55.714466522786154
       }
     ],
     "stated_limits": [
@@ -320,8 +320,8 @@
     ],
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

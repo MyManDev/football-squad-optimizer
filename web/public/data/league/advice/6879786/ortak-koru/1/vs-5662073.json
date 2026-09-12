@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,34 +9,53 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 83299,
-          "name": "Lewis Dunk",
-          "short_name": "Dunk",
-          "position": "DEF",
-          "team": "Brighton"
+          "player_id": 111234,
+          "name": "Jordan Pickford",
+          "short_name": "Pickford",
+          "position": "GK",
+          "team": "Everton"
         },
         "player_in": {
-          "player_id": 465730,
-          "name": "Maxim De Cuyper",
-          "short_name": "Cuyper",
-          "position": "DEF",
-          "team": "Brighton"
+          "player_id": 485055,
+          "name": "Anton\u00edn Kinsk\u00fd",
+          "short_name": "Kinsk\u00fd",
+          "position": "GK",
+          "team": "Spurs"
         },
-        "expected_points_delta": 0.7003880684929338,
+        "expected_points_delta": -0.24793816902542565,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
+        "player_out": {
+          "player_id": 195546,
+          "name": "Emiliano Buend\u00eda Stati",
+          "short_name": "Stati",
+          "position": "MID",
+          "team": "Aston Villa"
+        },
+        "player_in": {
+          "player_id": 446008,
+          "name": "Bryan Mbeumo",
+          "short_name": "Mbeumo",
+          "position": "MID",
+          "team": "Man Utd"
+        },
+        "expected_points_delta": 1.77861441642739,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.9705764759643927,
+    "expected_points_cost": 0.031053846746381453,
     "rival_label": "entry-5662073",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 53.76211069144807,
+    "expected_own_points": 55.546889133133305,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -76,7 +95,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 437499,
@@ -87,14 +106,6 @@
         "expected_points": 3.397932275866678
       },
       {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.2356844156410305
-      },
-      {
         "player_id": 141746,
         "name": "Bruno Borges Fernandes",
         "short_name": "Fernandes",
@@ -103,12 +114,20 @@
         "expected_points": 7.066032835980204
       },
       {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.934679467666494
+      },
+      {
         "player_id": 466052,
         "name": "Rayan Cherki",
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.391694024990014
+        "expected_points": 4.389550689692313
       },
       {
         "player_id": 449434,
@@ -116,7 +135,7 @@
         "short_name": "Elanga",
         "position": "MID",
         "team": "Newcastle",
-        "expected_points": 3.4735053102667206
+        "expected_points": 3.516411504700961
       },
       {
         "player_id": 249231,
@@ -145,20 +164,12 @@
     ],
     "bench": [
       {
-        "player_id": 111234,
-        "name": "Jordan Pickford",
-        "short_name": "Pickford",
+        "player_id": 485055,
+        "name": "Anton\u00edn Kinsk\u00fd",
+        "short_name": "Kinsk\u00fd",
         "position": "GK",
-        "team": "Everton",
-        "expected_points": 3.009371278665004
-      },
-      {
-        "player_id": 195546,
-        "name": "Emiliano Buend\u00eda Stati",
-        "short_name": "Stati",
-        "position": "MID",
-        "team": "Aston Villa",
-        "expected_points": 3.156065051239104
+        "team": "Spurs",
+        "expected_points": 2.7614331096395786
       },
       {
         "player_id": 169432,
@@ -175,30 +186,38 @@
         "position": "DEF",
         "team": "Aston Villa",
         "expected_points": 2.5908352756752766
+      },
+      {
+        "player_id": 83299,
+        "name": "Lewis Dunk",
+        "short_name": "Dunk",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 2.5352963471480967
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 5662073,
-    "expected_points_cost_ceiling": 0.9705764759643927,
-    "overlap_count": 5,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 0.031053846746381453,
+    "overlap_count": 6,
+    "transfer_cap": 2,
     "overlap_target": 9,
-    "overlap_applied": 5,
+    "overlap_applied": 6,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 16.0,
-      "expected_points_cost": 17.216339835349217,
-      "expected_points_cost_ceiling": 17.216339835349217
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 12.0419789417303,
+      "expected_points_cost_ceiling": 12.0419789417303
     },
-    "expected_gap_vs_rival": -1.0607038801581012,
-    "captain_agreement": false,
+    "expected_gap_vs_rival": 3.6766721688985413,
+    "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
   }

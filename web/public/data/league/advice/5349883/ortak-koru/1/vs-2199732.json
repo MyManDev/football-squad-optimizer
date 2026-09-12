@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,10 +9,29 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
+        "player_out": {
+          "player_id": 106760,
+          "name": "Luke Shaw",
+          "short_name": "Shaw",
+          "position": "DEF",
+          "team": "Man Utd"
+        },
+        "player_in": {
+          "player_id": 465730,
+          "name": "Maxim De Cuyper",
+          "short_name": "Cuyper",
+          "position": "DEF",
+          "team": "Brighton"
+        },
+        "expected_points_delta": 1.3463137310514341,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
         "player_out": {
           "player_id": 153682,
           "name": "Harry Wilson",
@@ -32,11 +51,11 @@
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.7541083207815973,
+    "expected_points_cost": 0.8794378201761646,
     "rival_label": "entry-2199732",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.9941245616902,
+    "expected_own_points": 55.59188204290271,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -68,7 +87,15 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.237246793437091
       },
       {
         "player_id": 469142,
@@ -77,14 +104,6 @@
         "position": "DEF",
         "team": "Spurs",
         "expected_points": 2.9841394865498456
-      },
-      {
-        "player_id": 191866,
-        "name": "Kristoffer Ajer",
-        "short_name": "Ajer",
-        "position": "DEF",
-        "team": "Brentford",
-        "expected_points": 2.727628454292313
       },
       {
         "player_id": 446008,
@@ -116,7 +135,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9670189854400513
+        "expected_points": 4.010137596984558
       },
       {
         "player_id": 215413,
@@ -158,15 +177,15 @@
         "short_name": "Brobbey",
         "position": "FWD",
         "team": "Sunderland",
-        "expected_points": 2.9413313313301606
+        "expected_points": 2.8988019275211903
       },
       {
-        "player_id": 106760,
-        "name": "Luke Shaw",
-        "short_name": "Shaw",
+        "player_id": 191866,
+        "name": "Kristoffer Ajer",
+        "short_name": "Ajer",
         "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.521244083180876
+        "team": "Brentford",
+        "expected_points": 2.727628454292313
       },
       {
         "player_id": 487676,
@@ -174,30 +193,30 @@
         "short_name": "Hume",
         "position": "DEF",
         "team": "Sunderland",
-        "expected_points": 2.394858537183296
+        "expected_points": 2.35319016432435
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 2199732,
-    "expected_points_cost_ceiling": 0.7541083207815973,
-    "overlap_count": 4,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 0.8794378201761646,
+    "overlap_count": 5,
+    "transfer_cap": 2,
     "overlap_target": 9,
-    "overlap_applied": 4,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 20.0,
-      "expected_points_cost": 19.575672924450004,
-      "expected_points_cost_ceiling": 19.575672924450004
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 16.148338381479533,
+      "expected_points_cost_ceiling": 16.148338381479533
     },
-    "expected_gap_vs_rival": -1.9914190082485987,
+    "expected_gap_vs_rival": -1.4400816828846672,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
