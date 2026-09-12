@@ -344,15 +344,11 @@ export interface ScoreboardOurs {
   projected: number;
   /** `live`: decided before the deadline; `replay`: recorded afterwards from a pre-deadline capture. */
   mode: "live" | "replay" | null;
-  /**
-   * What the net is, and is not. `named_eleven_no_autosubs`: the eleven the decision
-   * named, scored as named — the game's automatic substitutions are not applied and the
-   * decision names no vice-captain, so a captain who did not play is not recovered.
-   * Both corrections only add points, so this reads low beside a real FPL entry's net.
-   */
-  scoring_basis: "named_eleven_no_autosubs";
-  /** False on every decision the ledger holds: the frozen decision names no vice-captain. */
+  /** Legacy named-eleven scoring or settlement using a recorded bench order and vice. */
+  scoring_basis: "named_eleven_no_autosubs" | "official_autosub_captain_v2";
   vice_captain_named: boolean;
+  diagnostics?: ScoreboardDiagnostics;
+  outcome_snapshot_id?: string | null;
 }
 
 export interface ScoreboardTop100 {
@@ -396,6 +392,8 @@ export interface ScoreboardGameweek {
   members: ScoreboardMember[];
   members_mean_net: number | null;
   members_counted: number;
+  /** Additive extension; absent on older publications. */
+  comparisons?: ScoreboardComparison[];
 }
 
 export interface ScoreboardCumulative {
@@ -427,4 +425,19 @@ export interface Scoreboard {
   histories_held: number;
   gameweeks: ScoreboardGameweek[];
   cumulative: ScoreboardCumulative;
+}
+
+export interface ScoreboardDiagnostics {
+  zero_minute_starters: number | null;
+  minutes_shortfall: number | null;
+  captain_shortfall: number | null;
+  autosub_recovery: number | null;
+}
+
+export interface ScoreboardComparison {
+  kind: "system" | "base" | "elite_xi" | "ownership_template" | "league_mean" | "game_mean";
+  net: number | null;
+  scoring_basis: string | null;
+  source_snapshot_id: string | null;
+  diagnostics: ScoreboardDiagnostics;
 }

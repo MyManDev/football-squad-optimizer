@@ -24,16 +24,11 @@ Where each number comes from, and what it is:
   eleven score, the hit points, the projection, and the mode the decision was made in
   (``live`` decided before its deadline from a capture that run took; ``replay`` recorded
   after that deadline, or from a capture the run did not take but named). Its
-  ``scoring_basis`` is ``named_eleven_no_autosubs``, and that is not FPL's own net: the
-  eleven the decision named is scored as named, the game's automatic substitutions are
-  not applied, and the ledger's decision carries no vice-captain to recover a captain who
-  did not play. Both corrections only ever add points, so our figure reads low beside a
-  member's ``points - event_transfers_cost``. Neither is computable from what the ledger
-  holds — the frozen decision records the bench as a set, not in the order the game's
-  autosubs walk it, and it names no vice-captain — so the basis is published rather than
-  guessed. When the ledger root holds no entry at all while the scoreboard already
-  published at ``<out>`` carries our rows, those rows are kept as they are: a decision
-  whose local record was lost is not the absence of a decision.
+  ``scoring_basis`` remains ``named_eleven_no_autosubs`` for legacy decisions.
+  Frozen bench order and vice-captain permit ``official_autosub_captain_v2`` from
+  finished, checked event-live captures. Settlement is computed in memory; ledger
+  files remain unchanged. Missing decision-time inputs yield null diagnostics.
+  When the local ledger is empty, already published rows are retained as before.
 - ``top100``: the Top-100 cohort's mean week, for the cohort capture's current gameweek
   only. The cohort is re-ranked every week, so a total is never differenced across
   captures; ``final`` says whether the gameweek was finished and checked in the cohort
@@ -60,6 +55,8 @@ from typing import Any, Final
 
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.application.scoreboard_diagnostics import empty_diagnostics
+from squadopt.application.scoreboard_history import settled_scoreboard_entries
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -81,6 +78,14 @@ from squadopt.live import (
 
 SCOREBOARD_FILE: Final = "scoreboard.json"
 TOP100_SIZE: Final = 100
+COMPARISON_KINDS: Final = (
+    "system",
+    "base",
+    "elite_xi",
+    "ownership_template",
+    "league_mean",
+    "game_mean",
+)
 #: What our own row's numbers are, and are not: see the module docstring.
 OUR_SCORING_BASIS: Final = "named_eleven_no_autosubs"
 #: The Overall standings pages a cohort capture holds, in page order.
@@ -239,8 +244,15 @@ def _ours(entry: LedgerEntry) -> dict[str, object]:
         "hits": float(str(block.get("transfer_hit_points", 0.0))),
         "projected": float(str(decision["projected_score"])),
         "mode": decision_mode(decision),
-        # Not FPL's net: no automatic substitutions, and no vice-captain to fall back on.
-        "scoring_basis": OUR_SCORING_BASIS,
+        "scoring_basis": (
+            OUR_SCORING_BASIS
+            if outcome is None
+            else outcome.get("scoring_basis", OUR_SCORING_BASIS)
+        ),
+        "diagnostics": empty_diagnostics()
+        if outcome is None
+        else outcome.get("diagnostics", empty_diagnostics()),
+        "outcome_snapshot_id": None if outcome is None else outcome.get("source_snapshot_id"),
         "vice_captain_named": decision.get("vice_captain_player_id") is not None,
     }
 
@@ -351,6 +363,35 @@ def scoreboard_payload(
             our_row = _ours(entry)
         elif published_ours is not None and gameweek in published_ours:
             our_row = dict(published_ours[gameweek])
+        settled = finished and event.get("data_checked") is True
+        comparisons: list[dict[str, object]] = [
+            {
+                "kind": kind,
+                "net": None,
+                "diagnostics": empty_diagnostics(),
+                "scoring_basis": None,
+                "source_snapshot_id": None,
+            }
+            for kind in COMPARISON_KINDS
+        ]
+        if our_row is not None:
+            comparisons[0].update(
+                net=our_row["net"] if settled else None,
+                diagnostics=our_row.get("diagnostics", empty_diagnostics())
+                if settled
+                else empty_diagnostics(),
+                scoring_basis=our_row.get("scoring_basis"),
+                source_snapshot_id=our_row.get("outcome_snapshot_id"),
+            )
+        for index, value, basis in (
+            (4, _mean(nets), "net"),
+            (5, _number(event.get("average_entry_score")), "source_average"),
+        ):
+            comparisons[index].update(
+                net=value if settled else None,
+                scoring_basis=basis,
+                source_snapshot_id=source_snapshot_id,
+            )
         rows.append(
             {
                 "gameweek": gameweek,
@@ -366,6 +407,7 @@ def scoreboard_payload(
                 "members": members,
                 "members_mean_net": _mean(nets),
                 "members_counted": len(nets),
+                "comparisons": comparisons,
             }
         )
 
@@ -561,7 +603,15 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         for entry_id in registered
         if (name := f"entry-{entry_id}-history.json") in snapshot.payloads
     }
-    entries = load_ledger(request.ledger_root, season)
+    entries = settled_scoreboard_entries(
+        load_ledger(request.ledger_root, season),
+        (
+            snapshot if name == snapshot_id else read_snapshot(request.snapshot_root, name)
+            for name in list_snapshot_ids(request.snapshot_root, source=FPL_LIVE_SOURCE)
+        ),
+        season=season,
+        as_of_utc=snapshot.metadata.captured_at_utc,
+    )
     target = Path(request.out_dir) / "data" / "league" / SCOREBOARD_FILE
     # An empty ledger root beside a scoreboard that already publishes our rows: the
     # decisions were made, their local record is what is missing. Keep the rows.

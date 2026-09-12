@@ -143,6 +143,13 @@ def main() -> int:
     assert isinstance(payload, dict)
     rows = payload["gameweeks"]
     ours = [row["gameweek"] for row in rows if row["ours"] is not None]
+    bases = sorted(
+        {
+            str(row["ours"].get("scoring_basis") or OUR_SCORING_BASIS)
+            for row in rows
+            if row["ours"] is not None
+        }
+    )
     top100 = [row["top100"] for row in rows if row["top100"] is not None]
     cohort_line = (
         "no gameweek"
@@ -152,7 +159,8 @@ def main() -> int:
     print(
         f"capture {snapshot_id}: {season}, gameweeks {[row['gameweek'] for row in rows]} "
         f"played; histories for {result.histories_held} of {result.registered_members} registered; "
-        f"ours recorded for {ours} ({OUR_SCORING_BASIS}); Top-100 for {cohort_line}"
+        f"ours recorded for {ours} ({', '.join(bases) or 'no scoring basis'}); "
+        f"Top-100 for {cohort_line}"
     )
     if any(week["basis"] == "gross" for week in top100):
         print(

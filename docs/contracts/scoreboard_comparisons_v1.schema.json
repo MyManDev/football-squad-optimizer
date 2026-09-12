@@ -1,0 +1,243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Scoreboard comparisons v1 gameweek extension",
+  "description": "Validates one scoreboard gameweek. The comparisons field is optional for legacy publications.",
+  "type": "object",
+  "required": [
+    "gameweek",
+    "finished",
+    "data_checked"
+  ],
+  "properties": {
+    "gameweek": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "finished": {
+      "type": "boolean"
+    },
+    "data_checked": {
+      "type": "boolean"
+    },
+    "comparisons": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "prefixItems": [
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/comparison"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "system"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/comparison"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "base"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/comparison"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "elite_xi"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/comparison"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "ownership_template"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/comparison"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "league_mean"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "$ref": "#/$defs/comparison"
+            },
+            {
+              "properties": {
+                "kind": {
+                  "const": "game_mean"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "not": {
+          "properties": {
+            "finished": {
+              "const": true
+            },
+            "data_checked": {
+              "const": true
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "comparisons": {
+            "items": {
+              "properties": {
+                "net": {
+                  "type": "null"
+                },
+                "diagnostics": {
+                  "properties": {
+                    "zero_minute_starters": {
+                      "type": "null"
+                    },
+                    "minutes_shortfall": {
+                      "type": "null"
+                    },
+                    "captain_shortfall": {
+                      "type": "null"
+                    },
+                    "autosub_recovery": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "diagnostics": {
+      "type": "object",
+      "required": [
+        "zero_minute_starters",
+        "minutes_shortfall",
+        "captain_shortfall",
+        "autosub_recovery"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "zero_minute_starters": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 11
+        },
+        "minutes_shortfall": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "captain_shortfall": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "autosub_recovery": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "required": [
+        "kind",
+        "net",
+        "scoring_basis",
+        "source_snapshot_id",
+        "diagnostics"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "system",
+            "base",
+            "elite_xi",
+            "ownership_template",
+            "league_mean",
+            "game_mean"
+          ]
+        },
+        "net": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "scoring_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "diagnostics": {
+          "$ref": "#/$defs/diagnostics"
+        }
+      }
+    }
+  }
+}
