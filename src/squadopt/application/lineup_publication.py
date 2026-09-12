@@ -39,7 +39,7 @@ def lineup_fields(week: PlanningWeekResult) -> dict[str, object]:
     bench order follow the same completion rule the official scorer applies to an
     optimizer decision (highest expected points first, ties by player id, the bench
     goalkeeper first) so what is shown is what would be scored. ``expected_own_points``
-    is the eleven plus the captain's double — expected points, nothing else.
+    is the eleven plus the captain's double: expected points, nothing else.
     """
 
     eleven = [row for _, row in week.starting_xi.iterrows()]
