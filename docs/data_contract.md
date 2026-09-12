@@ -164,12 +164,12 @@ should run it rather than discover the mismatch downstream as missing prices.
 registry; it is not a source of player-gameweek rows and no feature reads it.
 
 Two fields the public endpoints do not publish, and which therefore have to be carried as
-declared unknowns rather than filled in:
+a declared unknown or a derivation that says when it is one:
 
 | Field | State | What a consumer may not claim |
 | --- | --- | --- |
 | `purchase_prices` | empty, `purchase_prices_known=False` | Not a selling price. A held squad built from these picks values every player at his *current* price, which overstates the budget for anyone who has risen since he was bought. |
-| `free_transfers` | `1`, `free_transfers_known=False` | Not the banked count. The endpoints never state it. It is derivable from the per-event transfers and costs, but only through a model of the banking cap (changed in 2024-25) and of the chip weeks that consume no transfer — so it is an open decision, not a parsing detail. |
+| `free_transfers` | derived; `free_transfers_known=True` only when the derivation held | The endpoints never state the banked count. `banked_free_transfers` derives the count for the coming deadline from the history's per-event transfers and costs: none at the GW1 deadline, one added per week up to the cap the bootstrap's `max_extra_free_transfers` implies, consumed before any hit is paid, untouched by a Wildcard or Free Hit week. Every week's recorded cost is checked against that model; a missing week, a late joiner, a capture without the cap, or a cost the model does not reproduce leaves the floor of `1` with the flag down. |
 
 Both flags exist so a consumer that spends real budget or plans real transfers on these
 numbers has to acknowledge the limit rather than discover it.

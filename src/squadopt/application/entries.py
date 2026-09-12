@@ -64,10 +64,12 @@ class EntryPicks:
     bank_tenths: int
     free_transfers: int
     free_transfers_known: bool = True
-    """False when the source does not publish the banked count and ``free_transfers`` is
-    the rule-implied floor of one. The public endpoints never state it, so a capture-built
-    picks object carries ``1`` here with this flag down — and anything that plans transfers
-    on it must surface that the second free transfer, if banked, is invisible."""
+    """False when ``free_transfers`` is the rule-implied floor of one rather than the
+    banked count. The public endpoints never state the count; a capture-built picks
+    object derives it from the member's history (``data.sources.fpl_live.
+    banked_free_transfers``) and raises this flag only when every week was present and
+    the recorded hits agreed with the banking model. With the flag down, anything that
+    plans transfers on it must surface that a banked second transfer is invisible."""
     chips_used: Mapping[str, tuple[int, ...]] = field(default_factory=dict)
     """Chip name -> the gameweeks it was played (what the planner's windows need)."""
     purchase_prices: Mapping[int, int] = field(default_factory=dict)
