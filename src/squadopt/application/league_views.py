@@ -513,7 +513,12 @@ def _envelope(payload: Mapping[str, object], *, generated_at_utc: str) -> dict[s
 
 
 def _entry_player(
-    row: "pd.Series[Any]", *, role: str, is_captain: bool, bench_order: int | None
+    row: "pd.Series[Any]",
+    *,
+    role: str,
+    is_captain: bool,
+    bench_order: int | None,
+    is_vice_captain: bool | None,
 ) -> dict[str, object]:
     name = str(row["name"])
     return {
@@ -526,9 +531,37 @@ def _entry_player(
         "expected_points": float(str(row["expected_points"])),
         "event_points": None,
         "is_captain": is_captain,
+        # Absent, never false, when no held vice could be established (``None`` here):
+        # a reader that saw ``false`` on all fifteen would take it as "this member named
+        # nobody", which is a different and unproven claim.
+        **({} if is_vice_captain is None else {"is_vice_captain": is_vice_captain}),
         "bench_order": bench_order,
         "role": role,
     }
+
+
+def _held_vice_captain(picks: EntryPicks, pool: Mapping[int, object]) -> int | None:
+    """The vice-captain the member actually holds, or ``None`` when none can be stated.
+
+    ``EntryPicks`` requires a vice rather than defaulting one (see the field's docstring:
+    a guessed vice hands the armband to the wrong player in exactly the weeks the captain
+    blanked), but the application type validates nothing about the value, so the two facts
+    the capture parser proves are re-established here instead of assumed: the vice is one
+    of the fifteen, and he is not the captain. A value that fails either is a stand-in, and
+    publishing a stand-in would hand the page a guess wearing the shape of a fact.
+
+    He must also be in the projection pool, because a player the pool does not carry is
+    dropped from the published fifteen below; flagging the other fourteen ``false`` would
+    then read as "nobody holds it" rather than "the holder is not on this page".
+
+    He may be on the bench. The parser deliberately accepts a benched vice, and one of the
+    fifteen real entries in the September capture names one.
+    """
+
+    vice = int(picks.vice_captain)
+    if vice == int(picks.captain) or vice not in set(picks.squad) or vice not in pool:
+        return None
+    return vice
 
 
 def _entry_squad_payload(
@@ -545,6 +578,7 @@ def _entry_squad_payload(
     """The member's own squad, as the site's entry page renders it."""
 
     pool = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
+    vice = _held_vice_captain(picks, pool)
     starters: list[dict[str, object]] = []
     bench: list[dict[str, object]] = []
     bench_index = 0
@@ -552,6 +586,10 @@ def _entry_squad_payload(
         row = pool.get(int(player_id))
         if row is None:
             continue
+        # None on every record when no vice is held, so the field is absent from the whole
+        # document rather than present and false: the page's "not stated" path is the one
+        # that must stay live for such a member.
+        wears_vice = None if vice is None else int(player_id) == vice
         if int(player_id) in set(picks.starting_xi):
             starters.append(
                 _entry_player(
@@ -559,12 +597,19 @@ def _entry_squad_payload(
                     role="starter",
                     is_captain=int(player_id) == int(picks.captain),
                     bench_order=None,
+                    is_vice_captain=wears_vice,
                 )
             )
         else:
             bench_index += 1
             bench.append(
-                _entry_player(row, role="bench", is_captain=False, bench_order=bench_index)
+                _entry_player(
+                    row,
+                    role="bench",
+                    is_captain=False,
+                    bench_order=bench_index,
+                    is_vice_captain=wears_vice,
+                )
             )
     # What is still playable, per half, read before the upcoming deadline. A capture-built
     # EntryPicks always carries the history (the capture reader refuses a payload without

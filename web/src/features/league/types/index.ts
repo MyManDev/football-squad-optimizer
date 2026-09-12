@@ -105,14 +105,29 @@ export interface EntryChipAvailability {
   states: Record<string, Record<ChipHalf, ChipWindowState | null>>;
 }
 
+/**
+ * A player in a member's published fifteen: the shared view plus the armband the capture
+ * recorded for him.
+ */
+export interface EntrySquadPlayer extends PlayerView {
+  /**
+   * True for the one player the member's picks named vice-captain. Absent, never false,
+   * on every record of a document whose source did not state a held vice, and on every
+   * document published before the field: absent means "not stated", which is not the same
+   * claim as "nobody holds it". It rides bench records too, because the platform lets the
+   * armband sit on the bench.
+   */
+  is_vice_captain?: boolean;
+}
+
 export interface EntrySquad {
   league_id: number;
   season: string;
   gameweek: number;
   scored_gameweek: number | null;
   entry: HumanEntryView;
-  starting_xi: PlayerView[];
-  bench: PlayerView[];
+  starting_xi: EntrySquadPlayer[];
+  bench: EntrySquadPlayer[];
   bank_tenths: number;
   free_transfers: number;
   free_transfers_known: boolean;

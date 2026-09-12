@@ -1,6 +1,12 @@
 import { isEntryChips } from "./chipShape";
 import { LeagueDataError } from "./dataErrors";
-import type { EntryAdviceIndex, EntrySquad, LeagueMembers, LeagueViewEnvelope } from "./types";
+import type {
+  EntryAdviceIndex,
+  EntrySquad,
+  EntrySquadPlayer,
+  LeagueMembers,
+  LeagueViewEnvelope,
+} from "./types";
 
 const CONTRACT_VERSION = "provisional_league_ui_v1";
 
@@ -47,8 +53,21 @@ function publishedPlayer(value: unknown): boolean {
     ["GK", "DEF", "MID", "FWD"].includes(value.position) &&
     finite(value.expected_points) &&
     typeof value.is_captain === "boolean" &&
+    // Optional, like the state fields below: documents published before the field carry
+    // none, and so does a member whose source never stated a held vice. Absent is read as
+    // "not stated"; a wrong shape is still refused rather than read as absent.
+    (value.is_vice_captain === undefined || typeof value.is_vice_captain === "boolean") &&
     (value.bench_order == null || Number.isSafeInteger(value.bench_order))
   );
+}
+
+/**
+ * The platform names exactly one vice-captain, so a published fifteen may flag one player
+ * or, when the source did not state the armband, none at all. Two would leave the page
+ * choosing between them.
+ */
+function atMostOneViceCaptain(players: ReadonlyArray<EntrySquadPlayer>): boolean {
+  return players.filter((player) => player.is_vice_captain === true).length <= 1;
 }
 
 export function assertEnvelope<T>(value: unknown): LeagueViewEnvelope<T> {
@@ -104,6 +123,7 @@ export function assertSquad(
     !view.starting_xi.every(publishedPlayer) ||
     !Array.isArray(view.bench) ||
     !view.bench.every(publishedPlayer) ||
+    !atMostOneViceCaptain([...view.starting_xi, ...view.bench]) ||
     !Array.isArray(view.missing_fields) ||
     !view.missing_fields.every((field) => typeof field === "string") ||
     !["complete", "partial", "empty"].includes(view.data_quality) ||

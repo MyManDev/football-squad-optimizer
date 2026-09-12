@@ -295,6 +295,44 @@ describe("published member document shapes", () => {
     await expect(loadEntrySquad(ENTRY)).resolves.toEqual(source);
   });
 
+  it.each([0, 11])(
+    "carries a held vice-captain at squad position %i, bench as readily as eleven",
+    async (position) => {
+      const envelope = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+      const players = [...envelope.payload.starting_xi, ...envelope.payload.bench];
+      for (const player of players) player.is_vice_captain = false;
+      players[position]!.is_vice_captain = true;
+      fromNetwork(envelope);
+      await expect(loadEntrySquad(ENTRY)).resolves.toEqual(envelope);
+    },
+  );
+
+  it("accepts a squad that names no vice-captain, which carries no flag at all", async () => {
+    // Absent is not false. Documents published before the field carry none, and so does a
+    // member whose source never stated the armband; both must still render.
+    const envelope = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    const players = [...envelope.payload.starting_xi, ...envelope.payload.bench];
+    expect(players.every((player) => player.is_vice_captain === undefined)).toBe(true);
+    fromNetwork(envelope);
+    await expect(loadEntrySquad(ENTRY)).resolves.toEqual(envelope);
+  });
+
+  it("refuses a vice-captain flag that is not a boolean instead of reading it as absent", async () => {
+    const envelope = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    envelope.payload.starting_xi[0]!.is_vice_captain = "yes" as unknown as boolean;
+    fromNetwork(envelope);
+    await expect(loadEntrySquad(ENTRY)).rejects.toBeInstanceOf(LeagueDataError);
+  });
+
+  it("refuses two players wearing the one armband", async () => {
+    // The platform names exactly one vice; two would leave the page choosing between them.
+    const envelope = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    envelope.payload.starting_xi[0]!.is_vice_captain = true;
+    envelope.payload.bench[0]!.is_vice_captain = true;
+    fromNetwork(envelope);
+    await expect(loadEntrySquad(ENTRY)).rejects.toBeInstanceOf(LeagueDataError);
+  });
+
   const window = { state: "available", gameweek: null, start_event: 1, stop_event: 19 };
   it.each([
     ["chips", null],
