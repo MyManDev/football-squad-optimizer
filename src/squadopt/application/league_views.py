@@ -566,10 +566,22 @@ def _entry_squad_payload(
             bench.append(
                 _entry_player(row, role="bench", is_captain=False, bench_order=bench_index)
             )
+    # What is still playable, per half, read before the upcoming deadline. A capture-built
+    # EntryPicks always carries the history (the capture reader refuses a payload without
+    # its chips list), so ``known`` is true for every document the site publishes today;
+    # it is derived rather than written so that a provider without the history publishes
+    # the same shape with ``known`` false and every window ``unknown``, and the raw history
+    # absent rather than an empty map that would read as "no chip played".
+    upcoming = picks.gameweek + 1
+    states = chip_states(rules, upcoming, picks.chips_used)
+    windows = [window for halves in states.values() for window in halves.values()]
+    chips_known = picks.chips_used is not None and all(
+        window.state != "unknown" for window in windows if window is not None
+    )
     return {
         "league_id": int(league_id),
         "season": picks.season,
-        "gameweek": picks.gameweek + 1,
+        "gameweek": upcoming,
         "scored_gameweek": scored_gameweek,
         "entry": dict(member_row),
         "starting_xi": starters,
@@ -577,22 +589,26 @@ def _entry_squad_payload(
         "bank_tenths": int(picks.bank_tenths),
         "free_transfers": int(picks.free_transfers),
         "free_transfers_known": bool(picks.free_transfers_known),
-        "chips_used": {name: list(weeks) for name, weeks in picks.chips_used.items()},
-        # What is still playable, per half, read before the upcoming deadline. ``known`` is
-        # true here because an EntryPicks always carries the history (the capture reader
-        # refuses a payload without its chips list); the flag is published so a reader of a
-        # future provider that lacks the history sees the same shape, states "unknown".
+        "chips_used": (
+            {name: list(weeks) for name, weeks in picks.chips_used.items()} if chips_known else None
+        ),
         "chips": {
-            "known": True,
-            "gameweek": picks.gameweek + 1,
+            "known": chips_known,
+            "gameweek": upcoming,
             "states": {
                 name: {
                     half: None if window is None else window.to_dict()
                     for half, window in halves.items()
                 }
-                for name, halves in chip_states(rules, picks.gameweek + 1, picks.chips_used).items()
+                for name, halves in states.items()
             },
         },
+        # Which squad the fifteen above are: the captured week's own, or the squad held
+        # before a Free Hit voided it (``pre_free_hit_gwNN``), and the chip active in the
+        # captured week. The advice documents already say this; the squad page must too,
+        # or a pre-Free-Hit fifteen reads as the week's picks.
+        "squad_basis": picks.squad_basis,
+        "active_chip": picks.active_chip,
         "purchase_prices_known": bool(picks.purchase_prices_known),
         "source_snapshot_id": picks.source_snapshot_id,
         # Comparing a member's gameweek score with ours needs both scores; the standings

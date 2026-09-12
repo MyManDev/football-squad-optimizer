@@ -331,11 +331,28 @@ function squadEnvelope(entry: HumanEntryView, index: number): LeagueViewEnvelope
     free_transfers: 1,
     free_transfers_known: false,
     chips_used: {},
+    // Every chip still playable before gameweek 2: the 2026-27 season lists each one
+    // once per half, and the second half has not opened.
+    chips: {
+      known: true,
+      gameweek: GAMEWEEK,
+      states: Object.fromEntries(
+        ["wildcard", "freehit", "bboost", "3xc"].map((name) => [
+          name,
+          {
+            first_half: { state: "available", gameweek: null, start_event: 1, stop_event: 19 },
+            second_half: { state: "not_yet", gameweek: null, start_event: 20, stop_event: 38 },
+          },
+        ]),
+      ),
+    },
     purchase_prices_known: false,
     source_snapshot_id: "example-post-deadline-gw02",
     squadopt_comparison: squadoptComparison,
     data_quality: partial ? "partial" : "complete",
     missing_fields: partial ? ["team_name", "gameweek_points", "picks[8:11]"] : [],
+    squad_basis: "captured",
+    active_chip: null,
   });
 }
 
