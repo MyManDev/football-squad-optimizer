@@ -1,7 +1,8 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
-import type { Language } from "../../../i18n/messages";
+import { MESSAGES, type Language } from "../../../i18n/messages";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { ScoreboardComparison, ScoreboardGameweek } from "../types";
 import { ScoreboardComparisons } from "./ScoreboardComparisons";
 
@@ -51,6 +52,15 @@ describe.each<Language>(["en", "tr"])("six scoreboard comparisons in %s", (langu
       </LanguageProvider>,
     );
   }
+  it("keeps every comparison message inside the shared wording rule", () => {
+    const copy = MESSAGES[language].scoreboardComparisons;
+    const strings = [
+      ...Object.values(copy).filter((value) => typeof value === "string"),
+      ...Object.values(copy.names),
+    ];
+    for (const text of strings) expect(text).not.toMatch(AS_A_CHANCE);
+    for (const word of ["chance", "likelihood", "odds"]) expect(word).toMatch(AS_A_CHANCE);
+  });
   it("separates measured zero, missing data and scoring bases with integer starter counts", () => {
     const value = week();
     value.comparisons![0]!.diagnostics.zero_minute_starters = 2;
@@ -63,7 +73,7 @@ describe.each<Language>(["en", "tr"])("six scoreboard comparisons in %s", (langu
     expect(container.textContent).toContain(language === "tr" ? "47,5" : "47.5");
     expect(container.textContent).toContain(language === "tr" ? "-2,5" : "-2.5");
     expect(container.textContent).toContain(language === "tr" ? "ikinci kaptan" : "vice-captain");
-    expect(container.textContent).not.toMatch(/probab|olasılık|yüzde|ihtimal|şans|%/i);
+    expect(container.textContent).not.toMatch(AS_A_CHANCE);
     expect(container.querySelector("details")).toBeNull();
     expect(within(rows[1]!).getAllByRole("cell")[3]).toHaveTextContent(
       language === "tr" ? "0,0" : "0.0",

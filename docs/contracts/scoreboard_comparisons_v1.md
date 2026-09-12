@@ -32,6 +32,11 @@ measured zero. The web table shows missing measurements as `-` in both languages
 | `captain_shortfall` | Frozen captain's expected points minus the ordinary captain bonus received, including recorded vice recovery. Null without that prediction. |
 | `autosub_recovery` | Substitute points returned by the existing official scorer. Null when no recorded bench order and vice are available. |
 
+The current live ledger's `projections.csv` does not contain `expected_minutes`.
+Consequently `minutes_shortfall` remains `null` in live publications, even when
+settled minutes are available. A finite diagnostic requires expected minutes frozen
+with the decision. Current projections or later captures cannot fill that gap.
+
 Residuals are signed. A negative shortfall means the observation exceeded the
 prediction. The extra Triple Captain copy is outside the captain diagnostic;
 Bench Boost includes all fifteen players and has zero autosub recovery. These are

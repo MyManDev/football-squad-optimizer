@@ -3,64 +3,9 @@ import { points } from "../../../lib/format";
 import type { ScoreboardGameweek } from "../types";
 import styles from "./ScoreboardCard.module.css";
 
-const COPY = {
-  en: {
-    title: "Weekly comparison and error breakdown",
-    week: "GW",
-    name: "Decision",
-    net: "Points",
-    zero: "Starters with no minutes",
-    minutes: "Minutes shortfall",
-    captain: "Captain shortfall",
-    autosub: "Autosub recovery",
-    missing:
-      "- means not measured. Minutes shortfall covers starters who played; negative means more minutes than projected. Captain shortfall is expected minus received bonus points.",
-    legacy: "Named eleven; autosubs and vice-captain recovery unavailable",
-    synthetic: "Reconstructed legal squad within the opening budget; no transfer history",
-    game: "Game's published average",
-    official: "Official substitutions and captain scoring",
-    absent: "Decision record unavailable",
-    pending: "Awaiting settled results",
-    names: {
-      system: "System",
-      base: "Bare component",
-      elite_xi: "Lagged elite XI",
-      ownership_template: "Ownership template",
-      league_mean: "League mean, net",
-      game_mean: "Game average",
-    },
-  },
-  tr: {
-    title: "Haftalık karşılaştırma ve hata ayrıştırması",
-    week: "GW",
-    name: "Karar",
-    net: "Puan",
-    zero: "Sıfır dakikalı ilk 11",
-    minutes: "Dakika açığı",
-    captain: "Kaptan açığı",
-    autosub: "Otomatik değişiklik getirisi",
-    missing:
-      "- ölçülmedi demektir. Dakika açığı oynayan ilk 11 oyuncularını kapsar; negatif değer tahminden fazla dakika oynandığını gösterir. Kaptan açığı, beklenen ile gerçekleşen ek puan farkıdır.",
-    legacy: "Adı konan ilk 11; otomatik değişiklik ve ikinci kaptan getirisi bilinmiyor",
-    synthetic: "Açılış bütçesiyle kurallara uygun yeniden kurulan kadro; transfer geçmişi yok",
-    game: "Oyunun yayımladığı ortalama",
-    official: "Resmi değişiklik ve kaptan puanlaması",
-    absent: "Karar kaydı yok",
-    pending: "Yerleşmiş sonuç bekleniyor",
-    names: {
-      system: "Sistem",
-      base: "Çıplak bileşen",
-      elite_xi: "Önceki haftanın elit XI'i",
-      ownership_template: "Sahiplik şablonu",
-      league_mean: "Lig ortalaması, net",
-      game_mean: "Oyun ortalaması",
-    },
-  },
-};
-
 export function ScoreboardComparisons({ weeks }: { weeks: ScoreboardGameweek[] }) {
-  const { language, locale } = useLanguage();
-  const copy = COPY[language];
+  const { messages, locale } = useLanguage();
+  const copy = messages.scoreboardComparisons;
   if (!weeks.some((week) => Array.isArray(week.comparisons) && week.comparisons.length))
     return null;
   const number = (value: number | null | undefined) =>
