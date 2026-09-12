@@ -13,9 +13,9 @@ emitted. Three properties make it usable as evidence rather than as a note:
 
 - **It is written by the call that writes the published bytes.** ``build_league_views``
   writes both, from the same picks, the same projection and the same payloads. A runner
-  wrapped around the publish could not do this honestly — the weekly publish re-solves in
-  a fresh worktree at whatever code is on develop, so a record assembled outside it would
-  describe a different solve than the one that shipped.
+  wrapped around the publish could not do this honestly: it would be describing a solve
+  it did not perform. The weekly run publishes the preview tree it built, so its league
+  stage is that call and writes the record when the run is going to publish.
 - **It is scoring-complete.** Everything a later page needs to score what we advised is in
   the record: the eleven in pitch order, the bench in autosub order, the captain, the vice,
   the chip, the moves, the week's hit charge and the expected own points; the state the

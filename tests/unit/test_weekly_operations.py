@@ -12,7 +12,7 @@ from tests.unit.test_publication_services import publication_world
 
 from squadopt.application.weekly_plan import WeekError, WeeklyRequest, rotation_artifact
 from squadopt.platform import weekly_operations as weekly
-from squadopt.platform.weekly_journal import WeeklyJournalError, inspect_run
+from squadopt.platform.weekly_journal import WeeklyJournalError, fingerprint_paths, inspect_run
 
 
 def world(tmp_path: Path, *, rotation: bool = False) -> weekly.WeeklyOperations:
@@ -69,7 +69,7 @@ def test_real_weekly_services_complete_and_resume_without_rebuilding(tmp_path: P
     assert members["payload"]["gameweek"] == 2 and members["payload"]["season"] == "2026-27"
     entry = json.loads((operation.paths.out / "data/league/entries/101.json").read_bytes())
     assert entry["payload"]["source_snapshot_id"] == operation.request.snapshot_id
-    before = weekly.fingerprint_paths([operation.paths.out])
+    before = fingerprint_paths([operation.paths.out])
     resumed = weekly.WeeklyOperations(
         operation.request,
         operation.paths,
@@ -79,7 +79,7 @@ def test_real_weekly_services_complete_and_resume_without_rebuilding(tmp_path: P
         handoff=operation.supplied_handoff,
     )
     resumed.execute()
-    assert weekly.fingerprint_paths([operation.paths.out]) == before
+    assert fingerprint_paths([operation.paths.out]) == before
     assert inspect_run(operation.paths.journal, "synthetic")["status"] == "completed"
     # A mutable alias changed by another writer is not accepted just because the run succeeded.
     alias = operation.paths.handoffs / "2026-27-gw02.json"
@@ -131,7 +131,8 @@ def _git_checkout(tmp_path: Path) -> tuple[Path, weekly.WeeklyPaths, list[str]]:
     shutil.copyfile(publication.registry_path, paths.registry)
     handoff = checkout / "data/prebuilt.json"
     shutil.copyfile(publication.handoff_path, handoff)
-    (checkout / ".gitignore").write_text("data/\nartifacts/\n")
+    # Anchored: the published tree under web/public/data is tracked, as it is in the repo.
+    (checkout / ".gitignore").write_text("/data/\n/artifacts/\n/.codex-tmp/\n")
     (checkout / "source.py").write_text("unchanged")
     public = checkout / "web/public/data/members.json"
     public.parent.mkdir(parents=True)
@@ -328,9 +329,17 @@ def test_missing_reused_rotation_refuses_before_capture_or_export(tmp_path: Path
     assert all(stage["status"] == "pending" for stage in doc["stages"][1:])
 
 
-def test_preview_and_publish_record_destination_are_explicit(
+def test_the_preview_records_advice_only_when_it_is_the_publication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """The record is written by the build whose bytes ship. Without --publish the preview
+    is a preview and records nothing; with it, the preview is the publication and records
+    into the private root, and the records history already reads are declared inputs."""
+
+    week = tmp_path / "data/advice_records/2026-27/gw02/entry-101"
+    earlier = week / "fpl-live-20260820T120000Z-earlier"
+    earlier.mkdir(parents=True)
+    (week / ".fpl-live-dying.staging-1-abcd").mkdir()
     operation = world(tmp_path)
     operation.values["capture"] = {"snapshot_id": operation.request.snapshot_id}
     operation.values["handoff"] = {"path": str(operation.supplied_handoff)}
@@ -341,12 +350,132 @@ def test_preview_and_publish_record_destination_are_explicit(
         return SimpleNamespace(output_paths=(), snapshot_id=request.snapshot_id, gameweek=2)
 
     monkeypatch.setattr(weekly, "publish_league", publish)
-    operation._league()
-    operation._league(tmp_path / "publication", record=True)
-    assert calls[0].record_root is None
+    assert operation._league().value["advice_recorded"] is False
+    publishing = weekly.WeeklyOperations(
+        replace(operation.request, publish=True),
+        operation.paths,
+        run_id="publishing",
+        repository_commit="b" * 40,
+        handoff=operation.supplied_handoff,
+    )
+    publishing.values.update(operation.values)
+    assert publishing._league().value["advice_recorded"] is True
+    assert calls[0].record_root is None and calls[0].out_dir == operation.paths.out
     assert calls[1].record_root == operation.paths.records
-    assert calls[1].out_dir == tmp_path / "publication"
+    assert calls[1].out_dir == operation.paths.out
+    assert operation.record_inputs == publishing.record_inputs == [earlier]
     assert "rotation" not in operation.stages
+
+
+def _origin_develop_at_head(checkout: Path) -> Path:
+    """Publish HEAD as ``origin/develop``: the base a weekly publish is allowed from."""
+
+    origin = checkout.parent / "origin.git"
+    _git(checkout, "init", "-q", "--bare", str(origin))
+    _git(checkout, "remote", "add", "origin", str(origin))
+    _git(checkout, "push", "-q", "origin", "HEAD:refs/heads/develop")
+    return origin
+
+
+def _fake_gh(monkeypatch: pytest.MonkeyPatch, pr_url: str) -> None:
+    """Git runs for real against the bare origin; only the three gh calls are answered."""
+
+    from squadopt.platform import weekly_publish
+
+    real = weekly_publish._run
+
+    def run(arguments: list[str], *, cwd: Path, check: bool = True) -> str:
+        if arguments[0] != "gh":
+            return real(arguments, cwd=cwd, check=check)
+        if arguments[1:3] == ["pr", "list"]:
+            return ""
+        if arguments[1:3] == ["pr", "create"]:
+            return pr_url
+        head = real(["git", "rev-parse", "HEAD"], cwd=cwd)
+        return json.dumps({"url": pr_url, "headRefOid": head, "state": "OPEN"})
+
+    monkeypatch.setattr(weekly_publish, "_run", run)
+
+
+def test_the_publication_is_the_preview_byte_for_byte(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The publish stage commits the tree the preview built rather than solving again, so
+    the published documents, the history document included, are the previewed bytes."""
+
+    # A short root: a record's staging sibling has to fit inside Windows' path limit.
+    tmp_path = tmp_path_factory.mktemp("pub")
+    checkout, paths, args = _git_checkout(tmp_path)
+    origin = _origin_develop_at_head(checkout)
+    _fake_gh(monkeypatch, "https://example.invalid/pr/1")
+
+    assert weekly.main([*args, "--publish", "--run-id", "shipped"]) == 0
+
+    preview = paths.journal / "shipped/preview/data"
+    published = tmp_path / "published"
+    # The committed bytes, not a checkout's line-ending conversion of them.
+    _git(
+        tmp_path,
+        "-c",
+        "core.autocrlf=false",
+        "clone",
+        "-q",
+        "--branch",
+        "feature/gw02-decision-site",
+        str(origin),
+        str(published),
+    )
+    assert weekly.tree_digests(published / "web/public/data") == weekly.tree_digests(preview)
+    history = json.loads((preview / "league/history/101.json").read_bytes())
+    assert [week["gameweek"] for week in history["payload"]["weeks"]] == [2]
+    assert (published / "web/public/data/league/history/101.json").read_bytes() == (
+        preview / "league/history/101.json"
+    ).read_bytes()
+    snapshot = args[args.index("--snapshot-id") + 1]
+    assert (paths.records / "2026-27/gw02/entry-101" / snapshot / "advice.json").is_file()
+    doc = json.loads((paths.journal / "shipped/run.json").read_bytes())
+    stages = {stage["name"]: stage for stage in doc["stages"]}
+    assert stages["league"]["value"]["advice_recorded"] is True
+    assert [row["path"] for row in stages["publish"]["inputs"]] == [str(preview)]
+    assert stages["publish"]["value"]["status"] == "pr_open"
+    assert stages["publish"]["value"]["published_files"] == len(weekly.tree_digests(preview))
+    assert not (checkout / ".codex-tmp/publications/gw02-decision").exists()
+
+
+def test_a_publish_refused_after_the_preview_keeps_its_record_deliberately(
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Develop moves between preflight and publish: nothing is committed or pushed, and the
+    record the preview wrote for its capture stays. It is deliberate: the record is keyed
+    by the capture, a rerun of the same capture is a replay of it, and a rerun from a
+    fresher capture records its own; deleting it would make the record rewritable."""
+
+    tmp_path = tmp_path_factory.mktemp("ref")
+    checkout, paths, args = _git_checkout(tmp_path)
+    origin = _origin_develop_at_head(checkout)
+    real_publish = weekly.publish
+
+    def moved(names, **kwargs):
+        merged = _git(checkout, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "merged")
+        _git(checkout, "push", "-q", "origin", f"{merged}:refs/heads/develop")
+        return real_publish(names, **kwargs)
+
+    monkeypatch.setattr(weekly, "publish", moved)
+    assert weekly.main([*args, "--publish", "--run-id", "refused"]) == 1
+
+    assert "origin/develop" in capsys.readouterr().err
+    assert _git(checkout, "ls-remote", "--heads", str(origin), "feature/gw02-decision-site") == ""
+    assert not (checkout / ".codex-tmp/publications/gw02-decision").exists()
+    doc = json.loads((paths.journal / "refused/run.json").read_bytes())
+    stages = {stage["name"]: stage["status"] for stage in doc["stages"]}
+    assert stages["league"] == "completed" and stages["publish"] == "uncertain"
+    snapshot = args[args.index("--snapshot-id") + 1]
+    record = paths.records / "2026-27/gw02/entry-101" / snapshot / "advice.json"
+    assert json.loads(record.read_bytes())["state"]["source_snapshot_id"] == snapshot
+    history = paths.journal / "refused/preview/data/league/history/101.json"
+    assert [w["gameweek"] for w in json.loads(history.read_bytes())["payload"]["weeks"]] == [2]
 
 
 @pytest.mark.parametrize(

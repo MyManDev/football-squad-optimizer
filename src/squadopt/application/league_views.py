@@ -722,8 +722,9 @@ def build_league_views(
     advice record (``application/advice_record.py``). The published tree has no gameweek in
     its paths and is overwritten every week, so without this nothing on disk survives to say
     what a member was told for a given week. The record is written here, by the same call
-    that writes the published bytes, from the same picks, projection and payloads — a runner
-    around this could only guess, because the weekly publish re-solves in a fresh worktree.
+    that writes the published bytes, from the same picks, projection and payloads; a runner
+    around this could only guess. The weekly run passes it for the preview it will publish,
+    since that preview's tree is what its publish stage commits, without solving again.
 
     The record is keyed by ``inputs``' capture, so the mid-week publish and the one taken
     shortly before the deadline each write their own and neither refuses the other. A

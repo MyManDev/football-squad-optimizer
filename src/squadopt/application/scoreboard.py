@@ -606,9 +606,12 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
             f"scoreboard rows for gameweeks {list(kept)} rather than publishing none."
         )
     target.parent.mkdir(parents=True, exist_ok=True)
+    # LF on every platform: the preview is what a publish commits, byte for byte, and a
+    # platform newline here would be the one file git normalised on the way in.
     target.write_text(
         json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
+        newline="\n",
     )
     return ScoreboardPublicationResult(
         snapshot_id,
