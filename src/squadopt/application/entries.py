@@ -30,6 +30,9 @@ from squadopt.evaluation import FrozenSquadDecision
 from squadopt.live.transfers import HeldSquad
 
 ENTRY_REGISTRY_CONTRACT_VERSION = "entry_registry_v1"
+CAPTURED_SQUAD_BASIS = "captured"
+"""``EntryPicks.squad_basis`` when the squad is the captured week's own; the data twin
+declares the same literal, and the twin test keeps the two field lists identical."""
 
 
 class EntryError(ValueError):
@@ -74,6 +77,14 @@ class EntryPicks:
     *current* price — which overstates the budget whenever a player has risen since he was
     bought. A consumer that spends real budget on these numbers must say so to the user."""
     source_snapshot_id: str | None = None
+    active_chip: str | None = None
+    """The chip active in ``gameweek`` as the capture reported it, or None."""
+    squad_basis: str = CAPTURED_SQUAD_BASIS
+    """Which squad ``squad`` and ``bank_tenths`` describe. ``"captured"`` is the
+    picks document of ``gameweek`` itself. After a Free Hit that squad is void at the
+    next deadline, so the provider substitutes the squad held before the chip and says
+    so here (``pre_free_hit_gw02`` for a Free Hit played in gameweek 3, see
+    ``pre_free_hit_basis``), so the advice can state which squad it stands on."""
 
     def __post_init__(self) -> None:
         if (
@@ -95,6 +106,18 @@ class EntryPicks:
                 "purchase_prices are present but flagged unknown; a consumer could not "
                 "tell whether to trust them."
             )
+        if not isinstance(self.squad_basis, str) or not self.squad_basis.strip():
+            raise EntryError("squad_basis must be non-empty text.")
+        if self.active_chip is not None and (
+            not isinstance(self.active_chip, str) or not self.active_chip.strip()
+        ):
+            raise EntryError("active_chip must be None or a chip name.")
+
+
+def pre_free_hit_basis(gameweek: int) -> str:
+    """The ``squad_basis`` for a squad taken from ``gameweek``'s picks before a Free Hit."""
+
+    return f"pre_free_hit_gw{gameweek:02d}"
 
 
 class EntryPicksProvider(Protocol):
