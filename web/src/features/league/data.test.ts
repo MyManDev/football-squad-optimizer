@@ -265,4 +265,76 @@ describe("published member document shapes", () => {
       await expect(loadEntrySquad(entryId)).resolves.toEqual(envelope);
     },
   );
+
+  it("accepts a squad document from before the state fields, which carries none", async () => {
+    const envelope = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    const { chips: _chips, squad_basis: _basis, active_chip: _chip, ...older } = envelope.payload;
+    const source = { ...envelope, payload: older };
+    fromNetwork(source);
+    await expect(loadEntrySquad(ENTRY)).resolves.toEqual(source);
+  });
+
+  it("accepts the squad state a producer without the chip history publishes", async () => {
+    const envelope = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    const unknown = { state: "unknown", gameweek: null, start_event: 1, stop_event: 19 };
+    const source = {
+      ...envelope,
+      payload: {
+        ...envelope.payload,
+        chips_used: null,
+        chips: {
+          known: false,
+          gameweek: 2,
+          states: { wildcard: { first_half: unknown, second_half: null } },
+        },
+        squad_basis: "pre_free_hit_gw01",
+        active_chip: "freehit",
+      },
+    };
+    fromNetwork(source);
+    await expect(loadEntrySquad(ENTRY)).resolves.toEqual(source);
+  });
+
+  const window = { state: "available", gameweek: null, start_event: 1, stop_event: 19 };
+  it.each([
+    ["chips", null],
+    ["chips", { known: "yes", gameweek: 2, states: {} }],
+    ["chips", { known: true, gameweek: null, states: {} }],
+    ["chips", { known: true, gameweek: 2, states: [] }],
+    ["chips", { known: true, gameweek: 2, states: { wildcard: null } }],
+    ["chips", { known: true, gameweek: 2, states: { wildcard: { first_half: window } } }],
+    [
+      "chips",
+      { known: true, gameweek: 2, states: { wildcard: { first_half: window, third: null } } },
+    ],
+    [
+      "chips",
+      {
+        known: true,
+        gameweek: 2,
+        states: { wildcard: { first_half: { ...window, state: "maybe" }, second_half: null } },
+      },
+    ],
+    [
+      "chips",
+      {
+        known: true,
+        gameweek: 2,
+        states: { wildcard: { first_half: { ...window, stop_event: "19" }, second_half: null } },
+      },
+    ],
+    ["squad_basis", null],
+    ["squad_basis", 3],
+    ["squad_basis", " "],
+    ["active_chip", 7],
+    ["active_chip", ""],
+    ["active_chip", { name: "freehit" }],
+  ])("refuses a malformed squad %s instead of reading it as absent: %j", async (field, value) => {
+    const envelope = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    const fetcher = fromNetwork({ ...envelope, payload: { ...envelope.payload, [field]: value } });
+    const failure = loadEntrySquad(ENTRY);
+    await expect(failure).rejects.toBeInstanceOf(LeagueDataError);
+    await expect(failure).rejects.not.toBeInstanceOf(LeagueDataMissing);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
 });

@@ -357,6 +357,80 @@ def test_the_entry_page_gets_the_members_own_squad_not_our_advice(
         "3xc": "not_yet",
     }
     assert all(halves["second_half"] is None for halves in chips["states"].values())
+    assert payload["chips_used"] == {}
+    # The page says which squad it shows: this member's is the captured week's own, with
+    # no chip active in it.
+    assert payload["squad_basis"] == "captured"
+    assert payload["active_chip"] is None
+
+
+def test_the_entry_page_states_which_squad_it_shows_after_a_free_hit(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """A pre-Free-Hit fifteen must not read as the played week's picks."""
+
+    inputs, projection, rules = _world_context(world)
+    picks = dataclasses.replace(
+        _member_picks(world, 101, _legal_squad(world)),
+        active_chip="freehit",
+        chips_used={"freehit": (1,)},
+        squad_basis="pre_free_hit_gw01",
+    )
+    build_league_views(
+        _Provider({101: picks}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+    )
+    payload = json.loads(
+        (tmp_path / "league" / "entries" / "101.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert payload["squad_basis"] == "pre_free_hit_gw01"
+    assert payload["active_chip"] == "freehit"
+    assert payload["chips_used"] == {"freehit": [1]}
+    assert payload["chips"]["known"] is True
+    assert payload["chips"]["states"]["freehit"]["first_half"] == {
+        "state": "used",
+        "gameweek": 1,
+        "start_event": 1,
+        "stop_event": 19,
+    }
+
+
+def test_the_entry_page_says_when_the_chip_history_was_not_captured(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """``chips.known`` is read from the data: a provider without the history publishes
+    the same shape with the flag down, every window ``unknown``, and no raw history at
+    all, since an empty map would read as "no chip played".
+
+    The planner behind the advice needs the history, so this path cannot run the whole
+    build; the entries document is rendered directly from such a picks object."""
+
+    from squadopt.application.league_views import _entry_squad_payload
+
+    inputs, projection, rules = _world_context(world)
+    picks = dataclasses.replace(_member_picks(world, 101, _legal_squad(world)), chips_used=None)
+    payload = _entry_squad_payload(
+        picks,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        member_row={"member_kind": "human", "entry_id": 101},
+        missing=[],
+        scored_gameweek=None,
+    )
+    chips = payload["chips"]
+    assert chips["known"] is False and chips["gameweek"] == 2
+    assert {
+        name: halves["first_half"]["state"] for name, halves in chips["states"].items()
+    } == dict.fromkeys(("wildcard", "freehit", "bboost", "3xc"), "unknown")
+    assert payload["chips_used"] is None
 
 
 def test_only_the_computed_mode_and_window_are_published(

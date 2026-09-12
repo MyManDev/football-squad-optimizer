@@ -75,6 +75,36 @@ export interface LeagueMembers {
   members: EntryView[];
 }
 
+/** The halves a chip's windows belong to; the 2026-27 season lists each chip once per half. */
+export type ChipHalf = "first_half" | "second_half";
+
+/**
+ * One published window of one chip, as the member stands before `chips.gameweek`:
+ * `used` (with `gameweek` the week it was played), `expired` (closed unplayed), `not_yet`
+ * (not open yet), `available`, or `unknown` when the member's chip history was not
+ * captured at all. No history is not the same thing as no chips played.
+ */
+export type ChipWindowStateName = "used" | "expired" | "not_yet" | "available" | "unknown";
+
+export interface ChipWindowState {
+  state: ChipWindowStateName;
+  gameweek: number | null;
+  start_event: number;
+  stop_event: number;
+}
+
+/**
+ * What the member can still play, by chip and half, read before the upcoming deadline.
+ * Read `known` first: when it is false every window is `unknown` and `chips_used` is
+ * null, because the producer had no history to read. A chip the season lists once
+ * carries null for its second half.
+ */
+export interface EntryChipAvailability {
+  known: boolean;
+  gameweek: number;
+  states: Record<string, Record<ChipHalf, ChipWindowState | null>>;
+}
+
 export interface EntrySquad {
   league_id: number;
   season: string;
@@ -86,12 +116,23 @@ export interface EntrySquad {
   bank_tenths: number;
   free_transfers: number;
   free_transfers_known: boolean;
-  chips_used: Record<string, number[]>;
+  /** Chip name to the gameweeks it was played; null when the history was not captured. */
+  chips_used: Record<string, number[]> | null;
+  /** Absent on documents from before the block. */
+  chips?: EntryChipAvailability;
   purchase_prices_known: boolean;
   source_snapshot_id: string | null;
   squadopt_comparison: EntryScoreComparison | null;
   data_quality: EntryDataQuality;
   missing_fields: string[];
+  /**
+   * Which squad `starting_xi` and `bench` are: `captured` (the played week's own picks)
+   * or `pre_free_hit_gwNN` when a Free Hit voided that week's fifteen and the page shows
+   * the squad held before it. Absent on documents from before the field.
+   */
+  squad_basis?: string;
+  /** The chip active in the captured week as the source reported it, or null. */
+  active_chip?: string | null;
 }
 
 export interface EntryScoreComparison {

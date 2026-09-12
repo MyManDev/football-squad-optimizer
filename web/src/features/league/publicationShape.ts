@@ -50,6 +50,37 @@ function publishedPlayer(value: unknown): boolean {
   );
 }
 
+const CHIP_WINDOW_STATES = ["used", "expired", "not_yet", "available", "unknown"];
+const CHIP_HALVES = ["first_half", "second_half"];
+
+function chipWindow(value: unknown): boolean {
+  return (
+    value === null ||
+    (record(value) &&
+      typeof value.state === "string" &&
+      CHIP_WINDOW_STATES.includes(value.state) &&
+      nullableNumber(value.gameweek) &&
+      Number.isSafeInteger(value.start_event) &&
+      Number.isSafeInteger(value.stop_event))
+  );
+}
+
+/** The `chips` block: a flag, the gameweek it was read before, and every chip by half. */
+function chipAvailability(value: unknown): boolean {
+  return (
+    record(value) &&
+    typeof value.known === "boolean" &&
+    Number.isSafeInteger(value.gameweek) &&
+    record(value.states) &&
+    Object.values(value.states).every(
+      (halves) =>
+        record(halves) &&
+        Object.keys(halves).every((half) => CHIP_HALVES.includes(half)) &&
+        CHIP_HALVES.every((half) => half in halves && chipWindow(halves[half])),
+    )
+  );
+}
+
 export function assertEnvelope<T>(value: unknown): LeagueViewEnvelope<T> {
   if (
     !record(value) ||
@@ -108,7 +139,15 @@ export function assertSquad(
     !["complete", "partial", "empty"].includes(view.data_quality) ||
     typeof view.free_transfers_known !== "boolean" ||
     typeof view.purchase_prices_known !== "boolean" ||
-    !finite(view.free_transfers)
+    !finite(view.free_transfers) ||
+    // The state fields are optional (documents from before them carry none) but never
+    // malformed: a wrong shape is refused like every other field, not read as absent.
+    (view.chips !== undefined && !chipAvailability(view.chips)) ||
+    (view.squad_basis !== undefined &&
+      (typeof view.squad_basis !== "string" || view.squad_basis.trim() === "")) ||
+    (view.active_chip !== undefined &&
+      view.active_chip !== null &&
+      (typeof view.active_chip !== "string" || view.active_chip.trim() === ""))
   ) {
     throw new LeagueDataError("The published member squad is invalid or belongs to another entry.");
   }
