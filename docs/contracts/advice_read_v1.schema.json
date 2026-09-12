@@ -487,6 +487,9 @@
             "null"
           ]
         },
+        "squad_basis": {
+          "type": "string"
+        },
         "starting_xi": {
           "items": {
             "properties": {

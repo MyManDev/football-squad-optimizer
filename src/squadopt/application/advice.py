@@ -568,6 +568,9 @@ def build_advice_payload(
         **lineup,
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
+        # Which squad the advice stands on: the captured week's own, or the one held
+        # before a Free Hit voided it (``pre_free_hit_gwNN``), so the page can say so.
+        "squad_basis": picks.squad_basis,
     }
 
 
@@ -741,6 +744,9 @@ def build_window_payload(
         "stated_limits": window_stated_limits(projection),
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
+        # Which squad the advice stands on: the captured week's own, or the one held
+        # before a Free Hit voided it (``pre_free_hit_gwNN``), so the page can say so.
+        "squad_basis": picks.squad_basis,
     }
 
 

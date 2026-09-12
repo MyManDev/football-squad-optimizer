@@ -91,6 +91,9 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # read (``strategies/rule.py``). A band on points, stamped with the rule's id and
         # version — never a chance of catching up, which is why it fits in here at all.
         "suggested_strategy",
+        # Which squad the advice stands on: ``captured``, or ``pre_free_hit_gwNN`` when
+        # a Free Hit voided the captured week's fifteen. A label, never a number.
+        "squad_basis",
     }
 )
 

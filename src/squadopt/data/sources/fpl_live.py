@@ -1100,7 +1100,7 @@ def entry_endpoint_paths(entry_ids: Sequence[int], *, gameweek: int) -> Mapping[
     for entry_id in identifiers:
         paths[entry_payload(entry_id)] = f"entry/{entry_id}/"
         paths[entry_history_payload(entry_id)] = f"entry/{entry_id}/history/"
-        paths[entry_picks_payload(entry_id, week)] = f"entry/{entry_id}/event/{week}/picks/"
+        paths[entry_picks_payload(entry_id, week)] = entry_picks_endpoint_path(entry_id, week)
     return MappingProxyType(paths)
 
 
@@ -1762,6 +1762,10 @@ def _chips_used(history: bytes, *, entry_id: int) -> Mapping[str, tuple[int, ...
     return MappingProxyType({name: tuple(sorted(events)) for name, events in played.items()})
 
 
+FREE_HIT_CHIP: Final = "freehit"
+CAPTURED_SQUAD_BASIS: Final = "captured"
+
+
 @dataclass(frozen=True, slots=True)
 class EntryPicksRecord:
     """One entry's squad at one gameweek, as the public endpoints report it.
@@ -1803,8 +1807,22 @@ class EntryPicksRecord:
     purchase_prices: Mapping[int, int]
     purchase_prices_known: bool
     source_snapshot_id: str | None = None
+    active_chip: str | None = None
+    """The chip the picks document says was active in ``gameweek``, or None.
+
+    Load-bearing for one chip: a Free Hit squad lasts its own week only, so the squad
+    a member holds going into the next deadline is the one from *before* the Free Hit,
+    not the fifteen in this document. The resolver that walks back reads this field;
+    the parser only reports it.
+    """
+    squad_basis: str = CAPTURED_SQUAD_BASIS
+    """Which squad the record's fifteen and bank describe: the parser always says
+    ``"captured"``; the application resolver that substitutes a pre-Free-Hit squad
+    carries its own descriptor on the application twin."""
 
     def __post_init__(self) -> None:
+        if not isinstance(self.squad_basis, str) or not self.squad_basis.strip():
+            raise InvalidValueError(f"Entry {self.entry_id} squad_basis must be non-empty text.")
         if len(self.squad) != _SQUAD_SIZE or len(set(self.squad)) != _SQUAD_SIZE:
             raise InvalidValueError(
                 f"Entry {self.entry_id} gameweek {self.gameweek} must hold {_SQUAD_SIZE} "
@@ -1853,6 +1871,37 @@ class EntrySquad:
     starting_xi: tuple[int, ...]
     captain: int
     vice_captain: int
+
+
+def entry_active_chip(picks: bytes, *, entry_id: int, gameweek: int) -> str | None:
+    """Return the chip a picks document reports active for its gameweek, or None.
+
+    The platform writes ``"active_chip": null`` on an ordinary week and the chip's short
+    name (``"freehit"``, ``"wildcard"``, ``"bboost"``, ``"3xc"``) when one was played.
+    An absent key is read as no chip: the field is descriptive, and the documents we
+    hold from before it was read all lack nothing else.
+    """
+
+    identifier = _positive(entry_id, "entry id")
+    week = _positive(gameweek, "gameweek")
+    document = _document(picks, "Entry picks")
+    value = document.get("active_chip")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise DataSourceError(
+            f"Entry {identifier} gameweek {week} picks carry an active_chip of "
+            f"{value!r}; expected a chip name or null."
+        )
+    return value
+
+
+def entry_picks_endpoint_path(entry_id: int, gameweek: int) -> str:
+    """API path of one entry's picks document for one gameweek."""
+
+    identifier = _positive(entry_id, "entry id")
+    week = _positive(gameweek, "gameweek")
+    return f"entry/{identifier}/event/{week}/picks/"
 
 
 def entry_squad_from_picks(picks: bytes, *, entry_id: int, gameweek: int) -> EntrySquad:
@@ -1960,4 +2009,5 @@ def fpl_entry_picks(
         purchase_prices=MappingProxyType({}),
         purchase_prices_known=False,
         source_snapshot_id=source_snapshot_id,
+        active_chip=entry_active_chip(picks, entry_id=identifier, gameweek=week),
     )

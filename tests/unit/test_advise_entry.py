@@ -987,6 +987,7 @@ def test_the_price_ceiling_travels_through_the_declared_envelope(world: dict[str
         "rival_entry_id",
         "data_quality",
         "missing_fields",
+        "squad_basis",
     }
     inputs, projection, rules = _world_context(world)
     provider = _Provider(

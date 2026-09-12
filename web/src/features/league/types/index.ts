@@ -281,6 +281,12 @@ export interface EntryAdvice {
   stated_limits?: string[] | null;
   data_quality: EntryDataQuality;
   missing_fields: string[];
+  /**
+   * Which squad the advice stands on: `captured` (the played week's own picks) or
+   * `pre_free_hit_gwNN` when a Free Hit voided that week's fifteen and the advice
+   * was built on the squad held before it. Absent on documents from before the field.
+   */
+  squad_basis?: string;
 }
 
 /**
