@@ -6,14 +6,17 @@ manifest that is not a mapping) raise :class:`PreflightError`, because nothing a
 such inputs can be examined.
 """
 
-import hashlib
 from collections.abc import Mapping
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+# Compatibility re-export, 2026-09-10: `compute_table_sha256` moved to
+# `squadopt.data.checksums` so the product can digest a table without importing the
+# laboratory. Kept for one release (docs/architecture/dependency_rules.md, rule 2); remove
+# in the release after 1.0.0.
+from squadopt.data.checksums import compute_table_sha256 as compute_table_sha256
 from squadopt.data.errors import format_examples
 from squadopt.preflight.models import (
     ALLOWED_POSITIONS,
@@ -33,14 +36,6 @@ from squadopt.preflight.models import (
 
 _KEY_COLUMNS = ("fold_id", "player_id")
 _SORT_COLUMNS = ("season", "gameweek", "player_id")
-
-
-def compute_table_sha256(path: Path) -> str:
-    """Return the lowercase SHA-256 of the exact file bytes named by the manifest."""
-
-    if not path.is_file():
-        raise PreflightError(f"Residual table file does not exist: {path}.")
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _finding(check: str, passed: bool, detail: str) -> PreflightFinding:

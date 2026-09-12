@@ -35,6 +35,7 @@ import json
 import signal
 import time
 from collections.abc import Callable, Sequence
+from contextlib import ExitStack
 from datetime import UTC, datetime
 from types import FrameType
 from typing import Final
@@ -61,6 +62,7 @@ from squadopt.platform.backend_runtime import (
     backend_from_environment,
 )
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.worker_metrics import serve_worker_metrics
 
 __all__ = [
     "DEFAULT_HEARTBEAT_SECONDS",
@@ -208,14 +210,14 @@ def run_advice_worker(
         elapsed = time.monotonic()
         if elapsed - recovered_at >= recover_every_seconds:
             recovered_at = elapsed
-            recovered = queue.recover(at_utc=_stamp(now()), lease_seconds=lease_seconds)
+            recovered = queue.recover(clock=lambda: _stamp(now()), lease_seconds=lease_seconds)
             if recovered and log is not None:
                 log.event("advice_jobs_recovered", count=len(recovered))
         job = run_advice_worker_once(
             queue,
             cache,
             compute,
-            at_utc=_stamp(now()),
+            claim_at_utc=lambda: _stamp(now()),
             terminal_at_utc=lambda: _stamp(now()),
             heartbeat_seconds=heartbeat_seconds,
             metrics=metrics,
@@ -282,6 +284,8 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
     )
     parser.add_argument("--idle-seconds", type=float, default=DEFAULT_IDLE_SECONDS)
     parser.add_argument("--max-attempts", type=int, default=DEFAULT_MAX_ATTEMPTS)
+    parser.add_argument("--metrics-port", type=int, default=None)
+    parser.add_argument("--metrics-host", default="127.0.0.1")
     arguments = parser.parse_args(argv)
     # A zero idle turns the loop into a busy wait against the shared mount, which is a
     # deployment footgun rather than a tuning choice; the injected loop below still accepts
@@ -293,6 +297,8 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
 
     # Before anything that logs. The store check below is the first thing an operator needs
     # to read, and without a handler on the advice logger it was formatted and discarded.
+    if arguments.metrics_port is not None and not 0 <= arguments.metrics_port <= 65535:
+        parser.error("--metrics-port must be between 0 and 65535.")
     configure_advice_logging()
     running = backend if backend is not None else backend_from_environment()
     probe = running.probe.result()
@@ -311,20 +317,32 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
         if handled is not None:
             signal.signal(handled, flag.request)
     running.log.event("advice_worker_started", store=str(running.config.store_root))
-    processed = run_advice_worker(
-        running.queue,
-        running.cache,
-        build_advice_compute(
-            running.contexts, running.job_specs, max_attempts=arguments.max_attempts
-        ),
-        should_stop=flag,
-        # The same TTL'd gate the api submits behind, asked again before every round.
-        store_ready=running.probe.passed,
-        idle_seconds=arguments.idle_seconds,
-        max_jobs=arguments.max_jobs,
-        metrics=running.metrics,
-        log=running.log,
-    )
+    with ExitStack() as stack:
+        if arguments.metrics_port is not None:
+            server = stack.enter_context(
+                serve_worker_metrics(
+                    lambda: running.metrics.render(
+                        queue_depth=sum(not job.is_terminal for job in running.queue.jobs())
+                    ),
+                    host=arguments.metrics_host,
+                    port=arguments.metrics_port,
+                )
+            )
+            running.log.event("advice_worker_metrics_started", port=server.server_port)
+        processed = run_advice_worker(
+            running.queue,
+            running.cache,
+            build_advice_compute(
+                running.contexts, running.job_specs, max_attempts=arguments.max_attempts
+            ),
+            should_stop=flag,
+            # The same TTL'd gate the api submits behind, asked again before every round.
+            store_ready=running.probe.passed,
+            idle_seconds=arguments.idle_seconds,
+            max_jobs=arguments.max_jobs,
+            metrics=running.metrics,
+            log=running.log,
+        )
     running.log.event("advice_worker_stopped", processed=processed)
     return 0
 

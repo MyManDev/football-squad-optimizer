@@ -4,6 +4,8 @@ The git/gh subprocess half is deliberately thin and exercised by the operator; w
 test can pin is everything derived and everything refused.
 """
 
+from pathlib import Path
+
 import pytest
 from scripts.publish_gameweek_site import KINDS, PublishError, PublishNames, next_steps
 
@@ -11,7 +13,7 @@ from scripts.publish_gameweek_site import KINDS, PublishError, PublishNames, nex
 def test_the_names_are_derived_from_season_gameweek_and_kind() -> None:
     names = PublishNames(season="2026-27", gameweek=2, kind="decision")
     assert names.branch == "feature/gw02-decision-site"
-    assert names.worktree_directory == "../squadopt-gw02-decision"
+    assert names.worktree_directory == ".codex-tmp/publications/gw02-decision"
     assert names.site_tag == "site-2026-27-gw02-decision"
     assert names.commit_message == "site: publish the gw02 decision view"
 
@@ -138,7 +140,7 @@ def test_the_advice_record_lands_in_the_checkout_not_the_worktree_it_builds_in()
 
     from pathlib import Path
 
-    from scripts.publish_gameweek_site import REPOSITORY_ROOT, LeaguePublish
+    from scripts.publish_gameweek_site import LeaguePublish, repository_root
 
     league = LeaguePublish(
         league_id=352490,
@@ -149,11 +151,37 @@ def test_the_advice_record_lands_in_the_checkout_not_the_worktree_it_builds_in()
     arguments = league.build_arguments(worktree / "web" / "public")
     root = Path(arguments[arguments.index("--advice-record-root") + 1])
     assert root.is_absolute()
-    assert root == REPOSITORY_ROOT / "data" / "advice_records"
+    assert root == repository_root() / "data" / "advice_records"
     assert worktree not in root.parents and root != worktree
     # Recording is the default: a publish that quietly kept no record would be the defect
     # with the paths tidied up.
     assert "--no-advice-record" not in arguments
+
+
+def test_the_default_roots_anchor_to_the_checkout_whatever_the_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Measured before the fix: constructed from a subdirectory, every default root landed
+    under that subdirectory (``docs/data/...``), because the defaults were bound to the
+    working directory at import. They are resolved at construction now, from the checkout."""
+
+    import subprocess
+
+    from squadopt.platform.weekly_publish import LeaguePublish
+
+    checkout = tmp_path / "checkout"
+    (checkout / "docs").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=checkout, check=True, capture_output=True)
+    monkeypatch.chdir(checkout / "docs")
+
+    league = LeaguePublish(league_id=352490, snapshot_id="fpl-live-x", in_season_projection=None)
+
+    data = checkout.resolve() / "data"
+    assert league.snapshot_root == data / "snapshots"
+    assert league.registry == data / "entries" / "registry.json"
+    assert league.archive_root == data / "raw" / "vaastav-fpl"
+    assert league.ledger_root == data / "ledger"
+    assert league.advice_record_root == data / "advice_records"
 
 
 def test_the_deadline_escape_publishes_without_recording() -> None:

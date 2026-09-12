@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,10 +9,29 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
+        "player_out": {
+          "player_id": 154561,
+          "name": "David Raya Mart\u00edn",
+          "short_name": "Mart\u00edn",
+          "position": "GK",
+          "team": "Arsenal"
+        },
+        "player_in": {
+          "player_id": 485055,
+          "name": "Anton\u00edn Kinsk\u00fd",
+          "short_name": "Kinsk\u00fd",
+          "position": "GK",
+          "team": "Spurs"
+        },
+        "expected_points_delta": -0.6891467874018367,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
         "player_out": {
           "player_id": 216094,
           "name": "Jeremie Frimpong",
@@ -21,22 +40,41 @@
           "team": "Liverpool"
         },
         "player_in": {
-          "player_id": 465730,
-          "name": "Maxim De Cuyper",
-          "short_name": "Cuyper",
+          "player_id": 466075,
+          "name": "Riccardo Calafiori",
+          "short_name": "Calafiori",
           "position": "DEF",
-          "team": "Brighton"
+          "team": "Arsenal"
         },
-        "expected_points_delta": 1.5071396868438833,
+        "expected_points_delta": 1.8826116956803693,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-3",
+        "player_out": {
+          "player_id": 448047,
+          "name": "Enzo Fern\u00e1ndez",
+          "short_name": "Fern\u00e1ndez",
+          "position": "MID",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 446008,
+          "name": "Bryan Mbeumo",
+          "short_name": "Mbeumo",
+          "position": "MID",
+          "team": "Man Utd"
+        },
+        "expected_points_delta": 2.952284416883156,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.9705764759643785,
+    "expected_points_cost": 0.34671170043750976,
     "rival_label": "entry-5662073",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 53.901959938806584,
+    "expected_own_points": 56.5545946011367,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -51,7 +89,7 @@
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 5.583557313963405
+      "expected_points": 5.626690076810005
     },
     "starting_xi": [
       {
@@ -60,7 +98,7 @@
         "short_name": "Tzolakis",
         "position": "GK",
         "team": "Hull City",
-        "expected_points": 3.4563272913156653
+        "expected_points": 3.4546051551465986
       },
       {
         "player_id": 226597,
@@ -79,20 +117,12 @@
         "expected_points": 3.721627814273059
       },
       {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
+        "player_id": 466075,
+        "name": "Riccardo Calafiori",
+        "short_name": "Calafiori",
         "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.2356844156410305
-      },
-      {
-        "player_id": 606930,
-        "name": "Nobel Mendy",
-        "short_name": "Mendy",
-        "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 2.6989274408504094
+        "team": "Arsenal",
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 244851,
@@ -100,7 +130,15 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 5.583557313963405
+        "expected_points": 5.626690076810005
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.934679467666494
       },
       {
         "player_id": 204580,
@@ -145,12 +183,20 @@
     ],
     "bench": [
       {
-        "player_id": 154561,
-        "name": "David Raya Mart\u00edn",
-        "short_name": "Mart\u00edn",
+        "player_id": 485055,
+        "name": "Anton\u00edn Kinsk\u00fd",
+        "short_name": "Kinsk\u00fd",
         "position": "GK",
-        "team": "Arsenal",
-        "expected_points": 3.450579897041415
+        "team": "Spurs",
+        "expected_points": 2.7614331096395786
+      },
+      {
+        "player_id": 606930,
+        "name": "Nobel Mendy",
+        "short_name": "Mendy",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 2.7410954261136893
       },
       {
         "player_id": 200089,
@@ -167,38 +213,30 @@
         "position": "DEF",
         "team": "Spurs",
         "expected_points": 2.073447854398327
-      },
-      {
-        "player_id": 448047,
-        "name": "Enzo Fern\u00e1ndez",
-        "short_name": "Fern\u00e1ndez",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 1.9823950507833379
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 5662073,
-    "expected_points_cost_ceiling": 0.9705764759643785,
-    "overlap_count": 2,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 0.34671170043750976,
+    "overlap_count": 4,
+    "transfer_cap": 3,
     "overlap_target": 9,
-    "overlap_applied": 2,
+    "overlap_applied": 4,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 28.0,
-      "expected_points_cost": 26.595806748835727,
-      "expected_points_cost_ceiling": 26.595806748835727
+      "transfer_hit_points": 20.0,
+      "expected_points_cost": 20.24026468706942,
+      "expected_points_cost_ceiling": 20.24026468706942
     },
-    "expected_gap_vs_rival": -0.920854632799589,
-    "captain_agreement": true,
+    "expected_gap_vs_rival": 4.684377636901935,
+    "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
   }

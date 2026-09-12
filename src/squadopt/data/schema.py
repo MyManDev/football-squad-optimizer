@@ -4,20 +4,17 @@ This module is the single source of truth for the data layer. No other data,
 feature, or prediction module may hard-code canonical column names, position
 labels, price factors, or grouping/sorting keys; they import them from here.
 
-Position labels and the optimizer projection contract are imported from the
-optimization package rather than redefined, so the two layers cannot drift
-apart. The shared vocabulary arguably belongs in a neutral module owned by the
-software architecture layer; moving it there later is a mechanical change
-because every data-layer reference points at this module.
+Position labels and the optimizer projection contract come from the shared
+contracts layer, so data and optimization use the same vocabulary.
 """
 
 from collections.abc import Iterable, Mapping, Sequence
 from types import MappingProxyType
 from typing import Literal, TypeAlias
 
+from squadopt.contracts import POSITIONS, Position
+from squadopt.contracts import REQUIRED_COLUMNS as PROJECTION_REQUIRED_COLUMNS
 from squadopt.data.errors import InvalidValueError
-from squadopt.optimization.config import POSITIONS, Position
-from squadopt.optimization.validation import REQUIRED_COLUMNS as PROJECTION_REQUIRED_COLUMNS
 
 __all__ = [
     "AMBIGUOUS_TIMING_COLUMNS",

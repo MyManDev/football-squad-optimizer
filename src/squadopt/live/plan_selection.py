@@ -22,7 +22,8 @@ and every result records, per candidate, which chips it consumed — so a recomm
 "play bench boost in week two" is always read next to what playing it forecloses.
 
 The rival is held fixed across the window (the template does not trade); stated as a limit
-rather than hidden. Measurement machinery only: nothing here touches the live path.
+rather than hidden. This is the product's plan chooser: `application.mode_selection` prices
+a league member's transfer menu with it, and the laboratory measures it from here too.
 """
 
 from collections.abc import Mapping, Sequence
@@ -32,7 +33,7 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
-from squadopt.experiments.config import ExperimentConfigurationError, ExperimentExecutionError
+from squadopt.evaluation.promotion import ExperimentConfigurationError, ExperimentExecutionError
 from squadopt.optimization import OptimizationConfig
 from squadopt.planning import (
     ChipAvailability,

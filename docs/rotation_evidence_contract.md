@@ -1,4 +1,4 @@
-# `rotation_evidence_v1` — the contract
+# `rotation_evidence_v2` — the contract
 
 The sibling of `phase_b_evidence_contract.md`, for the rotation lane. One CSV and one
 manifest per decision week, written exactly once, read by the member-facing card and by the
@@ -78,18 +78,40 @@ letting a reader assume the check is stronger than it is.
 | 14 | `feed_scout_news_link_present` | boolean | field absent → refuse |
 | 15 | `club_source_covered` | boolean | **never absent.** False = no document was read for this player's club this week |
 | 16 | `rotation_claim_observed` | boolean | **never absent.** False = the process ran and produced no disposition for him |
-| 17 | `rotation_disposition` | string, closed | missing **only** where column 16 is False |
-| 18 | `rotation_claim_source_sha256` | string | no claim, or the claim came from the feed alone |
-| 19 | `rotation_claim_span_start` | Int64 | no located sentence |
-| 20 | `rotation_claim_span_end` | Int64 | no located sentence. 19-20 are byte offsets into the hashed source bytes |
-| 21 | `rotation_claim_published_at_utc` | string | **the source carried no dateline.** Never substituted with the fetch instant |
-| 22 | `rotation_claim_published_precision` | string, closed | `instant` / `day` / `unknown` |
-| 23 | `rotation_claim_speaker` | string, closed | `manager` / `club_official` / `club_statement` / `unattributed`. Never a person's name |
-| 24 | `model_identifier` | string | no model was involved in this row |
-| 25 | `prompt_sha256` | string | no model was involved |
-| 26 | `model_response_sha256` | string | no model was involved, or it said nothing about him |
-| 27 | `model_evidence_observed` | boolean | **never absent.** False = the model produced no disposition for him at all |
-| 28 | `fixture_context_midweek` | boolean | **never absent** — the calendar could not answer, so the build refused instead |
+| 17 | `rotation_claim_unresolved` | boolean | **never absent.** True = a claim was made about him and its citation could not be verified |
+| 18 | `rotation_disposition` | string, closed | missing **only** where column 16 is False |
+| 19 | `rotation_claim_source_sha256` | string | no claim, or the claim came from the feed alone |
+| 20 | `rotation_claim_span_start` | Int64 | no located sentence |
+| 21 | `rotation_claim_span_end` | Int64 | no located sentence. 20-21 are byte offsets into the hashed source bytes |
+| 22 | `rotation_claim_published_at_utc` | string | **the source carried no dateline.** Never substituted with the fetch instant |
+| 23 | `rotation_claim_published_precision` | string, closed | `instant` / `day` / `unknown` |
+| 24 | `rotation_claim_speaker` | string, closed | `manager` / `club_official` / `club_statement` / `unattributed`. Never a person's name |
+| 25 | `model_identifier` | string | no model was involved in this row |
+| 26 | `prompt_sha256` | string | no model was involved |
+| 27 | `model_response_sha256` | string | no model was involved, or it said nothing about him. **This player's club's** response — see below |
+| 28 | `model_evidence_observed` | boolean | **never absent.** False = the model produced no disposition for him at all |
+| 29 | `fixture_context_midweek` | boolean | **never absent** — the calendar could not answer, so the build refused instead |
+
+## Four states, not three
+
+Columns 15, 16 and 17 are read together, and the reason column 17 exists is that without it
+the fourth state was indistinguishable from the second:
+
+| | `club_source_covered` | `rotation_claim_observed` | `rotation_claim_unresolved` |
+| --- | --- | --- | --- |
+| his club was never read | False | False | False |
+| read, and nothing was said about him | True | False | False |
+| something was said, the citation could not be verified | True | False | **True** |
+| something was said and it was located | True | True | False |
+
+The third row is a **source error**: the model wrote about him and the quote it gave could not
+be found in the bytes it cites, so no disposition is carried. Before column 17 he appeared as
+the second row, which asserts a silence that never happened.
+
+One unverifiable citation costs one claim. A club whose *every* claim lost its citation is
+dropped from `clubs_covered` — nothing it said survives into evidence, so calling it covered
+would assert that its page was read into the table when none of it was. A club that was read
+and genuinely said nothing has no claims either way and stays covered.
 
 ### `rotation_disposition`, in full
 
@@ -104,6 +126,29 @@ become a number.
 They are computed independently and they agree on every row today, because the model is
 currently the only source of a disposition. They are kept apart because a later feed-derived
 disposition would set 16 without 27, and a table that had aliased them could not say so.
+
+### Provenance is per club, and the instrument is not
+
+A model is called once per club, so a week holds as many responses as clubs it read. Column 26
+is the digest of **that player's club's** response. A single digest written across every row
+would give an Arsenal player a citation into bytes that never mentioned him — and the digest
+would verify, which is the worst kind of wrong.
+
+Columns 24 and 25 stay single-valued. Which model answered and which question it was asked are
+facts about the instrument, not about a club, and the manifest states one of each. A week
+answered by two models, served by two model versions, or asked under two prompts is therefore
+**refused** rather than recorded: it is a mixture the manifest cannot express, and a week whose
+claims came from somewhere other than the model the manifest names is not a week anyone can
+check. Same reasoning as the coding call's refusal to declare a fallback model.
+
+The manifest's `response_sha256s` lists every response the week holds, sorted and without
+repeats. Deduplicated because one response can legitimately cover several clubs — the fixture
+provider answers once for all of them — and listing the same digest twice would imply a second
+call there never was.
+
+A claim placed on a player whose club has no recorded response refuses the whole week, naming
+every such club at once. A disposition whose response cannot be named is traceable to no bytes
+at all.
 
 ### `feed_news_state`, and why three
 
@@ -147,7 +192,7 @@ document, where a replay may differ by the wall clock and nothing else. An artif
 different content under the same name is refused, never overwritten. The export refuses a
 dirty working tree, so the commit it records actually reproduces the bytes.
 
-The name is `rotation_evidence_v1_<season>_gw<NN>_<capture digest>`, so a rehearsal earlier in
+The name is `rotation_evidence_v2_<season>_gw<NN>_<capture digest>`, so a rehearsal earlier in
 the week is a different artifact from the real run rather than a silent overwrite of it. The
 digest is the capture the claims came from; while the synthetic fixture stands in for a live
 source the claims are fixed, so the decision capture is what varies and names the file
@@ -192,3 +237,8 @@ of the lane brief; no capture has been read here to confirm them. The refusal in
 "absent means" is what keeps that honest — if the source spells them differently, the first
 real capture stops with the names it was looking for rather than quietly reporting that nobody
 has any risks.
+
+## The model call
+
+How the coding response is produced, what the prompt asks for, and why the model is never
+asked for a byte offset: `docs/rotation_claim_coding.md`.

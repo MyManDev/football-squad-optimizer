@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -21,13 +21,32 @@
           "team": "Aston Villa"
         },
         "player_in": {
+          "player_id": 424876,
+          "name": "Dominik Szoboszlai",
+          "short_name": "Szoboszlai",
+          "position": "MID",
+          "team": "Liverpool"
+        },
+        "expected_points_delta": 1.0766125031854323,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
+        "player_out": {
+          "player_id": 449434,
+          "name": "Anthony Elanga",
+          "short_name": "Elanga",
+          "position": "MID",
+          "team": "Newcastle"
+        },
+        "player_in": {
           "player_id": 503139,
           "name": "Alex Scott",
           "short_name": "Scott",
           "position": "MID",
           "team": "Bournemouth"
         },
-        "expected_points_delta": 1.0501958403663223,
+        "expected_points_delta": 0.7330557599883343,
         "reason_code": "mode_tradeoff"
       }
     ],
@@ -36,7 +55,7 @@
     "rival_label": "entry-2281624",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.73268716741247,
+    "expected_own_points": 55.57794297987969,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -76,7 +95,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 437499,
@@ -100,7 +119,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.391694024990014
+        "expected_points": 4.389550689692313
       },
       {
         "player_id": 503139,
@@ -108,15 +127,15 @@
         "short_name": "Scott",
         "position": "MID",
         "team": "Bournemouth",
-        "expected_points": 4.206260891605426
+        "expected_points": 4.2494672646892955
       },
       {
-        "player_id": 449434,
-        "name": "Anthony Elanga",
-        "short_name": "Elanga",
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
         "position": "MID",
-        "team": "Newcastle",
-        "expected_points": 3.4735053102667206
+        "team": "Liverpool",
+        "expected_points": 4.232677554424536
       },
       {
         "player_id": 249231,
@@ -180,13 +199,13 @@
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 2281624,
     "expected_points_cost_ceiling": 0.0,
     "overlap_count": 4,
-    "transfer_cap": 1,
+    "transfer_cap": 2,
     "overlap_target": 5,
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
@@ -197,7 +216,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": -0.5339090095545558,
+    "expected_gap_vs_rival": 0.2635260730180633,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

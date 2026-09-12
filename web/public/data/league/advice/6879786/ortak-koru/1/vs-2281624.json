@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,10 +9,29 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
+        "player_out": {
+          "player_id": 83299,
+          "name": "Lewis Dunk",
+          "short_name": "Dunk",
+          "position": "DEF",
+          "team": "Brighton"
+        },
+        "player_in": {
+          "player_id": 487676,
+          "name": "Trai Hume",
+          "short_name": "Hume",
+          "position": "DEF",
+          "team": "Sunderland"
+        },
+        "expected_points_delta": -0.1821061828237469,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
         "player_out": {
           "player_id": 195546,
           "name": "Emiliano Buend\u00eda Stati",
@@ -21,22 +40,22 @@
           "team": "Aston Villa"
         },
         "player_in": {
-          "player_id": 440993,
-          "name": "Iliman Ndiaye",
-          "short_name": "Ndiaye",
+          "player_id": 424876,
+          "name": "Dominik Szoboszlai",
+          "short_name": "Szoboszlai",
           "position": "MID",
-          "team": "Man City"
+          "team": "Liverpool"
         },
-        "expected_points_delta": 0.2800949739981351,
+        "expected_points_delta": 1.0766125031854323,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.7701008663681819,
+    "expected_points_cost": 0.7330557599883392,
     "rival_label": "entry-2281624",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 53.96258630104428,
+    "expected_own_points": 54.84488721989135,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -76,7 +95,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 437499,
@@ -100,7 +119,15 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.391694024990014
+        "expected_points": 4.389550689692313
+      },
+      {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 4.232677554424536
       },
       {
         "player_id": 449434,
@@ -108,15 +135,7 @@
         "short_name": "Elanga",
         "position": "MID",
         "team": "Newcastle",
-        "expected_points": 3.4735053102667206
-      },
-      {
-        "player_id": 440993,
-        "name": "Iliman Ndiaye",
-        "short_name": "Ndiaye",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 3.436160025237239
+        "expected_points": 3.516411504700961
       },
       {
         "player_id": 249231,
@@ -169,35 +188,35 @@
         "expected_points": 2.5908352756752766
       },
       {
-        "player_id": 83299,
-        "name": "Lewis Dunk",
-        "short_name": "Dunk",
+        "player_id": 487676,
+        "name": "Trai Hume",
+        "short_name": "Hume",
         "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 2.5352963471480967
+        "team": "Sunderland",
+        "expected_points": 2.35319016432435
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 2281624,
-    "expected_points_cost_ceiling": 0.7701008663681819,
-    "overlap_count": 5,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 0.7330557599883392,
+    "overlap_count": 6,
+    "transfer_cap": 2,
     "overlap_target": 9,
-    "overlap_applied": 5,
+    "overlap_applied": 6,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 16.0,
-      "expected_points_cost": 14.773395552332872,
-      "expected_points_cost_ceiling": 14.773395552332872
+      "transfer_hit_points": 12.0,
+      "expected_points_cost": 11.529162262046569,
+      "expected_points_cost_ceiling": 11.529162262046569
     },
-    "expected_gap_vs_rival": -1.3040098759227448,
+    "expected_gap_vs_rival": -0.46952968697027586,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

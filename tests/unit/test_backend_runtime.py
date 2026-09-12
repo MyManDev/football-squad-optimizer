@@ -25,6 +25,7 @@ from squadopt.live.tick import handoff_path_for
 from squadopt.platform import backend_runtime
 from squadopt.platform.advice_observability import AdviceLog
 from squadopt.platform.backend_runtime import (
+    SITE_ORIGINS,
     BackendConfig,
     BackendConfigError,
     CaptureContextProvider,
@@ -116,7 +117,7 @@ def _deployment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, An
         site_data_root=site_root,
         snapshot_root=snapshot_root,
         handoff_root=handoff_root,
-        allowed_origins=("https://squadopt.pages.dev",),
+        allowed_origins=SITE_ORIGINS,
     )
     return {
         "config": config,
@@ -294,6 +295,14 @@ def test_a_capture_without_its_handoff_yields_no_context(deployment: dict[str, A
     assert ready is False
     assert checks["capture_context"] is False
     assert checks["league_tree"] is True
+
+
+def test_existing_but_invalid_membership_is_not_ready(deployment: dict[str, Any]) -> None:
+    path = deployment["config"].site_data_root / "league" / "members.json"
+    path.write_text('{"payload": null}', encoding="utf-8")
+    ready, checks = build_backend(deployment["config"]).readiness()
+    assert not ready
+    assert checks["league_tree"] is False
 
 
 def test_the_context_names_the_capture_and_its_handoff(deployment: dict[str, Any]) -> None:

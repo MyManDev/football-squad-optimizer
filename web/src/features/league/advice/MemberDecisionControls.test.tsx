@@ -272,9 +272,50 @@ describe("member decision controls", () => {
     }
   });
 
+  it("does not tell a member the pure-points plan has the highest expected points", () => {
+    // A superlative nothing enforces. `expected_own_points` — the figure the member's
+    // card shows — is the eleven plus the captain; the solve maximises the eleven, the
+    // captain and the bench together, so the two have different maximisers. On the
+    // 2026-27 GW4 capture entry 3832237's pure-points plan publishes 46.5454 with a
+    // 7.1846 bench and its ortak-koru plan publishes 46.7016 with a 4.3379 bench: the
+    // banded plan is higher on the number that is printed and lower on the one that was
+    // optimised. The card may say what the plan is chosen on; it may not rank it.
+    const SUPERLATIVE = /highest|most expected|en yüksek|en iyi puan/i;
+    for (const language of ["tr", "en"] as const) {
+      const { description } = MESSAGES[language].leagueMembers.strategies["saf-puan"];
+      expect(description.length).toBeGreaterThan(0);
+      expect(description).not.toMatch(SUPERLATIVE);
+      const { container, unmount } = renderControls(
+        `/league/members/${ENTRY}?mode=saf-puan`,
+        undefined,
+        language,
+      );
+      const text = container.textContent ?? "";
+      // The sweep has a subject: this is the copy the control actually renders.
+      expect(text).toContain(description);
+      expect(text).not.toMatch(SUPERLATIVE);
+      unmount();
+    }
+  });
+
   it("phrases the rule as a band on the gap, never as a chance of catching up", () => {
     // Check the declared rule separately as well as the full rendered controls.
+    //
+    // This is the same rule as the producer's `FORBIDDEN_TEXT_PATTERN`
+    // (`squadopt/application/strategies/catalog.py`), and the two are deliberately not
+    // the same width. This one may match any of its words anywhere, because its only
+    // subjects are the two copy strings below — strings this repository wrote — so it
+    // never meets a member-typed name and the site's own "bu yüzden" never reaches it.
+    // The producer's does meet names, so there `şans` and `yüzde` are bounded on both
+    // sides (Şanslı, Şansal and "Bu Yüzden" are legitimate names it must publish) while
+    // `ihtimal` and `olasıl` stay stems (ihtimali, olasılığı are the forbidden word
+    // inflected, not names). Do not add boundaries here to match the producer, and do
+    // not drop them there to match this: each is as wide as its own subject allows.
     const AS_A_CHANCE = /chance|likelihood|odds|ihtimal|şans|yüzde|olasılık|probabilit|%/i;
+    // The bare Turkish words are still caught here, so a copy edit cannot slip one in.
+    for (const word of ["olasılık", "yüzde"]) {
+      expect(word).toMatch(AS_A_CHANCE);
+    }
     for (const language of ["tr", "en"] as const) {
       const copy = MESSAGES[language].leagueMembers;
       for (const line of [copy.rulePickBadge, copy.rulePickNote("Half Space", "-140", 37)]) {

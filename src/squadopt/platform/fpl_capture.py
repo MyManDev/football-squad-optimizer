@@ -5,6 +5,7 @@ HTTP adapter here lets installed CLI entry points provide it without importing a
 module under ``scripts``.
 """
 
+import re
 import time
 import urllib.error
 import urllib.request
@@ -13,14 +14,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from squadopt.application.entries import EntryRegistry
-from squadopt.data.errors import DataSourceError
+from squadopt.data.errors import DataError, DataSourceError
 from squadopt.data.identity import reconcile_player_identity
 from squadopt.data.snapshots import SnapshotMetadata, write_snapshot
 from squadopt.data.sources.fpl_live import (
     BOOTSTRAP_PAYLOAD,
     FIXTURES_PAYLOAD,
     FPL_LIVE_SOURCE,
+    FREE_HIT_CHIP,
+    entry_active_chip,
     entry_endpoint_paths,
+    entry_picks_endpoint_path,
+    entry_picks_payload,
     gameweek_deadlines,
     league_standings_endpoint_path,
     live_endpoint_path,
@@ -160,6 +165,43 @@ def component_history_endpoints(bootstrap: bytes, *, as_of_utc: str) -> Mapping[
     return {name: f"{BASE_URL}/{path}" for name, path in sorted(paths.items())}
 
 
+_PICKS_PAYLOAD = re.compile(r"^entry-(\d+)-picks-gw(\d+)\.json$")
+
+
+def free_hit_basis_endpoints(payloads: Mapping[str, bytes]) -> Mapping[str, str]:
+    """Payload name to URL for the picks a Free Hit week hides.
+
+    A Free Hit squad lasts one gameweek: at the next deadline the member holds the
+    squad from *before* the chip, which is the previous gameweek's picks document. A
+    capture that reads only the played week's picks therefore has no record of the
+    squad the advice must stand on, so for every captured picks document whose
+    ``active_chip`` is the Free Hit this names the previous week's document too --
+    walking back once more if that week was also a Free Hit (two chip sets a season
+    make it possible), and never below gameweek 1. A Wildcard squad persists and needs
+    nothing earlier; Bench Boost and Triple Captain change no squad.
+
+    Documents already present are not re-read, and a picks document this cannot read
+    is left to the consumer that will refuse it with its own reason: the capture's job
+    is to keep bytes, not to validate them.
+    """
+
+    urls: dict[str, str] = {}
+    for name in sorted(payloads):
+        match = _PICKS_PAYLOAD.match(name)
+        if match is None:
+            continue
+        entry_id, week = int(match.group(1)), int(match.group(2))
+        try:
+            chip = entry_active_chip(payloads[name], entry_id=entry_id, gameweek=week)
+        except DataError:
+            continue
+        if chip == FREE_HIT_CHIP and week > 1:
+            earlier = entry_picks_payload(entry_id, week - 1)
+            if earlier not in payloads:
+                urls[earlier] = f"{BASE_URL}/{entry_picks_endpoint_path(entry_id, week - 1)}"
+    return urls
+
+
 def registered_entry_ids(path: Path) -> tuple[int, ...]:
     """Read the registry, reporting a bad one in the data error contract.
 
@@ -221,17 +263,27 @@ def capture(
             payloads[name] = fetch(url)
             print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
 
-    extra = registered_endpoints(
-        payloads[BOOTSTRAP_PAYLOAD],
-        as_of_utc=resolution_at,
-        entry_registry=entry_registry,
-        league_id=league_id,
+    extra = dict(
+        registered_endpoints(
+            payloads[BOOTSTRAP_PAYLOAD],
+            as_of_utc=resolution_at,
+            entry_registry=entry_registry,
+            league_id=league_id,
+        )
     )
     if extra:
         print(f"Reading {len(extra)} registered-entry endpoint(s)")
         for name, url in extra.items():
             payloads[name] = fetch(url)
             print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
+        # A Free Hit week's picks are not the squad the member holds next; read the
+        # week before, and keep reading back while that week was a Free Hit as well.
+        while earlier := free_hit_basis_endpoints(payloads):
+            print(f"Reading {len(earlier)} pre-Free-Hit picks endpoint(s)")
+            for name, url in earlier.items():
+                payloads[name] = fetch(url)
+                extra[name] = url
+                print(f"  read     {name}  ({len(payloads[name]):,} bytes)")
 
     captured_at = _utc_now()
     print()

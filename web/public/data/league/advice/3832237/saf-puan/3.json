@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 34.53999999999999,
-    "expected_own_points": 46.54539159350413,
+    "optimality_gap": 34.59200000000001,
+    "expected_own_points": 46.46470457960441,
     "captain": {
       "player_id": 446008,
       "name": "Bryan Mbeumo",
@@ -71,20 +71,20 @@
         "expected_points": 4.305863646230902
       },
       {
-        "player_id": 441164,
-        "name": "Pedro Porro Sauceda",
-        "short_name": "Sauceda",
-        "position": "DEF",
-        "team": "Spurs",
-        "expected_points": 2.227509225197033
-      },
-      {
         "player_id": 472769,
         "name": "Nico O'Reilly",
         "short_name": "O'Reilly",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 1.550337345902003
+        "expected_points": 2.026527638301547
+      },
+      {
+        "player_id": 441164,
+        "name": "Pedro Porro Sauceda",
+        "short_name": "Sauceda",
+        "position": "DEF",
+        "team": "Spurs",
+        "expected_points": 1.6706319188977747
       },
       {
         "player_id": 446008,
@@ -201,9 +201,9 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 46.54539159350412
+        "free_transfers_before": 3,
+        "free_transfers_after": 3,
+        "expected_points": 46.46470457960441
       },
       {
         "gameweek": 5,
@@ -218,18 +218,18 @@
         ],
         "transfers_out": [
           {
-            "player_id": 472769,
-            "name": "Nico O'Reilly",
-            "short_name": "O'Reilly",
+            "player_id": 441164,
+            "name": "Pedro Porro Sauceda",
+            "short_name": "Sauceda",
             "position": "DEF",
-            "team": "Man City"
+            "team": "Spurs"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 48.76789436717482
+        "free_transfers_before": 3,
+        "free_transfers_after": 3,
+        "expected_points": 48.56691278027933
       },
       {
         "gameweek": 6,
@@ -244,17 +244,17 @@
         ],
         "transfers_out": [
           {
-            "player_id": 106611,
-            "name": "Michael Keane",
-            "short_name": "Keane",
+            "player_id": 472769,
+            "name": "Nico O'Reilly",
+            "short_name": "O'Reilly",
             "position": "DEF",
-            "team": "Everton"
+            "team": "Man City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
+        "free_transfers_before": 3,
+        "free_transfers_after": 3,
         "expected_points": 50.26201295625084
       }
     ],
@@ -268,8 +268,8 @@
     ],
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

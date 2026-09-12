@@ -64,9 +64,21 @@ export function gameweekPath(season: string, gameweek: number, file = "recommend
   return `${season}/gw${String(gameweek).padStart(2, "0")}/${file}.json`;
 }
 
-function unwrap<T>(envelope: ViewEnvelope<T>): Loaded<T> {
+function unwrap<T>(value: unknown): Loaded<T> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid published view envelope.");
+  }
+  const envelope = value as ViewEnvelope<T>;
   if (envelope.contract_version !== UI_VIEW_CONTRACT_VERSION) {
     throw new ContractMismatchError(envelope.contract_version, UI_VIEW_CONTRACT_VERSION);
+  }
+  if (
+    envelope.payload === null ||
+    typeof envelope.payload !== "object" ||
+    Array.isArray(envelope.payload) ||
+    typeof envelope.generated_at_utc !== "string"
+  ) {
+    throw new Error("Invalid published view payload.");
   }
   return { payload: envelope.payload, generatedAtUtc: envelope.generated_at_utc };
 }

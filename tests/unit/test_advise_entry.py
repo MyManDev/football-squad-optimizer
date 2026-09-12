@@ -109,16 +109,16 @@ def test_uncomputed_combinations_are_refused_not_faked(world: dict[str, Any]) ->
 
     with pytest.raises(EntryError, match="needs a rival"):
         call(_request(strategy="fark-yarat"))
-    with pytest.raises(EntryError, match="not computed"):
+    with pytest.raises(EntryError, match=r"supports windows \(1, 3, 5\) only"):
         call(_request(window=2))
     # A saf-puan window is computed, but only from the capture's horizon builder.
     with pytest.raises(EntryError, match="horizon builder"):
         call(_request(window=3))
-    with pytest.raises(EntryError, match="window 1 only"):
+    with pytest.raises(EntryError, match=r"supports windows \(1,\) only"):
         call(_request(strategy="fark-yarat", rival_entry_id=202, window=5))
-    with pytest.raises(EntryError, match="not in the catalogue"):
+    with pytest.raises(EntryError, match="not computed on this path yet"):
         call(_request(strategy="kaptan-taklidi"))
-    with pytest.raises(EntryError, match="not wired"):
+    with pytest.raises(EntryError, match="not computed on this path yet"):
         call(_request(strategy="kaptan-ayris", rival_entry_id=202))
     with pytest.raises(EntryError, match="rival-free"):
         call(_request(rival_entry_id=202))
@@ -987,6 +987,7 @@ def test_the_price_ceiling_travels_through_the_declared_envelope(world: dict[str
         "rival_entry_id",
         "data_quality",
         "missing_fields",
+        "squad_basis",
     }
     inputs, projection, rules = _world_context(world)
     provider = _Provider(

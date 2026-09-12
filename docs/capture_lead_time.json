@@ -1,0 +1,178 @@
+{
+  "artifact_type": "capture_lead_time",
+  "buckets": [
+    "fitness_or_suspension",
+    "transfer",
+    "unclassified"
+  ],
+  "captures_read": 7,
+  "contract_version": "capture_lead_time_v1",
+  "gameweeks": [
+    {
+      "captures": [
+        {
+          "captured_at_utc": "2026-08-13T20:11:43Z",
+          "lead_time_hours": 189.3,
+          "snapshot_id": "fpl-live-20260813T201143Z-55789a780186"
+        },
+        {
+          "captured_at_utc": "2026-08-20T17:05:25Z",
+          "lead_time_hours": 24.41,
+          "snapshot_id": "fpl-live-20260820T170525Z-545aaf5df705"
+        }
+      ],
+      "deadline_utc": "2026-08-21T17:30:00Z",
+      "earliest_lead_time_hours": 189.3,
+      "gameweek": 1,
+      "latest_lead_time_hours": 24.41,
+      "recovered": {
+        "items_by_bucket": {
+          "fitness_or_suspension": 31,
+          "transfer": 19,
+          "unclassified": 4
+        },
+        "items_recovered": 54,
+        "players_by_bucket": {
+          "fitness_or_suspension": [
+            21205,
+            50175,
+            76357,
+            111317,
+            128295,
+            172649,
+            173879,
+            176412,
+            180974,
+            184341,
+            200785,
+            204968,
+            206915,
+            222694,
+            244858,
+            248875,
+            444765,
+            445028,
+            448089,
+            462635,
+            465351,
+            486520,
+            489888,
+            490094,
+            492859,
+            535818,
+            561245,
+            575901,
+            592031,
+            614071,
+            690838
+          ],
+          "transfer": [
+            155405,
+            168636,
+            172453,
+            184254,
+            221632,
+            232859,
+            235826,
+            433036,
+            437738,
+            444307,
+            469247,
+            494307,
+            500957,
+            547676,
+            548308,
+            551262,
+            578545,
+            586268,
+            597320
+          ],
+          "unclassified": [
+            93605,
+            119471,
+            208706,
+            241293
+          ]
+        },
+        "window_closed_utc": "2026-08-20T17:05:25Z",
+        "window_hours": 164.9,
+        "window_opened_utc": "2026-08-13T20:11:43Z"
+      }
+    },
+    {
+      "captures": [
+        {
+          "captured_at_utc": "2026-08-22T04:10:36Z",
+          "lead_time_hours": 157.32,
+          "snapshot_id": "fpl-live-20260822T041036Z-3b0de5aea3e3"
+        },
+        {
+          "captured_at_utc": "2026-08-25T06:58:39.473352Z",
+          "lead_time_hours": 82.52,
+          "snapshot_id": "fpl-live-20260825T065839Z-a9b3374c1b5e"
+        },
+        {
+          "captured_at_utc": "2026-08-25T08:56:55.843839Z",
+          "lead_time_hours": 80.55,
+          "snapshot_id": "fpl-live-20260825T085655Z-7bc3733781c4"
+        },
+        {
+          "captured_at_utc": "2026-08-25T08:58:11.980604Z",
+          "lead_time_hours": 80.53,
+          "snapshot_id": "fpl-live-20260825T085811Z-8671994ce2be"
+        },
+        {
+          "captured_at_utc": "2026-08-25T13:35:18.635923Z",
+          "lead_time_hours": 75.91,
+          "snapshot_id": "fpl-live-20260825T133518Z-fee387354b88"
+        }
+      ],
+      "deadline_utc": "2026-08-28T17:30:00Z",
+      "earliest_lead_time_hours": 157.32,
+      "gameweek": 2,
+      "latest_lead_time_hours": 75.91,
+      "recovered": {
+        "items_by_bucket": {
+          "fitness_or_suspension": 16,
+          "transfer": 0,
+          "unclassified": 2
+        },
+        "items_recovered": 18,
+        "players_by_bucket": {
+          "fitness_or_suspension": [
+            78916,
+            146426,
+            193278,
+            215379,
+            216055,
+            222531,
+            231416,
+            232185,
+            448089,
+            481624,
+            486672,
+            493250,
+            515621,
+            606930,
+            620109,
+            622758
+          ],
+          "transfer": [],
+          "unclassified": [
+            244851,
+            474120
+          ]
+        },
+        "window_closed_utc": "2026-08-25T13:35:18.635923Z",
+        "window_hours": 81.41,
+        "window_opened_utc": "2026-08-22T04:10:36Z"
+      }
+    }
+  ],
+  "gameweeks_measured": 2,
+  "gameweeks_seen": 2,
+  "gate_evidence": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "news_classifier_version": "news_keywords_v1"
+}

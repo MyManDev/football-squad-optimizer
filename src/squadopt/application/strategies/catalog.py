@@ -37,7 +37,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Final
 
-from squadopt.bayesopt import BayesianFactor, FactorKind
+from squadopt.contracts import BayesianFactor, FactorKind
 from squadopt.planning.models import CHIP_NAMES
 
 
@@ -91,6 +91,9 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # read (``strategies/rule.py``). A band on points, stamped with the rule's id and
         # version — never a chance of catching up, which is why it fits in here at all.
         "suggested_strategy",
+        # Which squad the advice stands on: ``captured``, or ``pre_free_hit_gwNN`` when
+        # a Free Hit voided the captured week's fifteen. A label, never a number.
+        "squad_basis",
     }
 )
 
@@ -103,6 +106,45 @@ _SAFETY_LANGUAGE: Final = re.compile(r"g[üu]venli|riskli?|safe|daha az riskli",
 #: the word boundary: bare ``p_`` would also match ``overlap_count`` and the rest of
 #: the overlap fields, which are set arithmetic and publishable.
 FORBIDDEN_FIELD_PATTERN: Final = re.compile(r"probab|olas.l.k|quantile|spread|\bp_")
+
+#: The same rule applied to *text* rather than to field names, in both languages the
+#: site publishes. Its subject is the text **this repository generates**: strategy names,
+#: notes, badges, rule copy, every string in the published tree that a member did not
+#: type. ``tests/unit/test_public_probability_guards.py`` sweeps the built tree with it.
+#:
+#: It is deliberately **not** applied to a member's own team name, manager name or
+#: registry label. Those are the member's words, chosen inside the game and public there
+#: once the deadline passes; they are not a claim this site makes, so the honesty envelope
+#: does not reach them and the producer publishes them as captured
+#: (``application/league_views.py``). The producer still normalises a name's *shape* —
+#: control characters, markup delimiters, length — because that is a safety question and
+#: not a question of wording.
+#:
+#: This is the web guard's ``AS_A_CHANCE`` set (``MemberDecisionControls.test.tsx``)
+#: with the repository's own ``P(`` and ``quantile`` beside it: one rule written twice.
+#:
+#: Some alternatives carry word boundaries — ``chances?``, ``likelihood``, ``odds``,
+#: ``\u015fans`` and ``y\u00fczde`` — while ``ihtimal`` and ``olas\u0131l`` stay stems.
+#: The boundaries were added while this pattern still read member-typed names, so that
+#: ``\u015eansl\u0131`` ("lucky"), the surname ``\u015eansal`` and ``Bu Y\u00fczden``
+#: ("for that reason") were not published as ``entry-<id>`` in place of the name a member
+#: chose. That reason is gone now that names are out of scope. The boundaries are left
+#: exactly as they are rather than re-tuned in the same change: widening them would move
+#: the guard on our own copy, and this change moves nothing there. Our own wording does
+#: not rely on them either way — the web tests hold it with an unbounded set.
+#:
+#: The dotless i and the soft g are escaped wherever they appear, here and in the pattern,
+#: because they are easy to misread as ``i`` and ``g``.
+#:
+#: The pattern is compiled from ``str``, so ``\b`` is the Unicode boundary and counts
+#: ``\u0131``, ``\u015f``, ``\u011f`` and ``\u00fc`` as word characters — measured,
+#: not assumed: under ``re.ASCII`` it would fall *inside* these words, and bare
+#: ``\u015fans`` would pass.
+FORBIDDEN_TEXT_PATTERN: Final = re.compile(
+    r"%|\bP\(|probabilit|quantile|\bchances?\b|\blikelihood\b|\bodds\b"
+    "|\\bihtimal|\\b\u015fans\\b|\\by\u00fczde\\b|olas\u0131l",
+    re.IGNORECASE,
+)
 
 
 class RankingCriterion(StrEnum):
@@ -312,7 +354,17 @@ def _catalog() -> Mapping[str, Strategy]:
             # windows publish the per-week plan and the window's stated limits.
             publishes=_BASELINE_PUBLISHES | frozenset({"plan_weeks", "stated_limits"}),
             evidence=EvidenceStatus.PREREG_OPEN,
-            tagline="Unconstrained: the highest expected points.",
+            # Not "the highest expected points". The solve maximises the eleven, the
+            # captain and the bench together (``planning/optimizer.py``: ``projected_score
+            # + bench_weight * projected_bench - hits``, bench_weight 0.1), while
+            # ``expected_own_points`` — the number this publishes and the member reads —
+            # is the eleven and the captain only. The two have different maximisers, and
+            # on the 2026-27 GW4 capture they disagree: entry 3832237's plan scores 46.5454
+            # on the published figure with a 7.1846 bench, and its ortak-koru plan scores
+            # 46.7016 with a 4.3379 bench — the banded plan reads higher on the figure and
+            # lower on the objective. Nothing enforces a maximum over the published figure,
+            # so nothing may claim one.
+            tagline="Unconstrained: chosen on the eleven, the captain and the bench together.",
         ),
         Strategy(
             slug="ortak-koru",

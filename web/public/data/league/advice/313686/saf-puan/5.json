@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 5,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 39.45999999999998,
-    "expected_own_points": 54.276215395590754,
+    "optimality_gap": 41.22399999999999,
+    "expected_own_points": 54.15103867195976,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -68,7 +68,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 522047,
@@ -79,12 +79,12 @@
         "expected_points": 3.2456264546203446
       },
       {
-        "player_id": 106760,
-        "name": "Luke Shaw",
-        "short_name": "Shaw",
+        "player_id": 487676,
+        "name": "Trai Hume",
+        "short_name": "Hume",
         "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.521244083180876
+        "team": "Sunderland",
+        "expected_points": 2.35319016432435
       },
       {
         "player_id": 141746,
@@ -108,7 +108,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.391694024990014
+        "expected_points": 4.389550689692313
       },
       {
         "player_id": 424876,
@@ -158,15 +158,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
-      },
-      {
-        "player_id": 487676,
-        "name": "Trai Hume",
-        "short_name": "Hume",
-        "position": "DEF",
-        "team": "Sunderland",
-        "expected_points": 2.394858537183296
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 472769,
@@ -174,7 +166,15 @@
         "short_name": "O'Reilly",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 1.550337345902003
+        "expected_points": 2.026527638301547
+      },
+      {
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
+        "position": "DEF",
+        "team": "Man Utd",
+        "expected_points": 1.8909330623856568
       }
     ],
     "chip": null,
@@ -201,19 +201,19 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 54.27621539559076
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 54.15103867195976
       },
       {
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 209036,
-            "name": "Marc Gu\u00e9hi",
-            "short_name": "Gu\u00e9hi",
+            "player_id": 97032,
+            "name": "Virgil van Dijk",
+            "short_name": "Dijk",
             "position": "DEF",
-            "team": "Man City"
+            "team": "Liverpool"
           }
         ],
         "transfers_out": [
@@ -227,35 +227,35 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.476599126682935
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.46478066316897
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 503139,
-            "name": "Alex Scott",
-            "short_name": "Scott",
-            "position": "MID",
-            "team": "Bournemouth"
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
+            "position": "DEF",
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
-            "position": "MID",
-            "team": "Brighton"
+            "player_id": 106760,
+            "name": "Luke Shaw",
+            "short_name": "Shaw",
+            "position": "DEF",
+            "team": "Man Utd"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.31204704606244
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.46478066316897
       },
       {
         "gameweek": 7,
@@ -279,35 +279,35 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.317794440336684
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.46880592127415
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 244851,
-            "name": "Cole Palmer",
-            "short_name": "Palmer",
+            "player_id": 503139,
+            "name": "Alex Scott",
+            "short_name": "Scott",
             "position": "MID",
-            "team": "Chelsea"
+            "team": "Bournemouth"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 466052,
-            "name": "Rayan Cherki",
-            "short_name": "Cherki",
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
             "position": "MID",
-            "team": "Man City"
+            "team": "Brighton"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 57.50965772931008
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 56.34746021373753
       }
     ],
     "stated_limits": [
@@ -320,8 +320,8 @@
     ],
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

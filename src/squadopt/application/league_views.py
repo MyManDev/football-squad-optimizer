@@ -25,11 +25,13 @@ Two rules are load-bearing and tested rather than asserted:
 
 import functools
 import json
-from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
+import shutil
+import unicodedata
+from collections.abc import Callable, Collection, Iterable, Mapping
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import pandas as pd
 
@@ -56,6 +58,7 @@ from squadopt.application.entries import (
     EntryPicks,
     EntryPicksProvider,
     EntryRegistration,
+    chip_states,
     held_squad_from_picks,
 )
 from squadopt.application.mode_selection import (
@@ -67,7 +70,7 @@ from squadopt.application.mode_selection import (
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.application.strategies.rule import RIVAL_RULE_STRATEGIES, suggest_strategy
 from squadopt.data.errors import DataError
-from squadopt.experiments.config import ExperimentError
+from squadopt.evaluation.promotion import ExperimentError
 from squadopt.live import (
     Projection,
     RecommendationInputs,
@@ -289,6 +292,99 @@ class MemberStanding:
     transfer_cost: int | None = None
 
 
+#: The longest team or manager name this publishes. Not a claim about what the game
+#: allows — a bound on what we put in a document, so one member's name cannot decide the
+#: size of a payload every other member downloads. Every name the real capture carries is
+#: far inside it; a name that is not is truncated to it and the build says so.
+PUBLISHED_NAME_LIMIT: Final = 64
+
+
+def _entry_stand_in(entry_id: int) -> str:
+    """The stand-in a member with no readable name is published under. ``advice.py``
+    already labels a rival it cannot name this way, so a reader meets one convention,
+    not two."""
+
+    return f"entry-{int(entry_id)}"
+
+
+def published_member_name(raw: str | None, *, entry_id: int, field: str) -> tuple[str | None, str]:
+    """One member-typed name, and what had to be done to it to publish it.
+
+    A team name and a manager name come out of the game as text the member typed. They
+    are the only free text in this tree, and they land in ``members.json``, in
+    ``entries/{id}.json``, in the rival label and in the page's own ``<h1>``. The page is
+    React and escapes markup, but the page is not the only reader: these documents are
+    fetched by whatever wants them, and a document is not made safe by one of its
+    consumers. So the producer decides, once, what may be published — refusing at the
+    page would leave the file itself carrying whatever arrived.
+
+    What the producer decides is a question of *safety and shape*, not of wording. A
+    member's team name is the member's own words, chosen inside the game and public there
+    the moment the deadline passes; it is not a claim this site is making, so the honesty
+    envelope — no probability, percentage, quantile, spread, likelihood or chance wording
+    on a member-facing surface — does not reach it. That envelope governs the text *we*
+    generate: strategy names, notes, badges, rule copy, everything in this tree that a
+    member did not type. It is still enforced there, unchanged. A name that reads as a
+    chance or a percentage in either language is published as captured, and the note that
+    used to accompany the substitution is gone with it;
+    ``tests/unit/test_public_probability_guards.py`` names the cases on both sides of
+    that line.
+
+    Two rules, in order, and each returns the reason it fired so the build can state it:
+
+    - **Normalise.** Every character in Unicode's ``C`` classes becomes a space: the C0
+      and C1 controls (a NUL that truncates a C string, an ESC that a terminal reads as a
+      command, a newline that forges a second log line) and the format class, which is
+      where the bidi overrides live — ``U+202E`` reverses everything printed after it, so
+      a name carrying one rewrites the sentence it sits in. No real name contains any of
+      them. Whitespace runs collapse afterwards, so removing a newline never joins two
+      words. ``<`` and ``>`` go with them: our page is React and escapes markup — a
+      ``<script>`` in a team name renders as five visible words and injects no node, and
+      the probe confirmed it — but that is a property of one reader, and these files are
+      served to whoever asks. The two characters open every markup and template language
+      a name might be pasted into and mean nothing inside a name, so the producer does
+      not hand them on.
+    - **Bound.** Longer than ``PUBLISHED_NAME_LIMIT`` is truncated to it.
+
+    ``None`` in stays ``None`` out: a name the capture never carried and a name that
+    normalised away to nothing are different facts, and only the second one gets the
+    entry's id as a stand-in — a member we hold no name for must read as unavailable
+    rather than as a blank.
+    """
+
+    if raw is None:
+        return None, ""
+    notes: list[str] = []
+    cleaned = "".join(
+        " " if unicodedata.category(char).startswith("C") or char in "<>" else char for char in raw
+    )
+    cleaned = " ".join(cleaned.split())
+    if cleaned != raw:
+        notes.append(f"{field}: unprintable characters and markup delimiters removed")
+    if len(cleaned) > PUBLISHED_NAME_LIMIT:
+        cleaned = cleaned[:PUBLISHED_NAME_LIMIT].rstrip()
+        notes.append(f"{field}: truncated to {PUBLISHED_NAME_LIMIT} characters")
+    if not cleaned:
+        # Nothing printable survived. The capture did carry something, so ``None`` — "no
+        # name was captured" — would be the wrong claim; the id says what we know.
+        return _entry_stand_in(entry_id), f"{field}: nothing printable survived normalisation"
+    return cleaned, "; ".join(notes)
+
+
+def _published_standing(placing: MemberStanding) -> tuple[MemberStanding, tuple[str, ...]]:
+    """One standings row with both of its free-text fields put through the rule above."""
+
+    entry_id = int(placing.entry_id)
+    team, team_note = published_member_name(placing.team_name, entry_id=entry_id, field="team_name")
+    manager, manager_note = published_member_name(
+        placing.manager_name, entry_id=entry_id, field="manager_name"
+    )
+    notes = tuple(note for note in (team_note, manager_note) if note)
+    # ``MemberStanding`` types both names as ``str``; only a name that was never captured
+    # is None, and this path is only reached for one the capture did carry.
+    return replace(placing, team_name=team or "", manager_name=manager or ""), notes
+
+
 @dataclass(frozen=True, slots=True)
 class LeagueViewsReport:
     league_id: int
@@ -296,10 +392,115 @@ class LeagueViewsReport:
     gameweek: int
     members: tuple[MemberViewResult, ...]
     files: tuple[str, ...]
+    #: Documents from an earlier publish that this run removed because it did not produce
+    #: them. Reported rather than done quietly: a deletion under ``web/public`` is a change
+    #: to what the site serves, and the operator reads this line beside "not rendered".
+    removed: tuple[str, ...] = ()
 
     @property
     def rendered_count(self) -> int:
         return sum(1 for member in self.members if member.rendered)
+
+
+def _prune_unpublished_members(
+    out: Path, published: Collection[int], *, refused: Collection[int] = ()
+) -> tuple[str, ...]:
+    """Remove the member documents this run did not write, and name them.
+
+    A publish is a whole picture of one gameweek, not an overlay on the last one — but the
+    tree it builds into is the previous publish's. ``publish_gameweek_site`` checks a
+    worktree out of ``origin/develop``, which carries the committed tree from last week, and
+    then commits ``git add web/public/data``: the union of what it finds. Nothing here used
+    to remove anything, so a member whose render failed kept last week's
+    ``entries/{id}.json`` and ``advice/{id}/**`` while ``members.json`` was rewritten to this
+    gameweek. Their row still linked, their page still rendered, and what it rendered was a
+    finished gameweek's transfer recommendation served as this week's advice.
+
+    Refusing the whole publish was the other way to answer that, and it is the wrong one. A
+    member's picks go missing for reasons that have nothing to do with the other fourteen —
+    a member with no current price took the whole batch out once — and this module's stated
+    rule is that one failure does not sink the batch. Refusing would answer one member's
+    data gap by withholding everyone else's advice, which is a larger harm than the one
+    being fixed.
+
+    So the publish stands and the absence becomes honest. The tree can already *say* absent:
+    the member's row carries ``data_quality`` "empty". What it could not do was *be* absent,
+    because the old document was still at the address. Removing it means the page has
+    nothing to render rather than something wrong — absent, which is not the same as zero
+    and not the same as stale.
+
+    Only entry-shaped names are touched: a file under ``entries/`` or a directory under
+    ``advice/`` whose name is an entry id this run did not publish. Anything else in the
+    tree — ``scoreboard.json``, which a different script writes into the same directory
+    after this one — is left exactly as found, because a rule that deletes what it did not
+    anticipate is a worse failure than the one it fixes.
+
+    A ``refused`` member is one this run wrote an ``advice/{id}/index.json`` for and nothing
+    else: the index carries the reason the page shows, so it stays, and every other name
+    under that directory — last week's documents — goes, along with ``entries/{id}.json``.
+    """
+
+    removed: list[str] = []
+    kept = frozenset(refused)
+
+    def _stale(name: str) -> bool:
+        try:
+            return int(name) not in published
+        except ValueError:
+            return False
+
+    entries = out / "entries"
+    if entries.is_dir():
+        for path in sorted(entries.iterdir()):
+            if path.is_file() and path.suffix == ".json" and _stale(path.stem):
+                path.unlink()
+                removed.append(f"entries/{path.name}")
+    advice = out / "advice"
+    if advice.is_dir():
+        for path in sorted(advice.iterdir()):
+            if not path.is_dir() or not _stale(path.name):
+                continue
+            if int(path.name) not in kept:
+                shutil.rmtree(path)
+                removed.append(f"advice/{path.name}/")
+                continue
+            for child in sorted(path.iterdir()):
+                if child.is_dir():
+                    shutil.rmtree(child)
+                    removed.append(f"advice/{path.name}/{child.name}/")
+                elif child.name != "index.json":
+                    child.unlink()
+                    removed.append(f"advice/{path.name}/{child.name}")
+    return tuple(removed)
+
+
+def _refused_member_index(task: MemberRenderTask, *, reason: str) -> dict[str, object]:
+    """The index of a member with no advice this week, under the successful index's shape.
+
+    Every declared strategy is listed and none is computed; the reason sits in
+    ``unavailable`` once per strategy with no rival, where the page already reads reasons.
+    ``windows`` names no window for any strategy, so a reader that checks each listed
+    window's file finds nothing promised.
+    """
+
+    strategies = [COMPUTED_MODE, *task.rival_strategies]
+    return {
+        "league_id": task.league_id,
+        "season": task.season,
+        "gameweek": task.gameweek,
+        "entry_id": task.entry_id,
+        "window": COMPUTED_WINDOW,
+        "windows": {strategy: [] for strategy in strategies},
+        "strategies": strategies,
+        "rival_entry_ids": list(task.rival_ids),
+        "default_rival_entry_id": task.default_rival_id,
+        "suggested_strategy": None,
+        "computed": [],
+        "unavailable": [
+            {"strategy": strategy, "rival_entry_id": None, "reason": reason}
+            for strategy in strategies
+        ],
+    }
 
 
 def _envelope(payload: Mapping[str, object], *, generated_at_utc: str) -> dict[str, object]:
@@ -334,6 +535,7 @@ def _entry_squad_payload(
     picks: EntryPicks,
     inputs: RecommendationInputs,
     projection: Projection,
+    rules: SeasonRules,
     *,
     league_id: int,
     member_row: Mapping[str, object],
@@ -376,6 +578,21 @@ def _entry_squad_payload(
         "free_transfers": int(picks.free_transfers),
         "free_transfers_known": bool(picks.free_transfers_known),
         "chips_used": {name: list(weeks) for name, weeks in picks.chips_used.items()},
+        # What is still playable, per half, read before the upcoming deadline. ``known`` is
+        # true here because an EntryPicks always carries the history (the capture reader
+        # refuses a payload without its chips list); the flag is published so a reader of a
+        # future provider that lacks the history sees the same shape, states "unknown".
+        "chips": {
+            "known": True,
+            "gameweek": picks.gameweek + 1,
+            "states": {
+                name: {
+                    half: None if window is None else window.to_dict()
+                    for half, window in halves.items()
+                }
+                for name, halves in chip_states(rules, picks.gameweek + 1, picks.chips_used).items()
+            },
+        },
         "purchase_prices_known": bool(picks.purchase_prices_known),
         "source_snapshot_id": picks.source_snapshot_id,
         # Comparing a member's gameweek score with ours needs both scores; the standings
@@ -493,17 +710,43 @@ def build_league_views(
     around this could only guess, because the weekly publish re-solves in a fresh worktree.
 
     The record is keyed by ``inputs``' capture, so the mid-week publish and the one taken
-    shortly before the deadline each write their own and neither refuses the other. What is
-    still refused is a *rebuild of one capture* that produces different bytes: the capture
-    is the whole input, so that is our own non-determinism, and it raises
-    ``AdviceRecordConflictError`` naming the difference.
+    shortly before the deadline each write their own and neither refuses the other. A
+    re-publish of *one* capture is a replay and keeps the record it already wrote: the
+    envelopes below are stamped with ``generated``, which moves whenever ``now`` is not
+    passed — and no caller here passes it — so the same advice re-published is never the
+    same bytes. What is still refused is a rebuild of one capture that produces different
+    *advice*: the capture is the whole input, so that is our own non-determinism, and it
+    raises ``AdviceRecordConflictError`` naming the difference.
 
     The records are written after every member's files are on disk, so a refusal can never
     stop the advice being published; the refusal is raised once, after every writable record
     has been written. The published bytes are identical with and without this argument.
     """
 
-    placings = dict(standings or {})
+    # Every member-typed name is normalised here, once, before anything reads a standings
+    # row: ``_row`` writes both names into ``members.json`` and into the ``entry`` block
+    # of ``entries/{id}.json``, and the rival label below is the same ``team_name`` again.
+    # Normalising at the source is what makes those three agree; doing it at each of them
+    # would be three chances to miss one. The wording of a name is the member's own and is
+    # published as captured; only its shape is ours to decide.
+    name_notes: dict[int, tuple[str, ...]] = {}
+    placings: dict[int, MemberStanding] = {}
+    for entry_id, raw_placing in (standings or {}).items():
+        placings[entry_id], notes = _published_standing(raw_placing)
+        if notes:
+            name_notes[int(entry_id)] = notes
+    # The registry's label is the same free text by another route — ``seed_entry_registry``
+    # records each member's own team name as the label — and it is what every row falls
+    # back to when the capture holds no standings page, so it is filtered on the same rule.
+    labels: dict[int, str] = {}
+    for registration in registrations:
+        registered_id = int(registration.entry_id)
+        safe_label, label_note = published_member_name(
+            registration.label, entry_id=registered_id, field="label"
+        )
+        labels[registered_id] = safe_label or _entry_stand_in(registered_id)
+        if label_note:
+            name_notes[registered_id] = (*name_notes.get(registered_id, ()), label_note)
     if mode_paths is not None:
         window_weeks = tuple(int(week) for week in mode_paths.target.gameweeks)
         if window_weeks != (int(inputs.deadline.gameweek),):
@@ -569,7 +812,7 @@ def build_league_views(
         picks_or_error = fetched[entry_id]
         if isinstance(picks_or_error, EntryPicks):
             placing = placings.get(entry_id)
-            label = placing.team_name if placing is not None else registration.label
+            label = placing.team_name if placing is not None else labels[entry_id]
             rival_squads[entry_id] = rival_squad_from_picks(picks_or_error, label=label)
     ranks = {entry_id: placing.rank for entry_id, placing in placings.items()}
     prices = {
@@ -598,7 +841,7 @@ def build_league_views(
     tasks = [
         MemberRenderTask(
             entry_id=int(registration.entry_id),
-            label=registration.label,
+            label=labels[int(registration.entry_id)],
             season=season,
             gameweek=gameweek,
             league_id=int(league_id),
@@ -643,22 +886,35 @@ def build_league_views(
     # digest it was solved under, and every advice document with the bytes that landed.
     # Records are written from this after the whole tree is on disk.
     publications: list[tuple[EntryPicks, str, list[PublishedAdvice], dict[str, object]]] = []
+    #: Members with no advice this week, whose index names why.
+    refused: set[int] = set()
 
     for registration, task in zip(registrations, tasks, strict=True):
         entry_id = int(registration.entry_id)
         picks_or_error = fetched[entry_id]
         render = renders[entry_id]
         if not isinstance(picks_or_error, EntryPicks) or render.baseline is None:
-            reason = (
-                render.reason if isinstance(picks_or_error, EntryPicks) else str(picks_or_error)
+            reason = "; ".join(
+                part
+                for part in (
+                    *name_notes.get(entry_id, ()),
+                    render.reason
+                    if isinstance(picks_or_error, EntryPicks)
+                    else str(picks_or_error),
+                )
+                if part
             )
-            results.append(MemberViewResult(entry_id, registration.label, False, reason=reason))
-            member_rows.append(_row(entry_id, registration.label, "empty"))
+            results.append(MemberViewResult(entry_id, labels[entry_id], False, reason=reason))
+            member_rows.append(_row(entry_id, labels[entry_id], "empty"))
+            # The page reads this member's index for the reason; without one it can only
+            # say "unavailable". The row keeps ``data_quality`` "empty" — no advice exists.
+            refused.add(entry_id)
+            _write(f"advice/{entry_id}/index.json", _refused_member_index(task, reason=reason))
             continue
         picks = picks_or_error
         advice = render.baseline
         quality = str(advice["data_quality"])
-        member_row = _row(entry_id, registration.label, quality)
+        member_row = _row(entry_id, labels[entry_id], quality)
         raw_missing = advice.get("missing_fields")
         missing = [str(field) for field in raw_missing] if isinstance(raw_missing, list) else []
 
@@ -670,6 +926,7 @@ def build_league_views(
             picks,
             inputs,
             projection,
+            rules,
             league_id=league_id,
             member_row=member_row,
             missing=missing,
@@ -869,7 +1126,11 @@ def build_league_views(
         )
         publications.append((picks, render.transfer_config_fingerprint, emitted, told))
 
-        results.append(MemberViewResult(entry_id, registration.label, True, reason=mode_note))
+        # What was changed about this member's own name before it was published travels
+        # on their row of the report, so the operator running the publish sees it. A name
+        # we altered and never mentioned would be the quiet half of this fix.
+        note = "; ".join(part for part in (*name_notes.get(entry_id, ()), mode_note) if part)
+        results.append(MemberViewResult(entry_id, labels[entry_id], True, reason=note))
         member_rows.append(member_row)
     # The standings order is the league's order; registry order is arbitrary.
     if placings:
@@ -892,6 +1153,13 @@ def build_league_views(
         newline="\n",
     )
     written.append(members_path.name)
+
+    # Whatever this run did not produce is not this week's advice, and the tree it wrote
+    # into is last week's. Removed after members.json rather than before the renders, so a
+    # run that dies mid-batch leaves the old tree whole rather than half-deleted.
+    removed = _prune_unpublished_members(
+        out, {picks.entry_id for picks, _, _, _ in publications}, refused=refused
+    )
 
     # The record comes last, after every published file is on disk: a refusal here must
     # never be able to stop a member's advice reaching them. Every member is attempted
@@ -929,4 +1197,5 @@ def build_league_views(
         gameweek=gameweek,
         members=tuple(results),
         files=tuple(sorted(written)),
+        removed=removed,
     )

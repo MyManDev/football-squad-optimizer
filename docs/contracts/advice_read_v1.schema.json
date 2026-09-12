@@ -14,12 +14,175 @@
     "payload": {
       "additionalProperties": true,
       "properties": {
+        "alternative_plan": {
+          "properties": {
+            "expected_points_cost": {
+              "type": "number"
+            },
+            "expected_points_cost_ceiling": {
+              "type": "number"
+            },
+            "kind": {
+              "enum": [
+                "within_free_transfers",
+                "with_hits"
+              ]
+            },
+            "overlap_applied": {
+              "type": "number"
+            },
+            "transfer_hit_points": {
+              "type": [
+                "number",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "overlap_applied",
+            "transfer_hit_points",
+            "expected_points_cost"
+          ],
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "bench": {
+          "items": {
+            "properties": {
+              "expected_points": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "player_id": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "position": {
+                "enum": [
+                  "GK",
+                  "DEF",
+                  "MID",
+                  "FWD"
+                ]
+              },
+              "short_name": {
+                "type": "string"
+              },
+              "team": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "player_id",
+              "name",
+              "short_name",
+              "position",
+              "team"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "captain": {
+          "anyOf": [
+            {
+              "properties": {
+                "expected_points": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "player_id": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "position": {
+                  "enum": [
+                    "GK",
+                    "DEF",
+                    "MID",
+                    "FWD"
+                  ]
+                },
+                "short_name": {
+                  "type": "string"
+                },
+                "team": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "player_id",
+                "name",
+                "short_name",
+                "position",
+                "team"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "captain_agreement": {
+          "type": "boolean"
+        },
+        "chip": {
+          "enum": [
+            null,
+            "bboost",
+            "3xc",
+            "wildcard",
+            "freehit"
+          ]
+        },
+        "control_optimality_gap": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "control_solver_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "data_quality": {
-          "type": "string"
+          "enum": [
+            "complete",
+            "partial",
+            "empty"
+          ]
         },
         "entry_id": {
           "minimum": 1,
           "type": "integer"
+        },
+        "expected_gap_vs_rival": {
+          "type": "number"
+        },
+        "expected_own_points": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "expected_points_cost": {
+          "type": "number"
+        },
+        "expected_points_cost_ceiling": {
+          "type": "number"
         },
         "gameweek": {
           "minimum": 1,
@@ -39,10 +202,393 @@
           "type": "string"
         },
         "moves": {
+          "items": {
+            "properties": {
+              "expected_points_delta": {
+                "type": "number"
+              },
+              "move_id": {
+                "type": "string"
+              },
+              "player_in": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "expected_points": {
+                        "type": "number"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "player_id": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "position": {
+                        "enum": [
+                          "GK",
+                          "DEF",
+                          "MID",
+                          "FWD"
+                        ]
+                      },
+                      "short_name": {
+                        "type": "string"
+                      },
+                      "team": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "player_id",
+                      "name",
+                      "short_name",
+                      "position",
+                      "team"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "player_out": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "expected_points": {
+                        "type": "number"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "player_id": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "position": {
+                        "enum": [
+                          "GK",
+                          "DEF",
+                          "MID",
+                          "FWD"
+                        ]
+                      },
+                      "short_name": {
+                        "type": "string"
+                      },
+                      "team": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "player_id",
+                      "name",
+                      "short_name",
+                      "position",
+                      "team"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reason_code": {
+                "enum": [
+                  "window_value",
+                  "mode_tradeoff",
+                  "points_gain"
+                ]
+              }
+            },
+            "required": [
+              "move_id",
+              "player_out",
+              "player_in",
+              "expected_points_delta",
+              "reason_code"
+            ],
+            "type": "object"
+          },
           "type": "array"
+        },
+        "optimality_gap": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "overlap_applied": {
+          "type": "number"
+        },
+        "overlap_count": {
+          "type": "number"
+        },
+        "overlap_target": {
+          "type": "number"
+        },
+        "plan_kind": {
+          "enum": [
+            "within_free_transfers",
+            "with_hits"
+          ]
+        },
+        "plan_weeks": {
+          "items": {
+            "properties": {
+              "chip": {
+                "enum": [
+                  null,
+                  "bboost",
+                  "3xc",
+                  "wildcard",
+                  "freehit"
+                ]
+              },
+              "expected_points": {
+                "type": "number"
+              },
+              "free_transfers_after": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "free_transfers_before": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "gameweek": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "transfer_hit_points": {
+                "type": "number"
+              },
+              "transfers_in": {
+                "items": {
+                  "properties": {
+                    "expected_points": {
+                      "type": "number"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "player_id": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "position": {
+                      "enum": [
+                        "GK",
+                        "DEF",
+                        "MID",
+                        "FWD"
+                      ]
+                    },
+                    "short_name": {
+                      "type": "string"
+                    },
+                    "team": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "player_id",
+                    "name",
+                    "short_name",
+                    "position",
+                    "team"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "transfers_out": {
+                "items": {
+                  "properties": {
+                    "expected_points": {
+                      "type": "number"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "player_id": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "position": {
+                      "enum": [
+                        "GK",
+                        "DEF",
+                        "MID",
+                        "FWD"
+                      ]
+                    },
+                    "short_name": {
+                      "type": "string"
+                    },
+                    "team": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "player_id",
+                    "name",
+                    "short_name",
+                    "position",
+                    "team"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "gameweek",
+              "transfers_in",
+              "transfers_out",
+              "transfer_hit_points",
+              "chip",
+              "free_transfers_before",
+              "free_transfers_after",
+              "expected_points"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "rival_entry_id": {
+          "minimum": 1,
+          "type": "integer"
+        },
+        "rival_label": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "season": {
           "type": "string"
+        },
+        "solver_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_snapshot_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "squad_basis": {
+          "type": "string"
+        },
+        "starting_xi": {
+          "items": {
+            "properties": {
+              "expected_points": {
+                "type": "number"
+              },
+              "name": {
+                "type": "string"
+              },
+              "player_id": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "position": {
+                "enum": [
+                  "GK",
+                  "DEF",
+                  "MID",
+                  "FWD"
+                ]
+              },
+              "short_name": {
+                "type": "string"
+              },
+              "team": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "player_id",
+              "name",
+              "short_name",
+              "position",
+              "team"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "stated_limits": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "transfer_cap": {
+          "type": "number"
+        },
+        "transfer_hit_points": {
+          "type": "number"
+        },
+        "vice_captain": {
+          "anyOf": [
+            {
+              "properties": {
+                "expected_points": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "player_id": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "position": {
+                  "enum": [
+                    "GK",
+                    "DEF",
+                    "MID",
+                    "FWD"
+                  ]
+                },
+                "short_name": {
+                  "type": "string"
+                },
+                "team": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "player_id",
+                "name",
+                "short_name",
+                "position",
+                "team"
+              ],
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "window": {
           "enum": [
@@ -67,7 +613,10 @@
       "type": "object"
     },
     "source_kind": {
-      "type": "string"
+      "enum": [
+        "live",
+        "example"
+      ]
     }
   },
   "required": [

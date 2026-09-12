@@ -15,6 +15,7 @@ from squadopt.preflight import (
     PreflightError,
     run_measurement_preflight,
 )
+from squadopt.preflight.measurement import MEASUREMENT_DECLARATIONS
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
@@ -67,6 +68,79 @@ def test_a_holdout_access_flag_anywhere_fails() -> None:
     document = _document(nested={"inner": {"locked_holdout_accessed": True}})
 
     assert "artifact_no_holdout_access" in _failed(document)
+
+
+@pytest.mark.parametrize(
+    ("field", "check"),
+    [
+        ("locked_holdout_accessed", "artifact_no_holdout_access"),
+        ("automatic_promotion", "artifact_no_automatic_promotion"),
+        ("recommendation_only", "artifact_recommendation_only"),
+    ],
+)
+def test_a_required_root_declaration_cannot_be_replaced_by_a_nested_one(
+    field: str, check: str
+) -> None:
+    document = _document()
+    value = document.pop(field)
+    document["nested"] = {field: value}
+
+    assert check in _failed(document)
+
+
+@pytest.mark.parametrize("value", [None, 0, "false", [], {}])
+def test_invalid_declaration_types_are_not_false(value: object) -> None:
+    assert "artifact_no_holdout_access" in _failed(_document(locked_holdout_accessed=value))
+
+
+@pytest.mark.parametrize("value", [True, None, [], {}])
+def test_nested_declarations_include_containers_and_contradictions(value: object) -> None:
+    document = _document(nested=[{"automatic_promotion": value}])
+
+    assert "artifact_no_automatic_promotion" in _failed(document)
+
+
+def test_recommendation_only_false_cannot_pass() -> None:
+    assert "artifact_recommendation_only" in _failed(_document(recommendation_only=False))
+
+
+@pytest.mark.parametrize("kind", sorted(MEASUREMENT_KINDS))
+def test_every_kind_requires_an_explicit_no_holdout_declaration(kind: str) -> None:
+    document = _document()
+    document.update({name: {} for name in MEASUREMENT_KINDS[kind] if name not in document})
+    document.pop("locked_holdout_accessed")
+
+    report = run_measurement_preflight(document, kind)
+
+    assert "artifact_no_holdout_access" in {finding.check for finding in report.failures}
+    assert set(MEASUREMENT_DECLARATIONS) == set(MEASUREMENT_KINDS)
+
+
+@pytest.mark.parametrize("kind", ["scenario_audit", "control_uncertainty", "rotation_evidence"])
+def test_descriptive_kinds_report_optional_absence_without_claiming_evidence(kind: str) -> None:
+    document = _document()
+    document.update({name: {} for name in MEASUREMENT_KINDS[kind] if name not in document})
+    document.pop("automatic_promotion")
+    document.pop("recommendation_only")
+
+    report = run_measurement_preflight(document, kind)
+
+    assert report.passed
+    optional = [
+        finding
+        for finding in report.findings
+        if finding.check in {"artifact_no_automatic_promotion", "artifact_recommendation_only"}
+    ]
+    assert len(optional) == 2
+    assert all(
+        "optional" in finding.detail and "undeclared" in finding.detail for finding in optional
+    )
+
+
+def test_an_optional_declaration_must_be_valid_when_supplied() -> None:
+    document = _document(decision_level={}, player_level={}, rows=[], automatic_promotion=None)
+
+    assert "artifact_no_automatic_promotion" in _failed(document, "scenario_audit")
 
 
 def test_a_malformed_fingerprint_fails() -> None:

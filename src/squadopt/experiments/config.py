@@ -10,6 +10,18 @@ from numbers import Integral, Real
 from typing import Final
 
 from squadopt.evaluation import EvaluationConfig
+from squadopt.evaluation.promotion import (
+    ExperimentConfigurationError as ExperimentConfigurationError,
+)
+from squadopt.evaluation.promotion import (
+    ExperimentError as ExperimentError,
+)
+from squadopt.evaluation.promotion import (
+    ExperimentExecutionError as ExperimentExecutionError,
+)
+from squadopt.evaluation.promotion import (
+    PromotionPolicy as PromotionPolicy,
+)
 from squadopt.features import CrossSeasonConfig, FeatureConfigurationError
 from squadopt.optimization import OptimizationConfig
 from squadopt.prediction import FormWindowMapping
@@ -19,18 +31,6 @@ DEFAULT_DEVELOPMENT_SEASONS: Final = ("2021-22", "2022-23", "2023-24", "2024-25"
 DEFAULT_HOLDOUT_SEASONS: Final = ("2025-26",)
 DEFAULT_FORM_WINDOWS: Final = (3, 5, 7, 10)
 DEFAULT_BENCH_WEIGHTS: Final = (0.0, 0.1, 0.25)
-
-
-class ExperimentError(Exception):
-    """Base exception for the experiment package."""
-
-
-class ExperimentConfigurationError(ExperimentError):
-    """Raised when an experiment configuration violates its public contract."""
-
-
-class ExperimentExecutionError(ExperimentError):
-    """Raised when an experiment cannot produce a trustworthy comparison."""
 
 
 class FrozenCandidateError(ExperimentError):
@@ -70,49 +70,6 @@ class ExperimentCandidate:
         """Return a stable identifier independent of binary float formatting."""
 
         return f"fw{self.form_window:02d}-bw{_bench_token(self.bench_weight)}"
-
-
-@dataclass(frozen=True, slots=True)
-class PromotionPolicy:
-    """Pre-registered gates for sending a challenger to the locked holdout."""
-
-    min_mean_improvement: float = 0.5
-    confidence_level: float = 0.90
-    bootstrap_resamples: int = 5_000
-    moving_block_length: int = 4
-    deterministic_seed: int = 0
-
-    def __post_init__(self) -> None:
-        improvement = self.min_mean_improvement
-        confidence = self.confidence_level
-        if isinstance(improvement, bool) or not isinstance(improvement, Real):
-            raise ExperimentConfigurationError("min_mean_improvement must be a finite real.")
-        normalized_improvement = float(improvement)
-        if not math.isfinite(normalized_improvement) or normalized_improvement < 0.0:
-            raise ExperimentConfigurationError("min_mean_improvement must be non-negative.")
-        if isinstance(confidence, bool) or not isinstance(confidence, Real):
-            raise ExperimentConfigurationError("confidence_level must be a finite real.")
-        normalized_confidence = float(confidence)
-        if not math.isfinite(normalized_confidence) or not 0.0 < normalized_confidence < 1.0:
-            raise ExperimentConfigurationError("confidence_level must be strictly between 0 and 1.")
-
-        normalized_integers: dict[str, int] = {}
-        for name, value, minimum in (
-            ("bootstrap_resamples", self.bootstrap_resamples, 1),
-            ("moving_block_length", self.moving_block_length, 1),
-            ("deterministic_seed", self.deterministic_seed, 0),
-        ):
-            if isinstance(value, bool) or not isinstance(value, Integral):
-                raise ExperimentConfigurationError(f"{name} must be an integer.")
-            normalized = int(value)
-            if normalized < minimum:
-                raise ExperimentConfigurationError(f"{name} must be at least {minimum}.")
-            normalized_integers[name] = normalized
-
-        object.__setattr__(self, "min_mean_improvement", normalized_improvement)
-        object.__setattr__(self, "confidence_level", normalized_confidence)
-        for name, value in normalized_integers.items():
-            object.__setattr__(self, name, value)
 
 
 def _normalize_seasons(value: object, name: str) -> tuple[str, ...]:

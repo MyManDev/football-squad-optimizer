@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,34 +9,34 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 219924,
-          "name": "Issa Diop",
-          "short_name": "Diop",
-          "position": "DEF",
-          "team": "Ipswich Town"
-        },
-        "player_in": {
-          "player_id": 606702,
-          "name": "Jeremy Jacquet",
-          "short_name": "Jacquet",
-          "position": "DEF",
+          "player_id": 424876,
+          "name": "Dominik Szoboszlai",
+          "short_name": "Szoboszlai",
+          "position": "MID",
           "team": "Liverpool"
         },
-        "expected_points_delta": 0.6341796405653879,
+        "player_in": {
+          "player_id": 446008,
+          "name": "Bryan Mbeumo",
+          "short_name": "Mbeumo",
+          "position": "MID",
+          "team": "Man Utd"
+        },
+        "expected_points_delta": 0.7020019132419577,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 1.336411551176198,
+    "expected_points_cost": 0.23553540882784318,
     "rival_label": "entry-5662073",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 55.67254307476861,
+    "expected_own_points": 56.01641882010358,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -68,7 +68,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 465730,
@@ -76,15 +76,15 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.2356844156410305
+        "expected_points": 3.237246793437091
       },
       {
-        "player_id": 606702,
-        "name": "Jeremy Jacquet",
-        "short_name": "Jacquet",
+        "player_id": 487676,
+        "name": "Trai Hume",
+        "short_name": "Hume",
         "position": "DEF",
-        "team": "Liverpool",
-        "expected_points": 2.8008054349848788
+        "team": "Sunderland",
+        "expected_points": 2.35319016432435
       },
       {
         "player_id": 141746,
@@ -95,12 +95,12 @@
         "expected_points": 7.066032835980204
       },
       {
-        "player_id": 424876,
-        "name": "Dominik Szoboszlai",
-        "short_name": "Szoboszlai",
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
         "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 4.232677554424536
+        "team": "Man Utd",
+        "expected_points": 4.934679467666494
       },
       {
         "player_id": 449434,
@@ -108,7 +108,7 @@
         "short_name": "Elanga",
         "position": "MID",
         "team": "Newcastle",
-        "expected_points": 3.4735053102667206
+        "expected_points": 3.516411504700961
       },
       {
         "player_id": 440993,
@@ -161,44 +161,44 @@
         "expected_points": 3.10088389206097
       },
       {
+        "player_id": 219924,
+        "name": "Issa Diop",
+        "short_name": "Diop",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 2.166625794419491
+      },
+      {
         "player_id": 106760,
         "name": "Luke Shaw",
         "short_name": "Shaw",
         "position": "DEF",
         "team": "Man Utd",
-        "expected_points": 2.521244083180876
-      },
-      {
-        "player_id": 487676,
-        "name": "Trai Hume",
-        "short_name": "Hume",
-        "position": "DEF",
-        "team": "Sunderland",
-        "expected_points": 2.394858537183296
+        "expected_points": 1.8909330623856568
       }
     ],
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 5662073,
-    "expected_points_cost_ceiling": 1.336411551176198,
-    "overlap_count": 5,
+    "expected_points_cost_ceiling": 0.23553540882784318,
+    "overlap_count": 4,
     "transfer_cap": 1,
     "overlap_target": 9,
-    "overlap_applied": 5,
+    "overlap_applied": 4,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 16.0,
-      "expected_points_cost": 17.86534810850273,
-      "expected_points_cost_ceiling": 17.86534810850273
+      "transfer_hit_points": 20.0,
+      "expected_points_cost": 20.943460357248547,
+      "expected_points_cost_ceiling": 20.943460357248547
     },
-    "expected_gap_vs_rival": 0.8497285031624386,
-    "captain_agreement": true,
+    "expected_gap_vs_rival": 4.146201855868817,
+    "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
   }

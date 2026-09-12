@@ -1100,7 +1100,7 @@ def entry_endpoint_paths(entry_ids: Sequence[int], *, gameweek: int) -> Mapping[
     for entry_id in identifiers:
         paths[entry_payload(entry_id)] = f"entry/{entry_id}/"
         paths[entry_history_payload(entry_id)] = f"entry/{entry_id}/history/"
-        paths[entry_picks_payload(entry_id, week)] = f"entry/{entry_id}/event/{week}/picks/"
+        paths[entry_picks_payload(entry_id, week)] = entry_picks_endpoint_path(entry_id, week)
     return MappingProxyType(paths)
 
 
@@ -1762,6 +1762,133 @@ def _chips_used(history: bytes, *, entry_id: int) -> Mapping[str, tuple[int, ...
     return MappingProxyType({name: tuple(sorted(events)) for name, events in played.items()})
 
 
+FREE_HIT_CHIP: Final = "freehit"
+CAPTURED_SQUAD_BASIS: Final = "captured"
+
+# The points the game deducts per transfer beyond the free ones (official rules, "Transfers";
+# the same 4 the member path charges as ``hit_points_charged`` in ``live/transfers.py``).
+# The bootstrap publishes the free-transfer cap but not this, so it is a constant here.
+TRANSFER_HIT_POINTS: Final = 4
+# The two chips under which transfers consume no free transfer and cost nothing. Bench
+# Boost and Triple Captain change no squad, so they do not enter the banking model.
+TRANSFER_CHIPS: Final = ("wildcard", FREE_HIT_CHIP)
+_BANKING_ROW_FIELDS: Final = ("event", "event_transfers", "event_transfers_cost")
+
+
+@dataclass(frozen=True, slots=True)
+class BankedFreeTransfers:
+    """The free transfers a member can spend at the coming deadline, and whether that is
+    derived or the rule floor. ``reason`` says why a count is unknown; the picks record
+    carries only the count and the flag, so a caller wanting the reason reads this."""
+
+    count: int
+    known: bool
+    reason: str | None = None
+
+
+def free_transfer_cap(bootstrap: bytes) -> int | None:
+    """The most free transfers a manager can bank, read from the captured settings.
+
+    ``game_config.rules.max_extra_free_transfers`` is the field ``live/rules.py`` builds
+    ``TransferRules.max_free_transfers`` from (one plus the extra bank), so reading the
+    same block keeps the banking model and the planner's cap on one number;
+    ``game_settings`` repeats it and is the fallback. None when the bootstrap carries
+    neither, so the count stays an honest unknown rather than a hard-coded season.
+    """
+
+    document = _document(bootstrap, "Bootstrap")
+    config = document.get("game_config")
+    rules = config.get("rules") if isinstance(config, dict) else None
+    for block in (rules, document.get("game_settings")):
+        if isinstance(block, dict) and "max_extra_free_transfers" in block:
+            return 1 + _integer(block, "max_extra_free_transfers", "Bootstrap rules")
+    return None
+
+
+def banked_free_transfers(
+    history: bytes,
+    *,
+    entry_id: int,
+    gameweek: int,
+    max_free_transfers: int | None,
+    active_chip: str | None = None,
+) -> BankedFreeTransfers:
+    """Derive the free transfers held at the deadline after ``gameweek`` from the history.
+
+    The model, under the rules in force since 2024-25 (``docs/transfer_planning_spec.md``,
+    ``wildcard_preserves_free_transfers``; the cap from the captured settings):
+
+    * No free transfer exists at the gameweek 1 deadline: the opening squad is built
+      with unlimited changes. From gameweek 2 on, one is added before each deadline and
+      the bank is capped at ``max_free_transfers``.
+    * A week's transfers consume the banked ones first; each beyond them costs
+      ``TRANSFER_HIT_POINTS``. So the cost the history records must equal the hit times
+      the transfers above the count this model says was available: that identity is
+      checked for every week, and a week that breaks it means the model is wrong, so
+      the count is reported unknown rather than trusted.
+    * Under a Wildcard or Free Hit the transfers consume nothing and cost nothing, and
+      the bank is kept and still gains its one the week after.
+
+    A member whose rows do not start at gameweek 1 or skip a week up to ``gameweek``
+    is reported unknown: a late joiner's opening week is not modelled here.
+    """
+
+    identifier = _positive(entry_id, "entry id")
+    week = _positive(gameweek, "gameweek")
+    if max_free_transfers is None:
+        return BankedFreeTransfers(1, False, "the capture states no free-transfer cap")
+    document = _document(history, "Entry history")
+    current = document.get("current")
+    if not isinstance(current, list):
+        raise DataSourceError(
+            f"Entry {identifier} history must carry a 'current' array, got "
+            f"{type(current).__name__}."
+        )
+    rows = tuple(record for record in current if isinstance(record, dict))
+    if len(rows) != len(current):
+        raise DataSourceError(f"Entry {identifier} history has non-object entries in 'current'.")
+    _require_fields(rows, _BANKING_ROW_FIELDS, "Entry history")
+    by_week: dict[int, tuple[int, int]] = {}
+    for record in rows:
+        event = _positive(_integer(record, "event", "Entry history"), "gameweek")
+        if event in by_week:
+            raise DuplicateRecordsError(
+                f"Entry {identifier} history lists gameweek {event} more than once."
+            )
+        by_week[event] = (
+            _integer(record, "event_transfers", "Entry history"),
+            _integer(record, "event_transfers_cost", "Entry history"),
+        )
+    missing = [w for w in range(1, week + 1) if w not in by_week]
+    if missing:
+        return BankedFreeTransfers(
+            1, False, f"the history has no row for gameweek {format_examples(missing)}"
+        )
+    chips = document.get("chips")
+    chip_weeks = {
+        _integer(chip, "event", "Entry chip")
+        for chip in (chips if isinstance(chips, list) else ())
+        if isinstance(chip, dict) and chip.get("name") in TRANSFER_CHIPS
+    }
+    if active_chip in TRANSFER_CHIPS:
+        chip_weeks.add(week)
+    available = 0
+    for w in range(1, week + 1):
+        transfers, cost = by_week[w]
+        unlimited = w == 1 or w in chip_weeks
+        consumed = 0 if unlimited else min(transfers, available)
+        expected = 0 if unlimited else (transfers - consumed) * TRANSFER_HIT_POINTS
+        if cost != expected:
+            return BankedFreeTransfers(
+                1,
+                False,
+                f"gameweek {w} recorded {transfers} transfers costing {cost} points, but "
+                f"with {available} free the banking model expects {expected}",
+            )
+        available = min(max_free_transfers, available - consumed + 1)
+    return BankedFreeTransfers(available, True)
+
+
 @dataclass(frozen=True, slots=True)
 class EntryPicksRecord:
     """One entry's squad at one gameweek, as the public endpoints report it.
@@ -1803,8 +1930,22 @@ class EntryPicksRecord:
     purchase_prices: Mapping[int, int]
     purchase_prices_known: bool
     source_snapshot_id: str | None = None
+    active_chip: str | None = None
+    """The chip the picks document says was active in ``gameweek``, or None.
+
+    Load-bearing for one chip: a Free Hit squad lasts its own week only, so the squad
+    a member holds going into the next deadline is the one from *before* the Free Hit,
+    not the fifteen in this document. The resolver that walks back reads this field;
+    the parser only reports it.
+    """
+    squad_basis: str = CAPTURED_SQUAD_BASIS
+    """Which squad the record's fifteen and bank describe: the parser always says
+    ``"captured"``; the application resolver that substitutes a pre-Free-Hit squad
+    carries its own descriptor on the application twin."""
 
     def __post_init__(self) -> None:
+        if not isinstance(self.squad_basis, str) or not self.squad_basis.strip():
+            raise InvalidValueError(f"Entry {self.entry_id} squad_basis must be non-empty text.")
         if len(self.squad) != _SQUAD_SIZE or len(set(self.squad)) != _SQUAD_SIZE:
             raise InvalidValueError(
                 f"Entry {self.entry_id} gameweek {self.gameweek} must hold {_SQUAD_SIZE} "
@@ -1853,6 +1994,37 @@ class EntrySquad:
     starting_xi: tuple[int, ...]
     captain: int
     vice_captain: int
+
+
+def entry_active_chip(picks: bytes, *, entry_id: int, gameweek: int) -> str | None:
+    """Return the chip a picks document reports active for its gameweek, or None.
+
+    The platform writes ``"active_chip": null`` on an ordinary week and the chip's short
+    name (``"freehit"``, ``"wildcard"``, ``"bboost"``, ``"3xc"``) when one was played.
+    An absent key is read as no chip: the field is descriptive, and the documents we
+    hold from before it was read all lack nothing else.
+    """
+
+    identifier = _positive(entry_id, "entry id")
+    week = _positive(gameweek, "gameweek")
+    document = _document(picks, "Entry picks")
+    value = document.get("active_chip")
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise DataSourceError(
+            f"Entry {identifier} gameweek {week} picks carry an active_chip of "
+            f"{value!r}; expected a chip name or null."
+        )
+    return value
+
+
+def entry_picks_endpoint_path(entry_id: int, gameweek: int) -> str:
+    """API path of one entry's picks document for one gameweek."""
+
+    identifier = _positive(entry_id, "entry id")
+    week = _positive(gameweek, "gameweek")
+    return f"entry/{identifier}/event/{week}/picks/"
 
 
 def entry_squad_from_picks(picks: bytes, *, entry_id: int, gameweek: int) -> EntrySquad:
@@ -1915,6 +2087,7 @@ def fpl_entry_picks(
     season: str,
     gameweek: int,
     source_snapshot_id: str | None = None,
+    max_free_transfers: int | None = None,
 ) -> EntryPicksRecord:
     """Return one entry's squad at one gameweek from its two captured documents.
 
@@ -1925,12 +2098,13 @@ def fpl_entry_picks(
     purchase price, so a squad built from this values every player at his current price,
     which overstates the budget for anyone who has risen since he was bought.
 
-    ``free_transfers`` is the rule-implied floor of one, flagged unknown. The endpoints
-    never state the banked count. It is *derivable* from the history's per-event transfers
-    and costs, but only through a model of the banking rules -- which changed in 2024-25 --
-    and of the chip weeks that consume no transfer. That model is a reviewed decision with
-    its own tests, not a side effect of parsing a capture, so this adapter reports the
-    honest unknown instead of a plausible number.
+    ``free_transfers`` is the count the member can spend at the deadline after
+    ``gameweek``, derived by ``banked_free_transfers`` from the history's per-event
+    transfers and costs under the banking model documented there, and flagged known only
+    when every week up to ``gameweek`` was present and the recorded costs agreed with the
+    model. Otherwise, and whenever the caller passes no ``max_free_transfers`` (the cap
+    the capture's settings state, see ``free_transfer_cap``), it is the rule floor of one
+    flagged unknown, as it was before the model existed.
     """
 
     named = entry_squad_from_picks(picks, entry_id=entry_id, gameweek=gameweek)
@@ -1945,6 +2119,16 @@ def fpl_entry_picks(
             f"object, got {type(entry_history).__name__}."
         )
 
+    active_chip = entry_active_chip(picks, entry_id=identifier, gameweek=week)
+    chips_used = _chips_used(history, entry_id=identifier)
+    banked = banked_free_transfers(
+        history,
+        entry_id=identifier,
+        gameweek=week,
+        max_free_transfers=max_free_transfers,
+        active_chip=active_chip,
+    )
+
     return EntryPicksRecord(
         entry_id=identifier,
         season=_require_season(season),
@@ -1954,10 +2138,11 @@ def fpl_entry_picks(
         captain=named.captain,
         vice_captain=named.vice_captain,
         bank_tenths=_integer(entry_history, "bank", "Entry history"),
-        free_transfers=1,
-        free_transfers_known=False,
-        chips_used=_chips_used(history, entry_id=identifier),
+        free_transfers=banked.count,
+        free_transfers_known=banked.known,
+        chips_used=chips_used,
         purchase_prices=MappingProxyType({}),
         purchase_prices_known=False,
         source_snapshot_id=source_snapshot_id,
+        active_chip=active_chip,
     )

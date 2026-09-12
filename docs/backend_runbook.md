@@ -16,7 +16,9 @@ a parameter awaiting confirmation rather than a measured fact.
 
 ## The two commands
 
-One image, two processes. Only the api gets ingress; the worker has no listener.
+One image, two processes. Only the api gets ingress. The worker opens no listener by default;
+given `--metrics-port` it binds a loopback-by-default HTTP listener serving only `/health` and
+`/metrics`, which is how the container health check reaches it.
 
 ```bash
 uvicorn --factory squadopt.api.runtime:build_app --host 0.0.0.0 --port 8000
@@ -26,9 +28,11 @@ uvicorn --factory squadopt.api.runtime:build_app --host 0.0.0.0 --port 8000
 python -m squadopt.platform.advice_worker
 ```
 
-The worker takes `--max-jobs` (stop after N, for a one-shot run), `--idle-seconds` and
-`--max-attempts`. It stops on SIGTERM or SIGINT **after** the job in hand finishes, so a
-container stop costs nobody their solve.
+The worker takes `--max-jobs` (stop after N, for a one-shot run), `--idle-seconds`,
+`--max-attempts`, and `--metrics-port` with `--metrics-host` (default `127.0.0.1`; Compose
+passes `0.0.0.0` and `9091` so the check can reach it from inside the container). It stops on
+SIGTERM or SIGINT **after** the job in hand finishes, so a container stop costs nobody their
+solve.
 
 ## Configuration
 
@@ -60,7 +64,10 @@ SQUADOPT_BACKEND_SNAPSHOT_ROOT=/mnt/squadopt-inputs/snapshots
 SQUADOPT_BACKEND_HANDOFF_ROOT=/mnt/squadopt-inputs/handoffs
 
 # An allowlist, never a wildcard (ADR 0006). Empty means no cross-origin access at all.
-SQUADOPT_BACKEND_ALLOWED_ORIGINS=https://squadopt.pages.dev
+# Both published hostnames, canonical first: squadopt.mymandev.com is the address members
+# open, and the origin their browsers send. Keep it in step with SITE_ORIGINS in
+# src/squadopt/platform/backend_runtime.py — a test asserts this line matches it.
+SQUADOPT_BACKEND_ALLOWED_ORIGINS=https://squadopt.mymandev.com,https://squadopt.pages.dev
 
 # Part of every answer's identity. An image carries no .git, so the build stamps it in;
 # without it the backend refuses to fill a cache it could not name.
@@ -277,6 +284,24 @@ stack on linux/amd64, both commands from one image, an api-written job computed 
 container, the answer surviving the api container's replacement, `docker stop` letting the
 worker exit 0, and a forgotten volume refused rather than served from ephemeral disk. It is
 evidence about a local volume and says nothing about a cloud filesystem.
+
+## One host with Compose
+
+The same topology on a single Docker host, as [`deploy/compose.yaml`](../deploy/compose.yaml):
+api and worker from one tested image digest, one writable store, read-only publication,
+capture and handoff mounts. Copy [`deploy/backend.env.example`](../deploy/backend.env.example)
+somewhere outside Git, set the digest and existing absolute host paths, then:
+
+```bash
+docker compose --env-file /path/to/backend.env -f deploy/compose.yaml up -d
+```
+
+Every bind source must already exist (missing ones are refused, not created), and the store
+must be writable by the image's UID/GID 10001. Both ports bind to host loopback only — the api
+on `SQUADOPT_API_PORT`, the worker's `/health` and `/metrics` on `SQUADOPT_WORKER_METRICS_PORT`
+— so public HTTPS ingress is a separate host or proxy decision. What the running pair should
+answer, and what the health checks do not prove, is in
+[operations_inventory.md](architecture/operations_inventory.md#one-command-host-deployment).
 
 ## Azure Container Apps
 

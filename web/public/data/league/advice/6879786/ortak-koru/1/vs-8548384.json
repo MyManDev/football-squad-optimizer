@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,34 +9,53 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 466052,
-          "name": "Rayan Cherki",
-          "short_name": "Cherki",
+          "player_id": 195546,
+          "name": "Emiliano Buend\u00eda Stati",
+          "short_name": "Stati",
           "position": "MID",
-          "team": "Man City"
+          "team": "Aston Villa"
         },
         "player_in": {
-          "player_id": 446008,
-          "name": "Bryan Mbeumo",
-          "short_name": "Mbeumo",
+          "player_id": 184029,
+          "name": "Martin \u00d8degaard",
+          "short_name": "\u00d8degaard",
           "position": "MID",
-          "team": "Man Utd"
+          "team": "Arsenal"
         },
-        "expected_points_delta": 0.5429854426764802,
+        "expected_points_delta": 0.8540725457454541,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw04-2",
+        "player_out": {
+          "player_id": 466075,
+          "name": "Riccardo Calafiori",
+          "short_name": "Calafiori",
+          "position": "DEF",
+          "team": "Arsenal"
+        },
+        "player_in": {
+          "player_id": 477424,
+          "name": "Jo\u0161ko Gvardiol",
+          "short_name": "Gvardiol",
+          "position": "DEF",
+          "team": "Man City"
+        },
+        "expected_points_delta": 0.03115291351559346,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.507210397689839,
+    "expected_points_cost": 0.9244428039127115,
     "rival_label": "entry-8548384",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.225476769722626,
+    "expected_own_points": 54.65350017596696,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -71,12 +90,12 @@
         "expected_points": 4.305863646230902
       },
       {
-        "player_id": 466075,
-        "name": "Riccardo Calafiori",
-        "short_name": "Calafiori",
+        "player_id": 477424,
+        "name": "Jo\u0161ko Gvardiol",
+        "short_name": "Gvardiol",
         "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "team": "Man City",
+        "expected_points": 3.64230933799311
       },
       {
         "player_id": 437499,
@@ -95,12 +114,20 @@
         "expected_points": 7.066032835980204
       },
       {
-        "player_id": 446008,
-        "name": "Bryan Mbeumo",
-        "short_name": "Mbeumo",
+        "player_id": 466052,
+        "name": "Rayan Cherki",
+        "short_name": "Cherki",
         "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 4.934679467666494
+        "team": "Man City",
+        "expected_points": 4.389550689692313
+      },
+      {
+        "player_id": 184029,
+        "name": "Martin \u00d8degaard",
+        "short_name": "\u00d8degaard",
+        "position": "MID",
+        "team": "Arsenal",
+        "expected_points": 4.010137596984558
       },
       {
         "player_id": 449434,
@@ -108,7 +135,7 @@
         "short_name": "Elanga",
         "position": "MID",
         "team": "Newcastle",
-        "expected_points": 3.4735053102667206
+        "expected_points": 3.516411504700961
       },
       {
         "player_id": 249231,
@@ -117,14 +144,6 @@
         "position": "MID",
         "team": "Brentford",
         "expected_points": 3.3779501799701594
-      },
-      {
-        "player_id": 195546,
-        "name": "Emiliano Buend\u00eda Stati",
-        "short_name": "Stati",
-        "position": "MID",
-        "team": "Aston Villa",
-        "expected_points": 3.156065051239104
       },
       {
         "player_id": 219168,
@@ -180,24 +199,24 @@
     "chip": null,
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 8548384,
-    "expected_points_cost_ceiling": 0.507210397689839,
-    "overlap_count": 4,
-    "transfer_cap": 1,
+    "expected_points_cost_ceiling": 0.9244428039127115,
+    "overlap_count": 5,
+    "transfer_cap": 2,
     "overlap_target": 9,
-    "overlap_applied": 4,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 20.0,
-      "expected_points_cost": 19.250706104864832,
-      "expected_points_cost_ceiling": 19.250706104864832
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 16.054649676307506,
+      "expected_points_cost_ceiling": 16.054649676307506
     },
-    "expected_gap_vs_rival": -0.48917205569694744,
+    "expected_gap_vs_rival": -0.10410170053021517,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

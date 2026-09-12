@@ -134,9 +134,9 @@ class RotationCeilingComparison:
     """Both arms on identical folds, aggregated, promoting nothing.
 
     There is no verdict field here on purpose. The threshold G0 is read against lives in
-    ``experiments.config.PromotionPolicy``, a layer above this one, so the comparison
-    reports the paired difference and the caller that owns the policy applies it. That
-    also keeps this object honest about what it is: a description, not a decision.
+    ``evaluation.promotion.PromotionPolicy``. The comparison reports the paired difference
+    and the caller that owns the policy applies it. That keeps this object honest about
+    what it is: a description, not a decision.
     """
 
     contract_version: str

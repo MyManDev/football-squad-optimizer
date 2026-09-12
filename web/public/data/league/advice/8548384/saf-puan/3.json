@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T10:50:08Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,25 +9,25 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 445087,
-          "name": "Ronald Araujo",
-          "short_name": "Araujo",
-          "position": "DEF",
-          "team": "Liverpool"
+          "player_id": 209244,
+          "name": "Phil Foden",
+          "short_name": "Foden",
+          "position": "MID",
+          "team": "Man City"
         },
         "player_in": {
-          "player_id": 108416,
-          "name": "John Egan",
-          "short_name": "Egan",
-          "position": "DEF",
-          "team": "Hull City"
+          "player_id": 503139,
+          "name": "Alex Scott",
+          "short_name": "Scott",
+          "position": "MID",
+          "team": "Bournemouth"
         },
-        "expected_points_delta": 0.6618837651482674,
+        "expected_points_delta": 0.9038555664844674,
         "reason_code": "window_value"
       }
     ],
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 21.201999999999998,
-    "expected_own_points": 55.376532590567834,
+    "optimality_gap": 20.884000000000015,
+    "expected_own_points": 55.66145744298164,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -76,7 +76,7 @@
         "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 3.668738526053537
+        "expected_points": 3.666932155533569
       },
       {
         "player_id": 477424,
@@ -87,12 +87,12 @@
         "expected_points": 3.64230933799311
       },
       {
-        "player_id": 108416,
-        "name": "John Egan",
-        "short_name": "Egan",
+        "player_id": 445087,
+        "name": "Ronald Araujo",
+        "short_name": "Araujo",
         "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 3.084595871077711
+        "team": "Liverpool",
+        "expected_points": 2.4227121059294436
       },
       {
         "player_id": 446008,
@@ -103,12 +103,20 @@
         "expected_points": 4.934679467666494
       },
       {
+        "player_id": 503139,
+        "name": "Alex Scott",
+        "short_name": "Scott",
+        "position": "MID",
+        "team": "Bournemouth",
+        "expected_points": 4.2494672646892955
+      },
+      {
         "player_id": 184029,
         "name": "Martin \u00d8degaard",
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9670189854400513
+        "expected_points": 4.010137596984558
       },
       {
         "player_id": 577725,
@@ -117,14 +125,6 @@
         "position": "MID",
         "team": "Fulham",
         "expected_points": 3.449045744024133
-      },
-      {
-        "player_id": 209244,
-        "name": "Phil Foden",
-        "short_name": "Foden",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 3.34397088815176
       },
       {
         "player_id": 223094,
@@ -183,37 +183,11 @@
         "gameweek": 4,
         "transfers_in": [
           {
-            "player_id": 108416,
-            "name": "John Egan",
-            "short_name": "Egan",
-            "position": "DEF",
-            "team": "Hull City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 445087,
-            "name": "Ronald Araujo",
-            "short_name": "Araujo",
-            "position": "DEF",
-            "team": "Liverpool"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.376532590567834
-      },
-      {
-        "gameweek": 5,
-        "transfers_in": [
-          {
-            "player_id": 243298,
-            "name": "Cody Gakpo",
-            "short_name": "Gakpo",
+            "player_id": 503139,
+            "name": "Alex Scott",
+            "short_name": "Scott",
             "position": "MID",
-            "team": "Liverpool"
+            "team": "Bournemouth"
           }
         ],
         "transfers_out": [
@@ -229,33 +203,59 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.0193475776222
+        "expected_points": 55.66145744298164
       },
       {
-        "gameweek": 6,
+        "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 84450,
-            "name": "Granit Xhaka",
-            "short_name": "Xhaka",
-            "position": "MID",
-            "team": "Sunderland"
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
+            "position": "DEF",
+            "team": "Everton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 108413,
-            "name": "Will Hughes",
-            "short_name": "Hughes",
-            "position": "MID",
-            "team": "Crystal Palace"
+            "player_id": 445087,
+            "name": "Ronald Araujo",
+            "short_name": "Araujo",
+            "position": "DEF",
+            "team": "Liverpool"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.61343329059078
+        "expected_points": 57.0115854566249
+      },
+      {
+        "gameweek": 6,
+        "transfers_in": [
+          {
+            "player_id": 209036,
+            "name": "Marc Gu\u00e9hi",
+            "short_name": "Gu\u00e9hi",
+            "position": "DEF",
+            "team": "Man City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 97032,
+            "name": "Virgil van Dijk",
+            "short_name": "Dijk",
+            "position": "DEF",
+            "team": "Liverpool"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 57.06628111536439
       }
     ],
     "stated_limits": [
@@ -268,8 +268,8 @@
     ],
     "data_quality": "partial",
     "missing_fields": [
-      "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

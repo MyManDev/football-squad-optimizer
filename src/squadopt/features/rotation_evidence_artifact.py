@@ -1,4 +1,4 @@
-"""Read a ``rotation_evidence_v1`` pair, or refuse it.
+"""Read a ``rotation_evidence_v2`` pair, or refuse it.
 
 The owner's lane reads this instead of raw captures, so everything the table asserts about
 itself is checked here before a single row is returned: the digest, the manifest's required

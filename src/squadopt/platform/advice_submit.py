@@ -256,7 +256,10 @@ class AdviceSubmitService:
                     ),
                 ),
             )
-        # At-most-one open job is the queue's atomic guarantee, not a scan's promise:
-        # two api processes racing here converge on one winner.
-        winner, _created = self._queue.submit_unique(record)
+        # Completion publishes cache bytes and removes the open reservation under the
+        # same lock as this final cache check and enqueue decision. An earlier miss must
+        # not create a second job after another worker has already answered it.
+        winner = self._queue.submit_unless_cached(record, read_cached=self._reader.cached)
+        if isinstance(winner, bytes):
+            return SubmitOutcome(kind="hit", payload=winner)
         return SubmitOutcome(kind="job", job=winner)

@@ -227,9 +227,9 @@ def test_windows_are_saf_puan_only_and_need_the_horizon_builder(
     one-week plan."""
 
     assert MEMBER_WINDOWS == (1, 3, 5)
-    with pytest.raises(EntryError, match="window 1 only"):
+    with pytest.raises(EntryError, match=r"supports windows \(1,\) only"):
         _advise(window_world, strategy="fark-yarat", rival_entry_id=202, window=3)
-    with pytest.raises(EntryError, match="not computed"):
+    with pytest.raises(EntryError, match=r"supports windows \(1, 3, 5\) only"):
         _advise(window_world, window=2)
     with pytest.raises(EntryError, match="horizon builder"):
         _advise(window_world, window=3, with_builder=False)

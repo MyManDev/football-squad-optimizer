@@ -248,6 +248,7 @@ def test_every_unparseable_response_breaks_the_format_its_own_way(
 def test_a_document_whose_declared_length_disagrees_with_its_bytes_is_rejected() -> None:
     with pytest.raises(InvalidValueError, match="declares 5 bytes"):
         RawDocument(
+            club="Arsenal",
             requested_url="https://club.example/a",
             final_url="https://club.example/a",
             http_status=200,
@@ -255,12 +256,90 @@ def test_a_document_whose_declared_length_disagrees_with_its_bytes_is_rejected()
             byte_length=5,
             fetched_at_utc="2026-09-12T14:05:00Z",
             content=b"abc",
+            readable=b"abc",
         )
+
+
+def test_a_document_that_names_no_club_is_rejected() -> None:
+    """The club travels with the bytes, because a later guess joins to the wrong squad.
+
+    A claim is joined on the club the capture itself spells. A document that arrived
+    without one would have to be attributed by whatever the caller happened to remember,
+    and a caller that read two clubs in one pass can remember wrongly.
+    """
+
+    with pytest.raises(InvalidValueError, match="must name the club"):
+        RawDocument(
+            club="   ",
+            requested_url="https://club.example/a",
+            final_url="https://club.example/a",
+            http_status=200,
+            content_type="text/plain",
+            byte_length=3,
+            fetched_at_utc="2026-09-12T14:05:00Z",
+            content=b"abc",
+            readable=b"abc",
+        )
+
+
+def test_a_document_carries_no_transport_publication_claim_by_default() -> None:
+    """Absent stays absent. It is never filled in from when we looked.
+
+    Three clocks now, and the third is the weakest: a server can serve yesterday's words
+    under today's header. It is recorded when the response carried one and left empty
+    otherwise -- substituting the fetch instant would manufacture a claim about when
+    something was published out of a fact about when it was read.
+    """
+
+    document = RawDocument(
+        club="Arsenal",
+        requested_url="https://club.example/a",
+        final_url="https://club.example/a",
+        http_status=200,
+        content_type="text/plain",
+        byte_length=3,
+        fetched_at_utc="2026-09-12T14:05:00Z",
+        content=b"abc",
+        readable=b"abc",
+    )
+
+    assert document.last_modified_utc is None
+    assert document.last_modified_utc != document.fetched_at_utc
+
+
+def test_a_transport_publication_claim_must_be_an_instant() -> None:
+    """Kept only in the one form the rest of the pipeline can compare."""
+
+    with pytest.raises(Exception, match="last_modified_utc"):
+        RawDocument(
+            club="Arsenal",
+            requested_url="https://club.example/a",
+            final_url="https://club.example/a",
+            http_status=200,
+            content_type="text/plain",
+            byte_length=3,
+            fetched_at_utc="2026-09-12T14:05:00Z",
+            content=b"abc",
+            readable=b"abc",
+            last_modified_utc="Thu, 12 Sep 2026 13:00:00 GMT",
+        )
+
+
+def test_the_fixture_provider_serves_each_document_with_its_club() -> None:
+    """The fixture always declared it; the provider used to drop it on the floor."""
+
+    provider = FixtureClubNewsProvider(FIXTURE_FILE)
+
+    clubs = {provider.fetch(url).club for url in provider.urls}
+
+    assert clubs == set(provider.clubs_covered())
+    assert clubs <= set(provider.clubs_declared())
 
 
 def test_a_document_with_a_local_fetch_instant_is_rejected() -> None:
     with pytest.raises(Exception, match="fetched_at_utc"):
         RawDocument(
+            club="Arsenal",
             requested_url="https://club.example/a",
             final_url="https://club.example/a",
             http_status=200,
@@ -268,6 +347,7 @@ def test_a_document_with_a_local_fetch_instant_is_rejected() -> None:
             byte_length=3,
             fetched_at_utc="2026-09-12 14:05:00",
             content=b"abc",
+            readable=b"abc",
         )
 
 

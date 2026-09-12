@@ -1,5 +1,6 @@
 import { cp } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 
 import type { EntryAdvice, LeagueViewEnvelope } from "../src/features/league/types";
 
@@ -21,10 +22,29 @@ test("a browser computes through the worker, then reads the same answer from cac
   );
   expect(await absent.text()).not.toContain('"contract_version"');
 
-  await page.goto(`/league/members/${context.entryId}`);
+  await page.goto("/");
+  const leagueRequests: string[] = [];
+  page.on("request", (request) => {
+    if (["fetch", "xhr"].includes(request.resourceType())) leagueRequests.push(request.url());
+  });
+  const leagueField = page.getByLabel("Lig numarası");
+  const findLeague = page.getByRole("button", { name: "Ligi bul", exact: true });
+  await leagueField.fill("123");
+  await findLeague.click();
+  await expect(page.getByRole("status")).toHaveText(
+    "Şimdilik yalnız 352490 numaralı lig destekleniyor.",
+  );
+  expect(leagueRequests).toEqual([]);
+  await leagueField.fill(String(context.leagueId));
+  await findLeague.click();
+  await expect(page).toHaveURL("/league/members");
+  await page.getByRole("button", { name: "Bu benim", exact: true }).click();
+  await expect(page).toHaveURL(`/league/members/${context.entryId}`);
+  expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
+  await expect(page.getByRole("button", { name: "Seçimi Kaldır" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
-  await expect(page.getByText("Bu mod ve ufuk bu yayın için hesaplanmadı.")).toBeVisible();
+  await expect(page.getByText("Listelenen öneri dosyası bulunamadı.")).toBeVisible();
   const compute = page.getByRole("button", { name: "Hesapla", exact: true });
   const accepted = page.waitForResponse(
     (response) => response.url().startsWith(route) && response.request().method() === "POST",
@@ -62,6 +82,7 @@ test("a browser computes through the worker, then reads the same answer from cac
   expect(await job.json()).toMatchObject({ job_id: jobId, status: "completed" });
   await expect(page.getByText("Plan hazır", { exact: true })).toBeVisible();
   await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await expect(page.getByText(context.snapshotId, { exact: false })).toBeVisible();
   const advice = page.locator('[aria-labelledby="entry-advice-title"]');
   expect(["OPTIMAL", "FEASIBLE"]).toContain(answer.payload.solver_status);

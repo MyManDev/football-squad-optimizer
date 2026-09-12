@@ -122,7 +122,18 @@ jobs:
         env:
           SQUADOPT_CONTAINER_SMOKE: "1"
           SQUADOPT_CONTAINER_IMAGE: squadopt-backend:ci
-        run: python -m pytest tests/integration/test_backend_container.py -q -p no:cacheprovider -rA
+        run: |
+          mkdir -p .pt
+          python -m pytest tests/integration/test_backend_container.py -q -p no:cacheprovider --basetemp .pt/ci-container -rA
+
+      - name: Retain container failure evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: container-failure
+          path: .pt/ci-container
+          include-hidden-files: true
+          retention-days: 7
 
   web:
     name: web (node 22)
@@ -142,6 +153,18 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints.txt
+
+      - name: Install publication and backend acceptance dependencies
+        working-directory: .
+        run: python -m pip install -c constraints.txt -e ".[api,dev]"
 
       - name: Types match the committed contract
         run: |
@@ -185,6 +208,28 @@ jobs:
       - name: Playwright smoke
         timeout-minutes: 8
         run: npm run e2e
+
+      - name: Python publication and browser API worker acceptance
+        working-directory: .
+        timeout-minutes: 8
+        env:
+          SQUADOPT_PUBLICATION_CONTRACT: "1"
+          SQUADOPT_BROWSER_SMOKE: "1"
+        run: |
+          mkdir -p .pt
+          python -m pytest tests/integration/test_publication_contract.py tests/integration/test_advice_browser.py -q -p no:cacheprovider --basetemp .pt/ci-backend -rA
+
+      - name: Retain browser and backend failure evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-backend-failure
+          include-hidden-files: true
+          path: |
+            web/test-results
+            web/playwright-report
+            .pt/ci-backend
+          retention-days: 7
 
       - name: Upload site
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

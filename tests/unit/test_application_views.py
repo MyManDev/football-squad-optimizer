@@ -17,6 +17,7 @@ from tests.unit.test_season_ledger import _capture, _flat_points, _panel
 
 from squadopt.application import (
     UI_VIEW_CONTRACT_VERSION,
+    UI_VIEW_SCHEMA_PATH,
     build_site,
     ledger_view,
     pool_view,
@@ -72,6 +73,12 @@ def test_the_schema_is_a_valid_draft_2020_12_document_and_writes_deterministical
         ]["const"]
         == UI_VIEW_CONTRACT_VERSION
     )
+
+
+def test_the_committed_schema_file_is_the_generator_output() -> None:
+    # The site build publishes the generated schema and CI pins the committed file to the
+    # frontend types; this is the missing edge, so the two cannot disagree silently.
+    assert json.loads(UI_VIEW_SCHEMA_PATH.read_text(encoding="utf-8")) == ui_view_schema()
 
 
 def test_a_recommendation_view_matches_the_ledger_view_of_the_same_decision(

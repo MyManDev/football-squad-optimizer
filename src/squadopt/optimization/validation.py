@@ -6,20 +6,13 @@ from numbers import Integral, Real
 
 import pandas as pd
 
+from squadopt.contracts import REQUIRED_COLUMNS as REQUIRED_COLUMNS
 from squadopt.optimization.config import POSITIONS, OptimizationConfig
 from squadopt.optimization.models import (
     InsufficientPlayerPoolError,
     InvalidPlayerDataError,
 )
 
-REQUIRED_COLUMNS: tuple[str, ...] = (
-    "player_id",
-    "name",
-    "team_id",
-    "position",
-    "price_tenths",
-    "expected_points",
-)
 MAX_ERROR_EXAMPLES = 10
 
 

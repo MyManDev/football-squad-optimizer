@@ -21,15 +21,19 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Final, Protocol
 
 import pandas as pd
 
 from squadopt.application.views import _View
 from squadopt.evaluation import FrozenSquadDecision
+from squadopt.live.rules import CHIP_NAMES, SeasonRules
 from squadopt.live.transfers import HeldSquad
 
 ENTRY_REGISTRY_CONTRACT_VERSION = "entry_registry_v1"
+CAPTURED_SQUAD_BASIS = "captured"
+"""``EntryPicks.squad_basis`` when the squad is the captured week's own; the data twin
+declares the same literal, and the twin test keeps the two field lists identical."""
 
 
 class EntryError(ValueError):
@@ -61,10 +65,12 @@ class EntryPicks:
     bank_tenths: int
     free_transfers: int
     free_transfers_known: bool = True
-    """False when the source does not publish the banked count and ``free_transfers`` is
-    the rule-implied floor of one. The public endpoints never state it, so a capture-built
-    picks object carries ``1`` here with this flag down — and anything that plans transfers
-    on it must surface that the second free transfer, if banked, is invisible."""
+    """False when ``free_transfers`` is the rule-implied floor of one rather than the
+    banked count. The public endpoints never state the count; a capture-built picks
+    object derives it from the member's history (``data.sources.fpl_live.
+    banked_free_transfers``) and raises this flag only when every week was present and
+    the recorded hits agreed with the banking model. With the flag down, anything that
+    plans transfers on it must surface that a banked second transfer is invisible."""
     chips_used: Mapping[str, tuple[int, ...]] = field(default_factory=dict)
     """Chip name -> the gameweeks it was played (what the planner's windows need)."""
     purchase_prices: Mapping[int, int] = field(default_factory=dict)
@@ -74,6 +80,14 @@ class EntryPicks:
     *current* price — which overstates the budget whenever a player has risen since he was
     bought. A consumer that spends real budget on these numbers must say so to the user."""
     source_snapshot_id: str | None = None
+    active_chip: str | None = None
+    """The chip active in ``gameweek`` as the capture reported it, or None."""
+    squad_basis: str = CAPTURED_SQUAD_BASIS
+    """Which squad ``squad`` and ``bank_tenths`` describe. ``"captured"`` is the
+    picks document of ``gameweek`` itself. After a Free Hit that squad is void at the
+    next deadline, so the provider substitutes the squad held before the chip and says
+    so here (``pre_free_hit_gw02`` for a Free Hit played in gameweek 3, see
+    ``pre_free_hit_basis``), so the advice can state which squad it stands on."""
 
     def __post_init__(self) -> None:
         if (
@@ -95,6 +109,18 @@ class EntryPicks:
                 "purchase_prices are present but flagged unknown; a consumer could not "
                 "tell whether to trust them."
             )
+        if not isinstance(self.squad_basis, str) or not self.squad_basis.strip():
+            raise EntryError("squad_basis must be non-empty text.")
+        if self.active_chip is not None and (
+            not isinstance(self.active_chip, str) or not self.active_chip.strip()
+        ):
+            raise EntryError("active_chip must be None or a chip name.")
+
+
+def pre_free_hit_basis(gameweek: int) -> str:
+    """The ``squad_basis`` for a squad taken from ``gameweek``'s picks before a Free Hit."""
+
+    return f"pre_free_hit_gw{gameweek:02d}"
 
 
 class EntryPicksProvider(Protocol):
@@ -187,6 +213,81 @@ def held_squad_from_picks(picks: EntryPicks, *, current_prices: Mapping[int, int
             str(name): tuple(int(w) for w in weeks) for name, weeks in picks.chips_used.items()
         },
     )
+
+
+CHIP_HALF_LABELS: Final = ("first_half", "second_half")
+"""The halves a chip's windows belong to, in the order the source publishes them: the
+2026-27 bootstrap lists each of the four chips twice, once ending at gameweek 19 and
+once starting at 20 (``live/rules.py`` reads them; nothing here fixes the boundary)."""
+
+
+@dataclass(frozen=True, slots=True)
+class ChipWindowState:
+    """One published window of one chip, as the member stands before ``gameweek``.
+
+    ``state`` is ``used`` (with ``gameweek`` the week it was played), ``expired`` (the
+    window closed unplayed), ``not_yet`` (the window has not opened), ``available``, or
+    ``unknown`` when the member's chip history was not captured at all: no history is
+    not the same thing as no chips played.
+    """
+
+    state: str
+    start_event: int
+    stop_event: int
+    gameweek: int | None = None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "state": self.state,
+            "gameweek": self.gameweek,
+            "start_event": self.start_event,
+            "stop_event": self.stop_event,
+        }
+
+
+def chip_states(
+    rules: SeasonRules,
+    gameweek: int,
+    chips_used: Mapping[str, Sequence[int]] | None,
+) -> dict[str, dict[str, ChipWindowState | None]]:
+    """Each chip's windows by half, read before ``gameweek``'s deadline.
+
+    A window counts as spent once ``number`` plays fall inside it (``chip_availability_for``
+    applies the same reading to the planner's horizon); a play outside every window is a
+    history the rules cannot place and is refused. A chip the season lists once carries
+    ``None`` for its second half; more windows than halves is a rule set this shape
+    cannot state.
+    """
+
+    played = (
+        None
+        if chips_used is None
+        else {name: sorted(int(week) for week in weeks) for name, weeks in chips_used.items()}
+    )
+    states: dict[str, dict[str, ChipWindowState | None]] = {}
+    for name in CHIP_NAMES:
+        windows = sorted((w for w in rules.chips if w.name == name), key=lambda w: w.start_event)
+        if len(windows) > len(CHIP_HALF_LABELS):
+            raise EntryError(f"Chip {name!r} has {len(windows)} windows; halves cannot name them.")
+        weeks = None if played is None else played.get(name, [])
+        if weeks and not all(any(w.covers(week) for w in windows) for week in weeks):
+            raise EntryError(f"Chip {name!r} was played in {weeks!r}, outside every window.")
+        by_half: dict[str, ChipWindowState | None] = dict.fromkeys(CHIP_HALF_LABELS)
+        for half, window in zip(CHIP_HALF_LABELS, windows, strict=False):
+            inside = None if weeks is None else [week for week in weeks if window.covers(week)]
+            if inside is None:
+                state, when = "unknown", None
+            elif len(inside) >= window.number:
+                state, when = "used", inside[0]
+            elif gameweek > window.stop_event:
+                state, when = "expired", None
+            elif gameweek < window.start_event:
+                state, when = "not_yet", None
+            else:
+                state, when = "available", None
+            by_half[half] = ChipWindowState(state, window.start_event, window.stop_event, when)
+        states[name] = by_half
+    return states
 
 
 def frozen_decision_from_picks(
