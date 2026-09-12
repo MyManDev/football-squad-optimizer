@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -21,22 +21,22 @@
           "team": "Leeds"
         },
         "player_in": {
-          "player_id": 494595,
-          "name": "Florian Wirtz",
-          "short_name": "Wirtz",
+          "player_id": 244850,
+          "name": "Morgan Rogers",
+          "short_name": "Rogers",
           "position": "MID",
-          "team": "Liverpool"
+          "team": "Chelsea"
         },
-        "expected_points_delta": 1.3556837160617143,
+        "expected_points_delta": 2.0348555762196026,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 1.0803312165732422,
+    "expected_points_cost": 0.0,
     "rival_label": "entry-4287206",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.667901665898555,
+    "expected_own_points": 55.43521266812418,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -68,7 +68,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 469142,
@@ -95,6 +95,14 @@
         "expected_points": 4.934679467666494
       },
       {
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 4.585626518790779
+      },
+      {
         "player_id": 437730,
         "name": "Antoine Semenyo",
         "short_name": "Semenyo",
@@ -108,15 +116,7 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "expected_points": 3.9670189854400513
-      },
-      {
-        "player_id": 494595,
-        "name": "Florian Wirtz",
-        "short_name": "Wirtz",
-        "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 3.9064546586328905
+        "expected_points": 4.010137596984558
       },
       {
         "player_id": 215413,
@@ -158,15 +158,7 @@
         "short_name": "Brobbey",
         "position": "FWD",
         "team": "Sunderland",
-        "expected_points": 2.9413313313301606
-      },
-      {
-        "player_id": 106760,
-        "name": "Luke Shaw",
-        "short_name": "Shaw",
-        "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.521244083180876
+        "expected_points": 2.8988019275211903
       },
       {
         "player_id": 487676,
@@ -174,7 +166,15 @@
         "short_name": "Hume",
         "position": "DEF",
         "team": "Sunderland",
-        "expected_points": 2.394858537183296
+        "expected_points": 2.35319016432435
+      },
+      {
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
+        "position": "DEF",
+        "team": "Man Utd",
+        "expected_points": 1.8909330623856568
       }
     ],
     "chip": null,
@@ -183,22 +183,23 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 4287206,
-    "expected_points_cost_ceiling": 1.0803312165732422,
-    "overlap_count": 3,
+    "expected_points_cost_ceiling": 0.0,
+    "overlap_count": 5,
     "transfer_cap": 1,
     "overlap_target": 9,
-    "overlap_applied": 3,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 24.0,
-      "expected_points_cost": 24.24754353346607,
-      "expected_points_cost_ceiling": 24.24754353346607
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 15.539814469579724,
+      "expected_points_cost_ceiling": 15.539814469579724
     },
-    "expected_gap_vs_rival": 1.3349342563120388,
-    "captain_agreement": true,
+    "expected_gap_vs_rival": 4.126428957082268,
+    "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
   }

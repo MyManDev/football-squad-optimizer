@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,16 +27,16 @@
           "position": "DEF",
           "team": "Sunderland"
         },
-        "expected_points_delta": -0.3327699171090166,
+        "expected_points_delta": -0.374438289967963,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 1.105376999544447,
+    "expected_points_cost": 1.1485833726283232,
     "rival_label": "entry-313686",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 56.126314337871506,
+    "expected_own_points": 56.167314744609584,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -68,7 +68,7 @@
         "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 3.668738526053537
+        "expected_points": 3.666932155533569
       },
       {
         "player_id": 244723,
@@ -108,7 +108,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 513545,
@@ -158,7 +158,7 @@
         "short_name": "Hume",
         "position": "DEF",
         "team": "Sunderland",
-        "expected_points": 2.394858537183296
+        "expected_points": 2.35319016432435
       },
       {
         "player_id": 449429,
@@ -183,8 +183,9 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 313686,
-    "expected_points_cost_ceiling": 1.105376999544447,
+    "expected_points_cost_ceiling": 1.1485833726283232,
     "overlap_count": 5,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -194,10 +195,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 16.0,
-      "expected_points_cost": 16.323284400691605,
-      "expected_points_cost_ceiling": 16.323284400691605
+      "expected_points_cost": 16.321807208029995,
+      "expected_points_cost_ceiling": 16.321807208029995
     },
-    "expected_gap_vs_rival": 8.808358215290546,
+    "expected_gap_vs_rival": 9.437797378496924,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,7 +27,7 @@
           "position": "MID",
           "team": "Sunderland"
         },
-        "expected_points_delta": 0.3822598385463154,
+        "expected_points_delta": 0.33945306128827246,
         "reason_code": "mode_tradeoff"
       }
     ],
@@ -36,7 +36,7 @@
     "rival_label": "entry-5662073",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 57.433150461496425,
+    "expected_own_points": 57.43676384008697,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -76,7 +76,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 465730,
@@ -84,7 +84,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.2356844156410305
+        "expected_points": 3.237246793437091
       },
       {
         "player_id": 141746,
@@ -116,7 +116,7 @@
         "short_name": "F\u00e9e",
         "position": "MID",
         "team": "Sunderland",
-        "expected_points": 3.5158402140096534
+        "expected_points": 3.4728706842808976
       },
       {
         "player_id": 440993,
@@ -174,7 +174,7 @@
         "short_name": "Ngoyo",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 1.1128992923687029
+        "expected_points": 1.1462964306360883
       }
     ],
     "chip": null,
@@ -183,6 +183,7 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 5662073,
     "expected_points_cost_ceiling": 0.0,
     "overlap_count": 3,
@@ -197,8 +198,8 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 2.6103358898902513,
-    "captain_agreement": true,
+    "expected_gap_vs_rival": 5.566546875852204,
+    "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
   }

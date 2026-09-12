@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,7 +27,7 @@
           "position": "MID",
           "team": "Bournemouth"
         },
-        "expected_points_delta": 1.0501958403663223,
+        "expected_points_delta": 1.0934022134501915,
         "reason_code": "mode_tradeoff"
       }
     ],
@@ -36,7 +36,7 @@
     "rival_label": "entry-5349883",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.73268716741247,
+    "expected_own_points": 54.86167693015611,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -76,7 +76,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 437499,
@@ -100,7 +100,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.391694024990014
+        "expected_points": 4.389550689692313
       },
       {
         "player_id": 503139,
@@ -108,7 +108,7 @@
         "short_name": "Scott",
         "position": "MID",
         "team": "Bournemouth",
-        "expected_points": 4.206260891605426
+        "expected_points": 4.2494672646892955
       },
       {
         "player_id": 449434,
@@ -116,7 +116,7 @@
         "short_name": "Elanga",
         "position": "MID",
         "team": "Newcastle",
-        "expected_points": 3.4735053102667206
+        "expected_points": 3.516411504700961
       },
       {
         "player_id": 249231,
@@ -183,6 +183,7 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 5349883,
     "expected_points_cost_ceiling": 0.0,
     "overlap_count": 2,
@@ -197,7 +198,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 1.6191897781831912,
+    "expected_gap_vs_rival": 1.7442381755270162,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,7 +27,7 @@
           "position": "MID",
           "team": "Bournemouth"
         },
-        "expected_points_delta": 2.2238658408220884,
+        "expected_points_delta": 2.2670722139059576,
         "reason_code": "mode_tradeoff"
       }
     ],
@@ -36,7 +36,7 @@
     "rival_label": "entry-7252721",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.87253641477099,
+    "expected_own_points": 54.999321399795676,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -51,7 +51,7 @@
       "short_name": "Palmer",
       "position": "MID",
       "team": "Chelsea",
-      "expected_points": 5.583557313963405
+      "expected_points": 5.626690076810005
     },
     "starting_xi": [
       {
@@ -60,7 +60,7 @@
         "short_name": "Tzolakis",
         "position": "GK",
         "team": "Hull City",
-        "expected_points": 3.4563272913156653
+        "expected_points": 3.4546051551465986
       },
       {
         "player_id": 226597,
@@ -84,7 +84,7 @@
         "short_name": "Mendy",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 2.6989274408504094
+        "expected_points": 2.7410954261136893
       },
       {
         "player_id": 244851,
@@ -92,7 +92,7 @@
         "short_name": "Palmer",
         "position": "MID",
         "team": "Chelsea",
-        "expected_points": 5.583557313963405
+        "expected_points": 5.626690076810005
       },
       {
         "player_id": 503139,
@@ -100,7 +100,7 @@
         "short_name": "Scott",
         "position": "MID",
         "team": "Bournemouth",
-        "expected_points": 4.206260891605426
+        "expected_points": 4.2494672646892955
       },
       {
         "player_id": 204580,
@@ -183,6 +183,7 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 7252721,
     "expected_points_cost_ceiling": 0.0,
     "overlap_count": 2,
@@ -197,7 +198,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": -0.278422245224192,
+    "expected_gap_vs_rival": -0.23484232254811843,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

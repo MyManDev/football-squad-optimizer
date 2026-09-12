@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 16.394999999999982,
-    "expected_own_points": 57.78170549668515,
+    "optimality_gap": 16.019000000000005,
+    "expected_own_points": 57.86491055903376,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -71,20 +71,20 @@
         "expected_points": 3.64230933799311
       },
       {
+        "player_id": 146426,
+        "name": "Semi Ajayi",
+        "short_name": "Ajayi",
+        "position": "DEF",
+        "team": "Hull City",
+        "expected_points": 3.0983922428810176
+      },
+      {
         "player_id": 244723,
         "name": "Tyrick Mitchell",
         "short_name": "Mitchell",
         "position": "DEF",
         "team": "Crystal Palace",
         "expected_points": 3.056313305016537
-      },
-      {
-        "player_id": 146426,
-        "name": "Semi Ajayi",
-        "short_name": "Ajayi",
-        "position": "DEF",
-        "team": "Hull City",
-        "expected_points": 3.0557842715324486
       },
       {
         "player_id": 141746,
@@ -108,7 +108,7 @@
         "short_name": "Gibbs-White",
         "position": "MID",
         "team": "Nott'm Forest",
-        "expected_points": 4.472404986183817
+        "expected_points": 4.470195299925821
       },
       {
         "player_id": 424876,
@@ -124,7 +124,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 223094,
@@ -203,7 +203,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.78170549668515
+        "expected_points": 57.86491055903376
       },
       {
         "gameweek": 5,
@@ -218,36 +218,10 @@
         ],
         "transfers_out": [
           {
-            "player_id": 67089,
-            "name": "Martin Dubravka",
-            "short_name": "Dubravka",
+            "player_id": 489639,
+            "name": "Bart Verbruggen",
+            "short_name": "Verbruggen",
             "position": "GK",
-            "team": "Spurs"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 58.7426810225015
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 503139,
-            "name": "Alex Scott",
-            "short_name": "Scott",
-            "position": "MID",
-            "team": "Bournemouth"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
-            "position": "MID",
             "team": "Brighton"
           }
         ],
@@ -255,7 +229,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 59.652520168606955
+        "expected_points": 58.82416394868105
+      },
+      {
+        "gameweek": 6,
+        "transfers_in": [
+          {
+            "player_id": 586309,
+            "name": "Thierno Barry",
+            "short_name": "Barry",
+            "position": "FWD",
+            "team": "Everton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 661313,
+            "name": "Juan Angulo",
+            "short_name": "Angulo",
+            "position": "FWD",
+            "team": "Sunderland"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 58.82416394868105
       }
     ],
     "stated_limits": [
@@ -270,6 +270,7 @@
     "missing_fields": [
       "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

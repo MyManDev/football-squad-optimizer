@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -54,7 +54,7 @@
         "position": "DEF",
         "team": "Spurs",
         "price_tenths": 55,
-        "expected_points": 2.227509225197033,
+        "expected_points": 1.6706319188977747,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
@@ -185,8 +185,8 @@
         "short_name": "O'Reilly",
         "position": "DEF",
         "team": "Man City",
-        "price_tenths": 65,
-        "expected_points": 1.550337345902003,
+        "price_tenths": 64,
+        "expected_points": 2.026527638301547,
         "event_points": null,
         "is_captain": false,
         "bench_order": 2,
@@ -228,7 +228,7 @@
       ]
     },
     "purchase_prices_known": false,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "squadopt_comparison": null,
     "data_quality": "partial",
     "missing_fields": [

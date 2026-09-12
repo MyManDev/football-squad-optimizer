@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -54,7 +54,7 @@
         "position": "DEF",
         "team": "Liverpool",
         "price_tenths": 65,
-        "expected_points": 3.668738526053537,
+        "expected_points": 3.666932155533569,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
@@ -105,8 +105,8 @@
         "short_name": "\u00d8degaard",
         "position": "MID",
         "team": "Arsenal",
-        "price_tenths": 66,
-        "expected_points": 3.9670189854400513,
+        "price_tenths": 67,
+        "expected_points": 4.010137596984558,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
@@ -132,7 +132,7 @@
         "position": "MID",
         "team": "Man City",
         "price_tenths": 70,
-        "expected_points": 3.34397088815176,
+        "expected_points": 3.345611698204828,
         "event_points": null,
         "is_captain": false,
         "bench_order": null,
@@ -228,7 +228,7 @@
       ]
     },
     "purchase_prices_known": false,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "squadopt_comparison": null,
     "data_quality": "partial",
     "missing_fields": [

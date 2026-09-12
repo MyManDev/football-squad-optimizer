@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,7 +27,7 @@
           "position": "MID",
           "team": "Bournemouth"
         },
-        "expected_points_delta": 1.0501958403663223,
+        "expected_points_delta": 1.0934022134501915,
         "reason_code": "window_value"
       }
     ],
@@ -35,8 +35,8 @@
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 22.100000000000023,
-    "expected_own_points": 54.73268716741247,
+    "optimality_gap": 21.846000000000004,
+    "expected_own_points": 54.86167693015611,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -76,7 +76,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 437499,
@@ -100,7 +100,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.391694024990014
+        "expected_points": 4.389550689692313
       },
       {
         "player_id": 503139,
@@ -108,7 +108,7 @@
         "short_name": "Scott",
         "position": "MID",
         "team": "Bournemouth",
-        "expected_points": 4.206260891605426
+        "expected_points": 4.2494672646892955
       },
       {
         "player_id": 449434,
@@ -116,7 +116,7 @@
         "short_name": "Elanga",
         "position": "MID",
         "team": "Newcastle",
-        "expected_points": 3.4735053102667206
+        "expected_points": 3.516411504700961
       },
       {
         "player_id": 249231,
@@ -203,43 +203,17 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 54.732687167412465
+        "expected_points": 54.8616769301561
       },
       {
         "gameweek": 5,
         "transfers_in": [
           {
-            "player_id": 243298,
-            "name": "Cody Gakpo",
-            "short_name": "Gakpo",
+            "player_id": 424876,
+            "name": "Dominik Szoboszlai",
+            "short_name": "Szoboszlai",
             "position": "MID",
             "team": "Liverpool"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 466052,
-            "name": "Rayan Cherki",
-            "short_name": "Cherki",
-            "position": "MID",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.327779017628586
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 244850,
-            "name": "Morgan Rogers",
-            "short_name": "Rogers",
-            "position": "MID",
-            "team": "Chelsea"
           }
         ],
         "transfers_out": [
@@ -255,7 +229,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.439900226152645
+        "expected_points": 55.57794297987968
+      },
+      {
+        "gameweek": 6,
+        "transfers_in": [
+          {
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
+            "position": "DEF",
+            "team": "Everton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 437499,
+            "name": "Maxence Lacroix",
+            "short_name": "Lacroix",
+            "position": "DEF",
+            "team": "Chelsea"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 55.952850823585706
       }
     ],
     "stated_limits": [
@@ -270,6 +270,7 @@
     "missing_fields": [
       "free_transfers",
       "purchase_prices"
-    ]
+    ],
+    "squad_basis": "captured"
   }
 }

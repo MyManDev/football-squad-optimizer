@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,7 +27,7 @@
           "position": "MID",
           "team": "Bournemouth"
         },
-        "expected_points_delta": 1.1053769995444562,
+        "expected_points_delta": 1.1485833726283254,
         "reason_code": "mode_tradeoff"
       }
     ],
@@ -36,7 +36,7 @@
     "rival_label": "entry-2281624",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 57.23169133741597,
+    "expected_own_points": 57.31589811723791,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -68,7 +68,7 @@
         "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 3.668738526053537
+        "expected_points": 3.666932155533569
       },
       {
         "player_id": 244723,
@@ -108,7 +108,7 @@
         "short_name": "Scott",
         "position": "MID",
         "team": "Bournemouth",
-        "expected_points": 4.206260891605426
+        "expected_points": 4.2494672646892955
       },
       {
         "player_id": 60307,
@@ -116,7 +116,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 513545,
@@ -183,6 +183,7 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 2281624,
     "expected_points_cost_ceiling": 0.0,
     "overlap_count": 3,
@@ -197,7 +198,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 1.9650951604489393,
+    "expected_gap_vs_rival": 2.0014812103762836,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

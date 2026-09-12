@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,34 +9,34 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 437499,
-          "name": "Maxence Lacroix",
-          "short_name": "Lacroix",
-          "position": "DEF",
-          "team": "Chelsea"
+          "player_id": 466052,
+          "name": "Rayan Cherki",
+          "short_name": "Cherki",
+          "position": "MID",
+          "team": "Man City"
         },
         "player_in": {
-          "player_id": 97032,
-          "name": "Virgil van Dijk",
-          "short_name": "Dijk",
-          "position": "DEF",
-          "team": "Liverpool"
+          "player_id": 446008,
+          "name": "Bryan Mbeumo",
+          "short_name": "Mbeumo",
+          "position": "MID",
+          "team": "Man Utd"
         },
-        "expected_points_delta": 0.2708062501868591,
+        "expected_points_delta": 0.5451287779741811,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.7793895901794556,
+    "expected_points_cost": 0.5482734354760126,
     "rival_label": "entry-4287206",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 53.95329757723301,
+    "expected_own_points": 54.313403494680095,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -71,20 +71,20 @@
         "expected_points": 4.305863646230902
       },
       {
-        "player_id": 97032,
-        "name": "Virgil van Dijk",
-        "short_name": "Dijk",
-        "position": "DEF",
-        "team": "Liverpool",
-        "expected_points": 3.668738526053537
-      },
-      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
+      },
+      {
+        "player_id": 437499,
+        "name": "Maxence Lacroix",
+        "short_name": "Lacroix",
+        "position": "DEF",
+        "team": "Chelsea",
+        "expected_points": 3.397932275866678
       },
       {
         "player_id": 141746,
@@ -95,12 +95,12 @@
         "expected_points": 7.066032835980204
       },
       {
-        "player_id": 466052,
-        "name": "Rayan Cherki",
-        "short_name": "Cherki",
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
         "position": "MID",
-        "team": "Man City",
-        "expected_points": 4.391694024990014
+        "team": "Man Utd",
+        "expected_points": 4.934679467666494
       },
       {
         "player_id": 449434,
@@ -108,7 +108,7 @@
         "short_name": "Elanga",
         "position": "MID",
         "team": "Newcastle",
-        "expected_points": 3.4735053102667206
+        "expected_points": 3.516411504700961
       },
       {
         "player_id": 249231,
@@ -183,21 +183,22 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 4287206,
-    "expected_points_cost_ceiling": 0.7793895901794556,
-    "overlap_count": 4,
+    "expected_points_cost_ceiling": 0.5482734354760126,
+    "overlap_count": 3,
     "transfer_cap": 1,
     "overlap_target": 9,
-    "overlap_applied": 4,
+    "overlap_applied": 3,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 20.0,
-      "expected_points_cost": 19.34898775989018,
-      "expected_points_cost_ceiling": 19.34898775989018
+      "transfer_hit_points": 24.0,
+      "expected_points_cost": 23.080792916205063,
+      "expected_points_cost_ceiling": 23.080792916205063
     },
-    "expected_gap_vs_rival": 0.6203301676464932,
+    "expected_gap_vs_rival": 3.0046197836381836,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

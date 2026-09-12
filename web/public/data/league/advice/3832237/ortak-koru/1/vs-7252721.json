@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -36,7 +36,7 @@
     "rival_label": "entry-7252721",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 46.54539159350413,
+    "expected_own_points": 46.46470457960441,
     "captain": {
       "player_id": 446008,
       "name": "Bryan Mbeumo",
@@ -71,20 +71,20 @@
         "expected_points": 4.305863646230902
       },
       {
-        "player_id": 441164,
-        "name": "Pedro Porro Sauceda",
-        "short_name": "Sauceda",
-        "position": "DEF",
-        "team": "Spurs",
-        "expected_points": 2.227509225197033
-      },
-      {
         "player_id": 472769,
         "name": "Nico O'Reilly",
         "short_name": "O'Reilly",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 1.550337345902003
+        "expected_points": 2.026527638301547
+      },
+      {
+        "player_id": 441164,
+        "name": "Pedro Porro Sauceda",
+        "short_name": "Sauceda",
+        "position": "DEF",
+        "team": "Spurs",
+        "expected_points": 1.6706319188977747
       },
       {
         "player_id": 446008,
@@ -183,6 +183,7 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 7252721,
     "expected_points_cost_ceiling": 0.0,
     "overlap_count": 4,
@@ -194,10 +195,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 20.0,
-      "expected_points_cost": 11.058955387742927,
-      "expected_points_cost_ceiling": 11.058955387742927
+      "expected_points_cost": 10.892853625236604,
+      "expected_points_cost_ceiling": 10.892853625236604
     },
-    "expected_gap_vs_rival": -8.605567066491055,
+    "expected_gap_vs_rival": -8.769459142739386,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

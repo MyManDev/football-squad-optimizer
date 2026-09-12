@@ -1,10 +1,10 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:58:22Z",
+  "generated_at_utc": "2026-09-12T09:20:50Z",
   "payload": {
-    "captured_at_utc": "2026-09-09T05:50:21.952665Z",
-    "cohort_picks_snapshot_id": "fpl-elite-picks-20260909T053428Z-5679674b5954",
-    "cohort_snapshot_id": "fpl-top100-20260909T053412Z-33a08d17a8fd",
+    "captured_at_utc": "2026-09-12T08:20:14.639866Z",
+    "cohort_picks_snapshot_id": "fpl-elite-picks-20260912T081954Z-260fbe653d58",
+    "cohort_snapshot_id": "fpl-top100-20260912T081931Z-e715e11216fc",
     "cumulative": {
       "average_entry_score": 182.0,
       "gameweeks": [
@@ -395,8 +395,8 @@
           "final": true,
           "gameweek": 3,
           "hit_points": 4.0,
-          "mean_score": 68.83,
-          "picks_snapshot_id": "fpl-elite-picks-20260909T053428Z-5679674b5954"
+          "mean_score": 68.72,
+          "picks_snapshot_id": "fpl-elite-picks-20260912T081954Z-260fbe653d58"
         }
       }
     ],
@@ -404,7 +404,7 @@
     "league_id": 352490,
     "registered_members": 15,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf"
   },
   "source_kind": "live"
 }

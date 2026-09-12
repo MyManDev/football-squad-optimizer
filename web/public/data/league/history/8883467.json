@@ -1,0 +1,30 @@
+{
+  "contract_version": "weekly_suggestion_history_v1",
+  "generated_at_utc": "2026-09-12T08:20:14.639866Z",
+  "payload": {
+    "league_id": 352490,
+    "entry_id": 8883467,
+    "season": "2026-27",
+    "as_of_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
+    "weeks": [
+      {
+        "gameweek": 4,
+        "status": "unsettled",
+        "reason": "not_settled",
+        "deadline_utc": "2026-09-12T12:30:00Z",
+        "advice_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
+        "advice_captured_at_utc": "2026-09-12T08:20:14.639866Z",
+        "advice_generated_at_utc": "2026-09-12T08:52:51Z",
+        "advice_sha256": "50695927da3abd037c3d302d996da05579f1683db728e2a708cb930a0c3ac415",
+        "outcome_snapshot_id": null,
+        "outcome_captured_at_utc": null,
+        "expected_own_points": 54.999321399795676,
+        "suggested": null,
+        "actual": null,
+        "actual_reason": null,
+        "net_difference": null,
+        "players": []
+      }
+    ]
+  }
+}

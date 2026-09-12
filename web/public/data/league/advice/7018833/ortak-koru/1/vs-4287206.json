@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -21,22 +21,22 @@
           "team": "Spurs"
         },
         "player_in": {
-          "player_id": 191866,
-          "name": "Kristoffer Ajer",
-          "short_name": "Ajer",
+          "player_id": 223827,
+          "name": "Daniel Ballard",
+          "short_name": "Ballard",
           "position": "DEF",
-          "team": "Brentford"
+          "team": "Sunderland"
         },
-        "expected_points_delta": 0.5001192290952798,
+        "expected_points_delta": 1.421178940836709,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 1.1971041126613642,
+    "expected_points_cost": 0.49360674998150955,
     "rival_label": "entry-4287206",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.74385763810386,
+    "expected_own_points": 54.74361364537995,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -76,7 +76,7 @@
         "short_name": "Dijk",
         "position": "DEF",
         "team": "Liverpool",
-        "expected_points": 3.668738526053537
+        "expected_points": 3.666932155533569
       },
       {
         "player_id": 465730,
@@ -84,7 +84,7 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.2356844156410305
+        "expected_points": 3.237246793437091
       },
       {
         "player_id": 244850,
@@ -153,20 +153,20 @@
         "expected_points": 2.495351765499311
       },
       {
+        "player_id": 223827,
+        "name": "Daniel Ballard",
+        "short_name": "Ballard",
+        "position": "DEF",
+        "team": "Sunderland",
+        "expected_points": 3.0918108597344838
+      },
+      {
         "player_id": 540324,
         "name": "Mohamed Belloumi",
         "short_name": "Belloumi",
         "position": "MID",
         "team": "Hull City",
         "expected_points": 2.877905422562655
-      },
-      {
-        "player_id": 191866,
-        "name": "Kristoffer Ajer",
-        "short_name": "Ajer",
-        "position": "DEF",
-        "team": "Brentford",
-        "expected_points": 2.727628454292313
       },
       {
         "player_id": 231416,
@@ -183,22 +183,23 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 4287206,
-    "expected_points_cost_ceiling": 1.1971041126613642,
-    "overlap_count": 6,
+    "expected_points_cost_ceiling": 0.49360674998150955,
+    "overlap_count": 4,
     "transfer_cap": 1,
     "overlap_target": 9,
-    "overlap_applied": 6,
+    "overlap_applied": 4,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 12.0,
-      "expected_points_cost": 12.631576266767183,
-      "expected_points_cost_ceiling": 12.631576266767183
+      "transfer_hit_points": 20.0,
+      "expected_points_cost": 18.4281393329602,
+      "expected_points_cost_ceiling": 18.4281393329602
     },
-    "expected_gap_vs_rival": 1.4108902285173457,
-    "captain_agreement": true,
+    "expected_gap_vs_rival": 3.4348299343380404,
+    "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
   }

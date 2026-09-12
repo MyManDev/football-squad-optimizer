@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,16 +27,16 @@
           "position": "MID",
           "team": "Liverpool"
         },
-        "expected_points_delta": 0.7591722441578157,
+        "expected_points_delta": 0.7162660497235751,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.2910235962084968,
+    "expected_points_cost": 0.3771361637266111,
     "rival_label": "entry-2199732",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.44166357120396,
+    "expected_own_points": 54.48454076642949,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -76,7 +76,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 437499,
@@ -100,7 +100,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.391694024990014
+        "expected_points": 4.389550689692313
       },
       {
         "player_id": 424876,
@@ -183,8 +183,9 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 2199732,
-    "expected_points_cost_ceiling": 0.2910235962084968,
+    "expected_points_cost_ceiling": 0.3771361637266111,
     "overlap_count": 5,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -194,10 +195,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 16.0,
-      "expected_points_cost": 14.499178633887254,
-      "expected_points_cost_ceiling": 14.499178633887254
+      "expected_points_cost": 14.538842046348059,
+      "expected_points_cost_ceiling": 14.538842046348059
     },
-    "expected_gap_vs_rival": -2.5438799987348375,
+    "expected_gap_vs_rival": -2.5474229593578883,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

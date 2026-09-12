@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,34 +9,34 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
         "player_out": {
-          "player_id": 154561,
-          "name": "David Raya Mart\u00edn",
-          "short_name": "Mart\u00edn",
-          "position": "GK",
-          "team": "Arsenal"
+          "player_id": 209036,
+          "name": "Marc Gu\u00e9hi",
+          "short_name": "Gu\u00e9hi",
+          "position": "DEF",
+          "team": "Man City"
         },
         "player_in": {
-          "player_id": 200720,
-          "name": "Caoimh\u00edn Kelleher",
-          "short_name": "Kelleher",
-          "position": "GK",
-          "team": "Brentford"
+          "player_id": 223827,
+          "name": "Daniel Ballard",
+          "short_name": "Ballard",
+          "position": "DEF",
+          "team": "Sunderland"
         },
-        "expected_points_delta": -0.6036791315152703,
+        "expected_points_delta": -0.6298169545385752,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.9115477433356318,
+    "expected_points_cost": 0.9376855663589367,
     "rival_label": "entry-4287206",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 56.52160271816081,
+    "expected_own_points": 56.49907827372803,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -55,20 +55,12 @@
     },
     "starting_xi": [
       {
-        "player_id": 200720,
-        "name": "Caoimh\u00edn Kelleher",
-        "short_name": "Kelleher",
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
         "position": "GK",
-        "team": "Brentford",
-        "expected_points": 2.846900765526145
-      },
-      {
-        "player_id": 209036,
-        "name": "Marc Gu\u00e9hi",
-        "short_name": "Gu\u00e9hi",
-        "position": "DEF",
-        "team": "Man City",
-        "expected_points": 3.721627814273059
+        "team": "Arsenal",
+        "expected_points": 3.450579897041415
       },
       {
         "player_id": 466075,
@@ -76,7 +68,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 465730,
@@ -84,7 +76,15 @@
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.2356844156410305
+        "expected_points": 3.237246793437091
+      },
+      {
+        "player_id": 223827,
+        "name": "Daniel Ballard",
+        "short_name": "Ballard",
+        "position": "DEF",
+        "team": "Sunderland",
+        "expected_points": 3.0918108597344838
       },
       {
         "player_id": 141746,
@@ -108,7 +108,7 @@
         "short_name": "F\u00e9e",
         "position": "MID",
         "team": "Sunderland",
-        "expected_points": 3.5158402140096534
+        "expected_points": 3.4728706842808976
       },
       {
         "player_id": 440993,
@@ -158,7 +158,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 219924,
@@ -174,7 +174,7 @@
         "short_name": "Ngoyo",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 1.1128992923687029
+        "expected_points": 1.1462964306360883
       }
     ],
     "chip": null,
@@ -183,22 +183,23 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 4287206,
-    "expected_points_cost_ceiling": 0.9115477433356318,
-    "overlap_count": 3,
+    "expected_points_cost_ceiling": 0.9376855663589367,
+    "overlap_count": 5,
     "transfer_cap": 1,
     "overlap_target": 9,
-    "overlap_applied": 3,
+    "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 24.0,
-      "expected_points_cost": 25.521240791469168,
-      "expected_points_cost_ceiling": 25.521240791469168
+      "transfer_hit_points": 16.0,
+      "expected_points_cost": 16.460212865722326,
+      "expected_points_cost_ceiling": 16.460212865722326
     },
-    "expected_gap_vs_rival": 3.188635308574291,
-    "captain_agreement": true,
+    "expected_gap_vs_rival": 5.19029456268612,
+    "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
   }

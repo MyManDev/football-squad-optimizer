@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:31:48Z",
+  "generated_at_utc": "2026-09-12T08:52:51Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5",
+    "source_snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf",
     "moves": [
       {
         "move_id": "gw04-1",
@@ -27,16 +27,16 @@
           "position": "DEF",
           "team": "Everton"
         },
-        "expected_points_delta": 1.3779815823894048,
+        "expected_points_delta": 1.4196499552483512,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_points_cost": 0.6690125919097341,
+    "expected_points_cost": 0.533023526658198,
     "rival_label": "entry-2281624",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 53.60720280368103,
+    "expected_own_points": 53.650079998906556,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -76,7 +76,7 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.5661358939542867
+        "expected_points": 3.6111564244775165
       },
       {
         "player_id": 522047,
@@ -108,7 +108,7 @@
         "short_name": "Cherki",
         "position": "MID",
         "team": "Man City",
-        "expected_points": 4.391694024990014
+        "expected_points": 4.389550689692313
       },
       {
         "player_id": 424876,
@@ -158,15 +158,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.296421745499964
-      },
-      {
-        "player_id": 106760,
-        "name": "Luke Shaw",
-        "short_name": "Shaw",
-        "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.521244083180876
+        "expected_points": 3.339228522758007
       },
       {
         "player_id": 472769,
@@ -174,7 +166,15 @@
         "short_name": "O'Reilly",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 1.550337345902003
+        "expected_points": 2.026527638301547
+      },
+      {
+        "player_id": 106760,
+        "name": "Luke Shaw",
+        "short_name": "Shaw",
+        "position": "DEF",
+        "team": "Man Utd",
+        "expected_points": 1.8909330623856568
       }
     ],
     "chip": null,
@@ -183,8 +183,9 @@
       "free_transfers",
       "purchase_prices"
     ],
+    "squad_basis": "captured",
     "rival_entry_id": 2281624,
-    "expected_points_cost_ceiling": 0.6690125919097341,
+    "expected_points_cost_ceiling": 0.533023526658198,
     "overlap_count": 5,
     "transfer_cap": 1,
     "overlap_target": 5,
@@ -194,10 +195,10 @@
       "kind": "with_hits",
       "overlap_applied": 5,
       "transfer_hit_points": 0.0,
-      "expected_points_cost": 0.6690125919097341,
-      "expected_points_cost_ceiling": 0.6690125919097341
+      "expected_points_cost": 0.533023526658198,
+      "expected_points_cost_ceiling": 0.533023526658198
     },
-    "expected_gap_vs_rival": -1.659393373286001,
+    "expected_gap_vs_rival": -1.664336907955068,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
