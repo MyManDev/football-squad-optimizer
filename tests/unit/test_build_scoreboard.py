@@ -11,11 +11,14 @@ figures name what they cover.
 
 import json
 import sys
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 import scripts.build_scoreboard as cli
+from jsonschema import Draft202012Validator, ValidationError
 from scripts.build_scoreboard import (
     OUR_SCORING_BASIS,
     CohortCapture,
@@ -25,10 +28,13 @@ from scripts.build_scoreboard import (
     scoreboard_payload,
     top100_week,
 )
+from tests.unit.test_scoreboard_history import capture, entry_at
 
+from squadopt.application.scoreboard import ScoreboardPublicationRequest, publish_scoreboard
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import write_snapshot
 from squadopt.live import LedgerEntry
+from squadopt.live.ledger import LedgerError, write_manifest
 
 SEASON = "2026-27"
 DEADLINES = {
@@ -234,6 +240,10 @@ def test_our_row_is_the_ledger_entry_with_its_mode_and_null_where_unsettled() ->
         "mode": "live",
         "scoring_basis": OUR_SCORING_BASIS,
         "vice_captain_named": False,
+        "diagnostics": dict.fromkeys(
+            ("zero_minute_starters", "minutes_shortfall", "captain_shortfall", "autosub_recovery")
+        ),
+        "outcome_snapshot_id": None,
     }
     assert rows[2]["ours"] == {
         "net": None,
@@ -243,6 +253,10 @@ def test_our_row_is_the_ledger_entry_with_its_mode_and_null_where_unsettled() ->
         "mode": "replay",
         "scoring_basis": OUR_SCORING_BASIS,
         "vice_captain_named": False,
+        "diagnostics": dict.fromkeys(
+            ("zero_minute_starters", "minutes_shortfall", "captain_shortfall", "autosub_recovery")
+        ),
+        "outcome_snapshot_id": None,
     }
     assert rows[3]["ours"] is None
 
@@ -665,3 +679,159 @@ def test_the_shell_refuses_an_empty_registry(
     )
     assert cli.main() == 1
     assert not (tmp_path / "site").exists()
+
+
+def test_comparison_shape_preserves_missing_and_unsettled_cells() -> None:
+    rows = _rows(_payload(ledger_entries=(_entry(1, mode="live", settled=True),)))
+    expected = ["system", "base", "elite_xi", "ownership_template", "league_mean", "game_mean"]
+    for week in rows.values():
+        assert [row["kind"] for row in week["comparisons"]] == expected
+        for row in week["comparisons"]:
+            assert set(row["diagnostics"]) == {
+                "zero_minute_starters",
+                "minutes_shortfall",
+                "captain_shortfall",
+                "autosub_recovery",
+            }
+    assert rows[1]["comparisons"][0]["net"] == 26
+    assert rows[1]["comparisons"][1]["net"] is None
+    assert all(row["net"] is None for row in rows[3]["comparisons"])
+
+
+def _comparison_validator() -> Draft202012Validator:
+    schema = json.loads(
+        (
+            Path(__file__).parents[2] / "docs/contracts/scoreboard_comparisons_v1.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+    Draft202012Validator.check_schema(schema)
+    return Draft202012Validator(schema)
+
+
+def test_comparison_contract_accepts_the_producer_and_legacy_documents() -> None:
+    validator = _comparison_validator()
+    for week in _rows(_payload(ledger_entries=(_entry(1, mode="live", settled=True),))).values():
+        validator.validate(week)
+        legacy = dict(week)
+        del legacy["comparisons"]
+        validator.validate(legacy)
+
+
+@pytest.mark.parametrize(
+    "failure", ["fractional_count", "wrong_kind", "missing_row", "unchecked_score"]
+)
+def test_comparison_contract_rejects_misleading_or_incomplete_measurements(failure: str) -> None:
+    week = deepcopy(_rows(_payload(ledger_entries=(_entry(1, mode="live", settled=True),)))[1])
+    if failure == "fractional_count":
+        week["comparisons"][0]["diagnostics"]["zero_minute_starters"] = 2.5
+    elif failure == "wrong_kind":
+        week["comparisons"][1]["kind"] = "system"
+    elif failure == "missing_row":
+        week["comparisons"].pop()
+    else:
+        week["data_checked"] = False
+    with pytest.raises(ValidationError):
+        _comparison_validator().validate(week)
+
+
+def _settlement_world(tmp_path: Path) -> tuple[ScoreboardPublicationRequest, Path]:
+    source = capture("checked", "2026-08-24T12:00:00Z")
+    snapshots = tmp_path / "snapshots"
+    metadata = write_snapshot(
+        snapshots,
+        source="fpl-live",
+        captured_at_utc=source.metadata.captured_at_utc,
+        payloads=source.payloads,
+    )
+    registry = tmp_path / "registry.json"
+    registry.write_text(
+        json.dumps(
+            {
+                "contract_version": "entry_registry_v1",
+                "entries": [{"entry_id": 11, "label": "member"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    ledger = tmp_path / "ledger" / SEASON / "gw01"
+    ledger.mkdir(parents=True)
+    entry = entry_at(ledger)
+    decision = dict(entry.decision)
+    decision.update(
+        projected_score=56.1,
+        mode="live",
+        ordered_bench_player_ids=[2, 6, 7, 12],
+        vice_captain_player_id=9,
+        completion_policy="optimizer_completion_v1",
+    )
+    (ledger / "decision.json").write_text(json.dumps(decision), encoding="utf-8")
+    write_manifest(ledger)
+    return ScoreboardPublicationRequest(
+        snapshot_root=snapshots,
+        snapshot_id=metadata.snapshot_id,
+        registry_path=registry,
+        ledger_root=tmp_path / "ledger",
+        out_dir=tmp_path / "site",
+        league_id=352490,
+        season=SEASON,
+    ), ledger
+
+
+def test_publication_settles_verified_inputs_without_writing_the_ledger(tmp_path: Path) -> None:
+    request, ledger = _settlement_world(tmp_path)
+    before = {p.name: p.read_bytes() for p in ledger.iterdir()}
+    result = publish_scoreboard(request)
+    week = result.document["payload"]["gameweeks"][0]
+    assert week["ours"]["net"] == 96
+    assert week["ours"]["outcome_snapshot_id"] == request.snapshot_id
+    assert week["comparisons"][0]["diagnostics"]["autosub_recovery"] == 6
+    _comparison_validator().validate(week)
+    assert {p.name: p.read_bytes() for p in ledger.iterdir()} == before
+    # The retained publication survives loss of the local ledger without a reconstruction.
+    retained = publish_scoreboard(replace(request, ledger_root=tmp_path / "missing"))
+    assert retained.ours_kept_from_published == (1,)
+    assert retained.document["payload"]["gameweeks"][0]["comparisons"][0] == week["comparisons"][0]
+
+
+@pytest.mark.parametrize("corrupt_digest", [False, True])
+def test_invalid_settlement_preserves_the_last_publication(
+    tmp_path: Path, corrupt_digest: bool
+) -> None:
+    request, ledger = _settlement_world(tmp_path)
+    target = publish_scoreboard(request).target
+    before = target.read_bytes()
+    path = ledger / "projections.csv"
+    projections = path.read_text(encoding="utf-8").replace("GK", "INVALID")
+    path.write_text(projections, encoding="utf-8")
+    if not corrupt_digest:
+        write_manifest(ledger)
+    with pytest.raises((DataError, LedgerError)):
+        publish_scoreboard(request)
+    assert target.read_bytes() == before
+
+
+def test_the_shell_reports_the_actual_settled_scoring_basis(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    request, _ = _settlement_world(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "build_scoreboard",
+            "--league",
+            "352490",
+            "--snapshot-root",
+            str(request.snapshot_root),
+            "--registry",
+            str(request.registry_path),
+            "--ledger-root",
+            str(request.ledger_root),
+            "--out",
+            str(request.out_dir),
+        ],
+    )
+    assert cli.main() == 0
+    output = capsys.readouterr().out
+    assert "official_autosub_captain_v2" in output
+    assert "named_eleven_no_autosubs" not in output

@@ -417,7 +417,7 @@ const en = {
     membersTotal: (count: number) => `mean total of ${count}`,
     membersCovers: (gameweeks: string) => `covers GW ${gameweeks}`,
     paperLedger:
-      "Our squad is a paper ledger, not an FPL entry. Its figure is the eleven the decision named, scored as named: the game's automatic substitutions are not applied, and the frozen decision names no vice-captain, so a captain who did not play is not recovered. Both would only add points, so our number reads low beside a real entry's. A member's net is their week minus the transfer cost, read from their own history.",
+      "Our squad is a paper ledger. The comparison table names each row's scoring basis. Older decisions lack a frozen bench order and vice-captain, so their figure scores only the named eleven. New decisions record both and can be scored with official substitutions. A member's net is their week minus the transfer cost, read from their own history.",
     grossNote:
       "The Top-100 mean for this capture is gross of transfer costs: it is the cohort standings' own weekly total, before hits are taken off, so it is not on the same basis as the net columns beside it and the two do not compare. It is netted only when the week's elite-picks capture covers all hundred.",
     provisionalNote:
@@ -1276,7 +1276,7 @@ const tr: MessageSchema<typeof en> = {
     membersTotal: (count) => `${count} üyenin ortalama toplamı`,
     membersCovers: (gameweeks) => `OH ${gameweeks} kapsıyor`,
     paperLedger:
-      "Kadromuz bir FPL takımı değil, kâğıt üstünde bir ledger. Sayısı, kararın yazdığı on birin yazıldığı gibi puanlanmasıdır: oyunun otomatik değişiklikleri uygulanmaz ve dondurulmuş karar hiç yardımcı kaptan yazmaz, dolayısıyla oynamayan bir kaptanın yerine kimse geçmez. İkisi de yalnızca puan ekleyeceği için sayımız gerçek bir takımın yanında düşük okunur. Bir üyenin neti, kendi geçmişinden okunan hafta puanı eksi transfer cezasıdır.",
+      "Kadromuz kâğıt üstünde izlenen bir kadrodur. Karşılaştırma tablosu her satırın puanlama temelini gösterir. Eski kararlarda dondurulmuş bench sırası ve yardımcı kaptan olmadığı için yalnızca adı konan ilk 11 puanlanır. Yeni kararlar ikisini de kaydeder ve resmi otomatik değişikliklerle puanlanabilir. Bir üyenin neti, kendi geçmişinden okunan hafta puanı eksi transfer cezasıdır.",
     grossNote:
       "Bu capture'daki Top-100 ortalaması transfer cezaları düşülmeden hesaplanmıştır: kohortun kendi sıralama tablosundaki haftalık toplamdır ve cezalar çıkarılmamıştır; yanındaki net sütunlarla aynı ölçüde değildir, ikisi karşılaştırılamaz. Ancak haftanın elite-picks capture'ı yüz üyenin hepsini kapsadığında netlenir.",
     provisionalNote:
