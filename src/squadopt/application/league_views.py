@@ -401,7 +401,9 @@ class LeagueViewsReport:
         return sum(1 for member in self.members if member.rendered)
 
 
-def _prune_unpublished_members(out: Path, published: Collection[int]) -> tuple[str, ...]:
+def _prune_unpublished_members(
+    out: Path, published: Collection[int], *, refused: Collection[int] = ()
+) -> tuple[str, ...]:
     """Remove the member documents this run did not write, and name them.
 
     A publish is a whole picture of one gameweek, not an overlay on the last one — but the
@@ -431,9 +433,14 @@ def _prune_unpublished_members(out: Path, published: Collection[int]) -> tuple[s
     tree — ``scoreboard.json``, which a different script writes into the same directory
     after this one — is left exactly as found, because a rule that deletes what it did not
     anticipate is a worse failure than the one it fixes.
+
+    A ``refused`` member is one this run wrote an ``advice/{id}/index.json`` for and nothing
+    else: the index carries the reason the page shows, so it stays, and every other name
+    under that directory — last week's documents — goes, along with ``entries/{id}.json``.
     """
 
     removed: list[str] = []
+    kept = frozenset(refused)
 
     def _stale(name: str) -> bool:
         try:
@@ -450,10 +457,49 @@ def _prune_unpublished_members(out: Path, published: Collection[int]) -> tuple[s
     advice = out / "advice"
     if advice.is_dir():
         for path in sorted(advice.iterdir()):
-            if path.is_dir() and _stale(path.name):
+            if not path.is_dir() or not _stale(path.name):
+                continue
+            if int(path.name) not in kept:
                 shutil.rmtree(path)
                 removed.append(f"advice/{path.name}/")
+                continue
+            for child in sorted(path.iterdir()):
+                if child.is_dir():
+                    shutil.rmtree(child)
+                    removed.append(f"advice/{path.name}/{child.name}/")
+                elif child.name != "index.json":
+                    child.unlink()
+                    removed.append(f"advice/{path.name}/{child.name}")
     return tuple(removed)
+
+
+def _refused_member_index(task: MemberRenderTask, *, reason: str) -> dict[str, object]:
+    """The index of a member with no advice this week, under the successful index's shape.
+
+    Every declared strategy is listed and none is computed; the reason sits in
+    ``unavailable`` once per strategy with no rival, where the page already reads reasons.
+    ``windows`` names no window for any strategy, so a reader that checks each listed
+    window's file finds nothing promised.
+    """
+
+    strategies = [COMPUTED_MODE, *task.rival_strategies]
+    return {
+        "league_id": task.league_id,
+        "season": task.season,
+        "gameweek": task.gameweek,
+        "entry_id": task.entry_id,
+        "window": COMPUTED_WINDOW,
+        "windows": {strategy: [] for strategy in strategies},
+        "strategies": strategies,
+        "rival_entry_ids": list(task.rival_ids),
+        "default_rival_entry_id": task.default_rival_id,
+        "suggested_strategy": None,
+        "computed": [],
+        "unavailable": [
+            {"strategy": strategy, "rival_entry_id": None, "reason": reason}
+            for strategy in strategies
+        ],
+    }
 
 
 def _envelope(payload: Mapping[str, object], *, generated_at_utc: str) -> dict[str, object]:
@@ -823,6 +869,8 @@ def build_league_views(
     # digest it was solved under, and every advice document with the bytes that landed.
     # Records are written from this after the whole tree is on disk.
     publications: list[tuple[EntryPicks, str, list[PublishedAdvice], dict[str, object]]] = []
+    #: Members with no advice this week, whose index names why.
+    refused: set[int] = set()
 
     for registration, task in zip(registrations, tasks, strict=True):
         entry_id = int(registration.entry_id)
@@ -841,6 +889,10 @@ def build_league_views(
             )
             results.append(MemberViewResult(entry_id, labels[entry_id], False, reason=reason))
             member_rows.append(_row(entry_id, labels[entry_id], "empty"))
+            # The page reads this member's index for the reason; without one it can only
+            # say "unavailable". The row keeps ``data_quality`` "empty" — no advice exists.
+            refused.add(entry_id)
+            _write(f"advice/{entry_id}/index.json", _refused_member_index(task, reason=reason))
             continue
         picks = picks_or_error
         advice = render.baseline
@@ -1087,7 +1139,9 @@ def build_league_views(
     # Whatever this run did not produce is not this week's advice, and the tree it wrote
     # into is last week's. Removed after members.json rather than before the renders, so a
     # run that dies mid-batch leaves the old tree whole rather than half-deleted.
-    removed = _prune_unpublished_members(out, {picks.entry_id for picks, _, _, _ in publications})
+    removed = _prune_unpublished_members(
+        out, {picks.entry_id for picks, _, _, _ in publications}, refused=refused
+    )
 
     # The record comes last, after every published file is on disk: a refusal here must
     # never be able to stop a member's advice reaching them. Every member is attempted

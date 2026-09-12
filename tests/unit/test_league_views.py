@@ -1464,8 +1464,10 @@ def test_a_member_who_fails_to_render_does_not_keep_last_weeks_documents(
 
     assert report.rendered_count == 0
     assert not (out / "entries" / "101.json").exists(), "last week's squad is still served"
-    assert not (out / "advice" / "101").exists(), "last week's advice is still served"
-    assert report.removed == ("entries/101.json", "advice/101/")
+    assert not (out / "advice" / "101" / "saf-puan").exists(), "last week's advice is still served"
+    # What remains is the index that names why there is no advice, and nothing beside it.
+    assert sorted(path.name for path in (out / "advice" / "101").iterdir()) == ["index.json"]
+    assert report.removed == ("entries/101.json", "advice/101/saf-puan/")
     # The members list is still published, and still names the member as empty rather than
     # dropping them: absent advice is not an absent member.
     members = json.loads((out / "members.json").read_text(encoding="utf-8"))["payload"]["members"]
