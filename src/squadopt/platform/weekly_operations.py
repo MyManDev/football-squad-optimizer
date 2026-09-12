@@ -524,6 +524,15 @@ class WeeklyOperations:
                 season=self.request.season,
                 cohort_snapshot_id=self._cohort_id(),
                 elite_snapshot_id=self._elite_id(),
+                evidence_root=self.paths.evidence,
+                recovery_publication_root=(
+                    self.paths.workspace / "web/public"
+                    if (
+                        self.paths.workspace / "web/public/data/2026-27/gw01/recommendation.json"
+                    ).is_file()
+                    else None
+                ),
+                advice_record_root=self.paths.records,
             )
         )
         return WeeklyStageResult(

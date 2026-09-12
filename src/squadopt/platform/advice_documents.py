@@ -24,6 +24,9 @@ from typing import Any, Final
 
 import jsonschema
 
+from squadopt.application.chip_contract import validate_chip_recommendations
+from squadopt.data.errors import DataError
+
 LEAGUE_STATE_CONTRACT_VERSION: Final = "league_state_v1"
 ADVICE_READ_SCHEMA_PATH: Final = Path("docs") / "contracts" / "advice_read_v1.schema.json"
 LEAGUE_STATE_SCHEMA_PATH: Final = Path("docs") / "contracts" / "league_state_v1.schema.json"
@@ -31,6 +34,74 @@ LEAGUE_STATE_SCHEMA_PATH: Final = Path("docs") / "contracts" / "league_state_v1.
 
 class AdviceDocumentError(ValueError):
     """Bytes that claim to be a versioned advice answer, and are not."""
+
+
+def _chip_recommendations_schema() -> dict[str, Any]:
+    """Additive chip contract, sharing the existing lineup field definitions."""
+    positive_integer = {"type": "integer", "minimum": 1}
+    nullable_number = {"type": ["number", "null"]}
+    lineup_fields = (
+        "captain",
+        "vice_captain",
+        "starting_xi",
+        "bench",
+        "chip",
+        "expected_own_points",
+        "transfer_hit_points",
+    )
+    comparison: dict[str, Any] = {
+        "chip": {"enum": ["bboost", "3xc", "wildcard", "freehit"]},
+        "available_from_gameweek": positive_integer,
+        "last_usable_gameweek": positive_integer,
+        "remaining": positive_integer,
+        "action": {"enum": ["play", "hold"]},
+        "gameweek": {"type": ["integer", "null"], "minimum": 1},
+        "expected_points_gain": nullable_number,
+        "reason": {"enum": ["window_gain", "no_positive_gain", "outside_horizon"]},
+        "solver_status": {"type": ["string", "null"]},
+        "optimality_gap": nullable_number,
+        "decision": {
+            "type": ["object", "null"],
+            "properties": {
+                **{
+                    name: {"$ref": f"#/properties/payload/properties/{name}"}
+                    for name in lineup_fields
+                },
+                "gameweek": positive_integer,
+            },
+            "required": [*lineup_fields, "gameweek"],
+        },
+    }
+    decision_fields = comparison["decision"]["properties"]
+    for name, count in (("starting_xi", 11), ("bench", 4)):
+        decision_fields[name] = {
+            **decision_fields[name],
+            "type": "array",
+            "minItems": count,
+            "maxItems": count,
+        }
+    for name in ("captain", "vice_captain"):
+        decision_fields[name] = {**decision_fields[name], "type": "object"}
+    decision_fields["expected_own_points"] = {"type": "number"}
+    decision_fields["transfer_hit_points"] = {"type": "number", "minimum": 0}
+    fields = {
+        "contract_version": {"const": "member_chip_recommendations_v1"},
+        "planning_policy_id": {"type": "string"},
+        "gameweeks": {
+            "type": "array",
+            "items": positive_integer,
+            "minItems": 1,
+            "maxItems": 5,
+            "uniqueItems": True,
+        },
+        "control_solver_status": {"type": "string"},
+        "control_optimality_gap": nullable_number,
+        "comparisons": {
+            "type": "array",
+            "items": {"type": "object", "properties": comparison, "required": list(comparison)},
+        },
+    }
+    return {"type": "object", "properties": fields, "required": list(fields)}
 
 
 def advice_read_schema() -> dict[str, Any]:
@@ -102,6 +173,7 @@ def advice_read_schema() -> dict[str, Any]:
             "starting_xi": {"type": ["array", "null"], "items": player},
             "bench": {"type": ["array", "null"], "items": player},
             "chip": chip,
+            "chip_recommendations": _chip_recommendations_schema(),
             "plan_weeks": {"type": ["array", "null"], "items": plan_week},
             "stated_limits": {"type": ["array", "null"], "items": {"type": "string"}},
             "plan_kind": {"enum": ["within_free_transfers", "with_hits"]},
@@ -224,6 +296,16 @@ def validate_advice_document(raw: bytes) -> None:
         raise AdviceDocumentError(
             f"The advice document violates advice_read_v1: {errors[0].message}"
         )
+
+    payload = document["payload"]
+    if "chip_recommendations" in payload:
+        try:
+            validate_chip_recommendations(
+                payload["chip_recommendations"],
+                gameweeks=range(payload["gameweek"], payload["gameweek"] + payload["window"]),
+            )
+        except DataError as error:
+            raise AdviceDocumentError(str(error)) from error
 
 
 def _invalid_number(value: str) -> None:

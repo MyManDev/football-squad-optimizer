@@ -150,6 +150,31 @@ def _rows(payload: dict[str, Any]) -> dict[int, dict[str, Any]]:
     return {row["gameweek"]: row for row in payload["gameweeks"]}
 
 
+def test_comparison_shape_preserves_missing_and_unsettled_cells() -> None:
+    rows = _rows(_payload(ledger_entries=(_entry(1, mode="live", settled=True),)))
+    expected = ["system", "base", "elite_xi", "ownership_template", "league_mean", "game_mean"]
+    for week in rows.values():
+        assert [row["kind"] for row in week["comparisons"]] == expected
+        for row in week["comparisons"]:
+            assert set(row["diagnostics"]) == {
+                "zero_minute_starters",
+                "minutes_shortfall",
+                "captain_shortfall",
+                "autosub_recovery",
+            }
+    assert rows[1]["comparisons"][0]["net"] == 26
+    assert rows[1]["comparisons"][1]["net"] is None
+    assert all(row["net"] is None for row in rows[3]["comparisons"])
+
+
+def test_base_pair_requires_the_same_decision_capture() -> None:
+    with pytest.raises(DataError, match="same season and capture"):
+        _payload(
+            ledger_entries=(_entry(1, mode="live", settled=True),),
+            baseline_entries=(_entry(2, mode="live", settled=True),),
+        )
+
+
 # --- members: gross in the source, net on the board ----------------------------------
 
 
@@ -234,6 +259,10 @@ def test_our_row_is_the_ledger_entry_with_its_mode_and_null_where_unsettled() ->
         "mode": "live",
         "scoring_basis": OUR_SCORING_BASIS,
         "vice_captain_named": False,
+        "diagnostics": dict.fromkeys(
+            ("zero_minute_starters", "minutes_shortfall", "captain_shortfall", "autosub_recovery")
+        ),
+        "outcome_snapshot_id": None,
     }
     assert rows[2]["ours"] == {
         "net": None,
@@ -243,6 +272,10 @@ def test_our_row_is_the_ledger_entry_with_its_mode_and_null_where_unsettled() ->
         "mode": "replay",
         "scoring_basis": OUR_SCORING_BASIS,
         "vice_captain_named": False,
+        "diagnostics": dict.fromkeys(
+            ("zero_minute_starters", "minutes_shortfall", "captain_shortfall", "autosub_recovery")
+        ),
+        "outcome_snapshot_id": None,
     }
     assert rows[3]["ours"] is None
 

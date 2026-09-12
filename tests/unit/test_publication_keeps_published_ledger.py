@@ -185,6 +185,9 @@ def test_an_empty_ledger_root_keeps_our_published_scoreboard_rows(
     result = publish_scoreboard(request)
 
     assert result.ours_kept_from_published == (1,)
+    comparison = result.document["payload"]["gameweeks"][0]["comparisons"][0]
+    assert comparison["kind"] == "system" and comparison["net"] == 26.0
+    assert all(value is None for value in comparison["diagnostics"].values())
     rows = {row["gameweek"]: row for row in result.document["payload"]["gameweeks"]}
     assert rows[1]["ours"]["net"] == 26.0 and rows[1]["ours"]["mode"] == "live"
     assert rows[2]["ours"] is None and rows[3]["ours"] is None

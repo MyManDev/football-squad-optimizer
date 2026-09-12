@@ -146,6 +146,175 @@
             "freehit"
           ]
         },
+        "chip_recommendations": {
+          "properties": {
+            "comparisons": {
+              "items": {
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "play",
+                      "hold"
+                    ]
+                  },
+                  "available_from_gameweek": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "chip": {
+                    "enum": [
+                      "bboost",
+                      "3xc",
+                      "wildcard",
+                      "freehit"
+                    ]
+                  },
+                  "decision": {
+                    "properties": {
+                      "bench": {
+                        "$ref": "#/properties/payload/properties/bench",
+                        "maxItems": 4,
+                        "minItems": 4,
+                        "type": "array"
+                      },
+                      "captain": {
+                        "$ref": "#/properties/payload/properties/captain",
+                        "type": "object"
+                      },
+                      "chip": {
+                        "$ref": "#/properties/payload/properties/chip"
+                      },
+                      "expected_own_points": {
+                        "type": "number"
+                      },
+                      "gameweek": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "starting_xi": {
+                        "$ref": "#/properties/payload/properties/starting_xi",
+                        "maxItems": 11,
+                        "minItems": 11,
+                        "type": "array"
+                      },
+                      "transfer_hit_points": {
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "vice_captain": {
+                        "$ref": "#/properties/payload/properties/vice_captain",
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "captain",
+                      "vice_captain",
+                      "starting_xi",
+                      "bench",
+                      "chip",
+                      "expected_own_points",
+                      "transfer_hit_points",
+                      "gameweek"
+                    ],
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "expected_points_gain": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "gameweek": {
+                    "minimum": 1,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "last_usable_gameweek": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "optimality_gap": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "reason": {
+                    "enum": [
+                      "window_gain",
+                      "no_positive_gain",
+                      "outside_horizon"
+                    ]
+                  },
+                  "remaining": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "solver_status": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "chip",
+                  "available_from_gameweek",
+                  "last_usable_gameweek",
+                  "remaining",
+                  "action",
+                  "gameweek",
+                  "expected_points_gain",
+                  "reason",
+                  "solver_status",
+                  "optimality_gap",
+                  "decision"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "contract_version": {
+              "const": "member_chip_recommendations_v1"
+            },
+            "control_optimality_gap": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "control_solver_status": {
+              "type": "string"
+            },
+            "gameweeks": {
+              "items": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "maxItems": 5,
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "planning_policy_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "contract_version",
+            "planning_policy_id",
+            "gameweeks",
+            "control_solver_status",
+            "control_optimality_gap",
+            "comparisons"
+          ],
+          "type": "object"
+        },
         "control_optimality_gap": {
           "type": [
             "number",

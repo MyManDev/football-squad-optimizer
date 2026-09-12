@@ -24,16 +24,13 @@ Where each number comes from, and what it is:
   eleven score, the hit points, the projection, and the mode the decision was made in
   (``live`` decided before its deadline from a capture that run took; ``replay`` recorded
   after that deadline, or from a capture the run did not take but named). Its
-  ``scoring_basis`` is ``named_eleven_no_autosubs``, and that is not FPL's own net: the
-  eleven the decision named is scored as named, the game's automatic substitutions are
-  not applied, and the ledger's decision carries no vice-captain to recover a captain who
-  did not play. Both corrections only ever add points, so our figure reads low beside a
-  member's ``points - event_transfers_cost``. Neither is computable from what the ledger
-  holds — the frozen decision records the bench as a set, not in the order the game's
-  autosubs walk it, and it names no vice-captain — so the basis is published rather than
-  guessed. When the ledger root holds no entry at all while the scoreboard already
-  published at ``<out>`` carries our rows, those rows are kept as they are: a decision
-  whose local record was lost is not the absence of a decision.
+  ``scoring_basis`` remains ``named_eleven_no_autosubs`` on legacy decisions without an
+  explicitly frozen bench order and vice-captain. New decisions freeze both; checked
+  event-live captures then permit ``official_autosub_captain_v2``. Publication computes
+  settlement in memory and preserves the immutable ledger. Diagnostic columns remain
+  null wherever a decision-time input was not recorded.
+  If the local ledger is empty, already published rows are retained; explicit
+  historical recovery takes precedence for GW1-GW4 where source loss is known.
 - ``top100``: the Top-100 cohort's mean week, for the cohort capture's current gameweek
   only. The cohort is re-ranked every week, so a total is never differenced across
   captures; ``final`` says whether the gameweek was finished and checked in the cohort
@@ -60,6 +57,14 @@ from typing import Any, Final
 
 from squadopt.application.entries import EntryRegistry
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.application.scoreboard_baselines import human_baseline_rows
+from squadopt.application.scoreboard_chips import recorded_chip_rows
+from squadopt.application.scoreboard_diagnostics import empty_diagnostics
+from squadopt.application.scoreboard_history import settled_scoreboard_entries
+from squadopt.application.scoreboard_recovery import (
+    enrich_recovered_scoreboard,
+    load_publication_recovery,
+)
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
@@ -78,6 +83,8 @@ from squadopt.live import (
     load_ledger,
     season_from_bootstrap,
 )
+from squadopt.live.ledger import write_atomic
+from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
 
 SCOREBOARD_FILE: Final = "scoreboard.json"
 TOP100_SIZE: Final = 100
@@ -240,8 +247,18 @@ def _ours(entry: LedgerEntry) -> dict[str, object]:
         "projected": float(str(decision["projected_score"])),
         "mode": decision_mode(decision),
         # Not FPL's net: no automatic substitutions, and no vice-captain to fall back on.
-        "scoring_basis": OUR_SCORING_BASIS,
+        "scoring_basis": (
+            OUR_SCORING_BASIS
+            if outcome is None
+            else outcome.get("scoring_basis", OUR_SCORING_BASIS)
+        ),
         "vice_captain_named": decision.get("vice_captain_player_id") is not None,
+        "diagnostics": (
+            empty_diagnostics()
+            if outcome is None
+            else outcome.get("diagnostics", empty_diagnostics())
+        ),
+        "outcome_snapshot_id": None if outcome is None else outcome.get("source_snapshot_id"),
     }
 
 
@@ -299,6 +316,9 @@ def scoreboard_payload(
     cohort_picks: CohortPicks | None = None,
     published_ours: Mapping[int, Mapping[str, object]] | None = None,
     generated_at_utc: str,
+    baseline_entries: Sequence[LedgerEntry] = (),
+    human_baselines: Mapping[int, Mapping[str, Mapping[str, object]]] | None = None,
+    pending_gameweeks: Sequence[int] = (),
 ) -> dict[str, object]:
     """The scoreboard envelope, from bytes and ledger entries alone; pure, so testable.
 
@@ -315,6 +335,7 @@ def scoreboard_payload(
         for entry_id, payload in histories.items()
     }
     ledger = {entry.gameweek: entry for entry in ledger_entries}
+    baseline = {entry.gameweek: entry for entry in baseline_entries}
     if cohort is not None:
         # A gameweek number repeats every season, so the week check below proves the two
         # captures are from the same week only once they are known to be from the same
@@ -334,7 +355,7 @@ def scoreboard_payload(
         )
 
     rows: list[dict[str, object]] = []
-    for gameweek in played:
+    for gameweek in sorted(set(played) | set(pending_gameweeks)):
         event = events.get(gameweek)
         if event is None:
             raise DataError(f"The bootstrap publishes no gameweek {gameweek}.")
@@ -351,6 +372,59 @@ def scoreboard_payload(
             our_row = _ours(entry)
         elif published_ours is not None and gameweek in published_ours:
             our_row = dict(published_ours[gameweek])
+        settled = finished and event.get("data_checked") is True
+        control = baseline.get(gameweek)
+        if control is not None and (
+            entry is None
+            or control.season != season
+            or control.decision.get("snapshot_id") != entry.decision.get("snapshot_id")
+        ):
+            raise DataError("Paired base decision must use the system's same season and capture.")
+        if control is not None and control.decision.get("model_version") != COMPONENT_MODEL_VERSION:
+            raise DataError("The bare component row needs a frozen component-only model decision.")
+        comparisons: list[dict[str, object]] = []
+        for name, candidate in (("system", entry), ("base", control)):
+            row = _ours(candidate) if candidate is not None else None
+            if name == "system" and row is None:
+                row = our_row
+            comparisons.append(
+                {
+                    "kind": name,
+                    "net": row["net"] if settled and row else None,
+                    "diagnostics": (
+                        row.get("diagnostics", empty_diagnostics())
+                        if settled and row
+                        else empty_diagnostics()
+                    ),
+                    "scoring_basis": row.get("scoring_basis") if row else None,
+                    "source_snapshot_id": row.get("outcome_snapshot_id") if row else None,
+                }
+            )
+        for name in ("elite_xi", "ownership_template"):
+            human = (human_baselines or {}).get(gameweek, {}).get(name) if settled else None
+            comparisons.append(
+                {
+                    "kind": name,
+                    "net": None,
+                    "diagnostics": empty_diagnostics(),
+                    "scoring_basis": None,
+                    "source_snapshot_id": None,
+                    **dict(human or {}),
+                }
+            )
+        for name, value in (
+            ("league_mean", _mean(nets)),
+            ("game_mean", _number(event.get("average_entry_score"))),
+        ):
+            comparisons.append(
+                {
+                    "kind": name,
+                    "net": value if settled else None,
+                    "diagnostics": empty_diagnostics(),
+                    "scoring_basis": "net" if name == "league_mean" else "source_average",
+                    "source_snapshot_id": source_snapshot_id,
+                }
+            )
         rows.append(
             {
                 "gameweek": gameweek,
@@ -366,6 +440,7 @@ def scoreboard_payload(
                 "members": members,
                 "members_mean_net": _mean(nets),
                 "members_counted": len(nets),
+                "comparisons": comparisons,
             }
         )
 
@@ -522,6 +597,10 @@ class ScoreboardPublicationRequest:
     cohort_snapshot_id: str | None = None
     elite_snapshot_id: str | None = None
     now_utc: str | None = None
+    baseline_ledger_root: Path | None = None
+    evidence_root: Path | None = None
+    recovery_publication_root: Path | None = None
+    advice_record_root: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -561,11 +640,52 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         for entry_id in registered
         if (name := f"entry-{entry_id}-history.json") in snapshot.payloads
     }
-    entries = load_ledger(request.ledger_root, season)
+    snapshots = tuple(
+        read_snapshot(request.snapshot_root, identifier)
+        for identifier in list_snapshot_ids(request.snapshot_root, source=FPL_LIVE_SOURCE)
+    )
+    recovery = None
+    if season == "2026-27" and request.recovery_publication_root is not None:
+        if request.advice_record_root is None:
+            raise DataError("Publication recovery requires an explicit advice record root.")
+        recovery = load_publication_recovery(
+            snapshot=snapshot,
+            publication_root=request.recovery_publication_root,
+            advice_root=request.advice_record_root,
+            league_id=request.league_id,
+            entry_ids=tuple(registered),
+            outcome_snapshots=snapshots,
+        )
+    ledger = load_ledger(request.ledger_root, season)
+    if recovery is not None:
+        ledger = tuple(entry for entry in ledger if entry.gameweek > 4)
+    entries = settled_scoreboard_entries(
+        ledger,
+        snapshots,
+        season=season,
+        as_of_utc=snapshot.metadata.captured_at_utc,
+    )
+    future_entries = entries
+    if recovery is not None:
+        entries = (recovery.entry, *entries)
+    baseline_entries = (
+        ()
+        if request.baseline_ledger_root is None
+        else settled_scoreboard_entries(
+            tuple(
+                entry
+                for entry in load_ledger(request.baseline_ledger_root, season)
+                if recovery is None or entry.gameweek > 4
+            ),
+            snapshots,
+            season=season,
+            as_of_utc=snapshot.metadata.captured_at_utc,
+        )
+    )
     target = Path(request.out_dir) / "data" / "league" / SCOREBOARD_FILE
-    # An empty ledger root beside a scoreboard that already publishes our rows: the
-    # decisions were made, their local record is what is missing. Keep the rows.
-    published_ours = _published_ours(target, season) if not entries else {}
+    published_ours = _published_ours(target, season) if not ledger else {}
+    if recovery is not None:
+        published_ours = {week: row for week, row in published_ours.items() if week > 4}
     cohort = (
         read_cohort(request.snapshot_root, request.cohort_snapshot_id)
         if request.cohort_snapshot_id
@@ -590,7 +710,22 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
         published_ours=published_ours or None,
         generated_at_utc=request.now_utc
         or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        baseline_entries=baseline_entries,
+        human_baselines=human_baseline_rows(
+            future_entries, snapshots, evidence_root=request.evidence_root
+        ),
+        pending_gameweeks=(4,) if recovery is not None and recovery.records else (),
     )
+    if recovery is not None:
+        enrich_recovered_scoreboard(document, recovery, snapshot, snapshots)
+    if request.advice_record_root is not None:
+        chips = recorded_chip_rows(
+            request.advice_record_root, snapshot=snapshot, snapshots=snapshots, entry_ids=registered
+        )
+        payload = document["payload"]
+        assert isinstance(payload, dict)
+        for row in payload["gameweeks"]:
+            row["chip_recommendations"] = chips.get(row["gameweek"], [])
     payload = document["payload"]
     published_rows: list[object] = payload["gameweeks"] if isinstance(payload, dict) else []
     kept = tuple(
@@ -606,9 +741,9 @@ def publish_scoreboard(request: ScoreboardPublicationRequest) -> ScoreboardPubli
             f"scoreboard rows for gameweeks {list(kept)} rather than publishing none."
         )
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(
-        json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n",
-        encoding="utf-8",
+    write_atomic(
+        target,
+        (json.dumps(document, indent=2, sort_keys=True, allow_nan=False) + "\n").encode("utf-8"),
     )
     return ScoreboardPublicationResult(
         snapshot_id,

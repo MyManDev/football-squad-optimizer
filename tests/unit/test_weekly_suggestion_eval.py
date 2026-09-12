@@ -360,3 +360,22 @@ def test_python_result_matches_the_browser_contract_fixture(tmp_path: Path) -> N
     document = json.loads(fixture.read_text(encoding="utf-8"))
     assert document["contract_version"] == review.CONTRACT_VERSION
     assert document["payload"]["weeks"] == json.loads(json.dumps([asdict(result)]))
+
+
+def test_as_of_replay_excludes_a_later_publication_before_the_deadline(tmp_path: Path) -> None:
+    earlier = recorded()
+    later = recorded(
+        captured="2026-09-10T09:00:00Z", published="2026-09-11T11:00:00Z", name="capture-b"
+    )
+    record_member_advice(tmp_path, earlier)
+    record_member_advice(tmp_path, later)
+    assert choose(tmp_path) == later
+    selected = review.select_record(
+        tmp_path,
+        season=SEASON,
+        gameweek=4,
+        entry_id=101,
+        deadline_utc=DEADLINE,
+        as_of_utc=earlier["generated_at_utc"],
+    )
+    assert selected == earlier

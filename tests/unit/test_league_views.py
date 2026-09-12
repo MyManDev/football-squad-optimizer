@@ -163,8 +163,12 @@ def test_a_members_advice_is_invariant_to_every_other_members_state(
     assert first == second
 
 
+@pytest.mark.parametrize("deterministic_budget_exhausted", [False, True])
 def test_an_unproven_plan_is_published_with_its_status_not_discarded(
-    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    world: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    deterministic_budget_exhausted: bool,
 ) -> None:
     """A member whose plan the solver found but could not prove keeps their page.
 
@@ -191,7 +195,11 @@ def test_an_unproven_plan_is_published_with_its_status_not_discarded(
         relabelled = dataclasses.replace(
             plan,
             solver_status=SolverStatus.FEASIBLE,
-            diagnostics={**dict(plan.diagnostics), "absolute_optimality_gap": 0.25},
+            diagnostics={
+                **dict(plan.diagnostics),
+                "absolute_optimality_gap": 0.25,
+                "deterministic_time_budget_exhausted": deterministic_budget_exhausted,
+            },
         )
         return relabelled, decision, config
 
@@ -213,6 +221,11 @@ def test_an_unproven_plan_is_published_with_its_status_not_discarded(
     assert payload["solver_status"] == "FEASIBLE"
     assert payload["optimality_gap"] == 0.25
     assert payload["moves"]  # the found plan itself is published, not just the caveat
+    if deterministic_budget_exhausted:
+        assert payload["chip_recommendations"]["control_solver_status"] == "FEASIBLE"
+        assert payload["chip_recommendations"]["control_optimality_gap"] == 0.25
+    else:
+        assert "chip_recommendations" not in payload  # no price from a clock-truncated control
 
 
 def test_a_proven_plan_publishes_its_proof(world: dict[str, Any], tmp_path: Path) -> None:
@@ -785,7 +798,8 @@ def test_the_member_planning_hit_cost_reaches_the_published_bytes(
 # value is ``test_the_member_planning_hit_cost_reaches_the_published_bytes`` above, which
 # holds a discretionary member; the value itself is pinned in
 # ``tests/unit/test_live_transfers.py``.
-IN_SEASON_MEMBER_ADVICE_SHA256 = "cf3846bd66baba6938898a47b9d67b6a42ead8512f4653f4b0193d41a1441477"
+# v3 adds independently priced chip alternatives; the readable transfer pin below is unchanged.
+IN_SEASON_MEMBER_ADVICE_SHA256 = "423b70d105c9b1dd6eac7dc7cb80af9731588d68165c04ca44c481612379d8f1"
 # (player_out, player_in, expected_points_delta) per move, each pair one position. The
 # week's hit charge is not here because it is not a property of a move: this plan makes
 # two transfers and pays for one, and the payload states that once as

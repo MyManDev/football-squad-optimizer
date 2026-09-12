@@ -15,6 +15,7 @@ import {
   type MeasurementType,
 } from "../data";
 import styles from "./AnalysisPage.module.css";
+import { ScoreboardSection } from "../../league/components/ScoreboardCard";
 
 const TYPE_TONES: Record<MeasurementType, "good" | "bad" | "neutral" | "accent"> = {
   passed: "good",
@@ -133,6 +134,7 @@ export function AnalysisPage() {
         <p>{copy.lede}</p>
       </header>
 
+      <ScoreboardSection />
       <div className={styles.tabs} aria-label={copy.viewLabel}>
         <button type="button" aria-pressed={tab === "all"} onClick={() => setTab("all")}>
           {copy.all}

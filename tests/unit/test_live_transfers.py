@@ -328,24 +328,18 @@ POLICY_PROVENANCE_ARTIFACTS = (
 def test_the_member_planning_policy_is_the_rule_and_its_provenance_exists(
     world: dict[str, Any],
 ) -> None:
-    """The member path plans under ``member_planning_policy_v2``: the rule values.
-
-    The policy is the planner's defaults but for the hit cost, which carries the caution
-    margin ``member_policy_hit_cost_grid`` measured; the charge stays the game's 4. The
-    fingerprint must therefore differ from the defaults' in exactly that one control, and
-    each artifact the policy's docstring cites as provenance must exist where it says.
-    """
+    """Pin v3's selected FT/discount settings and preserve the measured hit margin."""
 
     snapshot = read_snapshot(world["snapshot_root"], world["gw1_id"])
     rules = read_season_rules(snapshot, season=SEASON)
 
-    assert MEMBER_PLANNING_POLICY_ID == "member_planning_policy_v2"
+    assert MEMBER_PLANNING_POLICY_ID == "member_planning_policy_v3"
     assert isinstance(MEMBER_PLANNING_POLICY, MappingProxyType)
     assert dict(MEMBER_PLANNING_POLICY) == {
         "transfer_hit_cost_points": 8.0,
         "hit_points_charged": 4.0,
-        "banked_transfer_value_points": 0.0,
-        "horizon_discount_factor": 1.0,
+        "banked_transfer_value_points": 1.5,
+        "horizon_discount_factor": 0.84,
         "chip_holding_value_points": {},
     }
 
@@ -354,7 +348,12 @@ def test_the_member_planning_policy_is_the_rule_and_its_provenance_exists(
     assert config.configuration_fingerprint != defaults.configuration_fingerprint
     assert (
         config.configuration_fingerprint
-        == replace(defaults, transfer_hit_cost_points=8.0).configuration_fingerprint
+        == replace(
+            defaults,
+            transfer_hit_cost_points=8.0,
+            banked_transfer_value_points=1.5,
+            horizon_discount_factor=0.84,
+        ).configuration_fingerprint
     )
     assert config.transfer_hit_cost_points == MEMBER_PLANNING_POLICY["transfer_hit_cost_points"]
     assert config.hit_points_charged == MEMBER_PLANNING_POLICY["hit_points_charged"]
@@ -567,7 +566,9 @@ def test_gameweek_two_is_decided_from_the_held_squad_and_frozen(
     after = set(decision["squad_player_ids"])
     assert after == (held - set(block["transfers_out"])) | set(block["transfers_in"])
     assert block["transfer_count"] == len(block["transfers_in"]) == len(block["transfers_out"])
-    assert block["transfer_count"] >= 1  # 1024 at 9.0 is worth a free transfer
+    # 1024 is already held; the marginal reshuffle no longer beats banking the FT.
+    assert block["transfer_count"] == 0
+    assert block["free_transfers_after"] == 2
     assert block["free_transfers_before"] == 1
     assert (
         block["free_transfers_after"] == min(5, max(0, 1 - block["transfer_count"]) + 1)

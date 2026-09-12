@@ -34,12 +34,15 @@ from squadopt.application.advice_capabilities import (
 from squadopt.application.advice_capabilities import (
     validate_advice_selection,
 )
+from squadopt.application.chip_publication import chip_recommendation_payload
 from squadopt.application.entries import (
     EntryError,
     EntryPicks,
     EntryPicksProvider,
     held_squad_from_picks,
 )
+from squadopt.application.lineup_publication import advice_player as _advice_player
+from squadopt.application.lineup_publication import lineup_fields as lineup_fields
 from squadopt.application.phase_e import TransferAdviceDiagnostic, run_transfer_advice_diagnostic
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.errors import DataSourceError
@@ -53,6 +56,7 @@ from squadopt.live import (
     plan_transfers,
     plan_transfers_with_overlap,
 )
+from squadopt.live.chip_advice import recommend_chips
 from squadopt.live.recommendation import InSeasonProjection
 from squadopt.live.transfers import HeldSquad, TransferDecision
 from squadopt.optimization import (
@@ -96,9 +100,6 @@ WINDOW_WALL_CEILING_SECONDS = 1800.0
 #: member: it depends on the capture and the handoff only, never on whose squad asks.
 HorizonBuilder = Callable[[tuple[int, ...]], ProjectionHorizon]
 
-#: Pitch order for the published eleven and the outfield bench.
-_POSITION_ORDER: tuple[str, ...] = ("GK", "DEF", "MID", "FWD")
-
 
 @dataclass(frozen=True, slots=True)
 class AdviseEntryRequest:
@@ -129,68 +130,6 @@ class AdviseEntryRequest:
             or self.rival_entry_id < 1
         ):
             raise EntryError("rival_entry_id must be None or a positive integer.")
-
-
-def _advice_player(row: "pd.Series[Any]") -> dict[str, object]:
-    name = str(row["name"])
-    return {
-        "player_id": int(str(row["player_id"])),
-        "name": name,
-        "short_name": name.rsplit(" ", 1)[-1],
-        "position": str(row["position"]),
-        "team": str(row["team_id"]),
-    }
-
-
-def _lineup_player(row: "pd.Series[Any]") -> dict[str, object]:
-    return {**_advice_player(row), "expected_points": float(str(row["expected_points"]))}
-
-
-def _ranking(row: "pd.Series[Any]") -> tuple[float, int]:
-    return (-float(str(row["expected_points"])), int(str(row["player_id"])))
-
-
-def lineup_fields(week: PlanningWeekResult) -> dict[str, object]:
-    """The complete decision a member acts on, read from the plan's first week.
-
-    Transfers alone are not a gameweek: the member still has to name a captain, a
-    vice-captain, an eleven and a bench order, and decide whether a chip is played.
-    The planner decides the eleven, the captain and the chip; the vice-captain and the
-    bench order follow the same completion rule the official scorer applies to an
-    optimizer decision (highest expected points first, ties by player id, the bench
-    goalkeeper first) so what is shown is what would be scored. ``expected_own_points``
-    is the eleven plus the captain's double — expected points, nothing else.
-    """
-
-    eleven = [row for _, row in week.starting_xi.iterrows()]
-    bench = [row for _, row in week.bench.iterrows()]
-    captain_id = int(str(week.captain["player_id"]))
-    starters = {int(str(row["player_id"])): row for row in eleven}
-    if captain_id not in starters:
-        raise EntryError("The plan's captain is not in its starting eleven.")
-    vice_candidates = sorted(
-        (row for row in eleven if int(str(row["player_id"])) != captain_id), key=_ranking
-    )
-    if not vice_candidates:
-        raise EntryError("The plan's eleven has no vice-captain candidate.")
-    goalkeepers = [row for row in bench if str(row["position"]) == "GK"]
-    outfield = sorted((row for row in bench if str(row["position"]) != "GK"), key=_ranking)
-    if len(goalkeepers) != 1:
-        raise EntryError("The plan's bench must hold exactly one goalkeeper.")
-    ordered_eleven = sorted(
-        eleven, key=lambda row: (_POSITION_ORDER.index(str(row["position"])), _ranking(row))
-    )
-    expected_own = sum(float(str(row["expected_points"])) for row in eleven) + float(
-        str(starters[captain_id]["expected_points"])
-    )
-    return {
-        "expected_own_points": expected_own,
-        "captain": _lineup_player(starters[captain_id]),
-        "vice_captain": _lineup_player(vice_candidates[0]),
-        "starting_xi": [_lineup_player(row) for row in ordered_eleven],
-        "bench": [_lineup_player(row) for row in (*goalkeepers, *outfield)],
-        "chip": week.chip,
-    }
 
 
 #: What a payload carries when the decision it renders came without its plan week.
@@ -355,6 +294,7 @@ class MemberControl:
     plan: TransferPlanResult
     decision: TransferDecision
     transfer_config: TransferPlanningConfig
+    held: HeldSquad
 
 
 def solve_member_control(
@@ -386,7 +326,9 @@ def solve_member_control(
     except Exception:
         # An opt-in internal diagnostic cannot invalidate the already-solved advice.
         logging.getLogger(__name__).warning("Phase E advice diagnostic failed", exc_info=True)
-    return MemberControl(picks=picks, plan=plan, decision=decision, transfer_config=transfer_config)
+    return MemberControl(
+        picks=picks, plan=plan, decision=decision, transfer_config=transfer_config, held=held
+    )
 
 
 def net_expected_points(plan: TransferPlanResult) -> float:
@@ -497,6 +439,7 @@ def build_advice_payload(
     if mode != COMPUTED_MODE and decision is None:
         raise EntryError(f"Mode {mode!r} advice needs the decision its selector chose.")
     pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
+    chip_fields: dict[str, object] = {}
     if decision is None:
         solved = _control_for(
             picks, control, inputs, projection, rules, phase_e_diagnostic=phase_e_diagnostic
@@ -510,6 +453,14 @@ def build_advice_payload(
         raw_gap = plan.diagnostics.get("absolute_optimality_gap")
         optimality_gap = float(str(raw_gap)) if raw_gap is not None else None
         week = plan.weeks[0]
+        # The existing one-week contract retains a feasible incumbent with its gap.
+        # A clock-truncated control cannot support a reproducible chip price, but
+        # that optional comparison must not erase the member's ordinary advice.
+        if not wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
+            chip_fields["chip_recommendations"] = chip_recommendation_payload(
+                recommend_chips(inputs, projection, solved.held, rules, plan),
+                plan,
+            )
     else:
         transfers = decision
         by_id = pool_by_id
@@ -566,6 +517,7 @@ def build_advice_payload(
         # eleven in pitch order, the bench in the order the game's autosubs walk it,
         # and the chip — all in expected points, none of it a probability.
         **lineup,
+        **chip_fields,
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
     }
@@ -594,9 +546,8 @@ WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "(a wildcard week excepted); the one-week plan has no such cap.",
     WINDOW_TOP100_LIMIT,
     "Prices are held at the captured values; no price change is modelled.",
-    "No chip is offered inside the window. A finite window counts nothing for "
-    "holding a chip back, so a planner that could reach one would spend it; chip "
-    "timing is a season-long decision this window cannot price.",
+    "The main window plan uses no chip. Chip alternatives are priced separately "
+    "against it; holding a chip beyond this window has no assigned value.",
 )
 
 
@@ -671,15 +622,16 @@ def build_window_payload(
         for _, row in inputs.players.iterrows()
     }
     held = held_squad_from_picks(picks, current_prices=prices)
+    settings = OptimizationConfig(
+        solver_time_limit_seconds=WINDOW_WALL_CEILING_SECONDS,
+        solver_deterministic_time_limit=WINDOW_DETERMINISTIC_UNITS_PER_WEEK * window,
+    )
     plan, _transfer_config = plan_transfer_horizon(
         inputs,
         horizon,
         held,
         rules,
-        optimization=OptimizationConfig(
-            solver_time_limit_seconds=WINDOW_WALL_CEILING_SECONDS,
-            solver_deterministic_time_limit=WINDOW_DETERMINISTIC_UNITS_PER_WEEK * window,
-        ),
+        optimization=settings,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
         raise SolverExecutionError(
@@ -739,6 +691,12 @@ def build_window_payload(
             for week in plan.weeks
         ],
         "stated_limits": window_stated_limits(projection),
+        "chip_recommendations": chip_recommendation_payload(
+            recommend_chips(
+                inputs, projection, held, rules, plan, horizon=horizon, optimization=settings
+            ),
+            plan,
+        ),
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
     }

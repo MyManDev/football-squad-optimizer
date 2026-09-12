@@ -1,10 +1,10 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-09T06:58:22Z",
+  "generated_at_utc": "2026-09-10T18:55:23.083140Z",
   "payload": {
-    "captured_at_utc": "2026-09-09T05:50:21.952665Z",
-    "cohort_picks_snapshot_id": "fpl-elite-picks-20260909T053428Z-5679674b5954",
-    "cohort_snapshot_id": "fpl-top100-20260909T053412Z-33a08d17a8fd",
+    "captured_at_utc": "2026-09-10T18:55:23.083140Z",
+    "cohort_picks_snapshot_id": null,
+    "cohort_snapshot_id": null,
     "cumulative": {
       "average_entry_score": 182.0,
       "gameweeks": [
@@ -28,8 +28,83 @@
     "gameweeks": [
       {
         "average_entry_score": 50.0,
+        "comparisons": [
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": 4.166051660516605,
+              "minutes_shortfall": null,
+              "zero_minute_starters": 2
+            },
+            "kind": "system",
+            "net": 26.0,
+            "scoring_basis": "named_eleven_no_autosubs",
+            "source_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9"
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "base",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "elite_xi",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "ownership_template",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "league_mean",
+            "net": 54.266666666666666,
+            "scoring_basis": "net",
+            "source_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9"
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "game_mean",
+            "net": 50.0,
+            "scoring_basis": "source_average",
+            "source_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9"
+          }
+        ],
         "data_checked": true,
         "deadline_utc": "2026-08-21T17:30:00Z",
+        "decision_record_status": "available",
         "finished": true,
         "gameweek": 1,
         "highest_score": 131.0,
@@ -39,6 +114,113 @@
             "hit_cost": 0,
             "net": 73,
             "points": 73,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 80,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 9,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 1,
+                "position": 3
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 487676,
+                "points": 2,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 522047,
+                "points": 6,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 8,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 141746,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 2,
+                "position": 8
+              },
+              {
+                "minutes": 82,
+                "multiplier": 1,
+                "player_id": 502500,
+                "points": 0,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 1,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 11,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 489639,
+                "points": 6,
+                "position": 12
+              },
+              {
+                "minutes": 62,
+                "multiplier": 1,
+                "player_id": 472769,
+                "points": 2,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 60307,
+                "points": 2,
+                "position": 14
+              },
+              {
+                "minutes": 82,
+                "multiplier": 1,
+                "player_id": 244851,
+                "points": 13,
+                "position": 15
+              }
+            ],
             "total_points": 73
           },
           {
@@ -46,6 +228,113 @@
             "hit_cost": 0,
             "net": 64,
             "points": 64,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 80,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 9,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 209036,
+                "points": 10,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 219924,
+                "points": 2,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 8,
+                "position": 5
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 484420,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 141746,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 440993,
+                "points": 9,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223094,
+                "points": 2,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 1,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 11,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 112520,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 199798,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 244723,
+                "points": 1,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 60307,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 64
           },
           {
@@ -53,6 +342,113 @@
             "hit_cost": 0,
             "net": 66,
             "points": 66,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 204936,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 80,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 9,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 1,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 500040,
+                "points": 6,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 440993,
+                "points": 9,
+                "position": 6
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 484420,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 75,
+                "multiplier": 1,
+                "player_id": 439509,
+                "points": 6,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 8,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 11,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 1,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 1,
+                "position": 13
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 487676,
+                "points": 2,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 219924,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 66
           },
           {
@@ -60,6 +456,113 @@
             "hit_cost": 0,
             "net": 53,
             "points": 53,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 3,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 5,
+                "position": 2
+              },
+              {
+                "minutes": 62,
+                "multiplier": 1,
+                "player_id": 472769,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 0,
+                "multiplier": 1,
+                "player_id": 231416,
+                "points": 0,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 84450,
+                "points": 9,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437730,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 430871,
+                "points": 2,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 8,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 169432,
+                "points": 5,
+                "position": 10
+              },
+              {
+                "minutes": 82,
+                "multiplier": 1,
+                "player_id": 502500,
+                "points": 0,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 204936,
+                "points": 3,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 441164,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 106611,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 178301,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 53
           },
           {
@@ -67,6 +570,113 @@
             "hit_cost": 0,
             "net": 67,
             "points": 67,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 485055,
+                "points": 2,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223827,
+                "points": 0,
+                "position": 2
+              },
+              {
+                "minutes": 80,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 9,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 500040,
+                "points": 6,
+                "position": 4
+              },
+              {
+                "minutes": 82,
+                "multiplier": 1,
+                "player_id": 244851,
+                "points": 13,
+                "position": 5
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 430871,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 81,
+                "multiplier": 1,
+                "player_id": 244850,
+                "points": 8,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 2,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 475168,
+                "points": 11,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223094,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 457569,
+                "points": 2,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 451284,
+                "points": 1,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 108413,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 455084,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 67
           },
           {
@@ -74,6 +684,113 @@
             "hit_cost": 0,
             "net": 26,
             "points": 26,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 1,
+                "position": 2
+              },
+              {
+                "minutes": 54,
+                "multiplier": 1,
+                "player_id": 247348,
+                "points": 0,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 199796,
+                "points": -1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 219924,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 141746,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 67,
+                "multiplier": 1,
+                "player_id": 223340,
+                "points": 9,
+                "position": 7
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 484420,
+                "points": 2,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223094,
+                "points": 2,
+                "position": 9
+              },
+              {
+                "minutes": 82,
+                "multiplier": 1,
+                "player_id": 502500,
+                "points": 0,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 199798,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 153366,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 108413,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 26
           },
           {
@@ -81,6 +798,113 @@
             "hit_cost": 0,
             "net": 68,
             "points": 68,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 204936,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 80,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 9,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 500040,
+                "points": 6,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 469142,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437730,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 65,
+                "multiplier": 1,
+                "player_id": 153682,
+                "points": 3,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 215413,
+                "points": 11,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 2,
+                "position": 8
+              },
+              {
+                "minutes": 75,
+                "multiplier": 1,
+                "player_id": 184029,
+                "points": 11,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 11,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 1,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 1,
+                "position": 13
+              },
+              {
+                "minutes": 66,
+                "multiplier": 1,
+                "player_id": 441264,
+                "points": 2,
+                "position": 14
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 487676,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 68
           },
           {
@@ -88,6 +912,113 @@
             "hit_cost": 0,
             "net": 45,
             "points": 45,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 485055,
+                "points": 2,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 80,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 9,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 95658,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 81,
+                "multiplier": 1,
+                "player_id": 244850,
+                "points": 8,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 446008,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 511499,
+                "points": 2,
+                "position": 8
+              },
+              {
+                "minutes": 85,
+                "multiplier": 1,
+                "player_id": 195546,
+                "points": 2,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 11,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 219168,
+                "points": 2,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 204936,
+                "points": 3,
+                "position": 12
+              },
+              {
+                "minutes": 66,
+                "multiplier": 0,
+                "player_id": 441264,
+                "points": 2,
+                "position": 13
+              },
+              {
+                "minutes": 81,
+                "multiplier": 0,
+                "player_id": 441302,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 62,
+                "multiplier": 0,
+                "player_id": 472769,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 45
           },
           {
@@ -95,6 +1026,113 @@
             "hit_cost": 0,
             "net": 46,
             "points": 46,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244723,
+                "points": 1,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 95658,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 75,
+                "multiplier": 1,
+                "player_id": 439509,
+                "points": 6,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 440993,
+                "points": 9,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 60307,
+                "points": 2,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 11,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 199798,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 449429,
+                "points": 2,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 631786,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 46
           },
           {
@@ -102,6 +1140,113 @@
             "hit_cost": 0,
             "net": 63,
             "points": 63,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 5,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437499,
+                "points": 6,
+                "position": 3
+              },
+              {
+                "minutes": 81,
+                "multiplier": 1,
+                "player_id": 441302,
+                "points": 0,
+                "position": 4
+              },
+              {
+                "minutes": 80,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 9,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 85,
+                "multiplier": 1,
+                "player_id": 195546,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 27,
+                "multiplier": 1,
+                "player_id": 466052,
+                "points": 8,
+                "position": 8
+              },
+              {
+                "minutes": 22,
+                "multiplier": 1,
+                "player_id": 172780,
+                "points": 1,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 475168,
+                "points": 11,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 219168,
+                "points": 2,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 111234,
+                "points": 7,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 83299,
+                "points": 6,
+                "position": 13
+              },
+              {
+                "minutes": 75,
+                "multiplier": 0,
+                "player_id": 449434,
+                "points": 9,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 169432,
+                "points": 5,
+                "position": 15
+              }
+            ],
             "total_points": 63
           },
           {
@@ -109,6 +1254,113 @@
             "hit_cost": 0,
             "net": 33,
             "points": 33,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 489639,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 1,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 219924,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 469142,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 5,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 23,
+                "multiplier": 1,
+                "player_id": 508395,
+                "points": 1,
+                "position": 7
+              },
+              {
+                "minutes": 75,
+                "multiplier": 1,
+                "player_id": 184029,
+                "points": 11,
+                "position": 8
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 430871,
+                "points": 2,
+                "position": 9
+              },
+              {
+                "minutes": 82,
+                "multiplier": 2,
+                "player_id": 502500,
+                "points": 0,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 482973,
+                "points": 2,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 66,
+                "multiplier": 0,
+                "player_id": 167512,
+                "points": 1,
+                "position": 13
+              },
+              {
+                "minutes": 85,
+                "multiplier": 0,
+                "player_id": 514254,
+                "points": 6,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 223094,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 33
           },
           {
@@ -116,6 +1368,113 @@
             "hit_cost": 0,
             "net": 59,
             "points": 59,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 204936,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 209036,
+                "points": 10,
+                "position": 3
+              },
+              {
+                "minutes": 0,
+                "multiplier": 1,
+                "player_id": 231416,
+                "points": 0,
+                "position": 4
+              },
+              {
+                "minutes": 67,
+                "multiplier": 1,
+                "player_id": 204480,
+                "points": 3,
+                "position": 5
+              },
+              {
+                "minutes": 81,
+                "multiplier": 1,
+                "player_id": 244850,
+                "points": 8,
+                "position": 6
+              },
+              {
+                "minutes": 62,
+                "multiplier": 1,
+                "player_id": 494595,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466525,
+                "points": 13,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 540324,
+                "points": 3,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 11,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 155503,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 441164,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 224117,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 538638,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 59
           },
           {
@@ -123,6 +1482,113 @@
             "hit_cost": 0,
             "net": 54,
             "points": 54,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 489639,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 477424,
+                "points": 9,
+                "position": 2
+              },
+              {
+                "minutes": 80,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 9,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244723,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 222531,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437730,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 8,
+                "position": 8
+              },
+              {
+                "minutes": 82,
+                "multiplier": 1,
+                "player_id": 502500,
+                "points": 0,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 11,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 60307,
+                "points": 2,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 451284,
+                "points": 1,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 54
           },
           {
@@ -130,6 +1596,113 @@
             "hit_cost": 0,
             "net": 51,
             "points": 51,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 477424,
+                "points": 9,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 5,
+                "position": 4
+              },
+              {
+                "minutes": 20,
+                "multiplier": 1,
+                "player_id": 445087,
+                "points": 1,
+                "position": 5
+              },
+              {
+                "minutes": 10,
+                "multiplier": 1,
+                "player_id": 572584,
+                "points": 1,
+                "position": 6
+              },
+              {
+                "minutes": 62,
+                "multiplier": 1,
+                "player_id": 215379,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 75,
+                "multiplier": 1,
+                "player_id": 184029,
+                "points": 11,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 2,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 8,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 2,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 470313,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 108413,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 517052,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 51
           },
           {
@@ -137,15 +1710,129 @@
             "hit_cost": 0,
             "net": 46,
             "points": 46,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 5,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 209036,
+                "points": 10,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 216094,
+                "points": 0,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 432422,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 25,
+                "multiplier": 1,
+                "player_id": 448047,
+                "points": 1,
+                "position": 7
+              },
+              {
+                "minutes": 66,
+                "multiplier": 1,
+                "player_id": 166989,
+                "points": 2,
+                "position": 8
+              },
+              {
+                "minutes": 75,
+                "multiplier": 1,
+                "player_id": 155408,
+                "points": 3,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 11,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 473284,
+                "points": 10,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 578153,
+                "points": 2,
+                "position": 13
+              },
+              {
+                "minutes": 74,
+                "multiplier": 0,
+                "player_id": 222683,
+                "points": 3,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 169432,
+                "points": 5,
+                "position": 15
+              }
+            ],
             "total_points": 46
           }
         ],
         "members_counted": 15,
         "members_mean_net": 54.266666666666666,
         "ours": {
+          "diagnostics": {
+            "autosub_recovery": null,
+            "captain_shortfall": 4.166051660516605,
+            "minutes_shortfall": null,
+            "zero_minute_starters": 2
+          },
           "hits": 0.0,
           "mode": "live",
           "net": 26.0,
+          "outcome_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9",
           "projected": 56.077499304365105,
           "scoring_basis": "named_eleven_no_autosubs",
           "vice_captain_named": false,
@@ -155,8 +1842,83 @@
       },
       {
         "average_entry_score": 81.0,
+        "comparisons": [
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "system",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "base",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "elite_xi",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "ownership_template",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "league_mean",
+            "net": 86.26666666666667,
+            "scoring_basis": "net",
+            "source_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9"
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "game_mean",
+            "net": 81.0,
+            "scoring_basis": "source_average",
+            "source_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9"
+          }
+        ],
         "data_checked": true,
         "deadline_utc": "2026-08-28T17:30:00Z",
+        "decision_record_status": "missing",
         "finished": true,
         "gameweek": 2,
         "highest_score": 161.0,
@@ -166,6 +1928,113 @@
             "hit_cost": 0,
             "net": 106,
             "points": 106,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 11,
+                "position": 2
+              },
+              {
+                "minutes": 72,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 88,
+                "multiplier": 1,
+                "player_id": 472769,
+                "points": 2,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 487676,
+                "points": 6,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 4,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 141746,
+                "points": 23,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 11,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244851,
+                "points": 7,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 502500,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 489639,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 177815,
+                "points": 8,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 522047,
+                "points": 4,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 60307,
+                "points": 13,
+                "position": 15
+              }
+            ],
             "total_points": 179
           },
           {
@@ -173,6 +2042,113 @@
             "hit_cost": 0,
             "net": 96,
             "points": 96,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 11,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 209036,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 465730,
+                "points": 0,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 4,
+                "position": 5
+              },
+              {
+                "minutes": 89,
+                "multiplier": 1,
+                "player_id": 484420,
+                "points": 3,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 23,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 440993,
+                "points": 4,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 13,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 8,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 112520,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 11,
+                "multiplier": 0,
+                "player_id": 199798,
+                "points": 1,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 60307,
+                "points": 13,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 160
           },
           {
@@ -180,6 +2156,113 @@
             "hit_cost": 0,
             "net": 96,
             "points": 96,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 204936,
+                "points": 0,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 11,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 465730,
+                "points": 0,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 487676,
+                "points": 6,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 141746,
+                "points": 23,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 440993,
+                "points": 4,
+                "position": 6
+              },
+              {
+                "minutes": 89,
+                "multiplier": 1,
+                "player_id": 484420,
+                "points": 3,
+                "position": 7
+              },
+              {
+                "minutes": 45,
+                "multiplier": 1,
+                "player_id": 439509,
+                "points": 0,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 4,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223094,
+                "points": 13,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 72,
+                "multiplier": 0,
+                "player_id": 106760,
+                "points": 2,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 177815,
+                "points": 8,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 162
           },
           {
@@ -187,6 +2270,113 @@
             "hit_cost": 0,
             "net": 59,
             "points": 59,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 8,
+                "position": 2
+              },
+              {
+                "minutes": 88,
+                "multiplier": 1,
+                "player_id": 472769,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 441164,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 231416,
+                "points": 0,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437730,
+                "points": 5,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 11,
+                "position": 7
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 430871,
+                "points": 9,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 4,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 84450,
+                "points": 6,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 169432,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 204936,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 106611,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 178301,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 502500,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 112
           },
           {
@@ -194,6 +2384,113 @@
             "hit_cost": 0,
             "net": 97,
             "points": 97,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 485055,
+                "points": 1,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223827,
+                "points": 8,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 11,
+                "position": 3
+              },
+              {
+                "minutes": 78,
+                "multiplier": 1,
+                "player_id": 500040,
+                "points": 6,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244851,
+                "points": 7,
+                "position": 5
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 430871,
+                "points": 9,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244850,
+                "points": 5,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 11,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 475168,
+                "points": 9,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223094,
+                "points": 13,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 8,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 457569,
+                "points": 3,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 451284,
+                "points": 2,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 108413,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 455084,
+                "points": 6,
+                "position": 15
+              }
+            ],
             "total_points": 164
           },
           {
@@ -201,6 +2498,113 @@
             "hit_cost": 0,
             "net": 96,
             "points": 96,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 72,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 77,
+                "multiplier": 1,
+                "player_id": 199796,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 11,
+                "multiplier": 1,
+                "player_id": 199798,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 141746,
+                "points": 23,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223340,
+                "points": 11,
+                "position": 6
+              },
+              {
+                "minutes": 89,
+                "multiplier": 1,
+                "player_id": 484420,
+                "points": 3,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 577725,
+                "points": 2,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223094,
+                "points": 13,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 502500,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 8,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 247348,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 153366,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 122
           },
           {
@@ -208,6 +2612,113 @@
             "hit_cost": 0,
             "net": 78,
             "points": 78,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 204936,
+                "points": 0,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 11,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 191866,
+                "points": 3,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 487676,
+                "points": 6,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437730,
+                "points": 5,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 215413,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 11,
+                "position": 7
+              },
+              {
+                "minutes": 70,
+                "multiplier": 1,
+                "player_id": 184029,
+                "points": 3,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 13,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 10
+              },
+              {
+                "minutes": 63,
+                "multiplier": 1,
+                "player_id": 441264,
+                "points": 2,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 45,
+                "multiplier": 0,
+                "player_id": 153682,
+                "points": 1,
+                "position": 13
+              },
+              {
+                "minutes": 72,
+                "multiplier": 0,
+                "player_id": 106760,
+                "points": 2,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 469142,
+                "points": 1,
+                "position": 15
+              }
+            ],
             "total_points": 146
           },
           {
@@ -215,6 +2726,113 @@
             "hit_cost": 0,
             "net": 100,
             "points": 100,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 485055,
+                "points": 1,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 1,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 11,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 95658,
+                "points": 4,
+                "position": 4
+              },
+              {
+                "minutes": 88,
+                "multiplier": 1,
+                "player_id": 472769,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244850,
+                "points": 5,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 141746,
+                "points": 23,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 11,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 219168,
+                "points": 8,
+                "position": 10
+              },
+              {
+                "minutes": 63,
+                "multiplier": 1,
+                "player_id": 441264,
+                "points": 2,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 204936,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 195546,
+                "points": 2,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 441302,
+                "points": 1,
+                "position": 14
+              },
+              {
+                "minutes": 67,
+                "multiplier": 0,
+                "player_id": 511499,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 145
           },
           {
@@ -222,6 +2840,113 @@
             "hit_cost": 0,
             "net": 97,
             "points": 97,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 1,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244723,
+                "points": 0,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 95658,
+                "points": 4,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 23,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 11,
+                "position": 6
+              },
+              {
+                "minutes": 45,
+                "multiplier": 1,
+                "player_id": 439509,
+                "points": 0,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 440993,
+                "points": 4,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 60307,
+                "points": 13,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 13,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 11,
+                "multiplier": 0,
+                "player_id": 199798,
+                "points": 1,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 449429,
+                "points": -1,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 631786,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 143
           },
           {
@@ -229,6 +2954,113 @@
             "hit_cost": 0,
             "net": 115,
             "points": 115,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 111234,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 8,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437499,
+                "points": 1,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 11,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 141746,
+                "points": 23,
+                "position": 5
+              },
+              {
+                "minutes": 81,
+                "multiplier": 1,
+                "player_id": 449434,
+                "points": 8,
+                "position": 6
+              },
+              {
+                "minutes": 81,
+                "multiplier": 1,
+                "player_id": 466052,
+                "points": 14,
+                "position": 7
+              },
+              {
+                "minutes": 87,
+                "multiplier": 1,
+                "player_id": 249231,
+                "points": 6,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 169432,
+                "points": 1,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 219168,
+                "points": 8,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 154561,
+                "points": 6,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 83299,
+                "points": -1,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 195546,
+                "points": 2,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 441302,
+                "points": 1,
+                "position": 15
+              }
+            ],
             "total_points": 178
           },
           {
@@ -236,6 +3068,113 @@
             "hit_cost": 0,
             "net": 69,
             "points": 69,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 489639,
+                "points": 0,
+                "position": 1
+              },
+              {
+                "minutes": 72,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 469142,
+                "points": 1,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 8,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 23,
+                "position": 5
+              },
+              {
+                "minutes": 70,
+                "multiplier": 1,
+                "player_id": 184029,
+                "points": 3,
+                "position": 6
+              },
+              {
+                "minutes": 79,
+                "multiplier": 1,
+                "player_id": 430871,
+                "points": 9,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 514254,
+                "points": 5,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 502500,
+                "points": 2,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 482973,
+                "points": 1,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223094,
+                "points": 13,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 167512,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 2,
+                "position": 14
+              },
+              {
+                "minutes": 21,
+                "multiplier": 0,
+                "player_id": 508395,
+                "points": 1,
+                "position": 15
+              }
+            ],
             "total_points": 102
           },
           {
@@ -243,6 +3182,113 @@
             "hit_cost": 0,
             "net": 57,
             "points": 57,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 204936,
+                "points": 0,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 1,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 209036,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 231416,
+                "points": 0,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 441164,
+                "points": 1,
+                "position": 5
+              },
+              {
+                "minutes": 84,
+                "multiplier": 1,
+                "player_id": 204480,
+                "points": 5,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244850,
+                "points": 5,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 494595,
+                "points": 4,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466525,
+                "points": 4,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 13,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 155503,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 224117,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 82,
+                "multiplier": 0,
+                "player_id": 540324,
+                "points": 6,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 538638,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 116
           },
           {
@@ -250,6 +3296,113 @@
             "hit_cost": 0,
             "net": 86,
             "points": 86,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 489639,
+                "points": 0,
+                "position": 1
+              },
+              {
+                "minutes": 74,
+                "multiplier": 1,
+                "player_id": 477424,
+                "points": 5,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 11,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244723,
+                "points": 0,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 222531,
+                "points": 13,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437730,
+                "points": 5,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 11,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 4,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 502500,
+                "points": 2,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 13,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 60307,
+                "points": 13,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 451284,
+                "points": 2,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 140
           },
           {
@@ -257,6 +3410,113 @@
             "hit_cost": 4,
             "net": 71,
             "points": 75,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 74,
+                "multiplier": 1,
+                "player_id": 477424,
+                "points": 5,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 1,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 8,
+                "position": 4
+              },
+              {
+                "minutes": 13,
+                "multiplier": 1,
+                "player_id": 445087,
+                "points": 0,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 577725,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 70,
+                "multiplier": 1,
+                "player_id": 184029,
+                "points": 3,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 11,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 4,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 13,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 17,
+                "multiplier": 0,
+                "player_id": 572584,
+                "points": 1,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 108413,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 19,
+                "multiplier": 0,
+                "player_id": 470313,
+                "points": 4,
+                "position": 15
+              }
+            ],
             "total_points": 122
           },
           {
@@ -264,6 +3524,113 @@
             "hit_cost": 0,
             "net": 71,
             "points": 71,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 473284,
+                "points": 10,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 8,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 491279,
+                "points": 0,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 209036,
+                "points": 2,
+                "position": 4
+              },
+              {
+                "minutes": 70,
+                "multiplier": 1,
+                "player_id": 216094,
+                "points": 1,
+                "position": 5
+              },
+              {
+                "minutes": 58,
+                "multiplier": 1,
+                "player_id": 606930,
+                "points": 1,
+                "position": 6
+              },
+              {
+                "minutes": 70,
+                "multiplier": 1,
+                "player_id": 200089,
+                "points": 3,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 166989,
+                "points": 4,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244851,
+                "points": 7,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 13,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 9,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 154561,
+                "points": 6,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 448047,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 204580,
+                "points": 1,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 169432,
+                "points": 1,
+                "position": 15
+              }
+            ],
             "total_points": 117
           }
         ],
@@ -274,8 +3641,83 @@
       },
       {
         "average_entry_score": 51.0,
+        "comparisons": [
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "system",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "base",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "elite_xi",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "ownership_template",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "league_mean",
+            "net": 58.666666666666664,
+            "scoring_basis": "net",
+            "source_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9"
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "game_mean",
+            "net": 51.0,
+            "scoring_basis": "source_average",
+            "source_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9"
+          }
+        ],
         "data_checked": true,
         "deadline_utc": "2026-09-04T17:30:00Z",
+        "decision_record_status": "missing",
         "finished": true,
         "gameweek": 3,
         "highest_score": 119.0,
@@ -285,6 +3727,113 @@
             "hit_cost": 0,
             "net": 33,
             "points": 33,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 66,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 4,
+                "position": 3
+              },
+              {
+                "minutes": 26,
+                "multiplier": 1,
+                "player_id": 487676,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 3,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 65,
+                "multiplier": 2,
+                "player_id": 466052,
+                "points": 3,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 8,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 60307,
+                "points": 1,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 502500,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 72,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 489639,
+                "points": 3,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 472769,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 522047,
+                "points": 4,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 475168,
+                "points": 1,
+                "position": 15
+              }
+            ],
             "total_points": 212
           },
           {
@@ -292,6 +3841,113 @@
             "hit_cost": 0,
             "net": 51,
             "points": 51,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 66,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 209036,
+                "points": 8,
+                "position": 3
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 465730,
+                "points": 4,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 3,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 60307,
+                "points": 1,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 484420,
+                "points": 8,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 9,
+                "position": 9
+              },
+              {
+                "minutes": 72,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 1,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 112520,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 199798,
+                "points": 4,
+                "position": 13
+              },
+              {
+                "minutes": 86,
+                "multiplier": 0,
+                "player_id": 440993,
+                "points": 3,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 3,
+                "position": 15
+              }
+            ],
             "total_points": 211
           },
           {
@@ -299,6 +3955,113 @@
             "hit_cost": 0,
             "net": 52,
             "points": 52,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 204936,
+                "points": 7,
+                "position": 1
+              },
+              {
+                "minutes": 66,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 465730,
+                "points": 4,
+                "position": 3
+              },
+              {
+                "minutes": 26,
+                "multiplier": 1,
+                "player_id": 487676,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 86,
+                "multiplier": 1,
+                "player_id": 440993,
+                "points": 3,
+                "position": 6
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 449434,
+                "points": 1,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 3,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 3,
+                "player_id": 223094,
+                "points": 9,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 1,
+                "position": 10
+              },
+              {
+                "minutes": 72,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 439509,
+                "points": 5,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 106760,
+                "points": 4,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 3,
+                "position": 15
+              }
+            ],
             "total_points": 214
           },
           {
@@ -306,6 +4069,113 @@
             "hit_cost": 0,
             "net": 44,
             "points": 44,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 154561,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 441164,
+                "points": 7,
+                "position": 3
+              },
+              {
+                "minutes": 77,
+                "multiplier": 1,
+                "player_id": 231416,
+                "points": 2,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 84450,
+                "points": 3,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437730,
+                "points": 6,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 8,
+                "position": 7
+              },
+              {
+                "minutes": 69,
+                "multiplier": 1,
+                "player_id": 430871,
+                "points": 3,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 3,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 169432,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 502500,
+                "points": 2,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 204936,
+                "points": 7,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 472769,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 106611,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 178301,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 156
           },
           {
@@ -313,6 +4183,113 @@
             "hit_cost": 0,
             "net": 54,
             "points": 54,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 200720,
+                "points": 2,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 191866,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 6,
+                "position": 3
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 465730,
+                "points": 4,
+                "position": 4
+              },
+              {
+                "minutes": 65,
+                "multiplier": 1,
+                "player_id": 466052,
+                "points": 3,
+                "position": 5
+              },
+              {
+                "minutes": 24,
+                "multiplier": 1,
+                "player_id": 209244,
+                "points": 1,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 494595,
+                "points": 3,
+                "position": 7
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 449434,
+                "points": 1,
+                "position": 8
+              },
+              {
+                "minutes": 63,
+                "multiplier": 1,
+                "player_id": 219168,
+                "points": 13,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 9,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 216646,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 457569,
+                "points": 1,
+                "position": 12
+              },
+              {
+                "minutes": 66,
+                "multiplier": 0,
+                "player_id": 466075,
+                "points": 2,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 60307,
+                "points": 1,
+                "position": 14
+              },
+              {
+                "minutes": 29,
+                "multiplier": 0,
+                "player_id": 434752,
+                "points": 1,
+                "position": 15
+              }
+            ],
             "total_points": 218
           },
           {
@@ -320,6 +4297,113 @@
             "hit_cost": 0,
             "net": 52,
             "points": 52,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 4,
+                "position": 2
+              },
+              {
+                "minutes": 31,
+                "multiplier": 1,
+                "player_id": 247348,
+                "points": 1,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 463726,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 89,
+                "multiplier": 1,
+                "player_id": 223340,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 484420,
+                "points": 8,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 577725,
+                "points": 10,
+                "position": 8
+              },
+              {
+                "minutes": 72,
+                "multiplier": 1,
+                "player_id": 177815,
+                "points": 1,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 9,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 502500,
+                "points": 2,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 199798,
+                "points": 4,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 153366,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 3,
+                "position": 15
+              }
+            ],
             "total_points": 174
           },
           {
@@ -327,6 +4411,113 @@
             "hit_cost": 0,
             "net": 59,
             "points": 59,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 204936,
+                "points": 7,
+                "position": 1
+              },
+              {
+                "minutes": 66,
+                "multiplier": 1,
+                "player_id": 466075,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 191866,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 26,
+                "multiplier": 1,
+                "player_id": 487676,
+                "points": 1,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437730,
+                "points": 6,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 215413,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 8,
+                "position": 7
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 184029,
+                "points": 10,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 9,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 1,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 441264,
+                "points": 2,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 17,
+                "multiplier": 0,
+                "player_id": 153682,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 106760,
+                "points": 4,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 469142,
+                "points": 8,
+                "position": 15
+              }
+            ],
             "total_points": 205
           },
           {
@@ -334,6 +4525,113 @@
             "hit_cost": 0,
             "net": 68,
             "points": 68,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 116535,
+                "points": 8,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 4,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 606702,
+                "points": 5,
+                "position": 3
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 465730,
+                "points": 4,
+                "position": 4
+              },
+              {
+                "minutes": 74,
+                "multiplier": 1,
+                "player_id": 441302,
+                "points": 7,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 6
+              },
+              {
+                "minutes": 69,
+                "multiplier": 1,
+                "player_id": 176297,
+                "points": 3,
+                "position": 7
+              },
+              {
+                "minutes": 65,
+                "multiplier": 1,
+                "player_id": 466052,
+                "points": 3,
+                "position": 8
+              },
+              {
+                "minutes": 24,
+                "multiplier": 1,
+                "player_id": 209244,
+                "points": 1,
+                "position": 9
+              },
+              {
+                "minutes": 63,
+                "multiplier": 1,
+                "player_id": 219168,
+                "points": 13,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 9,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 40383,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 606798,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 593174,
+                "points": 0,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 645618,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 213
           },
           {
@@ -341,6 +4639,113 @@
             "hit_cost": 0,
             "net": 57,
             "points": 57,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 6,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 191866,
+                "points": 2,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 95658,
+                "points": 2,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 8,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 439509,
+                "points": 5,
+                "position": 7
+              },
+              {
+                "minutes": 45,
+                "multiplier": 1,
+                "player_id": 513545,
+                "points": 0,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 60307,
+                "points": 1,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 3,
+                "player_id": 223094,
+                "points": 9,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 73,
+                "multiplier": 0,
+                "player_id": 244723,
+                "points": 15,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 449429,
+                "points": 1,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 631786,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 200
           },
           {
@@ -348,6 +4753,113 @@
             "hit_cost": 0,
             "net": 44,
             "points": 44,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 111234,
+                "points": 1,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 2,
+                "position": 2
+              },
+              {
+                "minutes": 74,
+                "multiplier": 1,
+                "player_id": 441302,
+                "points": 7,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 83299,
+                "points": 5,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 449434,
+                "points": 1,
+                "position": 6
+              },
+              {
+                "minutes": 65,
+                "multiplier": 1,
+                "player_id": 466052,
+                "points": 3,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 249231,
+                "points": 2,
+                "position": 8
+              },
+              {
+                "minutes": 74,
+                "multiplier": 2,
+                "player_id": 195546,
+                "points": 3,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 169432,
+                "points": 2,
+                "position": 10
+              },
+              {
+                "minutes": 63,
+                "multiplier": 1,
+                "player_id": 219168,
+                "points": 13,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 154561,
+                "points": 3,
+                "position": 12
+              },
+              {
+                "minutes": 66,
+                "multiplier": 0,
+                "player_id": 466075,
+                "points": 2,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 475168,
+                "points": 1,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 437499,
+                "points": 2,
+                "position": 15
+              }
+            ],
             "total_points": 222
           },
           {
@@ -355,6 +4867,113 @@
             "hit_cost": 0,
             "net": 68,
             "points": 68,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 489639,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 106760,
+                "points": 4,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 469142,
+                "points": 8,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 2,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 141746,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 184029,
+                "points": 10,
+                "position": 6
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 449434,
+                "points": 1,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 514254,
+                "points": 2,
+                "position": 8
+              },
+              {
+                "minutes": 63,
+                "multiplier": 2,
+                "player_id": 219168,
+                "points": 13,
+                "position": 9
+              },
+              {
+                "minutes": 31,
+                "multiplier": 1,
+                "player_id": 482973,
+                "points": 1,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 223094,
+                "points": 9,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 167512,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 3,
+                "position": 14
+              },
+              {
+                "minutes": 45,
+                "multiplier": 0,
+                "player_id": 508395,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 170
           },
           {
@@ -362,6 +4981,113 @@
             "hit_cost": 4,
             "net": 74,
             "points": 78,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 204936,
+                "points": 7,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 6,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 209036,
+                "points": 8,
+                "position": 3
+              },
+              {
+                "minutes": 77,
+                "multiplier": 1,
+                "player_id": 231416,
+                "points": 2,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 204480,
+                "points": 5,
+                "position": 5
+              },
+              {
+                "minutes": 86,
+                "multiplier": 1,
+                "player_id": 244850,
+                "points": 6,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 466525,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 494595,
+                "points": 3,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 1,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 9,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 216646,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 489639,
+                "points": 3,
+                "position": 12
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 441164,
+                "points": 7,
+                "position": 13
+              },
+              {
+                "minutes": 81,
+                "multiplier": 1,
+                "player_id": 540324,
+                "points": 5,
+                "position": 14
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 465730,
+                "points": 4,
+                "position": 15
+              }
+            ],
             "total_points": 190
           },
           {
@@ -369,6 +5095,113 @@
             "hit_cost": 0,
             "net": 71,
             "points": 71,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 489639,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 477424,
+                "points": 8,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 146426,
+                "points": 5,
+                "position": 3
+              },
+              {
+                "minutes": 73,
+                "multiplier": 1,
+                "player_id": 244723,
+                "points": 15,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 222531,
+                "points": 3,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 437730,
+                "points": 6,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 8,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 424876,
+                "points": 3,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 60307,
+                "points": 1,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 2,
+                "player_id": 223094,
+                "points": 9,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 661313,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 451284,
+                "points": 3,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 219924,
+                "points": 3,
+                "position": 15
+              }
+            ],
             "total_points": 211
           },
           {
@@ -376,6 +5209,113 @@
             "hit_cost": 0,
             "net": 84,
             "points": 84,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 154561,
+                "points": 3,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 477424,
+                "points": 8,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 97032,
+                "points": 6,
+                "position": 3
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 226597,
+                "points": 2,
+                "position": 4
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 445087,
+                "points": 8,
+                "position": 5
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 577725,
+                "points": 10,
+                "position": 6
+              },
+              {
+                "minutes": 76,
+                "multiplier": 1,
+                "player_id": 184029,
+                "points": 10,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 446008,
+                "points": 8,
+                "position": 8
+              },
+              {
+                "minutes": 24,
+                "multiplier": 1,
+                "player_id": 209244,
+                "points": 1,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 3,
+                "player_id": 223094,
+                "points": 9,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 1,
+                "position": 11
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 67089,
+                "points": 0,
+                "position": 12
+              },
+              {
+                "minutes": 12,
+                "multiplier": 0,
+                "player_id": 572584,
+                "points": 1,
+                "position": 13
+              },
+              {
+                "minutes": 16,
+                "multiplier": 0,
+                "player_id": 108413,
+                "points": 1,
+                "position": 14
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 470313,
+                "points": 0,
+                "position": 15
+              }
+            ],
             "total_points": 206
           },
           {
@@ -383,28 +5323,468 @@
             "hit_cost": 0,
             "net": 69,
             "points": 69,
+            "settled_picks": [
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 473284,
+                "points": 6,
+                "position": 1
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 491279,
+                "points": 9,
+                "position": 2
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 209036,
+                "points": 8,
+                "position": 3
+              },
+              {
+                "minutes": 70,
+                "multiplier": 1,
+                "player_id": 606930,
+                "points": 8,
+                "position": 4
+              },
+              {
+                "minutes": 62,
+                "multiplier": 1,
+                "player_id": 200089,
+                "points": 2,
+                "position": 5
+              },
+              {
+                "minutes": 75,
+                "multiplier": 1,
+                "player_id": 448047,
+                "points": 3,
+                "position": 6
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 166989,
+                "points": 2,
+                "position": 7
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 244851,
+                "points": 1,
+                "position": 8
+              },
+              {
+                "minutes": 90,
+                "multiplier": 3,
+                "player_id": 223094,
+                "points": 9,
+                "position": 9
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 475168,
+                "points": 1,
+                "position": 10
+              },
+              {
+                "minutes": 90,
+                "multiplier": 1,
+                "player_id": 169432,
+                "points": 2,
+                "position": 11
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 154561,
+                "points": 3,
+                "position": 12
+              },
+              {
+                "minutes": 0,
+                "multiplier": 0,
+                "player_id": 216094,
+                "points": 0,
+                "position": 13
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 226597,
+                "points": 2,
+                "position": 14
+              },
+              {
+                "minutes": 90,
+                "multiplier": 0,
+                "player_id": 204580,
+                "points": 11,
+                "position": 15
+              }
+            ],
             "total_points": 186
           }
         ],
         "members_counted": 15,
         "members_mean_net": 58.666666666666664,
         "ours": null,
-        "top100": {
-          "basis": "net",
-          "cohort_size": 100,
-          "final": true,
-          "gameweek": 3,
-          "hit_points": 4.0,
-          "mean_score": 68.83,
-          "picks_snapshot_id": "fpl-elite-picks-20260909T053428Z-5679674b5954"
-        }
+        "top100": null
+      },
+      {
+        "average_entry_score": null,
+        "comparisons": [
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "system",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "base",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "elite_xi",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "ownership_template",
+            "net": null,
+            "scoring_basis": null,
+            "source_snapshot_id": null
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "league_mean",
+            "net": null,
+            "scoring_basis": "net",
+            "source_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9"
+          },
+          {
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "kind": "game_mean",
+            "net": null,
+            "scoring_basis": "source_average",
+            "source_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9"
+          },
+          {
+            "advice_sha256": "31b8882cc0b3a16b976021d46e54ee5dca424cebffe5c261188937f0f1eceaf5",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 313686,
+            "expected_net": 54.276215395590754,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "d8af1e134542f8879dde7ba7bfa9aabc665845447527a6f0fbd489e071214640",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 2199732,
+            "expected_net": 57.433150461496425,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "4c143c3cde52e1ccb4c60c324b1a03de9804f2f24407c67715e3f0c5032c9a7f",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 2281624,
+            "expected_net": 57.008954625944824,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "f4f65908d181a25832026f2e4cc238b0f1c01a831104506bd8eff5b4bdd61b52",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 3832237,
+            "expected_net": 46.54539159350413,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "238e173a7369ead238675560c3769077d9c745f9eec32f6c960c01bd52413bb5",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 4287206,
+            "expected_net": 55.251806065821725,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "03b8e2f0505de7f6aa9c9124abd8d834328d51bb760ead98421e34152bbe80fc",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 5081114,
+            "expected_net": 54.97959044222908,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "79f7b996763bc6f87da9b731d948839d32d6bca066bfe6b9015fcf6a2e90f454",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 5349883,
+            "expected_net": 55.7482328824718,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "8b993bcef78a971e02dde22d81627645fbe4ab4ef2dac9e412541809f02f0ade",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 5662073,
+            "expected_net": 55.747372124614785,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "6903d8a4b48fcbfb4601cfa92a564ac9a75635d158298365e705228be6fd9f5b",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 6654210,
+            "expected_net": 57.23169133741597,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "2c7953860c6ad829ada804ae36a05030f2482ece64ad9453425a5a94a2c9064f",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 6879786,
+            "expected_net": 54.73268716741247,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "437c32daa9ca7cc313e1d93560721cdfd70af1adc0b047d22b6b8e6eb76ed3b0",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 6880255,
+            "expected_net": 55.72490845641053,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "bfff6ba639dd6c1df2f27dd55ea1c5fcf4053101487a4334848fc594896ec766",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 7018833,
+            "expected_net": 55.940961750765226,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "7dd922a69a5583c30adaff1de81a137ca52f52c1c12f2fc4c858b95dd94414b5",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 7252721,
+            "expected_net": 57.98431394155085,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "ef9e37cb1b1fd363efdde560e591d0a85b7188595a6665c1c5e59a72cb0ec745",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 8548384,
+            "expected_net": 55.60335549169234,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          },
+          {
+            "advice_sha256": "8b990e46ed3011c365406bc039963828b81e9ddfad079338612f2ce75b240a4d",
+            "diagnostics": {
+              "autosub_recovery": null,
+              "captain_shortfall": null,
+              "minutes_shortfall": null,
+              "zero_minute_starters": null
+            },
+            "entry_id": 8883467,
+            "expected_net": 54.87253641477099,
+            "kind": "member_advice",
+            "net": null,
+            "outcome_snapshot_id": null,
+            "scoring_basis": "official_autosub_captain_v2",
+            "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+          }
+        ],
+        "data_checked": false,
+        "deadline_utc": "2026-09-12T12:30:00Z",
+        "decision_record_status": "available",
+        "finished": false,
+        "gameweek": 4,
+        "highest_score": null,
+        "members": [],
+        "members_counted": 0,
+        "members_mean_net": null,
+        "ours": null,
+        "top100": null
       }
     ],
     "histories_held": 15,
     "league_id": 352490,
+    "recovery": {
+      "collection_purpose": "settled_outcomes_only",
+      "contract_version": "publication_recovery_v1",
+      "gw1_api_net": 26.0,
+      "gw1_original_reported_net": 26.0,
+      "gw1_publication_sha256": "cc607a6ea2166353c2b7f24d27e2daf72961e78679b1a60087f7cd93f580a31b",
+      "gw4_member_records": 15,
+      "historical_availability": "lost",
+      "missing_decision_gameweeks": [
+        2,
+        3
+      ]
+    },
     "registered_members": 15,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20260909T055021Z-94238cf346c5"
+    "source_snapshot_id": "fpl-live-20260910T185523Z-0f86edf4aed9"
   },
   "source_kind": "live"
 }

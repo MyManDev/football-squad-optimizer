@@ -78,10 +78,11 @@ _SHA = "ab" * 32
 #: The published envelope as it stands before any squad verdict exists. Written out
 #: rather than imported so that a widening shows up here as a diff, not as a pass.
 #:
-#: ``expected_points_cost_ceiling`` is the one entry added since this list was first
+#: ``expected_points_cost_ceiling`` was added after this list was first
 #: written, and it is a solver bound rather than a calibration reading: the most a
 #: strategy can cost, from the distance a stopped search left between the control it is
 #: priced against and that search's own bound. It carries nothing from a squad verdict.
+#: ``chip_recommendations`` adds independent expected-points alternatives, not a squad verdict.
 _PUBLISHED_ENVELOPE = frozenset(
     {
         "moves",
@@ -100,6 +101,7 @@ _PUBLISHED_ENVELOPE = frozenset(
         "starting_xi",
         "bench",
         "chip",
+        "chip_recommendations",
         "control_solver_status",
         "control_optimality_gap",
         "transfer_cap",

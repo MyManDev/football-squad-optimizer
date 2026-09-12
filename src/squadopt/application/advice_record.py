@@ -64,6 +64,7 @@ from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live.ledger import (
     prune_stale_staging,
     record_lock,
+    replace_retrying,
     staging_directory,
     verify_manifest,
     write_manifest,
@@ -389,6 +390,11 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
         "scoring_complete": bool(starting_xi and bench and captain is not None),
         "published_sha256": _sha256(advice.raw),
         "advice_sha256": _sha256(encoded),
+        **(
+            {"chip_recommendations": payload["chip_recommendations"]}
+            if "chip_recommendations" in payload
+            else {}
+        ),
     }
 
 
@@ -469,6 +475,13 @@ def build_member_advice_record(
     documents = [_advice_document(advice) for advice in published]
     for document in documents:
         named |= _player_ids(document)
+        chip_block = document.get("chip_recommendations")
+        if isinstance(chip_block, dict):
+            for row in chip_block["comparisons"]:
+                decision = row.get("decision")
+                if isinstance(decision, dict):
+                    for key in ("starting_xi", "bench"):
+                        named.update(int(player["player_id"]) for player in decision[key])
     players, unresolved = _players_block(projection, named)
     diagnostics = projection.diagnostics
     return {
@@ -884,7 +897,7 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
             write_manifest(staging, contract_version=MEMBER_ADVICE_RECORD_CONTRACT_VERSION)
             verify_manifest(staging)
             # One rename: the record exists complete or does not exist at all.
-            os.replace(staging, directory)
+            replace_retrying(staging, directory)
         except BaseException:
             shutil.rmtree(staging, ignore_errors=True)
             raise

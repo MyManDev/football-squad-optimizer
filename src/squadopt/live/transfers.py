@@ -183,25 +183,29 @@ class _MemberPlanningPolicy(TypedDict):
     chip_holding_value_points: Mapping[str, float]
 
 
-MEMBER_PLANNING_POLICY_ID: Final = "member_planning_policy_v2"
+MEMBER_PLANNING_POLICY_ID: Final = "member_planning_policy_v3"
 _MEMBER_PLANNING_POLICY_VALUES: Final[_MemberPlanningPolicy] = {
     "transfer_hit_cost_points": 8.0,
     "hit_points_charged": 4.0,
-    "banked_transfer_value_points": 0.0,
-    "horizon_discount_factor": 1.0,
+    "banked_transfer_value_points": 1.5,
+    "horizon_discount_factor": 0.84,
     "chip_holding_value_points": MappingProxyType({}),
 }
 MEMBER_PLANNING_POLICY: Final[Mapping[str, object]] = MappingProxyType(
     _MEMBER_PLANNING_POLICY_VALUES
 )
-"""The member path's planning policy, ``member_planning_policy_v2``: the rule values.
+"""The member path's planning policy, ``member_planning_policy_v3``.
+
+Owner-authorized initial settings (2026-09-10 roadmap, Phase 2): terminal banked FT
+value 1.5 and horizon discount 0.84. These are selected starting values, not a measured
+improvement. See docs/contracts/member_chip_recommendations_v1.md for the objective
+and publication boundaries. The historical evidence below concerns earlier policies.
 
 Every mid-season member decision plans one week ahead under these five controls; the
 rest of ``TransferPlanningConfig`` is the season's rules (the free-transfer cap, a
 transfer cap when a caller sets one) and the planner's contract. A banked free transfer
-is worth nothing past the week, a single week is not discounted, and no chip carries a
-holding value because the member path offers no chip unless the operator names one
-(``_chip_availability``), which leaves holding values inert here.
+has terminal value 1.5. Week offset k is discounted by 0.84**k; the first week retains
+weight 1. Chip alternatives are independent comparisons with no terminal chip value.
 
 The two hit numbers are the policy's one departure from the dataclass defaults, and they
 mean different things. ``hit_points_charged`` is 4.0, the points the game takes off the
@@ -266,7 +270,7 @@ Provenance — what each measurement said about moving them, in date order:
   an interior optimum; the next measurement should widen the range (4-12) before it is
   read as one.
 
-Revisit rule. These values change only in a pull request that cites a measurement on
+Historical v2 revisit rule. Those values changed only in a pull request that cited a measurement on
 the lookahead-1 season chain with 2025-26 included as a season, and that re-pins the
 site's pinned fixture under ``web/public/data`` in the same commit, because a changed
 policy changes what every member is told. The reading is re-examined at gameweek 19 from

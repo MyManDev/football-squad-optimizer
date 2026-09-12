@@ -120,7 +120,13 @@ def _ids(value: object) -> tuple[int, ...]:
 
 
 def select_record(
-    root: Path, *, season: str, gameweek: int, entry_id: int, deadline_utc: str
+    root: Path,
+    *,
+    season: str,
+    gameweek: int,
+    entry_id: int,
+    deadline_utc: str,
+    as_of_utc: str | None = None,
 ) -> dict[str, Any] | None:
     """Select the latest recorded publication, checking both clocks and all identities.
 
@@ -128,6 +134,7 @@ def select_record(
     An unreadable candidate is refused instead of silently falling back to an older one.
     """
     deadline = as_instant(normalize_utc_timestamp(deadline_utc, label="deadline_utc"))
+    cutoff = as_instant(as_of_utc) if as_of_utc is not None else None
     candidates: list[tuple[datetime, dict[str, Any]]] = []
     for capture in recorded_captures(root, season, gameweek, entry_id):
         record = load_member_advice_record(root, season, gameweek, entry_id, capture.snapshot_id)
@@ -146,7 +153,11 @@ def select_record(
         published = as_instant(normalize_utc_timestamp(stamp, label="generated_at_utc"))
         if published < capture.instant:
             raise SuggestionEvaluationError("Recorded publication precedes its capture.")
-        if capture.instant < deadline and published < deadline:
+        if (
+            capture.instant < deadline
+            and published < deadline
+            and (cutoff is None or published <= cutoff)
+        ):
             try:
                 _advice(record)
             except SuggestionEvaluationError as error:

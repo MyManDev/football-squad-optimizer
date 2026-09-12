@@ -3,6 +3,7 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
+import { ChipRecommendations } from "../advice/ChipRecommendations";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
   AdviceMove,
@@ -132,6 +133,7 @@ export function AdviceCard({
       ) : null}
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      <ChipRecommendations value={view.chip_recommendations} />
       {view.solver_status === "FEASIBLE" ? (
         <p className={styles.honesty}>
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}

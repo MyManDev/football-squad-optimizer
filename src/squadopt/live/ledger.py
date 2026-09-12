@@ -46,10 +46,12 @@ import pandas as pd
 
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
+from squadopt.evaluation.scoring import complete_optimization_decision
 from squadopt.live.errors import LedgerError as LedgerError
 from squadopt.live.recommendation import Projection
 from squadopt.live.report import Recommendation
 from squadopt.live.transfers import FREE_TRANSFERS_AFTER_OPENING, HeldSquad
+from squadopt.optimization import OptimizationResult, SolverStatus
 
 SEASON_LEDGER_CONTRACT_VERSION: Final = "season_ledger_v1"
 LOGGER = logging.getLogger(__name__)
@@ -264,6 +266,8 @@ def _verify_manifest(directory: Path) -> None:
 # call sites read better with them.
 digest_bytes = _digest
 """SHA-256 of some bytes, lowercase hex — the digest every manifest here records."""
+replace_retrying = _replace_retrying
+"""Replace a staged path with bounded retries for transient permission errors."""
 write_atomic = _write_atomic
 """Write bytes through a sibling temporary file and one rename."""
 staging_directory = _staging_directory
@@ -299,6 +303,19 @@ def record_decision(
             "immutable. A revised decision needs an explicit, separate record."
         )
 
+    frozen = complete_optimization_decision(
+        OptimizationResult(
+            solver_status=SolverStatus[recommendation.solver_status],
+            selected_squad=recommendation.squad,
+            starting_xi=recommendation.starting_xi,
+            bench=recommendation.bench,
+            captain=recommendation.captain,
+            total_cost_tenths=recommendation.total_cost_tenths,
+            projected_score=recommendation.projected_score,
+            objective_value=None,
+            diagnostics={},
+        )
+    )
     decision = {
         "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
         "snapshot_id": recommendation.snapshot_id,
@@ -316,6 +333,9 @@ def record_decision(
         "starting_xi_player_ids": [int(value) for value in recommendation.starting_xi["player_id"]],
         "bench_player_ids": [int(value) for value in recommendation.bench["player_id"]],
         "captain_player_id": int(recommendation.captain["player_id"]),
+        "vice_captain_player_id": int(str(frozen.vice_captain_id)),
+        "ordered_bench_player_ids": [int(str(player)) for player in frozen.bench],
+        "completion_policy": frozen.completion_policy,
         "total_cost_tenths": int(recommendation.total_cost_tenths),
         "projected_score": float(recommendation.projected_score),
         "unavailable_player_count": len(projection.unavailable_players),

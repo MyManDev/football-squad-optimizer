@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from squadopt.api.app import create_app
@@ -201,3 +202,40 @@ def test_the_committed_read_schemas_match_their_generators() -> None:
 
     assert json.loads(ADVICE_READ_SCHEMA_PATH.read_text(encoding="utf-8")) == advice_read_schema()
     assert json.loads(LEAGUE_STATE_SCHEMA_PATH.read_text(encoding="utf-8")) == league_state_schema()
+
+
+def test_chip_contract_is_checked_by_the_served_document_validator() -> None:
+    from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
+
+    document = json.loads(_valid_advice_document())
+    block = {
+        "contract_version": "member_chip_recommendations_v1",
+        "planning_policy_id": "member_planning_policy_v3",
+        "gameweeks": [3],
+        "control_solver_status": "OPTIMAL",
+        "control_optimality_gap": 0,
+        "comparisons": [
+            {
+                "chip": "3xc",
+                "available_from_gameweek": 20,
+                "last_usable_gameweek": 38,
+                "remaining": 1,
+                "action": "hold",
+                "gameweek": None,
+                "expected_points_gain": None,
+                "reason": "outside_horizon",
+                "solver_status": None,
+                "optimality_gap": None,
+                "decision": None,
+            }
+        ],
+    }
+    document["payload"]["chip_recommendations"] = block
+    validate_advice_document(json.dumps(document).encode())
+    block["contract_version"] = "unknown"
+    with pytest.raises(AdviceDocumentError):
+        validate_advice_document(json.dumps(document).encode())
+    block["contract_version"] = "member_chip_recommendations_v1"
+    block["comparisons"][0]["expected_points_gain"] = "not a price"
+    with pytest.raises(AdviceDocumentError):
+        validate_advice_document(json.dumps(document).encode())
