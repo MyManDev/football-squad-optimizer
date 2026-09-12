@@ -200,8 +200,6 @@ export interface EntryAdvice {
   mode: AdviceStrategy;
   window: WindowSize;
   source_snapshot_id: string | null;
-  /** The producer-stated squad basis; absent on older advice documents. */
-  squad_basis?: string;
   moves: AdviceMove[];
   /**
    * The week's hit charge, once: the game takes four points for each transfer beyond
