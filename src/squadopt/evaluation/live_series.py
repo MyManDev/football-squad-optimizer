@@ -53,6 +53,13 @@ and the correlation is not estimable, so the reading refuses instead of guessing
 carries no correlation, no effective count and no horizon, because zero correlation is the
 most optimistic answer available and a refusal that could be read as zero would understate
 the horizon by roughly the average number of members in a week.
+
+An estimable reading names the member-weeks it measured. A horizon is a statement about one
+set of records and is meaningless against any other set, so ``member_week_keys`` travels on
+the result, built from the rows the estimator consumed rather than from a second query that
+could reach further. ``docs/contracts/member_week_horizon_v1.md`` is where that set is
+compared, and each key names an advice digest and an outcome capture so a rescored week
+cannot pass as the week it replaced.
 """
 
 import math
@@ -66,6 +73,19 @@ from squadopt.evaluation.models import EvaluationValidationError
 
 LIVE_SERIES_METHOD_VERSION: Final = "member_week_cluster_power_v1"
 MINIMUM_WEEKS_FOR_CORRELATION: Final = 2
+
+# The committed measurement this instrument was built to be read beside, and the effect that
+# measurement records: the unconditional 147-fold minimum detectable effect at alpha 0.05 and
+# power 0.80. A live horizon quoted at any other effect is not comparable to that floor while
+# still looking comparable, so the target travels with the artifact that recorded it and a
+# test pins both to the artifact's own committed digits.
+BACKTEST_PRECISION_ARTIFACT: Final = "docs/measurement_instrument.json"
+BACKTEST_PRECISION_FLOOR_POINTS: Final = 3.488499380776099
+
+# Member-week keys are colon joined, so no part of one may carry the separator. The published
+# contract compares whole keys for equality; an ambiguous join would let two different
+# member-weeks spell the same key and quietly satisfy that comparison.
+KEY_SEPARATOR: Final = ":"
 
 RefusalReason = Literal[
     "no_settled_member_weeks",
@@ -84,6 +104,21 @@ def _finite(value: object, label: str) -> float:
     return number
 
 
+def _token(value: object, label: str) -> str:
+    """A provenance string that can be joined into a key without becoming ambiguous."""
+
+    if not isinstance(value, str):
+        raise EvaluationValidationError(f"{label} must be a string.")
+    text = value.strip()
+    if not text:
+        raise EvaluationValidationError(f"{label} must not be empty.")
+    if KEY_SEPARATOR in text or any(character.isspace() for character in text):
+        raise EvaluationValidationError(
+            f"{label} must not contain whitespace or {KEY_SEPARATOR!r}, got {value!r}."
+        )
+    return text
+
+
 def _identity(value: object, label: str) -> int:
     if isinstance(value, bool) or not isinstance(value, Integral):
         raise EvaluationValidationError(f"{label} must be an integer.")
@@ -95,12 +130,20 @@ def _identity(value: object, label: str) -> int:
 
 @dataclass(frozen=True, slots=True)
 class MemberWeekComparison:
-    """One settled member-week: its cluster key, its member and its paired difference."""
+    """One settled member-week: its cluster key, its member, its difference, its provenance.
+
+    The provenance is carried on the row rather than fetched later because it is what makes
+    ``record_key`` describe the exact bytes this difference was computed from. A row whose
+    advice digest or outcome capture is unknown is not a member-week this instrument can
+    name, and the boundary refuses it instead of naming a weaker key.
+    """
 
     season: str
     gameweek: int
     entry_id: int
     difference: float
+    advice_sha256: str
+    outcome_snapshot_id: str
 
     def __post_init__(self) -> None:
         if not isinstance(self.season, str) or not self.season.strip():
@@ -109,6 +152,28 @@ class MemberWeekComparison:
         object.__setattr__(self, "gameweek", _identity(self.gameweek, "gameweek"))
         object.__setattr__(self, "entry_id", _identity(self.entry_id, "entry_id"))
         object.__setattr__(self, "difference", _finite(self.difference, "difference"))
+        object.__setattr__(self, "advice_sha256", _token(self.advice_sha256, "advice_sha256"))
+        object.__setattr__(
+            self, "outcome_snapshot_id", _token(self.outcome_snapshot_id, "outcome_snapshot_id")
+        )
+
+    @property
+    def record_key(self) -> str:
+        """This member-week's published name, spelled as the reader spells it.
+
+        The season is absent on purpose: the reader builds the same four parts from one
+        season's histories, and the advice digest already separates a week from a rescored
+        version of itself.
+        """
+
+        return KEY_SEPARATOR.join(
+            (
+                str(self.entry_id),
+                str(self.gameweek),
+                self.advice_sha256,
+                self.outcome_snapshot_id,
+            )
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,6 +269,9 @@ class LiveSeriesPower:
     ``correlation_floored`` says when that happened rather than hiding it. The two degrees of
     freedom are on the face of the result because the first estimable reading rests on one
     between-week degree of freedom and is very noisy.
+
+    ``member_week_keys`` is sorted and holds one key per counted member-week, so its length is
+    ``member_weeks`` and a reader can check the set it was measured on rather than trusting it.
     """
 
     member_weeks: int
@@ -219,6 +287,7 @@ class LiveSeriesPower:
     within_week_degrees_of_freedom: int
     confidence_level: float
     power: float
+    member_week_keys: tuple[str, ...]
     method_version: str = LIVE_SERIES_METHOD_VERSION
     estimable: ClassVar[Literal[True]] = True
 
@@ -247,21 +316,31 @@ class LiveSeriesPower:
 LiveSeriesReading = NotYetEstimable | LiveSeriesPower
 
 
-def _clusters(comparisons: Sequence[MemberWeekComparison]) -> dict[tuple[str, int], list[float]]:
-    """Group the differences by week, refusing a member counted twice in one week."""
+def _clusters(
+    comparisons: Sequence[MemberWeekComparison],
+) -> dict[tuple[str, int], list[MemberWeekComparison]]:
+    """Group the rows by week, refusing a member counted twice and a key spelled twice.
 
-    grouped: dict[tuple[str, int], list[float]] = {}
+    The key check is separate from the member check because the published contract compares
+    whole key lists: one key repeated would make a set that no reader could ever match, and
+    would do it without any member appearing twice in a week.
+    """
+
+    grouped: dict[tuple[str, int], list[MemberWeekComparison]] = {}
     seen: set[tuple[str, int, int]] = set()
+    keys: set[str] = set()
     for row in comparisons:
         identity = (row.season, row.gameweek, row.entry_id)
         if identity in seen:
             raise EvaluationValidationError(
                 f"Member {row.entry_id} appears twice in {row.season} gameweek {row.gameweek}."
             )
+        if row.record_key in keys:
+            raise EvaluationValidationError(f"Record {row.record_key} appears twice.")
         seen.add(identity)
-        grouped.setdefault((row.season, row.gameweek), []).append(
-            _finite(row.difference, "difference")
-        )
+        keys.add(row.record_key)
+        _finite(row.difference, "difference")
+        grouped.setdefault((row.season, row.gameweek), []).append(row)
     return grouped
 
 
@@ -276,7 +355,8 @@ def read_live_series(
     weeks that share a gameweek number into one cluster.
     """
 
-    grouped = _clusters(comparisons)
+    clustered = _clusters(comparisons)
+    grouped = {week: [row.difference for row in rows] for week, rows in clustered.items()}
     sizes = [len(values) for values in grouped.values()]
     member_weeks = sum(sizes)
     weeks = len(sizes)
@@ -324,4 +404,8 @@ def read_live_series(
         within_week_degrees_of_freedom=within_degrees,
         confidence_level=policy.confidence_level,
         power=policy.power,
+        # From the rows just measured, not from a second pass over the caller's sequence.
+        member_week_keys=tuple(
+            sorted(row.record_key for rows in clustered.values() for row in rows)
+        ),
     )

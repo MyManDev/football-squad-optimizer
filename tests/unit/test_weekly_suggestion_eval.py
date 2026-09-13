@@ -3,10 +3,15 @@
 import copy
 import hashlib
 import json
+import math
+import re
+from collections.abc import Sequence
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from statistics import NormalDist
+from typing import Any, cast
 
+import jsonschema
 import pandas as pd
 import pytest
 
@@ -20,6 +25,7 @@ from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
 from squadopt.evaluation.live_series import (
     LiveSeriesPower,
+    LiveSeriesReading,
     NotYetEstimable,
     read_live_series,
 )
@@ -43,6 +49,7 @@ def recorded(
     name: str = "capture-a",
     gameweek: int = 4,
     entry_id: int = 101,
+    digest: str = "a" * 64,
 ) -> dict[str, Any]:
     return {
         "contract_version": MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
@@ -70,7 +77,7 @@ def recorded(
                 "chip": None,
                 "transfer_hit_points": 4,
                 "expected_own_points": 42.0,
-                "advice_sha256": "a" * 64,
+                "advice_sha256": digest,
             }
         ],
     }
@@ -365,7 +372,15 @@ def test_later_other_strategy_does_not_displace_the_pure_points_record(tmp_path:
     assert choose(tmp_path) == early
 
 
-def publish_for(root: Path, *, gameweek: int, entry_id: int) -> None:
+def publish_for(
+    root: Path,
+    *,
+    gameweek: int,
+    entry_id: int,
+    digest: str = "a" * 64,
+    name: str = "capture-a",
+    published_hour: str = "07",
+) -> None:
     """Record one member's pre-deadline advice for one gameweek."""
     day = DEADLINES[gameweek][:10]
     record_member_advice(
@@ -374,7 +389,9 @@ def publish_for(root: Path, *, gameweek: int, entry_id: int) -> None:
             gameweek=gameweek,
             entry_id=entry_id,
             captured=f"{day}T06:00:00Z",
-            published=f"{day}T07:00:00Z",
+            published=f"{day}T{published_hour}:00:00Z",
+            name=name,
+            digest=digest,
         ),
     )
 
@@ -540,9 +557,9 @@ def test_the_published_document_is_the_reviews_it_serializes(tmp_path: Path) -> 
         entry_ids=[101, 202],
         out_dir=tmp_path / "out",
     )
-    assert [path.name for path in written] == ["101.json", "202.json"]
+    assert [path.name for path in written] == ["101.json", "202.json", "series-horizon.json"]
     assert [week.gameweek for week in reviews[101]] == [4, 3]  # Newest week first.
-    for entry_id, path in zip((101, 202), written, strict=True):
+    for entry_id, path in zip((101, 202), written[:2], strict=True):
         document = json.loads(path.read_text(encoding="utf-8"))
         assert document["contract_version"] == review.CONTRACT_VERSION
         assert document["payload"]["entry_id"] == entry_id
@@ -558,3 +575,283 @@ def test_python_result_matches_the_browser_contract_fixture(tmp_path: Path) -> N
     document = json.loads(fixture.read_text(encoding="utf-8"))
     assert document["contract_version"] == review.CONTRACT_VERSION
     assert document["payload"]["weeks"] == json.loads(json.dumps([asdict(result)]))
+
+
+HORIZON_SCHEMA = Path(__file__).parents[2] / "docs/contracts/member_week_horizon_v1.schema.json"
+# The contract's required field list, written out so the producer's document is checked
+# against it on every run. The schema file itself is the consumer lane's and lands with it,
+# so ``check_contract`` below adds the committed schema's judgement when it is in the tree
+# and these assertions carry the check until then.
+HORIZON_FIELDS = (
+    "contract_version",
+    "season",
+    "league_id",
+    "scoring_basis",
+    "population",
+    "measurement_artifact",
+    "within_week_correlation",
+    "required_week_clusters",
+    "member_week_keys",
+)
+
+
+def check_contract(document: dict[str, Any]) -> None:
+    """Assert every constraint member_week_horizon_v1 places on a published document."""
+    assert sorted(document) == sorted(HORIZON_FIELDS)
+    assert document["contract_version"] == "member_week_horizon_v1"
+    assert re.fullmatch(r"[0-9]{4}-[0-9]{2}", document["season"])
+    assert isinstance(document["league_id"], int) and document["league_id"] >= 1
+    assert document["scoring_basis"] == "official_autosub_captain_v2"
+    assert document["population"] == "recorded_member_suggestions_vs_actual"
+    assert re.fullmatch(r"docs/[a-z0-9_-]+\.json", document["measurement_artifact"])
+    correlation = document["within_week_correlation"]
+    assert isinstance(correlation, float) and -1.0 <= correlation <= 1.0
+    required = document["required_week_clusters"]
+    assert isinstance(required, int) and not isinstance(required, bool) and required >= 2
+    keys = document["member_week_keys"]
+    assert isinstance(keys, list) and len(keys) >= 2
+    assert len(set(keys)) == len(keys)
+    assert all(isinstance(key, str) and key for key in keys)
+    if HORIZON_SCHEMA.is_file():  # Both halves are in one tree; let the committed schema rule.
+        jsonschema.validate(document, json.loads(HORIZON_SCHEMA.read_text(encoding="utf-8")))
+
+
+def reader_keys(histories: Sequence[Path]) -> list[str]:
+    """Rebuild the reader's record keys from the published bytes, the way it spells them.
+
+    ``web/src/features/league/history/liveSeries.ts`` keeps an available week that has a
+    suggestion, an actual score and a difference, and names it entry, gameweek, advice digest,
+    outcome capture. This walks the published documents rather than the reviews behind them,
+    so the comparison covers what a browser would actually receive.
+    """
+    keys = []
+    for path in histories:
+        payload = json.loads(path.read_text(encoding="utf-8"))["payload"]
+        for week in payload["weeks"]:
+            if (
+                week["status"] != "available"
+                or week["suggested"] is None
+                or week["actual"] is None
+                or week["net_difference"] is None
+            ):
+                continue
+            keys.append(
+                f"{payload['entry_id']}:{week['gameweek']}:"
+                f"{week['advice_sha256']}:{week['outcome_snapshot_id']}"
+            )
+    return sorted(keys)
+
+
+def settled_two_weeks(tmp_path: Path) -> CapturedSnapshot:
+    """Two members, two settled weeks each: the smallest record that carries a horizon."""
+    for entry_id in (101, 202):
+        for week in (3, 4):
+            publish_for(tmp_path / "records", gameweek=week, entry_id=entry_id)
+    return capture_with(
+        tmp_path / "snapshots",
+        events={3: True, 4: True},
+        actuals={101: {3: 18, 4: 25}, 202: {3: 20, 4: 22}},
+    )
+
+
+def horizon_document(reading: object, **stated: object) -> dict[str, Any] | None:
+    """Build a handoff for this league and season, stating the basis and population."""
+    arguments: dict[str, Any] = {
+        "season": SEASON,
+        "league_id": 352490,
+        "scoring_basis": review.RECORDED_ADVICE_SCORING_BASIS,
+        "population": review.SETTLED_COMPARISON_POPULATION,
+        **stated,
+    }
+    return review.series_horizon_document(cast(LiveSeriesReading, reading), **arguments)
+
+
+def published(tmp_path: Path, anchor: CapturedSnapshot) -> tuple[Path, ...]:
+    return review.publish_suggestion_histories(
+        record_root=tmp_path / "records",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=352490,
+        entry_ids=[101, 202],
+        out_dir=tmp_path / "out",
+    )
+
+
+def test_the_horizon_names_the_keys_the_page_builds_from_the_same_publication(
+    tmp_path: Path,
+) -> None:
+    anchor = settled_two_weeks(tmp_path)
+    written = published(tmp_path, anchor)
+    horizon = tmp_path / "out" / review.SERIES_HORIZON_FILE
+    assert written[-1] == horizon
+    document = json.loads(horizon.read_text(encoding="utf-8"))
+    check_contract(document)
+    # The safety property: a horizon measured against one set of member-weeks is unusable
+    # against any other, and the reader compares whole sorted lists for equality.
+    assert sorted(document["member_week_keys"]) == reader_keys(written[:2])
+    assert len(document["member_week_keys"]) == 4
+    assert document["season"] == SEASON and document["league_id"] == 352490
+    assert document["measurement_artifact"] == "docs/measurement_instrument.json"
+
+
+def test_the_published_horizon_is_the_reading_of_the_reviews_it_was_published_with(
+    tmp_path: Path,
+) -> None:
+    anchor = settled_two_weeks(tmp_path)
+    written = published(tmp_path, anchor)
+    reviews = reviewed(tmp_path, entry_ids=[101, 202], anchor=anchor)
+    reading = read_live_series(review.settled_member_week_comparisons(reviews, season=SEASON))
+    assert isinstance(reading, LiveSeriesPower)
+    document = json.loads(written[-1].read_text(encoding="utf-8"))
+    horizon = reading.weeks_to_detect(review.BACKTEST_PRECISION_FLOOR_POINTS)
+    assert document["required_week_clusters"] == horizon.total_weeks
+    assert list(reading.member_week_keys) == document["member_week_keys"]
+    # Required although the page renders none of it: the correlation is the whole distance
+    # between this target and the one an independence assumption would have produced, and a
+    # producer that drops it leaves the page at "unknown" with nothing on screen to say why.
+    assert document["within_week_correlation"] == reading.within_week_correlation
+    assert document["within_week_correlation"] > 0.0
+    # The target rests on this record's own dependence, not on an independence assumption.
+    independent = math.ceil(
+        (reading.member_week_standard_deviation / horizon.effect) ** 2
+        * (NormalDist().inv_cdf(0.975) + NormalDist().inv_cdf(0.8)) ** 2
+        / reading.average_members_per_week
+    )
+    assert document["required_week_clusters"] > independent
+
+
+def test_an_unsupportable_record_publishes_no_horizon_and_clears_a_stale_one(
+    tmp_path: Path,
+) -> None:
+    # Fifteen members, one published week, nothing settled: the archive as it stands.
+    entry_ids = list(range(101, 116))
+    for entry_id in entry_ids:
+        publish_for(tmp_path / "records", gameweek=4, entry_id=entry_id)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    stale = out_dir / review.SERIES_HORIZON_FILE
+    stale.write_text('{"contract_version": "member_week_horizon_v1"}\n', encoding="utf-8")
+    written = review.publish_suggestion_histories(
+        record_root=tmp_path / "records",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=capture_with(tmp_path / "snapshots", events={4: False}),
+        season=SEASON,
+        league_id=352490,
+        entry_ids=entry_ids,
+        out_dir=out_dir,
+    )
+    # Publishing nothing is the true statement, and the page already renders "not yet" for an
+    # absent document. A target measured on a record that no longer stands does not stay put.
+    assert not stale.exists()
+    assert [path.parent.name for path in written] == ["history"] * 15
+
+
+def test_the_published_target_is_floored_at_the_instruments_own_two_week_minimum(
+    tmp_path: Path,
+) -> None:
+    anchor = settled_two_weeks(tmp_path)
+    reviews = reviewed(tmp_path, entry_ids=[101, 202], anchor=anchor)
+    reading = read_live_series(review.settled_member_week_comparisons(reviews, season=SEASON))
+    assert isinstance(reading, LiveSeriesPower)
+    # An effect this large is already detectable, so the arithmetic asks for a single week.
+    assert reading.weeks_to_detect(1000.0).total_weeks == 1
+    document = horizon_document(reading, effect=1000.0)
+    assert document is not None
+    # A clustered reading does not exist below two weeks, so one is not a count anyone could
+    # measure at, and the reader refuses anything under two.
+    assert document["required_week_clusters"] == 2
+    check_contract(document)
+
+
+def test_a_later_advice_for_one_week_moves_that_key_and_no_other(tmp_path: Path) -> None:
+    anchor = settled_two_weeks(tmp_path)
+    before = json.loads(published(tmp_path, anchor)[-1].read_text(encoding="utf-8"))
+    # The same member and the same week, published again before the deadline under a second
+    # capture with a different advice digest. Entry and gameweek alone could not tell the two
+    # apart, and the horizon would then describe bytes nobody is reading.
+    publish_for(
+        tmp_path / "records",
+        gameweek=4,
+        entry_id=101,
+        digest="b" * 64,
+        name="capture-b",
+        published_hour="08",
+    )
+    after = json.loads(published(tmp_path, anchor)[-1].read_text(encoding="utf-8"))
+    moved = set(before["member_week_keys"]) ^ set(after["member_week_keys"])
+    assert {tuple(key.split(":", 2)[:2]) for key in moved} == {("101", "4")}
+    assert sorted(after["member_week_keys"]) == reader_keys(
+        [tmp_path / "out" / "history" / f"{entry_id}.json" for entry_id in (101, 202)]
+    )
+    assert sorted(before["member_week_keys"]) != sorted(after["member_week_keys"])
+
+
+def test_a_refusal_builds_no_document_at_all() -> None:
+    reading = read_live_series(())
+    assert isinstance(reading, NotYetEstimable)
+    assert horizon_document(reading) is None
+
+
+@pytest.mark.parametrize(
+    "stated",
+    [
+        {"scoring_basis": "named_eleven_no_autosubs"},
+        {"scoring_basis": "realized_squad_points_v1"},
+        {"population": "all_league_members"},
+        {"population": "recorded_member_suggestions_vs_paper_ledger"},
+        {"measurement_artifact": "docs/Measurement_Instrument.json"},
+        {"measurement_artifact": "measurement_instrument.json"},
+    ],
+)
+def test_a_series_on_another_basis_or_population_is_refused_not_relabelled(
+    tmp_path: Path,
+    stated: dict[str, str],
+) -> None:
+    anchor = settled_two_weeks(tmp_path)
+    reviews = reviewed(tmp_path, entry_ids=[101, 202], anchor=anchor)
+    reading = read_live_series(review.settled_member_week_comparisons(reviews, season=SEASON))
+    # The contract fixes the basis and the population, and a fixed value in a schema is a
+    # promise about what produced the numbers. Stamping one over another series is the silent
+    # mislabelling this refusal exists to prevent.
+    with pytest.raises(review.SuggestionEvaluationError):
+        horizon_document(reading, **stated)
+
+
+def test_the_basis_and_population_are_read_from_where_they_were_produced() -> None:
+    # Not the contract constants repeated at the call site: one names the scorer that ran and
+    # the other the filter that chose the rows, and the document builder compares the two.
+    assert review.RECORDED_ADVICE_SCORING_BASIS == review.CONTRACT_SCORING_BASIS
+    assert review.SETTLED_COMPARISON_POPULATION == review.CONTRACT_POPULATION
+
+
+def test_a_record_that_froze_no_starting_vice_never_reaches_this_series() -> None:
+    # The named-eleven basis exists for a decision with no bench order and no vice-captain.
+    # This scorer refuses such a record rather than scoring it and letting the publication
+    # label the number official_autosub_captain_v2.
+    record = recorded()
+    advice = dict(record["advice"][0])
+    advice["vice_captain"] = advice["bench"][0]
+    with pytest.raises(review.SuggestionEvaluationError, match="vice-captain must start"):
+        review.score_recorded_advice(record, advice, points())
+
+
+def test_a_settled_week_without_its_provenance_is_refused_rather_than_named() -> None:
+    settled = review.WeekReview(
+        gameweek=4,
+        status="available",
+        reason=None,
+        advice_sha256="a" * 64,
+        outcome_snapshot_id="fpl-live-20260922T090000Z-abcdef123456",
+        suggested=review.SuggestedScore(20.0, 0.0, 20.0, 0.0, 0.0, None),
+        actual=review.ActualScore(18.0, 0.0, 18.0),
+        net_difference=2.0,
+    )
+    assert len(review.settled_member_week_comparisons({101: (settled,)}, season=SEASON)) == 1
+    for broken in (
+        copy.replace(settled, outcome_snapshot_id=None),
+        copy.replace(settled, advice_sha256=None),
+        copy.replace(settled, advice_sha256="not-a-digest"),
+    ):
+        with pytest.raises(review.SuggestionEvaluationError):
+            review.settled_member_week_comparisons({101: (broken,)}, season=SEASON)

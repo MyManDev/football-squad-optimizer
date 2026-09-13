@@ -1,12 +1,17 @@
 """The live record reports its own precision, refuses below two weeks, and judges nobody."""
 
+import hashlib
+import json
 import math
 from dataclasses import asdict
+from pathlib import Path
 from statistics import NormalDist
 
 import pytest
 
 from squadopt.evaluation.live_series import (
+    BACKTEST_PRECISION_ARTIFACT,
+    BACKTEST_PRECISION_FLOOR_POINTS,
     DetectionPolicy,
     LiveSeriesPower,
     MemberWeekComparison,
@@ -17,6 +22,7 @@ from squadopt.evaluation.live_series import (
 from squadopt.evaluation.models import EvaluationValidationError
 
 SEASON = "2026-27"
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 # The two normal quantiles the recorded fold precision is quoted at, written out here so the
 # test reaches the pinned digits by its own path rather than through the module under test.
 Z_SUM = NormalDist().inv_cdf(0.975) + NormalDist().inv_cdf(0.8)
@@ -46,11 +52,30 @@ FIFTEEN = {
 }
 
 
+def comparison(
+    week: int, entry_id: int, value: float, *, season: str = SEASON
+) -> MemberWeekComparison:
+    """One member-week with the provenance the published key is spelled from.
+
+    The digest is a real sha256 of the member-week and the capture identifier is shaped like
+    a snapshot id, so the keys these tests compare have the same shape as published ones.
+    """
+
+    return MemberWeekComparison(
+        season,
+        week,
+        entry_id,
+        value,
+        hashlib.sha256(f"{season}:{week}:{entry_id}".encode()).hexdigest(),
+        f"fpl-live-gw{week:02d}-000000000000",
+    )
+
+
 def rows(weeks: dict[int, tuple[float, ...]]) -> list[MemberWeekComparison]:
     """One comparison per member-week, members numbered inside each week."""
 
     return [
-        MemberWeekComparison(SEASON, week, 100 + index, value)
+        comparison(week, 100 + index, value)
         for week, values in weeks.items()
         for index, value in enumerate(values)
     ]
@@ -218,38 +243,95 @@ def test_a_horizon_needs_a_real_effect(effect: float) -> None:
 
 
 def test_one_member_counted_twice_in_a_week_is_refused_rather_than_counted() -> None:
-    duplicated = [*rows(BALANCED), MemberWeekComparison(SEASON, 4, 100, 3.0)]
-    with pytest.raises(EvaluationValidationError, match="twice"):
+    duplicated = [*rows(BALANCED), comparison(4, 100, 3.0)]
+    with pytest.raises(EvaluationValidationError, match="Member 100 appears twice"):
         read_live_series(duplicated)
+
+
+def test_two_rows_that_spell_one_published_key_are_refused() -> None:
+    # Different cluster identities, one key: the reader compares whole key lists, so a
+    # repeated key makes a set nothing can match and no member is counted twice to show it.
+    same_key = MemberWeekComparison(
+        "2027-28",
+        4,
+        100,
+        2.0,
+        hashlib.sha256(f"{SEASON}:4:100".encode()).hexdigest(),
+        "fpl-live-gw04-000000000000",
+    )
+    with pytest.raises(EvaluationValidationError, match="appears twice"):
+        read_live_series([comparison(4, 100, 1.0), same_key])
 
 
 def test_the_same_member_in_two_weeks_and_two_seasons_stays_separate() -> None:
     reading = read_live_series(
         [
-            MemberWeekComparison(SEASON, 4, 100, 1.0),
-            MemberWeekComparison(SEASON, 5, 100, 2.0),
-            MemberWeekComparison("2027-28", 4, 100, 3.0),
+            comparison(4, 100, 1.0),
+            comparison(5, 100, 2.0),
+            comparison(4, 100, 3.0, season="2027-28"),
         ]
     )
     assert isinstance(reading, NotYetEstimable)
     assert reading == NotYetEstimable("no_within_week_replication", 3, 3)
 
 
+DIGEST = hashlib.sha256(b"advice").hexdigest()
+CAPTURE = "fpl-live-20260922T090000Z-abcdef123456"
+
+
 @pytest.mark.parametrize(
     "arguments",
     [
-        (SEASON, 4, 100, math.nan),
-        (SEASON, 4, 100, math.inf),
-        (SEASON, 0, 100, 1.0),
-        (SEASON, 4, True, 1.0),
-        ("   ", 4, 100, 1.0),
+        (SEASON, 4, 100, math.nan, DIGEST, CAPTURE),
+        (SEASON, 4, 100, math.inf, DIGEST, CAPTURE),
+        (SEASON, 0, 100, 1.0, DIGEST, CAPTURE),
+        (SEASON, 4, True, 1.0, DIGEST, CAPTURE),
+        ("   ", 4, 100, 1.0, DIGEST, CAPTURE),
+        # A part that carries the separator or whitespace would let two different
+        # member-weeks spell one key, which is the one thing the published set cannot survive.
+        (SEASON, 4, 100, 1.0, "", CAPTURE),
+        (SEASON, 4, 100, 1.0, f"{DIGEST}:extra", CAPTURE),
+        (SEASON, 4, 100, 1.0, DIGEST, "fpl-live:gw04"),
+        (SEASON, 4, 100, 1.0, DIGEST, "fpl-live gw04"),
+        (SEASON, 4, 100, 1.0, DIGEST, None),
     ],
 )
 def test_a_comparison_that_cannot_be_counted_is_refused_at_the_boundary(
-    arguments: tuple[str, int, int, float],
+    arguments: tuple[object, ...],
 ) -> None:
     with pytest.raises(EvaluationValidationError):
-        MemberWeekComparison(*arguments)
+        MemberWeekComparison(*arguments)  # type: ignore[arg-type]
+
+
+def test_the_reading_names_exactly_the_member_weeks_it_measured() -> None:
+    measured = rows(BALANCED)
+    reading = estimable(BALANCED)
+    assert reading.member_week_keys == tuple(sorted(row.record_key for row in measured))
+    assert len(reading.member_week_keys) == reading.member_weeks
+    assert len(set(reading.member_week_keys)) == reading.member_weeks
+    assert reading.member_week_keys == tuple(sorted(reading.member_week_keys))
+    # Entry, gameweek, advice digest, outcome capture: provenance, not just an index, so a
+    # rescored week cannot pass as the week it replaced.
+    digest = hashlib.sha256(f"{SEASON}:4:100".encode()).hexdigest()
+    assert measured[0].record_key == f"100:4:{digest}:fpl-live-gw04-000000000000"
+
+
+def test_a_wider_row_set_cannot_be_mistaken_for_the_measured_one() -> None:
+    narrow = estimable(BALANCED)
+    wider = estimable({**BALANCED, 7: (-1.0, 1.0, 3.0, 5.0)})
+    assert set(narrow.member_week_keys) < set(wider.member_week_keys)
+    assert narrow.member_week_keys != wider.member_week_keys
+
+
+def test_the_published_target_effect_is_the_committed_backtest_floor() -> None:
+    # The live horizon is quoted at the effect docs/measurement_instrument.json records, so
+    # the two numbers are on one axis. Pinned to the artifact rather than restated near it.
+    artifact = json.loads(
+        (REPOSITORY_ROOT / BACKTEST_PRECISION_ARTIFACT).read_text(encoding="utf-8")
+    )
+    assert BACKTEST_PRECISION_ARTIFACT == "docs/measurement_instrument.json"
+    recorded_floor = artifact["precision"]["raw"]["iid_mde_alpha_0_05_power_0_8"]
+    assert recorded_floor == BACKTEST_PRECISION_FLOOR_POINTS
 
 
 @pytest.mark.parametrize(
