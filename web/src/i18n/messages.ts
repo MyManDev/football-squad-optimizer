@@ -737,8 +737,6 @@ const en = {
     incompleteBody: (fields: string) =>
       `The source did not provide: ${fields}. Nothing is invented to fill it.`,
     entryAssumptionsTitle: "Public-data limits",
-    freeTransfersAssumed: (count: number) =>
-      `The public source does not reveal banked free transfers. This plan assumes ${count}; a second banked transfer may be invisible.`,
     currentPriceFallback:
       "Purchase prices are not public. Current prices are used as selling prices, which may overstate the available budget after a price rise.",
     memberSquad: "Member Squad",
@@ -1627,8 +1625,6 @@ const tr: MessageSchema<typeof en> = {
     incompleteBody: (fields) =>
       `Kaynak şu alanları sağlamadı: ${fields}. Boşlukları doldurmak için veri uydurulmaz.`,
     entryAssumptionsTitle: "Herkese Açık Veri Sınırları",
-    freeTransfersAssumed: (count) =>
-      `Herkese açık kaynak banka edilmiş serbest transfer sayısını göstermiyor. Bu plan ${count} varsayıyor; banka edilmiş ikinci transfer görünmüyor olabilir.`,
     currentPriceFallback:
       "Satın alma fiyatları herkese açık değildir. Satış fiyatı olarak mevcut fiyat kullanılır; fiyatı yükselen bir oyuncu için kullanılabilir bütçe olduğundan yüksek görünebilir.",
     memberSquad: "Üye kadrosu",
