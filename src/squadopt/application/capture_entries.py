@@ -154,6 +154,11 @@ class CapturePicksProvider:
             captain=self._code(basis.captain),
             vice_captain=self._code(basis.vice_captain),
             bank_tenths=basis.bank_tenths,
+            # The selling value of the basis week's fifteen, from the same document as
+            # its bank: after a Free Hit both belong to the week before the chip, so a
+            # budget taken from the chip week's squad would price a squad the member
+            # does not hold.
+            squad_sell_value_tenths=basis.squad_sell_value_tenths,
             free_transfers=banked.count,
             free_transfers_known=banked.known,
             chips_used=record.chips_used,

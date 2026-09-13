@@ -41,6 +41,7 @@ def _held(world: dict[str, Any], inputs: Any, squad: list[int]) -> HeldSquad:
         captain=squad[0],
         vice_captain=squad[1],
         bank_tenths=5,
+        squad_sell_value_tenths=world_module.member_squad_sell_value(world, squad),
         free_transfers=1,
         free_transfers_known=False,
         source_snapshot_id=world["gw2_id"],

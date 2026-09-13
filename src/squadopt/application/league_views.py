@@ -655,6 +655,19 @@ def _entry_squad_payload(
         "squad_basis": picks.squad_basis,
         "active_chip": picks.active_chip,
         "purchase_prices_known": bool(picks.purchase_prices_known),
+        # What the fifteen would raise if sold, and that plus the bank: what the member
+        # may spend. The endpoints publish no purchase price, so no page may add up the
+        # fifteen current prices and call the total a budget, because the game keeps half
+        # of every rise since a player was bought. The aggregate is published instead, and
+        # it is what the plan on this page was held to. Null where a source states neither.
+        "squad_sell_value_tenths": (
+            None if picks.squad_sell_value_tenths is None else int(picks.squad_sell_value_tenths)
+        ),
+        "spendable_budget_tenths": (
+            None
+            if picks.squad_sell_value_tenths is None
+            else int(picks.squad_sell_value_tenths) + int(picks.bank_tenths)
+        ),
         "source_snapshot_id": picks.source_snapshot_id,
         # Comparing a member's gameweek score with ours needs both scores; the standings
         # view does not carry points yet, so this stays absent rather than guessed.

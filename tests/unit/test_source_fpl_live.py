@@ -848,9 +848,15 @@ def _picks_payload(
     captain_position: int | None = 1,
     vice_position: int | None = 2,
     bank: int = 5,
+    value: int = 1_000,
     positions: list[int] | None = None,
 ) -> bytes:
-    """Return one ``event/{gw}/picks`` document carrying the fields the adapter reads."""
+    """Return one ``event/{gw}/picks`` document carrying the fields the adapter reads.
+
+    ``value`` is the platform's own field: the entry's whole worth at the deadline, the
+    squad's selling value *plus* the bank, which is why every entry reads 1000 at
+    gameweek 1 whatever it has banked.
+    """
 
     elements = squad if squad is not None else list(range(101, 116))
     slots = positions if positions is not None else list(range(1, len(elements) + 1))
@@ -867,7 +873,12 @@ def _picks_payload(
     document = {
         "picks": picks,
         "active_chip": None,
-        "entry_history": {"bank": bank, "event_transfers": 0, "event_transfers_cost": 0},
+        "entry_history": {
+            "bank": bank,
+            "value": value,
+            "event_transfers": 0,
+            "event_transfers_cost": 0,
+        },
     }
     return json.dumps(document).encode("utf-8")
 
@@ -1721,6 +1732,7 @@ def test_the_same_player_cannot_be_captain_and_vice() -> None:
             captain=101,
             vice_captain=101,
             bank_tenths=0,
+            squad_sell_value_tenths=1_000,
             free_transfers=1,
             free_transfers_known=False,
             chips_used={},

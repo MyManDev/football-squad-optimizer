@@ -136,6 +136,15 @@ export interface EntrySquad {
   /** Absent on documents from before the block. */
   chips?: EntryChipAvailability;
   purchase_prices_known: boolean;
+  /**
+   * What the fifteen would raise if they were all sold, in tenths, and that plus the
+   * bank: what the member may spend at the coming deadline. Adding up the squad's current
+   * prices does not give either number, because the game keeps half of every rise since a
+   * player was bought, so the publisher states them rather than leaving a page to guess.
+   * Absent on documents from before the pair; null where a source states neither.
+   */
+  squad_sell_value_tenths?: number | null;
+  spendable_budget_tenths?: number | null;
   source_snapshot_id: string | null;
   squadopt_comparison: EntryScoreComparison | null;
   data_quality: EntryDataQuality;

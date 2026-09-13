@@ -502,8 +502,17 @@ def build_member_advice_record(
             # the source published. A banked second transfer would be invisible.
             "free_transfers_known": bool(picks.free_transfers_known),
             "purchase_prices_known": bool(picks.purchase_prices_known),
+            # What the whole squad sells for, which the endpoints state even where they
+            # state no purchase price. It is the budget the plan was held to, so the
+            # record carries it beside the bank rather than leaving a reader to add up
+            # current prices and get a larger number than the member could ever raise.
+            "squad_sell_value_tenths": (
+                None
+                if picks.squad_sell_value_tenths is None
+                else int(picks.squad_sell_value_tenths)
+            ),
             # Absent, not empty: an unknown purchase price is a different fact from a
-            # purchase price of nothing, and the plan valued the squad at current prices.
+            # purchase price of nothing.
             "purchase_prices": (
                 {str(player): int(price) for player, price in sorted(picks.purchase_prices.items())}
                 if picks.purchase_prices_known

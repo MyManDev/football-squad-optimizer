@@ -1857,6 +1857,16 @@ class EntryPicksRecord:
     adapter that refuses a real capture is worse than one that accepts a bench vice.
     """
     bank_tenths: int
+    squad_sell_value_tenths: int
+    """What the fifteen would raise if they were all sold, in tenths.
+
+    The picks document's ``entry_history.value`` is the entry's whole worth at that
+    gameweek's deadline, the squad's selling value *plus* the bank; the same pair is on
+    the entry endpoint as ``last_deadline_value`` and ``last_deadline_bank``. Every entry
+    reads 1000 at gameweek 1 whatever its bank, which is what fixes the reading. So the
+    squad's own selling value is ``value`` minus ``bank``, and it is stated exactly even
+    though the purchase price behind any one player is not published.
+    """
     free_transfers: int
     free_transfers_known: bool
     chips_used: Mapping[str, tuple[int, ...]]
@@ -1908,6 +1918,11 @@ class EntryPicksRecord:
         if self.bank_tenths < 0:
             raise InvalidValueError(
                 f"Entry {self.entry_id} reports a negative bank of {self.bank_tenths}."
+            )
+        if self.squad_sell_value_tenths < 0:
+            raise InvalidValueError(
+                f"Entry {self.entry_id} reports a squad selling value of "
+                f"{self.squad_sell_value_tenths} tenths, which is less than nothing."
             )
 
 
@@ -2027,8 +2042,9 @@ def fpl_entry_picks(
     may claim.
 
     ``purchase_prices`` is empty and flagged unknown: the public endpoints publish no
-    purchase price, so a squad built from this values every player at his current price,
-    which overstates the budget for anyone who has risen since he was bought.
+    purchase price, so nothing here can say what any one player would sell for.
+    ``squad_sell_value_tenths`` is the answer for the fifteen together, which the
+    endpoints do publish, so a consumer can bound the budget without inventing the split.
 
     ``free_transfers`` is the rule floor of one, flagged unknown: the endpoints never
     state the banked count, and deriving it is a season-rules question this parsing layer
@@ -2052,6 +2068,15 @@ def fpl_entry_picks(
     active_chip = entry_active_chip(picks, entry_id=identifier, gameweek=week)
     chips_used = _chips_used(history, entry_id=identifier)
 
+    bank_tenths = _integer(entry_history, "bank", "Entry history")
+    entry_value_tenths = _integer(entry_history, "value", "Entry history")
+    if entry_value_tenths < bank_tenths:
+        raise DataSourceError(
+            f"Entry {identifier} gameweek {week} reports a worth of {entry_value_tenths} "
+            f"tenths against a bank of {bank_tenths}; the bank is part of the worth, so "
+            "the squad would have a negative selling value."
+        )
+
     return EntryPicksRecord(
         entry_id=identifier,
         season=_require_season(season),
@@ -2060,7 +2085,8 @@ def fpl_entry_picks(
         starting_xi=named.starting_xi,
         captain=named.captain,
         vice_captain=named.vice_captain,
-        bank_tenths=_integer(entry_history, "bank", "Entry history"),
+        bank_tenths=bank_tenths,
+        squad_sell_value_tenths=entry_value_tenths - bank_tenths,
         free_transfers=1,
         free_transfers_known=False,
         chips_used=chips_used,

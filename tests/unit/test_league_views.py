@@ -46,6 +46,7 @@ def _member_picks(world: dict[str, Any], entry_id: int, squad_codes: list[int]) 
         captain=squad_codes[0],
         vice_captain=squad_codes[1],
         bank_tenths=5,
+        squad_sell_value_tenths=world_module.member_squad_sell_value(world, squad_codes),
         free_transfers=1,
         free_transfers_known=False,
         source_snapshot_id=world["gw2_id"],
@@ -341,6 +342,12 @@ def test_the_entry_page_gets_the_members_own_squad_not_our_advice(
     assert [p["bench_order"] for p in payload["bench"]] == [1, 2, 3, 4]
     assert sum(1 for p in payload["starting_xi"] if p["is_captain"]) == 1
     assert payload["bank_tenths"] == picks.bank_tenths
+    # What the member may spend, stated rather than left for a page to work out by adding
+    # up current prices: the game keeps half of every rise since a player was bought, so
+    # that total is not a budget. Here the squad's selling value is its priced total
+    # because this world's member bought at today's prices.
+    assert payload["squad_sell_value_tenths"] == picks.squad_sell_value_tenths
+    assert payload["spendable_budget_tenths"] == picks.squad_sell_value_tenths + picks.bank_tenths
     # The unknown flags travel to the entry page too, not just to the advice.
     assert payload["free_transfers_known"] is False
     assert "free_transfers" in payload["missing_fields"]
