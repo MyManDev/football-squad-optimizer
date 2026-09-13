@@ -7,11 +7,21 @@ model nor the promotion rule changes. No raw holdout-season file is read.
 
 ## Fixed analysis
 
-The verified Phase C handoff and the existing control projection builder reproduce
-both scores in each recorded fold before any comparison. A different score, input
-hash, fold population or scoring policy refuses the run. The candidate covariates
-are fixed before measurement: projected XI plus captain for each arm, and the
-component pool's total projected points. No target column enters selection.
+The verified Phase C handoff and existing control projection builder supply
+covariates for the complete, ordered fold population of the recorded comparison.
+Input hashes, scoring policy, finite scores and paired-difference arithmetic are
+validated. Recorded scores are never replaced with new optimization results.
+The historical comparison includes time-limited FEASIBLE solutions; an initial
+attempt to require optimal replay refused at 2021-22-gw04. Rerunning that solver
+cannot establish identity of the original decisions. No correlations were measured
+in that refused attempt.
+
+The fixed covariates for the completed study are the component pool's mean and
+total projected points and the control pool's total projected points. These need
+no reconstructed XI. Direct-control fallback rows use the existing control builder.
+No target column enters the covariates; the handoff independently checks outcome
+alignment. Historical selected-XI projections are excluded because the frozen
+selected identities needed for them are absent from the comparison record.
 
 These inherit the handoff's structural pre-decision contract. Historical deadline
 timestamps are absent; no deadline is invented from kickoff. The source manifest
@@ -77,3 +87,8 @@ The JSON record includes source hashes, repository revision and dependency versi
 Inputs are hashed before and after the run; changed bytes refuse publication. The
 existing atomic create-once writer refuses to overwrite a different measurement.
 The exact input snapshot inventory must be retained for a historical replay.
+Choose a fresh preview directory on every run: a retained old scoreboard is not an
+input to this measurement. Source changes must be committed before the run and
+the revision must remain unchanged through it. To compare a new replay, write to a
+new internal output file and compare the measurement sections; revision and wall
+clock metadata describe the new execution.

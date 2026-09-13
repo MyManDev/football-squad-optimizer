@@ -22,15 +22,17 @@ from squadopt.experiments.availability_calibration import (
     calibration_report,
 )
 from squadopt.experiments.fold_precision import compare_precision
-from squadopt.experiments.instrument_replay import replay_covariates
+from squadopt.experiments.instrument_replay import projection_covariates
 from squadopt.experiments.shadow_report import write_document_once
 from squadopt.features import CrossSeasonConfig
 from squadopt.live import season_from_bootstrap
 
+CHECKOUT = Path(__file__).resolve().parents[1]
+
 HISTORY = ("2020-21", "2021-22", "2022-23", "2023-24", "2024-25")
 COVARIATES = (
-    "component_projected_xi_captain",
-    "control_projected_xi_captain",
+    "component_projected_pool_mean",
+    "control_projected_pool_total",
     "component_projected_pool_total",
 )
 
@@ -46,8 +48,13 @@ def fingerprints(paths: list[Path], root: Path) -> dict[str, str]:
     return result
 
 
+def ledger_files(root: Path) -> list[Path]:
+    return sorted(path for path in (root / "data/ledger/2026-27").rglob("*") if path.is_file())
+
+
 def measure(root: Path, handoff_dir: Path, preview: Path) -> dict[str, Any]:
-    """One local archive scan, fixed development population and exact score replay."""
+    """One local archive scan, fixed development population and recorded score alignment."""
+    revision = source_revision()
     root = root.resolve()
     handoff_dir = handoff_dir.resolve()
     snapshots_root = root / "data/snapshots"
@@ -67,7 +74,8 @@ def measure(root: Path, handoff_dir: Path, preview: Path) -> dict[str, Any]:
     input_paths += [
         path for name in ids for path in (snapshots_root / name).rglob("*") if path.is_file()
     ]
-    input_paths += [path for path in (root / "data/ledger/2026-27").rglob("*") if path.is_file()]
+    ledger_inventory = ledger_files(root)
+    input_paths += ledger_inventory
     before = fingerprints(input_paths, root)
     handoff = read_phase_c_component_handoff(table, roster, manifest)
     recorded = json.loads(source.read_text(encoding="utf-8"))["decision_comparison"]
@@ -78,8 +86,8 @@ def measure(root: Path, handoff_dir: Path, preview: Path) -> dict[str, Any]:
         seasons=HISTORY[1:],
         projection_builder=make_ridge_projection_builder(cross_season=CrossSeasonConfig()),
     )
-    print("Replaying the recorded decision pair.", flush=True)
-    folds = replay_covariates(handoff, controls, recorded)
+    print("Aligning the recorded decision pair with projection covariates.", flush=True)
+    folds = projection_covariates(handoff, controls, recorded)
     precision = compare_precision(
         [row["difference"] for row in folds],
         {key: [row[key] for row in folds] for key in COVARIATES},
@@ -113,14 +121,18 @@ def measure(root: Path, handoff_dir: Path, preview: Path) -> dict[str, Any]:
         }
         for week in weeks
     ]
-    if before != fingerprints(input_paths, root) or ids != list_snapshot_ids(snapshots_root):
+    if (
+        before != fingerprints(input_paths, root)
+        or ids != list_snapshot_ids(snapshots_root)
+        or ledger_inventory != ledger_files(root)
+    ):
         raise ValueError("Measurement inputs changed during the run; no record was written.")
+    if source_revision() != revision:
+        raise ValueError("Measurement source revision changed during the run.")
     return {
         "contract_version": "measurement_instrument_v1",
         "generated_at_utc": datetime.now(UTC).isoformat(),
-        "repository_commit": subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], text=True
-        ).strip(),
+        "repository_commit": revision,
         "input_sha256": before,
         "environment": {
             name: version(name) for name in ("numpy", "pandas", "scipy", "scikit-learn", "ortools")
@@ -129,6 +141,7 @@ def measure(root: Path, handoff_dir: Path, preview: Path) -> dict[str, Any]:
             "Phase C component base minus historical ridge control; official_autosub_captain_v2"
         ),
         "population": [row["fold_id"] for row in folds],
+        "folds": folds,
         "locked_holdout_used_as_input": False,
         "covariate_timing": (
             "OOF manifest's structural pre-decision contract; archive deadline "
@@ -148,10 +161,28 @@ def measure(root: Path, handoff_dir: Path, preview: Path) -> dict[str, Any]:
         "decisions_changed": False,
         "promotion_gate_changed": False,
         "method_source": (
-            ""
             "https://ai.stanford.edu/~ronnyk/2013-02CUPEDImprovingSensitivityOfControlledExperiments.pdf"
         ),
     }
+
+
+def source_revision() -> str:
+    status = subprocess.check_output(["git", "status", "--porcelain"], cwd=CHECKOUT, text=True)
+    if status.strip():
+        raise ValueError("Commit measurement source changes before running.")
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=CHECKOUT, text=True).strip()
+
+
+def validate_destinations(preview: Path, output: Path, checkout: Path) -> None:
+    preview, output, checkout = preview.resolve(), output.resolve(), checkout.resolve()
+    if not preview.is_relative_to(checkout / ".pt") or preview == checkout / ".pt":
+        raise ValueError("preview-root must be a new child of this checkout's .pt directory")
+    if preview.exists():
+        raise ValueError(
+            "preview-root already exists; old publications cannot supply measurement rows"
+        )
+    if not any(output.is_relative_to(checkout / name) for name in ("docs", "artifacts", ".pt")):
+        raise ValueError("output must be inside this checkout's docs, artifacts or .pt directory")
 
 
 def main() -> int:
@@ -161,16 +192,12 @@ def main() -> int:
     parser.add_argument("--preview-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    # Never let a diagnostic preview overwrite the operational or member-facing trees.
     preview = args.preview_root.resolve()
     root = args.source_root.resolve()
-    if not preview.is_relative_to(Path.cwd().resolve() / ".pt"):
-        parser.error("preview-root must be inside this checkout's .pt directory")
-    if (
-        args.output.resolve().is_relative_to(root / "data")
-        or "web/public" in args.output.resolve().as_posix()
-    ):
-        parser.error("output must be an internal measurement record")
+    try:
+        validate_destinations(preview, args.output, CHECKOUT)
+    except ValueError as error:
+        parser.error(str(error))
     document = measure(root, args.handoff_dir, preview)
     print(write_document_once(document, args.output))
     return 0

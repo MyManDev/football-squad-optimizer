@@ -104,3 +104,22 @@ def test_unchecked_or_other_season_outcome_cannot_fill_a_gap() -> None:
 def test_invalid_feed_value_refuses_measurement(stated) -> None:
     with pytest.raises(ValueError):
         measure(snapshot(stated=stated))
+
+
+def test_forecast_at_deadline_is_excluded() -> None:
+    rows, report = measure(snapshot(at="2026-08-21T17:30:00Z"))
+    assert rows == []
+    assert report["excluded_captures"][0]["reason"] == "not_before_deadline"
+
+
+def test_absent_player_outcome_is_unknown_even_when_week_is_checked() -> None:
+    post = snapshot("post", at="2026-08-25T12:00:00Z", checked=True)
+    bootstrap = json.loads(post.payloads[BOOTSTRAP_PAYLOAD])
+    bootstrap["elements"][0]["code"] = 200
+    post = replace(
+        post, payloads={**post.payloads, BOOTSTRAP_PAYLOAD: json.dumps(bootstrap).encode()}
+    )
+    rows, report = measure(snapshot(), post)
+    assert rows[0]["missing_reason"] == "player_outcome_missing"
+    assert report["observed_player_weeks"] == 0
+    assert report["bins"][0]["played"] is None
