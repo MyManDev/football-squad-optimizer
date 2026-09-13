@@ -83,6 +83,10 @@ def _window_world(tmp_path: Path) -> dict[str, Any]:
         captain=GW1_REPLAY_CAPTAIN,
         vice_captain=1004,
         bank_tenths=1_000 - GW1_REPLAY_TOTAL_COST_TENTHS,
+        # The member bought this squad at the capture's own prices, so nothing is in
+        # profit and the sell-on fee withholds nothing: the selling value is what the
+        # fifteen cost. The fee is pinned in test_member_spending_power.py.
+        squad_sell_value_tenths=GW1_REPLAY_TOTAL_COST_TENTHS,
         free_transfers=1,
         free_transfers_known=False,
         source_snapshot_id=str(inputs.snapshot_id),

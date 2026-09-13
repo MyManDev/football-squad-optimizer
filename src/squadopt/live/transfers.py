@@ -39,6 +39,7 @@ from squadopt.planning import (
     TransferPlanResult,
     optimize_transfer_plan,
     sell_price_tenths,
+    spending_power,
 )
 
 LEDGER_TRANSFERS_CONTRACT_VERSION: Final = "ledger_transfers_v1"
@@ -58,6 +59,16 @@ class HeldSquad:
     bank_tenths: int
     free_transfers: int
     chips_used: Mapping[str, tuple[int, ...]]
+    squad_sell_value_tenths: int | None = None
+    """What the whole squad would raise if sold, when the source states it, in tenths.
+
+    None for our own squad, whose purchase prices are the ledger's own and whose sell
+    prices are therefore the rule's exact answer, player by player. It is set for a squad
+    read from the public entry endpoints, which publish no purchase price and so leave
+    ``purchase_prices`` holding current prices: those overstate every risen player's sale
+    by half his rise. The planner takes the difference back out of the budget rather than
+    letting a plan spend it (``planning.pricing.spending_power``).
+    """
 
     def __post_init__(self) -> None:
         squad = tuple(int(value) for value in self.squad_player_ids)
@@ -71,6 +82,8 @@ class HeldSquad:
             raise LedgerError("A held bank may not be negative.")
         if self.free_transfers < 0:
             raise LedgerError("Held free transfers may not be negative.")
+        if self.squad_sell_value_tenths is not None and self.squad_sell_value_tenths < 0:
+            raise LedgerError("A held squad's selling value may not be negative.")
         object.__setattr__(self, "squad_player_ids", squad)
         object.__setattr__(
             self, "purchase_prices", MappingProxyType({player: prices[player] for player in squad})
@@ -403,10 +416,17 @@ def _prepare_planning(
             strict=True,
         )
     )
-    sell_prices = {
-        player: sell_price_tenths(current[player], held.purchase_prices[player], sell_on_fee=fee)
-        for player in held.squad_player_ids
-    }
+    budget = spending_power(
+        bank_tenths=held.bank_tenths,
+        sell_prices_tenths={
+            player: sell_price_tenths(
+                current[player], held.purchase_prices[player], sell_on_fee=fee
+            )
+            for player in held.squad_player_ids
+        },
+        stated_squad_sell_value_tenths=held.squad_sell_value_tenths,
+    )
+    sell_prices = dict(budget.sell_prices_tenths)
     horizon_table = pd.DataFrame(
         {
             "gameweek": gameweek,
@@ -431,7 +451,7 @@ def _prepare_planning(
     )
     state = InitialSquadState(
         held.squad_player_ids,
-        bank_tenths=held.bank_tenths,
+        bank_tenths=budget.bank_tenths,
         free_transfers=min(held.free_transfers, transfer_config.max_free_transfers),
     )
     availability = _chip_availability(rules, gameweek, held, chip)
@@ -500,7 +520,11 @@ def _package_decision(
             "held_squad_decided_gameweek": held.decided_gameweek,
             "held_bank_tenths": held.bank_tenths,
             "held_free_transfers": held.free_transfers,
+            # What the planner was allowed to raise from the held fifteen, which is the
+            # source's own aggregate whenever it stated one, not the sum of their current
+            # prices.
             "held_squad_sell_value_tenths": sum(sell_prices.values()),
+            "stated_squad_sell_value_tenths": held.squad_sell_value_tenths,
             "chips_used_before": {name: list(weeks) for name, weeks in held.chips_used.items()},
             "planner_relative_gap": plan.diagnostics.get("relative_optimality_gap"),
         },
@@ -777,10 +801,17 @@ def plan_transfer_horizon(
             "the removed players before planning."
         )
     fee = float(rules.transfers.sell_on_fee)
-    held_sell_prices = {
-        player: sell_price_tenths(current[player], held.purchase_prices[player], sell_on_fee=fee)
-        for player in held.squad_player_ids
-    }
+    budget = spending_power(
+        bank_tenths=held.bank_tenths,
+        sell_prices_tenths={
+            player: sell_price_tenths(
+                current[player], held.purchase_prices[player], sell_on_fee=fee
+            )
+            for player in held.squad_player_ids
+        },
+        stated_squad_sell_value_tenths=held.squad_sell_value_tenths,
+    )
+    held_sell_prices = dict(budget.sell_prices_tenths)
 
     planning_table = table.loc[
         :, ["gameweek", "player_id", "name", "team_id", "position", "expected_points"]
@@ -807,7 +838,7 @@ def plan_transfer_horizon(
     )
     state = InitialSquadState(
         held.squad_player_ids,
-        bank_tenths=held.bank_tenths,
+        bank_tenths=budget.bank_tenths,
         free_transfers=min(held.free_transfers, planning_policy.max_free_transfers),
     )
     plan = optimize_transfer_plan(

@@ -78,6 +78,7 @@ def _member_picks(
         captain=squad_codes[0],
         vice_captain=squad_codes[1],
         bank_tenths=5,
+        squad_sell_value_tenths=world_module.member_squad_sell_value(world, squad_codes),
         free_transfers=free_transfers,
         free_transfers_known=free_transfers > 1,
         source_snapshot_id=capture or world["gw2_id"],

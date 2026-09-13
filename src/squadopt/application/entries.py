@@ -47,7 +47,8 @@ class EntryPicks:
 
     ``element`` ids are FPL element ids (the same ids the capture's bootstrap uses);
     ``purchase_prices`` may be empty when the endpoint does not publish them, in which
-    case the held squad values players at their current price.
+    case the held squad prices each player at his current price and
+    ``squad_sell_value_tenths`` states what the fifteen together are really worth.
     """
 
     entry_id: int
@@ -76,10 +77,20 @@ class EntryPicks:
     """Chip name -> the gameweeks it was played (what the planner's windows need)."""
     purchase_prices: Mapping[int, int] = field(default_factory=dict)
     purchase_prices_known: bool = False
-    """False when selling prices cannot be derived. The public endpoints do not publish
-    purchase prices, so a held squad built from such picks values every player at his
-    *current* price — which overstates the budget whenever a player has risen since he was
-    bought. A consumer that spends real budget on these numbers must say so to the user."""
+    """False when no *per-player* selling price can be derived. The public endpoints do
+    not publish purchase prices, so nothing says what any one of the fifteen would raise
+    on his own. What the fifteen raise together is a different question and
+    ``squad_sell_value_tenths`` answers it; a consumer that needs the split, to price one
+    named sale, still has to say it does not have it."""
+    squad_sell_value_tenths: int | None = None
+    """What the fifteen would raise if all were sold, in tenths, or None when the source
+    does not state it.
+
+    The endpoints publish the entry's whole worth at the deadline (squad plus bank), so
+    subtracting the bank leaves the squad's selling value exactly. It is the budget a
+    plan may spend, and it is below the sum of the current prices for anyone holding a
+    player who has risen, because the game keeps half of that rise. A held squad built
+    without it, and without purchase prices, has no honest budget at all."""
     source_snapshot_id: str | None = None
     active_chip: str | None = None
     """The chip active in ``gameweek`` as the capture reported it, or None."""
@@ -110,6 +121,8 @@ class EntryPicks:
                 "purchase_prices are present but flagged unknown; a consumer could not "
                 "tell whether to trust them."
             )
+        if self.squad_sell_value_tenths is not None and self.squad_sell_value_tenths < 0:
+            raise EntryError("squad_sell_value_tenths must be None or a count of tenths.")
         if not isinstance(self.squad_basis, str) or not self.squad_basis.strip():
             raise EntryError("squad_basis must be non-empty text.")
         if self.active_chip is not None and (
@@ -188,13 +201,13 @@ def held_squad_from_picks(picks: EntryPicks, *, current_prices: Mapping[int, int
     ``current_prices`` are the capture's prices (element id -> tenths); purchase prices
     fall back to them when the entry endpoints do not publish what was paid.
 
-    That fallback is not free, and the picks object now says so:
-    ``picks.purchase_prices_known`` is False on capture-built picks because the public
-    endpoints publish no purchase prices, so every selling price here is the *current*
-    price — an overstatement of the real budget for any player who has risen since he was
-    bought. The planner will spend that phantom budget. Any surface that shows a plan built
-    from such a squad must carry the caveat; this function stays honest by construction
-    only when its caller does.
+    That fallback is an upper bound, not an answer: the game sells a risen player for his
+    purchase price plus half the rise, never for the market price, so a squad priced this
+    way is worth more on paper than the member could raise. What stops a plan spending the
+    difference is ``picks.squad_sell_value_tenths``, which the endpoints do publish for the
+    fifteen together; it travels to the planner on the held squad and caps the budget
+    there. Without it, and without purchase prices, there is no honest budget to plan on
+    and this refuses rather than guessing the optimistic one.
     """
 
     missing = [p for p in picks.squad if p not in current_prices]
@@ -202,6 +215,19 @@ def held_squad_from_picks(picks: EntryPicks, *, current_prices: Mapping[int, int
         raise EntryError(
             f"No current price for players {missing[:5]!r}; the capture must cover the squad."
         )
+    # The aggregate is the answer to the question the purchase prices cannot answer, so it
+    # travels only when they are the fallback. With real purchase prices the per-player
+    # rule is exact and a second, older aggregate could only fight it.
+    stated_sell_value: int | None = None
+    if not picks.purchase_prices_known:
+        if picks.squad_sell_value_tenths is None:
+            raise EntryError(
+                f"Entry {picks.entry_id} has neither purchase prices nor a stated squad "
+                "selling value, so what it can spend is unknown. Planning on the current "
+                "prices would credit the member with the half of every price rise the "
+                "game keeps."
+            )
+        stated_sell_value = int(picks.squad_sell_value_tenths)
     purchase = {int(p): int(picks.purchase_prices.get(p, current_prices[p])) for p in picks.squad}
     return HeldSquad(
         season=picks.season,
@@ -213,6 +239,7 @@ def held_squad_from_picks(picks: EntryPicks, *, current_prices: Mapping[int, int
         chips_used={
             str(name): tuple(int(w) for w in weeks) for name, weeks in picks.chips_used.items()
         },
+        squad_sell_value_tenths=stated_sell_value,
     )
 
 

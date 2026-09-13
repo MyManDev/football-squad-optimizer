@@ -120,6 +120,8 @@ def test_advice_keeps_control_bytes_and_compute_counts_while_recording_a_better_
         captain=HELD[0],
         vice_captain=HELD[1],
         bank_tenths=held.bank_tenths,
+        # Fifteen bought at today's price: no profit, so no sell-on fee to withhold.
+        squad_sell_value_tenths=sum(held.purchase_prices.values()),
         free_transfers=held.free_transfers,
         source_snapshot_id="capture-a",
     )
