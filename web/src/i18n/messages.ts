@@ -739,7 +739,7 @@ const en = {
       `The source did not provide: ${fields}. Nothing is invented to fill it.`,
     entryAssumptionsTitle: "Public-data limits",
     currentPriceFallback:
-      "Purchase prices are not public. Current prices are used as selling prices, which may overstate the available budget after a price rise.",
+      "Purchase prices are not public, so what each player alone would sell for is unknown. What the whole squad sells for is published, and the plan spends that and the bank, never more.",
     memberSquad: "Member Squad",
     heldViceCaptainUnavailable: "The published squad does not name the vice-captain.",
     starterCount: (count: number) => `${count} starters`,
@@ -1640,7 +1640,7 @@ const tr: MessageSchema<typeof en> = {
       `Kaynak şu alanları sağlamadı: ${fields}. Boşlukları doldurmak için veri uydurulmaz.`,
     entryAssumptionsTitle: "Herkese Açık Veri Sınırları",
     currentPriceFallback:
-      "Satın alma fiyatları herkese açık değildir. Satış fiyatı olarak mevcut fiyat kullanılır; fiyatı yükselen bir oyuncu için kullanılabilir bütçe olduğundan yüksek görünebilir.",
+      "Satın alma fiyatları herkese açık değil, yani tek bir oyuncunun kaça satılacağı bilinmiyor. Kadronun tamamının satış değeri ise yayımlanıyor; plan onu ve bankayı harcar, fazlasını değil.",
     memberSquad: "Üye kadrosu",
     heldViceCaptainUnavailable: "Yayımlanan kadroda yedek kaptan belirtilmiyor.",
     starterCount: (count) => `${count} ilk 11 oyuncusu`,

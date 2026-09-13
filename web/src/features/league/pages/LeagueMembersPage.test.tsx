@@ -262,7 +262,12 @@ describe("league member surfaces", () => {
       .closest("section");
     expect(transferCard).toHaveTextContent("Bilinmiyor");
     expect(transferCard).not.toHaveTextContent("banka edilmiş ikinci transfer");
-    expect(screen.getByText(/Satın alma fiyatları herkese açık değildir/)).toBeInTheDocument();
+    // The limit is the per-player split, not the budget: the squad's selling value is
+    // published, so the plan can spend exactly that and no more.
+    expect(screen.getByText(/Satın alma fiyatları herkese açık değil/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Kadronun tamamının satış değeri ise yayımlanıyor/),
+    ).toBeInTheDocument();
     expect(container.textContent).not.toContain("%");
   });
 
