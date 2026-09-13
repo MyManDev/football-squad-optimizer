@@ -96,6 +96,9 @@ def advice_read_schema() -> dict[str, Any]:
             "optimality_gap": nullable_number,
             "control_optimality_gap": nullable_number,
             "expected_own_points": nullable_number,
+            # Null where the comparison against holding could not be walked, which is
+            # not the same fact as a plan that gains nothing.
+            "expected_gain_vs_hold": nullable_number,
             "captain_agreement": {"type": "boolean"},
             "captain": {"anyOf": [player, {"type": "null"}]},
             "vice_captain": {"anyOf": [player, {"type": "null"}]},
@@ -150,7 +153,9 @@ def advice_read_schema() -> dict[str, Any]:
                                 "move_id": {"type": "string"},
                                 "player_out": {"anyOf": [player, {"type": "null"}]},
                                 "player_in": {"anyOf": [player, {"type": "null"}]},
-                                "expected_points_delta": {"type": "number"},
+                                # Null where the row's share of the plan's gain could
+                                # not be measured; the row still names the swap.
+                                "expected_points_delta": nullable_number,
                                 "reason_code": {
                                     "enum": ["window_value", "mode_tradeoff", "points_gain"]
                                 },

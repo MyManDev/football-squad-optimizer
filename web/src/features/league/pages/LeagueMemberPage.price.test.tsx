@@ -92,7 +92,10 @@ describe("an unproven price reads as a ceiling", () => {
     // The plan itself, and the candidate beside it, both under the same bound.
     expect(text).toMatch(/at most 7\.9 expected points against pure points/);
     expect(text).not.toMatch(/, 6\.4 expected points against pure points/);
-    expect(text).toMatch(/published as a ceiling — the most this strategy can cost/);
+    expect(text).toMatch(/published as a ceiling, the most this strategy can cost/);
+    // The bound it rests on is named for what it bounds, the planner's objective.
+    expect(text).toMatch(/planner objective .* which is not a points total/);
+    expect(text).not.toMatch(/gap ≤ 1\.5 pts/);
   });
 
   it("states the most it can cost, not the difference, in Turkish", () => {
@@ -109,7 +112,7 @@ describe("an unproven price reads as a ceiling", () => {
       optimality_gap: 1.1,
       expected_points_cost_ceiling: 0.8,
     });
-    expect(renderText("en", found)).toMatch(/It is the best plan the search found/);
+    expect(renderText("en", found)).toMatch(/This is the best plan the search found/);
     expect(renderText("tr", found)).toMatch(/aramanın bulduğu en iyi plan/);
   });
 });

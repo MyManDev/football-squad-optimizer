@@ -1057,7 +1057,11 @@ def test_every_published_move_names_a_swap_the_game_would_accept(
     transfer screen would refuse. The synthetic world numbers its players in position
     blocks and so cannot cross them; these are real codes and positions from the
     published pool (``web/public/data/2026-27/gw01/pool.json``), whose id order does
-    cross. The row set and the summed delta are unchanged by the pairing.
+    cross. The row set is unchanged by the pairing.
+
+    The four players here are not a fifteen, so the eleven behind each row cannot be
+    chosen and no row carries a measured share: the rows are published without one
+    rather than with the raw two-player difference they used to carry.
     """
 
     import pandas as pd
@@ -1074,11 +1078,12 @@ def test_every_published_move_names_a_swap_the_game_would_accept(
             }
         ).iterrows()
     }
-    moves = advice_service._moves(
+    moves, gain = advice_service._moves(
         [141746, 200834],
         [201895, 607464],
         by_id=pool,
         pool_by_id=pool,
+        held=[141746, 200834],
         gameweek=2,
         reason_code="mode_tradeoff",
     )
@@ -1086,7 +1091,8 @@ def test_every_published_move_names_a_swap_the_game_would_accept(
     assert len(moves) == 2
     for move in moves:
         assert move["player_out"]["position"] == move["player_in"]["position"]
-    assert sum(float(str(move["expected_points_delta"])) for move in moves) == pytest.approx(5.0)
+    assert [move["expected_points_delta"] for move in moves] == [None, None]
+    assert gain is None
     # The real payload agrees: nothing else re-orders the rows.
     inputs, projection, rules = _world_context(world)
     payload = advise_entry(
@@ -1122,3 +1128,106 @@ def test_the_one_week_plan_is_not_captioned_as_a_longer_window(world: dict[str, 
     moves = payload["moves"]
     assert isinstance(moves, list) and moves
     assert {move["reason_code"] for move in moves} == {"points_gain"}
+
+
+def test_the_rows_and_the_headline_are_one_basis_and_add_up_to_the_gain(
+    world: dict[str, Any],
+) -> None:
+    """Every points figure the card prints is the eleven with the captain doubled.
+
+    A move row used to be the raw difference between the two players' own projections,
+    which is a fifteen-man number: it counted a player leaving the bench as a loss the
+    member would never have taken, and it summed to something no other figure on the page
+    agreed with. A row is now that swap's share of what the plan gains against holding the
+    squad, measured on the payload's own basis with the rows above it already applied, so
+    the rows add up to ``expected_gain_vs_hold`` exactly and that figure is the difference
+    between two totals stated in the same units as ``expected_own_points``.
+    """
+
+    inputs, projection, rules = _world_context(world)
+    picks = _member_picks(world, 101, _legal_squad(world))
+    payload = advise_entry(
+        _request(),
+        provider=_Provider({101: picks}),
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+    moves = payload["moves"]
+    assert isinstance(moves, list) and moves
+    gain = payload["expected_gain_vs_hold"]
+    assert isinstance(gain, float)
+    assert sum(float(str(move["expected_points_delta"])) for move in moves) == pytest.approx(gain)
+
+    # The same arithmetic from the outside: the plan's own total, less what the member
+    # would have fielded from the fifteen they already hold.
+    pool = {
+        int(str(row["player_id"])): (str(row["position"]), float(str(row["expected_points"])))
+        for _, row in projection.table.iterrows()
+    }
+    hold = advice_service.best_eleven_points(pool[player] for player in picks.squad)
+    assert hold is not None
+    assert float(str(payload["expected_own_points"])) - hold == pytest.approx(gain)
+
+
+def test_a_swap_out_of_the_bench_is_not_priced_as_a_swap_out_of_the_eleven() -> None:
+    """A player who was never going to start costs nothing to sell.
+
+    This is the reading the fifteen-man difference got wrong, and it is worth pinning on
+    its own: replacing a benched player with one who does start is worth what the eleven
+    gains, not the difference between two projections the member would only have scored
+    one of.
+    """
+
+    held: list[tuple[str, float]] = [
+        ("GK", 6.0),
+        ("GK", 1.0),
+        *[("DEF", 5.0)] * 5,
+        *[("MID", 4.0)] * 4,
+        ("MID", 1.0),
+        *[("FWD", 3.0)] * 3,
+    ]
+    assert len(held) == 15
+    before = advice_service.best_eleven_points(held)
+    assert before is not None
+
+    # The outgoing midfielder is the 1.0 on the bench; the incoming one is worth 4.5.
+    swapped = [*held]
+    swapped[swapped.index(("MID", 1.0))] = ("MID", 4.5)
+    after = advice_service.best_eleven_points(swapped)
+    assert after is not None
+
+    # The raw two-player difference is 3.5. What the eleven gains is 0.5: the newcomer
+    # displaces the weakest starting midfielder, who drops to the bench.
+    assert after - before == pytest.approx(0.5)
+
+
+def test_a_fifteen_with_no_legal_eleven_is_worth_nothing_measurable() -> None:
+    """Absent is not zero, at the one place the arithmetic can fail."""
+
+    assert advice_service.best_eleven_points([]) is None
+    # No goalkeeper: the game has no eleven to field from this, so neither does this.
+    assert advice_service.best_eleven_points([("MID", 5.0)] * 15) is None
+
+
+def test_the_one_week_plan_states_that_no_chip_was_offered(world: dict[str, Any]) -> None:
+    """``chip: null`` is what a plan that never weighed a chip looks like.
+
+    The solver is handed an empty chip availability on every member path, so the one-week
+    payload's null chip was not a decision. The windows already stated the limit; the
+    one-week payload states the same sentence, in the same words, so the page can say so.
+    """
+
+    inputs, projection, rules = _world_context(world)
+    payload = advise_entry(
+        _request(),
+        provider=_Provider({101: _member_picks(world, 101, _legal_squad(world))}),
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+    assert payload["chip"] is None
+    assert payload["stated_limits"] == [advice_service.NO_CHIP_LIMIT]
+    assert advice_service.NO_CHIP_LIMIT in advice_service.WINDOW_STATED_LIMITS

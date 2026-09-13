@@ -41,6 +41,7 @@ from squadopt.application.entries import (
     held_squad_from_picks,
 )
 from squadopt.application.lineup_publication import advice_player as _advice_player
+from squadopt.application.lineup_publication import best_eleven_points as best_eleven_points
 from squadopt.application.lineup_publication import lineup_fields as lineup_fields
 from squadopt.application.phase_e import TransferAdviceDiagnostic, run_transfer_advice_diagnostic
 from squadopt.application.strategies import STRATEGY_CATALOG
@@ -196,33 +197,92 @@ def _paired_by_position(
     return pairs
 
 
+def _attributed_gains(
+    pairs: Sequence[tuple[int | None, int | None]],
+    *,
+    held: Sequence[int],
+    lookup: dict[int, tuple[str, float]],
+) -> list[float] | None:
+    """Each swap's share of what the plan is worth against holding the squad.
+
+    One basis, the published one: the eleven with the captain doubled. The moves are
+    applied to the held fifteen in the order the rows are printed, the eleven is re-chosen
+    after each of them (``best_eleven_points``), and a row is what that total moved by. So
+    the rows add up to the whole plan's gain against doing nothing, exactly, and a swap
+    whose outgoing player was never going to start prints what it is really worth rather
+    than a difference between two names.
+
+    The order is the rows' own, which makes each row conditional on the ones above it: the
+    second of two swaps into the same position is credited only with what it adds on top
+    of the first. That is a choice, not a measurement, and it is the only decomposition
+    that is exactly additive; the card says the rows are read in order.
+
+    ``None`` when the chain cannot be walked at all: a player neither table names, a row
+    with no outgoing or no incoming player, or an intermediate fifteen holding no legal
+    eleven. Nothing is then published for any row, because a row whose value was not
+    measured is not a row worth zero.
+    """
+
+    squad = list(held)
+    if any(player not in lookup for player in squad):
+        return None
+    previous = best_eleven_points(lookup[player] for player in squad)
+    if previous is None:
+        return None
+    gains: list[float] = []
+    for player_out, player_in in pairs:
+        if player_out is None or player_in is None:
+            return None
+        if player_out not in squad or player_in in squad or player_in not in lookup:
+            return None
+        squad[squad.index(player_out)] = player_in
+        value = best_eleven_points(lookup[player] for player in squad)
+        if value is None:
+            return None
+        gains.append(value - previous)
+        previous = value
+    return gains
+
+
 def _moves(
     outs: Sequence[int],
     ins: Sequence[int],
     *,
     by_id: "dict[int, pd.Series[Any]]",
     pool_by_id: "dict[int, pd.Series[Any]]",
+    held: Sequence[int],
     gameweek: int,
     reason_code: str,
-) -> list[dict[str, object]]:
-    """The published moves: out/in pairs by pitch position, each with its expected-points
-    delta. ``by_id`` resolves the incoming players (the plan's own squad rows),
-    ``pool_by_id`` the outgoing ones (the shared projection).
+) -> tuple[list[dict[str, object]], float | None]:
+    """The published moves and what the whole set is worth against holding the squad.
+
+    Out/in pairs by pitch position. ``by_id`` resolves the incoming players (the plan's
+    own squad rows), ``pool_by_id`` the outgoing ones (the shared projection), and
+    ``held`` is the fifteen the member holds, which is where the comparison starts.
+
+    Each row's ``expected_points_delta`` is on the same basis as the payload's
+    ``expected_own_points``: the eleven with the captain doubled. A raw difference between
+    the two players' own projections is not that, and was not comparable with anything
+    else the card prints; see ``_attributed_gains``. Where the decomposition cannot be
+    walked, every row publishes ``null`` and so does the total, rather than a zero nobody
+    measured.
 
     A move carries no cost of its own. The week's hit charge is a property of the week —
     the game takes four points once for each transfer beyond the free ones, and nothing
     here measures what share of that belongs to one swap — so it is published once,
-    beside ``moves``, as the payload's ``transfer_hit_points``.
+    beside ``moves``, as the payload's ``transfer_hit_points``, and the gain returned here
+    is before it.
     """
 
-    moves: list[dict[str, object]] = []
     pairs = _paired_by_position(outs, ins, by_id=by_id, pool_by_id=pool_by_id)
+    lookup: dict[int, tuple[str, float]] = {
+        player: (str(row["position"]), float(str(row["expected_points"])))
+        for table in (pool_by_id, by_id)
+        for player, row in table.items()
+    }
+    gains = _attributed_gains(pairs, held=held, lookup=lookup)
+    moves: list[dict[str, object]] = []
     for index, (player_out, player_in) in enumerate(pairs):
-        delta = 0.0
-        if player_in is not None and player_in in by_id:
-            delta += float(str(by_id[player_in]["expected_points"]))
-        if player_out is not None and player_out in pool_by_id:
-            delta -= float(str(pool_by_id[player_out]["expected_points"]))
         moves.append(
             {
                 "move_id": f"gw{gameweek:02d}-{index + 1}",
@@ -236,11 +296,11 @@ def _moves(
                     if player_in is not None and player_in in by_id
                     else None
                 ),
-                "expected_points_delta": delta,
+                "expected_points_delta": None if gains is None else gains[index],
                 "reason_code": reason_code,
             }
         )
-    return moves
+    return moves, (None if gains is None else math.fsum(gains))
 
 
 def _missing_fields(picks: EntryPicks) -> list[str]:
@@ -391,6 +451,23 @@ def _control_for(
     return control
 
 
+#: No plan on this path is offered a chip. Every member solve, one week and window alike,
+#: is handed an empty chip availability, so a payload's ``chip: null`` says the plan plays
+#: none and not that a chip was weighed and declined. Named here because the one-week
+#: payload states the same limit the windows state, in the same words, from one place.
+NO_CHIP_LIMIT: str = (
+    "No chip is offered inside the window. A finite window counts nothing for "
+    "holding a chip back, so a planner that could reach one would spend it; chip "
+    "timing is a season-long decision this window cannot price."
+)
+
+#: What a one-week plan assumes. The windows carry six sentences; the only one of them
+#: that is also true here is the chip, and it is the one a reader cannot otherwise tell
+#: from the payload: "no chip this week" is what a plan that never considered one looks
+#: like, so without this sentence the absence reads as a decision.
+ONE_WEEK_STATED_LIMITS: tuple[str, ...] = (NO_CHIP_LIMIT,)
+
+
 def build_advice_payload(
     picks: EntryPicks,
     inputs: RecommendationInputs,
@@ -458,6 +535,9 @@ def build_advice_payload(
     reason_code = "points_gain" if mode == COMPUTED_MODE else "mode_tradeoff"
     moves: list[dict[str, object]] = []
     transfer_hit_points = 0.0
+    # No transfers is a measured answer, not an absent one: the plan's fifteen is the
+    # fifteen already held, so what it gains against holding is exactly nothing.
+    gain_vs_hold: float | None = 0.0
     if transfers is not None:
         record = transfers.as_record()
         outs_raw = record.get("transfers_out", [])
@@ -465,11 +545,12 @@ def build_advice_payload(
         outs = [int(str(v)) for v in outs_raw] if isinstance(outs_raw, list | tuple) else []
         ins = [int(str(v)) for v in ins_raw] if isinstance(ins_raw, list | tuple) else []
         transfer_hit_points = float(str(record.get("transfer_hit_points", 0.0)))
-        moves = _moves(
+        moves, gain_vs_hold = _moves(
             outs,
             ins,
             by_id=by_id,
             pool_by_id=pool_by_id,
+            held=picks.squad,
             gameweek=picks.gameweek + 1,
             reason_code=reason_code,
         )
@@ -487,6 +568,11 @@ def build_advice_payload(
         # four points for each transfer beyond the free ones, on the week rather than on
         # any one move, so no move row carries it.
         "transfer_hit_points": transfer_hit_points,
+        # What the whole plan is worth against simply keeping the fifteen already held,
+        # on the same basis as ``expected_own_points`` and as every move row: the eleven
+        # with the captain doubled, before the week's hit charge above. Equal to the sum
+        # of the rows by construction. ``null`` where the comparison could not be walked.
+        "expected_gain_vs_hold": gain_vs_hold,
         # The mode's whole-plan price against the pure-points pick, in expected points —
         # the only cross-mode number the site may show (no probability ships, ever). It
         # is the measured difference between two solved plans, which is the cost itself
@@ -503,6 +589,10 @@ def build_advice_payload(
         # eleven in pitch order, the bench in the order the game's autosubs walk it,
         # and the chip — all in expected points, none of it a probability.
         **lineup,
+        # What this plan assumes, in the producer's own sentence. A one-week solve is
+        # handed no chip either, and the payload said nothing about it, so a reader had
+        # no way to tell a chip that was weighed and declined from one never offered.
+        "stated_limits": list(ONE_WEEK_STATED_LIMITS),
         "data_quality": "partial" if missing else "complete",
         "missing_fields": missing,
         # Which squad the advice stands on: the captured week's own, or the one held
@@ -534,9 +624,7 @@ WINDOW_STATED_LIMITS: tuple[str, ...] = (
     "(a wildcard week excepted); the one-week plan has no such cap.",
     WINDOW_TOP100_LIMIT,
     "Prices are held at the captured values; no price change is modelled.",
-    "No chip is offered inside the window. A finite window counts nothing for "
-    "holding a chip back, so a planner that could reach one would spend it; chip "
-    "timing is a season-long decision this window cannot price.",
+    NO_CHIP_LIMIT,
 )
 
 
@@ -636,6 +724,15 @@ def build_window_payload(
     by_id = {int(str(row["player_id"])): row for _, row in first.selected_squad.iterrows()}
     raw_gap = plan.diagnostics.get("absolute_optimality_gap")
     missing = _missing_fields(picks)
+    moves, gain_vs_hold = _moves(
+        [int(str(v)) for v in first.transfers_out["player_id"].tolist()],
+        [int(str(v)) for v in first.transfers_in["player_id"].tolist()],
+        by_id=by_id,
+        pool_by_id=pool_by_id,
+        held=picks.squad,
+        gameweek=picks.gameweek + 1,
+        reason_code="window_value",
+    )
     return {
         "season": picks.season,
         "gameweek": picks.gameweek + 1,
@@ -645,17 +742,13 @@ def build_window_payload(
         "window": int(window),
         "source_snapshot_id": picks.source_snapshot_id,
         # The first week's moves, in the one-week shape the page already renders.
-        "moves": _moves(
-            [int(str(v)) for v in first.transfers_out["player_id"].tolist()],
-            [int(str(v)) for v in first.transfers_in["player_id"].tolist()],
-            by_id=by_id,
-            pool_by_id=pool_by_id,
-            gameweek=picks.gameweek + 1,
-            reason_code="window_value",
-        ),
+        "moves": moves,
         # The first week's hit charge, once, as the one-week payload carries it; the
         # rest of the window's charges are on their own rows in ``plan_weeks``.
         "transfer_hit_points": float(first.transfer_hit_points),
+        # The first week's gain against holding, matching the first week's moves and the
+        # first week's lineup total; the later weeks are in ``plan_weeks``.
+        "expected_gain_vs_hold": gain_vs_hold,
         "expected_points_cost": 0.0,
         "rival_label": None,
         # The solver's own account of the whole window: OPTIMAL is a proof, FEASIBLE is
@@ -1089,12 +1182,15 @@ __all__: tuple[str, ...] = (
     "COMPUTED_MODE",
     "COMPUTED_WINDOW",
     "MEMBER_WINDOWS",
+    "NO_CHIP_LIMIT",
+    "ONE_WEEK_STATED_LIMITS",
     "WINDOW_STATED_LIMITS",
     "WINDOW_TOP100_LIMIT",
     "AdviseEntryRequest",
     "HorizonBuilder",
     "MemberControl",
     "advise_entry",
+    "best_eleven_points",
     "bound_slack",
     "build_advice_payload",
     "build_window_payload",
