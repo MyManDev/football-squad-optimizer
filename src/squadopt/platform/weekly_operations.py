@@ -9,6 +9,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -45,6 +46,7 @@ from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.live import handoff_path_for, load_entry, read_projection_handoff, read_season_rules
+from squadopt.live.runlog import LOG_ROOT_NAME, RunLog, configure_run_logging
 from squadopt.platform import cohort_capture, elite_capture
 from squadopt.platform._queue_lock import QueueFileLock
 from squadopt.platform.fpl_capture import capture
@@ -77,7 +79,8 @@ class WeeklyPaths:
     rotation: Path
     out: Path
     journal: Path
-    log: Path
+    log_root: Path
+    """Root above every component's log directory, never qualified with a component."""
     records: Path
     club_news_fixture: Path
 
@@ -95,7 +98,7 @@ class WeeklyPaths:
             root / "artifacts/rotation",
             out or root / "data/runtime/weekly/preview",
             root / "data/runtime/weekly",
-            root / "data/logs/season_tick",
+            root / LOG_ROOT_NAME,
             root / "data/advice_records",
             root / "data/sample/club_news_v1.fixture.json",
         )
@@ -138,6 +141,9 @@ def recorded_capture_directories(root: Path, season: str) -> list[Path]:
 
 
 class WeeklyOperations:
+    log: RunLog
+    """Set by :meth:`execute`; the stages record through it."""
+
     def __init__(
         self,
         request: WeeklyRequest,
@@ -529,7 +535,7 @@ class WeeklyOperations:
                 self.paths.archive,
                 self.paths.handoffs,
                 self.run.directory,
-                self.paths.log,
+                self.paths.log_root,
                 self.paths.out,
                 season=self.request.season,
                 snapshot_id=self._capture_id(),
@@ -619,8 +625,40 @@ class WeeklyOperations:
             raise WeekError("Publication did not return a verified PR/no-change receipt.")
         return self._receipt("publish", {**proof, **copied, "preview": str(preview)})
 
+    def _stage(
+        self,
+        name: str,
+        *,
+        inputs: Sequence[Path],
+        operation: Callable[[], WeeklyStageResult],
+        repeatable: bool = True,
+    ) -> WeeklyStageResult:
+        """Run one journalled stage and record its boundary in the run log."""
+
+        self.log.event("tick.week.stage.start", stage=name)
+        try:
+            result = self.run.stage(name, inputs=inputs, operation=operation, repeatable=repeatable)
+        except Exception as error:
+            self.log.failure("tick.week.stage.failed", stage=name, error=str(error))
+            raise
+        self.log.event("tick.week.stage.done", stage=name)
+        return result
+
     def execute(self) -> Path:
         p = self.paths
+        # A weekly run is the season tick driven by hand, so it records into the tick's own
+        # component: the status page reads one run log, not one per entry point.
+        self.log = configure_run_logging(
+            "season_tick", log_root=p.log_root, run_id=self.run_id, console=False
+        )
+        self.log.event(
+            "tick.week.plan",
+            season=self.request.season,
+            gameweek=self.request.gameweek,
+            league=self.request.league_id,
+            stages=list(self.stages),
+            resume=self.resume,
+        )
         with (
             QueueFileLock(p.journal / ".workspace.lock", timeout_seconds=0).hold(),
             self.run.hold(),
@@ -629,21 +667,21 @@ class WeeklyOperations:
             if self.rule_snapshot:
                 initial_inputs.append(self._snapshot_path(self.rule_snapshot))
             self.values["preflight"] = dict(
-                self.run.stage("preflight", inputs=initial_inputs, operation=self._preflight).value
+                self._stage("preflight", inputs=initial_inputs, operation=self._preflight).value
             )
             if "top100" in self.plan.steps:
                 self.values["top100_cohort"] = dict(
-                    self.run.stage("top100_cohort", inputs=[], operation=self._cohort).value
+                    self._stage("top100_cohort", inputs=[], operation=self._cohort).value
                 )
                 self.values["top100_picks"] = dict(
-                    self.run.stage(
+                    self._stage(
                         "top100_picks",
                         inputs=[self._snapshot_path(str(self._cohort_id()))],
                         operation=self._elite,
                     ).value
                 )
                 self.values["top100_evidence"] = dict(
-                    self.run.stage(
+                    self._stage(
                         "top100_evidence",
                         inputs=[
                             self._snapshot_path(str(self._cohort_id())),
@@ -656,17 +694,15 @@ class WeeklyOperations:
             if self.request.snapshot_id:
                 capture_inputs.append(self._snapshot_path(self.request.snapshot_id))
             self.values["capture"] = dict(
-                self.run.stage("capture", inputs=capture_inputs, operation=self._capture).value
+                self._stage("capture", inputs=capture_inputs, operation=self._capture).value
             )
             selected = self._snapshot_path(self._capture_id())
             self.values["settled_outcomes"] = dict(
-                self.run.stage(
-                    "settled_outcomes", inputs=[p.snapshots], operation=self._settled
-                ).value
+                self._stage("settled_outcomes", inputs=[p.snapshots], operation=self._settled).value
             )
             if self.request.rotation:
                 self.values["rotation"] = dict(
-                    self.run.stage(
+                    self._stage(
                         "rotation", inputs=[selected, p.club_news_fixture], operation=self._rotation
                     ).value
                 )
@@ -680,12 +716,12 @@ class WeeklyOperations:
                         Path(self.values["top100_evidence"][key]) for key in ("table", "manifest")
                     )
             self.values["handoff"] = dict(
-                self.run.stage("handoff", inputs=handoff_inputs, operation=self._handoff).value
+                self._stage("handoff", inputs=handoff_inputs, operation=self._handoff).value
             )
             held_handoff = Path(self.values["handoff"]["path"])
             if self.request.decide:
                 self.values["decide"] = dict(
-                    self.run.stage(
+                    self._stage(
                         "decide",
                         inputs=[selected, held_handoff, *self.ledger_inputs],
                         operation=self._decide,
@@ -697,16 +733,18 @@ class WeeklyOperations:
             # writes for its own capture is the stage's output, so a week whose records
             # moved between runs is visible as changed inputs rather than as changed bytes.
             self.values["league"] = dict(
-                self.run.stage(
+                self._stage(
                     "league",
                     inputs=[*common, p.archive, *self.record_inputs],
                     operation=self._league,
                 ).value
             )
+            # The run log is not a declared input: this run appends its own records to it
+            # while it works, so fingerprinting it would report "inputs changed" on every
+            # resume. The status page's recent events are a live read of this machine's
+            # log, this run's records included, not a frozen artifact of the week.
             self.values["site"] = dict(
-                self.run.stage(
-                    "site", inputs=[*common, p.ledger, p.log], operation=self._site
-                ).value
+                self._stage("site", inputs=[*common, p.ledger], operation=self._site).value
             )
             cohort_inputs = [
                 self._snapshot_path(identifier)
@@ -714,7 +752,7 @@ class WeeklyOperations:
                 if identifier
             ]
             self.values["scoreboard"] = dict(
-                self.run.stage(
+                self._stage(
                     "scoreboard",
                     inputs=[*common, p.ledger, p.evidence, p.snapshots, *cohort_inputs],
                     operation=self._scoreboard,
@@ -723,14 +761,20 @@ class WeeklyOperations:
             if self.request.publish:
                 # What ships is the preview tree, so that is the stage's whole input.
                 self.values["publish"] = dict(
-                    self.run.stage(
+                    self._stage(
                         "publish",
                         inputs=[p.out / "data"],
                         operation=self._publish,
                         repeatable=False,
                     ).value
                 )
-            return self.run.finish()
+            try:
+                receipt = self.run.finish()
+            except Exception as error:
+                self.log.failure("tick.week.failed", error=str(error))
+                raise
+            self.log.event("tick.week.done", receipt=str(receipt))
+            return receipt
 
 
 def build_parser() -> argparse.ArgumentParser:

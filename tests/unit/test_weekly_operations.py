@@ -10,7 +10,9 @@ from types import SimpleNamespace
 import pytest
 from tests.unit.test_publication_services import publication_world
 
+from squadopt.application.build import _recent_events
 from squadopt.application.weekly_plan import WeekError, WeeklyRequest, rotation_artifact
+from squadopt.live.runlog import LOG_ROOT_NAME
 from squadopt.platform import weekly_operations as weekly
 from squadopt.platform.weekly_journal import WeeklyJournalError, fingerprint_paths, inspect_run
 
@@ -513,3 +515,32 @@ def test_legacy_and_installed_dry_run_flags_match_without_writing(
     assert legacy.main(args) == 0
     assert capsys.readouterr().out == installed
     assert list(tmp_path.iterdir()) == []
+
+
+def test_a_weekly_run_leaves_the_same_kind_of_run_log_record_a_tick_does(tmp_path: Path) -> None:
+    """A completed weekly run was journalled but wrote nothing the status page could read.
+
+    The journal under ``data/runtime/weekly`` records stages for a resume; the run log is
+    what the operations status reads. The runner now configures the tick's own component,
+    so a week driven by hand shows up beside a scheduled tick.
+    """
+
+    operation = world(tmp_path)
+    operation.execute()
+
+    root = operation.paths.log_root
+    assert root == tmp_path / LOG_ROOT_NAME
+    events = _recent_events(root, "season_tick", 200)
+    assert events, "a weekly run must leave a record the status page can read"
+    assert {event.run_id for event in events} == {"synthetic"}
+
+    messages = [event.message for event in events]
+    assert "tick.week.plan" in messages and "tick.week.done" in messages
+    stages_started = {
+        str(event.fields["stage"]) for event in events if event.message == "tick.week.stage.start"
+    }
+    assert stages_started == set(operation.stages)
+
+    plan = next(event for event in events if event.message == "tick.week.plan")
+    assert plan.fields["season"] == "2026-27" and plan.fields["gameweek"] == 2
+    assert plan.level == "INFO" and plan.ts

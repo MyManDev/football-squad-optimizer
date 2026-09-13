@@ -30,10 +30,11 @@ from squadopt.application.site_publication import (
 )
 from squadopt.data.errors import DataError
 from squadopt.live import LedgerError
+from squadopt.live.runlog import LOG_ROOT_NAME
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HANDOFF_ROOT = REPOSITORY_ROOT / "data" / "handoffs"
-DEFAULT_LOG_ROOT = REPOSITORY_ROOT / "data" / "logs"
+DEFAULT_LOG_ROOT = REPOSITORY_ROOT / LOG_ROOT_NAME
 
 
 def _parse_arguments() -> argparse.Namespace:
