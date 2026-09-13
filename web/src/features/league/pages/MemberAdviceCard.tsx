@@ -92,7 +92,11 @@ export function AdviceCard({
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
   const view = envelope.payload;
-  const basisWeek = /^pre_free_hit_gw(\d{2})$/.exec(view.squad_basis ?? "")?.[1];
+  const entryBasis = squad.payload.squad_basis;
+  const basisAgrees = view.squad_basis === undefined || view.squad_basis === entryBasis;
+  const basisWeek = basisAgrees
+    ? /^pre_free_hit_gw(\d{2})$/.exec(entryBasis ?? "")?.[1]
+    : undefined;
   const rival =
     view.rival_entry_id === undefined
       ? null

@@ -14,20 +14,24 @@ import {
   mockEntrySquadEnvelopes,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
-import type { EntryAdvice, LeagueViewEnvelope } from "../types";
+import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 
 afterEach(cleanup);
 
 const ENTRY = 35249001;
 
-function renderAdvice(advice: LeagueViewEnvelope<EntryAdvice>, language: "tr" | "en" = "tr") {
+function renderAdvice(
+  advice: LeagueViewEnvelope<EntryAdvice>,
+  language: "tr" | "en" = "tr",
+  squad: LeagueViewEnvelope<EntrySquad> = mockEntrySquadEnvelopes[ENTRY]!,
+) {
   return render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
         <LeagueMemberView
           index={mockEntryAdviceIndex(ENTRY).payload}
-          squad={mockEntrySquadEnvelopes[ENTRY]}
+          squad={squad}
           advice={advice}
         />
       </MemoryRouter>
@@ -99,20 +103,51 @@ describe("the published Free Hit squad basis", () => {
     ["en", "Free Hit played; this advice stands on your GW 2 squad."],
   ] as const)("names the prior squad in %s", (language, expected) => {
     const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    squad.payload.squad_basis = "pre_free_hit_gw02";
+    squad.payload.active_chip = "freehit";
     renderAdvice(
       { ...base, payload: { ...base.payload, squad_basis: "pre_free_hit_gw02" } },
       language,
+      squad,
     );
     expect(screen.getAllByText(expected)).toHaveLength(1);
   });
 
+  it.each([undefined, "captured", "pre_free_hit_gw03"])(
+    "shows the entry note only when advice basis %s does not contradict it",
+    (basis) => {
+      const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+      const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+      squad.payload.squad_basis = "pre_free_hit_gw02";
+      const payload = { ...advice.payload };
+      delete payload.squad_basis;
+      if (basis !== undefined) payload.squad_basis = basis;
+      renderAdvice({ ...advice, payload }, "en", squad);
+      if (basis === undefined) {
+        expect(
+          screen.getByText("Free Hit played; this advice stands on your GW 2 squad."),
+        ).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText(/Free Hit played;/)).not.toBeInTheDocument();
+      }
+    },
+  );
+
   it.each([undefined, "captured", "pre_free_hit_gw2", "pre_free_hit_gw002", "other"])(
-    "shows no basis note for %s, including Wildcard and legacy advice",
+    "ignores advice basis when entry basis is %s, including Wildcard and older entries",
     (basis) => {
       const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
-      const payload: EntryAdvice = { ...base.payload, chip: "wildcard" };
-      if (basis !== undefined) payload.squad_basis = basis;
-      renderAdvice({ ...base, payload }, "en");
+      const payload: EntryAdvice = {
+        ...base.payload,
+        chip: "wildcard",
+        squad_basis: "pre_free_hit_gw02",
+      };
+      const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+      delete squad.payload.squad_basis;
+      squad.payload.active_chip = "wildcard";
+      if (basis !== undefined) squad.payload.squad_basis = basis;
+      renderAdvice({ ...base, payload }, "en", squad);
       expect(screen.queryByText(/Free Hit played;/)).not.toBeInTheDocument();
       expect(
         within(screen.getByRole("region", { name: "Your gameweek" })).getByText("Wildcard"),
