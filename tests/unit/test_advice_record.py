@@ -406,6 +406,96 @@ def test_a_replay_forgives_the_publication_clock_and_nothing_else(
     assert load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"]) == recorded
 
 
+def test_one_publish_not_knowing_its_revision_is_not_two_publishes_disagreeing(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """A capture published once with a null revision and rebuilt with a real one is a replay.
+
+    ``provenance.repository_commit`` publishes ``null`` when the build cannot stand behind a
+    commit, which is the correct answer and is also a value the same capture will not produce
+    twice: rebuild it from a checkout that *can* be named and the field arrives populated.
+    Compared as bytes that is a difference, and it would fail a week over a footnote while
+    every word of the advice matched.
+
+    So it is reconciled, and the reconciliation is narrow in three ways that are each pinned
+    below. The bytes on disk never move, so the record that declined to guess still declines
+    afterwards and is not quietly upgraded. Both orders behave the same, because which build
+    ran first is an accident. And two revisions that *both* name a commit still conflict,
+    which is the case the field exists to catch.
+    """
+
+    source = tmp_path / "source"
+    _build(world, tmp_path / "site", record_root=source)
+    recorded = load_member_advice_record(source, SEASON, 2, 101, world["gw2_id"])
+
+    def _stamped(commit: str | None) -> dict[str, Any]:
+        """The same advice, from a build that could or could not name the commit it ran."""
+
+        document = copy.deepcopy(recorded)
+        provenance = document["provenance"]
+        assert isinstance(provenance, dict)
+        provenance["repository_commit"] = commit
+        return document
+
+    def _landed(root: Path) -> Any:
+        directory = record_directory(root, SEASON, 2, 101, world["gw2_id"])
+        return json.loads((directory / RECORD_FILE).read_text(encoding="utf-8"))["provenance"][
+            "repository_commit"
+        ]
+
+    unknown_first = tmp_path / "unknown-first"
+    directory = record_member_advice(unknown_first, _stamped(None))
+    assert record_member_advice(unknown_first, _stamped("a" * 40)) == directory
+    assert _landed(unknown_first) is None
+
+    known_first = tmp_path / "known-first"
+    directory = record_member_advice(known_first, _stamped("a" * 40))
+    assert record_member_advice(known_first, _stamped(None)) == directory
+    assert _landed(known_first) == "a" * 40
+
+    # Two builds that each named a commit, and named different ones, is the disagreement the
+    # field is carried for. Still refused, and still named in the refusal.
+    disagreed = tmp_path / "disagreed"
+    record_member_advice(disagreed, _stamped("a" * 40))
+    with pytest.raises(AdviceRecordConflictError, match="repository_commit"):
+        record_member_advice(disagreed, _stamped("b" * 40))
+
+    # And the allowance is for a build that did not know its revision, not for anything at
+    # all appearing opposite a null. An abbreviation is not a revision this system resolved.
+    abbreviated = tmp_path / "abbreviated"
+    record_member_advice(abbreviated, _stamped(None))
+    with pytest.raises(AdviceRecordConflictError, match="repository_commit"):
+        record_member_advice(abbreviated, _stamped("0123456789abcdef"))
+
+
+def test_a_revision_missing_from_a_record_is_still_a_difference(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Reconciling ``null`` against a commit must not reconcile a field that is not there.
+
+    A record with no ``repository_commit`` at all is a differently shaped document, not a
+    build that declined to name itself, and forgiving that would forgive any future field
+    dropped out of the provenance block.
+    """
+
+    source = tmp_path / "source"
+    _build(world, tmp_path / "site", record_root=source)
+    recorded = load_member_advice_record(source, SEASON, 2, 101, world["gw2_id"])
+
+    absent = copy.deepcopy(recorded)
+    provenance = absent["provenance"]
+    assert isinstance(provenance, dict)
+    del provenance["repository_commit"]
+
+    records = tmp_path / "records"
+    record_member_advice(records, absent)
+    named = copy.deepcopy(recorded)
+    assert isinstance(named["provenance"], dict)
+    named["provenance"]["repository_commit"] = "a" * 40
+    with pytest.raises(AdviceRecordConflictError, match="repository_commit"):
+        record_member_advice(records, named)
+
+
 def test_two_publishes_of_one_week_from_two_captures_each_keep_their_record(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
