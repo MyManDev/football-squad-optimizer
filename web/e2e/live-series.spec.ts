@@ -90,7 +90,6 @@ for (const language of ["en", "tr"] as const) {
     const copy = MESSAGES[language];
     await expect(page.getByText(copy.liveSeries.accumulated(2, 2))).toBeVisible();
     await expect(page.getByText(copy.liveSeries.unknown)).toBeVisible();
-    await expect(page.getByText(copy.leagueScoreboard.mixedBases)).toBeVisible();
     await expect(page.getByText(copy.scoreboardComparisons.missing)).toBeVisible();
     const scoreboard = page.getByRole("table", { name: copy.leagueScoreboard.caption });
     await expect(scoreboard.getByRole("columnheader")).toHaveCount(10);

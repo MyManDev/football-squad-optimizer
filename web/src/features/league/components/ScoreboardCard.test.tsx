@@ -180,18 +180,28 @@ describe("scoreboard card", () => {
           expect(cell).toHaveTextContent(/^—$/);
     },
   );
-  it("labels different scoring bases on their rows and does not combine their totals", () => {
-    const value = structuredClone(scoreboard);
-    value.payload.gameweeks[1].ours!.net = 30;
-    value.payload.gameweeks[1].ours!.scoring_basis = "official_autosub_captain_v2";
-    const { container } = renderCard(value);
-    const rows = container.querySelectorAll("tbody tr");
-    expect(rows[0]).toHaveTextContent(MESSAGES.en.scoreboardComparisons.legacy);
-    expect(rows[1]).toHaveTextContent(MESSAGES.en.scoreboardComparisons.official);
-    expect(container.querySelector("tfoot")).toHaveTextContent(
-      MESSAGES.en.leagueScoreboard.mixedBases,
-    );
-  });
+  it.each(["en", "tr"] as const)(
+    "shows the producer's single-basis total beside differently scored weeks in %s",
+    (language) => {
+      const value = structuredClone(scoreboard);
+      value.payload.gameweeks[1].ours!.net = 30;
+      value.payload.gameweeks[1].ours!.scoring_basis = "official_autosub_captain_v2";
+      value.payload.cumulative.ours_net = 30;
+      value.payload.cumulative.ours_gameweeks = [2];
+      value.payload.cumulative.ours_basis = "official_autosub_captain_v2";
+      value.payload.cumulative.ours_excluded_gameweeks = [
+        { gameweek: 1, scoring_basis: "named_eleven_no_autosubs" },
+      ];
+      const { container } = renderCard(value, language);
+      const copy = MESSAGES[language];
+      const rows = container.querySelectorAll("tbody tr");
+      expect(rows[0]).toHaveTextContent(copy.scoreboardComparisons.legacy);
+      expect(rows[1]).toHaveTextContent(copy.scoreboardComparisons.official);
+      const totalCell = container.querySelector("tfoot td")!;
+      expect(totalCell.firstChild?.textContent).toBe("30");
+      expect(totalCell).toHaveTextContent(copy.leagueScoreboard.oursCovers("2"));
+    },
+  );
   it.each(["tr", "en"] as const)("shows one row per finished gameweek in %s", (language) => {
     const copy = MESSAGES[language].leagueScoreboard;
     const { container } = renderCard(scoreboard, language);

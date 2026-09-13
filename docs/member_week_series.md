@@ -11,7 +11,8 @@ weekly mean and each underlying pair, with links to the member's recorded histor
 overall mean weights member-weeks equally and is explicitly descriptive. It does not
 claim that members followed the advice or that the suggestion caused the difference.
 The system paper ledger never enters this series. Its legacy GW1 basis remains visible
-on its own scoreboard row; the page refuses to combine different paper scoring bases.
+on its own scoreboard row; the producer totals only weeks on the series basis, and the
+page displays that total with the producer's coverage explanation.
 GW1 is not rescored or rewritten by this change. It remains a separate scoring series;
 missing frozen inputs are never reconstructed by assumption to make it comparable.
 

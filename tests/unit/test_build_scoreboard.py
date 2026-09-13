@@ -755,14 +755,6 @@ def test_comparison_contract_rejects_misleading_or_incomplete_measurements(failu
         _comparison_validator().validate(week)
 
 
-def test_producer_refuses_a_measured_row_without_a_scoring_basis() -> None:
-    entry = _entry(1, mode="live", settled=True)
-    assert entry.outcome is not None
-    entry.outcome["scoring_basis"] = None
-    with pytest.raises(DataError, match="must name its scoring basis"):
-        _payload(ledger_entries=(entry,))
-
-
 def _settlement_world(tmp_path: Path) -> tuple[ScoreboardPublicationRequest, Path]:
     source = capture("checked", "2026-08-24T12:00:00Z")
     snapshots = tmp_path / "snapshots"

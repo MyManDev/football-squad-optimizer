@@ -43,6 +43,8 @@ const view: Scoreboard = {
     gameweeks: [],
     ours_net: null,
     ours_gameweeks: [],
+    ours_basis: null,
+    ours_excluded_gameweeks: [],
     members_mean_total_points: null,
     members_gameweeks: [],
     members_counted: 0,

@@ -54,11 +54,6 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
   const view = envelope.payload;
   const finished = view.gameweeks.filter((week) => week.finished);
   const total = view.cumulative;
-  const ourSeries = [
-    ...new Set(
-      finished.filter((week) => week.ours?.net != null).map((week) => week.ours!.scoring_basis),
-    ),
-  ];
   // A gross Top-100 mean sits in a net table; the card says so rather than letting the
   // column read as one more net figure.
   const anyGross = finished.some((week) => week.top100?.basis === "gross");
@@ -135,11 +130,7 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
                 <tr className={styles.total}>
                   <th scope="row">{copy.cumulative(total.through_gameweek)}</th>
                   <td className={`${styles.right} num`}>
-                    {ourSeries.length > 1
-                      ? copy.mixedBases
-                      : total.ours_net === null
-                        ? "—"
-                        : points(total.ours_net, 0, locale)}
+                    {total.ours_net === null ? "—" : points(total.ours_net, 0, locale)}
                     {oursCovers && <div className={styles.sub}>{oursCovers}</div>}
                   </td>
                   <td className={`${styles.right} num`}>
