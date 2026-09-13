@@ -79,10 +79,11 @@ ROSTER_FILE = "players_raw.csv"
 FIXTURES_FILE = "fixtures.csv"
 TEAMS_FILE = "teams.csv"
 
-# Only columns present in every supported season are mapped. Advanced metrics such
-# as expected goals and `starts` appear in some seasons and not others, and a panel
-# with a column missing for one season would fail canonical validation. Adding them
-# means either restricting the season range or handling per-season availability.
+# Only columns present in every supported season are mapped here. Advanced metrics
+# such as expected goals appear in some seasons and not others; a column declared
+# for a season it does not carry would fail canonical validation. Columns of that
+# kind go in `SEASON_OPTIONAL_COLUMNS` below, which is the "handling per-season
+# availability" half of the choice this comment used to leave open.
 # `opponent_team` and `was_home` are deliberately absent. They are fixture-level
 # attributes, and a gameweek can hold more than one fixture for the same player — up
 # to three in the rescheduled 2020-21 season — so at player-gameweek grain they have
@@ -102,6 +103,30 @@ COLUMN_MAP: Mapping[str, str] = MappingProxyType(
     }
 )
 
+# Columns the archive carries in some seasons and not others, with the seasons that
+# carry them **completely**. A season is listed only when the column is present and
+# populated for every one of its gameweeks; `build_panel` validates each season on
+# its own and then concatenates, so a column absent for one season is simply missing
+# there rather than a validation failure.
+#
+# `starts` is listed for three seasons, not four, and 2022-23 is the omission worth
+# explaining. That season has the column, but it sums to exactly zero for GW1-GW15
+# while minutes over those gameweeks are normal at about 19,700 each; from GW16 it
+# reads 220 per single gameweek, which is ten matches times twenty-two starters. Zero
+# starts beside nineteen thousand minutes is an unpopulated column, not a third of a
+# season nobody started in.
+#
+# The whole season is omitted rather than its first third because `clean_canonical_dataset`
+# refuses a missing value -- canonical data is complete or the column is dropped -- so a
+# season carries the column entirely or not at all. Keeping the zeros would put a false
+# value in canonical data, which is worse than not carrying the column.
+#
+# Declared population and the pre-registration that binds it: `docs/participation_model_prereg.md`.
+SEASON_OPTIONAL_COLUMNS: Mapping[str, tuple[str, ...]] = MappingProxyType(
+    {"starts": ("2023-24", "2024-25", "2025-26")}
+)
+
+
 # Canonical player-position labels and aliases. The archive spells goalkeeper as
 # `GKP` in 2021-22 GW37 and `GK` elsewhere, so both must survive this filter.
 # From 2024-25 the archive also carries `AM`
@@ -113,7 +138,7 @@ PLAYER_POSITIONS: frozenset[str] = frozenset(POSITION_ALIASES)
 # Summed when a player appears in more than one fixture within a gameweek. Price is
 # not summed: it is identical across a player's fixtures in every supported season,
 # verified across all six.
-_ADDITIVE_COLUMNS: tuple[str, ...] = ("minutes", "total_points")
+_ADDITIVE_COLUMNS: tuple[str, ...] = ("minutes", "total_points", "starts")
 
 # FPL encodes position numerically in `players_raw.csv`. `merged_gw.csv` already
 # carries the label from 2020-21 onwards, so both spellings are accepted.
@@ -127,6 +152,30 @@ VAASTAV_ADAPTER = SourceAdapter(
     position_codes=POSITION_CODES,
     price_unit="tenths",
 )
+
+
+def adapter_for_season(season: str) -> SourceAdapter:
+    """The adapter for one season: the shared map plus whatever that season carries.
+
+    A season-scoped adapter rather than one wider map, because `apply_adapter` maps a
+    declared column whenever the source happens to have it. 2022-23 *has* a `starts`
+    column, so a single map would import its unpopulated zeros as though they were
+    starts. Declaring availability per season is what keeps "the archive has this
+    column" and "this season's values are usable" from being the same statement.
+    """
+
+    carried = {
+        column: column for column, seasons in SEASON_OPTIONAL_COLUMNS.items() if season in seasons
+    }
+    if not carried:
+        return VAASTAV_ADAPTER
+    return SourceAdapter(
+        name=VAASTAV_ADAPTER.name,
+        column_map={**COLUMN_MAP, **carried},
+        position_codes=POSITION_CODES,
+        price_unit=VAASTAV_ADAPTER.price_unit,
+    )
+
 
 # Columns the loader needs before adaptation can begin.
 _REQUIRED_GAMEWEEK_COLUMNS: tuple[str, ...] = (
@@ -301,7 +350,7 @@ def load_season(
     players_only = drop_non_player_rows(gameweeks)
     collapsed = collapse_to_player_gameweek(players_only)
     joined = attach_player_code(collapsed, roster).assign(season=season)
-    adapted = apply_adapter(joined, VAASTAV_ADAPTER)
+    adapted = apply_adapter(joined, adapter_for_season(season))
     cleaned = clean_canonical_dataset(adapted, price_unit=VAASTAV_ADAPTER.price_unit)
     if shift_price:
         cleaned = shift_price_to_deadline(cleaned)
