@@ -383,8 +383,13 @@ export interface ScoreboardOurs {
   projected: number;
   /** `live`: decided before the deadline; `replay`: recorded afterwards from a pre-deadline capture. */
   mode: "live" | "replay" | null;
-  /** Legacy named-eleven scoring or settlement using a recorded bench order and vice. */
-  scoring_basis: "named_eleven_no_autosubs" | "official_autosub_captain_v2";
+  /**
+   * Which rule produced `net`: legacy named-eleven scoring, or settlement using a recorded
+   * bench order and vice. Null exactly when `net` is null, because a basis describes a
+   * number and an unsettled row has none. A settled row always states one; a row that
+   * could not is refused by the producer rather than published with a default.
+   */
+  scoring_basis: "named_eleven_no_autosubs" | "official_autosub_captain_v2" | null;
   vice_captain_named: boolean;
   diagnostics?: ScoreboardDiagnostics;
   outcome_snapshot_id?: string | null;
@@ -438,9 +443,26 @@ export interface ScoreboardGameweek {
 export interface ScoreboardCumulative {
   through_gameweek: number | null;
   gameweeks: number[];
+  /**
+   * Our running total, kept on the single basis `ours_basis` names. Weeks scored under a
+   * different rule are different measurements and are not added in; see
+   * `ours_excluded_gameweeks`. Null when no finished week sits on that basis, which means
+   * there is nothing to total and never that the total is zero.
+   */
   ours_net: number | null;
   /** The gameweeks `ours_net` covers; a subset of `gameweeks` until the ledger catches up. */
   ours_gameweeks: number[];
+  /** The basis `ours_net` is on; null exactly when `ours_net` is null. */
+  ours_basis: "named_eleven_no_autosubs" | "official_autosub_captain_v2" | null;
+  /**
+   * Finished weeks left out of `ours_net` because they were scored on another basis, each
+   * named with the basis that produced it. Their own rows stay published; the reason they
+   * are not in the total is published too, rather than the weeks quietly going missing.
+   */
+  ours_excluded_gameweeks: {
+    gameweek: number;
+    scoring_basis: "named_eleven_no_autosubs" | "official_autosub_captain_v2";
+  }[];
   members_mean_total_points: number | null;
   /**
    * The gameweeks `members_mean_total_points` covers. It is a running total at

@@ -833,3 +833,109 @@ def test_completion_fields_are_covered_by_the_recorded_checksum(
     path.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(LedgerError, match="does not match its recorded digest"):
         load_entry(root, SEASON, 1)
+
+
+# --- the basis travels with the number --------------------------------------
+
+
+def _rewrite(directory: Path, name: str, document: dict[str, Any]) -> None:
+    """Replace one file of a landed entry and re-derive the manifest over it.
+
+    Used to build records the current writer can no longer produce: outcomes from before
+    the basis was recorded, and decisions from before a completion was frozen. The
+    manifest is rewritten so the entry still passes its checksum and the test is about
+    the basis rule rather than about tampering, which has its own tests above.
+    """
+
+    from squadopt.live.ledger import write_manifest
+
+    (directory / name).write_text(json.dumps(document, indent=2, sort_keys=True), encoding="utf-8")
+    write_manifest(directory)
+
+
+def test_a_recorded_outcome_states_the_basis_that_produced_its_numbers(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """``record_outcome`` scores the named eleven, so that is what it writes down.
+
+    A statement of fact about the line that computed the number, not a default: nothing
+    downstream is left to infer it, and the manifest covers it like every other byte.
+    """
+
+    recommendation, projection, root = decision_world
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    points = _flat_points(recommendation, value=2.0)
+
+    record_outcome(root, SEASON, 1, points, source_snapshot_id="later-capture")
+
+    written = json.loads((directory / "outcome.json").read_text(encoding="utf-8"))
+    assert written["scoring_basis"] == "named_eleven_no_autosubs"
+    entry = load_entry(root, SEASON, 1)  # verifies the manifest on the way in
+    assert entry.outcome is not None
+    assert entry.outcome["scoring_basis"] == "named_eleven_no_autosubs"
+    # Recorded, not derived: nothing needed reading off the decision's shape.
+    assert "basis_source" not in entry.outcome
+
+
+def test_a_settled_outcome_with_no_basis_is_refused_when_its_decision_could_settle_either_way(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """The genuinely ambiguous record, and the one that must never be guessed at.
+
+    This decision froze a bench order and a vice-captain, so either scorer could have
+    produced the number. Nothing entails the basis, so nothing supplies one.
+    """
+
+    recommendation, projection, root = decision_world
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    record_outcome(root, SEASON, 1, _flat_points(recommendation), source_snapshot_id="capture")
+    outcome = json.loads((directory / "outcome.json").read_text(encoding="utf-8"))
+    del outcome["scoring_basis"]
+    _rewrite(directory, "outcome.json", outcome)
+
+    with pytest.raises(LedgerError, match="without a scoring_basis"):
+        load_entry(root, SEASON, 1)
+
+
+def test_a_legacy_decisions_basis_is_entailed_by_its_own_shape_and_says_so(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """The system's real gameweek 1, in shape: a decision that froze no completion.
+
+    The official scorer needs a bench order and a vice-captain and refuses without them,
+    so the named eleven is the only rule that could have produced any number here. That is
+    entailment, not assumption, and the loaded record says which it was: ``basis_source``
+    marks a basis read off the decision rather than recorded beside the number.
+    """
+
+    recommendation, projection, root = decision_world
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    record_outcome(root, SEASON, 1, _flat_points(recommendation), source_snapshot_id="capture")
+    decision = json.loads((directory / "decision.json").read_text(encoding="utf-8"))
+    for field in ("vice_captain_player_id", "ordered_bench_player_ids", "completion_policy"):
+        del decision[field]
+    _rewrite(directory, "decision.json", decision)
+    outcome = json.loads((directory / "outcome.json").read_text(encoding="utf-8"))
+    del outcome["scoring_basis"]
+    _rewrite(directory, "outcome.json", outcome)
+
+    entry = load_entry(root, SEASON, 1)
+
+    assert entry.outcome is not None
+    assert entry.outcome["scoring_basis"] == "named_eleven_no_autosubs"
+    assert entry.outcome["basis_source"] == "entailed_by_legacy_decision"
+    # Read only. The stamp lives on the loaded entry; the file still says what it said.
+    on_disk = json.loads((directory / "outcome.json").read_text(encoding="utf-8"))
+    assert "scoring_basis" not in on_disk
+    assert "basis_source" not in on_disk
+
+
+def test_an_entry_with_no_outcome_owes_no_basis_and_is_not_stamped(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    """Absent is not broken. A decision awaiting its week is loaded, not refused."""
+
+    recommendation, projection, root = decision_world
+    record_decision(root, recommendation, projection, report_text="report")
+
+    assert load_entry(root, SEASON, 1).outcome is None

@@ -24,14 +24,15 @@ Where each number comes from, and what it is:
   eleven score, the hit points, the projection, and the mode the decision was made in
   (``live`` decided before its deadline from a capture that run took; ``replay`` recorded
   after that deadline, or from a capture the run did not take but named). Its
-  ``scoring_basis`` is ``named_eleven_no_autosubs``, and that is not FPL's own net: the
-  eleven the decision named is scored as named, the game's automatic substitutions are
-  not applied, and the ledger's decision carries no vice-captain to recover a captain who
-  did not play. Both corrections only ever add points, so our figure reads low beside a
-  member's ``points - event_transfers_cost``. Neither is computable from what the ledger
-  holds — the frozen decision records the bench as a set, not in the order the game's
-  autosubs walk it, and it names no vice-captain — so the basis is published rather than
-  guessed.
+  ``scoring_basis`` names the rule that produced the number, and it is published rather
+  than guessed. A decision that froze a bench order and a vice-captain settles under
+  ``official_autosub_captain_v2``. One that froze neither is scored as the eleven it
+  named: the game's automatic substitutions are not applied and no vice-captain can
+  recover a captain who did not play, so the figure reads low beside a member's
+  ``points - event_transfers_cost``, and it is ``named_eleven_no_autosubs``. Neither
+  correction is computable from what such a decision holds, which is why it is a
+  different measurement rather than a worse one. An unsettled row states no basis,
+  because it has no number for a basis to describe.
 - ``top100``: the Top-100 cohort's mean week, for the cohort capture's current gameweek
   only. The cohort is re-ranked every week, so a total is never differenced across
   captures; ``final`` says whether the gameweek was finished and checked in the cohort
@@ -53,10 +54,10 @@ import sys
 from pathlib import Path
 
 from squadopt.application.scoreboard import (
-    OUR_SCORING_BASIS as OUR_SCORING_BASIS,
+    SCOREBOARD_FILE as SCOREBOARD_FILE,
 )
 from squadopt.application.scoreboard import (
-    SCOREBOARD_FILE as SCOREBOARD_FILE,
+    SERIES_SCORING_BASIS as SERIES_SCORING_BASIS,
 )
 from squadopt.application.scoreboard import (
     TOP100_SIZE as TOP100_SIZE,
@@ -157,9 +158,9 @@ def main() -> int:
     ours = [row["gameweek"] for row in rows if row["ours"] is not None]
     bases = sorted(
         {
-            str(row["ours"].get("scoring_basis") or OUR_SCORING_BASIS)
+            str(row["ours"]["scoring_basis"])
             for row in rows
-            if row["ours"] is not None
+            if row["ours"] is not None and row["ours"]["scoring_basis"] is not None
         }
     )
     top100 = [row["top100"] for row in rows if row["top100"] is not None]
@@ -178,6 +179,15 @@ def main() -> int:
         print(
             "  The Top-100 mean is gross of transfer costs: no elite-picks capture covered "
             "every one of the hundred for that week. Pass --elite-snapshot to net it."
+        )
+    excluded = payload["cumulative"]["ours_excluded_gameweeks"]
+    if excluded:
+        named = ", ".join(f"GW{week['gameweek']} {week['scoring_basis']}" for week in excluded)
+        print(
+            f"  Our running total is on {SERIES_SCORING_BASIS} and covers "
+            f"{payload['cumulative']['ours_gameweeks']}. Left out, and published in its own "
+            f"row with its own basis: {named}. Weeks scored under different rules are "
+            "different measurements and are not summed."
         )
     print(f"Wrote {target}")
     return 0
