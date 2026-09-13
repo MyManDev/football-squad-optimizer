@@ -80,7 +80,7 @@ $env:PYTHONPATH="$PWD/src;$PWD"
   --source-root ../../.. `
   --handoff-dir ../../../.codex-tmp/phase-e-frozen-inputs `
   --preview-root .pt/instrument-preview `
-  --output docs/measurement_instrument.json
+  --output .pt/instrument-replay.json
 ```
 
 The JSON record includes source hashes, repository revision and dependency versions.
@@ -92,3 +92,60 @@ input to this measurement. Source changes must be committed before the run and
 the revision must remain unchanged through it. To compare a new replay, write to a
 new internal output file and compare the measurement sections; revision and wall
 clock metadata describe the new execution.
+
+## Measured result, 13 September 2026
+
+The completed run used source revision `3437e392be22a86a12ae4b3300658fd196fcc2b8`.
+Its record is `measurement_instrument.json`; the raw inputs stayed local. All 147
+recorded development fold differences were retained. Their mean is 4.619048 points,
+the IID normal 90% half-width is 2.048151, and the alpha 0.05 / power 0.8 MDE is
+3.488499 points. The issue's approximate 1.9 is not silently substituted for this
+named comparison's measured baseline.
+
+| Pre-decision covariate | Correlation | Residual variance ratio | Conditional 90% half-width | Conditional MDE |
+| --- | ---: | ---: | ---: | ---: |
+| `component_projected_pool_mean` | 0.192250 | 0.963040 | 2.009945 | 3.423425 |
+| `control_projected_pool_total` | 0.231648 | 0.946339 | 1.992441 | 3.393611 |
+| `component_projected_pool_total` | 0.380786 | 0.855002 | 1.893850 | 3.225687 |
+
+The least weak covariate is `component_projected_pool_total`. It does not get the
+conditional half-width to 1.5. On the 123 expanding-history diagnostic folds, the
+matched raw half-width is 2.265337 and the adjusted one is 2.133739. The adjusted
+mean also moves from 5.813008 to 5.518354, so that diagnostic is not substituted for
+the original effect estimate. The unconditional mean-estimator floor remains
+unchanged, with no validated precision gain and no promotion.
+
+The current scoreboard already carries the four diagnostic fields. Its private
+reproduction, from the latest live capture, gives:
+
+| Settled week | Zero-minute starters | Minutes shortfall | Captain shortfall | Autosub recovery |
+| --- | ---: | ---: | ---: | ---: |
+| GW1 | 2 | absent | 4.166052 | absent |
+| GW2 | absent | absent | absent | absent |
+| GW3 | absent | absent | absent | absent |
+
+Captain shortfall follows the existing scoreboard convention: the additional
+captain copy, not both copies of the doubled player. GW1 has no projected minutes,
+recorded bench order or vice captain. GW2 and GW3 have no frozen system decision.
+The capture has not settled GW4. No missing value above is a measured zero.
+
+The eight captured directories contain six usable bootstrap forecasts for GW4;
+two elite-picks captures have no bootstrap. There are 3,934 forecast rows before
+removing repeated player/weeks and 656 unique player/weeks afterwards. None has a
+checked same-week outcome. This is forecast coverage, not evidence that the feed
+is calibrated or uninformative. Every realized rate is null.
+
+| Captured status | Stated value | Unique player/weeks | Observed outcomes | Realized rate |
+| --- | ---: | ---: | ---: | --- |
+| `a` | 100 | 67 | 0 | absent |
+| `a` | absent | 407 | 0 | absent |
+| `d` | 25 | 2 | 0 | absent |
+| `d` | 50 | 3 | 0 | absent |
+| `d` | 75 | 8 | 0 | absent |
+| `i` | 0 | 64 | 0 | absent |
+| `s` | 0 | 1 | 0 | absent |
+| `u` | 0 | 104 | 0 | absent |
+
+A later checked outcome capture matching these GW4 forecasts will make the same
+join measurable. No previous deadline capture or missing frozen decision has been
+reconstructed from later information.
