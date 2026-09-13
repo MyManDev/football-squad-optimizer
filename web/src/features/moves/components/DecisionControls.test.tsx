@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { DecisionControls } from "./DecisionControls";
 
 const EVIDENCE = {
@@ -60,7 +61,7 @@ describe("DecisionControls", () => {
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getByRole("radio", { name: /Saf Puan/ })).toBeChecked();
     expect(screen.queryByText("diagnostik")).not.toBeInTheDocument();
-    expect(screen.getByText("Rakip Bütçesi Yok")).toBeInTheDocument();
+    expect(screen.getByText("Rakip bütçesi yok, ölçülmüş maliyet yok")).toBeInTheDocument();
     expect(screen.getByText("canlı kontrol")).toBeInTheDocument();
     expect(screen.getByText(/H1 mevcut kararı belirler/)).toBeInTheDocument();
   });
@@ -75,7 +76,7 @@ describe("DecisionControls", () => {
     const query = screen.getByLabelText("Current URL query").textContent ?? "";
     expect(new URLSearchParams(query).get("window")).toBe("3");
     expect(new URLSearchParams(query).get("mode")).toBe("garantici");
-    expect(screen.getByText("P(geride) %46 → %27")).toBeInTheDocument();
+    expect(screen.getByText("maliyet 1,6 puan")).toBeInTheDocument();
     expect(screen.getByText("araştırma gölgesi")).toBeInTheDocument();
     expect(screen.getByText(/H3 gölge kanıt için ayrılmıştır/)).toBeInTheDocument();
     expect(screen.getByText("araştırma gölgesi").closest('[role="note"]')).toHaveAttribute(
@@ -115,6 +116,20 @@ describe("DecisionControls", () => {
     expect(
       screen.getByText(/Lig-içi 5 haftalık sonuç bir teşhis göstergesidir/),
     ).toBeInTheDocument();
-    expect(screen.getByText(/P\(5\+ önde\) %19/)).toBeInTheDocument();
+    expect(screen.getByText("maliyet 1,5 puan")).toBeInTheDocument();
+  });
+
+  it("prices every mode in points only, in both languages", () => {
+    const turkish = renderControls().container.textContent ?? "";
+    cleanup();
+    const english = renderEnglishControls().container.textContent ?? "";
+
+    for (const text of [turkish, english]) expect(text).not.toMatch(AS_A_CHANCE);
+    for (const price of ["maliyet 1,6 puan", "maliyet 1,8 puan", "maliyet 1,5 puan"])
+      expect(turkish).toContain(price);
+    expect(turkish).toContain("Rakip bütçesi yok, ölçülmüş maliyet yok");
+    for (const price of ["cost 1.6 points", "cost 1.8 points", "cost 1.5 points"])
+      expect(english).toContain(price);
+    expect(english).toContain("No rival budget, no measured cost");
   });
 });

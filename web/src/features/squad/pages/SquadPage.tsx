@@ -10,10 +10,10 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
 import { useLanguage } from "../../../i18n/context";
 import { riskText } from "../../../i18n/reasons";
+// No percent formatter here on purpose: this page publishes points, never a share of one.
 import {
   countdown,
   local,
-  percent,
   points,
   pounds,
   shortDigest,
@@ -181,20 +181,10 @@ function Squad({
       </header>
 
       <StatRow>
-        <Stat
-          label={copy.projectedScore}
-          value={points(view.projected_score, 1, locale)}
-          note={
-            risk.status === "available" &&
-            risk.lower_quantile_score !== null &&
-            risk.lower_quantile_probability !== null
-              ? copy.lowerTail(
-                  percent(risk.lower_quantile_probability, 0, locale),
-                  points(risk.lower_quantile_score, 1, locale),
-                )
-              : copy.lowerTailUnavailable
-          }
-        />
+        {/* Projected score carries no note: the lower-tail quantile that used to sit here
+            published a probability, which this site does not do, and no other distributional
+            statistic replaces it. */}
+        <Stat label={copy.projectedScore} value={points(view.projected_score, 1, locale)} />
         <Stat
           label={view.decision_kind === "opening" ? copy.squadCost : copy.squadSellValue}
           value={pounds(view.total_cost_tenths)}
@@ -295,43 +285,29 @@ function Squad({
         </p>
         {/* The metrics, not the status, open this block. A frozen ledger entry records the
             status and nulls every metric, and a block opened on the status alone labelled
-            itself with a threshold nobody measured and printed an absent worst-case share
-            as a percentage of zero. */}
-        {risk.status === "available" && risk.probability_below_threshold !== null && (
+            itself with a threshold nobody measured.
+
+            What is left here is the mean of the scenarios, which is expected points, with
+            two qualifiers on it that are also not distributional: how far it was shifted for
+            selection optimism, in points, and how many scenarios it was taken over. The
+            probability of falling below a threshold, the interval around that probability
+            and the mean over the worst fraction of scenarios were all removed: a
+            probability, a spread of one, and a tail keyed to a percentage are none of them
+            publishable, and nothing distributional replaces them. */}
+        {risk.status === "available" && risk.mean_score !== null && (
           <StatRow>
             <Stat
-              label={`P(${copy.score} < ${risk.points_threshold ?? "?"})`}
-              value={
-                risk.probability_below_threshold !== null
-                  ? percent(risk.probability_below_threshold, 0, locale)
-                  : "—"
-              }
-              note={
-                risk.probability_below_threshold_interval
-                  ? `90% [${percent(risk.probability_below_threshold_interval[0], 0, locale)}, ${percent(risk.probability_below_threshold_interval[1], 0, locale)}]`
-                  : undefined
-              }
-            />
-            <Stat
               label={copy.scenarioMean}
-              value={risk.mean_score !== null ? points(risk.mean_score, 1, locale) : "—"}
+              value={points(risk.mean_score, 1, locale)}
               note={
-                risk.location_shift_points !== null
-                  ? copy.shiftedForOptimism(points(risk.location_shift_points, 1, locale))
-                  : undefined
-              }
-            />
-            <Stat
-              label={copy.meanWorst(
-                risk.worst_fraction === null ? "—" : percent(risk.worst_fraction, 0, locale),
-              )}
-              value={
-                risk.mean_worst_fraction_score !== null
-                  ? points(risk.mean_worst_fraction_score, 1, locale)
-                  : "—"
-              }
-              note={
-                risk.scenario_count !== null ? copy.scenarioCount(risk.scenario_count) : undefined
+                [
+                  risk.location_shift_points === null
+                    ? null
+                    : copy.shiftedForOptimism(points(risk.location_shift_points, 1, locale)),
+                  risk.scenario_count === null ? null : copy.scenarioCount(risk.scenario_count),
+                ]
+                  .filter((part) => part !== null)
+                  .join(" · ") || undefined
               }
             />
           </StatRow>
