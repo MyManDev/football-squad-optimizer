@@ -24,6 +24,13 @@ about to delete. The record is keyed by the capture, so publishing a week twice 
 then again before the deadline from a fresher capture — records both. What is refused is a
 rebuild of *one* capture that disagrees with its own record, with the difference named;
 ``--no-advice-record`` is the deadline escape.
+
+The source-checkout build path shells out to ``scripts.*`` with ``cwd`` set to the fresh
+worktree, which puts ``scripts`` in the worktree but leaves ``squadopt`` wherever the
+interpreter's install points it -- an editable install pins the main checkout's ``src``, so
+the two halves can come from two different revisions and neither says so. That split is
+checked before any build runs and refused by default; ``--allow-split-build`` is the
+deadline escape, and it prints both paths so the published tree can be attributed later.
 """
 
 import argparse
@@ -254,6 +261,66 @@ def check_publication_base(root: Path, expected_commit: str) -> None:
         )
 
 
+def resolved_squadopt_root(worktree: Path) -> Path:
+    """Where ``squadopt`` resolves for the interpreter the build subprocesses will use.
+
+    Asked of that interpreter, from the directory it will be launched in, rather than read
+    off *this* process: the publish may have been started from anywhere, and an inherited
+    ``PYTHONPATH`` or a console entry point can put this process on a different copy of the
+    package than a plain ``python -m scripts.build_site`` in the worktree would get.
+    """
+
+    completed = subprocess.run(
+        [sys.executable, "-c", "import squadopt; print(squadopt.__file__)"],
+        cwd=worktree,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0 or not completed.stdout.strip():
+        raise PublishError(
+            f"{sys.executable} cannot import squadopt from {worktree}, so the build scripts "
+            f"it is about to run cannot either:\n{completed.stdout}{completed.stderr}"
+        )
+    return Path(completed.stdout.strip()).resolve().parent
+
+
+def check_build_resolves_in_the_worktree(worktree: Path, *, allow_split: bool) -> None:
+    """Refuse a source-checkout build whose ``squadopt`` comes from outside the worktree.
+
+    ``scripts`` resolves from ``cwd``, so it is the worktree's copy; ``squadopt`` resolves
+    from the interpreter's install, and the editable install used here is a path file naming
+    the main checkout's ``src``. Measured: from a worktree ahead of that checkout, importing
+    the worktree's ``scripts.build_site`` raised an ``ImportError`` for a name the worktree's
+    ``squadopt`` has and the checkout's does not.
+
+    A hard failure is the lucky case. When the two revisions merely differ the build
+    succeeds and publishes a tree assembled from two versions of the code, with nothing in
+    the commit, the PR or the advice record saying which. That is unattributable after the
+    fact, so it is refused here rather than discovered later.
+    """
+
+    resolved = resolved_squadopt_root(worktree)
+    if worktree in resolved.parents:
+        return
+    split = (
+        f"The build would run this worktree's scripts against another checkout's squadopt:\n"
+        f"  scripts:  {worktree}\n"
+        f"  squadopt: {resolved}\n"
+    )
+    if allow_split:
+        print(f"--allow-split-build: publishing a split build on purpose.\n{split}")
+        return
+    raise PublishError(
+        f"{split}"
+        "A published tree built from two revisions cannot be attributed to either. "
+        "Recovery: bring the checkout that squadopt resolves from up to origin/develop "
+        "(git fetch origin && git switch develop && git pull --ff-only) so both halves are "
+        "the same revision, then re-run; or run the installed weekly publish, which builds "
+        "in process and never splits. If the deadline will not wait and the difference is "
+        "understood, pass --allow-split-build to publish anyway."
+    )
+
+
 def next_steps(names: PublishNames, pr_url: str) -> str:
     """The outward half, printed for a person rather than performed."""
 
@@ -283,6 +350,7 @@ def publish(
     builder: Callable[[Path], None] | None = None,
     expected_commit: str | None = None,
     on_published: Callable[[Mapping[str, object]], None] | None = None,
+    allow_split_build: bool = False,
 ) -> int:
     root = (workspace or repository_root()).resolve()
     worktree = (root / names.worktree_directory).resolve()
@@ -326,7 +394,7 @@ def publish(
         if builder is not None:
             builder(worktree / "web" / "public")
         else:
-            _legacy_build(worktree, root, names, league)
+            _legacy_build(worktree, root, names, league, allow_split_build=allow_split_build)
         _run(["git", "add", "web/public/data"], cwd=worktree)
         if _run(["git", "status", "--porcelain"], cwd=worktree) == "":
             print("The build changed nothing; there is nothing to publish.")
@@ -393,10 +461,19 @@ def publish(
 
 
 def _legacy_build(
-    worktree: Path, root: Path, names: PublishNames, league: LeaguePublish | None
+    worktree: Path,
+    root: Path,
+    names: PublishNames,
+    league: LeaguePublish | None,
+    *,
+    allow_split_build: bool = False,
 ) -> None:
     """Source-checkout compatibility; installed weekly runs supply typed service builders."""
 
+    # Every build below is a subprocess with cwd in the worktree, which settles `scripts`
+    # and leaves `squadopt` to the interpreter's install. Settle that too, before the first
+    # of them runs and spends a solve on a tree nobody could attribute afterwards.
+    check_build_resolves_in_the_worktree(worktree, allow_split=allow_split_build)
     build = _run(
         [
             sys.executable,
@@ -418,7 +495,9 @@ def _legacy_build(
     print(build)
     if league is not None:
         # The members' tree beside the season views, from the same capture and the
-        # same projection the decision reads; solved in this worktree's code.
+        # same projection the decision reads. Solved in this worktree's `scripts`; the
+        # `squadopt` under them is whatever the interpreter's install resolves, which the
+        # check above is what makes the same tree rather than a second revision.
         print(_run(league.build_arguments(worktree / "web" / "public"), cwd=worktree))
         # The scoreboard reads the ledger, so it follows the site views and the tree.
         print(
@@ -455,6 +534,13 @@ def main() -> int:
         "an already recorded capture is refused and the deadline will not wait — the first "
         "record is kept and the difference stays to be reconciled afterwards",
     )
+    parser.add_argument(
+        "--allow-split-build",
+        action="store_true",
+        help="build even though squadopt resolves outside the publication worktree; the "
+        "escape when the deadline will not wait for the two revisions to be brought "
+        "together. Both paths are printed so the published tree can be attributed",
+    )
     arguments = parser.parse_args()
     try:
         names = PublishNames(
@@ -474,7 +560,11 @@ def main() -> int:
                 record_advice=not arguments.no_advice_record,
             )
         return publish(
-            names, force_branch=arguments.force_branch, dry_run=arguments.dry_run, league=league
+            names,
+            force_branch=arguments.force_branch,
+            dry_run=arguments.dry_run,
+            league=league,
+            allow_split_build=arguments.allow_split_build,
         )
     except PublishError as error:
         print(f"Refused: {error}")
