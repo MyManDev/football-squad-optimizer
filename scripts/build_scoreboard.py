@@ -119,6 +119,16 @@ def main() -> int:
     )
     parser.add_argument("--season", help="default: inferred from the capture")
     parser.add_argument("--out", type=Path, default=SITE_OUT, help="site root (web/public)")
+    parser.add_argument(
+        "--baseline-ledger-root",
+        type=Path,
+        help="frozen component-only decisions from the system's same captures",
+    )
+    parser.add_argument(
+        "--evidence-root",
+        type=Path,
+        help="verified player_evidence_v1 CSV/manifest pairs for elite baselines",
+    )
     arguments = parser.parse_args()
     try:
         snapshot_id = resolve_live_snapshot_id(arguments.snapshot_root, arguments.snapshot_id)
@@ -133,6 +143,8 @@ def main() -> int:
                 season=arguments.season,
                 cohort_snapshot_id=arguments.cohort_snapshot,
                 elite_snapshot_id=arguments.elite_snapshot,
+                baseline_ledger_root=arguments.baseline_ledger_root,
+                evidence_root=arguments.evidence_root,
             )
         )
     except (DataError, LedgerError, OSError, ValueError, KeyError) as error:

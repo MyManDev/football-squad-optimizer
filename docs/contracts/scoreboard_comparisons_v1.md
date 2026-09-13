@@ -10,15 +10,15 @@ The schema requires exactly six rows in this order:
 | Kind | Source and meaning |
 | --- | --- |
 | `system` | Frozen season ledger decision, net of its recorded transfer charge. |
-| `base` | Reserved for the base component provider. Null in this release. |
-| `elite_xi` | Reserved for the lagged elite squad provider. Null in this release. |
-| `ownership_template` | Reserved for the ownership template provider. Null in this release. |
+| `base` | Frozen component-only decision paired to the system capture, supplied by `--baseline-ledger-root`. |
+| `elite_xi` | Synthetic legal squad using complete lagged Top-100 starter counts and captain counts. |
+| `ownership_template` | Synthetic legal squad using captured ownership. |
 | `league_mean` | Mean member net points from captured entry histories, with the existing coverage counts. |
 | `game_mean` | FPL's published average, on its source basis. It is not relabelled as member net. |
 
 Each row has `kind`, nullable `net`, nullable `scoring_basis`, nullable
-`source_snapshot_id`, and `diagnostics`. Reserved rows do not manufacture decisions
-or scores. The baseline providers are a separate change.
+`source_snapshot_id`, and `diagnostics`. Missing sources leave rows empty; no
+historical source is reconstructed.
 
 ## Measurements
 
@@ -70,3 +70,31 @@ When the ledger root is empty, the existing same-season published `ours` rows
 remain available under the publication retention rule. This does not reconstruct
 missing decisions, captures or capture-time eligibility. No scoreboard data file
 is committed by this change; the normal weekly publication produces it.
+
+## Human baseline inputs
+
+Both human rows replay `ownership_template_v2` with the opening budget, club limits,
+legal full squad, starting formation, ordered bench and vice captain. They have no
+transfer history or chip use. `construction` labels this synthetic replay; these
+are not recorded manager decisions or claims about capture-time player eligibility.
+Ownership ranks the squad and XI. For the elite row, previous-week elite starter
+counts replace ownership and previous-week captain counts rank the armbands.
+Settled points never select players or captains.
+
+The decision capture must precede its matching deadline. Outcomes must come from a
+checked, finished same-season capture after that deadline and no later than the
+publication capture. `source_snapshot_id` names ownership's decision capture or
+elite evidence's source IDs; `outcome_snapshot_id` names the checked scoring capture.
+The optional `construction` and `outcome_snapshot_id` fields apply to synthetic rows.
+
+`--evidence-root` supplies verified CSV/manifest pairs, from no later than the
+system decision capture, matching its season, week and deadline. Elite evidence
+must cover the full player pool and the complete Top-100 cohort. Missing ownership,
+captures or complete elite evidence leaves the relevant row null. Invalid checksums,
+contradictory metadata and infeasible squads refuse publication. Predictions used
+for diagnostics come only from the decision's frozen projections, never ownership.
+
+The optional component ledger must match the system's capture and deadline and name
+the component-only model. It is settled alongside the system in the same archive
+scan. The weekly scoreboard records the evidence and capture archives as inputs;
+publication copies the validated preview without rebuilding the baselines.

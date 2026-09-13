@@ -555,6 +555,7 @@ class WeeklyOperations:
                 season=self.request.season,
                 cohort_snapshot_id=self._cohort_id(),
                 elite_snapshot_id=self._elite_id(),
+                evidence_root=self.paths.evidence,
             )
         )
         return WeeklyStageResult(
@@ -715,7 +716,7 @@ class WeeklyOperations:
             self.values["scoreboard"] = dict(
                 self.run.stage(
                     "scoreboard",
-                    inputs=[*common, p.ledger, *cohort_inputs],
+                    inputs=[*common, p.ledger, p.evidence, p.snapshots, *cohort_inputs],
                     operation=self._scoreboard,
                 ).value
             )

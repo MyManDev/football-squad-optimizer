@@ -835,3 +835,50 @@ def test_the_shell_reports_the_actual_settled_scoring_basis(
     output = capsys.readouterr().out
     assert "official_autosub_captain_v2" in output
     assert "named_eleven_no_autosubs" not in output
+
+
+@pytest.mark.parametrize("mismatch", [None, "snapshot_id", "model_version", "deadline_utc"])
+def test_base_comparison_requires_a_paired_component_decision(mismatch: str | None) -> None:
+    from squadopt.prediction.component_models import COMPONENT_MODEL_VERSION
+
+    system = _entry(1, mode="live", settled=True)
+    system = replace(system, decision={**system.decision, "deadline_utc": "2026-08-21T17:30:00Z"})
+    control = replace(
+        system, decision={**system.decision, "model_version": COMPONENT_MODEL_VERSION}
+    )
+    if mismatch:
+        control = replace(control, decision={**control.decision, mismatch: "different"})
+        with pytest.raises(DataError):
+            _payload(ledger_entries=(system,), baseline_entries=(control,))
+    else:
+        week = _rows(_payload(ledger_entries=(system,), baseline_entries=(control,)))[1]
+        assert week["comparisons"][1]["net"] == 26
+        _comparison_validator().validate(week)
+
+
+@pytest.mark.parametrize("settled", [True, False])
+def test_human_comparisons_keep_provenance_and_wait_for_checked_results(settled: bool) -> None:
+    from squadopt.application.scoreboard_diagnostics import empty_diagnostics
+
+    human = {
+        "net": 0.0,
+        "diagnostics": empty_diagnostics(),
+        "scoring_basis": "official_autosub_captain_v2",
+        "source_snapshot_id": "pre",
+        "outcome_snapshot_id": "post",
+        "construction": "constrained_ownership_template_v2_replay",
+    }
+    week = _rows(
+        _payload(
+            bootstrap=_bootstrap([_event(1, finished=settled)]),
+            human_baselines={1: {"elite_xi": human, "ownership_template": human}},
+        )
+    )[1]
+    for row in week["comparisons"][2:4]:
+        assert row["net"] == (0.0 if settled else None)
+        if settled:
+            assert row["source_snapshot_id"] == "pre"
+            assert row["outcome_snapshot_id"] == "post"
+        else:
+            assert "construction" not in row
+    _comparison_validator().validate(week)
