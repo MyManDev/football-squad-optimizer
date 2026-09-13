@@ -48,6 +48,7 @@ interface EntryStanding {
   transfer_cost: number | null;
   total_points: number | null;
   movement: RankMovement;
+  /** Absolute change between positive ranks in the same standings capture; null if unavailable. */
   movement_places: number | null;
   data_quality: EntryDataQuality;
 }

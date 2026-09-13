@@ -172,6 +172,7 @@ def prepare_league_publication(request: LeaguePublicationRequest) -> PreparedLea
                 team_name=row.entry_name,
                 manager_name=row.player_name,
                 rank=row.rank,
+                last_rank=row.last_rank,
                 gameweek_points=(scores[row.entry_id].points if row.entry_id in scores else None),
                 total_points=(
                     scores[row.entry_id].total_points if row.entry_id in scores else None

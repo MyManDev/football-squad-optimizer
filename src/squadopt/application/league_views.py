@@ -291,6 +291,19 @@ class MemberStanding:
     gameweek_points: int | None = None
     total_points: int | None = None
     transfer_cost: int | None = None
+    last_rank: int | None = None
+    """Previous position from the same standings capture, not from the points history."""
+
+
+def _rank_movement(placing: MemberStanding | None) -> tuple[str, int | None]:
+    if placing is None or any(
+        isinstance(value, bool) or not isinstance(value, int) or value <= 0
+        for value in (placing.rank, placing.last_rank)
+    ):
+        return "unknown", None
+    assert placing.last_rank is not None
+    difference = placing.last_rank - placing.rank
+    return ("up" if difference > 0 else "down" if difference < 0 else "same"), abs(difference)
 
 
 #: The longest team or manager name this publishes. Not a claim about what the game
@@ -846,6 +859,7 @@ def build_league_views(
 
     def _row(entry_id: int, label: str, quality: str) -> dict[str, object]:
         placing = placings.get(entry_id)
+        movement, movement_places = _rank_movement(placing)
         return {
             "member_kind": "human",
             "entry_id": entry_id,
@@ -857,8 +871,8 @@ def build_league_views(
             # one basis for everyone. Null stays null: no hit was proven, not no hit.
             "transfer_cost": placing.transfer_cost if placing else None,
             "total_points": placing.total_points if placing else None,
-            "movement": "unknown",
-            "movement_places": None,
+            "movement": movement,
+            "movement_places": movement_places,
             "data_quality": quality,
         }
 

@@ -753,10 +753,13 @@ const en = {
       "No gameweek has been finalised yet, so no scores are published: points are only final once the platform has added bonus and checked the week.",
     total: "total",
     movement: "movement",
+    noPreviousRank: "Previous rank unavailable",
+    movementNote:
+      "Movement compares the game's current and previous weekly ranks in this capture; the points beside it are from the last completed and checked gameweek.",
     unknown: "unknown",
     newMember: "new",
     movementLabel: (movement: "up" | "down" | "same", places: number) =>
-      movement === "same" ? "—" : `${movement === "up" ? "↑" : "↓"} ${places}`,
+      movement === "same" ? "unchanged" : `${movement === "up" ? "↑" : "↓"} ${places}`,
     unknownMember: "Unknown Member",
     unknownTeam: "Unnamed Team",
     publicDataTitle: "Public after the deadline",
@@ -1687,10 +1690,13 @@ const tr: MessageSchema<typeof en> = {
       "Henüz kesinleşmiş oyun haftası yok, o yüzden puan yayınlanmıyor: puanlar ancak platform bonusu ekleyip haftayı kontrol edince kesinleşir.",
     total: "toplam",
     movement: "hareket",
+    noPreviousRank: "Önceki sıra bilinmiyor",
+    movementNote:
+      "Hareket, oyunun bu yakalamada bildirdiği mevcut ve önceki haftalık sıraları karşılaştırır; yanındaki puanlar son tamamlanmış ve kontrol edilmiş haftadandır.",
     unknown: "bilinmiyor",
     newMember: "yeni",
     movementLabel: (movement, places) =>
-      movement === "same" ? "—" : `${movement === "up" ? "↑" : "↓"} ${places}`,
+      movement === "same" ? "yerinde kaldı" : `${movement === "up" ? "↑" : "↓"} ${places}`,
     unknownMember: "Bilinmeyen Üye",
     unknownTeam: "İsimsiz takım",
     publicDataTitle: "Son tarihten sonra herkese açık",
