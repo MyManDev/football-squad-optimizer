@@ -1,6 +1,7 @@
 """Historical advice is selected and scored from evidence, never solved again."""
 
 import copy
+import dataclasses
 import hashlib
 import json
 import math
@@ -848,10 +849,12 @@ def test_a_settled_week_without_its_provenance_is_refused_rather_than_named() ->
         net_difference=2.0,
     )
     assert len(review.settled_member_week_comparisons({101: (settled,)}, season=SEASON)) == 1
+    # dataclasses.replace, not copy.replace: the latter arrived in 3.13 and the merge gate
+    # also runs 3.11, where it does not exist.
     for broken in (
-        copy.replace(settled, outcome_snapshot_id=None),
-        copy.replace(settled, advice_sha256=None),
-        copy.replace(settled, advice_sha256="not-a-digest"),
+        dataclasses.replace(settled, outcome_snapshot_id=None),
+        dataclasses.replace(settled, advice_sha256=None),
+        dataclasses.replace(settled, advice_sha256="not-a-digest"),
     ):
         with pytest.raises(review.SuggestionEvaluationError):
             review.settled_member_week_comparisons({101: (broken,)}, season=SEASON)
