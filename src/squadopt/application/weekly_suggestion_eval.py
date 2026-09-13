@@ -36,6 +36,13 @@ from squadopt.data.sources.fpl_live import (
     scored_gameweeks,
 )
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
+from squadopt.evaluation.live_series import (
+    DEFAULT_DETECTION_POLICY,
+    DetectionPolicy,
+    LiveSeriesReading,
+    MemberWeekComparison,
+    read_live_series,
+)
 from squadopt.evaluation.models import EvaluationValidationError, FrozenSquadDecision
 from squadopt.evaluation.scoring import score_frozen_squad_decision
 from squadopt.live.recommendation import infer_season
@@ -346,7 +353,7 @@ def evaluate_week(
     )
 
 
-def publish_suggestion_histories(
+def review_member_weeks(
     *,
     record_root: Path,
     snapshot_root: Path,
@@ -354,9 +361,12 @@ def publish_suggestion_histories(
     season: str,
     league_id: int,
     entry_ids: Sequence[int],
-    out_dir: Path,
-) -> tuple[Path, ...]:
-    """Publish member-safe derived documents from existing verified, bounded captures."""
+) -> dict[int, tuple[WeekReview, ...]]:
+    """Review every recorded week of every member, newest gameweek first, from evidence only.
+
+    This is the body the publisher serializes, so the document and any later reading of the
+    same weeks are the same reviews rather than two walks that could drift apart.
+    """
     if league_id != SUPPORTED_LEAGUE_ID or not re.fullmatch(r"\d{4}-\d{2}", season):
         raise SuggestionEvaluationError("Only league 352490 and a valid season are supported.")
     if infer_season(as_of_snapshot) != season:
@@ -374,9 +384,11 @@ def publish_suggestion_histories(
         row.gameweek: row.deadline_utc
         for row in gameweek_deadlines(as_of_snapshot.payloads[BOOTSTRAP_PAYLOAD])
     }
-    written = []
+    reviews: dict[int, tuple[WeekReview, ...]] = {}
     for entry_id in entry_ids:
         _identifier(entry_id)
+        if entry_id in reviews:
+            continue
         weeks = []
         for directory in sorted((record_root / season).glob("gw[0-9][0-9]"), reverse=True):
             if not (directory / f"entry-{entry_id}").is_dir():
@@ -395,6 +407,81 @@ def publish_suggestion_histories(
                         captures=captures,
                     )
                 )
+        reviews[entry_id] = tuple(weeks)
+    return reviews
+
+
+def settled_member_week_comparisons(
+    reviews: Mapping[int, Sequence[WeekReview]], *, season: str
+) -> tuple[MemberWeekComparison, ...]:
+    """Keep the member-weeks that actually settled into a comparison, and only those.
+
+    An unsettled week, a refused week and a settled week whose actual score is unknown each
+    contribute nothing. An unknown actual score is not a difference of zero.
+    """
+    comparisons = []
+    for entry_id, weeks in reviews.items():
+        for week in weeks:
+            if week.status != "available" or week.actual is None or week.net_difference is None:
+                continue
+            comparisons.append(
+                MemberWeekComparison(
+                    season=season,
+                    gameweek=week.gameweek,
+                    entry_id=entry_id,
+                    difference=week.net_difference,
+                )
+            )
+    return tuple(comparisons)
+
+
+def live_series_reading(
+    *,
+    record_root: Path,
+    snapshot_root: Path,
+    as_of_snapshot: CapturedSnapshot,
+    season: str,
+    league_id: int,
+    entry_ids: Sequence[int],
+    policy: DetectionPolicy = DEFAULT_DETECTION_POLICY,
+) -> LiveSeriesReading:
+    """Read how much the settled record can support, from the same reviews we publish.
+
+    Nothing in the weekly run calls this. It writes nothing, publishes nothing, and says
+    nothing about which of the two columns scores better.
+    """
+    reviews = review_member_weeks(
+        record_root=record_root,
+        snapshot_root=snapshot_root,
+        as_of_snapshot=as_of_snapshot,
+        season=season,
+        league_id=league_id,
+        entry_ids=entry_ids,
+    )
+    return read_live_series(settled_member_week_comparisons(reviews, season=season), policy=policy)
+
+
+def publish_suggestion_histories(
+    *,
+    record_root: Path,
+    snapshot_root: Path,
+    as_of_snapshot: CapturedSnapshot,
+    season: str,
+    league_id: int,
+    entry_ids: Sequence[int],
+    out_dir: Path,
+) -> tuple[Path, ...]:
+    """Publish member-safe derived documents from existing verified, bounded captures."""
+    reviews = review_member_weeks(
+        record_root=record_root,
+        snapshot_root=snapshot_root,
+        as_of_snapshot=as_of_snapshot,
+        season=season,
+        league_id=league_id,
+        entry_ids=entry_ids,
+    )
+    written = []
+    for entry_id in entry_ids:
         document = {
             "contract_version": CONTRACT_VERSION,
             "generated_at_utc": as_of_snapshot.metadata.captured_at_utc,
@@ -403,7 +490,7 @@ def publish_suggestion_histories(
                 "entry_id": entry_id,
                 "season": season,
                 "as_of_snapshot_id": as_of_snapshot.metadata.snapshot_id,
-                "weeks": [asdict(week) for week in weeks],
+                "weeks": [asdict(week) for week in reviews[entry_id]],
             },
         }
         path = out_dir / "history" / f"{entry_id}.json"

@@ -18,25 +18,37 @@ from squadopt.application.advice_record import (
 )
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, read_snapshot, write_snapshot
+from squadopt.evaluation.live_series import (
+    LiveSeriesPower,
+    NotYetEstimable,
+    read_live_series,
+)
 from squadopt.evaluation.models import EvaluationValidationError
 
 SEASON = "2026-27"
 DEADLINE = "2026-09-12T10:00:00Z"
 CAPTURED = "2026-09-09T09:00:00Z"
 PUBLISHED = "2026-09-09T10:00:00Z"
+# Deadlines for the multi-week fixtures; gameweek 4 keeps the single-week fixture's clock.
+DEADLINES = {3: "2026-09-05T10:00:00Z", 4: DEADLINE, 5: "2026-09-19T10:00:00Z"}
 STARTERS = [1, 3, 4, 5, 8, 9, 10, 11, 13, 14, 15]
 BENCH = [2, 12, 6, 7]
 POSITIONS = ["GK"] * 2 + ["DEF"] * 5 + ["MID"] * 5 + ["FWD"] * 3
 
 
 def recorded(
-    *, captured: str = CAPTURED, published: str = PUBLISHED, name: str = "capture-a"
+    *,
+    captured: str = CAPTURED,
+    published: str = PUBLISHED,
+    name: str = "capture-a",
+    gameweek: int = 4,
+    entry_id: int = 101,
 ) -> dict[str, Any]:
     return {
         "contract_version": MEMBER_ADVICE_RECORD_CONTRACT_VERSION,
         "season": SEASON,
-        "gameweek": 4,
-        "entry_id": 101,
+        "gameweek": gameweek,
+        "entry_id": entry_id,
         "league_id": 352490,
         "player_id_space": "fpl_element_code",
         "generated_at_utc": published,
@@ -351,6 +363,192 @@ def test_later_other_strategy_does_not_displace_the_pure_points_record(tmp_path:
     other["advice"][0]["strategy"] = "risk"
     record_member_advice(tmp_path, other)
     assert choose(tmp_path) == early
+
+
+def publish_for(root: Path, *, gameweek: int, entry_id: int) -> None:
+    """Record one member's pre-deadline advice for one gameweek."""
+    day = DEADLINES[gameweek][:10]
+    record_member_advice(
+        root,
+        recorded(
+            gameweek=gameweek,
+            entry_id=entry_id,
+            captured=f"{day}T06:00:00Z",
+            published=f"{day}T07:00:00Z",
+        ),
+    )
+
+
+def capture_with(
+    root: Path,
+    *,
+    events: dict[int, bool],
+    actuals: dict[int, dict[int, int]] | None = None,
+    captured: str = "2026-09-22T09:00:00Z",
+) -> CapturedSnapshot:
+    """A capture whose named gameweeks are settled or not, with the actual scores it knows."""
+    bootstrap = {
+        "events": [
+            {
+                "id": 1,
+                "deadline_time": "2026-08-15T10:00:00Z",
+                "finished": True,
+                "data_checked": True,
+            },
+            *[
+                {
+                    "id": week,
+                    "deadline_time": DEADLINES[week],
+                    "finished": settled,
+                    "data_checked": settled,
+                }
+                for week, settled in events.items()
+            ],
+        ],
+        "elements": [{"id": i + 100, "code": i} for i in range(1, 16)],
+    }
+    payloads = {"bootstrap-static.json": json.dumps(bootstrap).encode()}
+    for week, settled in events.items():
+        if not settled:
+            continue
+        payloads[f"event-gw{week:02d}-live.json"] = json.dumps(
+            {
+                "elements": [
+                    {"id": i + 100, "stats": {"total_points": 2, "minutes": 90, "starts": 1}}
+                    for i in range(1, 16)
+                ]
+            }
+        ).encode()
+    for entry_id, weeks in (actuals or {}).items():
+        payloads[f"entry-{entry_id}-history.json"] = json.dumps(
+            {
+                "current": [
+                    {
+                        "event": week,
+                        "points": scored,
+                        "total_points": scored,
+                        "event_transfers_cost": 0,
+                    }
+                    for week, scored in weeks.items()
+                ]
+            }
+        ).encode()
+    metadata = write_snapshot(root, source="fpl-live", captured_at_utc=captured, payloads=payloads)
+    return read_snapshot(root, metadata.snapshot_id)
+
+
+def reviewed(
+    tmp_path: Path, *, entry_ids: list[int], anchor: CapturedSnapshot
+) -> dict[int, tuple[review.WeekReview, ...]]:
+    return review.review_member_weeks(
+        record_root=tmp_path / "records",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=352490,
+        entry_ids=entry_ids,
+    )
+
+
+def test_settled_member_weeks_become_one_comparison_each(tmp_path: Path) -> None:
+    for entry_id in (101, 202):
+        for week in (3, 4):
+            publish_for(tmp_path / "records", gameweek=week, entry_id=entry_id)
+    anchor = capture_with(
+        tmp_path / "snapshots",
+        events={3: True, 4: True},
+        actuals={101: {3: 18, 4: 25}, 202: {3: 20, 4: 22}},
+    )
+    reviews = reviewed(tmp_path, entry_ids=[101, 202], anchor=anchor)
+    comparisons = review.settled_member_week_comparisons(reviews, season=SEASON)
+    # The recorded advice nets 20 in every week here, so the difference is 20 minus the score.
+    assert [(row.entry_id, row.gameweek, row.difference) for row in comparisons] == [
+        (101, 4, -5.0),
+        (101, 3, 2.0),
+        (202, 4, -2.0),
+        (202, 3, 0.0),
+    ]
+    assert {row.season for row in comparisons} == {SEASON}
+    reading = read_live_series(comparisons)
+    assert isinstance(reading, LiveSeriesPower)
+    assert (reading.member_weeks, reading.weeks) == (4, 2)
+    assert reading.between_week_degrees_of_freedom == 1
+
+
+def test_a_week_without_a_settled_comparison_contributes_nothing(tmp_path: Path) -> None:
+    for week in (3, 4, 5):
+        publish_for(tmp_path / "records", gameweek=week, entry_id=101)
+    # Gameweek 3 settles but its actual score is absent, 4 has not settled, and 5 has no
+    # published deadline. None of the three is a difference of zero.
+    anchor = capture_with(tmp_path / "snapshots", events={3: True, 4: False})
+    reviews = reviewed(tmp_path, entry_ids=[101], anchor=anchor)
+    assert [(week.gameweek, week.status, week.reason) for week in reviews[101]] == [
+        (5, "unavailable", "missing_deadline"),
+        (4, "unsettled", "not_settled"),
+        (3, "available", None),
+    ]
+    assert reviews[101][2].actual_reason == "actual_score_missing"
+    assert review.settled_member_week_comparisons(reviews, season=SEASON) == ()
+
+
+def test_the_record_as_it_stands_today_refuses_rather_than_reporting_zero(
+    tmp_path: Path,
+) -> None:
+    # Fifteen members, one published gameweek, nothing settled: the archive on 13 September.
+    entry_ids = list(range(101, 116))
+    for entry_id in entry_ids:
+        publish_for(tmp_path / "records", gameweek=4, entry_id=entry_id)
+    anchor = capture_with(tmp_path / "snapshots", events={4: False})
+    reading = review.live_series_reading(
+        record_root=tmp_path / "records",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=352490,
+        entry_ids=entry_ids,
+    )
+    assert isinstance(reading, NotYetEstimable)
+    assert (reading.reason, reading.member_weeks, reading.weeks) == (
+        "no_settled_member_weeks",
+        0,
+        0,
+    )
+    assert not hasattr(reading, "within_week_correlation")
+    reviews = reviewed(tmp_path, entry_ids=entry_ids, anchor=anchor)
+    assert len(reviews) == 15
+    assert {(week.status, week.reason) for weeks in reviews.values() for week in weeks} == {
+        ("unsettled", "not_settled")
+    }
+
+
+def test_the_published_document_is_the_reviews_it_serializes(tmp_path: Path) -> None:
+    for week in (3, 4):
+        publish_for(tmp_path / "records", gameweek=week, entry_id=101)
+    publish_for(tmp_path / "records", gameweek=4, entry_id=202)
+    anchor = capture_with(
+        tmp_path / "snapshots",
+        events={3: True, 4: True},
+        actuals={101: {3: 18, 4: 25}, 202: {4: 22}},
+    )
+    reviews = reviewed(tmp_path, entry_ids=[101, 202], anchor=anchor)
+    written = review.publish_suggestion_histories(
+        record_root=tmp_path / "records",
+        snapshot_root=tmp_path / "snapshots",
+        as_of_snapshot=anchor,
+        season=SEASON,
+        league_id=352490,
+        entry_ids=[101, 202],
+        out_dir=tmp_path / "out",
+    )
+    assert [path.name for path in written] == ["101.json", "202.json"]
+    assert [week.gameweek for week in reviews[101]] == [4, 3]  # Newest week first.
+    for entry_id, path in zip((101, 202), written, strict=True):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        assert document["contract_version"] == review.CONTRACT_VERSION
+        assert document["payload"]["entry_id"] == entry_id
+        assert document["payload"]["weeks"] == json.loads(
+            json.dumps([asdict(week) for week in reviews[entry_id]])
+        )
 
 
 def test_python_result_matches_the_browser_contract_fixture(tmp_path: Path) -> None:
