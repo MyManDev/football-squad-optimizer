@@ -200,3 +200,114 @@ def test_the_deadline_escape_publishes_without_recording() -> None:
         record_advice=False,
     )
     assert "--no-advice-record" in league.build_arguments(Path("/tmp/site/web/public"))
+
+
+def test_a_build_whose_squadopt_lives_outside_the_worktree_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Measured: the source-checkout publish shells out with ``cwd`` in a fresh worktree, so
+    ``scripts`` is the worktree's and ``squadopt`` is the editable install's, which names the
+    main checkout's ``src``. From a worktree ahead of that checkout the import failed
+    outright; when the two revisions merely differ it succeeds and publishes a tree built
+    from both. The refusal names both paths because that is what the operator has to
+    reconcile."""
+
+    from squadopt.platform import weekly_publish
+
+    worktree = tmp_path / "publication"
+    worktree.mkdir()
+    elsewhere = tmp_path / "checkout" / "src" / "squadopt"
+    elsewhere.mkdir(parents=True)
+    monkeypatch.setattr(weekly_publish, "resolved_squadopt_root", lambda _: elsewhere)
+
+    with pytest.raises(PublishError) as refusal:
+        weekly_publish.check_build_resolves_in_the_worktree(worktree, allow_split=False)
+
+    message = str(refusal.value)
+    assert str(worktree) in message
+    assert str(elsewhere) in message
+    # The recovery is named, not left to be guessed at under a deadline.
+    assert "--allow-split-build" in message
+    assert "pull --ff-only" in message
+
+
+def test_a_build_whose_squadopt_lives_in_the_worktree_is_allowed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from squadopt.platform import weekly_publish
+
+    worktree = tmp_path / "publication"
+    inside = worktree / "src" / "squadopt"
+    inside.mkdir(parents=True)
+    monkeypatch.setattr(weekly_publish, "resolved_squadopt_root", lambda _: inside)
+
+    weekly_publish.check_build_resolves_in_the_worktree(worktree, allow_split=False)
+
+
+def test_the_split_escape_is_off_by_default_and_says_so_when_it_is_used(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A deadline can outrank a clean build, but only as an explicit act with its own name.
+    What it must never do is pass silently: both paths go to the output so the published
+    tree can be attributed after the fact."""
+
+    import inspect
+
+    from squadopt.platform import weekly_publish
+
+    signature = inspect.signature(weekly_publish.publish)
+    assert signature.parameters["allow_split_build"].default is False
+
+    worktree = tmp_path / "publication"
+    worktree.mkdir()
+    elsewhere = tmp_path / "checkout" / "src" / "squadopt"
+    elsewhere.mkdir(parents=True)
+    monkeypatch.setattr(weekly_publish, "resolved_squadopt_root", lambda _: elsewhere)
+
+    weekly_publish.check_build_resolves_in_the_worktree(worktree, allow_split=True)
+
+    printed = capsys.readouterr().out
+    assert "--allow-split-build" in printed
+    assert str(worktree) in printed
+    assert str(elsewhere) in printed
+
+
+def test_the_typed_weekly_builder_never_reaches_the_split_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The installed weekly run passes its own in-process builder, so it never shells out and
+    has no split to have. Pinned so the guard's blast radius stays the source-checkout path."""
+
+    import sys
+
+    from squadopt.platform import weekly_publish
+
+    def refuse_if_asked(_: Path) -> Path:
+        raise AssertionError("the typed builder path must not probe for a split build")
+
+    monkeypatch.setattr(weekly_publish, "resolved_squadopt_root", refuse_if_asked)
+
+    built: list[Path] = []
+    workspace = (tmp_path / "workspace").resolve()
+    workspace.mkdir()
+    commands: list[list[str]] = []
+
+    def fake_run(arguments: list[str], *, cwd: Path, check: bool = True) -> str:
+        commands.append(arguments)
+        return ""
+
+    monkeypatch.setattr(weekly_publish, "_run", fake_run)
+
+    exit_code = weekly_publish.publish(
+        PublishNames(season="2026-27", gameweek=4, kind="decision"),
+        force_branch=False,
+        dry_run=False,
+        workspace=workspace,
+        builder=built.append,
+    )
+
+    # An empty `git status --porcelain` is "the build changed nothing"; the point here is
+    # that the builder ran and no build subprocess was ever shelled out.
+    assert exit_code == 0
+    assert built == [workspace / ".codex-tmp" / "publications" / "gw04-decision" / "web" / "public"]
+    assert not any(argument[:1] == [sys.executable] for argument in commands)
