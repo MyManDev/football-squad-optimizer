@@ -47,6 +47,7 @@ from squadopt.application.advice import (
 )
 from squadopt.application.advice_record import (
     AdviceRecordConflictError,
+    AdviceRecordNotLandedError,
     PublishedAdvice,
     RecordCapture,
     build_member_advice_record,
@@ -1246,6 +1247,12 @@ def build_league_views(
         # from two captures leaves two records, and neither refuses the other.
         capture = RecordCapture(inputs.snapshot_id, inputs.captured_at_utc)
         conflicts: list[str] = []
+        # A record that never landed is a different failure from a record that disagrees,
+        # and it used to leave by a different door: the only handler here was the conflict
+        # one, so a rename the system refused for a moment travelled out of the loop and
+        # every member after it went unrecorded as well. Both are collected now, and every
+        # member is still attempted.
+        unlanded: list[str] = []
         for picks, fingerprint, emitted, told in publications:
             record = build_member_advice_record(
                 picks,
@@ -1263,6 +1270,14 @@ def build_league_views(
                 record_member_advice(Path(advice_record_root), record)
             except AdviceRecordConflictError as error:
                 conflicts.append(str(error))
+            except AdviceRecordNotLandedError as error:
+                unlanded.append(str(error))
+        if unlanded:
+            # A week that recorded nothing for a member decides the type when both
+            # happened: a conflict names two answers that are both on disk to compare,
+            # and this names advice that was published with no evidence of it kept. The
+            # conflicts are carried in the same message rather than dropped.
+            raise AdviceRecordNotLandedError("\n".join((*unlanded, *conflicts)))
         if conflicts:
             raise AdviceRecordConflictError("\n".join(conflicts))
 

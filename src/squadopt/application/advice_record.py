@@ -59,7 +59,8 @@ from pathlib import Path
 from typing import Final
 
 from squadopt.application.entries import EntryPicks
-from squadopt.data.errors import DataError
+from squadopt.data.atomic import replace_retrying
+from squadopt.data.errors import DataError, RenameRefusedError
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live.ledger import (
     prune_stale_staging,
@@ -125,6 +126,18 @@ class AdviceRecordError(DataError):
 
 class AdviceRecordConflictError(AdviceRecordError):
     """A capture already recorded was built again with different bytes."""
+
+
+class AdviceRecordNotLandedError(AdviceRecordError):
+    """A complete record could not be moved into place, so nothing was recorded.
+
+    Deliberately not a conflict. A conflict is two different answers for one capture and
+    needs a person to decide which is true; this is the filesystem refusing a rename for
+    the whole retry budget, with the record staged, verified and never published. Nothing
+    on disk disagrees with anything, and re-running the publish of this capture records
+    it. Reporting the two as one error would have an operator hunting a divergence that
+    does not exist while the week's evidence is simply missing.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -853,6 +866,12 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
     A *different* capture is not that. It is the next publish of the week — the mid-week
     build and the one taken shortly before the deadline are both real advice — and it lands
     at its own address rather than colliding with the earlier one.
+
+    The record is built in a staging sibling and published by one rename, so it exists
+    complete or not at all. A rename the system refuses while it still holds a handle on
+    the bytes just written is waited out rather than treated as a verdict, and only a
+    refusal that outlasts the whole budget gives up, as ``AdviceRecordNotLandedError``,
+    which says the run recorded nothing, not that anything disagreed.
     """
 
     season = str(record["season"])
@@ -888,15 +907,44 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
         prune_stale_staging(Path(root) / season / f"gw{gameweek:02d}", f"entry-{entry_id}")
         staging = staging_directory(directory)
         staging.mkdir(parents=True)
+        landed = False
         try:
             (staging / RECORD_FILE).write_bytes(payload)
             write_manifest(staging, contract_version=MEMBER_ADVICE_RECORD_CONTRACT_VERSION)
             verify_manifest(staging)
-            # One rename: the record exists complete or does not exist at all.
-            os.replace(staging, directory)
-        except BaseException:
-            shutil.rmtree(staging, ignore_errors=True)
-            raise
+            # One rename: the record exists complete or does not exist at all. Windows
+            # refuses that rename while anything still holds a handle on the bytes written
+            # a moment ago, and the same rename then succeeds, so it is waited out rather
+            # than failed. It used to be a plain os.replace inside a clause that deleted
+            # the staging and re-raised: a scanner reading advice.json for a fraction of a
+            # second was enough to destroy a complete record of a capture that is already
+            # spent, and to do it for a reason the next attempt would not have had.
+            try:
+                replace_retrying(staging, directory)
+                landed = True
+            except PermissionError:
+                if not directory.exists():
+                    raise
+                # The one refusal no retry survives: a record is already at this address.
+                # Under the lock that means another writer landed between the check above
+                # and here, and the occupant is the answer - the same advice replays, and
+                # different advice is the conflict it has always been. Ours is redundant
+                # either way, so it is the staging that goes, not the record.
+                return _settled()
+            except RenameRefusedError as error:
+                raise AdviceRecordNotLandedError(
+                    f"The advice record for entry {entry_id} in {season} gameweek "
+                    f"{gameweek} was staged complete and could not be published: {error} "
+                    "Nothing was recorded for this capture and nothing was overwritten; "
+                    "re-run the publish of this capture to record it."
+                ) from error
+        finally:
+            # Everything that did not land is removed here, and only here: a staging that
+            # landed *is* the record directory, and a staging that did not holds bytes
+            # that are either incomplete or now redundant. Leaving one behind would leave
+            # a half-written record beside the real ones for the stale sweep to find.
+            if not landed:
+                shutil.rmtree(staging, ignore_errors=True)
     return directory
 
 
@@ -907,6 +955,7 @@ __all__: tuple[str, ...] = (
     "RECORD_FILE",
     "AdviceRecordConflictError",
     "AdviceRecordError",
+    "AdviceRecordNotLandedError",
     "PublishedAdvice",
     "RecordCapture",
     "build_member_advice_record",

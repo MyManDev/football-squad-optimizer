@@ -45,7 +45,6 @@ import math
 import os
 import secrets
 import shutil
-import time
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -54,6 +53,8 @@ from typing import Any, Final
 
 import pandas as pd
 
+from squadopt.data.atomic import replace_retrying
+from squadopt.data.errors import RenameRefusedError
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
 from squadopt.evaluation.models import EvaluationValidationError
@@ -78,10 +79,6 @@ STALE_STAGING_SECONDS: Final = 3600.0
 """A staging directory older than this belongs to a writer that died; it is pruned."""
 STALE_LOCK_SECONDS: Final = 900.0
 """A lock older than this belongs to a writer that died; it is broken, once."""
-RENAME_RETRY_ATTEMPTS: Final = 5
-"""How many times a rename refused with ``PermissionError`` is attempted in all."""
-RENAME_RETRY_INITIAL_SECONDS: Final = 0.05
-"""The first pause before a retry; it doubles, so five attempts span 0.75 s of waiting."""
 
 
 def _digest(data: bytes) -> str:
@@ -89,39 +86,23 @@ def _digest(data: bytes) -> str:
 
 
 def _replace_retrying(source: Path, destination: Path) -> None:
-    """``os.replace``, retried for a moment while the operating system refuses it.
+    """The shared retried rename, reported in this module's own error type.
 
-    Windows refuses a rename with ``PermissionError`` while any process still holds a
-    handle on a path involved — a scanner or an indexer reading bytes that were written
-    a moment ago, which is likelier when the suite runs many workers at once. The same
-    rename then succeeds, so that error alone is retried, ``RENAME_RETRY_ATTEMPTS``
-    times with a doubling pause, and the last refusal is reported rather than swallowed.
+    The retry itself lives in ``data.atomic`` because every writer that publishes bytes
+    by renaming a sibling needs the same one, and each copy of it was a chance to get the
+    policy wrong. What stays here is the translation: callers of the ledger handle
+    ``LedgerError``, so a rename this module could not land is one of those, with the
+    shared message about how long it waited kept intact.
 
-    One case that is not transient arrives as the very same error: Windows refuses a
-    rename onto a destination that already exists as a directory. Retrying that would
-    turn a real refusal into a slow one, so it is re-raised at once. That is a backstop
-    only — create-once is enforced by the existence check the caller makes under the
-    lock, and this function never decides whether a record may be written.
+    A ``PermissionError`` for a destination that already exists is passed through
+    untouched. It is not a held handle, and the ledger's existence check under the lock
+    has already answered that question before the rename is reached.
     """
 
-    delay = RENAME_RETRY_INITIAL_SECONDS
-    waited = 0.0
-    for attempt in range(1, RENAME_RETRY_ATTEMPTS + 1):
-        try:
-            os.replace(source, destination)
-            return
-        except PermissionError as error:
-            if destination.is_dir():
-                raise
-            if attempt == RENAME_RETRY_ATTEMPTS:
-                raise LedgerError(
-                    f"Renaming {source} onto {destination} was refused on all "
-                    f"{RENAME_RETRY_ATTEMPTS} attempts over {waited:.2f} s; something "
-                    "still holds a handle on it."
-                ) from error
-        time.sleep(delay)
-        waited += delay
-        delay *= 2
+    try:
+        replace_retrying(source, destination)
+    except RenameRefusedError as error:
+        raise LedgerError(str(error)) from error
 
 
 def _write_atomic(path: Path, data: bytes) -> None:
