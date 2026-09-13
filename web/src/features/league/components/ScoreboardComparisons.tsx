@@ -9,7 +9,7 @@ export function ScoreboardComparisons({ weeks }: { weeks: ScoreboardGameweek[] }
   if (!weeks.some((week) => Array.isArray(week.comparisons) && week.comparisons.length))
     return null;
   const number = (value: number | null | undefined) =>
-    value == null || !Number.isFinite(value) ? "-" : points(value, 1, locale);
+    value == null || !Number.isFinite(value) ? null : points(value, 1, locale);
   return (
     <section aria-label={copy.title}>
       <h3>{copy.title}</h3>
@@ -50,24 +50,33 @@ export function ScoreboardComparisons({ weeks }: { weeks: ScoreboardGameweek[] }
                       )}
                       {settled && row.net !== null && (
                         <div className={styles.sub}>
-                          {row.kind === "game_mean"
+                          {row.scoring_basis === "source_average"
                             ? copy.game
-                            : row.kind === "elite_xi" || row.kind === "ownership_template"
-                              ? copy.synthetic
-                              : row.scoring_basis === "named_eleven_no_autosubs"
-                                ? copy.legacy
-                                : row.scoring_basis === "official_autosub_captain_v2"
-                                  ? copy.official
-                                  : null}
+                            : row.scoring_basis === "named_eleven_no_autosubs"
+                              ? copy.legacy
+                              : row.scoring_basis === "official_autosub_captain_v2"
+                                ? copy.official
+                                : row.scoring_basis === "net"
+                                  ? copy.memberNet
+                                  : copy.basisUnknown}
                         </div>
                       )}
+                      <div className={styles.sub}>
+                        {row.kind === "league_mean"
+                          ? copy.memberPopulation(week.members_counted)
+                          : row.kind === "game_mean"
+                            ? copy.gamePopulation
+                            : row.kind === "elite_xi" || row.kind === "ownership_template"
+                              ? copy.synthetic
+                              : copy.paperPopulation}
+                      </div>
                     </th>
                     <td>{number(settled ? row.net : null)}</td>
                     <td>
                       {errors?.zero_minute_starters != null &&
                       Number.isInteger(errors.zero_minute_starters)
                         ? points(errors.zero_minute_starters, 0, locale)
-                        : "-"}
+                        : null}
                     </td>
                     <td>{number(errors?.minutes_shortfall)}</td>
                     <td>{number(errors?.captain_shortfall)}</td>

@@ -69,7 +69,7 @@ describe.each<Language>(["en", "tr"])("six scoreboard comparisons in %s", (langu
     const rows = screen.getAllByRole("row");
     expect(rows).toHaveLength(7);
     expect(within(rows[1]!).getAllByRole("cell")[2]).toHaveTextContent(/^2$/);
-    expect(within(rows[2]!).getAllByRole("cell")[2]).toHaveTextContent(/^-$/);
+    expect(within(rows[2]!).getAllByRole("cell")[2]).toBeEmptyDOMElement();
     expect(container.textContent).toContain(language === "tr" ? "47,5" : "47.5");
     expect(container.textContent).toContain(language === "tr" ? "-2,5" : "-2.5");
     expect(container.textContent).toContain(language === "tr" ? "ikinci kaptan" : "vice-captain");
@@ -85,6 +85,10 @@ describe.each<Language>(["en", "tr"])("six scoreboard comparisons in %s", (langu
   ])("hides stale values until the week is finished and checked (%s, %s)", (finished, checked) => {
     const { container } = show(week(finished, checked));
     expect(container.textContent).not.toMatch(/47[.,]5|-2[.,]5/);
+    for (const row of screen.getAllByRole("row").slice(1)) {
+      for (const cell of within(row).getAllByRole("cell").slice(1))
+        expect(cell).toBeEmptyDOMElement();
+    }
     expect(
       screen.getAllByText(
         language === "tr" ? "Yerleşmiş sonuç bekleniyor" : "Awaiting settled results",

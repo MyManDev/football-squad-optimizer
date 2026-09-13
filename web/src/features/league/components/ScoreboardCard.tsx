@@ -8,6 +8,7 @@ import { LeagueDataMissing, loadScoreboard } from "../data";
 import type { LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import styles from "./ScoreboardCard.module.css";
 import { ScoreboardComparisons } from "./ScoreboardComparisons";
+import { LiveSeriesSection } from "./LiveSeriesCard";
 
 /**
  * The scoreboard as the `/league` page shows it: read, or say why not. A missing file is
@@ -39,7 +40,12 @@ export function ScoreboardSection() {
       </Card>
     );
   }
-  return <ScoreboardCard envelope={query.data} />;
+  return (
+    <>
+      <ScoreboardCard envelope={query.data} />
+      <LiveSeriesSection view={query.data.payload} />
+    </>
+  );
 }
 
 export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scoreboard> }) {
@@ -48,6 +54,11 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
   const view = envelope.payload;
   const finished = view.gameweeks.filter((week) => week.finished);
   const total = view.cumulative;
+  const ourSeries = [
+    ...new Set(
+      finished.filter((week) => week.ours?.net != null).map((week) => week.ours!.scoring_basis),
+    ),
+  ];
   // A gross Top-100 mean sits in a net table; the card says so rather than letting the
   // column read as one more net figure.
   const anyGross = finished.some((week) => week.top100?.basis === "gross");
@@ -102,6 +113,16 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
                 <th scope="col" className={styles.right}>
                   {copy.highest}
                 </th>
+                {[
+                  messages.scoreboardComparisons.zero,
+                  messages.scoreboardComparisons.minutes,
+                  messages.scoreboardComparisons.captain,
+                  messages.scoreboardComparisons.autosub,
+                ].map((label) => (
+                  <th key={label} scope="col">
+                    {label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -114,7 +135,11 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
                 <tr className={styles.total}>
                   <th scope="row">{copy.cumulative(total.through_gameweek)}</th>
                   <td className={`${styles.right} num`}>
-                    {total.ours_net === null ? "—" : points(total.ours_net, 0, locale)}
+                    {ourSeries.length > 1
+                      ? copy.mixedBases
+                      : total.ours_net === null
+                        ? "—"
+                        : points(total.ours_net, 0, locale)}
                     {oursCovers && <div className={styles.sub}>{oursCovers}</div>}
                   </td>
                   <td className={`${styles.right} num`}>
@@ -133,6 +158,10 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
                       : points(total.average_entry_score, 0, locale)}
                   </td>
                   <td className={`${styles.right} num`}>—</td>
+                  <td />
+                  <td />
+                  <td />
+                  <td />
                 </tr>
               </tfoot>
             )}
@@ -152,6 +181,8 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
   const copy = messages.leagueScoreboard;
   const ours = week.ours;
   const top100 = week.top100;
+  const errors =
+    week.finished && week.data_checked && ours?.net != null ? ours.diagnostics : undefined;
   return (
     <tr>
       <th scope="row" className="num">
@@ -172,6 +203,14 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
               </>
             )}
             {ours.net === null && <div className={styles.sub}>{copy.notSettled}</div>}
+            <div className={styles.sub}>
+              {ours.scoring_basis === "named_eleven_no_autosubs"
+                ? messages.scoreboardComparisons.legacy
+                : ours.scoring_basis === "official_autosub_captain_v2"
+                  ? messages.scoreboardComparisons.official
+                  : messages.scoreboardComparisons.basisUnknown}
+            </div>
+            <div className={styles.sub}>{messages.scoreboardComparisons.paperPopulation}</div>
           </>
         )}
       </td>
@@ -198,6 +237,18 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
       <td className={`${styles.right} num`}>
         {week.highest_score === null ? "—" : points(week.highest_score, 0, locale)}
       </td>
+      {[
+        errors?.zero_minute_starters,
+        errors?.minutes_shortfall,
+        errors?.captain_shortfall,
+        errors?.autosub_recovery,
+      ].map((value, index) => (
+        <td key={index} className={`${styles.right} num`}>
+          {value != null && Number.isFinite(value)
+            ? points(value, index === 0 ? 0 : 1, locale)
+            : null}
+        </td>
+      ))}
     </tr>
   );
 }

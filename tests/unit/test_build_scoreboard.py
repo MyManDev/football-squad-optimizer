@@ -737,7 +737,7 @@ def test_comparison_contract_accepts_the_producer_and_legacy_documents() -> None
 
 
 @pytest.mark.parametrize(
-    "failure", ["fractional_count", "wrong_kind", "missing_row", "unchecked_score"]
+    "failure", ["fractional_count", "wrong_kind", "missing_row", "missing_basis", "unchecked_score"]
 )
 def test_comparison_contract_rejects_misleading_or_incomplete_measurements(failure: str) -> None:
     week = deepcopy(_rows(_payload(ledger_entries=(_entry(1, mode="live", settled=True),)))[1])
@@ -747,10 +747,20 @@ def test_comparison_contract_rejects_misleading_or_incomplete_measurements(failu
         week["comparisons"][1]["kind"] = "system"
     elif failure == "missing_row":
         week["comparisons"].pop()
+    elif failure == "missing_basis":
+        week["comparisons"][0]["scoring_basis"] = None
     else:
         week["data_checked"] = False
     with pytest.raises(ValidationError):
         _comparison_validator().validate(week)
+
+
+def test_producer_refuses_a_measured_row_without_a_scoring_basis() -> None:
+    entry = _entry(1, mode="live", settled=True)
+    assert entry.outcome is not None
+    entry.outcome["scoring_basis"] = None
+    with pytest.raises(DataError, match="must name its scoring basis"):
+        _payload(ledger_entries=(entry,))
 
 
 def _settlement_world(tmp_path: Path) -> tuple[ScoreboardPublicationRequest, Path]:
