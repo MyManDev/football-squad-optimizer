@@ -433,6 +433,114 @@ def test_the_entry_page_says_when_the_chip_history_was_not_captured(
     assert payload["chips_used"] is None
 
 
+def _squad_payload(world: dict[str, Any], picks: EntryPicks) -> dict[str, Any]:
+    from squadopt.application.league_views import _entry_squad_payload
+
+    inputs, projection, rules = _world_context(world)
+    return _entry_squad_payload(
+        picks,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        member_row={"member_kind": "human", "entry_id": picks.entry_id},
+        missing=[],
+        scored_gameweek=None,
+    )
+
+
+def test_the_held_vice_captain_reaches_the_entry_page(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The capture names the vice beside the captain; the page could not say so.
+
+    The member's own armbands are what the entry page is for, and the vice decides where
+    the multiplier lands in exactly the weeks the captain blanks. It was read, kept on
+    ``EntryPicks`` and then dropped at the document, so the page fell back to saying the
+    published squad names nobody.
+    """
+
+    import json
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    picks = _member_picks(world, 101, squad)
+    build_league_views(
+        _Provider({101: picks}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+    )
+    payload = json.loads(
+        (tmp_path / "league" / "entries" / "101.json").read_text(encoding="utf-8")
+    )["payload"]
+    players = [*payload["starting_xi"], *payload["bench"]]
+    wearing = [player["player_id"] for player in players if player["is_vice_captain"]]
+    assert wearing == [picks.vice_captain]
+    # Every other record says so explicitly, and nobody wears both armbands.
+    assert all("is_vice_captain" in player for player in players)
+    assert not any(player["is_captain"] and player["is_vice_captain"] for player in players)
+
+
+def test_a_vice_captain_the_member_left_on_the_bench_is_published_with_the_bench(
+    world: dict[str, Any],
+) -> None:
+    """The armband is held in the squad, not in the eleven.
+
+    The capture adapter deliberately accepts a benched vice (``EntryPicksRecord``'s
+    docstring says so), and the September capture contains one: entry 3832237 names its
+    vice at squad position thirteen. A flag published on the starting eleven alone would
+    lose that member's vice entirely.
+    """
+
+    squad = _legal_squad(world)
+    picks = dataclasses.replace(_member_picks(world, 101, squad), vice_captain=squad[12])
+    payload = _squad_payload(world, picks)
+    assert not any(player["is_vice_captain"] for player in payload["starting_xi"])
+    wearing = [player["player_id"] for player in payload["bench"] if player["is_vice_captain"]]
+    assert wearing == [squad[12]]
+
+
+@pytest.mark.parametrize(
+    "case", ["the_captain_himself", "a_player_not_in_the_squad", "unprojected"]
+)
+def test_a_vice_captain_that_is_not_held_publishes_no_armband_at_all(
+    world: dict[str, Any], case: str
+) -> None:
+    """Absent is not false: a vice that cannot be established is published as nothing.
+
+    ``EntryPicks`` requires a vice rather than defaulting one, but the application type
+    proves nothing about the value, so a provider can hand over a stand-in: the captain
+    himself, or a player the member does not hold. The third case is the document's own
+    doing, not the provider's: a squad member the projection has no row for is dropped from
+    the published fifteen, and if that is the vice then flagging the survivors ``false``
+    would read as "nobody holds it" rather than "the holder is not on this page".
+
+    In all three the field leaves the document entirely, because ``false`` on all fifteen
+    states that the member named nobody, which is a claim the source never made, and the
+    page's "not stated" path is the one that must stay live.
+    """
+
+    squad = _legal_squad(world)
+    unprojected = max(squad) + 500
+    if case == "unprojected":
+        squad = [*squad[:14], unprojected]
+    stand_in = {
+        "the_captain_himself": squad[0],
+        "a_player_not_in_the_squad": unprojected,
+        "unprojected": unprojected,
+    }[case]
+    picks = dataclasses.replace(_member_picks(world, 101, squad), vice_captain=stand_in)
+    payload = _squad_payload(world, picks)
+    players = [*payload["starting_xi"], *payload["bench"]]
+    assert len(players) == (14 if case == "unprojected" else 15)
+    assert not any("is_vice_captain" in player for player in players)
+
+
 def test_only_the_computed_mode_and_window_are_published(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
