@@ -364,20 +364,86 @@ def test_every_registered_source_points_at_a_terms_reading(tmp_path: Path) -> No
         load_club_sources(path)
 
 
-def test_a_club_registered_twice_is_refused(tmp_path: Path) -> None:
-    """Two pages for one club makes "which is this club's" a question with two answers."""
+def _registry(tmp_path: Path, *entries: dict[str, str]) -> Path:
+    """A registry file carrying exactly ``entries``, each with its terms pointer."""
 
     path = tmp_path / "sources.json"
-    entry = {"club": "Example FC", "url": PAGE, "terms_record": "docs/club_news_sources.md"}
     path.write_text(
         json.dumps(
-            {"contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION, "sources": [entry, entry]}
+            {
+                "contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION,
+                "sources": [
+                    {"terms_record": "docs/club_news_sources.md", **entry} for entry in entries
+                ],
+            }
         ),
         encoding="utf-8",
+    )
+    return path
+
+
+def test_one_page_registered_twice_is_refused(tmp_path: Path) -> None:
+    """The same address twice is read twice and coded twice, from one sentence."""
+
+    path = _registry(
+        tmp_path, {"club": "Example FC", "url": PAGE}, {"club": "Example FC", "url": PAGE}
     )
 
     with pytest.raises(ClubNewsFetchError, match="twice"):
         load_club_sources(path)
+
+
+def test_a_club_may_register_more_than_one_page(tmp_path: Path) -> None:
+    """A club that splits team news and its injury table is registered, not refused.
+
+    Nothing below joins a claim to a club's page -- a claim cites a document by digest and
+    byte span -- so two pages for one club leave no question with two answers. Both entries
+    survive in the declared order, because the fetch order is what makes two runs over one
+    registry produce the same capture.
+    """
+
+    path = _registry(
+        tmp_path,
+        {"club": "Example FC", "url": "https://club.example/team-news"},
+        {"club": "Example FC", "url": "https://club.example/injuries"},
+    )
+
+    sources = load_club_sources(path)
+
+    assert [source.club for source in sources] == ["Example FC", "Example FC"]
+    assert [source.url for source in sources] == [
+        "https://club.example/team-news",
+        "https://club.example/injuries",
+    ]
+
+
+def test_two_spellings_of_one_host_are_one_address(tmp_path: Path) -> None:
+    """Host names are case-insensitive, so this is the same page registered twice."""
+
+    path = _registry(
+        tmp_path,
+        {"club": "Example FC", "url": "https://club.example/team-news"},
+        {"club": "Example FC", "url": "https://Club.Example/team-news"},
+    )
+
+    with pytest.raises(ClubNewsFetchError, match="twice"):
+        load_club_sources(path)
+
+
+def test_two_paths_differing_only_in_case_are_two_addresses(tmp_path: Path) -> None:
+    """Paths are case-sensitive, and folding them would refuse a truthful registry.
+
+    Whether a host serves the same bytes at both is the host's business and not something
+    this module may assume; refusing here would turn a guess into a rejected permission.
+    """
+
+    path = _registry(
+        tmp_path,
+        {"club": "Example FC", "url": "https://club.example/team-news"},
+        {"club": "Example FC", "url": "https://club.example/Team-News"},
+    )
+
+    assert len(load_club_sources(path)) == 2
 
 
 def test_an_empty_registry_is_refused(tmp_path: Path) -> None:
