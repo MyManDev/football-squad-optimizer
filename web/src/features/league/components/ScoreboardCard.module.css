@@ -17,6 +17,10 @@
   font-size: var(--step--1);
 }
 
+.summaryTable {
+  min-width: 0;
+}
+
 .table th,
 .table td {
   padding: 10px 8px;

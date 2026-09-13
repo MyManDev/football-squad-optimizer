@@ -74,6 +74,14 @@ function mockAssets() {
 }
 
 describe("AnalysisPage", () => {
+  it("shows the identifying slug when measurements share a title", async () => {
+    const duplicates = structuredClone(index);
+    duplicates.entries[1].title = duplicates.entries[0].title;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => duplicates }));
+    renderPage();
+    expect(await screen.findByText("positive", { selector: "code" })).toBeInTheDocument();
+    expect(screen.getByText("negative", { selector: "code" })).toBeInTheDocument();
+  });
   it("keeps negative measurements visible in their own tab", async () => {
     mockAssets();
     const user = userEvent.setup();

@@ -207,6 +207,32 @@
     },
     "comparison": {
       "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "net": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "net"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scoring_basis": {
+                "enum": [
+                  "named_eleven_no_autosubs",
+                  "official_autosub_captain_v2",
+                  "net",
+                  "source_average"
+                ]
+              }
+            }
+          }
+        }
+      ],
       "required": [
         "kind",
         "net",

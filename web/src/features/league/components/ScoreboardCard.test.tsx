@@ -142,6 +142,66 @@ function renderSection(language: Language = "en") {
 }
 
 describe("scoreboard card", () => {
+  it("shows four measured errors on a settled week and dashes on an unsettled one", () => {
+    const value = structuredClone(scoreboard);
+    value.payload.gameweeks[0].ours!.diagnostics = {
+      zero_minute_starters: 0,
+      minutes_shortfall: -12,
+      captain_shortfall: 2.5,
+      autosub_recovery: 3,
+    };
+    value.payload.gameweeks[1].ours!.diagnostics = value.payload.gameweeks[0].ours!.diagnostics;
+    const { container } = renderCard(value);
+    const rows = container.querySelectorAll("tbody tr");
+    expect([...rows[0].querySelectorAll("td")].slice(-4).map((cell) => cell.textContent)).toEqual([
+      "0",
+      "−12.0",
+      "+2.5",
+      "3.0",
+    ]);
+    for (const cell of [...rows[1].querySelectorAll("td")].slice(-4))
+      expect(cell).toHaveTextContent(/^—$/);
+  });
+  it.each(["en", "tr"] as const)(
+    "explains all nine value columns even without comparisons or diagnostics in %s",
+    (language) => {
+      const { container } = renderCard(scoreboard, language);
+      const copy = MESSAGES[language];
+      expect(screen.getByText(copy.scoreboardComparisons.missing)).toBeVisible();
+      expect(screen.queryByRole("heading", { name: copy.scoreboardComparisons.title })).toBeNull();
+      const table = screen.getByRole("table", { name: copy.leagueScoreboard.caption });
+      expect(table.querySelectorAll("thead th")).toHaveLength(10);
+      for (const label of ["zero", "minutes", "captain", "autosub"] as const)
+        expect(table.querySelector("caption")?.textContent?.toLocaleLowerCase()).toContain(
+          copy.scoreboardComparisons[label].toLocaleLowerCase(),
+        );
+      for (const row of container.querySelectorAll("tbody tr, tfoot tr"))
+        for (const cell of [...row.querySelectorAll("td")].slice(-4))
+          expect(cell).toHaveTextContent(/^—$/);
+    },
+  );
+  it.each(["en", "tr"] as const)(
+    "shows the producer's single-basis total beside differently scored weeks in %s",
+    (language) => {
+      const value = structuredClone(scoreboard);
+      value.payload.gameweeks[1].ours!.net = 30;
+      value.payload.gameweeks[1].ours!.scoring_basis = "official_autosub_captain_v2";
+      value.payload.cumulative.ours_net = 30;
+      value.payload.cumulative.ours_gameweeks = [2];
+      value.payload.cumulative.ours_basis = "official_autosub_captain_v2";
+      value.payload.cumulative.ours_excluded_gameweeks = [
+        { gameweek: 1, scoring_basis: "named_eleven_no_autosubs" },
+      ];
+      const { container } = renderCard(value, language);
+      const copy = MESSAGES[language];
+      const rows = container.querySelectorAll("tbody tr");
+      expect(rows[0]).toHaveTextContent(copy.scoreboardComparisons.legacy);
+      expect(rows[1]).toHaveTextContent(copy.scoreboardComparisons.official);
+      const totalCell = container.querySelector("tfoot td")!;
+      expect(totalCell.firstChild?.textContent).toBe("30");
+      expect(totalCell).toHaveTextContent(copy.leagueScoreboard.oursCovers("2"));
+    },
+  );
   it.each(["tr", "en"] as const)("shows one row per finished gameweek in %s", (language) => {
     const copy = MESSAGES[language].leagueScoreboard;
     const { container } = renderCard(scoreboard, language);

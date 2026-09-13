@@ -737,7 +737,7 @@ def test_comparison_contract_accepts_the_producer_and_legacy_documents() -> None
 
 
 @pytest.mark.parametrize(
-    "failure", ["fractional_count", "wrong_kind", "missing_row", "unchecked_score"]
+    "failure", ["fractional_count", "wrong_kind", "missing_row", "missing_basis", "unchecked_score"]
 )
 def test_comparison_contract_rejects_misleading_or_incomplete_measurements(failure: str) -> None:
     week = deepcopy(_rows(_payload(ledger_entries=(_entry(1, mode="live", settled=True),)))[1])
@@ -747,6 +747,8 @@ def test_comparison_contract_rejects_misleading_or_incomplete_measurements(failu
         week["comparisons"][1]["kind"] = "system"
     elif failure == "missing_row":
         week["comparisons"].pop()
+    elif failure == "missing_basis":
+        week["comparisons"][0]["scoring_basis"] = None
     else:
         week["data_checked"] = False
     with pytest.raises(ValidationError):

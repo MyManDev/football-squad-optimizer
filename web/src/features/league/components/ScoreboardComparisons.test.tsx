@@ -69,9 +69,9 @@ describe.each<Language>(["en", "tr"])("six scoreboard comparisons in %s", (langu
     const rows = screen.getAllByRole("row");
     expect(rows).toHaveLength(7);
     expect(within(rows[1]!).getAllByRole("cell")[2]).toHaveTextContent(/^2$/);
-    expect(within(rows[2]!).getAllByRole("cell")[2]).toHaveTextContent(/^-$/);
+    expect(within(rows[2]!).getAllByRole("cell")[2]).toHaveTextContent(/^—$/);
     expect(container.textContent).toContain(language === "tr" ? "47,5" : "47.5");
-    expect(container.textContent).toContain(language === "tr" ? "-2,5" : "-2.5");
+    expect(container.textContent).toContain(language === "tr" ? "−2,5" : "−2.5");
     expect(container.textContent).toContain(language === "tr" ? "ikinci kaptan" : "vice-captain");
     expect(container.textContent).not.toMatch(AS_A_CHANCE);
     expect(container.querySelector("details")).toBeNull();
@@ -85,6 +85,10 @@ describe.each<Language>(["en", "tr"])("six scoreboard comparisons in %s", (langu
   ])("hides stale values until the week is finished and checked (%s, %s)", (finished, checked) => {
     const { container } = show(week(finished, checked));
     expect(container.textContent).not.toMatch(/47[.,]5|-2[.,]5/);
+    for (const row of screen.getAllByRole("row").slice(1)) {
+      for (const cell of within(row).getAllByRole("cell").slice(1))
+        expect(cell).toHaveTextContent(/^—$/);
+    }
     expect(
       screen.getAllByText(
         language === "tr" ? "Yerleşmiş sonuç bekleniyor" : "Awaiting settled results",
@@ -96,6 +100,15 @@ describe.each<Language>(["en", "tr"])("six scoreboard comparisons in %s", (langu
     delete legacy.comparisons;
     const { container } = show(legacy);
     expect(container).toBeEmptyDOMElement();
+  });
+  it("rounds signed residuals before choosing their signs", () => {
+    const value = week();
+    value.comparisons![0]!.diagnostics.minutes_shortfall = -0.04;
+    value.comparisons![0]!.diagnostics.captain_shortfall = 2.5;
+    show(value);
+    const cells = within(screen.getAllByRole("row")[1]!).getAllByRole("cell");
+    expect(cells[3]).toHaveTextContent(language === "tr" ? /^0,0$/ : /^0\.0$/);
+    expect(cells[4]).toHaveTextContent(language === "tr" ? /^\+2,5$/ : /^\+2\.5$/);
   });
   it("does not label a recorded decision as missing when only its outcome is absent", () => {
     const value = week();

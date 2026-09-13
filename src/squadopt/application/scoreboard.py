@@ -507,6 +507,14 @@ def scoreboard_payload(
                 scoring_basis=basis,
                 source_snapshot_id=source_snapshot_id,
             )
+        for comparison in comparisons:
+            if comparison["net"] is not None and comparison["scoring_basis"] not in (
+                "named_eleven_no_autosubs",
+                "official_autosub_captain_v2",
+                "net",
+                "source_average",
+            ):
+                raise DataError("A measured scoreboard row must name its scoring basis.")
         rows.append(
             {
                 "gameweek": gameweek,
