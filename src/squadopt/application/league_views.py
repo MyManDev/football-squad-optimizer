@@ -513,7 +513,12 @@ def _envelope(payload: Mapping[str, object], *, generated_at_utc: str) -> dict[s
 
 
 def _entry_player(
-    row: "pd.Series[Any]", *, role: str, is_captain: bool, bench_order: int | None
+    row: "pd.Series[Any]",
+    *,
+    role: str,
+    is_captain: bool,
+    bench_order: int | None,
+    is_vice_captain: bool | None,
 ) -> dict[str, object]:
     name = str(row["name"])
     return {
@@ -526,9 +531,37 @@ def _entry_player(
         "expected_points": float(str(row["expected_points"])),
         "event_points": None,
         "is_captain": is_captain,
+        # Absent, never false, when no held vice could be established (``None`` here):
+        # a reader that saw ``false`` on all fifteen would take it as "this member named
+        # nobody", which is a different and unproven claim.
+        **({} if is_vice_captain is None else {"is_vice_captain": is_vice_captain}),
         "bench_order": bench_order,
         "role": role,
     }
+
+
+def _held_vice_captain(picks: EntryPicks, pool: Mapping[int, object]) -> int | None:
+    """The vice-captain the member actually holds, or ``None`` when none can be stated.
+
+    ``EntryPicks`` requires a vice rather than defaulting one (see the field's docstring:
+    a guessed vice hands the armband to the wrong player in exactly the weeks the captain
+    blanked), but the application type validates nothing about the value, so the two facts
+    the capture parser proves are re-established here instead of assumed: the vice is one
+    of the fifteen, and he is not the captain. A value that fails either is a stand-in, and
+    publishing a stand-in would hand the page a guess wearing the shape of a fact.
+
+    He must also be in the projection pool, because a player the pool does not carry is
+    dropped from the published fifteen below; flagging the other fourteen ``false`` would
+    then read as "nobody holds it" rather than "the holder is not on this page".
+
+    He may be on the bench. The parser deliberately accepts a benched vice, and one of the
+    fifteen real entries in the September capture names one.
+    """
+
+    vice = int(picks.vice_captain)
+    if vice == int(picks.captain) or vice not in set(picks.squad) or vice not in pool:
+        return None
+    return vice
 
 
 def _entry_squad_payload(
@@ -545,6 +578,7 @@ def _entry_squad_payload(
     """The member's own squad, as the site's entry page renders it."""
 
     pool = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
+    vice = _held_vice_captain(picks, pool)
     starters: list[dict[str, object]] = []
     bench: list[dict[str, object]] = []
     bench_index = 0
@@ -552,6 +586,10 @@ def _entry_squad_payload(
         row = pool.get(int(player_id))
         if row is None:
             continue
+        # None on every record when no vice is held, so the field is absent from the whole
+        # document rather than present and false: the page's "not stated" path is the one
+        # that must stay live for such a member.
+        wears_vice = None if vice is None else int(player_id) == vice
         if int(player_id) in set(picks.starting_xi):
             starters.append(
                 _entry_player(
@@ -559,17 +597,36 @@ def _entry_squad_payload(
                     role="starter",
                     is_captain=int(player_id) == int(picks.captain),
                     bench_order=None,
+                    is_vice_captain=wears_vice,
                 )
             )
         else:
             bench_index += 1
             bench.append(
-                _entry_player(row, role="bench", is_captain=False, bench_order=bench_index)
+                _entry_player(
+                    row,
+                    role="bench",
+                    is_captain=False,
+                    bench_order=bench_index,
+                    is_vice_captain=wears_vice,
+                )
             )
+    # What is still playable, per half, read before the upcoming deadline. A capture-built
+    # EntryPicks always carries the history (the capture reader refuses a payload without
+    # its chips list), so ``known`` is true for every document the site publishes today;
+    # it is derived rather than written so that a provider without the history publishes
+    # the same shape with ``known`` false and every window ``unknown``, and the raw history
+    # absent rather than an empty map that would read as "no chip played".
+    upcoming = picks.gameweek + 1
+    states = chip_states(rules, upcoming, picks.chips_used)
+    windows = [window for halves in states.values() for window in halves.values()]
+    chips_known = picks.chips_used is not None and all(
+        window.state != "unknown" for window in windows if window is not None
+    )
     return {
         "league_id": int(league_id),
         "season": picks.season,
-        "gameweek": picks.gameweek + 1,
+        "gameweek": upcoming,
         "scored_gameweek": scored_gameweek,
         "entry": dict(member_row),
         "starting_xi": starters,
@@ -577,23 +634,40 @@ def _entry_squad_payload(
         "bank_tenths": int(picks.bank_tenths),
         "free_transfers": int(picks.free_transfers),
         "free_transfers_known": bool(picks.free_transfers_known),
-        "chips_used": {name: list(weeks) for name, weeks in picks.chips_used.items()},
-        # What is still playable, per half, read before the upcoming deadline. ``known`` is
-        # true here because an EntryPicks always carries the history (the capture reader
-        # refuses a payload without its chips list); the flag is published so a reader of a
-        # future provider that lacks the history sees the same shape, states "unknown".
+        "chips_used": (
+            {name: list(weeks) for name, weeks in picks.chips_used.items()} if chips_known else None
+        ),
         "chips": {
-            "known": True,
-            "gameweek": picks.gameweek + 1,
+            "known": chips_known,
+            "gameweek": upcoming,
             "states": {
                 name: {
                     half: None if window is None else window.to_dict()
                     for half, window in halves.items()
                 }
-                for name, halves in chip_states(rules, picks.gameweek + 1, picks.chips_used).items()
+                for name, halves in states.items()
             },
         },
+        # Which squad the fifteen above are: the captured week's own, or the squad held
+        # before a Free Hit voided it (``pre_free_hit_gwNN``), and the chip active in the
+        # captured week. The advice documents already say this; the squad page must too,
+        # or a pre-Free-Hit fifteen reads as the week's picks.
+        "squad_basis": picks.squad_basis,
+        "active_chip": picks.active_chip,
         "purchase_prices_known": bool(picks.purchase_prices_known),
+        # What the fifteen would raise if sold, and that plus the bank: what the member
+        # may spend. The endpoints publish no purchase price, so no page may add up the
+        # fifteen current prices and call the total a budget, because the game keeps half
+        # of every rise since a player was bought. The aggregate is published instead, and
+        # it is what the plan on this page was held to. Null where a source states neither.
+        "squad_sell_value_tenths": (
+            None if picks.squad_sell_value_tenths is None else int(picks.squad_sell_value_tenths)
+        ),
+        "spendable_budget_tenths": (
+            None
+            if picks.squad_sell_value_tenths is None
+            else int(picks.squad_sell_value_tenths) + int(picks.bank_tenths)
+        ),
         "source_snapshot_id": picks.source_snapshot_id,
         # Comparing a member's gameweek score with ours needs both scores; the standings
         # view does not carry points yet, so this stays absent rather than guessed.
@@ -706,8 +780,9 @@ def build_league_views(
     advice record (``application/advice_record.py``). The published tree has no gameweek in
     its paths and is overwritten every week, so without this nothing on disk survives to say
     what a member was told for a given week. The record is written here, by the same call
-    that writes the published bytes, from the same picks, projection and payloads — a runner
-    around this could only guess, because the weekly publish re-solves in a fresh worktree.
+    that writes the published bytes, from the same picks, projection and payloads; a runner
+    around this could only guess. The weekly run passes it for the preview it will publish,
+    since that preview's tree is what its publish stage commits, without solving again.
 
     The record is keyed by ``inputs``' capture, so the mid-week publish and the one taken
     shortly before the deadline each write their own and neither refuses the other. A

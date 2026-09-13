@@ -1,3 +1,4 @@
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 /**
  * The member's controls name only what the producer computed: the catalogue's
  * strategies, the league's rivals with the producer's default marked, and the windows
@@ -311,7 +312,7 @@ describe("member decision controls", () => {
     // `ihtimal` and `olasıl` stay stems (ihtimali, olasılığı are the forbidden word
     // inflected, not names). Do not add boundaries here to match the producer, and do
     // not drop them there to match this: each is as wide as its own subject allows.
-    const AS_A_CHANCE = /chance|likelihood|odds|ihtimal|şans|yüzde|olasılık|probabilit|%/i;
+
     // The bare Turkish words are still caught here, so a copy edit cannot slip one in.
     for (const word of ["olasılık", "yüzde"]) {
       expect(word).toMatch(AS_A_CHANCE);

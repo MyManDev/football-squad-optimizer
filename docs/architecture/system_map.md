@@ -20,6 +20,8 @@ available in Git at `6ca49686:docs/architecture/system_map.md`.
 | `platform` | Filesystem, capture, queue, process pool, metrics, backup and command adapters |
 | `api` | HTTP translation; engine access goes through platform/application boundaries |
 | `web` | Static publication reader, validated HTTP advice client, member selection and rendering |
+| Measurement preflight | Required root fields declared per artifact kind in `preflight.measurement`; checks declared governance, proves nothing about the actions. See [evidence validation](evidence_validation.md) |
+| Solver helpers | Squad/lineup invariants shared by the live squad and transfer paths through `optimization.decisions`. See [solver boundaries](solver_boundaries.md) |
 
 The five former import exceptions are removed: vocabulary moved to `contracts.players`,
 and the common policy/statistics moved from `experiments` to `evaluation`. Original import
@@ -54,8 +56,8 @@ Capture adapters produce private snapshots. Typed application builders consume c
 inputs to produce evidence, retained handoffs, league views, the site and scoreboard.
 Platform adapters own network/Git operations and process workers; repository scripts retain
 compatible CLI entry points. The installed weekly runner journals stages and verifies
-artifacts before resuming a run. Acceptance of that runner is tracked in the
-[transition record](enterprise_transition.md).
+artifacts before resuming a run. What the transition accepted and what still waits on a real
+host is recorded in [ADR 0007](decisions/0007-enterprise-transition.md).
 
 Projection handoffs retain their capture/content-addressed originals before the compatibility
 alias changes. Backup inventory and trusted receipts establish byte integrity; restore into

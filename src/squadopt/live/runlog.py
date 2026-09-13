@@ -21,6 +21,23 @@ from typing import Any, Final
 LIVE_LOGGER_NAME: Final = "squadopt"
 _CONSOLE_FORMAT: Final = "%(asctime)s %(levelname)-7s %(name)s: %(message)s"
 
+LOG_ROOT_NAME: Final = Path("data/logs")
+"""Workspace-relative log root. A root is never component-qualified by its holder."""
+
+
+def component_log_directory(log_root: Path, component: str) -> Path:
+    """The directory holding ``component``'s daily files under an *unqualified* ``log_root``.
+
+    Writers and readers both go through here, so the component name is appended in exactly
+    one place. A caller that hands over ``<workspace>/data/logs/season_tick`` has already
+    done this join and would silently read and write ``season_tick/season_tick``; what a
+    caller holds is the root above every component, and this is what qualifies it.
+    """
+
+    if not isinstance(component, str) or not component.strip():
+        raise ValueError("component must be a non-empty string.")
+    return Path(log_root) / component
+
 
 class JsonLineFormatter(logging.Formatter):
     """One JSON object per record: time, level, logger, run id, message, extra fields."""
@@ -113,7 +130,7 @@ def configure_run_logging(
         stream._squadopt_run_handler = True  # type: ignore[attr-defined]
         root_logger.addHandler(stream)
     if log_root is not None:
-        directory = Path(log_root) / component
+        directory = component_log_directory(log_root, component)
         directory.mkdir(parents=True, exist_ok=True)
         log_path = directory / f"{datetime.now(UTC).strftime('%Y-%m-%d')}.jsonl"
         file_handler = logging.FileHandler(log_path, encoding="utf-8")

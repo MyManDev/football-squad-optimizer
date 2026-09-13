@@ -88,6 +88,23 @@ describe("provisional league fixtures", () => {
     expect(squad.source_snapshot_id).toBeTruthy();
   });
 
+  it("states which squad the example shows and what it can still play", () => {
+    const squad = mockEntrySquadEnvelopes[35249001]!.payload;
+
+    expect(squad.squad_basis).toBe("captured");
+    expect(squad.active_chip).toBeNull();
+    expect(squad.chips?.known).toBe(true);
+    expect(squad.chips?.gameweek).toBe(squad.gameweek);
+    expect(Object.keys(squad.chips?.states ?? {})).toEqual([
+      "wildcard",
+      "freehit",
+      "bboost",
+      "3xc",
+    ]);
+    expect(squad.chips?.states.freehit?.first_half?.state).toBe("available");
+    expect(squad.chips?.states.freehit?.second_half?.state).toBe("not_yet");
+  });
+
   it("keeps the settled system comparison arithmetically consistent", () => {
     const comparison = mockEntrySquadEnvelopes[35249001]!.payload.squadopt_comparison;
 

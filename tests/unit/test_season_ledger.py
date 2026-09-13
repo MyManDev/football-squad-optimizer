@@ -10,6 +10,7 @@ import errno
 import json
 import os
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -166,6 +167,12 @@ def test_a_recorded_decision_round_trips_with_full_provenance(
     assert entry.decision["snapshot_id"] == recommendation.snapshot_id
     assert entry.decision["prediction_fingerprint"] == recommendation.prediction_fingerprint
     assert entry.decision["captain_player_id"] == int(recommendation.captain["player_id"])
+    assert entry.decision["vice_captain_player_id"] != entry.decision["captain_player_id"]
+    assert entry.decision["vice_captain_player_id"] in entry.decision["starting_xi_player_ids"]
+    assert set(entry.decision["ordered_bench_player_ids"]) == set(
+        entry.decision["bench_player_ids"]
+    )
+    assert entry.decision["completion_policy"] == "optimizer_projection_order_v1"
     assert len(list(entry.decision["squad_player_ids"])) == 15  # type: ignore[arg-type]
     assert entry.outcome is None
     stored = pd.read_csv(directory / "projections.csv")
@@ -710,3 +717,116 @@ def test_scoring_writes_nothing(
 
     assert sorted(path.name for path in directory.iterdir()) == before
     assert not (directory / "outcome.json").exists()
+
+
+# --- additive completion evidence -------------------------------------------
+
+
+@pytest.mark.parametrize("tied", [False, True])
+def test_completion_freezes_projection_order_without_reordering_the_recommendation(
+    decision_world: tuple[Recommendation, Projection, Path],
+    tied: bool,
+) -> None:
+    recommendation, projection, root = decision_world
+    squad = recommendation.squad.iloc[::-1].copy()
+    squad["expected_points"] = 1.0
+    candidates = sorted(
+        set(recommendation.starting_xi["player_id"]) - {recommendation.captain["player_id"]}
+    )
+    outfield = sorted(
+        recommendation.bench.loc[recommendation.bench["position"] != "GK", "player_id"]
+    )
+    goalkeeper = int(
+        recommendation.bench.loc[recommendation.bench["position"] == "GK", "player_id"].iloc[0]
+    )
+    if not tied:
+        squad.loc[squad["player_id"].isin([*candidates[1:3], *outfield[1:]]), "expected_points"] = (
+            9.0
+        )
+    starters = squad.loc[squad["player_id"].isin(recommendation.starting_xi["player_id"])].copy()
+    bench = squad.loc[squad["player_id"].isin(recommendation.bench["player_id"])].copy()
+    changed = replace(recommendation, squad=squad, starting_xi=starters, bench=bench)
+    before = [frame.copy(deep=True) for frame in (squad, starters, bench)]
+
+    record_decision(root, changed, projection, report_text="report")
+    decision = load_entry(root, SEASON, 1).decision
+    assert decision["vice_captain_player_id"] == candidates[0 if tied else 1]
+    assert decision["ordered_bench_player_ids"] == [
+        goalkeeper,
+        *(outfield if tied else [*outfield[1:], outfield[0]]),
+    ]
+    assert decision["bench_player_ids"] == bench["player_id"].tolist()
+    assert decision["starting_xi_player_ids"] == starters["player_id"].tolist()
+    assert decision["captain_player_id"] == int(recommendation.captain["player_id"])
+    assert score_named_eleven(decision, _flat_points(recommendation)) == 24.0
+    for actual, original in zip((squad, starters, bench), before, strict=True):
+        pd.testing.assert_frame_equal(actual, original)
+
+
+def test_legacy_v1_without_completion_loads_and_settles_without_rewriting_its_decision(
+    decision_world: tuple[Recommendation, Projection, Path],
+) -> None:
+    from squadopt.live.ledger import write_manifest
+
+    recommendation, projection, root = decision_world
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    path = directory / "decision.json"
+    legacy = json.loads(path.read_text(encoding="utf-8"))
+    fields = ("vice_captain_player_id", "ordered_bench_player_ids", "completion_policy")
+    for field in fields:
+        del legacy[field]
+    path.write_text(json.dumps(legacy, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_manifest(directory)
+    decision_bytes = path.read_bytes()
+    manifest_bytes = (directory / "manifest.json").read_bytes()
+
+    entry = load_entry(root, SEASON, 1)
+    assert entry.decision["contract_version"] == "season_ledger_v1"
+    assert not set(fields).intersection(entry.decision)
+    assert path.read_bytes() == decision_bytes
+    assert (directory / "manifest.json").read_bytes() == manifest_bytes
+    record_outcome(root, SEASON, 1, _flat_points(recommendation), source_snapshot_id="settled")
+    assert load_entry(root, SEASON, 1).outcome is not None
+    assert path.read_bytes() == decision_bytes
+
+
+@pytest.mark.parametrize("invalid", ["goalkeeper", "projection", "solver"])
+def test_completion_refusal_leaves_no_ledger_entry_and_allows_a_corrected_retry(
+    decision_world: tuple[Recommendation, Projection, Path],
+    invalid: str,
+) -> None:
+    recommendation, projection, root = decision_world
+    if invalid == "goalkeeper":
+        broken = replace(
+            recommendation, bench=recommendation.bench.loc[recommendation.bench["position"] != "GK"]
+        )
+    elif invalid == "projection":
+        broken = replace(
+            recommendation, squad=recommendation.squad.assign(expected_points=float("nan"))
+        )
+    else:
+        broken = replace(recommendation, solver_status="not-a-status")
+    with pytest.raises(LedgerError, match="Cannot freeze"):
+        record_decision(root, broken, projection, report_text="report")
+    assert not root.exists()
+    record_decision(root, recommendation, projection, report_text="corrected")
+    assert (
+        load_entry(root, SEASON, 1).decision["completion_policy"] == "optimizer_projection_order_v1"
+    )
+
+
+@pytest.mark.parametrize(
+    "field", ["vice_captain_player_id", "ordered_bench_player_ids", "completion_policy"]
+)
+def test_completion_fields_are_covered_by_the_recorded_checksum(
+    decision_world: tuple[Recommendation, Projection, Path],
+    field: str,
+) -> None:
+    recommendation, projection, root = decision_world
+    directory = record_decision(root, recommendation, projection, report_text="report")
+    path = directory / "decision.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    document[field] = None
+    path.write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(LedgerError, match="does not match its recorded digest"):
+        load_entry(root, SEASON, 1)

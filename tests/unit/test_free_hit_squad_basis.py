@@ -10,6 +10,11 @@ Three seams are covered: the parser reports the chip, the capture reads the week
 a Free Hit week (and walks back while that week was a Free Hit too), and the provider
 resolves the basis or refuses with a reason when the earlier document is not on disk.
 A Wildcard, Bench Boost or Triple Captain week keeps the captured squad.
+
+A fourth seam asks the same question of our own record: the ledger path and the member
+path share one walk-back (``live.free_hit``) and are pinned here to the same squad on the
+same input, because a ledger that stepped back exactly once resolved two Free Hits in a
+row to a squad that never existed.
 """
 
 import json
@@ -33,6 +38,7 @@ from squadopt.application.entries import (
 )
 from squadopt.application.league_views import build_league_views
 from squadopt.data.sources.fpl_live import entry_active_chip, fpl_entry_picks
+from squadopt.live import LedgerEntry, LedgerError, ledger
 from squadopt.platform import fpl_capture
 
 ENTRY = 11
@@ -321,8 +327,9 @@ def test_a_capture_stores_the_pre_free_hit_picks_beside_the_played_week(
 
 def test_the_free_transfers_are_the_captured_weeks_not_the_basis_weeks() -> None:
     """A Free Hit voids the squad, not the bank of free transfers: the count for the GW4
-    deadline is derived through the chip week (none, one, two, kept, three), while the
-    GW2 basis document would only know the two held at the GW3 deadline."""
+    deadline is derived through the chip week (none at GW1, one for GW2, one saved into
+    GW3 whose own transfer paid for the chip, then one more for GW4), while the GW2 basis
+    document would not know the chip week at all."""
 
     bootstrap = {
         **json.loads(_bootstrap()),
@@ -341,7 +348,125 @@ def test_the_free_transfers_are_the_captured_weeks_not_the_basis_weeks() -> None
     )
     picks = provider.picks(ENTRY, "2026-27", 3)
     assert picks.squad_basis == pre_free_hit_basis(2)
-    assert (picks.free_transfers, picks.free_transfers_known) == (3, True)
+    assert (picks.free_transfers, picks.free_transfers_known) == (2, True)
+
+
+# --- one rule, one answer, on both walk-back paths ------------------------------------
+
+FIRST_FREE_HIT, SECOND_FREE_HIT = 19, 20
+BASIS_WEEK = FIRST_FREE_HIT - 1
+
+
+def _history_through(week: int, chips: list[tuple[str, int]]) -> bytes:
+    return payload_module._history_payload(
+        chips=[
+            {"name": name, "time": "2026-12-27T11:00:00Z", "event": event} for name, event in chips
+        ],
+        current=[
+            {
+                "event": event,
+                "points": 50,
+                "total_points": 50 * event,
+                "event_transfers": 0,
+                "event_transfers_cost": 0,
+                "points_on_bench": 3,
+                "bank": 20,
+            }
+            for event in range(1, week + 1)
+        ],
+    )
+
+
+def _ledger_entry(gameweek: int, squad: list[int], *, chip: str | None, bank: int) -> LedgerEntry:
+    """One recorded decision, in the shape ``held_squad_from_ledger`` reads."""
+
+    players = list(_codes(squad))
+    return LedgerEntry(
+        season="2026-27",
+        gameweek=gameweek,
+        decision={
+            "squad_player_ids": players,
+            "total_cost_tenths": 1000 - bank,
+            "transfers": {
+                "chip": chip,
+                "bank_after_tenths": bank,
+                "free_transfers_after": 2 if chip == "freehit" else 1,
+                "purchase_prices": {str(player): 50 for player in players},
+            },
+        },
+        outcome=None,
+        directory=Path("recorded"),
+    )
+
+
+def _held_from_ledger(
+    monkeypatch: pytest.MonkeyPatch, entries: tuple[LedgerEntry, ...], *, before: int
+) -> Any:
+    monkeypatch.setattr(ledger, "load_ledger", lambda root, season: entries)
+    return ledger.held_squad_from_ledger(
+        Path("recorded"), "2026-27", before_gameweek=before, budget_tenths=1000
+    )
+
+
+def test_both_walk_back_paths_resolve_two_free_hits_to_the_same_squad(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A member's captured picks and our own ledger answer the same question, so they
+    must give the same answer. Gameweeks 19 and 20 are the only consecutive pair the
+    halves allow, and the rule now forbids even that, so two in a row can only reach
+    either path as a damaged record: the honest answer is still the squad held before
+    both, never the void fifteen of the earlier chip week.
+    """
+
+    provider = _provider(
+        {
+            f"entry-{ENTRY}-picks-gw{SECOND_FREE_HIT}.json": _picks(
+                FREE_HIT_SQUAD, chip="freehit", bank=5
+            ),
+            f"entry-{ENTRY}-picks-gw{FIRST_FREE_HIT}.json": _picks(
+                HELD_SQUAD, chip="freehit", bank=15
+            ),
+            f"entry-{ENTRY}-picks-gw{BASIS_WEEK}.json": _picks(OLDER_SQUAD, chip=None, bank=30),
+            f"entry-{ENTRY}-history.json": _history_through(
+                SECOND_FREE_HIT, [("freehit", FIRST_FREE_HIT), ("freehit", SECOND_FREE_HIT)]
+            ),
+        }
+    )
+    picks = provider.picks(ENTRY, "2026-27", SECOND_FREE_HIT)
+
+    held = _held_from_ledger(
+        monkeypatch,
+        (
+            _ledger_entry(BASIS_WEEK, OLDER_SQUAD, chip=None, bank=30),
+            _ledger_entry(FIRST_FREE_HIT, HELD_SQUAD, chip="freehit", bank=15),
+            _ledger_entry(SECOND_FREE_HIT, FREE_HIT_SQUAD, chip="freehit", bank=5),
+        ),
+        before=SECOND_FREE_HIT + 1,
+    )
+
+    assert held.squad_player_ids == picks.squad == _codes(OLDER_SQUAD)
+    assert held.bank_tenths == picks.bank_tenths == 30
+    assert picks.squad_basis == pre_free_hit_basis(BASIS_WEEK) == "pre_free_hit_gw18"
+    assert held.decided_gameweek == SECOND_FREE_HIT
+    # The squad walks back; the free transfers are the chip week's own and do not.
+    assert held.free_transfers == 2
+
+
+def test_the_ledger_names_the_week_it_walked_to_rather_than_using_a_free_hit_squad(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Stepping back exactly once landed on the earlier Free Hit week and took its squad,
+    a fifteen the manager never held. With nothing before the pair recorded, the refusal
+    names gameweek 18, the week the walk actually needs.
+    """
+
+    entries = (
+        _ledger_entry(FIRST_FREE_HIT, HELD_SQUAD, chip="freehit", bank=15),
+        _ledger_entry(SECOND_FREE_HIT, FREE_HIT_SQUAD, chip="freehit", bank=5),
+    )
+    with pytest.raises(LedgerError) as raised:
+        _held_from_ledger(monkeypatch, entries, before=SECOND_FREE_HIT + 1)
+    assert f"GW{BASIS_WEEK}'s" in str(raised.value)
 
 
 # --- one member's refusal does not sink the league ------------------------------------

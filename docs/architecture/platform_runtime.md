@@ -199,9 +199,12 @@ Each invocation writes its canonical command request beneath `data/runtime/reque
 a Git checkout; otherwise the CLI resolves `git rev-parse HEAD` without a shell. Exit 0 means
 completed, 1 is a stated domain/preparation failure, and 2 is an unexpected runtime failure.
 
-The old `scripts.run_gameweek_ops`, `scripts.run_season_tick`, and manual capture module remain
-thin compatibility shells for one release. They delegate to this CLI or the public platform
-capture adapter and are not alternate implementations.
+The old `scripts.run_gameweek_ops`, `scripts.run_season_tick`, and manual capture module
+(`scripts.capture_deadline_snapshot`) were kept as thin compatibility shells "for one
+release". That release, 1.0.0, is cut (`CHANGELOG.md`, `pyproject.toml`) and the three
+shells are still in the tree; the PR that retires them is still owed. Until it lands they
+delegate to this CLI or the public platform capture adapter and are not alternate
+implementations.
 
 A tick that contacts the live FPL endpoint registers the newly captured response as an output,
 not as a pre-existing reproducibility input: a changing external response cannot honestly be
@@ -224,15 +227,29 @@ the platform boundary.
 
 ### Service and compute adapters
 
-FastAPI, background jobs, cache, authentication, deployment, and observability are later
-adapters over a stable runtime. Their order matters:
+The HTTP surface, the advice worker, the queue, the cache and the deployment are installed
+adapters over the runtime, not later stages. The versioned routes, normalized commands,
+read-model reuse, idempotency semantics, and public errors were fixed in the
+[backend HTTP boundary](backend.md) before the framework was installed, and the same rule
+holds for what is still absent: PostgreSQL, Redis, authentication, object storage and GPU
+orchestration (that document's "Deliberately absent from v1" keeps the list).
 
-The versioned routes, normalized commands, read-model reuse, idempotency semantics, and public
-errors are fixed in the [backend HTTP boundary](backend.md) before a framework is installed.
+| Module | Responsibility |
+| --- | --- |
+| `api/app.py`, `api/runtime.py`, `api/views.py` | FastAPI read-only surface; the api process's composition and the `build_app` factory uvicorn calls; reads of published `ui_view_v1` documents |
+| `platform/backend_runtime.py` | Composition root: wires the queue, cache, worker and API to one shared store |
+| `platform/queue_contracts.py`, `jobs_contract.py`, `api_contract.py` | Adapter-neutral queue operations, the `backend_jobs_v1` job lifecycle, transport-neutral request/response contracts |
+| `platform/file_advice_queue.py`, `advice_queue.py` | Recoverable file-backed queue with fenced metadata transactions; worker orchestration over it |
+| `platform/advice_cache.py` | Immutable-key advice cache behind a protocol |
+| `platform/advice_worker.py`, `worker_metrics.py` | The worker process loop and its own Prometheus listener |
+| `platform/store_probe.py` | Proves the shared mount provides what the adapters were built on |
+| `deploy/compose.yaml` | Runs `uvicorn --factory squadopt.api.runtime:build_app` and `python -m squadopt.platform.advice_worker` as separate processes over one store |
 
-- no HTTP implementation before request/response and runtime contracts;
-- no queue implementation before the job lifecycle contract;
+The order that governed the installed adapters still governs the missing ones:
+
 - no Redis implementation before execution fingerprints and cache policy;
+- no PostgreSQL before the narrow repository behavior the file adapter serves is extracted
+  ([ADR 0005](decisions/0005-persistence-boundaries.md));
 - no authentication before a user domain exists;
 - no object storage or GPU orchestration before a measured workload requires it.
 
@@ -282,20 +299,8 @@ explicit, reviewable state change backed by the gate artifacts and sign-offs.
 
 ## First delivery sequence
 
-The first three feature PRs are deliberately storage- and transport-neutral. Each groups the
-small contracts needed for one reviewable outcome instead of opening a PR per class or file:
-
-1. `feature/run-context-manifest` — run identity, reproducibility fingerprints, manifest
-   serialization, and tests;
-2. `feature/artifact-registry` — artifact records, a file-backed registry, checksum
-   verification, lineage, and tests;
-3. `feature/runtime-orchestration` — the shared execution lifecycle around public application
-   services and its integration tests.
-
-The runtime contracts were followed by `feature/application-command-services`, which supplied
-the public decide, settle, and tick seams, and then `feature/unified-cli`, which exercised all
-four preceding deliveries through an installed command. The independent persistence decision
-is now [ADR 0005](decisions/0005-persistence-boundaries.md), and
-`feature/backend-api-contract` fixes the HTTP boundary and `backend_api_v1` documents before a
-framework is installed. PostgreSQL, FastAPI implementation, workers, Redis, authentication,
-and scaling remain later stages rather than implicit contents of these contract PRs.
+The runtime landed contract-first: run context and manifest, artifact registry, runtime
+orchestration, application command services, then the unified CLI, followed by the
+persistence decision ([ADR 0005](decisions/0005-persistence-boundaries.md)) and the
+[HTTP boundary](backend.md); the installed adapters in the table above came after those
+contracts, and PostgreSQL, Redis and authentication have not.

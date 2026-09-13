@@ -37,9 +37,13 @@ export function LeagueMemberPage() {
   if (squad.isPending) return <EmptyState title={copy.loadingEntry} />;
   if (squad.isError) {
     const missing = squad.error instanceof LeagueDataMissing;
+    const reasons = missing ? [...new Set(index?.unavailable.map((item) => item.reason))] : [];
     return (
       <EmptyState title={missing ? copy.entryNotAvailable : copy.entryUnreadable}>
         <p>{missing ? copy.entryNotAvailableBody : copy.entryUnreadableBody}</p>
+        {reasons.filter(Boolean).map((reason) => (
+          <p key={reason}>{reason}</p>
+        ))}
         <Link to="/league/members">{copy.backToMembers}</Link>{" "}
         {!missing ? (
           <button type="button" onClick={() => void squad.refetch()}>

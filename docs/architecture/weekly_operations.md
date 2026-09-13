@@ -4,7 +4,11 @@ The installed entry point is `python -m squadopt.platform.weekly_operations`.
 `python -m scripts.run_week` preserves the existing flags and delegates to it. The
 domain planning, preflight, handoff, player evidence, rotation export and settled-outcome
 export live in `application`; HTTP capture, process pools, Git publication and execution
-journals live in `platform`. The installed path does not import `scripts`.
+journals live in `platform`. The installed runner does not import `scripts`: its `publish`
+stage hands `platform.weekly_publish` a typed builder for the site, league and scoreboard
+views. The manual `python -m scripts.publish_gameweek_site` path supplies no builder and
+still runs the `scripts.build_site`, `scripts.build_league_site` and
+`scripts.build_scoreboard` shells in a subprocess (`_legacy_build`).
 
 Use short Windows workspace and handoff roots on hosts with the legacy path limit.
 Retained content-addressed paths add directories and a 69-character filename; a
@@ -85,15 +89,23 @@ Ordinary built handoffs retain the existing evidence readers and model gates. Al
 publication uses capture-specific retention described in [backup recovery](backup_recovery.md).
 
 Rotation stays opt-in: the default fixture source has not become live intelligence.
-Preview league builds write no advice record. Only the explicit publication rebuild writes
-the private advice records tied to its generated public bytes.
+A preview that will not be published writes no advice record. With `--publish` the preview
+is the publication, so its league stage writes the private advice records from the solve
+whose bytes ship, before the history documents that read them are built. The records the
+season already held are declared as league-stage inputs, so a week whose records moved
+between two runs is visible in the journal rather than only in the history bytes.
 
 ## Publication and operational acceptance
 
 `--publish` is an external-effect stage. It requires Git/gh and the fresh `origin/develop`
-revision to match the run's source revision, renders in an owned worktree under
-`.codex-tmp/publications`, and verifies an open PR's exact commit or a no-change result.
-Its receipt confirms the PR commit and private record paths. The final merge,
+revision to match the run's source revision, copies the preview's `data/` tree into an
+owned worktree under `.codex-tmp/publications` (replacing the tree the worktree carries
+from `origin/develop`), reads the copy back against the preview byte for byte, and verifies
+an open PR's exact commit or a no-change result. Nothing is solved again: what a person
+read in the preview is what the commit holds. For the preview to be that tree, it starts
+from the checkout's `web/public/data`, which the worktree build also started from; the
+site and the scoreboard read that tree when the ledger holds nothing. Its receipt confirms
+the PR commit and the number of files published. The final merge,
 main CI, tag, deploy and canonical-site checks remain the release workflow's responsibility.
 A completed weekly run with an open PR is not evidence that the website is live.
 

@@ -6,9 +6,9 @@ and an optional advice API with independent workers.
 
 Start with the [documentation guide](docs/README.md), the
 [current system map](docs/architecture/system_map.md) or the
-[product and research roadmap](docs/product/roadmap.md). The
-[enterprise transition record](docs/architecture/enterprise_transition.md) distinguishes
-implemented changes, completed checks and outstanding operational acceptance.
+[product and research roadmap](docs/product/roadmap.md).
+[ADR 0007](docs/architecture/decisions/0007-enterprise-transition.md) records the enterprise
+transition: what it changed, what was accepted and what still waits on a real environment.
 
 ## Repository layout
 
@@ -25,6 +25,10 @@ implemented changes, completed checks and outstanding operational acceptance.
 | `tests/` | Offline fixtures, unit tests and opt-in acceptance probes |
 | `docs/` | Product, operations, architecture, contracts and scientific evidence |
 | `data/` | Private local operational state; a Git checkout is not its backup |
+| `notebooks/` | Exploration only; every notebook calls importable `src/squadopt/` code |
+| `constraints.txt` | Pinned package versions the container and measurement checks install |
+| `artifacts/` | Git-ignored local experiment outputs; generated, never source |
+| `.codex-tmp/` | Git-ignored agent worktrees and scratch; not project content |
 
 ## Development
 
@@ -39,7 +43,7 @@ python -m venv .venv
 
 For Python 3.11, install the declared ranges without `-c constraints.txt`. For the website,
 use Node 22, run `npm ci` in `web/`, then `npm run dev`. See
-[Contributing](CONTRIBUTING.md) and the [web guide](web/README.md) for the required checks.
+[Contributing](CONTRIBUTING.md) and the [web guide](web/README.md) for the checks CI runs.
 
 ## Running the system
 

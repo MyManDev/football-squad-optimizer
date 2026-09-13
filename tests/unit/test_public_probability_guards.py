@@ -90,6 +90,7 @@ def _member_picks(world: dict[str, Any], entry_id: int, squad_codes: list[int]) 
         captain=squad_codes[0],
         vice_captain=squad_codes[1],
         bank_tenths=5,
+        squad_sell_value_tenths=world_module.member_squad_sell_value(world, squad_codes),
         free_transfers=1,
         free_transfers_known=False,
         source_snapshot_id=world["gw2_id"],

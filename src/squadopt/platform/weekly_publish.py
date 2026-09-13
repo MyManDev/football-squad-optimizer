@@ -34,6 +34,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from squadopt.live.runlog import LOG_ROOT_NAME
+
 KINDS = ("decision", "settled")
 
 
@@ -407,7 +409,7 @@ def _legacy_build(
             "--snapshot-root",
             str(root / "data" / "snapshots"),
             "--log-root",
-            str(root / "data" / "logs" / "season_tick"),
+            str(root / LOG_ROOT_NAME),
             "--out",
             str(worktree / "web" / "public"),
         ],

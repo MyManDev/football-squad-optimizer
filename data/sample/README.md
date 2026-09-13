@@ -11,6 +11,7 @@ apart.
 | --- | --- | --- |
 | `raw_player_gameweeks.csv` | `python -m scripts.generate_sample_data` | `tests/unit/test_sample_data.py` |
 | `club_news_v1.fixture.json` | `python -m scripts.generate_club_news_fixture` | `tests/unit/test_club_news_fixture.py` |
+| `club_news_coding_v1.fixture.json` | `python -m scripts.generate_club_news_coding_fixture` | `tests/unit/test_club_news_coding.py` |
 | `entry_registry_v1.example.json` | hand-written shape example | — |
 
 ## `raw_player_gameweeks.csv` — shape
@@ -66,6 +67,10 @@ downstream has to keep apart, and it carries one of each:
   the join refuses instead of guessing;
 - four responses that break the response format four different ways, so a parser
   refuses rather than coerces.
+
+`club_news_coding_v1.fixture.json` is derived from this file: every quote it carries is
+cut from this fixture's document bytes at the offsets it declares, so the two agree by
+construction.
 
 Real captured club documents belong under `data/snapshots/`, which is
 git-ignored, and no byte of one is in this repository.

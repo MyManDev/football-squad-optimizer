@@ -13,9 +13,9 @@ emitted. Three properties make it usable as evidence rather than as a note:
 
 - **It is written by the call that writes the published bytes.** ``build_league_views``
   writes both, from the same picks, the same projection and the same payloads. A runner
-  wrapped around the publish could not do this honestly — the weekly publish re-solves in
-  a fresh worktree at whatever code is on develop, so a record assembled outside it would
-  describe a different solve than the one that shipped.
+  wrapped around the publish could not do this honestly: it would be describing a solve
+  it did not perform. The weekly run publishes the preview tree it built, so its league
+  stage is that call and writes the record when the run is going to publish.
 - **It is scoring-complete.** Everything a later page needs to score what we advised is in
   the record: the eleven in pitch order, the bench in autosub order, the captain, the vice,
   the chip, the moves, the week's hit charge and the expected own points; the state the
@@ -502,8 +502,17 @@ def build_member_advice_record(
             # the source published. A banked second transfer would be invisible.
             "free_transfers_known": bool(picks.free_transfers_known),
             "purchase_prices_known": bool(picks.purchase_prices_known),
+            # What the whole squad sells for, which the endpoints state even where they
+            # state no purchase price. It is the budget the plan was held to, so the
+            # record carries it beside the bank rather than leaving a reader to add up
+            # current prices and get a larger number than the member could ever raise.
+            "squad_sell_value_tenths": (
+                None
+                if picks.squad_sell_value_tenths is None
+                else int(picks.squad_sell_value_tenths)
+            ),
             # Absent, not empty: an unknown purchase price is a different fact from a
-            # purchase price of nothing, and the plan valued the squad at current prices.
+            # purchase price of nothing.
             "purchase_prices": (
                 {str(player): int(price) for player, price in sorted(picks.purchase_prices.items())}
                 if picks.purchase_prices_known

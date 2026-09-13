@@ -1,5 +1,12 @@
+import { isEntryChips } from "./chipShape";
 import { LeagueDataError } from "./dataErrors";
-import type { EntryAdviceIndex, EntrySquad, LeagueMembers, LeagueViewEnvelope } from "./types";
+import type {
+  EntryAdviceIndex,
+  EntrySquad,
+  EntrySquadPlayer,
+  LeagueMembers,
+  LeagueViewEnvelope,
+} from "./types";
 
 const CONTRACT_VERSION = "provisional_league_ui_v1";
 
@@ -46,8 +53,21 @@ function publishedPlayer(value: unknown): boolean {
     ["GK", "DEF", "MID", "FWD"].includes(value.position) &&
     finite(value.expected_points) &&
     typeof value.is_captain === "boolean" &&
+    // Optional, like the state fields below: documents published before the field carry
+    // none, and so does a member whose source never stated a held vice. Absent is read as
+    // "not stated"; a wrong shape is still refused rather than read as absent.
+    (value.is_vice_captain === undefined || typeof value.is_vice_captain === "boolean") &&
     (value.bench_order == null || Number.isSafeInteger(value.bench_order))
   );
+}
+
+/**
+ * The platform names exactly one vice-captain, so a published fifteen may flag one player
+ * or, when the source did not state the armband, none at all. Two would leave the page
+ * choosing between them.
+ */
+function atMostOneViceCaptain(players: ReadonlyArray<EntrySquadPlayer>): boolean {
+  return players.filter((player) => player.is_vice_captain === true).length <= 1;
 }
 
 export function assertEnvelope<T>(value: unknown): LeagueViewEnvelope<T> {
@@ -103,12 +123,22 @@ export function assertSquad(
     !view.starting_xi.every(publishedPlayer) ||
     !Array.isArray(view.bench) ||
     !view.bench.every(publishedPlayer) ||
+    !atMostOneViceCaptain([...view.starting_xi, ...view.bench]) ||
     !Array.isArray(view.missing_fields) ||
     !view.missing_fields.every((field) => typeof field === "string") ||
     !["complete", "partial", "empty"].includes(view.data_quality) ||
     typeof view.free_transfers_known !== "boolean" ||
     typeof view.purchase_prices_known !== "boolean" ||
-    !finite(view.free_transfers)
+    !Number.isSafeInteger(view.free_transfers) ||
+    view.free_transfers < 0 ||
+    // The state fields are optional (documents from before them carry none) but never
+    // malformed: a wrong shape is refused like every other field, not read as absent.
+    (view.chips !== undefined && !isEntryChips(view.chips, view.gameweek)) ||
+    (view.squad_basis !== undefined &&
+      (typeof view.squad_basis !== "string" || view.squad_basis.trim() === "")) ||
+    (view.active_chip !== undefined &&
+      view.active_chip !== null &&
+      (typeof view.active_chip !== "string" || view.active_chip.trim() === ""))
   ) {
     throw new LeagueDataError("The published member squad is invalid or belongs to another entry.");
   }

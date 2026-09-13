@@ -24,6 +24,11 @@ control is `form_window=5, bench_weight=0.1, risk_aversion=0`).
 
 ### T−2h .. T−30min: capture
 
+The installed weekly runner (`python -m squadopt.platform.weekly_operations`, see the
+[weekly runbook](weekly_runbook.md)) captures in-process as its `capture` stage, and the
+scheduled path is `squadopt season tick`. For a standalone manual capture, the deprecated
+shell over the same `platform.fpl_capture.capture` adapter still works:
+
 ```console
 python -m scripts.capture_deadline_snapshot
 ```
@@ -132,10 +137,17 @@ is committed.
 
 Every deadline after the opening one starts from the squad the ledger holds — the
 previous gameweek's recorded decision — and decides **transfers**, not a fresh squad.
-The machine is the same script:
+The machine is the same. The installed weekly runner does all three steps in-process
+(its `capture`, `handoff` and `decide` stages):
 
 ```console
-python -m scripts.capture_deadline_snapshot
+python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 2 --league 352490 --decide
+```
+
+Step by step, the same work is:
+
+```console
+python -m scripts.capture_deadline_snapshot         # deprecated manual shell; the runner captures in-process
 python -m scripts.build_projection_handoff          # writes the path decide reads
 squadopt gameweek decide --gameweek 2 \
     --in-season-projection data/handoffs/2026-27-gw02.json
@@ -184,7 +196,7 @@ Chips are **not timed by the planner** (a one-week horizon plays them at the fir
 opportunity; see `docs/season_chain_note.md`); play one by naming it:
 
 ```powershell
-... --phase decide --gameweek 24 --in-season-projection ... --chip bboost
+squadopt gameweek decide --gameweek 24 --in-season-projection ... --chip bboost
 ```
 
 A named chip is refused outside its published window or if already played inside it.

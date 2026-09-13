@@ -143,6 +143,9 @@ def _parity_snapshot(*, official_points: int = 12) -> CapturedSnapshot:
                 "points": official_points,
                 "event_transfers_cost": 0,
                 "bank": 0,
+                # The entry's whole worth at the deadline, squad plus bank: the opening
+                # budget here, since nothing is banked and no price has moved yet.
+                "value": 1_000,
             },
             "picks": [
                 {

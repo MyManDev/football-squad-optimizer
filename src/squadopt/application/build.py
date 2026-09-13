@@ -37,6 +37,7 @@ from squadopt.application.views import (
 from squadopt.live.ledger import LedgerEntry, decision_mode, load_ledger
 from squadopt.live.report import Recommendation
 from squadopt.live.risk import LiveRiskDiagnostics
+from squadopt.live.runlog import component_log_directory
 from squadopt.live.tick import LedgerState, TickPlan
 
 _PROJECTIONS_FILE = "projections.csv"
@@ -539,8 +540,10 @@ def _recent_events(
 ) -> tuple[RunLogEventView, ...]:
     if runlog_root is None:
         return ()
-    directory = Path(runlog_root) / component
+    directory = component_log_directory(runlog_root, component)
     if not directory.is_dir():
+        # Absent is not zero: a machine that has never run leaves no directory, and that
+        # reads as "no runs recorded" rather than as an error or as a counted fact.
         return ()
     events: list[RunLogEventView] = []
     for path in sorted(directory.glob("*.jsonl"), reverse=True):

@@ -5,8 +5,19 @@ import logging
 from pathlib import Path
 
 import pytest
+from scripts.build_site import DEFAULT_LOG_ROOT as build_site_log_root
+from scripts.build_site import REPOSITORY_ROOT as build_site_root
 
-from squadopt.live.runlog import JsonLineFormatter, configure_run_logging, new_run_id
+from squadopt.application.build import _recent_events
+from squadopt.live.runlog import (
+    LOG_ROOT_NAME,
+    JsonLineFormatter,
+    component_log_directory,
+    configure_run_logging,
+    new_run_id,
+)
+from squadopt.platform.cli import build_parser as cli_parser
+from squadopt.platform.weekly_operations import WeeklyPaths
 
 
 def test_a_run_writes_json_lines_with_its_run_id_and_fields(tmp_path: Path) -> None:
@@ -72,3 +83,49 @@ def test_no_log_root_keeps_logging_in_memory_and_bad_component_is_refused() -> N
     formatter = JsonLineFormatter("run", "c")
     record = logging.LogRecord("squadopt.x", logging.INFO, __file__, 1, "m", None, None)
     assert json.loads(formatter.format(record))["message"] == "m"
+
+
+def test_a_log_root_is_qualified_with_its_component_exactly_once(tmp_path: Path) -> None:
+    """The producer hands over an unqualified root; only the join helper adds the component.
+
+    The status page read ``data/logs/season_tick/season_tick`` and reported no run log at
+    all, because ``WeeklyPaths`` handed over a root that already named the component and
+    the reader qualified it again. Writer and reader now share one join, so the round trip
+    below fails the moment a caller pre-qualifies its root.
+    """
+
+    root = WeeklyPaths.under(tmp_path).log_root
+    assert root == tmp_path / LOG_ROOT_NAME
+    assert root.name != "season_tick", "a root a caller holds is above every component"
+
+    log = configure_run_logging("season_tick", log_root=root, console=False)
+    log.event("tick.week.done")
+    assert log.log_path is not None
+    assert log.log_path.parent == component_log_directory(root, "season_tick")
+
+    # What the writer wrote is what the reader reads, from the same root.
+    assert _recent_events(root, "season_tick", 10)[0].message == "tick.week.done"
+    # Qualifying that same root a second time is the defect, and finds nothing.
+    assert _recent_events(component_log_directory(root, "season_tick"), "season_tick", 10) == ()
+    with pytest.raises(ValueError, match="component"):
+        component_log_directory(root, " ")
+
+
+def test_every_holder_of_a_log_root_agrees_on_the_same_unqualified_root(tmp_path: Path) -> None:
+    """The weekly runner, the command line and the site builder must not drift apart."""
+
+    arguments = cli_parser().parse_args(
+        ["season", "tick", "--workspace-root", str(tmp_path), "--dry-run"]
+    )
+    assert Path(arguments.log_root) == LOG_ROOT_NAME
+    assert WeeklyPaths.under(tmp_path).log_root == tmp_path / LOG_ROOT_NAME
+    assert build_site_log_root == build_site_root / LOG_ROOT_NAME
+
+
+def test_a_machine_with_no_run_log_reads_as_no_runs_rather_than_an_error(tmp_path: Path) -> None:
+    """Absent is not zero: nothing recorded is an empty list, not a failure."""
+
+    assert _recent_events(None, "season_tick", 10) == ()
+    assert _recent_events(tmp_path / "never-run", "season_tick", 10) == ()
+    (tmp_path / "empty" / "season_tick").mkdir(parents=True)
+    assert _recent_events(tmp_path / "empty", "season_tick", 10) == ()

@@ -9,7 +9,8 @@ that models chips or sell-on fees can take the season's numbers rather than last
 season's.
 
 This module reads and validates; it does not interpret. What a defensive contribution
-requires (the CBIT threshold) is not in the payload, so it is not here either.
+requires (the CBIT threshold) is not in the payload, so it is not here either. The one
+rule value stated rather than read is the transfer hit, which the source does not publish.
 """
 
 import hashlib
@@ -28,6 +29,12 @@ from squadopt.planning import ChipAvailability
 SEASON_RULES_CONTRACT_VERSION: Final = "season_rules_v1"
 POSITIONS: Final = ("GKP", "DEF", "MID", "FWD")
 CHIP_NAMES: Final = ("wildcard", "freehit", "bboost", "3xc")
+# The points the game deducts per transfer beyond the free ones (official rules,
+# "Transfers"). The bootstrap publishes the free-transfer cap but not this, so it is a
+# constant, and this is its one definition: the banking model that derives a member's
+# free transfers checks every recorded cost against it (``live/banking.py``), and the
+# member planning policy charges it (``hit_points_charged`` in ``live/transfers.py``).
+TRANSFER_HIT_POINTS: Final = 4
 
 
 class SeasonRulesError(DataError):
@@ -60,6 +67,13 @@ class ChipWindow:
         return self.start_event <= gameweek <= self.stop_event
 
 
+def _max_free_transfers(max_extra_free_transfers: int) -> int:
+    """The most free transfers a manager can hold: one plus the extra bank the source
+    publishes as ``max_extra_free_transfers``."""
+
+    return 1 + max_extra_free_transfers
+
+
 @dataclass(frozen=True, slots=True)
 class TransferRules:
     squad_size: int
@@ -84,7 +98,7 @@ class TransferRules:
     def max_free_transfers(self) -> int:
         """The most free transfers a manager can hold: one plus the extra bank."""
 
-        return 1 + self.max_extra_free_transfers
+        return _max_free_transfers(self.max_extra_free_transfers)
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,6 +254,26 @@ def read_season_rules(snapshot: CapturedSnapshot, *, season: str) -> SeasonRules
             "awards_defensive_contribution": scoring.awards_defensive_contribution,
         },
     )
+
+
+def free_transfer_cap(bootstrap: bytes) -> int | None:
+    """The most free transfers a manager can bank, read from the captured settings alone.
+
+    ``game_config.rules.max_extra_free_transfers`` is the field ``read_season_rules``
+    builds ``TransferRules.max_free_transfers`` from, and the cap is the same one plus
+    the extra bank; ``game_settings`` repeats it and is the fallback. None when the
+    bootstrap carries neither, so a banked count derived from it stays an honest unknown
+    rather than a hard-coded season. A caller holding the full rules has the same number
+    in the property; this reads the one field for a caller that does not.
+    """
+
+    document = json.loads(bootstrap.decode("utf-8"))
+    config = document.get("game_config")
+    rules = config.get("rules") if isinstance(config, Mapping) else None
+    for block in (rules, document.get("game_settings")):
+        if isinstance(block, Mapping) and "max_extra_free_transfers" in block:
+            return _max_free_transfers(_int(block, "max_extra_free_transfers", "rules"))
+    return None
 
 
 def chip_availability_for(

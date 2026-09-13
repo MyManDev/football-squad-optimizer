@@ -169,6 +169,12 @@
           "minimum": 1,
           "type": "integer"
         },
+        "expected_gain_vs_hold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "expected_gap_vs_rival": {
           "type": "number"
         },
@@ -205,7 +211,10 @@
           "items": {
             "properties": {
               "expected_points_delta": {
-                "type": "number"
+                "type": [
+                  "number",
+                  "null"
+                ]
               },
               "move_id": {
                 "type": "string"

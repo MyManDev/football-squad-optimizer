@@ -166,8 +166,6 @@ const en = {
     playerPointDifference: (difference: string) => `Difference ${difference}`,
     pointDifferenceUnavailable: "Difference Pending",
     captainMultiplier: (multiplier: number) => `×${multiplier} C`,
-    lowerTail: (probability: string, points: string) => `Lower ${probability} Tail ${points}`,
-    lowerTailUnavailable: "Lower Tail: Not Evaluated",
     squadCost: "Squad Cost",
     squadSellValue: "Squad Sell Value",
     bankAndFt: (bank: string, transfers: number) => `Bank ${bank} · ${transfers} FT Left`,
@@ -183,7 +181,6 @@ const en = {
     substitutionOrder: "In Substitution Order",
     limitsTitle: "What these numbers do not say",
     risk: "Risk",
-    score: "Score",
     riskStatus: {
       available: "Available",
       unavailable: "Unavailable",
@@ -191,7 +188,6 @@ const en = {
     },
     scenarioMean: "Mean of Scenarios",
     shiftedForOptimism: (points: string) => `Shifted ${points} for Selection Optimism`,
-    meanWorst: (fraction: string) => `Mean Worst ${fraction}`,
     scenarioCount: (count: number) => `${count} Scenarios`,
     rivalComparisons: "Rival Comparisons →",
     captured: "Captured",
@@ -271,15 +267,14 @@ const en = {
     modes: {
       pure: "Pure Points",
       pureDescription: "Targets the highest expected points independently of a rival.",
-      purePrice: "No Rival Budget",
+      purePrice: "No rival budget, no measured cost",
       safe: "Cautious",
-      safeDescription: "Aims to reduce the chance of falling behind in the league.",
+      safeDescription:
+        "Counts finishing level with the rival as success; the price is its measured cost in expected points.",
       aggressive: "Aggressive",
       aggressiveDescription: "A balanced competitive mode focused on moving ahead of the rival.",
       extreme: "Very Aggressive",
       extremeDescription: "Looks for harder decisions that can create a gap of more than five.",
-      behind: "P(behind)",
-      aheadFive: "P(5+ ahead)",
       cost: "cost",
       points: "points",
     },
@@ -389,6 +384,32 @@ const en = {
     gameAverage: "official FPL average",
     lastWeek: (points: string) => `last scored week difference: ${points}`,
   },
+  scoreboardComparisons: {
+    title: "Weekly comparison and error breakdown",
+    week: "GW",
+    name: "Decision",
+    net: "Points",
+    zero: "Starters with no minutes",
+    minutes: "Minutes shortfall",
+    captain: "Captain shortfall",
+    autosub: "Autosub recovery",
+    missing:
+      "- means not measured. Minutes shortfall covers starters who played; negative means more minutes than projected. Captain shortfall is expected minus received bonus points.",
+    legacy: "Named eleven; autosubs and vice-captain recovery unavailable",
+    synthetic: "Reconstructed legal squad within the opening budget; no transfer history",
+    game: "Game's published average",
+    official: "Official substitutions and captain scoring",
+    absent: "Decision record unavailable",
+    pending: "Awaiting settled results",
+    names: {
+      system: "System",
+      base: "Bare component",
+      elite_xi: "Lagged elite XI",
+      ownership_template: "Ownership template",
+      league_mean: "League mean, net",
+      game_mean: "Game average",
+    },
+  },
   leagueScoreboard: {
     title: "Weekly scoreboard",
     aside: (snapshot: string) => `capture ${snapshot.slice(0, 24)}…`,
@@ -417,7 +438,7 @@ const en = {
     membersTotal: (count: number) => `mean total of ${count}`,
     membersCovers: (gameweeks: string) => `covers GW ${gameweeks}`,
     paperLedger:
-      "Our squad is a paper ledger, not an FPL entry. Its figure is the eleven the decision named, scored as named: the game's automatic substitutions are not applied, and the frozen decision names no vice-captain, so a captain who did not play is not recovered. Both would only add points, so our number reads low beside a real entry's. A member's net is their week minus the transfer cost, read from their own history.",
+      "Our squad is a paper ledger. The comparison table names each row's scoring basis. Older decisions lack a frozen bench order and vice-captain, so their figure scores only the named eleven. New decisions record both and can be scored with official substitutions. A member's net is their week minus the transfer cost, read from their own history.",
     grossNote:
       "The Top-100 mean for this capture is gross of transfer costs: it is the cohort standings' own weekly total, before hits are taken off, so it is not on the same basis as the net columns beside it and the two do not compare. It is netted only when the week's elite-picks capture covers all hundred.",
     provisionalNote:
@@ -435,6 +456,24 @@ const en = {
     unsupported: "Only league 352490 is supported for now.",
     missing: "The published league document is unavailable. Try again later.",
     failed: "The published league data could not be read. Try again.",
+  },
+  memberResources: {
+    transfersTitle: "Free transfers",
+    unknown: "Unknown",
+    chipsTitle: "Chips",
+    chipsMissing: "No chip information",
+    asOf: (week: number) => `Before GW${week}`,
+    halves: { first_half: "First half", second_half: "Second half" },
+    window: (start: number, stop: number) => `GW${start} to GW${stop}`,
+    used: (week: number) => `Used in GW${week}`,
+    noWindow: "No window published",
+    states: {
+      available: "Available",
+      used: "Used",
+      expired: "Expired",
+      not_yet: "Not open yet",
+      unknown: "Unknown",
+    },
   },
   leagueMembers: {
     loading: "Loading league members…",
@@ -566,6 +605,10 @@ const en = {
     windowRule:
       "The moves and the lineup above are the first week's. Each row below is one gameweek of the plan, in expected points under the limits stated here.",
     windowLimitsLabel: "What this window assumes",
+    // The same list on a one-week document, where "window" would name nothing the
+    // reader can see. A one-week plan is handed no chip either, and until it said so a
+    // blank chip line read as a chip that had been weighed and turned down.
+    planLimitsLabel: "What this plan assumes",
     windowWeek: "Week",
     windowWeekOf: (gameweek: number) => `GW${gameweek}`,
     windowHits: "Hit points",
@@ -588,7 +631,7 @@ const en = {
         "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
     } as Record<string, string>,
     controlUnprovenBody: (gap: string) =>
-      `The pure-points plan this price is measured against was not proven optimal (gap ≤ ${gap} pts), so the price is published as a ceiling — the most this strategy can cost — and not as an exact figure.`,
+      `The pure-points plan this price is measured against was not proven optimal: its planner objective (the eleven with the captain doubled, plus a tenth of the bench, less the transfer penalties, which is not a points total) is within ${gap} of the best value the search could prove. The price is therefore published as a ceiling, the most this strategy can cost, and not as an exact figure.`,
     overlapLine: (count: number) => `${count} of the rival's eleven in your fifteen`,
     gapLine: (points: string) => `expected gap vs rival ${points}`,
     captainShared: "same captain",
@@ -626,9 +669,9 @@ const en = {
     entryUnreadable: "This member's squad could not be read.",
     entryUnreadableBody: "The published squad document did not return readable data.",
     unprovenPlanGapUnknown:
-      "The proof for this plan is incomplete. The optimality gap was not published.",
+      "The proof for this plan is incomplete. The bound on the planner's objective was not published.",
     controlGapUnknown:
-      "The pure-points control was not proven optimal and its gap was not published. Any stated price ceiling remains an upper bound.",
+      "The pure-points control was not proven optimal and the bound on its planner objective was not published. Any stated price ceiling remains an upper bound.",
     planWithinFreeUnknown: (cap: number, target: number) =>
       `The plan used a free-transfer limit of ${cap} and requested an overlap bound of ${target} players. The applied overlap bound was not published.`,
     hitPointsNotPublished: "an unpublished number of",
@@ -650,6 +693,10 @@ const en = {
     adviceUnreadable: "This member's advice could not be read.",
     adviceUnreadableBody:
       "The squad above came from this build and the advice document did not answer, so this is a fault in reading the site rather than a combination nobody solved. Reloading, or reporting it, is the right move.",
+    freeHitSquadBasis: (week: number) =>
+      `Free Hit played; this advice stands on your GW ${week} squad.`,
+    squadBasisUnconfirmed:
+      "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Neither week is shown, because a wrong week is worse than no week. Check the fifteen above against your own team before using the moves below.",
     entryNotAvailable: "This member’s squad document is not published.",
     entryNotAvailableBody: "Return to the member list or try again after the next publication.",
     invalidEntry: "This entry ID is not valid.",
@@ -691,8 +738,6 @@ const en = {
     incompleteBody: (fields: string) =>
       `The source did not provide: ${fields}. Nothing is invented to fill it.`,
     entryAssumptionsTitle: "Public-data limits",
-    freeTransfersAssumed: (count: number) =>
-      `The public source does not reveal banked free transfers. This plan assumes ${count}; a second banked transfer may be invisible.`,
     currentPriceFallback:
       "Purchase prices are not public. Current prices are used as selling prices, which may overstate the available budget after a price rise.",
     memberSquad: "Member Squad",
@@ -715,11 +760,23 @@ const en = {
     diagnosticOnly:
       "The two starting XIs use the same projection. Shared players with equal multipliers cancel out; the remaining expected points, captain multipliers and this plan’s transfer hits determine the expected gap.",
     unprovenPlanBadge: "Proof incomplete",
+    // What the solver's bound bounds, named. It is a distance on the planner's
+    // objective, which is not the points total this card leads with, and on a window it
+    // covers every gameweek of the plan at once rather than any single one.
     unprovenPlanBody: (gap: string) =>
-      `The solver could not finish the proof for this plan (gap ≤ ${gap} pts). It is the best plan the search found, not a plan shown to be the best one.`,
+      `The solver could not finish the proof for this plan. Its planner objective is within ${gap} of the best value the search could prove. That objective is the eleven with the captain doubled, plus a tenth of the bench, less the transfer penalties, so it is not a points total. This is the best plan the search found, not a plan shown to be the best one.`,
+    unprovenPlanBodyWindow: (gap: string, weeks: number) =>
+      `The solver could not finish the proof for this plan. Its planner objective, taken over all ${weeks} gameweeks of the plan at once, is within ${gap} of the best value the search could prove. That objective is each week's eleven with the captain doubled, plus a tenth of the bench, less the transfer penalties, so it is neither a points total nor a figure for any one gameweek. This is the best plan the search found, not a plan shown to be the best one.`,
     out: "Out",
     in: "In",
-    projectedGain: (points: string) => `${points} projected gain`,
+    projectedGain: (points: string) => `${points} for the eleven with the captain doubled`,
+    projectedGainUnknown: "This move's share of the plan's gain was not published.",
+    moveRowsBasis:
+      "Each row is what the eleven with the captain doubled moves by once that swap is added to the rows above it, so the rows add up to the whole plan's gain below.",
+    planGainVsHold: (points: string) =>
+      `${points} expected points against keeping the squad you hold, for the eleven with the captain doubled.`,
+    planGainVsHoldBeforeCost: (points: string, cost: string) =>
+      `${points} expected points against keeping the squad you hold, for the eleven with the captain doubled, before this week's transfer cost of ${cost}.`,
     weekTransferCost: (points: string) =>
       `~${points} expected-point cost for this week's transfers in total: the game charges the week, not each move.`,
     windowValueReason: "Part of the multiweek plan using published projections.",
@@ -813,7 +870,10 @@ const en = {
     nextGameweek: "next gameweek",
     deadline: (time: string) => `deadline ${time}`,
     noDeadline: "no open deadline in the latest capture",
-    hours: "hours to deadline",
+    timeToDeadline: "time to deadline",
+    deadlinePassed: "deadline passed",
+    deadlineUnknown: "not known",
+    atPublish: (hours: string) => `${hours} h remained when this was published`,
     latestCapture: (capture: string) => `latest capture ${capture}`,
     noCapture: "no capture held",
     decidedSettled: "decided · settled",
@@ -1025,8 +1085,6 @@ const tr: MessageSchema<typeof en> = {
     playerPointDifference: (difference) => `Fark ${difference}`,
     pointDifferenceUnavailable: "Fark Bekleniyor",
     captainMultiplier: (multiplier) => `×${multiplier} C`,
-    lowerTail: (probability, pointsValue) => `Alt ${probability} Kuyruk ${pointsValue}`,
-    lowerTailUnavailable: "Alt Kuyruk Değerlendirilmedi",
     squadCost: "Kadro Maliyeti",
     squadSellValue: "Kadro Satış Değeri",
     bankAndFt: (bank, transfers) => `Banka ${bank} · ${transfers} Serbest Transfer Kaldı`,
@@ -1042,7 +1100,6 @@ const tr: MessageSchema<typeof en> = {
     substitutionOrder: "Oyuna Giriş Sırasıyla",
     limitsTitle: "Bu sayılar neyi söylemiyor",
     risk: "Risk",
-    score: "Puan",
     riskStatus: {
       available: "Kullanılabilir",
       unavailable: "Kullanılamıyor",
@@ -1050,7 +1107,6 @@ const tr: MessageSchema<typeof en> = {
     },
     scenarioMean: "Senaryo Ortalaması",
     shiftedForOptimism: (pointsValue) => `Seçim İyimserliği İçin ${pointsValue} Kaydırıldı`,
-    meanWorst: (fraction) => `En Kötü ${fraction} Ortalaması`,
     scenarioCount: (count) => `${count} Senaryo`,
     rivalComparisons: "Rakip Karşılaştırmaları →",
     captured: "Yakalandı",
@@ -1129,15 +1185,14 @@ const tr: MessageSchema<typeof en> = {
     modes: {
       pure: "Saf Puan",
       pureDescription: "Rakipten bağımsız en yüksek beklenen puanı hedefler.",
-      purePrice: "Rakip Bütçesi Yok",
+      purePrice: "Rakip bütçesi yok, ölçülmüş maliyet yok",
       safe: "Garantici",
-      safeDescription: "Lig içinde geride kalma ihtimalini azaltmayı hedefler.",
+      safeDescription:
+        "Rakiple eşit bitirmeyi başarı sayar; fiyatı, beklenen puan üzerinden ölçülen maliyetidir.",
       aggressive: "Agresif",
       aggressiveDescription: "Rakibin önüne geçmeye odaklanan dengeli rekabet modu.",
       extreme: "Aşırı Agresif",
       extremeDescription: "Beş puandan büyük fark yaratabilecek daha sert kararları arar.",
-      behind: "P(geride)",
-      aheadFive: "P(5+ önde)",
       cost: "maliyet",
       points: "puan",
     },
@@ -1246,6 +1301,32 @@ const tr: MessageSchema<typeof en> = {
     gameAverage: "resmi FPL ortalaması",
     lastWeek: (pointsValue) => `son puanlanan hafta farkı: ${pointsValue}`,
   },
+  scoreboardComparisons: {
+    title: "Haftalık karşılaştırma ve hata ayrıştırması",
+    week: "GW",
+    name: "Karar",
+    net: "Puan",
+    zero: "Sıfır dakikalı ilk 11",
+    minutes: "Dakika açığı",
+    captain: "Kaptan açığı",
+    autosub: "Otomatik değişiklik getirisi",
+    missing:
+      "- ölçülmedi demektir. Dakika açığı oynayan ilk 11 oyuncularını kapsar; negatif değer tahminden fazla dakika oynandığını gösterir. Kaptan açığı, beklenen ile gerçekleşen ek puan farkıdır.",
+    legacy: "Adı konan ilk 11; otomatik değişiklik ve ikinci kaptan getirisi bilinmiyor",
+    synthetic: "Açılış bütçesiyle kurallara uygun yeniden kurulan kadro; transfer geçmişi yok",
+    game: "Oyunun yayımladığı ortalama",
+    official: "Resmi değişiklik ve kaptan puanlaması",
+    absent: "Karar kaydı yok",
+    pending: "Yerleşmiş sonuç bekleniyor",
+    names: {
+      system: "Sistem",
+      base: "Çıplak bileşen",
+      elite_xi: "Önceki haftanın elit XI'i",
+      ownership_template: "Sahiplik şablonu",
+      league_mean: "Lig ortalaması, net",
+      game_mean: "Oyun ortalaması",
+    },
+  },
   leagueScoreboard: {
     title: "Haftalık skor tablosu",
     aside: (snapshot) => `capture ${snapshot.slice(0, 24)}…`,
@@ -1274,7 +1355,7 @@ const tr: MessageSchema<typeof en> = {
     membersTotal: (count) => `${count} üyenin ortalama toplamı`,
     membersCovers: (gameweeks) => `OH ${gameweeks} kapsıyor`,
     paperLedger:
-      "Kadromuz bir FPL takımı değil, kâğıt üstünde bir ledger. Sayısı, kararın yazdığı on birin yazıldığı gibi puanlanmasıdır: oyunun otomatik değişiklikleri uygulanmaz ve dondurulmuş karar hiç yardımcı kaptan yazmaz, dolayısıyla oynamayan bir kaptanın yerine kimse geçmez. İkisi de yalnızca puan ekleyeceği için sayımız gerçek bir takımın yanında düşük okunur. Bir üyenin neti, kendi geçmişinden okunan hafta puanı eksi transfer cezasıdır.",
+      "Kadromuz kâğıt üstünde izlenen bir kadrodur. Karşılaştırma tablosu her satırın puanlama temelini gösterir. Eski kararlarda dondurulmuş bench sırası ve yardımcı kaptan olmadığı için yalnızca adı konan ilk 11 puanlanır. Yeni kararlar ikisini de kaydeder ve resmi otomatik değişikliklerle puanlanabilir. Bir üyenin neti, kendi geçmişinden okunan hafta puanı eksi transfer cezasıdır.",
     grossNote:
       "Bu capture'daki Top-100 ortalaması transfer cezaları düşülmeden hesaplanmıştır: kohortun kendi sıralama tablosundaki haftalık toplamdır ve cezalar çıkarılmamıştır; yanındaki net sütunlarla aynı ölçüde değildir, ikisi karşılaştırılamaz. Ancak haftanın elite-picks capture'ı yüz üyenin hepsini kapsadığında netlenir.",
     provisionalNote:
@@ -1292,6 +1373,24 @@ const tr: MessageSchema<typeof en> = {
     unsupported: "Şimdilik yalnız 352490 numaralı lig destekleniyor.",
     missing: "Yayımlanmış lig belgesi şu anda mevcut değil. Daha sonra yeniden dene.",
     failed: "Yayımlanan lig verisi okunamadı. Yeniden dene.",
+  },
+  memberResources: {
+    transfersTitle: "Ücretsiz transfer hakkı",
+    unknown: "Bilinmiyor",
+    chipsTitle: "Chipler",
+    chipsMissing: "Chip bilgisi yok",
+    asOf: (week) => `GW${week} öncesi`,
+    halves: { first_half: "İlk yarı", second_half: "İkinci yarı" },
+    window: (start, stop) => `GW${start} ile GW${stop}`,
+    used: (week) => `GW${week}'te kullanıldı`,
+    noWindow: "Yayımlanmış pencere yok",
+    states: {
+      available: "Kullanılabilir",
+      used: "Kullanıldı",
+      expired: "Süresi doldu",
+      not_yet: "Henüz açılmadı",
+      unknown: "Bilinmiyor",
+    },
   },
   leagueMembers: {
     computeTitle: "Bu planı hesapla",
@@ -1414,6 +1513,7 @@ const tr: MessageSchema<typeof en> = {
     windowRule:
       "Yukarıdaki hamleler ve kadro ilk haftanın. Aşağıdaki her satır planın bir oyun haftası; beklenen puan, burada yazılı sınırlar altında.",
     windowLimitsLabel: "Bu pencerenin varsaydıkları",
+    planLimitsLabel: "Bu planın varsaydıkları",
     windowWeek: "Hafta",
     windowWeekOf: (gameweek) => `OH${gameweek}`,
     windowHits: "Transfer cezası",
@@ -1435,7 +1535,7 @@ const tr: MessageSchema<typeof en> = {
         "Pencere içinde çip önerilmez. Sonlu bir pencere, bir çipi elde tutmaya değer biçmez; ulaşabilse harcardı. Çip zamanlaması sezonluk bir karardır ve bu pencere onu fiyatlayamaz.",
     },
     controlUnprovenBody: (gap: string) =>
-      `Bu fiyatın ölçüldüğü saf puan planı en iyi diye kanıtlanamadı (fark ≤ ${gap} puan); bu yüzden fiyat kesin bir değer olarak değil, tavan olarak yayımlanıyor: bu stratejinin mal olabileceği en fazla değer.`,
+      `Bu fiyatın ölçüldüğü saf puan planı en iyi diye kanıtlanamadı: planlayıcı amaç değeri (ilk on bir kaptan iki kat, artı yedeklerin onda biri, eksi transfer cezaları; bir puan toplamı değil) aramanın kanıtlayabildiği en iyi değere en fazla ${gap} uzaklıkta. Bu yüzden fiyat kesin bir değer olarak değil, tavan olarak yayımlanıyor: bu stratejinin mal olabileceği en fazla değer.`,
     overlapLine: (count: number) => `rakibin on birinden ${count} tanesi senin on beşinde`,
     gapLine: (pointsValue: string) => `rakibe karşı beklenen fark ${pointsValue}`,
     captainShared: "aynı kaptan",
@@ -1472,9 +1572,9 @@ const tr: MessageSchema<typeof en> = {
     entryUnreadable: "Bu üyenin kadrosu okunamadı.",
     entryUnreadableBody: "Yayımlanan kadro belgesi okunabilir veri döndürmedi.",
     unprovenPlanGapUnknown:
-      "Bu planın en iyi olduğu kanıtlanamadı. En iyi çözüme uzaklık sınırı yayımlanmamış.",
+      "Bu planın en iyi olduğu kanıtlanamadı. Planlayıcı amaç değeri için sınır yayımlanmamış.",
     controlGapUnknown:
-      "Saf puan planının en iyi olduğu kanıtlanamadı ve fark sınırı yayımlanmamış. Belirtilen maliyet tavanı bir üst sınırdır.",
+      "Saf puan planının en iyi olduğu kanıtlanamadı ve planlayıcı amaç değeri için sınır yayımlanmamış. Belirtilen maliyet tavanı bir üst sınırdır.",
     planWithinFreeUnknown: (cap: number, target: number) =>
       `Planın serbest transfer sınırı ${cap}, ortak oyuncu sayısı için istenen sınır ${target}. Uygulanan ortak oyuncu sınırı yayımlanmamış.`,
     hitPointsNotPublished: "yayımlanmayan sayıda",
@@ -1495,6 +1595,9 @@ const tr: MessageSchema<typeof en> = {
     adviceUnreadable: "Bu üyenin önerisi okunamadı.",
     adviceUnreadableBody:
       "Yukarıdaki kadro bu yayından geldi, öneri belgesi ise yanıt vermedi; yani bu, kimsenin çözmediği bir kombinasyon değil, siteyi okurken çıkan bir arıza. Sayfayı yenilemek ya da bildirmek doğru olan.",
+    freeHitSquadBasis: (week: number) => `Free Hit oynadın; bu öneri GW ${week} kadrona göre.`,
+    squadBasisUnconfirmed:
+      "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Hiçbir hafta yazılmıyor, çünkü yanlış bir hafta yazmak hiç yazmamaktan kötü. Aşağıdaki hamleleri kullanmadan önce yukarıdaki on beş oyuncuyu kendi takımınla karşılaştır.",
     entryNotAvailable: "Bu üyenin kadro belgesi yayımlanmamış.",
     entryNotAvailableBody: "Üye listesine dönebilir veya sonraki yayında yeniden deneyebilirsin.",
     invalidEntry: "Bu üye numarası geçerli değil.",
@@ -1536,8 +1639,6 @@ const tr: MessageSchema<typeof en> = {
     incompleteBody: (fields) =>
       `Kaynak şu alanları sağlamadı: ${fields}. Boşlukları doldurmak için veri uydurulmaz.`,
     entryAssumptionsTitle: "Herkese Açık Veri Sınırları",
-    freeTransfersAssumed: (count) =>
-      `Herkese açık kaynak banka edilmiş serbest transfer sayısını göstermiyor. Bu plan ${count} varsayıyor; banka edilmiş ikinci transfer görünmüyor olabilir.`,
     currentPriceFallback:
       "Satın alma fiyatları herkese açık değildir. Satış fiyatı olarak mevcut fiyat kullanılır; fiyatı yükselen bir oyuncu için kullanılabilir bütçe olduğundan yüksek görünebilir.",
     memberSquad: "Üye kadrosu",
@@ -1560,11 +1661,20 @@ const tr: MessageSchema<typeof en> = {
     diagnosticOnly:
       "İki ilk 11 aynı projeksiyonla karşılaştırılır. Aynı çarpana sahip ortak oyuncuların katkıları sadeleşir; kalan beklenen puanlar, kaptan çarpanları ve bu planın transfer cezaları beklenen farkı belirler.",
     unprovenPlanBadge: "Kanıt tamamlanamadı",
-    unprovenPlanBody: (gap: string) =>
-      `Çözücü bu plan için kanıtı tamamlayamadı (fark ≤ ${gap} puan). Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.`,
+    unprovenPlanBody: (gap) =>
+      `Çözücü bu plan için kanıtı tamamlayamadı. Planlayıcı amaç değeri, aramanın kanıtlayabildiği en iyi değere en fazla ${gap} uzaklıkta. Bu amaç değeri, ilk on bir (kaptan iki kat) artı yedeklerin onda biri eksi transfer cezalarıdır; yani bir puan toplamı değildir. Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.`,
+    unprovenPlanBodyWindow: (gap, weeks) =>
+      `Çözücü bu plan için kanıtı tamamlayamadı. Planın ${weeks} oyun haftasının tamamı için birlikte hesaplanan planlayıcı amaç değeri, aramanın kanıtlayabildiği en iyi değere en fazla ${gap} uzaklıkta. Bu amaç değeri, her haftanın ilk on biri (kaptan iki kat) artı yedeklerin onda biri eksi transfer cezalarıdır; ne bir puan toplamıdır ne de tek bir haftaya ait bir değerdir. Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.`,
     out: "Çıkan",
     in: "Giren",
-    projectedGain: (pointsValue) => `${pointsValue} tahmini kazanç`,
+    projectedGain: (pointsValue) => `ilk on bir için ${pointsValue} (kaptan iki kat)`,
+    projectedGainUnknown: "Bu hamlenin plandaki kazanç payı yayımlanmamış.",
+    moveRowsBasis:
+      "Her satır, o takas kendisinden önceki satırlara eklendiğinde ilk on birin (kaptan iki kat) ne kadar değiştiğini gösterir; bu yüzden satırlar aşağıdaki toplam kazancı verir.",
+    planGainVsHold: (pointsValue) =>
+      `Mevcut kadronu korumaya göre ${pointsValue} beklenen puan (ilk on bir, kaptan iki kat).`,
+    planGainVsHoldBeforeCost: (pointsValue, cost) =>
+      `Mevcut kadronu korumaya göre ${pointsValue} beklenen puan (ilk on bir, kaptan iki kat); bu haftanın ${cost} transfer maliyeti düşülmeden önce.`,
     weekTransferCost: (pointsValue) =>
       `Bu haftanın transferlerinin toplam beklenen puan maliyeti ~${pointsValue}: oyun haftayı ücretlendirir, her hamleyi ayrı ayrı değil.`,
     windowValueReason: "Yayımlanan puan tahminlerini kullanan çok haftalı planın bir parçası.",
@@ -1654,7 +1764,10 @@ const tr: MessageSchema<typeof en> = {
     nextGameweek: "sıradaki oyun haftası",
     deadline: (time) => `son tarih ${time}`,
     noDeadline: "son capture'da açık son tarih yok",
-    hours: "son tarihe kalan saat",
+    timeToDeadline: "son tarihe kalan süre",
+    deadlinePassed: "son tarih geçti",
+    deadlineUnknown: "bilinmiyor",
+    atPublish: (hours) => `yayımlandığında ${hours} sa kalmıştı`,
     latestCapture: (capture) => `son capture ${capture}`,
     noCapture: "capture yok",
     decidedSettled: "kararlaştırılan · sonuçlanan",

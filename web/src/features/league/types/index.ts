@@ -75,23 +75,88 @@ export interface LeagueMembers {
   members: EntryView[];
 }
 
+/** The halves a chip's windows belong to; the 2026-27 season lists each chip once per half. */
+export type ChipHalf = "first_half" | "second_half";
+
+/**
+ * One published window of one chip, as the member stands before `chips.gameweek`:
+ * `used` (with `gameweek` the week it was played), `expired` (closed unplayed), `not_yet`
+ * (not open yet), `available`, or `unknown` when the member's chip history was not
+ * captured at all. No history is not the same thing as no chips played.
+ */
+export type ChipWindowStateName = "used" | "expired" | "not_yet" | "available" | "unknown";
+
+export interface ChipWindowState {
+  state: ChipWindowStateName;
+  gameweek: number | null;
+  start_event: number;
+  stop_event: number;
+}
+
+/**
+ * What the member can still play, by chip and half, read before the upcoming deadline.
+ * Read `known` first: when it is false every window is `unknown` and `chips_used` is
+ * null, because the producer had no history to read. A chip the season lists once
+ * carries null for its second half.
+ */
+export interface EntryChipAvailability {
+  known: boolean;
+  gameweek: number;
+  states: Record<string, Record<ChipHalf, ChipWindowState | null>>;
+}
+
+/**
+ * A player in a member's published fifteen: the shared view plus the armband the capture
+ * recorded for him.
+ */
+export interface EntrySquadPlayer extends PlayerView {
+  /**
+   * True for the one player the member's picks named vice-captain. Absent, never false,
+   * on every record of a document whose source did not state a held vice, and on every
+   * document published before the field: absent means "not stated", which is not the same
+   * claim as "nobody holds it". It rides bench records too, because the platform lets the
+   * armband sit on the bench.
+   */
+  is_vice_captain?: boolean;
+}
+
 export interface EntrySquad {
   league_id: number;
   season: string;
   gameweek: number;
   scored_gameweek: number | null;
   entry: HumanEntryView;
-  starting_xi: PlayerView[];
-  bench: PlayerView[];
+  starting_xi: EntrySquadPlayer[];
+  bench: EntrySquadPlayer[];
   bank_tenths: number;
   free_transfers: number;
   free_transfers_known: boolean;
-  chips_used: Record<string, number[]>;
+  /** Chip name to the gameweeks it was played; null when the history was not captured. */
+  chips_used: Record<string, number[]> | null;
+  /** Absent on documents from before the block. */
+  chips?: EntryChipAvailability;
   purchase_prices_known: boolean;
+  /**
+   * What the fifteen would raise if they were all sold, in tenths, and that plus the
+   * bank: what the member may spend at the coming deadline. Adding up the squad's current
+   * prices does not give either number, because the game keeps half of every rise since a
+   * player was bought, so the publisher states them rather than leaving a page to guess.
+   * Absent on documents from before the pair; null where a source states neither.
+   */
+  squad_sell_value_tenths?: number | null;
+  spendable_budget_tenths?: number | null;
   source_snapshot_id: string | null;
   squadopt_comparison: EntryScoreComparison | null;
   data_quality: EntryDataQuality;
   missing_fields: string[];
+  /**
+   * Which squad `starting_xi` and `bench` are: `captured` (the played week's own picks)
+   * or `pre_free_hit_gwNN` when a Free Hit voided that week's fifteen and the page shows
+   * the squad held before it. Absent on documents from before the field.
+   */
+  squad_basis?: string;
+  /** The chip active in the captured week as the source reported it, or null. */
+  active_chip?: string | null;
 }
 
 export interface EntryScoreComparison {
@@ -122,7 +187,14 @@ export interface AdviceMove {
   move_id: string;
   player_out: AdvicePlayer | null;
   player_in: AdvicePlayer | null;
-  expected_points_delta: number;
+  /**
+   * This swap's share of what the plan gains against holding the squad, on the payload's
+   * own basis: the eleven with the captain doubled, before the week's hit charge. The
+   * rows are cumulative in the order they are published and add up to
+   * `expected_gain_vs_hold`. Null where the producer could not measure the row, which is
+   * not the same fact as a swap that gains nothing.
+   */
+  expected_points_delta: number | null;
   reason_code: "window_value" | "mode_tradeoff" | "points_gain";
 }
 
@@ -207,6 +279,14 @@ export interface EntryAdvice {
    * published before the producer stated it here (they carried it on every move row).
    */
   transfer_hit_points?: number;
+  /**
+   * What the whole plan is worth against keeping the fifteen already held, on the same
+   * basis as `expected_own_points` and as every move row: the eleven with the captain
+   * doubled, before the week's hit charge above. Equal to the sum of the move rows.
+   * Null where the producer could not measure it; absent on documents published before
+   * the producer carried it.
+   */
+  expected_gain_vs_hold?: number | null;
   /**
    * The whole plan's expected-points price against the pure-points pick — the only
    * cross-mode number the producer publishes (never a probability). Absent on documents
@@ -303,15 +383,11 @@ export interface ScoreboardOurs {
   projected: number;
   /** `live`: decided before the deadline; `replay`: recorded afterwards from a pre-deadline capture. */
   mode: "live" | "replay" | null;
-  /**
-   * What the net is, and is not. `named_eleven_no_autosubs`: the eleven the decision
-   * named, scored as named — the game's automatic substitutions are not applied and the
-   * decision names no vice-captain, so a captain who did not play is not recovered.
-   * Both corrections only add points, so this reads low beside a real FPL entry's net.
-   */
-  scoring_basis: "named_eleven_no_autosubs";
-  /** False on every decision the ledger holds: the frozen decision names no vice-captain. */
+  /** Legacy named-eleven scoring or settlement using a recorded bench order and vice. */
+  scoring_basis: "named_eleven_no_autosubs" | "official_autosub_captain_v2";
   vice_captain_named: boolean;
+  diagnostics?: ScoreboardDiagnostics;
+  outcome_snapshot_id?: string | null;
 }
 
 export interface ScoreboardTop100 {
@@ -355,6 +431,8 @@ export interface ScoreboardGameweek {
   members: ScoreboardMember[];
   members_mean_net: number | null;
   members_counted: number;
+  /** Additive extension; absent on older publications. */
+  comparisons?: ScoreboardComparison[];
 }
 
 export interface ScoreboardCumulative {
@@ -386,4 +464,19 @@ export interface Scoreboard {
   histories_held: number;
   gameweeks: ScoreboardGameweek[];
   cumulative: ScoreboardCumulative;
+}
+
+export interface ScoreboardDiagnostics {
+  zero_minute_starters: number | null;
+  minutes_shortfall: number | null;
+  captain_shortfall: number | null;
+  autosub_recovery: number | null;
+}
+
+export interface ScoreboardComparison {
+  kind: "system" | "base" | "elite_xi" | "ownership_template" | "league_mean" | "game_mean";
+  net: number | null;
+  scoring_basis: string | null;
+  source_snapshot_id: string | null;
+  diagnostics: ScoreboardDiagnostics;
 }

@@ -1,0 +1,13 @@
+<!doctype html>
+<!--
+  Cloudflare Pages answers an unmatched path with the closest 404.html found by walking up
+  the directory tree. This file is the closest one for every path under /data/, so a document
+  that was never published now answers 404 instead of the application shell, and a reader can
+  tell "never published" apart from "published but corrupt".
+
+  There is deliberately no top-level 404.html. Its absence is what keeps Pages in single-page
+  application mode, so every client-side route still answers 200 with the shell.
+-->
+<meta charset="utf-8" />
+<title>404</title>
+<p>No document is published at this address.</p>

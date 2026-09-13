@@ -14,11 +14,13 @@ from squadopt.application.entries import (
 )
 from squadopt.data.errors import DataError
 from squadopt.data.sources.fpl_live import (
-    FREE_HIT_CHIP,
     EntryPicksRecord,
+    entry_transfer_history,
     fpl_entry_picks,
-    free_transfer_cap,
 )
+from squadopt.live.banking import BankedFreeTransfers, banked_free_transfers
+from squadopt.live.free_hit import FIRST_GAMEWEEK, FREE_HIT_CHIP, free_hit_basis_gameweek
+from squadopt.live.rules import free_transfer_cap
 
 
 def capture_element_codes(payloads: object) -> dict[int, int]:
@@ -71,7 +73,23 @@ class CapturePicksProvider:
             season=season,
             gameweek=gameweek,
             source_snapshot_id=self._snapshot_id,
+        )
+
+    def _banked(self, record: EntryPicksRecord) -> BankedFreeTransfers:
+        """The free transfers the member holds at the deadline after the captured week.
+
+        The parser reports the rule floor with the flag down; the banking model derives
+        the count from the same history under the season's cap, and the captured week's
+        own chip is read from the picks document because the history lists a chip only
+        once its week is over.
+        """
+
+        history = self._payloads[f"entry-{record.entry_id}-history.json"]
+        return banked_free_transfers(
+            entry_transfer_history(history, entry_id=record.entry_id),
+            gameweek=record.gameweek,
             max_free_transfers=self._max_free_transfers,
+            active_chip=record.active_chip,
         )
 
     def _basis(self, captured: EntryPicksRecord) -> tuple[EntryPicksRecord, str]:
@@ -81,9 +99,10 @@ class CapturePicksProvider:
         fifteen, and bank, are the ones from before the chip, and the chip week costs
         no transfer. So a Free Hit week's basis is the previous week's picks — walked
         back once more if that week was a Free Hit too (two chip sets a season make it
-        possible), never below gameweek 1. A Wildcard is the opposite case: its squad
-        *is* the new base and persists, so it keeps the captured basis, as do Bench
-        Boost and Triple Captain, which change no squad.
+        possible), never below gameweek 1. The walk itself is ``live.free_hit``'s, shared
+        with the ledger path so that one rule keeps one answer. A Wildcard is the opposite
+        case: its squad *is* the new base and persists, so it keeps the captured basis, as
+        do Bench Boost and Triple Captain, which change no squad.
 
         When the earlier document is not in the capture the answer is a stated refusal,
         not the Free Hit squad: advice built on fifteen players the member does not
@@ -92,14 +111,10 @@ class CapturePicksProvider:
 
         if captured.active_chip != FREE_HIT_CHIP:
             return captured, CAPTURED_SQUAD_BASIS
-        entry_id, season, week = captured.entry_id, captured.season, captured.gameweek
-        while True:
-            week -= 1
-            if week < 1:
-                raise EntryError(
-                    f"Entry {entry_id} played a Free Hit in gameweek {week + 1} with no "
-                    "earlier gameweek to fall back on; its squad cannot be resolved."
-                )
+        entry_id, season = captured.entry_id, captured.season
+        read: dict[int, EntryPicksRecord] = {}
+
+        def was_free_hit(week: int) -> bool:
             name = f"entry-{entry_id}-picks-gw{week:02d}.json"
             if name not in self._payloads:
                 raise EntryError(
@@ -107,20 +122,29 @@ class CapturePicksProvider:
                     f"squad for the coming deadline is the one held before it, but the "
                     f"capture holds no {name}. Re-capture with --entries."
                 )
-            earlier = self._record(entry_id, season, week)
-            if earlier.active_chip != FREE_HIT_CHIP:
-                return earlier, pre_free_hit_basis(week)
+            read[week] = self._record(entry_id, season, week)
+            return read[week].active_chip == FREE_HIT_CHIP
+
+        week = free_hit_basis_gameweek(captured.gameweek, was_free_hit=was_free_hit)
+        if week is None:
+            raise EntryError(
+                f"Entry {entry_id} played a Free Hit in gameweek {FIRST_GAMEWEEK} with no "
+                "earlier gameweek to fall back on; its squad cannot be resolved."
+            )
+        return read[week], pre_free_hit_basis(week)
 
     def picks(self, entry_id: int, season: str, gameweek: int) -> EntryPicks:
         record = self._record(entry_id, season, gameweek)
         basis, squad_basis = self._basis(record)
+        banked = self._banked(record)
         # The data record and the application type are twins by design: same field names,
         # no translation table, so a drift on either side is a type error rather than a
-        # silently wrong squad. Identity, chips, the active chip and the free transfers
-        # come from the captured week (the bank of free transfers runs through a Free Hit
-        # week untouched, so the captured week's derivation is the one for the coming
-        # deadline); the squad and bank from the basis week (the same record unless a
-        # Free Hit voided the captured one).
+        # silently wrong squad. Identity, chips and the active chip come from the captured
+        # week, and so do the free transfers, derived here rather than read off the record
+        # (the bank of free transfers runs through a Free Hit week untouched, so the
+        # captured week's derivation is the one for the coming deadline); the squad and
+        # bank from the basis week (the same record unless a Free Hit voided the captured
+        # one).
         return EntryPicks(
             entry_id=record.entry_id,
             season=record.season,
@@ -130,8 +154,13 @@ class CapturePicksProvider:
             captain=self._code(basis.captain),
             vice_captain=self._code(basis.vice_captain),
             bank_tenths=basis.bank_tenths,
-            free_transfers=record.free_transfers,
-            free_transfers_known=record.free_transfers_known,
+            # The selling value of the basis week's fifteen, from the same document as
+            # its bank: after a Free Hit both belong to the week before the chip, so a
+            # budget taken from the chip week's squad would price a squad the member
+            # does not hold.
+            squad_sell_value_tenths=basis.squad_sell_value_tenths,
+            free_transfers=banked.count,
+            free_transfers_known=banked.known,
             chips_used=record.chips_used,
             purchase_prices={
                 self._code(player): price for player, price in basis.purchase_prices.items()

@@ -20,6 +20,7 @@ import {
 } from "../../../fixtures/settledRecommendation";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import type { Language } from "../../../i18n/messages";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { SquadPage } from "../pages/SquadPage";
 
 afterEach(cleanup);
@@ -92,6 +93,36 @@ function renderAt(
   );
 }
 
+/**
+ * A decision whose risk view really was evaluated: every metric the contract allows is a
+ * number here, including the three the page must never publish. The published payload nulls
+ * all of them, so without this fixture the risk block is dark in every test and a
+ * probability could be reintroduced into it without one test going red.
+ */
+const fullyEvaluatedRisk: RecommendationView = {
+  ...unsettledRecommendationFixture,
+  risk: {
+    blockers: [],
+    location_shift_points: -3.2,
+    lower_quantile_probability: 0.1,
+    lower_quantile_score: 42.3,
+    mean_score: 52.7,
+    mean_worst_fraction_score: 31.4,
+    points_threshold: 45,
+    probability_below_threshold: 0.423,
+    probability_below_threshold_interval: [0.312, 0.537],
+    reason: "Risk metrics are supported by matched historical residual evidence.",
+    residual_source: "midseason-residuals-2025-26",
+    rivals: [],
+    scenario_count: 1000,
+    stated_limits: [
+      "Scenarios are drawn from one season of residuals, and one season is a short history.",
+    ],
+    status: "available",
+    worst_fraction: 0.1,
+  },
+};
+
 describe("SquadPage", () => {
   it("renders the latest decision from the site index", async () => {
     renderAt("/");
@@ -110,6 +141,25 @@ describe("SquadPage", () => {
     expect(screen.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeInTheDocument();
     expect(screen.getByText(/Oyuna Giriş Sırasıyla/)).toBeInTheDocument();
   });
+
+  it("puts no note under the projected score, and none in its place", async () => {
+    renderAt("/");
+    const label = await screen.findByText("Tahmini Puan");
+    const stat = label.parentElement;
+    expect(stat).not.toBeNull();
+    // Stat renders label, value and, only when given one, a note. Two children means none.
+    expect(stat!.children).toHaveLength(2);
+    expect(screen.queryByText(/Kuyruk/)).not.toBeInTheDocument();
+  });
+
+  it.each(["tr", "en"] as const)(
+    "publishes no probability on the squad page in %s",
+    async (language) => {
+      const { container } = renderAt("/", { language });
+      await screen.findByRole("heading", { level: 1 });
+      expect(container.textContent ?? "").not.toMatch(AS_A_CHANCE);
+    },
+  );
 
   it("says plainly when a gameweek has no decision", async () => {
     renderAt("/gw/2026-27/7");
@@ -173,7 +223,53 @@ describe("SquadPage", () => {
       const text = container.textContent ?? "";
       expect(text).not.toMatch(/P\(/);
       expect(text).not.toMatch(/%/);
-      expect(text).not.toMatch(/0 Ortalaması|Mean Worst 0/);
+      expect(text).not.toMatch(/Senaryo Ortalaması|Mean of Scenarios/);
+    },
+  );
+
+  it.each(["tr", "en"] as const)(
+    "publishes no probability when every risk metric IS populated, in %s",
+    async (language) => {
+      // The published payload nulls every risk metric, so the ordinary fixture leaves this
+      // block dark and cannot see what it would print. This one populates all of them. The
+      // forbidden wording here lives in the rendered values, not in a copy key, so the
+      // catalogue sweep cannot reach it and only a render can.
+      const { container } = renderAt("/", { viewOverride: fullyEvaluatedRisk, language });
+
+      expect(
+        await screen.findByRole("heading", { level: 1, name: /Oyun haftası 1|Gameweek 1/ }),
+      ).toBeInTheDocument();
+      const text = container.textContent ?? "";
+      expect(text).not.toMatch(AS_A_CHANCE);
+      expect(text).not.toMatch(/%/);
+      expect(text).not.toMatch(/P\(/);
+      // The numbers themselves, not only their labels: no metric may reach the page as a
+      // share, and no quantile score may reach it at all.
+      for (const forbidden of ["42", "31.4", "31,4", "0.423", "0,423", "10%", "%10", "90%", "%90"])
+        expect(text).not.toContain(forbidden);
+    },
+  );
+
+  it.each([
+    { language: "tr", mean: "52,7", shift: "Seçim İyimserliği İçin -3,2 Kaydırıldı" },
+    { language: "en", mean: "52.7", shift: "Shifted -3.2 for Selection Optimism" },
+  ] as const)(
+    "keeps what is not distributional in $language",
+    async ({ language, mean, shift }) => {
+      const { container } = renderAt("/", { viewOverride: fullyEvaluatedRisk, language });
+
+      expect(
+        await screen.findByRole("heading", { level: 1, name: /Oyun haftası 1|Gameweek 1/ }),
+      ).toBeInTheDocument();
+      const text = container.textContent ?? "";
+      // The mean of the scenarios is expected points, the shift is points, and the scenario
+      // count is a count. None of the three is a probability, a quantile or a spread.
+      expect(text).toContain(mean);
+      expect(text).toContain(shift);
+      expect(text).toContain(language === "tr" ? "1000 Senaryo" : "1000 Scenarios");
+      expect(container.textContent).toContain(
+        language === "tr" ? "Senaryo Ortalaması" : "Mean of Scenarios",
+      );
     },
   );
 

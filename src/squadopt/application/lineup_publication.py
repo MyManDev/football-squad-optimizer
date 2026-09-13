@@ -1,0 +1,158 @@
+"""Serialize a solved lineup using the existing deterministic completion rule.
+
+This module also owns the arithmetic behind the one number the card leads with, the
+eleven with the captain doubled, so that every figure stated on that basis is produced
+by the same code: the plan's own total (``lineup_fields``) and the total a fifteen the
+planner did not solve for would be worth (``best_eleven_points``).
+"""
+
+from collections.abc import Iterable
+from typing import Any, Final
+
+import pandas as pd
+
+from squadopt.application.entries import EntryError
+from squadopt.contracts import POSITIONS, Position
+from squadopt.optimization import OptimizationConfig
+from squadopt.planning import PlanningWeekResult
+
+#: Pitch order for the published eleven and the outfield bench.
+_POSITION_ORDER: tuple[Position, ...] = POSITIONS
+
+#: The planner's own defaults, read once rather than restated. ``best_eleven_points``
+#: below is the planner with its squad held fixed, so it has to choose an eleven from the
+#: same shapes and weigh the bench at the same weight; spelling either of them again here
+#: would let the baseline drift away from the plans it is compared against.
+_LINEUP_DEFAULTS: Final = OptimizationConfig()
+
+
+def _legal_shapes() -> tuple[tuple[tuple[Position, int], ...], ...]:
+    """Every eleven-man shape the optimizer's position bounds admit, in a fixed order."""
+
+    minimum = _LINEUP_DEFAULTS.starting_position_min
+    maximum = _LINEUP_DEFAULTS.starting_position_max
+    ranges = [range(minimum[position], maximum[position] + 1) for position in _POSITION_ORDER]
+    shapes: list[tuple[tuple[Position, int], ...]] = []
+
+    def walk(index: int, chosen: list[int]) -> None:
+        if index == len(_POSITION_ORDER):
+            if sum(chosen) == _LINEUP_DEFAULTS.starting_size:
+                shapes.append(tuple(zip(_POSITION_ORDER, chosen, strict=True)))
+            return
+        for count in ranges[index]:
+            walk(index + 1, [*chosen, count])
+
+    walk(0, [])
+    return tuple(shapes)
+
+
+#: Built once: the shapes are a function of the configuration, not of any squad.
+_LEGAL_SHAPES: Final = _legal_shapes()
+
+
+def best_eleven_points(squad: Iterable[tuple[str, float]]) -> float | None:
+    """What a fifteen is worth on the published basis, the eleven with the captain doubled.
+
+    With the fifteen held fixed the planner has only two decisions left, the shape of the
+    eleven and the armband, and both are small enough to settle exactly rather than
+    search: within one shape the highest-scoring players of a position maximise the
+    eleven's total *and* contain its best player, so that shape's own optimum is read off
+    a sort, and there are eight shapes. The shape is then chosen on the planner's own
+    objective, the eleven with the captain doubled plus ``bench_weight`` of the bench, so
+    this is the planner with its hands tied rather than a second opinion about what a
+    fifteen is worth. Ties fall to the first shape in the fixed order above, so two builds
+    of one capture return one number.
+
+    What comes back is the published basis alone: the eleven plus the captain's double,
+    with the bench's weighted contribution used for the choice and then dropped, exactly
+    as ``lineup_fields`` publishes it for a solved week.
+
+    ``None`` when the players handed in hold no legal eleven at all. The caller then has
+    no measured number and must publish none: a squad nobody could field is not a squad
+    worth zero.
+    """
+
+    players = list(squad)
+    by_position: dict[str, list[float]] = {str(position): [] for position in _POSITION_ORDER}
+    for position, expected_points in players:
+        if position in by_position:
+            by_position[position].append(float(expected_points))
+    for scores in by_position.values():
+        scores.sort(reverse=True)
+    total = sum(float(expected_points) for _position, expected_points in players)
+    best_objective: float | None = None
+    best_basis: float | None = None
+    for shape in _LEGAL_SHAPES:
+        if any(len(by_position[position]) < count for position, count in shape):
+            continue
+        chosen = [score for position, count in shape for score in by_position[position][:count]]
+        if not chosen:
+            continue
+        basis = sum(chosen) + max(chosen)
+        objective = basis + _LINEUP_DEFAULTS.bench_weight * (total - sum(chosen))
+        if best_objective is None or objective > best_objective:
+            best_objective = objective
+            best_basis = basis
+    return best_basis
+
+
+def advice_player(row: "pd.Series[Any]") -> dict[str, object]:
+    name = str(row["name"])
+    return {
+        "player_id": int(str(row["player_id"])),
+        "name": name,
+        "short_name": name.rsplit(" ", 1)[-1],
+        "position": str(row["position"]),
+        "team": str(row["team_id"]),
+    }
+
+
+def _lineup_player(row: "pd.Series[Any]") -> dict[str, object]:
+    return {**advice_player(row), "expected_points": float(str(row["expected_points"]))}
+
+
+def _ranking(row: "pd.Series[Any]") -> tuple[float, int]:
+    return (-float(str(row["expected_points"])), int(str(row["player_id"])))
+
+
+def lineup_fields(week: PlanningWeekResult) -> dict[str, object]:
+    """The complete decision a member acts on, read from the plan's first week.
+
+    Transfers alone are not a gameweek: the member still has to name a captain, a
+    vice-captain, an eleven and a bench order, and decide whether a chip is played.
+    The planner decides the eleven, the captain and the chip; the vice-captain and the
+    bench order follow the same completion rule the official scorer applies to an
+    optimizer decision (highest expected points first, ties by player id, the bench
+    goalkeeper first) so what is shown is what would be scored. ``expected_own_points``
+    is the eleven plus the captain's double: expected points, nothing else.
+    """
+
+    eleven = [row for _, row in week.starting_xi.iterrows()]
+    bench = [row for _, row in week.bench.iterrows()]
+    captain_id = int(str(week.captain["player_id"]))
+    starters = {int(str(row["player_id"])): row for row in eleven}
+    if captain_id not in starters:
+        raise EntryError("The plan's captain is not in its starting eleven.")
+    vice_candidates = sorted(
+        (row for row in eleven if int(str(row["player_id"])) != captain_id), key=_ranking
+    )
+    if not vice_candidates:
+        raise EntryError("The plan's eleven has no vice-captain candidate.")
+    goalkeepers = [row for row in bench if str(row["position"]) == "GK"]
+    outfield = sorted((row for row in bench if str(row["position"]) != "GK"), key=_ranking)
+    if len(goalkeepers) != 1:
+        raise EntryError("The plan's bench must hold exactly one goalkeeper.")
+    ordered_eleven = sorted(
+        eleven, key=lambda row: (_POSITION_ORDER.index(str(row["position"])), _ranking(row))
+    )
+    expected_own = sum(float(str(row["expected_points"])) for row in eleven) + float(
+        str(starters[captain_id]["expected_points"])
+    )
+    return {
+        "expected_own_points": expected_own,
+        "captain": _lineup_player(starters[captain_id]),
+        "vice_captain": _lineup_player(vice_candidates[0]),
+        "starting_xi": [_lineup_player(row) for row in ordered_eleven],
+        "bench": [_lineup_player(row) for row in (*goalkeepers, *outfield)],
+        "chip": week.chip,
+    }

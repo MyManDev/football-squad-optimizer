@@ -366,8 +366,11 @@ run postdates the fix.
 
 ```bash
 python -m scripts.fetch_historical_data      # download and verify
-python -m scripts.recommend_opening_squad    # opening-gameweek squad from that data
 ```
+
+The opening-gameweek squad is not a script any more: it is a frozen decision,
+`squadopt gameweek decide` (`src/squadopt/platform/cli.py`), and GW1 of 2026-27 is already
+recorded.
 
 The data is not committed — see [data/sources/README.md](../data/sources/README.md) for
 the licensing reasoning and how a pinned commit plus checksums keeps every machine on

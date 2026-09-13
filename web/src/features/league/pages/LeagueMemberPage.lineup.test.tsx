@@ -14,20 +14,24 @@ import {
   mockEntrySquadEnvelopes,
 } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
-import type { EntryAdvice, LeagueViewEnvelope } from "../types";
+import type { EntryAdvice, EntrySquad, LeagueViewEnvelope } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
 
 afterEach(cleanup);
 
 const ENTRY = 35249001;
 
-function renderAdvice(advice: LeagueViewEnvelope<EntryAdvice>, language: "tr" | "en" = "tr") {
+function renderAdvice(
+  advice: LeagueViewEnvelope<EntryAdvice>,
+  language: "tr" | "en" = "tr",
+  squad: LeagueViewEnvelope<EntrySquad> = mockEntrySquadEnvelopes[ENTRY]!,
+) {
   return render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[`/league/members/${ENTRY}`]}>
         <LeagueMemberView
           index={mockEntryAdviceIndex(ENTRY).payload}
-          squad={mockEntrySquadEnvelopes[ENTRY]}
+          squad={squad}
           advice={advice}
         />
       </MemoryRouter>
@@ -91,4 +95,96 @@ describe("the advice card carries the whole decision", () => {
     renderAdvice({ ...base, payload: legacy as EntryAdvice });
     expect(screen.queryByRole("region", { name: "Bu haftaki kadron" })).toBeNull();
   });
+});
+
+describe("the published Free Hit squad basis", () => {
+  it.each([
+    ["tr", "Free Hit oynadın; bu öneri GW 2 kadrona göre."],
+    ["en", "Free Hit played; this advice stands on your GW 2 squad."],
+  ] as const)("names the prior squad in %s", (language, expected) => {
+    const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    squad.payload.squad_basis = "pre_free_hit_gw02";
+    squad.payload.active_chip = "freehit";
+    renderAdvice(
+      { ...base, payload: { ...base.payload, squad_basis: "pre_free_hit_gw02" } },
+      language,
+      squad,
+    );
+    expect(screen.getAllByText(expected)).toHaveLength(1);
+  });
+
+  it("names the prior squad when the advice document carries no basis of its own", () => {
+    const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    squad.payload.squad_basis = "pre_free_hit_gw02";
+    const payload = { ...advice.payload };
+    delete payload.squad_basis;
+    renderAdvice({ ...advice, payload }, "en", squad);
+    expect(
+      screen.getByText("Free Hit played; this advice stands on your GW 2 squad."),
+    ).toBeInTheDocument();
+  });
+});
+
+/**
+ * The two documents disagreeing is not the same fact as neither of them saying anything,
+ * and the card is not allowed to render them the same way. A member whose squad really is
+ * a pre-Free-Hit squad would otherwise read a blank card as "nothing to report", which is
+ * the silence the rotation evidence contract keeps its own column to avoid asserting.
+ */
+describe("a squad basis the two documents disagree about", () => {
+  const UNCONFIRMED = {
+    en: "The squad this advice stands on could not be confirmed: the squad document and the advice document name different ones. Neither week is shown, because a wrong week is worse than no week. Check the fifteen above against your own team before using the moves below.",
+    tr: "Bu önerinin dayandığı kadro doğrulanamadı: kadro belgesi ile öneri belgesi farklı kadro gösteriyor. Hiçbir hafta yazılmıyor, çünkü yanlış bir hafta yazmak hiç yazmamaktan kötü. Aşağıdaki hamleleri kullanmadan önce yukarıdaki on beş oyuncuyu kendi takımınla karşılaştır.",
+  } as const;
+
+  it.each(["en", "tr"] as const)("says so, and names neither week, in %s", (language) => {
+    const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+    const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+    squad.payload.squad_basis = "pre_free_hit_gw02";
+    renderAdvice(
+      { ...advice, payload: { ...advice.payload, squad_basis: "pre_free_hit_gw03" } },
+      language,
+      squad,
+    );
+    // Neither week, and no other number that could be read as one: the sentence has no digit.
+    expect(screen.getByText(UNCONFIRMED[language]).textContent).not.toMatch(/\d/);
+    expect(screen.queryByText(/Free Hit played;|Free Hit oynadın;/)).not.toBeInTheDocument();
+  });
+
+  it.each(["captured", "pre_free_hit_gw2", "pre_free_hit_gw002", "other"])(
+    "is still a disagreement when the entry basis is %s rather than a week",
+    (basis) => {
+      const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+      const payload: EntryAdvice = { ...base.payload, squad_basis: "pre_free_hit_gw02" };
+      const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+      squad.payload.squad_basis = basis;
+      renderAdvice({ ...base, payload }, "en", squad);
+      expect(screen.getByText(UNCONFIRMED.en)).toBeInTheDocument();
+      expect(screen.queryByText(/Free Hit played;/)).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(["en", "tr"] as const)(
+    "says nothing at all when the entry carries no basis, in %s",
+    (language) => {
+      const base = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+      const payload: EntryAdvice = {
+        ...base.payload,
+        chip: "wildcard",
+        squad_basis: "pre_free_hit_gw02",
+      };
+      const squad = structuredClone(mockEntrySquadEnvelopes[ENTRY]!);
+      delete squad.payload.squad_basis;
+      squad.payload.active_chip = "wildcard";
+      renderAdvice({ ...base, payload }, language, squad);
+      expect(screen.queryByText(UNCONFIRMED[language])).not.toBeInTheDocument();
+      expect(screen.queryByText(/Free Hit played;|Free Hit oynadın;/)).not.toBeInTheDocument();
+      const lineup = language === "en" ? "Your gameweek" : "Bu haftaki kadron";
+      expect(
+        within(screen.getByRole("region", { name: lineup })).getByText("Wildcard"),
+      ).toBeInTheDocument();
+    },
+  );
 });
