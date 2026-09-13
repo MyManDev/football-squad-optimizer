@@ -53,7 +53,7 @@ from squadopt.live import (
     REPORT_CONTRACT_VERSION,
     SEASON_LEDGER_CONTRACT_VERSION,
 )
-from squadopt.live.runlog import RunLog, configure_run_logging
+from squadopt.live.runlog import LOG_ROOT_NAME, RunLog, configure_run_logging
 from squadopt.live.tick import TickAction, TickConfig, TickPlan
 from squadopt.planning import CHIP_NAMES as PLANNER_CHIP_NAMES
 from squadopt.platform.artifacts import FileArtifactRegistry, artifact_checksum
@@ -190,8 +190,11 @@ def _add_common_paths(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--runtime-root", type=Path, default=Path("data/runtime"))
     parser.add_argument(
         "--log-root",
-        default="data/logs",
-        help="JSONL log directory relative to workspace; '-' disables file logging",
+        default=str(LOG_ROOT_NAME),
+        help=(
+            "JSONL log root relative to workspace, above every component's own "
+            "directory; '-' disables file logging"
+        ),
     )
     parser.add_argument(
         "--repository-commit",
