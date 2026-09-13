@@ -67,6 +67,25 @@ function finiteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+/** Which squad the card says this advice stands on, in the three states it can tell apart. */
+type SquadBasisNote = { kind: "week"; week: number } | { kind: "unconfirmed" } | null;
+
+/**
+ * A squad document carrying no basis is the genuinely empty case: it claims nothing, every
+ * document published before the field is in it, and so the card says nothing. Two documents
+ * naming different bases are not that case. Something was claimed and this page cannot
+ * confirm it, and the rotation evidence contract keeps exactly that apart from silence with
+ * its own `rotation_claim_unresolved` column, because folding it into "nothing was said"
+ * asserts a silence that never happened. So the disagreement gets its own sentence here,
+ * and that sentence names no week: a wrong week is worse than no week.
+ */
+function squadBasisNote(entryBasis?: string, adviceBasis?: string): SquadBasisNote {
+  if (entryBasis === undefined) return null;
+  if (adviceBasis !== undefined && adviceBasis !== entryBasis) return { kind: "unconfirmed" };
+  const week = /^pre_free_hit_gw(\d{2})$/.exec(entryBasis)?.[1];
+  return week === undefined ? null : { kind: "week", week: Number(week) };
+}
+
 function hasPublishedPlan(view: EntryAdvice): boolean {
   return (
     (view.solver_status === "OPTIMAL" || view.solver_status === "FEASIBLE") &&
@@ -92,11 +111,7 @@ export function AdviceCard({
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
   const view = envelope.payload;
-  const entryBasis = squad.payload.squad_basis;
-  const basisAgrees = view.squad_basis === undefined || view.squad_basis === entryBasis;
-  const basisWeek = basisAgrees
-    ? /^pre_free_hit_gw(\d{2})$/.exec(entryBasis ?? "")?.[1]
-    : undefined;
+  const basisNote = squadBasisNote(squad.payload.squad_basis, view.squad_basis);
   const rival =
     view.rival_entry_id === undefined
       ? null
@@ -145,8 +160,12 @@ export function AdviceCard({
       ) : null}
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
-      {basisWeek ? (
-        <p className={styles.honesty}>{copy.freeHitSquadBasis(Number(basisWeek))}</p>
+      {basisNote ? (
+        <p className={styles.honesty}>
+          {basisNote.kind === "week"
+            ? copy.freeHitSquadBasis(basisNote.week)
+            : copy.squadBasisUnconfirmed}
+        </p>
       ) : null}
       {view.solver_status === "FEASIBLE" ? (
         <p className={styles.honesty}>
