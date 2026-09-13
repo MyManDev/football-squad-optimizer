@@ -51,6 +51,17 @@ for (const language of ["en", "tr"] as const) {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
+    await page.locator("#league-member-list").evaluate((table) => {
+      const wrapper = table.parentElement!;
+      wrapper.scrollLeft = wrapper.scrollWidth;
+    });
+    await page
+      .getByRole("cell", { name: copy.noPreviousRank, exact: true })
+      .scrollIntoViewIfNeeded();
+    await expect(
+      page.getByRole("cell", { name: copy.noPreviousRank, exact: true }),
+    ).toBeInViewport();
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: testInfo.outputPath("movement-mobile.png"), fullPage: true });
   });
 }

@@ -8,6 +8,7 @@ unverified claim. Other leagues are not enabled by merely changing the input fie
 | --- | --- |
 | Which product and research phases are implemented or gated? | [Product roadmap](roadmap.md) |
 | How is the frontend developed and checked? | [Web README](../../web/README.md) |
+| What does a member's rank movement compare? | [Captured rank movement](member_rank_movement.md) |
 | Which strategy hypotheses are being tested? | [Strategy screening declaration](../strategy_screening_prereg.md) |
 | What was measured for strategy behavior? | [Strategy bench record](../strategy_bench.md) and [declaration](../strategy_bench_prereg.md) |
 | What does a projection horizon promise? | [Projection horizon contract](../projection_horizon_contract.md) |

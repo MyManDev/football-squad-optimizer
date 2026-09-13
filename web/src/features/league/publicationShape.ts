@@ -25,7 +25,7 @@ function nullableNumber(value: unknown): boolean {
 function validMovement(value: Record<string, unknown>): boolean {
   if (value.movement === "unknown" || value.movement === "new")
     return value.movement_places == null;
-  if (value.movement === "same") return value.rank !== 0 && value.movement_places === 0;
+  if (value.movement === "same") return Number(value.rank) > 0 && value.movement_places === 0;
   return (
     (value.movement === "up" || value.movement === "down") &&
     Number(value.rank) > 0 &&
@@ -43,7 +43,8 @@ function publicMember(value: unknown): boolean {
       (value.member_kind === "system" && value.entry_id === null)) &&
     (value.manager_name === null || typeof value.manager_name === "string") &&
     (value.team_name === null || typeof value.team_name === "string") &&
-    finite(value.rank) &&
+    Number.isSafeInteger(value.rank) &&
+    Number(value.rank) >= 0 &&
     nullableNumber(value.gameweek_points) &&
     nullableNumber(value.total_points) &&
     (value.transfer_cost === undefined || nullableNumber(value.transfer_cost)) &&
