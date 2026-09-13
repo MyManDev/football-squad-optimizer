@@ -89,6 +89,47 @@ def test_real_weekly_services_complete_and_resume_without_rebuilding(tmp_path: P
         resumed.execute()
 
 
+def test_the_weekly_site_stage_publishes_the_run_log_it_declares(tmp_path: Path) -> None:
+    """The weekly run published an empty run log even against a populated log root.
+
+    ``WeeklyPaths.log`` named ``data/logs/season_tick`` while the status view appends
+    the component itself, so the lookup landed on ``season_tick/season_tick`` and every
+    published status page said the tick had never run. The path now means what
+    ``--log-root`` means everywhere else, and the stage declares only the component
+    directory it reads, so another component's logs do not drift this stage.
+    """
+
+    operation = world(tmp_path)
+    component = (tmp_path / "data/logs/season_tick").resolve()
+    component.mkdir(parents=True)
+    (component / "2026-08-27.jsonl").write_text(
+        json.dumps(
+            {
+                "ts": "2026-08-27T09:00:00Z",
+                "level": "INFO",
+                "message": "tick.done",
+                "run_id": "r1",
+                "fields": {"performed": 0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    # A component the site never reads must not reach the stage's declared inputs.
+    other = (tmp_path / "data/logs/gameweek_decide").resolve()
+    other.mkdir(parents=True)
+    (other / "2026-08-27.jsonl").write_text("{}", encoding="utf-8")
+
+    receipt = operation.execute()
+    status = json.loads((operation.paths.out / "data/2026-27/status.json").read_bytes())
+    assert [event["message"] for event in status["payload"]["recent_events"]] == ["tick.done"]
+    site = next(
+        stage for stage in json.loads(receipt.read_bytes())["stages"] if stage["name"] == "site"
+    )
+    declared = {row["path"] for row in site["inputs"]}
+    assert str(component) in declared and str(other) not in declared
+    assert operation.paths.log == component.parent
+
+
 def test_wrong_capture_handoff_is_rejected_before_alias_write(tmp_path: Path) -> None:
     operation = world(tmp_path)
     operation.values["capture"] = {"snapshot_id": "other-capture"}

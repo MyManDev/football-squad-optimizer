@@ -407,7 +407,7 @@ def _legacy_build(
             "--snapshot-root",
             str(root / "data" / "snapshots"),
             "--log-root",
-            str(root / "data" / "logs" / "season_tick"),
+            str(root / "data" / "logs"),
             "--out",
             str(worktree / "web" / "public"),
         ],

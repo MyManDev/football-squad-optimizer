@@ -39,6 +39,13 @@ from squadopt.live.report import Recommendation
 from squadopt.live.risk import LiveRiskDiagnostics
 from squadopt.live.tick import LedgerState, TickPlan
 
+SEASON_TICK_RUNLOG_COMPONENT = "season_tick"
+"""The sub-directory of a run-log root the status view reads.
+
+``configure_run_logging`` writes ``<log root>/<component>/<date>.jsonl``, so a run-log
+root is the directory that holds the component directories, never one of them.
+"""
+
 _PROJECTIONS_FILE = "projections.csv"
 _PUBLIC_RECOMMENDATION_METADATA_KEYS = frozenset(
     {
@@ -622,7 +629,7 @@ def status_view(
         is_idle=plan.is_idle,
         decided_gameweeks=tuple(sorted(ledger.decided)),
         settled_gameweeks=tuple(sorted(ledger.settled)),
-        recent_events=_recent_events(runlog_root, "season_tick", recent_events),
+        recent_events=_recent_events(runlog_root, SEASON_TICK_RUNLOG_COMPONENT, recent_events),
         tick_contract_version=plan.contract_version,
     )
 
@@ -671,6 +678,7 @@ def pool_view(
 
 
 __all__ = [
+    "SEASON_TICK_RUNLOG_COMPONENT",
     "JsonValue",
     "ledger_view",
     "pool_view",

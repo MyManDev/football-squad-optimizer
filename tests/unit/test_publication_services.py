@@ -199,6 +199,52 @@ def test_site_publication_pins_its_read_only_status_and_league_to_one_capture(
     assert not (tmp_path / "summaries").exists()
 
 
+def test_site_publication_reads_the_run_log_under_the_root_it_is_given(tmp_path: Path) -> None:
+    """The published status page carried an empty run log against a populated root.
+
+    ``configure_run_logging`` writes ``<log root>/season_tick/<date>.jsonl`` and the
+    status view appends the component itself, so the request's ``log_root`` is the root
+    that holds the component directories. A caller that passed the component directory
+    made the view look one level too deep and every publication said no run log yet.
+    """
+
+    request = publication_world(tmp_path)
+    log_root = tmp_path / "logs"
+    (log_root / "season_tick").mkdir(parents=True)
+    (log_root / "season_tick" / "2026-08-27.jsonl").write_text(
+        json.dumps(
+            {
+                "ts": "2026-08-27T09:00:00Z",
+                "level": "INFO",
+                "message": "tick.done",
+                "run_id": "r1",
+                "fields": {"performed": 0},
+            }
+        ),
+        encoding="utf-8",
+    )
+    result = publish_site(
+        SitePublicationRequest(
+            snapshot_root=request.snapshot_root,
+            snapshot_id=request.snapshot_id,
+            ledger_root=tmp_path / "empty-ledger",
+            archive_root=request.archive_root,
+            handoff_root=tmp_path / "handoffs",
+            summary_root=tmp_path / "summaries",
+            log_root=log_root,
+            out_dir=request.out_dir,
+            season=request.season,
+            now_utc="2026-08-27T10:00:00Z",
+        )
+    )
+    status = json.loads(
+        (result.report.out_dir / "data" / request.season / "status.json").read_bytes()
+    )
+    events = status["payload"]["recent_events"]
+    assert [event["message"] for event in events] == ["tick.done"]
+    assert events[0]["run_id"] == "r1" and events[0]["fields"] == {"performed": 0}
+
+
 def test_site_publication_rejects_a_pinned_non_live_capture(tmp_path: Path) -> None:
     request = publication_world(tmp_path)
     cohort = write_snapshot(

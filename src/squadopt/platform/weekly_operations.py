@@ -26,7 +26,11 @@ from squadopt.application.settled_outcomes import (
     SettledOutcomesRequest,
     export_settled_outcomes,
 )
-from squadopt.application.site_publication import SitePublicationRequest, publish_site
+from squadopt.application.site_publication import (
+    SitePublicationRequest,
+    publish_site,
+    status_runlog_directory,
+)
 from squadopt.application.weekly_plan import (
     CHIP_CHOICES,
     MODE_RULE,
@@ -95,7 +99,7 @@ class WeeklyPaths:
             root / "artifacts/rotation",
             out or root / "data/runtime/weekly/preview",
             root / "data/runtime/weekly",
-            root / "data/logs/season_tick",
+            root / "data/logs",
             root / "data/advice_records",
             root / "data/sample/club_news_v1.fixture.json",
         )
@@ -705,7 +709,11 @@ class WeeklyOperations:
             )
             self.values["site"] = dict(
                 self.run.stage(
-                    "site", inputs=[*common, p.ledger, p.log], operation=self._site
+                    "site",
+                    # The site reads the ledger and, for the status page's run log,
+                    # only the season tick's directory under the run-log root.
+                    inputs=[*common, p.ledger, status_runlog_directory(p.log)],
+                    operation=self._site,
                 ).value
             )
             cohort_inputs = [

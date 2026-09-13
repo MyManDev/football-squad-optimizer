@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from squadopt.application.build import SEASON_TICK_RUNLOG_COMPONENT
 from squadopt.application.season import TickRequest, plan_season_tick
 from squadopt.application.site import SiteBuildReport, build_site
 from squadopt.data.errors import DataError
@@ -42,6 +43,17 @@ class SitePublicationResult:
 
 class SiteSeasonUnavailableError(DataError):
     """The read-only publication could not infer a season."""
+
+
+def status_runlog_directory(log_root: Path) -> Path:
+    """The one directory under ``log_root`` the published status view reads.
+
+    ``log_root`` is the root that holds a directory per component, the same root
+    ``--log-root`` names and ``configure_run_logging`` writes under. A caller that
+    declares its inputs wants this narrower path, not the whole root.
+    """
+
+    return log_root / SEASON_TICK_RUNLOG_COMPONENT
 
 
 def publish_site(request: SitePublicationRequest) -> SitePublicationResult:
