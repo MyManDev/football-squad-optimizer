@@ -181,7 +181,6 @@ const en = {
     substitutionOrder: "In Substitution Order",
     limitsTitle: "What these numbers do not say",
     risk: "Risk",
-    score: "Score",
     riskStatus: {
       available: "Available",
       unavailable: "Unavailable",
@@ -189,7 +188,6 @@ const en = {
     },
     scenarioMean: "Mean of Scenarios",
     shiftedForOptimism: (points: string) => `Shifted ${points} for Selection Optimism`,
-    meanWorst: (fraction: string) => `Mean Worst ${fraction}`,
     scenarioCount: (count: number) => `${count} Scenarios`,
     rivalComparisons: "Rival Comparisons →",
     captured: "Captured",
@@ -1081,7 +1079,6 @@ const tr: MessageSchema<typeof en> = {
     substitutionOrder: "Oyuna Giriş Sırasıyla",
     limitsTitle: "Bu sayılar neyi söylemiyor",
     risk: "Risk",
-    score: "Puan",
     riskStatus: {
       available: "Kullanılabilir",
       unavailable: "Kullanılamıyor",
@@ -1089,7 +1086,6 @@ const tr: MessageSchema<typeof en> = {
     },
     scenarioMean: "Senaryo Ortalaması",
     shiftedForOptimism: (pointsValue) => `Seçim İyimserliği İçin ${pointsValue} Kaydırıldı`,
-    meanWorst: (fraction) => `En Kötü ${fraction} Ortalaması`,
     scenarioCount: (count) => `${count} Senaryo`,
     rivalComparisons: "Rakip Karşılaştırmaları →",
     captured: "Yakalandı",
