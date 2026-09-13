@@ -435,6 +435,7 @@ const en = {
     cumulative: (gameweek: number) => `cumulative through GW${gameweek}`,
     oursCovers: (gameweeks: string) => `GW ${gameweeks} only`,
     oursNone: "no settled week",
+    oursOtherBasis: (gameweeks: string) => `GW ${gameweeks} scored another way, not added in`,
     membersTotal: (count: number) => `mean total of ${count}`,
     membersCovers: (gameweeks: string) => `covers GW ${gameweeks}`,
     paperLedger:
@@ -1352,6 +1353,7 @@ const tr: MessageSchema<typeof en> = {
     cumulative: (gameweek) => `OH${gameweek} sonuna kadar kümülatif`,
     oursCovers: (gameweeks) => `yalnız OH ${gameweeks}`,
     oursNone: "sonuçlanmış hafta yok",
+    oursOtherBasis: (gameweeks) => `OH ${gameweeks} başka türlü puanlandı, toplama eklenmedi`,
     membersTotal: (count) => `${count} üyenin ortalama toplamı`,
     membersCovers: (gameweeks) => `OH ${gameweeks} kapsıyor`,
     paperLedger:

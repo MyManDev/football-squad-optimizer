@@ -63,6 +63,7 @@ from squadopt.evaluation.models import (
     FoldEvaluationResult,
     FrozenSquadDecision,
     RealizedSquadScore,
+    ScoringBasis,
     ScoringPolicy,
 )
 from squadopt.evaluation.scoring import (
@@ -111,6 +112,7 @@ __all__ = [
     "PhaseCDecisionDiagnostics",
     "RankedManager",
     "RealizedSquadScore",
+    "ScoringBasis",
     "ScoringPolicy",
     "Top100BenchmarkResult",
     "aggregate_top_100_scores",

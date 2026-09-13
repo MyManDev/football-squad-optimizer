@@ -22,6 +22,12 @@ fields remain valid and are never backfilled on read: absence means the completi
 was not recorded, not that the original bench order was the declared substitution order.
 Named-eleven outcome scoring is unchanged; recording completion does not apply autosubs.
 
+An outcome states the ``scoring_basis`` that produced its numbers, because the rule is
+not recoverable from the number and two numbers on different rules are different
+measurements. ``record_outcome`` writes ``named_eleven_no_autosubs``, which is what the
+scorer it calls does. Reading refuses a settled outcome that states no basis rather than
+supplying one, except where the decision's own shape entails it: see ``_stated_basis``.
+
 Writes are crash-safe. A decision is assembled in a hidden staging directory next to
 its final place, verified against its own manifest, and then moved into place with one
 rename, so a gameweek directory either exists complete or does not exist at all; a
@@ -57,7 +63,7 @@ from squadopt.data.atomic import replace_retrying
 from squadopt.data.errors import RenameRefusedError
 from squadopt.data.snapshots import CapturedSnapshot
 from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
-from squadopt.evaluation.models import EvaluationValidationError
+from squadopt.evaluation.models import EvaluationValidationError, ScoringBasis
 from squadopt.evaluation.scoring import complete_optimization_decision
 from squadopt.live.errors import LedgerError as LedgerError
 from squadopt.live.free_hit import FREE_HIT_CHIP, free_hit_basis_gameweek
@@ -526,6 +532,12 @@ def record_outcome(
         "realized_xi_score": realized_xi,
         "transfer_hit_points": hit_points,
         "realized_net_score": realized_xi - hit_points,
+        # What produced the two numbers above, recorded beside them because the rule is
+        # not recoverable from the numbers themselves. This is a statement of fact about
+        # the line that computed them -- ``score_named_eleven`` -- and not a default: a
+        # reader is never asked to supply it, and a record that does not carry it is
+        # refused by ``load_entry`` rather than assigned one.
+        "scoring_basis": str(ScoringBasis.NAMED_ELEVEN_NO_AUTOSUBS),
         "chip": chip,
         "projected_score": float(decision["projected_score"]),
         "projection_error": realized_xi - float(decision["projected_score"]),
@@ -565,8 +577,65 @@ class LedgerEntry:
     directory: Path
 
 
+BASIS_ENTAILED_BY_DECISION: Final = "entailed_by_legacy_decision"
+"""``basis_source`` for a basis read off a decision's shape rather than recorded with it."""
+
+
+def _stated_basis(
+    decision: Mapping[str, Any],
+    outcome: Mapping[str, Any] | None,
+    season: str,
+    gameweek: int,
+) -> Mapping[str, Any] | None:
+    """Refuse an outcome that claims a score without saying what produced it.
+
+    A settled outcome carries a number, and the rule that produced that number cannot be
+    recovered from the number. So it has to be written down. An outcome that states no
+    basis is refused rather than assigned one, because a default is a claim nobody made.
+
+    One exception, and it is entailed rather than assumed. The official scorer needs a
+    frozen bench order and a vice-captain; handed a decision with neither it has nothing
+    to complete the eleven with and refuses outright. So for such a decision the named
+    eleven is the only rule that could have produced any number at all, and the basis is
+    read off the decision's own shape. That reading is stamped with ``basis_source`` so
+    the record says the basis was derived and not recorded. A basis-less outcome beside a
+    decision that DID freeze a bench order is genuinely ambiguous: either scorer could
+    have run, so nothing is entailed and the entry is refused.
+
+    Nothing is written. The stamp exists in memory, on the loaded entry.
+    """
+
+    if outcome is None:
+        return None
+    score = outcome.get("realized_net_score")
+    if isinstance(score, bool) or not isinstance(score, int | float):
+        # No settled number, so no claim, so no basis is owed.
+        return outcome
+    if outcome.get("scoring_basis") is not None:
+        return outcome
+    if (
+        decision.get("ordered_bench_player_ids") is None
+        and decision.get("vice_captain_player_id") is None
+    ):
+        return {
+            **outcome,
+            "scoring_basis": str(ScoringBasis.NAMED_ELEVEN_NO_AUTOSUBS),
+            "basis_source": BASIS_ENTAILED_BY_DECISION,
+        }
+    raise LedgerError(
+        f"Outcome for {season} GW{gameweek} records a score of {score} without a "
+        "scoring_basis, and its decision froze a bench order or vice-captain, so either "
+        "scorer could have produced it. A number whose basis is unknown cannot be "
+        "compared with one whose basis is known; record the basis rather than assume it."
+    )
+
+
 def load_entry(root: Path, season: str, gameweek: int) -> LedgerEntry:
-    """Load one entry, refusing any file that fails its recorded checksum."""
+    """Load one entry, refusing any file that fails its recorded checksum.
+
+    Also refuses an outcome that states a score without stating the basis that produced
+    it; see ``_stated_basis``.
+    """
 
     directory = _entry_directory(root, season, gameweek)
     if not directory.is_dir():
@@ -577,6 +646,7 @@ def load_entry(root: Path, season: str, gameweek: int) -> LedgerEntry:
     outcome = (
         json.loads(outcome_path.read_text(encoding="utf-8")) if outcome_path.is_file() else None
     )
+    outcome = _stated_basis(decision, outcome, season, gameweek)
     return LedgerEntry(
         season=season,
         gameweek=gameweek,

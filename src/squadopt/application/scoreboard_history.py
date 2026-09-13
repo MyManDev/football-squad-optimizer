@@ -62,6 +62,22 @@ def settled_scoreboard_entries(
     results: list[LedgerEntry] = []
     for entry in entries:
         if entry.gameweek not in sources:
+            # No capture covers this week, so its recorded outcome is carried through as
+            # it stands. It may be carried only if it says what produced it: an entry that
+            # re-settles gets its basis from the scorer that just ran, and one that does
+            # not must have brought its own. Refuse rather than let a number with no stated
+            # basis reach a series where it would sit beside numbers that have one.
+            outcome = entry.outcome
+            if (
+                outcome is not None
+                and outcome.get("realized_net_score") is not None
+                and outcome.get("scoring_basis") is None
+            ):
+                raise DataError(
+                    f"GW{entry.gameweek} records a settled score and no scoring_basis, "
+                    "and no capture covers the week to rescore it. A number whose "
+                    "basis is unknown cannot enter the scoreboard."
+                )
             results.append(entry)
             continue
         source = sources[entry.gameweek][2]

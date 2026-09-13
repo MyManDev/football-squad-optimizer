@@ -52,9 +52,16 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
   // column read as one more net figure.
   const anyGross = finished.some((week) => week.top100?.basis === "gross");
   const anyProvisional = finished.some((week) => !week.data_checked);
+  // A null total has two different causes and they must not read alike. No week has
+  // settled at all, or weeks have settled but were scored under another rule and are not
+  // summed with this one. Saying "no settled week" in the second case would contradict the
+  // settled row sitting in the table above it.
+  const oursExcluded = total.ours_excluded_gameweeks ?? [];
   const oursCovers =
     total.ours_net === null
-      ? copy.oursNone
+      ? oursExcluded.length > 0
+        ? copy.oursOtherBasis(oursExcluded.map((week) => `${week.gameweek}`).join(", "))
+        : copy.oursNone
       : total.ours_gameweeks.length === total.gameweeks.length
         ? null
         : copy.oursCovers(total.ours_gameweeks.join(", "));

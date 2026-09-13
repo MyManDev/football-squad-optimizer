@@ -112,6 +112,8 @@ const scoreboard: LeagueViewEnvelope<Scoreboard> = {
       gameweeks: [1, 2, 3],
       ours_net: 26,
       ours_gameweeks: [1],
+      ours_basis: "official_autosub_captain_v2",
+      ours_excluded_gameweeks: [],
       members_mean_total_points: 199.2,
       members_gameweeks: [1, 2, 3],
       members_counted: 15,
@@ -300,6 +302,8 @@ describe("scoreboard card", () => {
       gameweeks: [],
       ours_net: null,
       ours_gameweeks: [],
+      ours_basis: null,
+      ours_excluded_gameweeks: [],
       members_mean_total_points: null,
       members_gameweeks: [],
       members_counted: 0,
@@ -309,6 +313,27 @@ describe("scoreboard card", () => {
     expect(screen.getByText(MESSAGES.en.leagueScoreboard.noGameweek)).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
+
+  it.each(["tr", "en"] as const)(
+    "does not call a settled week unsettled when it is left out for its basis, in %s",
+    (language) => {
+      // The total is null because gameweek 1 was scored under another rule and is not
+      // summed with the series, not because nothing has settled. Its row is right there in
+      // the table showing 26, so "no settled week" would contradict what the reader sees.
+      const other = structuredClone(scoreboard);
+      other.payload.cumulative = {
+        ...other.payload.cumulative,
+        ours_net: null,
+        ours_gameweeks: [],
+        ours_basis: null,
+        ours_excluded_gameweeks: [{ gameweek: 1, scoring_basis: "named_eleven_no_autosubs" }],
+      };
+      renderCard(other, language);
+      const copy = MESSAGES[language].leagueScoreboard;
+      expect(screen.getByText(copy.oursOtherBasis("1"))).toBeInTheDocument();
+      expect(screen.queryByText(copy.oursNone)).not.toBeInTheDocument();
+    },
+  );
 });
 
 describe("scoreboard section", () => {

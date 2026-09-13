@@ -20,7 +20,7 @@ import pytest
 import scripts.build_scoreboard as cli
 from jsonschema import Draft202012Validator, ValidationError
 from scripts.build_scoreboard import (
-    OUR_SCORING_BASIS,
+    SERIES_SCORING_BASIS,
     CohortCapture,
     CohortPicks,
     played_gameweeks,
@@ -105,7 +105,15 @@ def _entry(
     settled: bool,
     hits: float = 0.0,
     net: float = 26.0,
+    basis: str | None = SERIES_SCORING_BASIS,
 ) -> LedgerEntry:
+    """A frozen week. A settled one states the basis that produced its number.
+
+    ``basis`` defaults to the series basis because that is what every week from GW2 on
+    settles under. Pass the legacy basis to build an off-series week, or ``None`` to build
+    the record this module must refuse: a score with nothing saying what produced it.
+    """
+
     decision: dict[str, Any] = {
         "snapshot_id": f"fpl-live-gw{gameweek:02d}",
         "projected_score": 56.1,
@@ -113,11 +121,15 @@ def _entry(
     }
     if hits:
         decision["transfers"] = {"transfer_hit_points": hits, "chip": None}
-    outcome = (
-        {"realized_net_score": net, "realized_xi_score": net + hits, "transfer_hit_points": hits}
-        if settled
-        else None
-    )
+    outcome: dict[str, Any] | None = None
+    if settled:
+        outcome = {
+            "realized_net_score": net,
+            "realized_xi_score": net + hits,
+            "transfer_hit_points": hits,
+        }
+        if basis is not None:
+            outcome["scoring_basis"] = basis
     return LedgerEntry(SEASON, gameweek, decision, outcome, Path("."))
 
 
@@ -238,7 +250,7 @@ def test_our_row_is_the_ledger_entry_with_its_mode_and_null_where_unsettled() ->
         "hits": 0.0,
         "projected": 56.1,
         "mode": "live",
-        "scoring_basis": OUR_SCORING_BASIS,
+        "scoring_basis": SERIES_SCORING_BASIS,
         "vice_captain_named": False,
         "diagnostics": dict.fromkeys(
             ("zero_minute_starters", "minutes_shortfall", "captain_shortfall", "autosub_recovery")
@@ -251,7 +263,9 @@ def test_our_row_is_the_ledger_entry_with_its_mode_and_null_where_unsettled() ->
         "hits": 4.0,
         "projected": 56.1,
         "mode": "replay",
-        "scoring_basis": OUR_SCORING_BASIS,
+        # No number, so no basis: the field describes what produced a score, and this row
+        # has none. Claiming one here would assert a rule that never ran.
+        "scoring_basis": None,
         "vice_captain_named": False,
         "diagnostics": dict.fromkeys(
             ("zero_minute_starters", "minutes_shortfall", "captain_shortfall", "autosub_recovery")
@@ -267,7 +281,8 @@ def test_our_row_says_its_net_is_the_named_eleven_and_names_no_vice_captain() ->
     only ever add points, so the row reads low beside a member's own net — and the basis
     travels with the number rather than being left for the reader to infer."""
 
-    ours = _rows(_payload(ledger_entries=(_entry(1, mode="live", settled=True),)))[1]["ours"]
+    entry = _entry(1, mode="live", settled=True, basis="named_eleven_no_autosubs")
+    ours = _rows(_payload(ledger_entries=(entry,)))[1]["ours"]
     assert ours["scoring_basis"] == "named_eleven_no_autosubs"
     assert ours["vice_captain_named"] is False
 
@@ -493,6 +508,8 @@ def test_cumulative_figures_cover_the_finished_weeks_and_say_which_ours_covers()
         "gameweeks": [1, 2],
         "ours_net": 26.0,
         "ours_gameweeks": [1],
+        "ours_basis": SERIES_SCORING_BASIS,
+        "ours_excluded_gameweeks": [],
         "members_mean_total_points": pytest.approx((138 + 100) / 2),
         "members_gameweeks": [1, 2],
         "members_counted": 2,
@@ -510,6 +527,8 @@ def test_cumulative_is_null_where_nothing_is_finished() -> None:
         "gameweeks": [],
         "ours_net": None,
         "ours_gameweeks": [],
+        "ours_basis": None,
+        "ours_excluded_gameweeks": [],
         "members_mean_total_points": None,
         "members_gameweeks": [],
         "members_counted": 0,
