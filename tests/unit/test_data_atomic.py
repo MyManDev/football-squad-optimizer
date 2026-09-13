@@ -5,15 +5,27 @@ It moved out of the laboratory so the product can publish a manifest without imp
 these tests pin the contract the wrapper and the product both rely on: identical bytes
 replay, different bytes are refused, nothing on disk is ever overwritten, and a destination
 past Windows' MAX_PATH is still reachable.
+
+The retried rename lives here too, and the tests at the bottom pin what every writer that
+publishes by renaming a sibling now shares: a refusal while something holds a handle is
+waited out, a refusal that outlasts the budget says how long it waited, and a destination
+that already exists is refused at once instead of slowly.
 """
 
+import errno
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from squadopt.data import atomic
-from squadopt.data.errors import AtomicWriteError, ConflictingBytesError, DataError
+from squadopt.data.errors import (
+    AtomicWriteError,
+    ConflictingBytesError,
+    DataError,
+    RenameRefusedError,
+)
 from squadopt.experiments import shadow_report
 
 
@@ -131,6 +143,92 @@ def test_a_destination_past_windows_max_path_is_still_created_once(tmp_path: Pat
         atomic.write_document_once({"a": 2}, target)
     assert Path(atomic.addressable(target)).read_bytes() == atomic.document_bytes({"a": 1})
     assert [path.name for path in Path(atomic.addressable(root)).iterdir()] == [name]
+
+
+def _refuse_rename(monkeypatch: pytest.MonkeyPatch, *, times: int) -> list[float]:
+    """Refuse the next ``times`` renames the way Windows does; return the pauses asked for.
+
+    The handle race cannot be provoked on demand, so the ``PermissionError`` it raises
+    (WinError 5, "Access is denied") is injected instead. The pauses are recorded rather
+    than slept, so proving the retry costs the suite no wall-clock time.
+    """
+
+    real_replace = atomic.os.replace
+    refused = 0
+    pauses: list[float] = []
+
+    def flaky(source: Any, destination: Any) -> None:
+        nonlocal refused
+        if refused < times:
+            refused += 1
+            raise PermissionError(errno.EACCES, "Access is denied")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(atomic.os, "replace", flaky)
+    monkeypatch.setattr(atomic.time, "sleep", pauses.append)
+    return pauses
+
+
+def test_a_rename_refused_while_a_handle_is_held_is_waited_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "staged.json"
+    source.write_bytes(b"published")
+    destination = tmp_path / "record.json"
+    pauses = _refuse_rename(monkeypatch, times=atomic.RENAME_RETRY_ATTEMPTS - 1)
+
+    atomic.replace_retrying(source, destination)
+
+    assert destination.read_bytes() == b"published"
+    assert not source.exists()
+    first = atomic.RENAME_RETRY_INITIAL_SECONDS
+    assert pauses == [first, first * 2, first * 4, first * 8]
+
+
+def test_a_rename_refused_for_the_whole_budget_says_how_long_it_waited(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The refusal is reported, and what it was asked to move is left where it is."""
+
+    source = tmp_path / "staged.json"
+    source.write_bytes(b"published")
+    destination = tmp_path / "record.json"
+    attempts = atomic.RENAME_RETRY_ATTEMPTS
+    pauses = _refuse_rename(monkeypatch, times=attempts)
+
+    with pytest.raises(RenameRefusedError) as refusal:
+        atomic.replace_retrying(source, destination)
+
+    assert f"refused on all {attempts} attempts" in str(refusal.value)
+    assert f"over {sum(pauses):.2f} s" in str(refusal.value)
+    assert len(pauses) == attempts - 1
+    assert isinstance(refusal.value, AtomicWriteError)
+    assert source.read_bytes() == b"published"
+    assert not destination.exists()
+
+
+def test_a_destination_that_already_exists_is_refused_at_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Windows reports an occupied destination with the same error as a held handle.
+
+    Retrying that would answer a real refusal slowly instead of at once, and it would tell
+    a caller that a record already at the address is a transient problem. So the original
+    error passes through untouched, and a caller that knows what an occupant means reads
+    it for itself.
+    """
+
+    source = tmp_path / "staging"
+    source.mkdir()
+    destination = tmp_path / "record"
+    destination.mkdir()
+    pauses = _refuse_rename(monkeypatch, times=99)
+
+    with pytest.raises(PermissionError):
+        atomic.replace_retrying(source, destination)
+
+    assert pauses == []
+    assert source.is_dir()
 
 
 def test_the_laboratory_wrapper_keeps_its_own_exception_type(tmp_path: Path) -> None:

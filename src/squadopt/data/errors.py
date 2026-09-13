@@ -80,3 +80,12 @@ class ConflictingBytesError(AtomicWriteError):
     Distinct from a failure to write: the filesystem did its job, and the writer is
     refusing to let a recorded artifact be replaced in place.
     """
+
+
+class RenameRefusedError(AtomicWriteError):
+    """Raised when a publishing rename was refused for the whole retry budget.
+
+    Distinct from a conflict in the other direction: nothing decided that the write may
+    not happen. The operating system refused to move bytes that are complete, on every
+    attempt, so the writer never landed them and a caller may say so plainly.
+    """

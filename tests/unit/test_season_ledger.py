@@ -355,9 +355,12 @@ def _refuse_rename(
     produces is injected instead — at the one rename under test, with every other rename
     left to the real call. The pauses are recorded rather than slept, so proving the
     retry costs the suite no wall-clock time.
+
+    The retry itself lives in ``data.atomic`` now; the ledger calls it and keeps its own
+    error type, so this patches where the rename is actually made.
     """
 
-    from squadopt.live import ledger as ledger_module
+    from squadopt.data import atomic as atomic_module
 
     real_replace = os.replace
     refused = 0
@@ -370,8 +373,8 @@ def _refuse_rename(
             raise PermissionError(errno.EACCES, "Access is denied")
         real_replace(source, destination)
 
-    monkeypatch.setattr(ledger_module.os, "replace", flaky)
-    monkeypatch.setattr(ledger_module.time, "sleep", pauses.append)
+    monkeypatch.setattr(atomic_module.os, "replace", flaky)
+    monkeypatch.setattr(atomic_module.time, "sleep", pauses.append)
     return pauses
 
 
@@ -385,10 +388,10 @@ def test_a_landing_rename_the_system_refuses_is_retried_until_it_lands(
     still holding bytes written a moment ago. Failing the run for that loses the entry.
     """
 
-    from squadopt.live import ledger as ledger_module
+    from squadopt.data import atomic as atomic_module
 
     recommendation, projection, root = decision_world
-    within_budget = ledger_module.RENAME_RETRY_ATTEMPTS - 1
+    within_budget = atomic_module.RENAME_RETRY_ATTEMPTS - 1
     pauses = _refuse_rename(monkeypatch, when=lambda source: source.is_dir(), times=within_budget)
 
     directory = record_decision(root, recommendation, projection, report_text="report")
@@ -401,10 +404,10 @@ def test_a_landing_rename_the_system_refuses_is_retried_until_it_lands(
 def test_a_landing_rename_refused_past_the_budget_says_it_retried_and_for_how_long(
     decision_world: tuple[Recommendation, Projection, Path], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from squadopt.live import ledger as ledger_module
+    from squadopt.data import atomic as atomic_module
 
     recommendation, projection, root = decision_world
-    attempts = ledger_module.RENAME_RETRY_ATTEMPTS
+    attempts = atomic_module.RENAME_RETRY_ATTEMPTS
     pauses = _refuse_rename(monkeypatch, when=lambda source: source.is_dir(), times=attempts)
 
     with pytest.raises(LedgerError) as refusal:
@@ -423,7 +426,7 @@ def test_the_file_rename_is_retried_the_same_way(
 ) -> None:
     """The manifest's rename never refuses an existing target, so it retries for one reason."""
 
-    from squadopt.live import ledger as ledger_module
+    from squadopt.data import atomic as atomic_module
 
     recommendation, projection, root = decision_world
     pauses = _refuse_rename(
@@ -432,7 +435,7 @@ def test_the_file_rename_is_retried_the_same_way(
 
     directory = record_decision(root, recommendation, projection, report_text="report")
 
-    first = ledger_module.RENAME_RETRY_INITIAL_SECONDS
+    first = atomic_module.RENAME_RETRY_INITIAL_SECONDS
     assert pauses == [first, first * 2]
     assert load_entry(root, SEASON, 1).decision["gameweek"] == 1
     assert (directory / "manifest.json").is_file()
