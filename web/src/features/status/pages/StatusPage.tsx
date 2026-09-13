@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 import { useIndex, useStatus } from "../../../data/queries";
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
@@ -5,7 +7,7 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { Stat, StatRow } from "../../../design/components/Stat";
 import { useLanguage } from "../../../i18n/context";
 import { reasonText } from "../../../i18n/reasons";
-import { local, utcShort } from "../../../lib/format";
+import { countdown, local, utcShort } from "../../../lib/format";
 import styles from "./StatusPage.module.css";
 
 const TONE: Record<string, "neutral" | "good" | "warn" | "bad" | "accent"> = {
@@ -15,9 +17,27 @@ const TONE: Record<string, "neutral" | "good" | "warn" | "bad" | "accent"> = {
   wait: "neutral",
 };
 
+/**
+ * The browser's own clock, re-read on a modest interval.
+ *
+ * The document's `hours_to_deadline` is honest about the moment it was published and about
+ * nothing else, so a page left open, or opened a day later, cannot read remaining time off
+ * it. A minute is coarse enough that nothing flickers and fine enough that the tile does not
+ * keep claiming time that has already run out.
+ */
+function useNow(intervalMs: number): Date {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), intervalMs);
+    return () => window.clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
 export function StatusPage() {
   const { locale, messages } = useLanguage();
   const copy = messages.status;
+  const now = useNow(60_000);
   const index = useIndex();
   const season = index.data?.payload.seasons[0];
   const status = useStatus(season);
@@ -29,6 +49,14 @@ export function StatusPage() {
   }
   if (!status.data) return <EmptyState title={copy.noStatus} />;
   const view = status.data.payload;
+  // Absent is not zero. Without a deadline there is nothing to count towards, and the tile
+  // has to say so rather than fall back on the frozen published number.
+  const remaining = view.next_deadline_utc
+    ? countdown(view.next_deadline_utc, now, {
+        closed: copy.deadlinePassed,
+        day: messages.common.dayShort,
+      })
+    : null;
   return (
     <div className={styles.page}>
       <header>
@@ -48,13 +76,23 @@ export function StatusPage() {
           }
         />
         <Stat
-          label={copy.hours}
-          value={
-            view.hours_to_deadline !== null
-              ? view.hours_to_deadline.toLocaleString(locale, { maximumFractionDigits: 1 })
-              : "—"
+          label={copy.timeToDeadline}
+          value={remaining && remaining.text ? remaining.text : copy.deadlineUnknown}
+          tone={remaining?.isClosed ? "muted" : "default"}
+          note={
+            <>
+              <div>
+                {view.latest_capture ? copy.latestCapture(view.latest_capture) : copy.noCapture}
+              </div>
+              {view.hours_to_deadline !== null && (
+                <div>
+                  {copy.atPublish(
+                    view.hours_to_deadline.toLocaleString(locale, { maximumFractionDigits: 1 }),
+                  )}
+                </div>
+              )}
+            </>
           }
-          note={view.latest_capture ? copy.latestCapture(view.latest_capture) : copy.noCapture}
         />
         <Stat
           label={copy.decidedSettled}

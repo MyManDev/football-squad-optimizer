@@ -74,6 +74,31 @@ def test_a_chip_played_in_each_half_is_used_twice_and_the_halves_keep_their_week
     assert _flat(chip_states(rules, 30, {"freehit": (3,)}))["freehit"] == ("used", "available")
 
 
+def test_a_free_hit_last_week_bars_this_weeks_free_hit(tmp_path: Path) -> None:
+    """The Free Hit chip cannot be played in consecutive gameweeks (the official rules).
+
+    One Free Hit per half, gameweeks 2 to 19 and 20 to 38, so the only pair the rule can
+    forbid is 19 and 20. A member who played the first half's chip in gameweek 19 has the
+    second half's window open in gameweek 20 and still cannot play it; in gameweek 21 he
+    can. Calling it available in gameweek 20 is advice the game refuses.
+    """
+
+    rules = _rules(tmp_path)
+    assert _flat(chip_states(rules, 20, {"freehit": (19,)}))["freehit"] == ("used", "not_yet")
+    assert _flat(chip_states(rules, 21, {"freehit": (19,)}))["freehit"] == ("used", "available")
+    barred = chip_states(rules, 20, {"freehit": (19,)})["freehit"]["second_half"]
+    assert barred.to_dict() == {
+        "state": "not_yet",
+        "gameweek": None,
+        "start_event": 20,
+        "stop_event": 38,
+    }
+    # The bar is one week wide and belongs to the Free Hit alone.
+    assert _flat(chip_states(rules, 20, {"freehit": (3,)}))["freehit"] == ("used", "available")
+    assert _flat(chip_states(rules, 20, {"bboost": (19,)}))["bboost"] == ("used", "available")
+    assert _flat(chip_states(rules, 20, {"wildcard": (19,)}))["wildcard"] == ("used", "available")
+
+
 def test_a_chip_played_before_a_window_opens_is_refused_not_placed(tmp_path: Path) -> None:
     with pytest.raises(EntryError, match="outside every window"):
         chip_states(_rules(tmp_path), 4, {"wildcard": (1,)})

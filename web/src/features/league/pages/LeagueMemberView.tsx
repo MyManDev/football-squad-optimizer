@@ -10,6 +10,7 @@ import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { Pitch } from "../../squad/components/Pitch";
+import { MemberResourceCards } from "../components/MemberResourceCards";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import { AdviceCard, MissingAdviceCard } from "./MemberAdviceCard";
 import type { LeagueMemberViewProps } from "./memberPageTypes";
@@ -134,13 +135,11 @@ function LeagueMemberContent({
         </Card>
       ) : null}
 
-      {!view.free_transfers_known || !view.purchase_prices_known ? (
+      <MemberResourceCards squad={view} />
+      {!view.purchase_prices_known ? (
         <Card tone="muted" title={copy.entryAssumptionsTitle}>
           <ul className={styles.assumptionList}>
-            {!view.free_transfers_known ? (
-              <li>{copy.freeTransfersAssumed(view.free_transfers)}</li>
-            ) : null}
-            {!view.purchase_prices_known ? <li>{copy.currentPriceFallback}</li> : null}
+            <li>{copy.currentPriceFallback}</li>
           </ul>
         </Card>
       ) : null}

@@ -7,6 +7,7 @@ import { points } from "../../../lib/format";
 import { LeagueDataMissing, loadScoreboard } from "../data";
 import type { LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import styles from "./ScoreboardCard.module.css";
+import { ScoreboardComparisons } from "./ScoreboardComparisons";
 
 /**
  * The scoreboard as the `/league` page shows it: read, or say why not. A missing file is
@@ -132,6 +133,7 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
         </div>
       )}
       {anyGross && <p className={styles.notice}>{copy.grossNote}</p>}
+      <ScoreboardComparisons weeks={view.gameweeks} />
       {anyProvisional && <p className={styles.notice}>{copy.provisionalNote}</p>}
       <p className={styles.notice}>{copy.modeNote}</p>
     </Card>

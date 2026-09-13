@@ -12,9 +12,18 @@ export function points(value: number, digits = 1, locale = "en-GB"): string {
   });
 }
 
+/**
+ * A signed figure whose sign belongs to the number actually printed.
+ *
+ * The sign is taken after rounding to `digits`, not before. A value of -0.04 at one
+ * decimal prints as zero, and a minus in front of a zero is a claim the digits do not
+ * support: it reads as a loss the reader cannot see. Rounded to zero, it prints unsigned.
+ */
 export function signedPoints(value: number, digits = 1, locale = "en-GB"): string {
-  const text = points(Math.abs(value), digits, locale);
-  return value > 0 ? `+${text}` : value < 0 ? `−${text}` : text;
+  const scale = 10 ** digits;
+  const rounded = Math.round(value * scale) / scale;
+  const text = points(Math.abs(rounded), digits, locale);
+  return rounded > 0 ? `+${text}` : rounded < 0 ? `−${text}` : text;
 }
 
 export function percent(probability: number, digits = 0, locale = "en-GB"): string {

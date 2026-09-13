@@ -257,7 +257,11 @@ describe("league member surfaces", () => {
     expect(screen.getByRole("radio", { name: /1 hafta/ })).toBeChecked();
     expect(screen.getAllByText(/beklenen puan maliyeti/).length).toBeGreaterThan(0);
     expect(screen.getByText(/yalnızca senin kadrondan/)).toBeInTheDocument();
-    expect(screen.getByText(/banka edilmiş ikinci transfer/)).toBeInTheDocument();
+    const transferCard = screen
+      .getByRole("heading", { name: "Ücretsiz transfer hakkı" })
+      .closest("section");
+    expect(transferCard).toHaveTextContent("Bilinmiyor");
+    expect(transferCard).not.toHaveTextContent("banka edilmiş ikinci transfer");
     expect(screen.getByText(/Satın alma fiyatları herkese açık değildir/)).toBeInTheDocument();
     expect(container.textContent).not.toContain("%");
   });

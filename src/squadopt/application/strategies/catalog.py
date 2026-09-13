@@ -58,6 +58,11 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # published beside ``moves`` and no move row carries it.
         "transfer_hit_points",
         "expected_own_points",
+        # What the plan is worth against keeping the fifteen already held, on the same
+        # basis as ``expected_own_points`` and as every move row: the eleven with the
+        # captain doubled, before the week's hit charge. A difference between two
+        # expected-points totals, which is why it fits inside this envelope.
+        "expected_gain_vs_hold",
         "expected_gap_vs_rival",
         "expected_points_cost",
         # The most that price can be, from the solver's own bound on the control it is
@@ -314,7 +319,16 @@ _BASELINE_PUBLISHES: Final = frozenset(
         "moves",
         "transfer_hit_points",
         "expected_own_points",
+        # What the plan is worth against holding the squad, on the same basis as
+        # ``expected_own_points`` and as every move row. Every strategy publishes it:
+        # the question it answers, whether the plan is worth making at all, does not
+        # depend on which constraint produced the plan.
+        "expected_gain_vs_hold",
         "expected_points_cost",
+        # Every member solve, one week and window alike, is handed an empty chip
+        # availability, and the payload says so rather than leaving ``chip: null`` to be
+        # read as a chip that was weighed and declined.
+        "stated_limits",
         "solver_status",
         "optimality_gap",
         "captain",
@@ -351,8 +365,8 @@ def _catalog() -> Mapping[str, Strategy]:
             constraints=CandidateConstraints(),
             ranks_by=RankingCriterion.EXPECTED_OWN_POINTS,
             # The only strategy computed beyond one week: its three- and five-week
-            # windows publish the per-week plan and the window's stated limits.
-            publishes=_BASELINE_PUBLISHES | frozenset({"plan_weeks", "stated_limits"}),
+            # windows publish the per-week plan on top of what every strategy publishes.
+            publishes=_BASELINE_PUBLISHES | frozenset({"plan_weeks"}),
             evidence=EvidenceStatus.PREREG_OPEN,
             # Not "the highest expected points". The solve maximises the eleven, the
             # captain and the bench together (``planning/optimizer.py``: ``projected_score

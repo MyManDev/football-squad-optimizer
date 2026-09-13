@@ -119,6 +119,16 @@ def main() -> int:
     )
     parser.add_argument("--season", help="default: inferred from the capture")
     parser.add_argument("--out", type=Path, default=SITE_OUT, help="site root (web/public)")
+    parser.add_argument(
+        "--baseline-ledger-root",
+        type=Path,
+        help="frozen component-only decisions from the system's same captures",
+    )
+    parser.add_argument(
+        "--evidence-root",
+        type=Path,
+        help="verified player_evidence_v1 CSV/manifest pairs for elite baselines",
+    )
     arguments = parser.parse_args()
     try:
         snapshot_id = resolve_live_snapshot_id(arguments.snapshot_root, arguments.snapshot_id)
@@ -133,6 +143,8 @@ def main() -> int:
                 season=arguments.season,
                 cohort_snapshot_id=arguments.cohort_snapshot,
                 elite_snapshot_id=arguments.elite_snapshot,
+                baseline_ledger_root=arguments.baseline_ledger_root,
+                evidence_root=arguments.evidence_root,
             )
         )
     except (DataError, LedgerError, OSError, ValueError, KeyError) as error:
@@ -143,6 +155,13 @@ def main() -> int:
     assert isinstance(payload, dict)
     rows = payload["gameweeks"]
     ours = [row["gameweek"] for row in rows if row["ours"] is not None]
+    bases = sorted(
+        {
+            str(row["ours"].get("scoring_basis") or OUR_SCORING_BASIS)
+            for row in rows
+            if row["ours"] is not None
+        }
+    )
     top100 = [row["top100"] for row in rows if row["top100"] is not None]
     cohort_line = (
         "no gameweek"
@@ -152,7 +171,8 @@ def main() -> int:
     print(
         f"capture {snapshot_id}: {season}, gameweeks {[row['gameweek'] for row in rows]} "
         f"played; histories for {result.histories_held} of {result.registered_members} registered; "
-        f"ours recorded for {ours} ({OUR_SCORING_BASIS}); Top-100 for {cohort_line}"
+        f"ours recorded for {ours} ({', '.join(bases) or 'no scoring basis'}); "
+        f"Top-100 for {cohort_line}"
     )
     if any(week["basis"] == "gross" for week in top100):
         print(

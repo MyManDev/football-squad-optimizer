@@ -29,6 +29,8 @@ from tests.unit.test_public_probability_guards import _FORBIDDEN_TEXT
 from squadopt.application import advice as advice_module
 from squadopt.application.advice import (
     MEMBER_WINDOWS,
+    NO_CHIP_LIMIT,
+    ONE_WEEK_STATED_LIMITS,
     WINDOW_STATED_LIMITS,
     WINDOW_TOP100_LIMIT,
     AdviseEntryRequest,
@@ -54,8 +56,22 @@ LEAGUE = 352490
 WEB_FIXTURE = Path(__file__).resolve().parents[2] / "web" / "src" / "fixtures" / "league.ts"
 
 
+def _web_literal(name: str) -> str:
+    """One string constant the fixture declares, read out of the file."""
+
+    text = WEB_FIXTURE.read_text(encoding="utf-8")
+    declaration = re.search(rf'export const {name} =\s*("(?:[^"\\]|\\.)*");', text)
+    assert declaration is not None, f"{WEB_FIXTURE} no longer declares {name}"
+    return str(json.loads(declaration.group(1)))
+
+
 def _web_stated_limits() -> list[str]:
-    """The sentences the site holds, read out of its fixture rather than restated here."""
+    """The sentences the site holds, read out of its fixture rather than restated here.
+
+    One entry is a named constant rather than a literal, because the site publishes that
+    sentence on its own for a one-week plan too. It is resolved from its declaration so
+    this stays a comparison of sentences.
+    """
 
     text = WEB_FIXTURE.read_text(encoding="utf-8")
     block = re.search(
@@ -64,7 +80,13 @@ def _web_stated_limits() -> list[str]:
         re.DOTALL | re.MULTILINE,
     )
     assert block is not None, f"{WEB_FIXTURE} no longer declares WINDOW_STATED_LIMITS"
-    return [json.loads(literal) for literal in re.findall(r'"(?:[^"\\]|\\.)*"', block.group(1))]
+    entries = re.findall(r'"(?:[^"\\]|\\.)*"|NO_CHIP_STATED_LIMIT', block.group(1))
+    return [
+        _web_literal("NO_CHIP_STATED_LIMIT")
+        if entry == "NO_CHIP_STATED_LIMIT"
+        else str(json.loads(entry))
+        for entry in entries
+    ]
 
 
 @pytest.fixture(name="window_world")
@@ -83,6 +105,10 @@ def _window_world(tmp_path: Path) -> dict[str, Any]:
         captain=GW1_REPLAY_CAPTAIN,
         vice_captain=1004,
         bank_tenths=1_000 - GW1_REPLAY_TOTAL_COST_TENTHS,
+        # The member bought this squad at the capture's own prices, so nothing is in
+        # profit and the sell-on fee withholds nothing: the selling value is what the
+        # fifteen cost. The fee is pinned in test_member_spending_power.py.
+        squad_sell_value_tenths=GW1_REPLAY_TOTAL_COST_TENTHS,
         free_transfers=1,
         free_transfers_known=False,
         source_snapshot_id=str(inputs.snapshot_id),
@@ -407,3 +433,8 @@ def test_the_site_holds_the_producers_window_limit_sentences_verbatim() -> None:
     """
 
     assert _web_stated_limits() == list(WINDOW_STATED_LIMITS)
+    # The one-week payload states the same sentence, so the site holds it under its own
+    # name too and the two ends of that contract are compared here as well.
+    assert list(ONE_WEEK_STATED_LIMITS) == [NO_CHIP_LIMIT]
+    assert _web_literal("NO_CHIP_STATED_LIMIT") == NO_CHIP_LIMIT
+    assert NO_CHIP_LIMIT in WINDOW_STATED_LIMITS

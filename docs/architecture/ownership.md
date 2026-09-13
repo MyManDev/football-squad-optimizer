@@ -22,7 +22,7 @@ without saying what they are accountable for producing.
 | **data / data mining**<br>Data & Predictive Modeling | How do we produce the best available, leakage-safe, calibrated future information for the optimizer? | `data/`, `features/`, `prediction/` |
 | **optimization / evaluation**<br>Optimization & Decision Science + Core Architecture Hardening | Given that information, what is the best decision, how do we know, and how does the core remain modular and reproducible? | `optimization/`, `evaluation/`, `uncertainty/`, `scenarios/`, `risk/`, `planning/`, `bayesopt/`, `preflight/`, `recalibration/`, `experiments/`; `live/`'s measurement and decision logic; core CI, dependency enforcement, and the current `application/` pilot |
 | **platform / backend**<br>Platform, Backend & Runtime Engineering | How do accepted engine contracts become a traceable runtime, backend platform, and product without infrastructure leaking into the core? | `platform/`, `live/`'s operational surface (`ledger.py`, `tick.py`, `recommendation.py`) since the handover below, runtime registries and adapters, installed CLI, API, workers, persistence adapters, deployment, and observability |
-| **shared — all three** | — | `contracts/` (when it exists), `data/schema.py`, `optimization/config.py`, `backtest/` |
+| **shared, all three** | (none) | `contracts/`, `data/schema.py`, `optimization/config.py`, `backtest/` |
 
 The middle column is the useful half when a piece of work does not obviously belong to a
 directory. "Does the residual export cross machines byte for byte?" is a data-side question
@@ -45,8 +45,8 @@ outside the listed zone:
 | Work | Implementation lead | Review responsibility |
 | --- | --- | --- |
 | API, platform, workers, storage, image packaging and backend runbook | İbrahim (`@SpeedyV5`) | Ertuğrul (`@ErtugrulS32175`) handles integration sign-off; Tuna (`@tunayaslan`) retains backend review authority |
-| Operational `live/ledger.py`, `tick.py`, `recommendation.py` and `scripts/build_site.py` | İbrahim | The same backend reviewers; scientific or public-contract changes still need their existing owners |
-| Application and web integration, core CI and branch protection | Ertuğrul | Existing core-architecture reviewers; `web/` is assigned to Ertuğrul |
+| Operational `live/ledger.py`, `tick.py` and `recommendation.py` | İbrahim | The same backend reviewers; scientific or public-contract changes still need their existing owners |
+| Application and web integration, core CI and branch protection | Ertuğrul | Existing core-architecture reviewers; `web/` is assigned to Ertuğrul. `scripts/build_site.py` is a thin CLI over `application/site_publication.py` and is owned with it (Tuna and Ertuğrul in CODEOWNERS), not with the operational `live/` files |
 
 İbrahim's data-side ownership and Tuna's architecture authority remain in place. The backend
 paths list alternative reviewers; listing three people there does not extend the all-three
@@ -201,6 +201,7 @@ git log origin/develop --format='%an' -- src/squadopt/backtest | sort | uniq -c 
 Run it for any zone. If the table and the history disagree for a whole package, the table needs
 a deliberate decision rather than a quiet edit.
 
-Last reviewed against `b031ef1` (PR #110). The `data/identity.py` section above is newer
-and rests on the system map's measurement at `95a6f7e`; the rest of the page has not been
-re-checked since, and saying so is cheaper than implying it has.
+Last reviewed against `99a3387a` (develop, 2026-09-12): the zone table, the backend handover
+rows and the `contracts/` entry were re-checked against `.github/CODEOWNERS` and the tree.
+The `data/identity.py` section rests on the system map's measurement at `95a6f7e`; the
+remaining prose was not re-measured, and saying so is cheaper than implying it was.

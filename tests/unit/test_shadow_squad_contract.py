@@ -78,15 +78,21 @@ _SHA = "ab" * 32
 #: The published envelope as it stands before any squad verdict exists. Written out
 #: rather than imported so that a widening shows up here as a diff, not as a pass.
 #:
-#: ``expected_points_cost_ceiling`` is the one entry added since this list was first
+#: ``expected_points_cost_ceiling`` was the first entry added since this list was
 #: written, and it is a solver bound rather than a calibration reading: the most a
 #: strategy can cost, from the distance a stopped search left between the control it is
 #: priced against and that search's own bound. It carries nothing from a squad verdict.
+#:
+#: ``expected_gain_vs_hold`` is the second, and it is arithmetic on the projection the
+#: plan was solved from: the plan's eleven with the captain doubled, less the same total
+#: for the fifteen the member already holds. Two expected-points totals subtracted,
+#: reading nothing from a squad verdict and stating no spread around either.
 _PUBLISHED_ENVELOPE = frozenset(
     {
         "moves",
         "transfer_hit_points",
         "expected_own_points",
+        "expected_gain_vs_hold",
         "expected_gap_vs_rival",
         "expected_points_cost",
         "expected_points_cost_ceiling",

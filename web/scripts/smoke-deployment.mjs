@@ -1,14 +1,30 @@
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// The application shell renders into this element. A response that carries it is the shell,
+// whatever its status line says, so an absent document must not contain it.
+const SHELL_ELEMENT = 'id="root"';
+
 export const SMOKE_CHECKS = [
   { path: "/", kind: "html" },
   { path: "/moves", kind: "html" },
   { path: "/rivals", kind: "html" },
   { path: "/league", kind: "html" },
+  // A nested client-side route is the first thing a path-scoped not-found rule would break.
+  { path: "/league/members/0", kind: "html" },
   { path: "/analysis", kind: "html" },
   { path: "/status", kind: "html" },
   { path: "/data/index.json", kind: "json", revalidates: true },
+  {
+    path: "/data/league/members.json",
+    kind: "json",
+    revalidates: true,
+    requires: (published) => (published?.payload?.members ?? []).length > 0,
+    requirement: "at least one league member",
+  },
+  // Entry 0 is not an FPL entry, so this document can never be published. Served as the shell
+  // with a 200, a publication that never happened is indistinguishable from a corrupt one.
+  { path: "/data/league/entries/0.json", kind: "absent" },
 ];
 
 function deploymentUrl(value) {
@@ -33,12 +49,21 @@ async function checkEndpoint(baseUrl, check, { fetchImpl, sleep, attempts }) {
         redirect: "error",
         signal: AbortSignal.timeout(10_000),
       });
-      if (!response.ok) {
+      if (check.kind === "absent") {
+        if (response.status !== 404) {
+          throw new Error(`an unpublished document answered HTTP ${response.status}`);
+        }
+        const body = await response.text();
+        if (body.includes(SHELL_ELEMENT)) {
+          throw new Error("an unpublished document answered with the SPA document");
+        }
+      } else if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
-      }
-
-      if (check.kind === "json") {
-        await response.json();
+      } else if (check.kind === "json") {
+        const published = await response.json();
+        if (check.requires && !check.requires(published)) {
+          throw new Error(`response does not carry ${check.requirement}`);
+        }
       } else {
         const body = await response.text();
         if (!body.toLowerCase().includes("<!doctype html")) {

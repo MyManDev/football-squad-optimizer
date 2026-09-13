@@ -46,6 +46,7 @@ def _member_picks(world: dict[str, Any], entry_id: int, squad_codes: list[int]) 
         captain=squad_codes[0],
         vice_captain=squad_codes[1],
         bank_tenths=5,
+        squad_sell_value_tenths=world_module.member_squad_sell_value(world, squad_codes),
         free_transfers=1,
         free_transfers_known=False,
         source_snapshot_id=world["gw2_id"],
@@ -341,6 +342,12 @@ def test_the_entry_page_gets_the_members_own_squad_not_our_advice(
     assert [p["bench_order"] for p in payload["bench"]] == [1, 2, 3, 4]
     assert sum(1 for p in payload["starting_xi"] if p["is_captain"]) == 1
     assert payload["bank_tenths"] == picks.bank_tenths
+    # What the member may spend, stated rather than left for a page to work out by adding
+    # up current prices: the game keeps half of every rise since a player was bought, so
+    # that total is not a budget. Here the squad's selling value is its priced total
+    # because this world's member bought at today's prices.
+    assert payload["squad_sell_value_tenths"] == picks.squad_sell_value_tenths
+    assert payload["spendable_budget_tenths"] == picks.squad_sell_value_tenths + picks.bank_tenths
     # The unknown flags travel to the entry page too, not just to the advice.
     assert payload["free_transfers_known"] is False
     assert "free_transfers" in payload["missing_fields"]
@@ -357,6 +364,188 @@ def test_the_entry_page_gets_the_members_own_squad_not_our_advice(
         "3xc": "not_yet",
     }
     assert all(halves["second_half"] is None for halves in chips["states"].values())
+    assert payload["chips_used"] == {}
+    # The page says which squad it shows: this member's is the captured week's own, with
+    # no chip active in it.
+    assert payload["squad_basis"] == "captured"
+    assert payload["active_chip"] is None
+
+
+def test_the_entry_page_states_which_squad_it_shows_after_a_free_hit(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """A pre-Free-Hit fifteen must not read as the played week's picks."""
+
+    inputs, projection, rules = _world_context(world)
+    picks = dataclasses.replace(
+        _member_picks(world, 101, _legal_squad(world)),
+        active_chip="freehit",
+        chips_used={"freehit": (1,)},
+        squad_basis="pre_free_hit_gw01",
+    )
+    build_league_views(
+        _Provider({101: picks}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+    )
+    payload = json.loads(
+        (tmp_path / "league" / "entries" / "101.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert payload["squad_basis"] == "pre_free_hit_gw01"
+    assert payload["active_chip"] == "freehit"
+    assert payload["chips_used"] == {"freehit": [1]}
+    assert payload["chips"]["known"] is True
+    assert payload["chips"]["states"]["freehit"]["first_half"] == {
+        "state": "used",
+        "gameweek": 1,
+        "start_event": 1,
+        "stop_event": 19,
+    }
+
+
+def test_the_entry_page_says_when_the_chip_history_was_not_captured(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """``chips.known`` is read from the data: a provider without the history publishes
+    the same shape with the flag down, every window ``unknown``, and no raw history at
+    all, since an empty map would read as "no chip played".
+
+    The planner behind the advice needs the history, so this path cannot run the whole
+    build; the entries document is rendered directly from such a picks object."""
+
+    from squadopt.application.league_views import _entry_squad_payload
+
+    inputs, projection, rules = _world_context(world)
+    picks = dataclasses.replace(_member_picks(world, 101, _legal_squad(world)), chips_used=None)
+    payload = _entry_squad_payload(
+        picks,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        member_row={"member_kind": "human", "entry_id": 101},
+        missing=[],
+        scored_gameweek=None,
+    )
+    chips = payload["chips"]
+    assert chips["known"] is False and chips["gameweek"] == 2
+    assert {
+        name: halves["first_half"]["state"] for name, halves in chips["states"].items()
+    } == dict.fromkeys(("wildcard", "freehit", "bboost", "3xc"), "unknown")
+    assert payload["chips_used"] is None
+
+
+def _squad_payload(world: dict[str, Any], picks: EntryPicks) -> dict[str, Any]:
+    from squadopt.application.league_views import _entry_squad_payload
+
+    inputs, projection, rules = _world_context(world)
+    return _entry_squad_payload(
+        picks,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        member_row={"member_kind": "human", "entry_id": picks.entry_id},
+        missing=[],
+        scored_gameweek=None,
+    )
+
+
+def test_the_held_vice_captain_reaches_the_entry_page(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """The capture names the vice beside the captain; the page could not say so.
+
+    The member's own armbands are what the entry page is for, and the vice decides where
+    the multiplier lands in exactly the weeks the captain blanks. It was read, kept on
+    ``EntryPicks`` and then dropped at the document, so the page fell back to saying the
+    published squad names nobody.
+    """
+
+    import json
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    picks = _member_picks(world, 101, squad)
+    build_league_views(
+        _Provider({101: picks}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+    )
+    payload = json.loads(
+        (tmp_path / "league" / "entries" / "101.json").read_text(encoding="utf-8")
+    )["payload"]
+    players = [*payload["starting_xi"], *payload["bench"]]
+    wearing = [player["player_id"] for player in players if player["is_vice_captain"]]
+    assert wearing == [picks.vice_captain]
+    # Every other record says so explicitly, and nobody wears both armbands.
+    assert all("is_vice_captain" in player for player in players)
+    assert not any(player["is_captain"] and player["is_vice_captain"] for player in players)
+
+
+def test_a_vice_captain_the_member_left_on_the_bench_is_published_with_the_bench(
+    world: dict[str, Any],
+) -> None:
+    """The armband is held in the squad, not in the eleven.
+
+    The capture adapter deliberately accepts a benched vice (``EntryPicksRecord``'s
+    docstring says so), and the September capture contains one: entry 3832237 names its
+    vice at squad position thirteen. A flag published on the starting eleven alone would
+    lose that member's vice entirely.
+    """
+
+    squad = _legal_squad(world)
+    picks = dataclasses.replace(_member_picks(world, 101, squad), vice_captain=squad[12])
+    payload = _squad_payload(world, picks)
+    assert not any(player["is_vice_captain"] for player in payload["starting_xi"])
+    wearing = [player["player_id"] for player in payload["bench"] if player["is_vice_captain"]]
+    assert wearing == [squad[12]]
+
+
+@pytest.mark.parametrize(
+    "case", ["the_captain_himself", "a_player_not_in_the_squad", "unprojected"]
+)
+def test_a_vice_captain_that_is_not_held_publishes_no_armband_at_all(
+    world: dict[str, Any], case: str
+) -> None:
+    """Absent is not false: a vice that cannot be established is published as nothing.
+
+    ``EntryPicks`` requires a vice rather than defaulting one, but the application type
+    proves nothing about the value, so a provider can hand over a stand-in: the captain
+    himself, or a player the member does not hold. The third case is the document's own
+    doing, not the provider's: a squad member the projection has no row for is dropped from
+    the published fifteen, and if that is the vice then flagging the survivors ``false``
+    would read as "nobody holds it" rather than "the holder is not on this page".
+
+    In all three the field leaves the document entirely, because ``false`` on all fifteen
+    states that the member named nobody, which is a claim the source never made, and the
+    page's "not stated" path is the one that must stay live.
+    """
+
+    squad = _legal_squad(world)
+    unprojected = max(squad) + 500
+    if case == "unprojected":
+        squad = [*squad[:14], unprojected]
+    stand_in = {
+        "the_captain_himself": squad[0],
+        "a_player_not_in_the_squad": unprojected,
+        "unprojected": unprojected,
+    }[case]
+    picks = dataclasses.replace(_member_picks(world, 101, squad), vice_captain=stand_in)
+    payload = _squad_payload(world, picks)
+    players = [*payload["starting_xi"], *payload["bench"]]
+    assert len(players) == (14 if case == "unprojected" else 15)
+    assert not any("is_vice_captain" in player for player in players)
 
 
 def test_only_the_computed_mode_and_window_are_published(
@@ -796,18 +985,25 @@ def test_the_member_planning_hit_cost_reaches_the_published_bytes(
 # value is ``test_the_member_planning_hit_cost_reaches_the_published_bytes`` above, which
 # holds a discretionary member; the value itself is pinned in
 # ``tests/unit/test_live_transfers.py``.
-IN_SEASON_MEMBER_ADVICE_SHA256 = "5f197ac047d670817571365b37405eac1002099aab516a288dd68a845c466dad"
-# (player_out, player_in, expected_points_delta) per move, each pair one position. The
-# week's hit charge is not here because it is not a property of a move: this plan makes
-# two transfers and pays for one, and the payload states that once as
+IN_SEASON_MEMBER_ADVICE_SHA256 = "6623ae5ff4848e0952625b233b6e46af9271588c8c5697cc544b8b024215e6a2"
+# (player_out, player_in, expected_points_delta) per move, each pair one position. A
+# row is that swap's share of what the plan gains against holding the fifteen, measured
+# on the payload's own basis (the eleven with the captain doubled) with the rows above
+# it already applied, so the two rows add up to ``IN_SEASON_MEMBER_GAIN_VS_HOLD``. The
+# first row moves 0.5 rather than the 2.5 between the two players' own projections,
+# because the player leaving was not in the do-nothing eleven.
+#
+# The week's hit charge is not here because it is not a property of a move: this plan
+# makes two transfers and pays for one, and the payload states that once as
 # ``transfer_hit_points``. It is the game's 4, although the plan was solved under
 # MEMBER_PLANNING_POLICY's caution margin of 8: the margin decides what to do, the
 # charge is what the member is told, and only the second reaches these bytes.
 IN_SEASON_MEMBER_MOVES = (
-    (1005, 1009, 2.5),
-    (1020, 1024, 7.0),
+    (1005, 1009, 0.5),
+    (1020, 1024, 12.5),
 )
 IN_SEASON_MEMBER_TRANSFER_HIT_POINTS = 4.0
+IN_SEASON_MEMBER_GAIN_VS_HOLD = 13.0
 
 
 def test_the_recorded_in_season_member_plan_holds(world: dict[str, Any], tmp_path: Path) -> None:
@@ -859,6 +1055,11 @@ def test_the_recorded_in_season_member_plan_holds(world: dict[str, Any], tmp_pat
     for move in payload["moves"]:
         assert move["player_out"]["position"] == move["player_in"]["position"]
     assert payload["transfer_hit_points"] == IN_SEASON_MEMBER_TRANSFER_HIT_POINTS
+    # The rows are the whole of the plan's gain against holding, split between them.
+    assert payload["expected_gain_vs_hold"] == IN_SEASON_MEMBER_GAIN_VS_HOLD
+    assert sum(move["expected_points_delta"] for move in payload["moves"]) == pytest.approx(
+        IN_SEASON_MEMBER_GAIN_VS_HOLD
+    )
     assert payload["mode"] == "saf-puan"
     assert payload["window"] == 1
     assert payload["expected_points_cost"] == 0.0

@@ -9,6 +9,7 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  NO_CHIP_STATED_LIMIT,
   WINDOW_STATED_LIMITS,
   mockEntryAdviceEnvelope,
   mockEntryAdviceIndex,
@@ -53,7 +54,8 @@ describe("the advice card shows a window week by week", () => {
     // The paid transfer's hit points and the last week's chip are on their rows.
     expect(within(rows[2]!).getByText("4")).toBeInTheDocument();
     expect(within(rows[3]!).getByText("Bench Boost")).toBeInTheDocument();
-    expect(within(section).getByText("Bu pencerenin varsaydıkları")).toBeInTheDocument();
+    // What the window assumes is its own region now, beside every other plan's.
+    expect(screen.getByRole("region", { name: "Bu pencerenin varsaydıkları" })).toBeInTheDocument();
     // The first week's moves and lineup still render above, unchanged in shape.
     expect(screen.getByRole("region", { name: "Bu haftaki kadron" })).toBeInTheDocument();
     expect(screen.getByText("Kanıt tamamlanamadı")).toBeInTheDocument();
@@ -67,7 +69,8 @@ describe("the advice card shows a window week by week", () => {
     }
     renderAdvice(advice, language);
     const section = screen.getByRole("region", { name: copy.windowTitle(5) });
-    const items = within(section).getAllByRole("listitem");
+    const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
+    const items = within(limits).getAllByRole("listitem");
     expect(items.map((item) => item.textContent)).toEqual(
       WINDOW_STATED_LIMITS.map((sentence) => copy.statedLimits[sentence]),
     );
@@ -95,15 +98,16 @@ describe("the advice card shows a window week by week", () => {
       renderAdvice(advice, language);
       const copy = MESSAGES[language].leagueMembers;
       const section = screen.getByRole("region", { name: copy.windowTitle(3) });
-      const items = within(section).getAllByRole("listitem");
+      const limits = screen.getByRole("region", { name: copy.windowLimitsLabel });
+      const items = within(limits).getAllByRole("listitem");
       expect(items.map((item) => item.textContent)).toEqual([
         copy.statedLimits[WINDOW_STATED_LIMITS[0]!],
         ...raw.map(() => copy.statedLimitUnknown),
       ]);
-      for (const sentence of raw) expect(section).not.toHaveTextContent(sentence);
+      for (const sentence of raw) expect(limits).not.toHaveTextContent(sentence);
       expect(advice.payload.stated_limits).toEqual(published);
       expect(within(section).getByText(copy.windowWeekOf(2))).toBeInTheDocument();
-      expect(within(section).getByText(copy.windowLimitsLabel)).toBeInTheDocument();
+      expect(within(limits).getByText(copy.windowLimitsLabel)).toBeInTheDocument();
     },
   );
 
@@ -111,4 +115,23 @@ describe("the advice card shows a window week by week", () => {
     renderAdvice(mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1));
     expect(screen.queryByRole("region", { name: /haftalık pencere/ })).toBeNull();
   });
+
+  it.each(["tr", "en"] as const)(
+    "still says the one-week plan was never offered a chip in %s",
+    (language) => {
+      const advice = mockEntryAdviceEnvelope(ENTRY, "saf-puan", 1);
+      const copy = MESSAGES[language].leagueMembers;
+      expect(advice.payload.stated_limits).toEqual([NO_CHIP_STATED_LIMIT]);
+      renderAdvice(advice, language);
+
+      // A one-week document names the plan, not a window nobody can see.
+      const limits = screen.getByRole("region", { name: copy.planLimitsLabel });
+      expect(
+        within(limits)
+          .getAllByRole("listitem")
+          .map((item) => item.textContent),
+      ).toEqual([copy.statedLimits[NO_CHIP_STATED_LIMIT]]);
+      expect(screen.queryByRole("region", { name: copy.windowLimitsLabel })).toBeNull();
+    },
+  );
 });

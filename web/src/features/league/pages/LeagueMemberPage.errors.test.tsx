@@ -388,3 +388,40 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     },
   );
 });
+
+describe.each(["tr", "en"] as const)("unavailable squad basis in %s", (language) => {
+  it.each(["missing", "unreadable"] as const)(
+    "keeps the backend reason only for a %s squad",
+    async (kind) => {
+      const reason = "Free Hit in GW3: pre-Free Hit GW2 picks document is missing. <b>capture</b>";
+      const index = mockEntryAdviceIndex(ENTRY);
+      vi.mocked(data.loadEntryAdviceIndex).mockResolvedValue({
+        ...index,
+        payload: {
+          ...index.payload,
+          unavailable: [
+            { strategy: "saf-puan", rival_entry_id: null, reason },
+            { strategy: "ortak-koru", rival_entry_id: 123, reason },
+          ],
+        },
+      });
+      vi.mocked(data.loadEntrySquad).mockRejectedValue(
+        kind === "missing"
+          ? new data.LeagueDataMissing(`entries/${ENTRY}.json`)
+          : new data.LeagueDataError("bad JSON"),
+      );
+      open(language);
+      expect(
+        await screen.findByText(
+          MESSAGES[language].leagueMembers[
+            kind === "missing" ? "entryNotAvailable" : "entryUnreadable"
+          ],
+        ),
+      ).toBeInTheDocument();
+      if (kind === "missing") expect(await screen.findAllByText(reason)).toHaveLength(1);
+      else expect(screen.queryByText(reason)).not.toBeInTheDocument();
+      expect(screen.queryByText("capture", { selector: "b" })).not.toBeInTheDocument();
+      expect(data.loadEntryAdvice).not.toHaveBeenCalled();
+    },
+  );
+});

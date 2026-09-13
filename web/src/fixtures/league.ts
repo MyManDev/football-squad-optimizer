@@ -331,11 +331,28 @@ function squadEnvelope(entry: HumanEntryView, index: number): LeagueViewEnvelope
     free_transfers: 1,
     free_transfers_known: false,
     chips_used: {},
+    // Every chip still playable before gameweek 2: the 2026-27 season lists each one
+    // once per half, and the second half has not opened.
+    chips: {
+      known: true,
+      gameweek: GAMEWEEK,
+      states: Object.fromEntries(
+        ["wildcard", "freehit", "bboost", "3xc"].map((name) => [
+          name,
+          {
+            first_half: { state: "available", gameweek: null, start_event: 1, stop_event: 19 },
+            second_half: { state: "not_yet", gameweek: null, start_event: 20, stop_event: 38 },
+          },
+        ]),
+      ),
+    },
     purchase_prices_known: false,
     source_snapshot_id: "example-post-deadline-gw02",
     squadopt_comparison: squadoptComparison,
     data_quality: partial ? "partial" : "complete",
     missing_fields: partial ? ["team_name", "gameweek_points", "picks[8:11]"] : [],
+    squad_basis: "captured",
+    active_chip: null,
   });
 }
 
@@ -393,6 +410,14 @@ function moveFor(mode: AdviceStrategy, window: WindowSize): AdviceMove[] {
 }
 
 /**
+ * The one limit sentence every plan on this path carries, window or not: the solver is
+ * handed no chip, so a null chip is not a chip it weighed and declined. Named because the
+ * producer states it on a one-week payload on its own, and inside the list below.
+ */
+export const NO_CHIP_STATED_LIMIT =
+  "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.";
+
+/**
  * The producer's limit sentences for a three- or five-week window, as its payload
  * carries them (`WINDOW_STATED_LIMITS` in the application layer). The site's Turkish
  * copy is keyed by these exact strings, and a test pins that every one is known there.
@@ -408,7 +433,7 @@ export const WINDOW_STATED_LIMITS: readonly string[] = [
   "Every week inside the window, the first included, is capped at one transfer (a wildcard week excepted); the one-week plan has no such cap.",
   "The Top-100 uplift is inside the first week's numbers, and the repetition carries it into every later week.",
   "Prices are held at the captured values; no price change is modelled.",
-  "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+  NO_CHIP_STATED_LIMIT,
 ];
 
 /** One row per gameweek of a pure-points window: the first week's move, one paid
@@ -639,6 +664,12 @@ export function mockEntryAdviceEnvelope(
     // The week's hit charge, once, as the producer publishes it: this example week is
     // played inside the free transfers, so the game charges nothing for it.
     transfer_hit_points: 0,
+    // What the plan is worth against keeping the held fifteen, on the same basis as the
+    // move rows and the lineup total, and equal to the rows added up.
+    expected_gain_vs_hold: (quality === "complete" ? moveFor(mode, window) : []).reduce(
+      (total, move) => total + (move.expected_points_delta ?? 0),
+      0,
+    ),
     // The producer prices the whole plan against the pure-points pick, in expected
     // points only; the example mirrors that shape so the page renders it in dev/test.
     expected_points_cost: mode === "saf-puan" ? 0 : 0.8,
@@ -654,7 +685,9 @@ export function mockEntryAdviceEnvelope(
           plan_weeks: planWeeksFor(window),
           stated_limits: [...WINDOW_STATED_LIMITS],
         }
-      : {}),
+      : // Every one-week plan is solved with no chip offered, and says so; the windows
+        // say the same thing in the list above.
+        { stated_limits: [NO_CHIP_STATED_LIMIT] }),
     data_quality: quality,
     missing_fields: quality === "complete" ? [] : (squad?.missing_fields ?? ["entry"]),
   });

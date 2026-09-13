@@ -10,6 +10,7 @@ window, a tampered handoff.
 """
 
 import json
+from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
@@ -242,6 +243,26 @@ def _decide_gw1(monkeypatch: pytest.MonkeyPatch, world: dict[str, Any]) -> dict[
     assert _run(monkeypatch, world, "--phase", "decide", "--snapshot-id", world["gw1_id"]) == 0
     entry = world["ledger_root"] / SEASON / "gw01" / "decision.json"
     return dict(json.loads(entry.read_text(encoding="utf-8")))
+
+
+def member_squad_sell_value(world: dict[str, Any], squad_codes: Sequence[int]) -> int:
+    """What a member fixture's fifteen would raise, for this world's GW2 deadline.
+
+    The members these fixtures model bought at the capture's own prices, so no player
+    is in profit, no sell-on fee applies, and the squad's selling value is its priced
+    total. That is the case these tests were written to measure and it keeps measuring
+    it. The fee itself, and what it takes out of a budget, is pinned separately in
+    ``tests/unit/test_member_spending_power.py``.
+    """
+
+    inputs = read_inputs(read_snapshot(world["snapshot_root"], world["gw2_id"]), season=SEASON)
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    # A code the capture does not price is left out: such a squad is refused before any
+    # plan is made, so the number it would have contributed is never spent.
+    return sum(prices.get(int(code), 0) for code in squad_codes)
 
 
 def _handoff(
