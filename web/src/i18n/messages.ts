@@ -605,6 +605,10 @@ const en = {
     windowRule:
       "The moves and the lineup above are the first week's. Each row below is one gameweek of the plan, in expected points under the limits stated here.",
     windowLimitsLabel: "What this window assumes",
+    // The same list on a one-week document, where "window" would name nothing the
+    // reader can see. A one-week plan is handed no chip either, and until it said so a
+    // blank chip line read as a chip that had been weighed and turned down.
+    planLimitsLabel: "What this plan assumes",
     windowWeek: "Week",
     windowWeekOf: (gameweek: number) => `GW${gameweek}`,
     windowHits: "Hit points",
@@ -627,7 +631,7 @@ const en = {
         "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
     } as Record<string, string>,
     controlUnprovenBody: (gap: string) =>
-      `The pure-points plan this price is measured against was not proven optimal (gap ≤ ${gap} pts), so the price is published as a ceiling — the most this strategy can cost — and not as an exact figure.`,
+      `The pure-points plan this price is measured against was not proven optimal: its planner objective (the eleven with the captain doubled, plus a tenth of the bench, less the transfer penalties, which is not a points total) is within ${gap} of the best value the search could prove. The price is therefore published as a ceiling, the most this strategy can cost, and not as an exact figure.`,
     overlapLine: (count: number) => `${count} of the rival's eleven in your fifteen`,
     gapLine: (points: string) => `expected gap vs rival ${points}`,
     captainShared: "same captain",
@@ -665,9 +669,9 @@ const en = {
     entryUnreadable: "This member's squad could not be read.",
     entryUnreadableBody: "The published squad document did not return readable data.",
     unprovenPlanGapUnknown:
-      "The proof for this plan is incomplete. The optimality gap was not published.",
+      "The proof for this plan is incomplete. The bound on the planner's objective was not published.",
     controlGapUnknown:
-      "The pure-points control was not proven optimal and its gap was not published. Any stated price ceiling remains an upper bound.",
+      "The pure-points control was not proven optimal and the bound on its planner objective was not published. Any stated price ceiling remains an upper bound.",
     planWithinFreeUnknown: (cap: number, target: number) =>
       `The plan used a free-transfer limit of ${cap} and requested an overlap bound of ${target} players. The applied overlap bound was not published.`,
     hitPointsNotPublished: "an unpublished number of",
@@ -754,11 +758,23 @@ const en = {
     diagnosticOnly:
       "The two starting XIs use the same projection. Shared players with equal multipliers cancel out; the remaining expected points, captain multipliers and this plan’s transfer hits determine the expected gap.",
     unprovenPlanBadge: "Proof incomplete",
+    // What the solver's bound bounds, named. It is a distance on the planner's
+    // objective, which is not the points total this card leads with, and on a window it
+    // covers every gameweek of the plan at once rather than any single one.
     unprovenPlanBody: (gap: string) =>
-      `The solver could not finish the proof for this plan (gap ≤ ${gap} pts). It is the best plan the search found, not a plan shown to be the best one.`,
+      `The solver could not finish the proof for this plan. Its planner objective is within ${gap} of the best value the search could prove. That objective is the eleven with the captain doubled, plus a tenth of the bench, less the transfer penalties, so it is not a points total. This is the best plan the search found, not a plan shown to be the best one.`,
+    unprovenPlanBodyWindow: (gap: string, weeks: number) =>
+      `The solver could not finish the proof for this plan. Its planner objective, taken over all ${weeks} gameweeks of the plan at once, is within ${gap} of the best value the search could prove. That objective is each week's eleven with the captain doubled, plus a tenth of the bench, less the transfer penalties, so it is neither a points total nor a figure for any one gameweek. This is the best plan the search found, not a plan shown to be the best one.`,
     out: "Out",
     in: "In",
-    projectedGain: (points: string) => `${points} projected gain`,
+    projectedGain: (points: string) => `${points} for the eleven with the captain doubled`,
+    projectedGainUnknown: "This move's share of the plan's gain was not published.",
+    moveRowsBasis:
+      "Each row is what the eleven with the captain doubled moves by once that swap is added to the rows above it, so the rows add up to the whole plan's gain below.",
+    planGainVsHold: (points: string) =>
+      `${points} expected points against keeping the squad you hold, for the eleven with the captain doubled.`,
+    planGainVsHoldBeforeCost: (points: string, cost: string) =>
+      `${points} expected points against keeping the squad you hold, for the eleven with the captain doubled, before this week's transfer cost of ${cost}.`,
     weekTransferCost: (points: string) =>
       `~${points} expected-point cost for this week's transfers in total: the game charges the week, not each move.`,
     windowValueReason: "Part of the multiweek plan using published projections.",
@@ -1495,6 +1511,7 @@ const tr: MessageSchema<typeof en> = {
     windowRule:
       "Yukarıdaki hamleler ve kadro ilk haftanın. Aşağıdaki her satır planın bir oyun haftası; beklenen puan, burada yazılı sınırlar altında.",
     windowLimitsLabel: "Bu pencerenin varsaydıkları",
+    planLimitsLabel: "Bu planın varsaydıkları",
     windowWeek: "Hafta",
     windowWeekOf: (gameweek) => `OH${gameweek}`,
     windowHits: "Transfer cezası",
@@ -1516,7 +1533,7 @@ const tr: MessageSchema<typeof en> = {
         "Pencere içinde çip önerilmez. Sonlu bir pencere, bir çipi elde tutmaya değer biçmez; ulaşabilse harcardı. Çip zamanlaması sezonluk bir karardır ve bu pencere onu fiyatlayamaz.",
     },
     controlUnprovenBody: (gap: string) =>
-      `Bu fiyatın ölçüldüğü saf puan planı en iyi diye kanıtlanamadı (fark ≤ ${gap} puan); bu yüzden fiyat kesin bir değer olarak değil, tavan olarak yayımlanıyor: bu stratejinin mal olabileceği en fazla değer.`,
+      `Bu fiyatın ölçüldüğü saf puan planı en iyi diye kanıtlanamadı: planlayıcı amaç değeri (ilk on bir kaptan iki kat, artı yedeklerin onda biri, eksi transfer cezaları; bir puan toplamı değil) aramanın kanıtlayabildiği en iyi değere en fazla ${gap} uzaklıkta. Bu yüzden fiyat kesin bir değer olarak değil, tavan olarak yayımlanıyor: bu stratejinin mal olabileceği en fazla değer.`,
     overlapLine: (count: number) => `rakibin on birinden ${count} tanesi senin on beşinde`,
     gapLine: (pointsValue: string) => `rakibe karşı beklenen fark ${pointsValue}`,
     captainShared: "aynı kaptan",
@@ -1553,9 +1570,9 @@ const tr: MessageSchema<typeof en> = {
     entryUnreadable: "Bu üyenin kadrosu okunamadı.",
     entryUnreadableBody: "Yayımlanan kadro belgesi okunabilir veri döndürmedi.",
     unprovenPlanGapUnknown:
-      "Bu planın en iyi olduğu kanıtlanamadı. En iyi çözüme uzaklık sınırı yayımlanmamış.",
+      "Bu planın en iyi olduğu kanıtlanamadı. Planlayıcı amaç değeri için sınır yayımlanmamış.",
     controlGapUnknown:
-      "Saf puan planının en iyi olduğu kanıtlanamadı ve fark sınırı yayımlanmamış. Belirtilen maliyet tavanı bir üst sınırdır.",
+      "Saf puan planının en iyi olduğu kanıtlanamadı ve planlayıcı amaç değeri için sınır yayımlanmamış. Belirtilen maliyet tavanı bir üst sınırdır.",
     planWithinFreeUnknown: (cap: number, target: number) =>
       `Planın serbest transfer sınırı ${cap}, ortak oyuncu sayısı için istenen sınır ${target}. Uygulanan ortak oyuncu sınırı yayımlanmamış.`,
     hitPointsNotPublished: "yayımlanmayan sayıda",
@@ -1640,11 +1657,20 @@ const tr: MessageSchema<typeof en> = {
     diagnosticOnly:
       "İki ilk 11 aynı projeksiyonla karşılaştırılır. Aynı çarpana sahip ortak oyuncuların katkıları sadeleşir; kalan beklenen puanlar, kaptan çarpanları ve bu planın transfer cezaları beklenen farkı belirler.",
     unprovenPlanBadge: "Kanıt tamamlanamadı",
-    unprovenPlanBody: (gap: string) =>
-      `Çözücü bu plan için kanıtı tamamlayamadı (fark ≤ ${gap} puan). Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.`,
+    unprovenPlanBody: (gap) =>
+      `Çözücü bu plan için kanıtı tamamlayamadı. Planlayıcı amaç değeri, aramanın kanıtlayabildiği en iyi değere en fazla ${gap} uzaklıkta. Bu amaç değeri, ilk on bir (kaptan iki kat) artı yedeklerin onda biri eksi transfer cezalarıdır; yani bir puan toplamı değildir. Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.`,
+    unprovenPlanBodyWindow: (gap, weeks) =>
+      `Çözücü bu plan için kanıtı tamamlayamadı. Planın ${weeks} oyun haftasının tamamı için birlikte hesaplanan planlayıcı amaç değeri, aramanın kanıtlayabildiği en iyi değere en fazla ${gap} uzaklıkta. Bu amaç değeri, her haftanın ilk on biri (kaptan iki kat) artı yedeklerin onda biri eksi transfer cezalarıdır; ne bir puan toplamıdır ne de tek bir haftaya ait bir değerdir. Bu, aramanın bulduğu en iyi plan; en iyisi olduğu gösterilmiş bir plan değil.`,
     out: "Çıkan",
     in: "Giren",
-    projectedGain: (pointsValue) => `${pointsValue} tahmini kazanç`,
+    projectedGain: (pointsValue) => `ilk on bir için ${pointsValue} (kaptan iki kat)`,
+    projectedGainUnknown: "Bu hamlenin plandaki kazanç payı yayımlanmamış.",
+    moveRowsBasis:
+      "Her satır, o takas kendisinden önceki satırlara eklendiğinde ilk on birin (kaptan iki kat) ne kadar değiştiğini gösterir; bu yüzden satırlar aşağıdaki toplam kazancı verir.",
+    planGainVsHold: (pointsValue) =>
+      `Mevcut kadronu korumaya göre ${pointsValue} beklenen puan (ilk on bir, kaptan iki kat).`,
+    planGainVsHoldBeforeCost: (pointsValue, cost) =>
+      `Mevcut kadronu korumaya göre ${pointsValue} beklenen puan (ilk on bir, kaptan iki kat); bu haftanın ${cost} transfer maliyeti düşülmeden önce.`,
     weekTransferCost: (pointsValue) =>
       `Bu haftanın transferlerinin toplam beklenen puan maliyeti ~${pointsValue}: oyun haftayı ücretlendirir, her hamleyi ayrı ayrı değil.`,
     windowValueReason: "Yayımlanan puan tahminlerini kullanan çok haftalı planın bir parçası.",

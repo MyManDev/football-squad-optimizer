@@ -50,7 +50,7 @@ const move: Predicate = (value) =>
     move_id: text,
     player_out: nullable(player),
     player_in: nullable(player),
-    expected_points_delta: finite,
+    expected_points_delta: nullable(finite),
     reason_code: oneOf("window_value", "mode_tradeoff", "points_gain"),
   });
 const planWeek: Predicate = (value) =>
@@ -95,6 +95,7 @@ export function isAdvicePayload(value: unknown): boolean {
       rival_entry_id: identity,
       rival_label: nullable(text),
       transfer_hit_points: finite,
+      expected_gain_vs_hold: nullable(finite),
       expected_points_cost: finite,
       expected_points_cost_ceiling: finite,
       overlap_count: finite,

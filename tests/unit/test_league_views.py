@@ -985,18 +985,25 @@ def test_the_member_planning_hit_cost_reaches_the_published_bytes(
 # value is ``test_the_member_planning_hit_cost_reaches_the_published_bytes`` above, which
 # holds a discretionary member; the value itself is pinned in
 # ``tests/unit/test_live_transfers.py``.
-IN_SEASON_MEMBER_ADVICE_SHA256 = "5f197ac047d670817571365b37405eac1002099aab516a288dd68a845c466dad"
-# (player_out, player_in, expected_points_delta) per move, each pair one position. The
-# week's hit charge is not here because it is not a property of a move: this plan makes
-# two transfers and pays for one, and the payload states that once as
+IN_SEASON_MEMBER_ADVICE_SHA256 = "6623ae5ff4848e0952625b233b6e46af9271588c8c5697cc544b8b024215e6a2"
+# (player_out, player_in, expected_points_delta) per move, each pair one position. A
+# row is that swap's share of what the plan gains against holding the fifteen, measured
+# on the payload's own basis (the eleven with the captain doubled) with the rows above
+# it already applied, so the two rows add up to ``IN_SEASON_MEMBER_GAIN_VS_HOLD``. The
+# first row moves 0.5 rather than the 2.5 between the two players' own projections,
+# because the player leaving was not in the do-nothing eleven.
+#
+# The week's hit charge is not here because it is not a property of a move: this plan
+# makes two transfers and pays for one, and the payload states that once as
 # ``transfer_hit_points``. It is the game's 4, although the plan was solved under
 # MEMBER_PLANNING_POLICY's caution margin of 8: the margin decides what to do, the
 # charge is what the member is told, and only the second reaches these bytes.
 IN_SEASON_MEMBER_MOVES = (
-    (1005, 1009, 2.5),
-    (1020, 1024, 7.0),
+    (1005, 1009, 0.5),
+    (1020, 1024, 12.5),
 )
 IN_SEASON_MEMBER_TRANSFER_HIT_POINTS = 4.0
+IN_SEASON_MEMBER_GAIN_VS_HOLD = 13.0
 
 
 def test_the_recorded_in_season_member_plan_holds(world: dict[str, Any], tmp_path: Path) -> None:
@@ -1048,6 +1055,11 @@ def test_the_recorded_in_season_member_plan_holds(world: dict[str, Any], tmp_pat
     for move in payload["moves"]:
         assert move["player_out"]["position"] == move["player_in"]["position"]
     assert payload["transfer_hit_points"] == IN_SEASON_MEMBER_TRANSFER_HIT_POINTS
+    # The rows are the whole of the plan's gain against holding, split between them.
+    assert payload["expected_gain_vs_hold"] == IN_SEASON_MEMBER_GAIN_VS_HOLD
+    assert sum(move["expected_points_delta"] for move in payload["moves"]) == pytest.approx(
+        IN_SEASON_MEMBER_GAIN_VS_HOLD
+    )
     assert payload["mode"] == "saf-puan"
     assert payload["window"] == 1
     assert payload["expected_points_cost"] == 0.0

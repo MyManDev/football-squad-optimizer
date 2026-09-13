@@ -119,6 +119,14 @@ export function AdviceCard({
   const alternativePrice = unproven
     ? alternative?.expected_points_cost_ceiling
     : (alternative?.expected_points_cost_ceiling ?? alternative?.expected_points_cost);
+  // A bound on the planner's objective covers the whole plan at once, so the copy has to
+  // say how many gameweeks that is. A one-week document publishes no plan weeks.
+  const planWeeks = view.plan_weeks?.length ?? 1;
+  // A move row is a share of the plan's gain against holding, and only a document that
+  // publishes that gain carries shares of it. A document from before the producer did
+  // carries a different quantity on those rows, the raw difference between the two
+  // players' own projections, so its numbers are not printed under this label.
+  const rowsAreShares = view.expected_gain_vs_hold !== undefined;
   return (
     <Card
       title={copy.advice}
@@ -144,7 +152,9 @@ export function AdviceCard({
         <p className={styles.honesty}>
           <Badge tone="warn">{copy.unprovenPlanBadge}</Badge>{" "}
           {finiteNumber(view.optimality_gap)
-            ? copy.unprovenPlanBody(points(view.optimality_gap, 1, locale))
+            ? planWeeks > 1
+              ? copy.unprovenPlanBodyWindow(points(view.optimality_gap, 1, locale), planWeeks)
+              : copy.unprovenPlanBody(points(view.optimality_gap, 1, locale))
             : copy.unprovenPlanGapUnknown}
         </p>
       ) : null}
@@ -209,9 +219,14 @@ export function AdviceCard({
         <>
           <div className={styles.moves}>
             {view.moves.map((move) => (
-              <AdviceRow key={move.move_id} move={move} />
+              <AdviceRow key={move.move_id} move={move} measured={rowsAreShares} />
             ))}
           </div>
+          {/* Each row is conditional on the rows above it, which is what makes them add
+              up. Said once, and only where there is more than one row to read in order. */}
+          {rowsAreShares && view.moves.length > 1 ? (
+            <p className={styles.muted}>{copy.moveRowsBasis}</p>
+          ) : null}
           {/* The week's hit charge, once, because the game charges the week and not any
               one move. Absent on documents published before the producer stated it. */}
           {view.transfer_hit_points != null ? (
@@ -221,8 +236,24 @@ export function AdviceCard({
           ) : null}
         </>
       )}
+      {/* What the plan is worth against doing nothing, on the same basis as the rows
+          above it and as the lineup total below. Rendered only where the producer
+          measured it: a document without the number gets no sentence, not a zero. */}
+      {finiteNumber(view.expected_gain_vs_hold) ? (
+        <p className={styles.planCost}>
+          <strong className="num">
+            {finiteNumber(view.transfer_hit_points) && view.transfer_hit_points > 0
+              ? copy.planGainVsHoldBeforeCost(
+                  signedPoints(view.expected_gain_vs_hold, 1, locale),
+                  points(view.transfer_hit_points, 1, locale),
+                )
+              : copy.planGainVsHold(signedPoints(view.expected_gain_vs_hold, 1, locale))}
+          </strong>
+        </p>
+      ) : null}
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
       <LineupSection view={view} />
+      <StatedLimits view={view} />
       <WindowSection view={view} />
       <p className={styles.diagnostic}>{copy.diagnosticOnly}</p>
     </Card>
@@ -264,17 +295,46 @@ function RivalPlayers({
 }
 
 /**
- * A three- or five-week window: what it assumes, in the producer's own sentences, and
- * one row per gameweek — transfers, hit points, chip, expected points. The moves and
- * the lineup above are the first week's; the rest of the window lives here. Rendered
- * only when the producer published it, so a one-week document shows nothing extra.
+ * What the producer says this plan assumes, in its own sentences. It used to hang inside
+ * the window section, which meant a one-week document could publish a limit and show it
+ * to nobody: the one sentence that holds for every plan on this path is that no chip was
+ * ever offered to the solver, and without it a blank chip line reads as a chip that was
+ * weighed and turned down.
+ */
+function StatedLimits({ view }: { view: EntryAdvice }) {
+  const copy = useLanguage().messages.leagueMembers;
+  const limits = view.stated_limits ?? [];
+  if (limits.length === 0) return null;
+  const weeks = view.plan_weeks?.length ?? 1;
+  const label = weeks > 1 ? copy.windowLimitsLabel : copy.planLimitsLabel;
+  return (
+    <section className={styles.lineup} aria-label={label}>
+      <h4 className={styles.lineupSub}>{label}</h4>
+      <ul className={styles.limits}>
+        {limits.map((sentence) => (
+          <li key={sentence}>
+            {Object.hasOwn(copy.statedLimits, sentence)
+              ? copy.statedLimits[sentence]
+              : copy.statedLimitUnknown}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * A three- or five-week window: one row per gameweek — transfers, hit points, chip,
+ * expected points. The moves and the lineup above are the first week's; the rest of the
+ * window lives here. What the window assumes is stated above, beside every other plan's
+ * assumptions. Rendered only when the producer published it, so a one-week document shows
+ * nothing extra.
  */
 function WindowSection({ view }: { view: EntryAdvice }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const weeks = view.plan_weeks;
   if (!weeks || weeks.length === 0) return null;
-  const limits = view.stated_limits ?? [];
   const names = (players: AdvicePlayer[]) =>
     players.length === 0 ? "—" : players.map((player) => player.name).join(", ");
   const title = copy.windowTitle(weeks.length);
@@ -282,20 +342,6 @@ function WindowSection({ view }: { view: EntryAdvice }) {
     <section className={styles.window} aria-label={title}>
       <h3 className={styles.lineupTitle}>{title}</h3>
       <p className={styles.honesty}>{copy.windowRule}</p>
-      {limits.length > 0 ? (
-        <>
-          <h4 className={styles.lineupSub}>{copy.windowLimitsLabel}</h4>
-          <ul className={styles.limits}>
-            {limits.map((sentence) => (
-              <li key={sentence}>
-                {Object.hasOwn(copy.statedLimits, sentence)
-                  ? copy.statedLimits[sentence]
-                  : copy.statedLimitUnknown}
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
       <div className={styles.windowScroll}>
         <table className={styles.windowTable}>
           <thead>
@@ -439,7 +485,7 @@ function reasonFor(copy: MemberCopy, code: AdviceMove["reason_code"]): string {
   return copy.modeTradeoffReason;
 }
 
-function AdviceRow({ move }: { move: AdviceMove }) {
+function AdviceRow({ move, measured }: { move: AdviceMove; measured: boolean }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   return (
@@ -453,7 +499,11 @@ function AdviceRow({ move }: { move: AdviceMove }) {
         </span>
       </div>
       <div className={styles.moveNumbers}>
-        <span>{copy.projectedGain(points(move.expected_points_delta, 1, locale))}</span>
+        <span>
+          {measured && finiteNumber(move.expected_points_delta)
+            ? copy.projectedGain(signedPoints(move.expected_points_delta, 1, locale))
+            : copy.projectedGainUnknown}
+        </span>
       </div>
       <p className={styles.muted}>{reasonFor(copy, move.reason_code)}</p>
     </article>

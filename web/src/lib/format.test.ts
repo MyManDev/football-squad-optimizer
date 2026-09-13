@@ -16,6 +16,17 @@ describe("format", () => {
     expect(percent(0.74, 0, "tr-TR")).toBe("%74");
     expect(percent(0.74, 0, "en-GB")).toBe("74%");
   });
+  it("never signs a figure that rounds to zero", () => {
+    // A minus in front of a zero reads as a loss the printed digits do not show. The
+    // sign belongs to the number after rounding, not to the number before it.
+    expect(signedPoints(-0.04)).toBe("0.0");
+    expect(signedPoints(0.04)).toBe("0.0");
+    expect(signedPoints(-0)).toBe("0.0");
+    expect(signedPoints(-0.004, 2)).toBe("0.00");
+    expect(signedPoints(-0.04, 2)).toBe("−0.04");
+    expect(signedPoints(-0.06)).toBe("−0.1");
+    expect(signedPoints(-0.04, 1, "tr-TR")).toBe("0,0");
+  });
   it("counts down in days and hours, and closes", () => {
     const now = new Date("2026-08-19T10:00:00Z");
     const en = { closed: "closed", day: "d" };

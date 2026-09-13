@@ -187,7 +187,14 @@ export interface AdviceMove {
   move_id: string;
   player_out: AdvicePlayer | null;
   player_in: AdvicePlayer | null;
-  expected_points_delta: number;
+  /**
+   * This swap's share of what the plan gains against holding the squad, on the payload's
+   * own basis: the eleven with the captain doubled, before the week's hit charge. The
+   * rows are cumulative in the order they are published and add up to
+   * `expected_gain_vs_hold`. Null where the producer could not measure the row, which is
+   * not the same fact as a swap that gains nothing.
+   */
+  expected_points_delta: number | null;
   reason_code: "window_value" | "mode_tradeoff" | "points_gain";
 }
 
@@ -272,6 +279,14 @@ export interface EntryAdvice {
    * published before the producer stated it here (they carried it on every move row).
    */
   transfer_hit_points?: number;
+  /**
+   * What the whole plan is worth against keeping the fifteen already held, on the same
+   * basis as `expected_own_points` and as every move row: the eleven with the captain
+   * doubled, before the week's hit charge above. Equal to the sum of the move rows.
+   * Null where the producer could not measure it; absent on documents published before
+   * the producer carried it.
+   */
+  expected_gain_vs_hold?: number | null;
   /**
    * The whole plan's expected-points price against the pure-points pick — the only
    * cross-mode number the producer publishes (never a probability). Absent on documents
