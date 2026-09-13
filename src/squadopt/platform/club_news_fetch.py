@@ -112,6 +112,23 @@ class ClubSource:
         parsed = urllib.parse.urlsplit(self.url)
         return f"{parsed.scheme}://{parsed.netloc}"
 
+    @property
+    def address(self) -> str:
+        """The URL under the one normalisation the standards actually license.
+
+        Used to tell two registry entries apart. Host names are case-insensitive, so
+        ``Club.example`` and ``club.example`` are one address; paths are case-sensitive, so
+        ``/team-news`` and ``/Team-News`` are two, and folding them would refuse a registry
+        that is telling the truth. Nothing else is normalised -- no trailing slash, no query
+        reordering -- because a guess about which of two spellings a host considers the same
+        page is exactly the kind of guess this module does not make.
+        """
+
+        parsed = urllib.parse.urlsplit(self.url)
+        return urllib.parse.urlunsplit(
+            (parsed.scheme.lower(), parsed.netloc.lower(), parsed.path, parsed.query, "")
+        )
+
 
 def load_club_sources(path: Path | str) -> tuple[ClubSource, ...]:
     """Read the registry of pages this project may fetch, or refuse it.
@@ -122,8 +139,21 @@ def load_club_sources(path: Path | str) -> tuple[ClubSource, ...]:
     configuration. The pointer is required to exist and is not followed here -- checking
     that a human wrote something is this function's job; judging what they wrote is not.
 
-    A club may appear once. Two entries for one club would make "which page is this club's"
-    a question with two answers, and the evidence table joins on the club.
+    **A club may register more than one page; an address may be registered once.** The
+    earlier rule was the other way round, and its reason -- that two entries for one club
+    would make "which page is this club's" a question with two answers -- asked the wrong
+    question. Nothing downstream joins a claim to a club's page: a claim cites a *document*,
+    by digest and byte span (:class:`~squadopt.data.sources.club_news_claims.ParsedClaim`),
+    and that pointer has one answer however many pages the club publishes. The end-to-end
+    test found the limit from the other side: a club that puts its team news and its injury
+    table on separate pages could not be registered at all, though every layer below here
+    already carries several documents and codes them in one call.
+
+    The real duplicate is a repeated address. The same page registered twice is fetched
+    twice, offered to the model twice, and yields the same claim twice from two identical
+    digests -- a duplication the registry created, about a club that said something once.
+    Hosts are compared case-insensitively because host names are; paths are not, because
+    they are not.
     """
 
     location = Path(path)
@@ -168,13 +198,15 @@ def load_club_sources(path: Path | str) -> tuple[ClubSource, ...]:
                 "registered only after somebody read that host's terms and wrote down what "
                 "they said; without that pointer this entry is a permission nobody gave."
             )
-        if club.casefold() in seen:
+        source = ClubSource(club=club, url=url)
+        if source.address in seen:
             raise ClubNewsFetchError(
-                f"{location} registers {club!r} twice. One club has one page here, or "
-                "'which page is this club's' has two answers."
+                f"{location} registers {url!r} twice. A club may have several pages, but one "
+                "page registered twice is read twice and coded twice, which would put the "
+                "same sentence in the evidence table as two claims."
             )
-        seen.add(club.casefold())
-        sources.append(ClubSource(club=club, url=url))
+        seen.add(source.address)
+        sources.append(source)
     return tuple(sources)
 
 

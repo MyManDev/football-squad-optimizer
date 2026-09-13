@@ -15,8 +15,8 @@ two are not confused:
   disallowed path, recording that club as **not covered** rather than reading it anyway.
 - It treats a `robots.txt` that cannot be read as an unanswered question, not as consent.
   "We could not ask" is not "they said yes".
-- It sends one identity (`squadopt/1.0`), reads one registered path per club per run, and
-  follows no links.
+- It sends one identity (`squadopt/1.0`), reads only registered paths — a club may have more
+  than one, in the order the registry declares them — and follows no links.
 
 None of that is a terms reading. A host can allow a crawler in `robots.txt` and forbid the
 use in its terms, and the second is what the table below is for.
