@@ -7,7 +7,6 @@ import hashlib
 import json
 import secrets
 import shutil
-import subprocess
 import sys
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, replace
@@ -41,8 +40,9 @@ from squadopt.application.weekly_plan import (
     prepare_week,
     rotation_artifact,
 )
-from squadopt.data.errors import DataError
+from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
+from squadopt.data.source_revision import source_revision
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
 from squadopt.features.rotation_evidence_artifact import read_rotation_evidence_artifact
 from squadopt.live import handoff_path_for, load_entry, read_projection_handoff, read_season_rules
@@ -818,24 +818,44 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _revision(workspace: Path, supplied: str | None) -> str:
-    import re
+    """The revision every stage of this week's journal is declared under.
 
-    value = supplied
-    if (workspace / ".git").exists():
-        value = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=workspace, text=True
-        ).strip()
-        if supplied is not None and value != supplied:
-            raise WeekError("Supplied source revision differs from the workspace HEAD.")
-        if subprocess.check_output(
-            ["git", "status", "--porcelain"], cwd=workspace, text=True
-        ).strip():
-            raise WeekError("Weekly evidence requires a clean source checkout.")
-    if value is None or not re.fullmatch(r"[0-9a-f]{40}", value):
+    An **identity** use, so it refuses rather than publishing absence, and the strictest of
+    the four: this value is the journal declaration a resume reads back and the base
+    ``check_publication_base`` compares against.
+
+    Both refusals stay here rather than moving into the shared resolver, and for one reason.
+    Resolving a revision and holding a workspace to release discipline are different jobs: a
+    container image has no checkout to be clean and no HEAD to contradict, and a resolver that
+    enforced either would refuse a correct deployment. A weekly run is the opposite case. Its
+    ``--workspace`` *is* the source tree, the point of stamping a revision is that someone can
+    later rebuild the week from it, and a tree that is modified or is not on the declared
+    commit makes that impossible. So the resolver answers and this function judges.
+
+    Unlike the other three this one asks about the workspace it was pointed at rather than the
+    package's own checkout, for the same reason.
+    """
+
+    try:
+        revision = source_revision(declared=supplied, workspace=workspace)
+    except SourceRevisionError as error:
+        raise WeekError(str(error)) from error
+    if revision is None:
         raise WeekError(
             "A non-Git workspace requires --repository-commit with a full source revision."
         )
-    return value
+    if revision.checkout is not None:
+        if revision.checkout.head != revision.commit:
+            # Named by origin because it is no longer only ``--repository-commit`` that can
+            # reach here: an exported SQUADOPT_REPOSITORY_COMMIT does too, and an operator
+            # told only that "the supplied revision" is wrong would go looking at the flag.
+            raise WeekError(
+                f"The {revision.origin} source revision {revision.commit} differs from the "
+                f"workspace HEAD {revision.checkout.head}."
+            )
+        if revision.checkout.modified:
+            raise WeekError("Weekly evidence requires a clean source checkout.")
+    return revision.commit
 
 
 def main(argv: list[str] | None = None) -> int:

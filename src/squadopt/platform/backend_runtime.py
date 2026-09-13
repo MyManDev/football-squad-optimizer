@@ -29,8 +29,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
-import subprocess
 import threading
 import time
 from collections.abc import Callable, Mapping
@@ -44,6 +42,8 @@ from squadopt.application.advice_capabilities import (
 )
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.application.strategies import STRATEGY_CATALOG
+from squadopt.data.errors import SourceRevisionError
+from squadopt.data.source_revision import require_source_revision
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.platform.advice_cache import FileAdviceCache
 from squadopt.platform.advice_job_spec import AdviceJobSpecStore, FileAdviceJobSpecStore
@@ -74,8 +74,6 @@ __all__ = [
     "computable_strategies",
     "configuration_fingerprint",
 ]
-
-_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 CANONICAL_SITE_ORIGIN = "https://squadopt.mymandev.com"
 """The address members open, and therefore the ``Origin`` a real browser sends.
@@ -150,38 +148,27 @@ def configuration_fingerprint() -> str:
 
 
 def _repository_commit() -> str:
-    """The commit this deployment runs, from the environment or from git.
+    """The commit this deployment runs, resolved by the one resolver that answers that.
 
-    The environment comes first because a container image carries no ``.git``: the build
-    stamps the commit in. The git fallback is what makes a developer's local two-process
-    run work without ceremony.
+    An **identity** use, so it refuses rather than publishing absence: this value is hashed
+    into ``advice_cache_key`` and stored on the job spec, and a key assembled without one of
+    its ingredients is a key that collides across builds. A deployment that cannot name its
+    own code may not fill a cache.
+
+    It deliberately does not ask whether the checkout matched. A container image carries no
+    checkout to compare against -- that is why the build stamps
+    ``SQUADOPT_REPOSITORY_COMMIT`` in -- and a developer running two processes out of a tree
+    they are editing still needs a cache key, which the commit alone gives them.
     """
 
-    supplied = os.environ.get("SQUADOPT_REPOSITORY_COMMIT", "").strip().lower()
-    if not supplied:
-        # OSError, not just a non-zero exit: the deployment image carries neither .git nor
-        # git itself, so the fallback raises FileNotFoundError rather than failing. Letting
-        # that escape turned "the build forgot its build-arg" — the one mistake this code
-        # exists to name — into a traceback at request time.
-        try:
-            result = subprocess.run(
-                ["git", "-C", str(Path(__file__).resolve().parents[3]), "rev-parse", "HEAD"],
-                capture_output=True,
-                check=False,
-                text=True,
-                shell=False,
-            )
-        except OSError:
-            result = None
-        if result is not None and result.returncode == 0:
-            supplied = result.stdout.strip().lower()
-    if not _COMMIT_PATTERN.fullmatch(supplied):
+    try:
+        return require_source_revision().commit
+    except SourceRevisionError as error:
         raise BackendConfigError(
             "Could not resolve a 40-character repository commit; set "
             "SQUADOPT_REPOSITORY_COMMIT. It is part of every answer's identity, so a "
             "deployment that cannot name its own code may not fill a cache."
-        )
-    return supplied
+        ) from error
 
 
 @dataclass(frozen=True, slots=True)

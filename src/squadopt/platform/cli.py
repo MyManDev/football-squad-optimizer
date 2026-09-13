@@ -10,9 +10,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
-import re
-import subprocess
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
@@ -36,7 +33,7 @@ from squadopt.application import (
     verify_decision,
 )
 from squadopt.application.commands import PanelBuilder
-from squadopt.data.errors import DataError
+from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import (
     METADATA_FILENAME,
     PAYLOAD_DIRECTORY,
@@ -45,6 +42,7 @@ from squadopt.data.snapshots import (
     list_snapshot_ids,
     read_snapshot,
 )
+from squadopt.data.source_revision import source_revision
 from squadopt.data.sources import FPL_LIVE_SOURCE
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
@@ -78,7 +76,6 @@ COMPONENT_VERSIONS: Final[dict[str, str]] = {
     "application_commands": "application_commands_v1",
     "platform_runtime": "runtime_v1",
 }
-_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 _PLAN_KEYS = ("latest_capture", "next_gameweek", "next_deadline_utc", "hours_to_deadline")
 
 Verifier = DecisionVerifier
@@ -346,28 +343,33 @@ def _write_request(paths: _Paths, document: dict[str, object]) -> tuple[Path, st
     return target, fingerprint
 
 
-def _git_commit(workspace: Path, supplied: str | None) -> str:
-    candidates = [supplied, os.environ.get("SQUADOPT_REPOSITORY_COMMIT")]
-    roots = (workspace, Path(__file__).resolve().parents[3])
-    for root in roots:
-        if any(candidates):
-            break
-        result = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "HEAD"],
-            capture_output=True,
-            check=False,
-            text=True,
-            shell=False,
-        )
-        if result.returncode == 0:
-            candidates.append(result.stdout.strip())
-    value = next((candidate for candidate in candidates if candidate), "").lower()
-    if not _COMMIT_PATTERN.fullmatch(value):
+def _git_commit(supplied: str | None) -> str:
+    """The commit this run's manifest declares, resolved by the one resolver that answers that.
+
+    An **identity** use, so it refuses rather than publishing absence: the run manifest pins
+    this field to ``^[0-9a-f]{40}$`` and requires it, so there is no absent spelling to write.
+
+    It asks about the checkout this code was imported from, not about ``--workspace-root``.
+    The workspace is a data boundary -- it is routinely a directory with no repository in it
+    at all -- and the question the manifest asks is which commit produced the build, which is
+    a fact about the code that is running. The previous implementation reached the same
+    answer by accident, trying the workspace first and relying on ``git -C`` walking up out
+    of it; naming the source tree directly says what was always meant.
+    """
+
+    try:
+        resolved = source_revision(declared=supplied)
+    except SourceRevisionError as error:
+        # Something named a commit and it was not one. Reported as the resolver phrased it,
+        # naming the offending value: "could not resolve" would send an operator looking for
+        # a missing revision when what they have is a mistyped one.
+        raise DataError(str(error)) from error
+    if resolved is None:
         raise DataError(
             "Could not resolve a 40-character repository commit; pass --repository-commit "
             "or SQUADOPT_REPOSITORY_COMMIT."
         )
-    return value
+    return resolved.commit
 
 
 def _deduplicate(inputs: Iterable[_Input]) -> tuple[_Input, ...]:
@@ -397,7 +399,7 @@ def _runtime(
         fingerprints[name] = artifact_checksum(item.path)
         runtime_inputs.append(RuntimeInputArtifact(item.path, item.kind, item.schema_version, name))
     context = RunContext.create(
-        repository_commit=_git_commit(paths.workspace, arguments.repository_commit),
+        repository_commit=_git_commit(arguments.repository_commit),
         configuration_fingerprint=config_fingerprint,
         input_fingerprints=fingerprints,
         deterministic_seed=arguments.seed,

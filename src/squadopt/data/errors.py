@@ -70,6 +70,16 @@ class SnapshotIntegrityError(SnapshotError):
     """
 
 
+class SourceRevisionError(DataError):
+    """Raised when the commit that produced this build cannot be named, or is contradicted.
+
+    Both halves are the same failure: something asked which commit it is running and got no
+    answer it can stand behind. A caller that needs the revision as an identity lets this
+    out; a caller that only describes the build catches it, or asks for the outcome that
+    returns nothing instead.
+    """
+
+
 class AtomicWriteError(DataError):
     """Raised when a create-once write cannot be completed or its occupant cannot be read."""
 
