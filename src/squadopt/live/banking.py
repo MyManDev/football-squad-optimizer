@@ -52,7 +52,18 @@ def banked_free_transfers(
       checked for every week, and a week that breaks it means the model is wrong, so
       the count is reported unknown rather than trusted.
     * Under a Wildcard or Free Hit the transfers consume nothing and cost nothing, and
-      the bank is kept and still gains its one the week after.
+      the bank saved from earlier weeks is kept. That week's own free transfer is not
+      kept: activating either chip uses it up, which is why a member who plays one comes
+      out of the week with what they went in with rather than one more. The game states
+      both halves of this, in the transfer rules ("when playing either a Wildcard or your
+      Free Hit chip, any saved free transfers are retained for the following Gameweek")
+      and in its own answer to a member who thinks a transfer went missing ("when either
+      chip is played, the free transfer received for that Gameweek is used up as part of
+      activating the chip").
+
+    The cost identity cannot see a chip week, because a chip week is charged nothing
+    whatever the bank held. So ``known`` says the history was complete and every cost it
+    records agrees with this model, not that the game confirmed the number.
 
     A member whose rows do not start at gameweek 1 or skip a week up to ``gameweek``
     is reported unknown: a late joiner's opening week is not modelled here. The captured
@@ -82,6 +93,10 @@ def banked_free_transfers(
     for w in range(1, week + 1):
         row = history.weeks[w]
         unlimited = w == 1 or w in chip_weeks
+        # The week's own free transfer: none before the first deadline, where the squad is
+        # built with unlimited changes, and none in a Wildcard or Free Hit week, where
+        # activating the chip uses it up. Earlier savings are untouched either way.
+        available = min(max_free_transfers, available + (0 if unlimited else 1))
         consumed = 0 if unlimited else min(row.transfers, available)
         expected = 0 if unlimited else (row.transfers - consumed) * TRANSFER_HIT_POINTS
         if row.cost != expected:
@@ -91,5 +106,8 @@ def banked_free_transfers(
                 f"gameweek {w} recorded {row.transfers} transfers costing {row.cost} points, "
                 f"but with {available} free the banking model expects {expected}",
             )
-        available = min(max_free_transfers, available - consumed + 1)
-    return BankedFreeTransfers(available, True)
+        available -= consumed
+    # The coming deadline's own free transfer. No chip has been played in that week yet,
+    # so it is granted here; a member who then plays a Wildcard or Free Hit spends it on
+    # the chip, which the next derivation sees once the week is in the history.
+    return BankedFreeTransfers(min(max_free_transfers, available + 1), True)

@@ -321,8 +321,9 @@ def test_a_capture_stores_the_pre_free_hit_picks_beside_the_played_week(
 
 def test_the_free_transfers_are_the_captured_weeks_not_the_basis_weeks() -> None:
     """A Free Hit voids the squad, not the bank of free transfers: the count for the GW4
-    deadline is derived through the chip week (none, one, two, kept, three), while the
-    GW2 basis document would only know the two held at the GW3 deadline."""
+    deadline is derived through the chip week (none at GW1, one for GW2, one saved into
+    GW3 whose own transfer paid for the chip, then one more for GW4), while the GW2 basis
+    document would not know the chip week at all."""
 
     bootstrap = {
         **json.loads(_bootstrap()),
@@ -341,7 +342,7 @@ def test_the_free_transfers_are_the_captured_weeks_not_the_basis_weeks() -> None
     )
     picks = provider.picks(ENTRY, "2026-27", 3)
     assert picks.squad_basis == pre_free_hit_basis(2)
-    assert (picks.free_transfers, picks.free_transfers_known) == (3, True)
+    assert (picks.free_transfers, picks.free_transfers_known) == (2, True)
 
 
 # --- one member's refusal does not sink the league ------------------------------------

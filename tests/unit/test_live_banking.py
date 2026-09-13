@@ -57,13 +57,34 @@ def test_transfers_consume_the_bank_before_any_hit_is_paid() -> None:
 
 
 @pytest.mark.parametrize("chip", ["freehit", "wildcard"])
-def test_a_transfer_chip_week_consumes_nothing_and_the_bank_keeps_growing(chip: str) -> None:
+def test_a_transfer_chip_keeps_the_savings_and_spends_that_weeks_own_transfer(chip: str) -> None:
     rows = [_row(1), _row(2), _row(3, transfers=9), _row(4)]
     chips = [{"name": chip, "event": 3}]
-    assert _banked(rows, gameweek=3, chips=chips) == BankedFreeTransfers(3, True)
-    assert _banked(rows, gameweek=4, chips=chips) == BankedFreeTransfers(4, True)
+    # One was saved from gameweek 2 and survives the chip. Gameweek 3's own free transfer
+    # paid for playing it, so the member leaves the week with the one they came in with.
+    assert _banked(rows, gameweek=3, chips=chips) == BankedFreeTransfers(2, True)
+    assert _banked(rows, gameweek=4, chips=chips) == BankedFreeTransfers(3, True)
     # The captured week's own chip is read from the picks document as well.
-    assert _banked(rows, gameweek=3, active_chip=chip) == BankedFreeTransfers(3, True)
+    assert _banked(rows, gameweek=3, active_chip=chip) == BankedFreeTransfers(2, True)
+
+
+@pytest.mark.parametrize("chip", ["freehit", "wildcard"])
+def test_a_transfer_chip_week_ends_one_lower_than_the_same_week_without_it(chip: str) -> None:
+    """The rule the game states twice, as a difference against an otherwise identical week.
+
+    "When either chip is played, the free transfer received for that Gameweek is used up
+    as part of activating the chip. Any free transfers already saved up from earlier
+    Gameweeks are not affected" (the game's own answer to a member missing a transfer),
+    and "any saved free transfers are retained for the following Gameweek" (transfer
+    rules). Bench Boost changes no squad, so it is not a transfer chip and grants as usual.
+    """
+
+    rows = [_row(week) for week in range(1, 5)]
+    quiet = _banked(rows, gameweek=4).count
+    played = _banked(rows, gameweek=4, chips=[{"name": chip, "event": 3}]).count
+    assert played == quiet - 1
+    held = _banked(rows, gameweek=4, chips=[{"name": "bboost", "event": 3}]).count
+    assert held == quiet
 
 
 def test_bench_boost_and_triple_captain_leave_the_banking_untouched() -> None:
@@ -181,23 +202,26 @@ def test_the_provider_keeps_the_floor_when_the_capture_states_no_cap() -> None:
 # per week (transfers, cost), the chips played, and the count the model derives for the
 # GW4 deadline. Every recorded hit, including the two paid ones (7018833 GW3 with two free
 # and 8548384 GW2 with one), is reproduced by the model, which is the cross-check that
-# earns the flag. Eight of the fifteen held two or three, not the one assumed before.
+# earns the flag, and it cannot see a chip week, which is charged nothing whatever the
+# bank held. Eight of the fifteen held two or three, not the one assumed before. The
+# three who played a Wildcard or a Free Hit hold one fewer than an accrual that credits
+# a chip week: that week's own free transfer went on the chip.
 REAL_GW3_CAPTURE = (
     (2199732, ((0, 0), (1, 0), (0, 0)), (), 2),
     (2281624, ((0, 0), (1, 0), (1, 0)), (("bboost", 1), ("3xc", 3)), 1),
     (313686, ((0, 0), (0, 0), (1, 0)), (("bboost", 1),), 2),
     (3832237, ((0, 0), (0, 0), (0, 0)), (("3xc", 1),), 3),
-    (4287206, ((0, 0), (0, 0), (0, 0)), (("freehit", 3),), 3),
+    (4287206, ((0, 0), (0, 0), (0, 0)), (("freehit", 3),), 2),
     (5081114, ((0, 0), (1, 0), (1, 0)), (), 1),
     (5349883, ((0, 0), (1, 0), (0, 0)), (("bboost", 1),), 2),
-    (5662073, ((0, 0), (0, 0), (0, 0)), (("freehit", 3),), 3),
+    (5662073, ((0, 0), (0, 0), (0, 0)), (("freehit", 3),), 2),
     (6654210, ((0, 0), (0, 0), (2, 0)), (("3xc", 3),), 1),
     (6879786, ((0, 0), (1, 0), (0, 0)), (), 2),
     (6880255, ((0, 0), (0, 0), (2, 0)), (), 1),
     (7018833, ((0, 0), (0, 0), (3, 4)), (("bboost", 3),), 1),
     (7252721, ((0, 0), (0, 0), (2, 0)), (), 1),
     (8548384, ((0, 0), (2, 4), (1, 0)), (("3xc", 3),), 1),
-    (8883467, ((0, 0), (0, 0), (0, 0)), (("wildcard", 2), ("3xc", 3)), 3),
+    (8883467, ((0, 0), (0, 0), (0, 0)), (("wildcard", 2), ("3xc", 3)), 2),
 )
 
 
