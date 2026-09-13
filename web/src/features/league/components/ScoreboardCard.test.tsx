@@ -142,7 +142,7 @@ function renderSection(language: Language = "en") {
 }
 
 describe("scoreboard card", () => {
-  it("shows four measured errors on a settled week and empty cells on an unsettled one", () => {
+  it("shows four measured errors on a settled week and dashes on an unsettled one", () => {
     const value = structuredClone(scoreboard);
     value.payload.gameweeks[0].ours!.diagnostics = {
       zero_minute_starters: 0,
@@ -155,13 +155,31 @@ describe("scoreboard card", () => {
     const rows = container.querySelectorAll("tbody tr");
     expect([...rows[0].querySelectorAll("td")].slice(-4).map((cell) => cell.textContent)).toEqual([
       "0",
-      "-12.0",
-      "2.5",
+      "−12.0",
+      "+2.5",
       "3.0",
     ]);
     for (const cell of [...rows[1].querySelectorAll("td")].slice(-4))
-      expect(cell).toBeEmptyDOMElement();
+      expect(cell).toHaveTextContent(/^—$/);
   });
+  it.each(["en", "tr"] as const)(
+    "explains all nine value columns even without comparisons or diagnostics in %s",
+    (language) => {
+      const { container } = renderCard(scoreboard, language);
+      const copy = MESSAGES[language];
+      expect(screen.getByText(copy.scoreboardComparisons.missing)).toBeVisible();
+      expect(screen.queryByRole("heading", { name: copy.scoreboardComparisons.title })).toBeNull();
+      const table = screen.getByRole("table", { name: copy.leagueScoreboard.caption });
+      expect(table.querySelectorAll("thead th")).toHaveLength(10);
+      for (const label of ["zero", "minutes", "captain", "autosub"] as const)
+        expect(table.querySelector("caption")?.textContent?.toLocaleLowerCase()).toContain(
+          copy.scoreboardComparisons[label].toLocaleLowerCase(),
+        );
+      for (const row of container.querySelectorAll("tbody tr, tfoot tr"))
+        for (const cell of [...row.querySelectorAll("td")].slice(-4))
+          expect(cell).toHaveTextContent(/^—$/);
+    },
+  );
   it("labels different scoring bases on their rows and does not combine their totals", () => {
     const value = structuredClone(scoreboard);
     value.payload.gameweeks[1].ours!.net = 30;

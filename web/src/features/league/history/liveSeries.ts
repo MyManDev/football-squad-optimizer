@@ -70,7 +70,11 @@ export function summarizeLiveSeries(histories: SuggestionHistory[], view: Scoreb
 
 export type LiveSeries = ReturnType<typeof summarizeLiveSeries>;
 
-/** The measurement owner supplies the horizon. No effect size or dependence is assumed here. */
+/**
+ * The measurement owner supplies the horizon: docs/contracts/member_week_horizon_v1.md.
+ * Correlation is required evidence that within-week dependence was measured. It is
+ * validated here, never defaulted, displayed or used to estimate a target in the browser.
+ */
 export function remainingWeeks(
   value: unknown,
   series: LiveSeries,

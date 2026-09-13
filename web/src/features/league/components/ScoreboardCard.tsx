@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { points } from "../../../lib/format";
+import { points, signedPoints } from "../../../lib/format";
 import { LeagueDataMissing, loadScoreboard } from "../data";
 import type { LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import styles from "./ScoreboardCard.module.css";
@@ -158,16 +158,17 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
                       : points(total.average_entry_score, 0, locale)}
                   </td>
                   <td className={`${styles.right} num`}>—</td>
-                  <td />
-                  <td />
-                  <td />
-                  <td />
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
       )}
+      <p className={styles.notice}>{messages.scoreboardComparisons.missing}</p>
       {anyGross && <p className={styles.notice}>{copy.grossNote}</p>}
       <ScoreboardComparisons weeks={view.gameweeks} />
       {anyProvisional && <p className={styles.notice}>{copy.provisionalNote}</p>}
@@ -245,8 +246,10 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
       ].map((value, index) => (
         <td key={index} className={`${styles.right} num`}>
           {value != null && Number.isFinite(value)
-            ? points(value, index === 0 ? 0 : 1, locale)
-            : null}
+            ? index === 1 || index === 2
+              ? signedPoints(value, 1, locale)
+              : points(value, index === 0 ? 0 : 1, locale)
+            : "—"}
         </td>
       ))}
     </tr>

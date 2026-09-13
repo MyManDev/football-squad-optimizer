@@ -101,12 +101,21 @@ describe("member-week series", () => {
       null,
       {},
       { ...measurement, within_week_correlation: null },
+      { ...measurement, within_week_correlation: undefined },
+      { ...measurement, within_week_correlation: Number.NaN },
+      { ...measurement, within_week_correlation: Infinity },
+      { ...measurement, within_week_correlation: 1.01 },
+      { ...measurement, within_week_correlation: -1.01 },
       { ...measurement, scoring_basis: "named_eleven_no_autosubs" },
       { ...measurement, member_week_keys: measurement.member_week_keys.slice(1) },
       { ...measurement, required_week_clusters: 2.5 },
     ]) {
       expect(remainingWeeks(invalid, series, view)).toBeNull();
     }
+    for (const correlation of [-1, 0, 1])
+      expect(
+        remainingWeeks({ ...measurement, within_week_correlation: correlation }, series, view),
+      ).toBe(11);
     const one = summarizeLiveSeries([history], { ...view, gameweeks: view.gameweeks.slice(0, 1) });
     expect(
       remainingWeeks(

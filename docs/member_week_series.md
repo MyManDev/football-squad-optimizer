@@ -18,7 +18,7 @@ missing frozen inputs are never reconstructed by assumption to make it comparabl
 Both member scores use the existing history v1 scoring contract: official substitutions
 and captain fallback, chip handling, and transfer costs deducted on both sides. Every
 displayed pair identifies this scoring basis and the population of members who have both
-a recorded suggestion and an actual score. Unsettled error cells are empty, while a
+a recorded suggestion and an actual score. Unsettled error cells show an em dash (—), while a
 measured zero remains a zero.
 
 ## Optional measurement handoff
@@ -31,18 +31,9 @@ consumes its published result; the optional shape below is the current consumer 
 to align with that producer when it lands, not an implementation of the measurement.
 
 When that measurement exists, publish `data/league/series-horizon.json` beside the
-scoreboard. This is an optional `member_week_horizon_v1` consumer contract:
-
-| Field                     | Required meaning                                                                                                  |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `contract_version`        | `member_week_horizon_v1`                                                                                          |
-| `season`, `league_id`     | Exact scoreboard identity                                                                                         |
-| `scoring_basis`           | `official_autosub_captain_v2`                                                                                     |
-| `population`              | `recorded_member_suggestions_vs_actual`                                                                           |
-| `measurement_artifact`    | `docs/<slug>.json`, a committed measurement with its measurements-index entry                                     |
-| `within_week_correlation` | Finite measured value from -1 to 1; consumed but never rendered                                                   |
-| `required_week_clusters`  | Measured total week target, an integer of at least two; its measurement must declare the target effect and method |
-| `member_week_keys`        | Exact set of evaluated records: `<entry id>:<gameweek>:<advice sha256>:<outcome snapshot id>`                     |
+scoreboard. The standalone [member week horizon v1 contract](contracts/member_week_horizon_v1.md)
+and its [JSON schema](contracts/member_week_horizon_v1.schema.json) define the required
+fields, producer responsibilities and the reason within-week correlation is mandatory.
 
 The consumer requires at least two settled week groups and an exact match of record keys,
 including their captured provenance. A stale, malformed, missing or differently scoped

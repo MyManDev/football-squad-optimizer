@@ -23,7 +23,7 @@ historical source is reconstructed.
 ## Measurements
 
 All four diagnostic keys are present. Missing evidence is JSON `null`, never a
-measured zero. The web table shows missing measurements as `-` in both languages.
+measured zero. The web table shows missing measurements as `—` in both languages.
 
 | Diagnostic | Definition |
 | --- | --- |

@@ -91,6 +91,9 @@ for (const language of ["en", "tr"] as const) {
     await expect(page.getByText(copy.liveSeries.accumulated(2, 2))).toBeVisible();
     await expect(page.getByText(copy.liveSeries.unknown)).toBeVisible();
     await expect(page.getByText(copy.leagueScoreboard.mixedBases)).toBeVisible();
+    await expect(page.getByText(copy.scoreboardComparisons.missing)).toBeVisible();
+    const scoreboard = page.getByRole("table", { name: copy.leagueScoreboard.caption });
+    await expect(scoreboard.getByRole("columnheader")).toHaveCount(10);
     const card = page
       .locator("section")
       .filter({ has: page.getByRole("heading", { name: copy.liveSeries.title, exact: true }) });
@@ -126,5 +129,16 @@ for (const language of ["en", "tr"] as const) {
     );
     await page.reload();
     await expect(page.getByText(copy.liveSeries.remaining(10))).toBeVisible();
+    for (const week of view.gameweeks) delete week.ours!.diagnostics;
+    await page.reload();
+    await expect(page.getByText(copy.scoreboardComparisons.missing)).toBeVisible();
+    for (const row of await scoreboard.locator("tbody tr, tfoot tr").all()) {
+      const cells = await row.locator("td").allTextContents();
+      expect(cells.slice(-4)).toEqual(["—", "—", "—", "—"]);
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await scoreboard
+      .locator("..")
+      .screenshot({ path: testInfo.outputPath("scoreboard-missing.png") });
   });
 }

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { points } from "../../../lib/format";
+import { points, signedPoints } from "../../../lib/format";
 import { loadLiveSeries, type LiveSeries } from "../history/liveSeries";
 import type { Scoreboard } from "../types";
 import styles from "./ScoreboardCard.module.css";
@@ -48,7 +48,7 @@ export function LiveSeriesCard({
       <p className={styles.notice}>{copy.limits}</p>
       {unavailableMembers > 0 && <p>{copy.missing(unavailableMembers)}</p>}
       {series.meanDifference !== null && (
-        <p>{copy.mean(points(series.meanDifference, 1, locale))}</p>
+        <p>{copy.mean(signedPoints(series.meanDifference, 1, locale))}</p>
       )}
       {series.rows.length > 0 && (
         <>
@@ -67,7 +67,7 @@ export function LiveSeriesCard({
                   <tr key={week.gameweek}>
                     <th scope="row">{week.gameweek}</th>
                     <td>{week.members}</td>
-                    <td>{points(week.meanDifference, 1, locale)}</td>
+                    <td>{signedPoints(week.meanDifference, 1, locale)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -109,7 +109,7 @@ export function LiveSeriesCard({
                     </td>
                     <td>{points(row.suggested, 1, locale)}</td>
                     <td>{points(row.actual, 1, locale)}</td>
-                    <td>{points(row.difference, 1, locale)}</td>
+                    <td>{signedPoints(row.difference, 1, locale)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,5 +1,5 @@
 import { useLanguage } from "../../../i18n/context";
-import { points } from "../../../lib/format";
+import { points, signedPoints } from "../../../lib/format";
 import type { ScoreboardGameweek } from "../types";
 import styles from "./ScoreboardCard.module.css";
 
@@ -8,12 +8,15 @@ export function ScoreboardComparisons({ weeks }: { weeks: ScoreboardGameweek[] }
   const copy = messages.scoreboardComparisons;
   if (!weeks.some((week) => Array.isArray(week.comparisons) && week.comparisons.length))
     return null;
-  const number = (value: number | null | undefined) =>
-    value == null || !Number.isFinite(value) ? null : points(value, 1, locale);
+  const number = (value: number | null | undefined, signed = false) =>
+    value == null || !Number.isFinite(value)
+      ? "—"
+      : signed
+        ? signedPoints(value, 1, locale)
+        : points(value, 1, locale);
   return (
     <section aria-label={copy.title}>
       <h3>{copy.title}</h3>
-      <p className={styles.notice}>{copy.missing}</p>
       <div className={styles.tableWrap}>
         <table className={styles.table}>
           <caption className="visually-hidden">{copy.title}</caption>
@@ -76,10 +79,10 @@ export function ScoreboardComparisons({ weeks }: { weeks: ScoreboardGameweek[] }
                       {errors?.zero_minute_starters != null &&
                       Number.isInteger(errors.zero_minute_starters)
                         ? points(errors.zero_minute_starters, 0, locale)
-                        : null}
+                        : "—"}
                     </td>
-                    <td>{number(errors?.minutes_shortfall)}</td>
-                    <td>{number(errors?.captain_shortfall)}</td>
+                    <td>{number(errors?.minutes_shortfall, true)}</td>
+                    <td>{number(errors?.captain_shortfall, true)}</td>
                     <td>{number(errors?.autosub_recovery)}</td>
                   </tr>
                 );

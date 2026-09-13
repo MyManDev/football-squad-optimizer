@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Member week horizon v1",
+  "description": "Standalone measured week target. The consumer additionally checks the exact current member-week records and at least two settled weekly groups.",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "season",
+    "league_id",
+    "scoring_basis",
+    "population",
+    "measurement_artifact",
+    "within_week_correlation",
+    "required_week_clusters",
+    "member_week_keys"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "member_week_horizon_v1"
+    },
+    "season": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}$"
+    },
+    "league_id": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "scoring_basis": {
+      "const": "official_autosub_captain_v2"
+    },
+    "population": {
+      "const": "recorded_member_suggestions_vs_actual"
+    },
+    "measurement_artifact": {
+      "type": "string",
+      "pattern": "^docs/[a-z0-9_-]+\\.json$"
+    },
+    "within_week_correlation": {
+      "description": "Measured within-week dependence from the same artifact and records as the target. Required as measurement evidence; never defaulted to zero or calculated by the browser.",
+      "type": "number",
+      "minimum": -1,
+      "maximum": 1
+    },
+    "required_week_clusters": {
+      "type": "integer",
+      "minimum": 2,
+      "maximum": 9007199254740991
+    },
+    "member_week_keys": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Exact current entry:gameweek:advice_sha256:outcome_snapshot_id record keys, compared as a set. At least two different settled weeks are checked by the consumer."
+    }
+  }
+}

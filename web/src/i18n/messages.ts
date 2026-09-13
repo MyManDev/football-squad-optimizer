@@ -392,7 +392,7 @@ const en = {
       `${rows} member-week comparisons across ${weeks} settled weeks; members in the same week belong to one weekly group.`,
     unknown: "Not yet: the record does not establish how many more weeks are needed.",
     remaining: (weeks: number) =>
-      `Not yet: the recorded measurement calls for ${weeks} more settled weeks.`,
+      `Not yet: the recorded measurement calls for ${weeks} more settled week${weeks === 1 ? "" : "s"}.`,
     reached:
       "The recorded measurement's week target has been reached; this alone does not establish an improvement.",
     limits:
@@ -422,7 +422,7 @@ const en = {
     captain: "Captain shortfall",
     autosub: "Autosub recovery",
     missing:
-      "An empty cell means not measured or not settled. Minutes shortfall covers starters who played; negative means more minutes than projected. Captain shortfall is expected minus received bonus points.",
+      "A dash (—) means not measured, not settled or not applicable. Minutes shortfall covers starters who played; negative means more minutes than projected. Captain shortfall is expected minus received bonus points.",
     memberNet: "Official member score minus transfer costs",
     basisUnknown: "Scoring basis unavailable",
     memberPopulation: (count: number) => `${count} registered members with a recorded net score`,
@@ -451,7 +451,7 @@ const en = {
       "The scoreboard is not published yet. It appears after the first weekly run that writes it.",
     notAvailable: "The scoreboard could not be read.",
     caption:
-      "Per finished gameweek: our paper ledger, the league members' mean net, the Top-100 mean, the FPL average and the highest score",
+      "Per finished gameweek: our paper ledger, the league members' mean net, the Top-100 mean, the FPL average, the highest score, starters with no minutes, minutes shortfall, captain shortfall and autosub recovery",
     gameweek: "GW",
     ours: "SquadOpt · net",
     mixedBases: "Different scoring bases; no combined total",
@@ -1373,7 +1373,7 @@ const tr: MessageSchema<typeof en> = {
     captain: "Kaptan açığı",
     autosub: "Otomatik değişiklik getirisi",
     missing:
-      "Boş hücre ölçülmedi veya henüz yerleşmedi demektir. Dakika açığı oynayan ilk 11 oyuncularını kapsar; negatif değer tahminden fazla dakika oynandığını gösterir. Kaptan açığı, beklenen ile gerçekleşen ek puan farkıdır.",
+      "Tire (—) ölçülmedi, henüz yerleşmedi veya bu hücreye uygulanmıyor demektir. Dakika açığı oynayan ilk 11 oyuncularını kapsar; negatif değer tahminden fazla dakika oynandığını gösterir. Kaptan açığı, beklenen ile gerçekleşen ek puan farkıdır.",
     memberNet: "Üyenin resmi puanı eksi transfer bedeli",
     basisUnknown: "Puanlama temeli bilinmiyor",
     memberPopulation: (count) => `Net puanı kayıtlı ${count} lig üyesi`,
@@ -1402,7 +1402,7 @@ const tr: MessageSchema<typeof en> = {
       "Skor tablosu henüz yayımlanmadı. Onu yazan ilk haftalık çalıştırmadan sonra görünür.",
     notAvailable: "Skor tablosu okunamadı.",
     caption:
-      "Biten her oyun haftası için: kâğıt ledger'ımız, lig üyelerinin ortalama neti, Top-100 ortalaması, FPL ortalaması ve en yüksek puan",
+      "Biten her oyun haftası için: kâğıt ledger'ımız, lig üyelerinin ortalama neti, Top-100 ortalaması, FPL ortalaması, en yüksek puan, sıfır dakikalı ilk 11, dakika açığı, kaptan açığı ve otomatik değişiklik getirisi",
     gameweek: "OH",
     ours: "SquadOpt · net",
     mixedBases: "Farklı puanlama temelleri; birleşik toplam yok",
