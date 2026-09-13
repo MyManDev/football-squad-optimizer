@@ -181,20 +181,10 @@ function Squad({
       </header>
 
       <StatRow>
-        <Stat
-          label={copy.projectedScore}
-          value={points(view.projected_score, 1, locale)}
-          note={
-            risk.status === "available" &&
-            risk.lower_quantile_score !== null &&
-            risk.lower_quantile_probability !== null
-              ? copy.lowerTail(
-                  percent(risk.lower_quantile_probability, 0, locale),
-                  points(risk.lower_quantile_score, 1, locale),
-                )
-              : copy.lowerTailUnavailable
-          }
-        />
+        {/* Projected score carries no note: the lower-tail quantile that used to sit here
+            published a probability, which this site does not do, and no other distributional
+            statistic replaces it. */}
+        <Stat label={copy.projectedScore} value={points(view.projected_score, 1, locale)} />
         <Stat
           label={view.decision_kind === "opening" ? copy.squadCost : copy.squadSellValue}
           value={pounds(view.total_cost_tenths)}

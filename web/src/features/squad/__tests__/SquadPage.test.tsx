@@ -20,6 +20,7 @@ import {
 } from "../../../fixtures/settledRecommendation";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import type { Language } from "../../../i18n/messages";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { SquadPage } from "../pages/SquadPage";
 
 afterEach(cleanup);
@@ -110,6 +111,25 @@ describe("SquadPage", () => {
     expect(screen.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeInTheDocument();
     expect(screen.getByText(/Oyuna Giriş Sırasıyla/)).toBeInTheDocument();
   });
+
+  it("puts no note under the projected score, and none in its place", async () => {
+    renderAt("/");
+    const label = await screen.findByText("Tahmini Puan");
+    const stat = label.parentElement;
+    expect(stat).not.toBeNull();
+    // Stat renders label, value and, only when given one, a note. Two children means none.
+    expect(stat!.children).toHaveLength(2);
+    expect(screen.queryByText(/Kuyruk/)).not.toBeInTheDocument();
+  });
+
+  it.each(["tr", "en"] as const)(
+    "publishes no probability on the squad page in %s",
+    async (language) => {
+      const { container } = renderAt("/", { language });
+      await screen.findByRole("heading", { level: 1 });
+      expect(container.textContent ?? "").not.toMatch(AS_A_CHANCE);
+    },
+  );
 
   it("says plainly when a gameweek has no decision", async () => {
     renderAt("/gw/2026-27/7");
