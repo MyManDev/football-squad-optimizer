@@ -207,3 +207,123 @@ def test_the_meta_gate_catches_the_probability_prefix_convention() -> None:
         assert FORBIDDEN_FIELD_PATTERN.search(name), name
     for name in ("overlap_count", "overlap_target", "overlap_applied", "transfer_hit_points"):
         assert not FORBIDDEN_FIELD_PATTERN.search(name), name
+
+
+#: Names the meta-gate must refuse, written down so a later widening of the envelope has
+#: to edit this list on purpose rather than discover it. The rule being pinned is the
+#: envelope's own: expected points, expected gap, overlap counts and a price in points may
+#: be published, and the spread of any of them may not. A variance is a spread under
+#: another name, and so is every other second moment here.
+_MUST_BE_REFUSED = (
+    # A probability, by name or by naming convention, in either language.
+    "probability_ahead",
+    "p_win",
+    "lower_quantile",
+    "olasilik",
+    "olas\u0131l\u0131k",
+    "olas\u0131l\u0131\u011f\u0131",  # the same word inflected, which the stem catches
+    # A variance, and a covariance, which is the same stem.
+    "gap_variance",
+    "variance_floor",
+    "covariance",
+    "puan_varyansi",
+    "kovaryans",
+    # A standard deviation, in the spellings and abbreviations it travels under.
+    "score_stddev",
+    "gap_std_dev",
+    "gap_stdev",
+    "points_sd",
+    "sd_points",
+    "gap_sigma",
+    "score_deviation",
+    "standard_error",
+    "gap_std_err",
+    "puan_sapmasi",
+    # A correlation, which is a covariance rescaled.
+    "gap_correlation",
+    "korelasyonu",
+    # A cut through the distribution, or a piece of one.
+    "gap_percentile",
+    "upper_quartile",
+    "interquartile_range",
+    "yuzdelik_dilim",
+    "confidence_interval",
+    "puan_aralik",
+    "puan_aral\u0131\u011f\u0131",
+    "tail_points",
+    "left_tail_mass",
+    "spread_of_gap",
+    "gap_dispersion",
+    "score_volatility",
+)
+
+#: Names the meta-gate must let through. Two kinds: names this repository already
+#: publishes, and the near misses that make the boundaries in the pattern load-bearing.
+#: ``details`` is a real field in ``docs/contracts/backend_api_v1.schema.json``, and the
+#: three ``*_folds`` names are squad calibration diagnostics that the closed envelope
+#: stops on its own (``tests/unit/test_shadow_squad_contract.py``) because they are
+#: bookkeeping and not spreads.
+_MUST_PASS = (
+    "overlap_count",
+    "overlap_target",
+    "overlap_applied",
+    "transfer_hit_points",
+    "expected_gap_vs_rival",
+    "expected_points_cost_ceiling",
+    "expected_gain_vs_hold",
+    "difference_makers",
+    "optimality_gap",
+    "control_optimality_gap",
+    "suggested_strategy",
+    "squad_basis",
+    "stated_limits",
+    "plan_weeks",
+    "band_edge_points",
+    "details",
+    "detail",
+    "retail",
+    "curtail",
+    "stdout",
+    "stderr",
+    "used_transfers",
+    "standings",
+    "evaluation_folds",
+    "frozen_shift_points",
+    "shift_fit_folds",
+    # The word this repository uses for the rule that a member's advice is computed from
+    # that member's own squad alone. It shares a stem with ``variance`` and is not one.
+    "gap_invariance",
+)
+
+
+def test_a_second_moment_is_refused_under_every_name_it_travels_under() -> None:
+    """A field that publishes the width of a distribution may not reach a member under a
+    name that uses none of the words the envelope already forbids.
+
+    The five that walked through before this list existed: ``gap_variance``,
+    ``score_stddev``, ``covariance``, ``variance_floor``, ``sd_points``.
+    """
+
+    for name in _MUST_BE_REFUSED:
+        assert FORBIDDEN_FIELD_PATTERN.search(name), name
+
+
+def test_the_names_the_envelope_already_carries_are_not_caught_in_the_widening() -> None:
+    """The other half of the pin: a guard that refuses what is published is a bug.
+
+    Every name in ``PUBLISHABLE_FIELDS`` and every property name in the committed
+    contract schemas under ``docs/contracts`` was read with this pattern. Nothing the
+    member-facing advice envelope publishes is caught by it. One name outside that
+    envelope is: ``within_week_correlation``, the declared dependence estimate in
+    ``docs/contracts/member_week_horizon_v1.schema.json``, which no guard runs this
+    pattern over and which this change leaves exactly as it is.
+    """
+
+    for name in _MUST_PASS:
+        assert not FORBIDDEN_FIELD_PATTERN.search(name), name
+    for field_name in PUBLISHABLE_FIELDS:
+        assert not FORBIDDEN_FIELD_PATTERN.search(field_name), field_name
+
+
+def test_the_lists_cannot_drift_into_each_other() -> None:
+    assert not set(_MUST_BE_REFUSED) & set(_MUST_PASS)
