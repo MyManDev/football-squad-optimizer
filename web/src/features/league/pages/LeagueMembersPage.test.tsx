@@ -12,6 +12,8 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES, type Language } from "../../../i18n/messages";
 import { LeagueMemberView } from "./LeagueMemberPage";
 import { LeagueMembersView } from "./LeagueMembersPage";
+import { assertMembers } from "../publicationShape";
+import { AS_A_CHANCE } from "../../../testSupport/honesty";
 
 afterEach(cleanup);
 
@@ -33,6 +35,56 @@ function membersWith(
 }
 
 describe("league member points", () => {
+  it.each<Language>(["en", "tr"])(
+    "separates unknown, unchanged and counted movement in %s",
+    (language) => {
+      const original = mockLeagueMembersEnvelope.payload.members.find(
+        (member) => member.member_kind === "human",
+      )!;
+      const states = [
+        { movement: "unknown", movement_places: null },
+        { movement: "same", movement_places: 0 },
+        { movement: "up", movement_places: 2 },
+        { movement: "down", movement_places: 3 },
+      ] as const;
+      const value = membersWith({
+        members: states.map((state, index) => ({
+          ...original,
+          entry_id: 101 + index,
+          rank: index + 1,
+          manager_name: `Member ${index}`,
+          ...state,
+        })),
+      });
+      assertMembers(value);
+      const { container } = renderPage(
+        <LeagueMembersView envelope={value} />,
+        "/league/members",
+        language,
+      );
+      const copy = MESSAGES[language].leagueMembers;
+      expect(
+        [...container.querySelectorAll("tbody tr")].map(
+          (row) => row.querySelector("td:last-child")?.textContent,
+        ),
+      ).toEqual([copy.noPreviousRank, copy.movementLabel("same", 0), "↑ 2", "↓ 3"]);
+      expect(screen.getByText(copy.movementNote)).toBeInTheDocument();
+      for (const text of [copy.noPreviousRank, copy.movementNote, copy.movementLabel("same", 0)])
+        expect(text).not.toMatch(AS_A_CHANCE);
+    },
+  );
+  it.each([
+    { movement: "up", movement_places: null },
+    { movement: "up", movement_places: 0 },
+    { movement: "same", movement_places: null },
+    { movement: "unknown", movement_places: 1 },
+    { movement: "down", movement_places: -1 },
+    { movement: "down", movement_places: 1.5 },
+  ] as const)("rejects inconsistent movement at the publication boundary: %s", (state) => {
+    const value = structuredClone(mockLeagueMembersEnvelope);
+    Object.assign(value.payload.members[0], state);
+    expect(() => assertMembers(value)).toThrow();
+  });
   it("names the week the points belong to, because the view is labelled with another", () => {
     // The members view carries the *upcoming* gameweek; the scores are last week's. A
     // column headed only "GW points" would sit under the wrong number.

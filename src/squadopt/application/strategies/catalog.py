@@ -99,6 +99,9 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # Which squad the advice stands on: ``captured``, or ``pre_free_hit_gwNN`` when
         # a Free Hit voided the captured week's fifteen. A label, never a number.
         "squad_basis",
+        # Observed changes between ranks in one captured standings document.
+        "movement",
+        "movement_places",
     }
 )
 
