@@ -258,6 +258,9 @@ web/node_modules/
 web/dist/
 web/playwright-report/
 web/test-results/
+# `wrangler pages dev dist` is how the Pages routing rules are checked before a deploy; it
+# leaves a local cache and bundle scratch here that is neither project content nor evidence.
+web/.wrangler/
 
 # Half-written shadow artifacts. The create-once writer completes and fsyncs a
 # sibling temporary before publishing it with a no-overwrite link, and removes it on

@@ -5,7 +5,10 @@ import { fileURLToPath } from "node:url";
 export const MAX_DEPLOYMENT_FILES = 20_000;
 export const MAX_DEPLOYMENT_FILE_BYTES = 25 * 1024 * 1024;
 
-const REQUIRED_FILES = ["index.html", "data/index.json", "_headers"];
+// data/404.html is required and 404.html is forbidden for the same reason. Pages serves the
+// closest 404.html up the directory tree, so the one under data/ makes an unpublished document
+// answer 404, while the absence of a top-level one keeps every client-side route on the shell.
+const REQUIRED_FILES = ["index.html", "data/index.json", "data/404.html", "_headers"];
 const FORBIDDEN_TOP_LEVEL_PATHS = new Set(["404.html", "_worker.js", "functions"]);
 
 function slashPath(root, path) {
