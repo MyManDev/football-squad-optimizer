@@ -63,8 +63,8 @@ test("language selection switches the full frame and persists across routes", as
   await expect(page).toHaveURL(/mode=garantici&window=3/);
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
-  await page.getByRole("link", { name: "Analysis" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Analysis Center");
+  await page.getByRole("link", { name: "League", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Find your league");
   await page.reload();
   await expect(page.getByRole("link", { name: "League", exact: true })).toHaveAttribute(
     "href",
