@@ -10,6 +10,13 @@ on:
         description: Immutable annotated site tag (for example site-2026-27-gw01-decision)
         required: true
         type: string
+      allow_rollback:
+        description: >-
+          Publish a tag that is behind one already published. Deliberate rollback only;
+          leaving this unset is what stops a mistyped tag from reverting the site.
+        required: false
+        default: false
+        type: boolean
 
 # CI never receives Cloudflare credentials. This trusted default-branch workflow treats a PR
 # artifact as data, and only the two deployment jobs can enter the protected environment.
@@ -296,6 +303,7 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
+          ALLOW_ROLLBACK: ${{ inputs.allow_rollback }}
         with:
           github-token: ${{ github.token }}
           script: |
@@ -337,6 +345,52 @@ jobs:
             if (!["ahead", "identical"].includes(comparison.status)) {
               core.setFailed(`Tagged commit ${commitSha} is not reachable from main.`);
               return;
+            }
+
+            // Every check above passes for a tag that is OLDER than what is already
+            // published: it exists, it is annotated, it is reachable from main, its CI is
+            // green and its artifact is intact. Upload it and the site silently reverts,
+            // because the smoke test reads status codes, the document type, a non-empty
+            // members array and the cache policy, and nothing about which publication it
+            // is looking at. The tag is hand-typed into the dispatch, so one wrong
+            // character is all it takes. Ancestry decides this, not the tag's name: names
+            // sort by luck (fix10 sorts before fix9) while commits cannot lie about order.
+            const siteTags = await github.paginate(github.rest.repos.listTags, {
+              ...context.repo,
+              per_page: 100,
+            });
+            let newest = null;
+            for (const candidate of siteTags) {
+              if (candidate.name === tagName || !pattern.test(candidate.name)) continue;
+              const { data: candidateCommit } = await github.rest.repos.getCommit({
+                ...context.repo,
+                ref: candidate.commit.sha,
+              });
+              const when = Date.parse(candidateCommit.commit.committer.date);
+              if (newest === null || when > newest.when) {
+                newest = { name: candidate.name, sha: candidateCommit.sha, when };
+              }
+            }
+            if (newest !== null && newest.sha !== commitSha) {
+              const { data: against } = await github.rest.repos.compareCommits({
+                ...context.repo,
+                base: commitSha,
+                head: newest.sha,
+              });
+              if (against.status === "ahead") {
+                if (process.env.ALLOW_ROLLBACK !== "true") {
+                  core.setFailed(
+                    `${tagName} (${commitSha}) is behind ${newest.name} (${newest.sha}). ` +
+                      "Publishing it would revert the site and every check below would " +
+                      "still pass. Dispatch the newer tag, or pass allow_rollback if " +
+                      "reverting is what you mean to do.",
+                  );
+                  return;
+                }
+                core.warning(
+                  `Deliberate rollback: ${tagName} is behind ${newest.name}, allow_rollback was set.`,
+                );
+              }
             }
 
             const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
