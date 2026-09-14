@@ -57,6 +57,11 @@ export function StatusPage() {
         day: messages.common.dayShort,
       })
     : null;
+  // The document names the gameweek that was open when it was written. Once that deadline
+  // has passed the number is still true about the publication and false about what comes
+  // next, so the tile stops calling it next. It does not name the gameweek that is open now:
+  // the document does not carry one, and inventing it would be a number nobody measured.
+  const deadlineClosed = remaining?.isClosed === true;
   return (
     <div className={styles.page}>
       <header>
@@ -67,11 +72,13 @@ export function StatusPage() {
       </header>
       <StatRow>
         <Stat
-          label={copy.nextGameweek}
+          label={deadlineClosed ? copy.publishedGameweek : copy.nextGameweek}
           value={view.next_gameweek ?? "—"}
           note={
             view.next_deadline_utc
-              ? copy.deadline(local(view.next_deadline_utc, locale))
+              ? deadlineClosed
+                ? copy.deadlineClosedAt(local(view.next_deadline_utc, locale))
+                : copy.deadline(local(view.next_deadline_utc, locale))
               : copy.noDeadline
           }
         />
