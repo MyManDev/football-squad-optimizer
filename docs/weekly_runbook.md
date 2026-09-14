@@ -5,8 +5,12 @@ gameweek, from the capture to the site pull request, and — when asked — deci
 own squad on the way:
 
 ```bash
-python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 4 --league 352490 --workers 8 --decide --run-id 2026-27-gw04-decision
+python -m squadopt.platform.weekly_operations --season 2026-27 --gameweek 5 --league 352490 --workers 8 --run-id 2026-27-gw05-decision
 ```
+
+`--decide` is deliberately absent from that line. It is the members' loop that runs every
+week; our own squad is a separate decision with a precondition that is not currently met
+(below).
 
 `--run-id` is optional. Left out, the runner generates
 `week-<season>-gw<NN>-<UTC stamp>-<hex>` and prints it; an explicit id such as the one above
@@ -92,8 +96,9 @@ net columns beside it.
   appear there. A gameweek captured once reports **not measured**, never zero.
 - Two to three hours, rather than as late as possible, for one reason: everything the
   week needs has to fit **before** the deadline, in order — capture, handoff, decide,
-  and the league tree's twenty minutes for fifteen members. A capture at thirty minutes
-  leaves no room for a step that fails and has to be run again.
+  and the league tree, which is over half an hour for fifteen members (below). A capture
+  at thirty minutes leaves no room for the league tree at all, let alone for a step that
+  fails and has to be run again.
 - Do not read the feed's own `news` as cover for capturing early. The rotation-lane
   brief (2026-09-08) measured its items on the 2026-09-07 capture at a median of 22.9
   days behind it, with 3 of 71 added since the previous deadline; no artifact in this
@@ -108,11 +113,25 @@ net columns beside it.
 - The Top-100 captures refuse at or after the deadline, and read the cohort's picks for
   the gameweek that just closed — so they need those picks to be public (after the
   previous deadline) and the coming deadline still open.
-- The league tree takes about twenty minutes for fifteen members with `--workers 8`
+- The league tree takes **about thirty-six minutes** for fifteen members with `--workers 8`
   (one control plus twenty-eight rival solves per member); one process takes about
-  seven times longer. The bytes do not depend on the worker count.
+  seven times longer. The bytes do not depend on the worker count. Measured on the GW4
+  capture, 2026-09-14, run `rehearsal-20260914-gw04`: the league stage ran 35 min 45 s of
+  a 36 min 21 s run, with preflight, capture, settled outcomes, site and scoreboard
+  together under four seconds and the handoff 28 s. Two earlier runs put the same stage at
+  32 min and 49.5 min, so treat half an hour as the floor and not the estimate. This
+  figure is the run **without** `--publish`; the publish stage was rewritten since the
+  last run that used it and its cost is not currently measured.
 - `--decide` needs the ledger to hold the previous gameweek. A week that was skipped
   must be recorded first (below); the pre-flight says so before anything is captured.
+  **This is currently blocking and will not clear on its own.** `held_squad_from_ledger`
+  (`src/squadopt/live/ledger.py`) refuses when no decision exists for the previous week,
+  and the ledger holds `[1]`. So deciding GW4 needs GW3, GW3 needs a pre-deadline capture
+  that no longer exists, and every later week inherits the same break. Note that
+  `--dry-run` prints `decide run` regardless: it prints the plan and does not reach this
+  check, so the refusal appears only in a real run. The error names the way out itself —
+  record the missing weeks as a no-transfer roll — but that is a decision about what our
+  paper record claims, not a command to run without deciding it first.
 
 ## Our own squad: catching the ledger up, then deciding, then settling
 
@@ -121,26 +140,29 @@ scored from a later capture. `held_squad_from_ledger` wants exactly the previous
 gameweek's decision, so a gameweek the loop did not run for has to be recorded from a
 capture taken before its deadline — `squadopt gameweek decide` with an explicit
 `--snapshot-id` stamps such an entry `replay`, and the season ledger's Mode column shows
-it. As of 2026-09-07 the ledger holds GW1 only, so GW2 and GW3 come first, each from the
-capture its handoff was built from (`source_snapshot_id` in `data/handoffs/`):
+it.
+
+**GW2 and GW3 cannot be caught up, and this is settled, not pending.** The method above
+needs a capture taken before the gameweek's own deadline, and for GW1, GW2 and GW3 no
+such capture exists any more: they were destroyed on 2026-09-10 along with the GW4
+pre-deadline capture of the time, and they cannot be re-fetched, because a capture records
+each player's status, news and chance of playing *as they stood at that moment* and the
+API only ever serves the present. Earlier revisions of this section listed three capture
+ids and two handoff files for these commands; none of the five is on disk, so every
+command in that block would have refused. They are removed rather than corrected.
+
+The check that tells you where the season actually stands, before spending anything:
 
 ```bash
-# GW2: handoff 2026-27-gw02.json was built from this capture (GW2 open, GW1 scored)
-squadopt gameweek decide --season 2026-27 --gameweek 2 \
-  --snapshot-id fpl-live-20260826T083133Z-d45f1bea8b68 \
-  --in-season-projection data/handoffs/2026-27-gw02.json
-# GW2 settles from a capture in which GW2 is finished and checked
-squadopt gameweek settle --season 2026-27 --gameweek 2 \
-  --snapshot-id fpl-live-20260903T105145Z-8eb7745fbe28
-
-# GW3: handoff 2026-27-gw03.json was built from this capture (GW3 open, GW2 scored)
-squadopt gameweek decide --season 2026-27 --gameweek 3 \
-  --snapshot-id fpl-live-20260903T105145Z-8eb7745fbe28 \
-  --in-season-projection data/handoffs/2026-27-gw03.json
-# GW3 settles from the GW4 capture, in which GW3 is finished and checked
-squadopt gameweek settle --season 2026-27 --gameweek 3 \
-  --snapshot-id fpl-live-20260907T131414Z-db9314d00961
+python -m scripts.export_settled_outcomes --season 2026-27 --dry-run
 ```
+
+As of 2026-09-14 it reports gw01, gw02 and gw03 each skipped with "no capture was taken
+before its deadline", and then "No settled gameweek has both captures on disk; nothing to
+accumulate." So the ledger holds GW1's decision and the settled-outcome record holds
+nothing at all. **GW4 is the first gameweek that can complete the loop**, because its
+pre-deadline capture `fpl-live-20260912T100000Z-24613792ef57` survives; settle it from a
+capture taken once GW4 is finished and checked, and the record has its first row.
 
 Each decide verifies the handoff against the capture and the model version against the
 promoted in-season controls before anything is written; a refusal leaves the ledger as it
