@@ -1,0 +1,18 @@
+.page {
+  max-width: 640px;
+}
+
+.page p {
+  color: var(--color-text-muted);
+}
+
+.links {
+  padding: 0;
+  list-style: none;
+}
+
+.links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}

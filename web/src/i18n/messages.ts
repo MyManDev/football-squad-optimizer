@@ -102,6 +102,13 @@ const en = {
     notFound: "There is no page here.",
     metaDescription: "SquadOpt: a weekly FPL decision, and what it rests on.",
   },
+  admin: {
+    title: "Admin",
+    notice: "This admin page is unlisted, not protected; anyone with its address can open it.",
+    analysis: "Measurement archive",
+    status: "Operational state",
+    decisions: "Decision log (GitHub)",
+  },
   language: {
     label: "Language",
     tr: "Türkçe",
@@ -1064,6 +1071,14 @@ const tr: MessageSchema<typeof en> = {
     operations: "Operasyon Durumu",
     notFound: "Burada bir sayfa yok.",
     metaDescription: "SquadOpt: haftalık FPL kararı ve dayandığı kanıt.",
+  },
+  admin: {
+    title: "Yönetim",
+    notice:
+      "Bu yönetim sayfası menüde listelenmez, korumalı değildir; adresini bilen herkes açabilir.",
+    analysis: "Ölçüm arşivi",
+    status: "Operasyon durumu",
+    decisions: "Karar kaydı (GitHub)",
   },
   language: { label: "Dil", tr: "Türkçe", en: "English" },
   theme: {

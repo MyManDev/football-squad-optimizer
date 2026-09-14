@@ -6,10 +6,7 @@ import { useLanguage } from "../../i18n/context";
 import styles from "./PageShell.module.css";
 import { ThemeToggle } from "./ThemeToggle";
 
-const NAV = [
-  { to: "/", key: "league", end: true },
-  { to: "/analysis", key: "analysis", end: false },
-] as const;
+const NAV = [{ to: "/", key: "league", end: true }] as const;
 
 type NavKey = (typeof NAV)[number]["key"];
 
