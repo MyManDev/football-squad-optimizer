@@ -82,6 +82,9 @@ class _ClubNewsInputs:
     clubs_declared: tuple[str, ...]
     clubs_covered: tuple[str, ...]
     unverifiable: tuple[UnlocatableClaim, ...] = ()
+    #: Covered clubs at least one of whose registered pages was not read. A narrowing of
+    #: coverage, never a substitute for it -- every name here is also in ``clubs_covered``.
+    clubs_partially_covered: tuple[str, ...] = ()
 
 
 def _club_news_inputs(request: RotationExportRequest) -> _ClubNewsInputs:
@@ -123,7 +126,9 @@ def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
     many distinct answers there were.
     """
 
-    documents, coded, clubs_declared, clubs_covered = read_club_news_capture(snapshot)
+    documents, coded, clubs_declared, clubs_covered, partially_covered = read_club_news_capture(
+        snapshot
+    )
     if not coded:
         raise DataError(
             f"{snapshot.metadata.snapshot_id} carries documents but no model response, so "
@@ -140,6 +145,9 @@ def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
         unverifiable.extend(dropped)
 
     covered = _clubs_still_covered(clubs_covered, claims=claims, unverifiable=unverifiable)
+    # A club dropped from coverage above is no longer partly read either: it is unread, and
+    # carrying its name in both lists would say two things about it at once.
+    partial = tuple(club for club in partially_covered if club in set(covered))
     return _ClubNewsInputs(
         documents=documents,
         claims=tuple(claims),
@@ -147,6 +155,7 @@ def _inputs_from_capture(snapshot: CapturedSnapshot) -> _ClubNewsInputs:
         clubs_declared=clubs_declared,
         clubs_covered=covered,
         unverifiable=tuple(unverifiable),
+        clubs_partially_covered=partial,
     )
 
 
@@ -332,6 +341,7 @@ def _manifest(
         "source_snapshot_ids": list(attrs["source_snapshot_ids"]),
         "clubs_declared": list(attrs["clubs_declared"]),
         "clubs_covered": list(attrs["clubs_covered"]),
+        "clubs_partially_covered": list(attrs["clubs_partially_covered"]),
         "documents_read": attrs["documents_read"],
         "document_sha256s": list(attrs["document_sha256s"]),
         "model_identifier": attrs["model_identifier"],
@@ -360,6 +370,7 @@ def _export(arguments: RotationExportRequest, *, repository_commit: str) -> Mapp
         documents=club_news.documents,
         clubs_declared=club_news.clubs_declared,
         clubs_covered=club_news.clubs_covered,
+        clubs_partially_covered=club_news.clubs_partially_covered,
         model=club_news.model,
         unverifiable_claims=club_news.unverifiable,
         club_news_snapshot_id=arguments.club_news_snapshot,

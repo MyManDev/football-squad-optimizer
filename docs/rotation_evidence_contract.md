@@ -113,6 +113,39 @@ dropped from `clubs_covered` — nothing it said survives into evidence, so call
 would assert that its page was read into the table when none of it was. A club that was read
 and genuinely said nothing has no claims either way and stays covered.
 
+### Covered is not the same as covered in full
+
+A club may register more than one page — team news and an injury table are often separate —
+so "his club was read" and "all of his club's pages were read" stopped being one statement.
+The answer this contract gives:
+
+**Covered means at least one of that club's registered pages was read.** Column 15 keeps its
+meaning exactly, and the reason is the fetcher's own rule: one club failing does not fail the
+week, and by the same token one *page* failing must not cost a club its coverage. A player
+whose club published team news that was read is a player something was read about, whatever
+happened to the club's second page.
+
+**Fully covered is a different question, and the manifest answers it.**
+`clubs_partially_covered` names the covered clubs at least one of whose registered pages was
+not read. It is a narrowing of `clubs_covered`, never a substitute: every name in it also
+appears there, and a club none of whose pages were read is *unread*, not partly read. Those
+are different facts about different weeks, and an export that confuses them is refused.
+
+Fully covered is therefore `clubs_covered` minus `clubs_partially_covered`, and a reader who
+wants to know which page went missing has the capture: its index records every document's
+club and both URLs.
+
+The field is recorded rather than derived, for the same reason `clubs_covered` is. From the
+payloads alone, a club whose second page was refused is indistinguishable from a club that
+only ever registered one — both arrive with one document. Only the run that read the registry
+knows which it was, so it writes it down while it still knows.
+
+This moved the export contract to `rotation_evidence_export_v2`. **The table's own version did
+not move**: no column changed, because partial coverage is a club-level fact and the manifest
+is where club-level facts live. A capture written before the field carries no
+`clubs_partially_covered`, and an absent list reads as empty rather than as a refusal — those
+weeks allowed one page per club, so no club could be partly read.
+
 ### `rotation_disposition`, in full
 
 `not_addressed`, `no_statement`, `stated_expected_to_start`, `stated_expected_absent`,
@@ -165,7 +198,8 @@ makes the table checkable and one with a hole in it checks less than it claims.
 `contract_version`, `artifact_contract_version`, `season`, `target_gameweek`,
 `deadline_timestamp_utc`, `generated_at_utc`, `repository_commit`, `table_file`,
 `table_sha256`, `row_count`, `roster_size`, `roster_snapshot_id`, `source_snapshot_ids`,
-`clubs_declared`, `clubs_covered`, `documents_read`, `document_sha256s`, `model_identifier`,
+`clubs_declared`, `clubs_covered`, `clubs_partially_covered`, `documents_read`,
+`document_sha256s`, `model_identifier`,
 `model_version`, `prompt_sha256`, `response_sha256s`, `claims_coded`, `claims_ambiguous`,
 `players_not_addressed`.
 
