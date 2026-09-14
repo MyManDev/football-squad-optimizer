@@ -164,3 +164,65 @@ describe("the remaining-time tile", () => {
     },
   );
 });
+
+/**
+ * The gameweek tile names a number the document carries. That number is true about the
+ * publication for as long as the document exists, and true about what comes next only until
+ * its deadline closes. The tile therefore stops saying "next" at the same moment the
+ * countdown beside it starts saying the deadline has passed, so the two tiles cannot
+ * disagree. It never names the gameweek that is open now: the document does not carry one.
+ */
+describe("the gameweek tile", () => {
+  const OPEN_LABEL: Record<Language, string> = {
+    en: "next gameweek",
+    tr: "sıradaki oyun haftası",
+  };
+  const CLOSED_LABEL: Record<Language, string> = {
+    en: "gameweek in this publication",
+    tr: "bu yayının oyun haftası",
+  };
+
+  it.each(["en", "tr"] as const)(
+    "calls the week next while its deadline is still open, in %s",
+    async (language) => {
+      renderStatus({ ...PUBLISHED, next_deadline_utc: FUTURE_DEADLINE }, language);
+      expect(await tileValue(OPEN_LABEL[language])).toBe(String(PUBLISHED.next_gameweek));
+      expect(screen.queryByText(CLOSED_LABEL[language])).toBeNull();
+    },
+  );
+
+  it.each(["en", "tr"] as const)(
+    "stops calling the week next once its deadline has passed, in %s",
+    async (language) => {
+      // The document exactly as published: it names gameweek 4 at a deadline that closed.
+      expect(new Date(PUBLISHED.next_deadline_utc!).getTime()).toBeLessThan(NOW.getTime());
+      renderStatus(PUBLISHED, language);
+      expect(await tileValue(CLOSED_LABEL[language])).toBe(String(PUBLISHED.next_gameweek));
+      expect(screen.queryByText(OPEN_LABEL[language])).toBeNull();
+    },
+  );
+
+  it.each([
+    { language: "en", note: "already passed" },
+    { language: "tr", note: ", geçti" },
+  ] as const)(
+    "says the deadline has passed in the note, in $language",
+    async ({ language, note }) => {
+      renderStatus(PUBLISHED, language);
+      await screen.findByText(CLOSED_LABEL[language]);
+      expect(screen.getByText((content) => content.includes(note))).toBeInTheDocument();
+    },
+  );
+
+  it.each(["en", "tr"] as const)(
+    "keeps the published number itself unchanged either way, in %s",
+    async (language) => {
+      renderStatus({ ...PUBLISHED, next_deadline_utc: FUTURE_DEADLINE }, language);
+      const open = await tileValue(OPEN_LABEL[language]);
+      cleanup();
+      renderStatus(PUBLISHED, language);
+      const closed = await tileValue(CLOSED_LABEL[language]);
+      expect(open).toBe(closed);
+    },
+  );
+});
