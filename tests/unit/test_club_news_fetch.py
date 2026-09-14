@@ -23,6 +23,7 @@ import pytest
 from squadopt.platform.club_news_fetch import (
     CLUB_NEWS_SOURCES_CONTRACT_VERSION,
     MAXIMUM_DOCUMENT_BYTES,
+    PER_ORIGIN_DELAY_SECONDS,
     ClubNewsFetchError,
     ClubSource,
     fetch_club_document,
@@ -323,6 +324,114 @@ def test_reading_no_source_is_refused() -> None:
 
     with pytest.raises(ClubNewsFetchError, match="nothing to read"):
         fetch_registered_documents(())
+
+
+# --- one host, asked once -----------------------------------------------------
+
+
+def _three_pages_on_one_host() -> tuple[tuple[ClubSource, ...], _Opener]:
+    """One club publishing on three paths, which the registry now permits."""
+
+    sources = tuple(
+        ClubSource(club="Example FC", url=f"https://club.example/{path}")
+        for path in ("team-news", "injuries", "press-conference")
+    )
+    replies: dict[str, Any] = {ROBOTS: _allowing_robots()}
+    for source in sources:
+        replies[source.url] = _Reply(final_url=source.url)
+    return sources, _Opener(replies)
+
+
+def test_one_host_is_asked_for_its_robots_once_however_many_pages_it_serves() -> None:
+    """Counted, not assumed. Three pages used to mean three identical questions.
+
+    The verdicts are unchanged: one `robots.txt` decides every path of its host, so deciding
+    them locally removes requests without moving a single answer.
+    """
+
+    sources, opener = _three_pages_on_one_host()
+
+    documents, refused = fetch_registered_documents(
+        sources, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert refused == ()
+    assert len(documents) == 3
+    assert opener.requested.count(ROBOTS) == 1
+
+
+def test_a_second_request_to_one_host_waits() -> None:
+    """Politeness is owed to the machine answering, and it is measured through the clock."""
+
+    sources, opener = _three_pages_on_one_host()
+    delays, sleeper = _slept()
+
+    fetch_registered_documents(sources, opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper)
+
+    # One robots request and three documents: the first contact is free, the other three wait.
+    assert delays == [PER_ORIGIN_DELAY_SECONDS] * 3
+
+
+def test_two_hosts_do_not_wait_for_each_other() -> None:
+    """The debt is owed per host, so a slow neighbour does not slow an unrelated club."""
+
+    other = ClubSource(club="Other FC", url="https://other.example/news")
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(),
+            "https://other.example/robots.txt": _allowing_robots(),
+            other.url: _Reply(final_url=other.url),
+        }
+    )
+    delays, sleeper = _slept()
+
+    documents, refused = fetch_registered_documents(
+        (SOURCE, other), opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper
+    )
+
+    assert refused == ()
+    assert len(documents) == 2
+    # Each host is contacted twice -- its robots and its one page -- so each waits once.
+    assert delays == [PER_ORIGIN_DELAY_SECONDS, PER_ORIGIN_DELAY_SECONDS]
+
+
+def test_a_host_whose_robots_cannot_be_read_is_asked_once_and_refuses_every_page() -> None:
+    """Re-asking would not make the answer less unknown; it would only ask again."""
+
+    sources, _opener = _three_pages_on_one_host()
+    broken = urllib.error.HTTPError(ROBOTS, 500, "Server Error", {}, None)  # type: ignore[arg-type]
+    replies: dict[str, Any] = {ROBOTS: broken}
+    for source in sources:
+        replies[source.url] = _Reply(final_url=source.url)
+    opener = _Opener(replies)
+
+    documents, refused = fetch_registered_documents(
+        sources, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert documents == ()
+    assert len(refused) == 3
+    assert all("preference is unknown" in reason for _club, reason in refused)
+    assert opener.requested.count(ROBOTS) == 1
+
+
+def test_a_host_serving_no_robots_is_asked_once_and_allows_every_page() -> None:
+    """A 404 is silence, and silence is stated once for the whole host."""
+
+    sources, _opener = _three_pages_on_one_host()
+    replies: dict[str, Any] = {}
+    for source in sources:
+        replies[source.url] = _Reply(final_url=source.url)
+    opener = _Opener(replies)
+
+    documents, refused = fetch_registered_documents(
+        sources, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert refused == ()
+    assert len(documents) == 3
+    assert opener.requested.count(ROBOTS) == 1
 
 
 # --- the registry -----------------------------------------------------------
