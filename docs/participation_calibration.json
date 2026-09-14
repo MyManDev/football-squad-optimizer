@@ -1,0 +1,972 @@
+{
+  "artifact_type": "record",
+  "composed_start": {
+    "by_position": {
+      "DEF": {
+        "brier_score": 0.0994631664409882,
+        "event_rate": 0.3386249428962997,
+        "log_loss": 0.32458727926862724,
+        "log_loss_clip": 1e-15,
+        "mean_calibration_bias": -0.021442715675815682,
+        "mean_probability": 0.317182227220484,
+        "reliability_bins": [
+          {
+            "event_rate": 0.04339419978517723,
+            "index": 0,
+            "lower_bound": 0.0,
+            "mean_probability": 0.028663478021394514,
+            "observations": 4655,
+            "upper_bound": 0.1
+          },
+          {
+            "event_rate": 0.26899383983572894,
+            "index": 1,
+            "lower_bound": 0.1,
+            "mean_probability": 0.14526733546862072,
+            "observations": 487,
+            "upper_bound": 0.2
+          },
+          {
+            "event_rate": 0.3498233215547703,
+            "index": 2,
+            "lower_bound": 0.2,
+            "mean_probability": 0.2437207420816989,
+            "observations": 283,
+            "upper_bound": 0.30000000000000004
+          },
+          {
+            "event_rate": 0.4377880184331797,
+            "index": 3,
+            "lower_bound": 0.30000000000000004,
+            "mean_probability": 0.3532528002493663,
+            "observations": 217,
+            "upper_bound": 0.4
+          },
+          {
+            "event_rate": 0.4732510288065844,
+            "index": 4,
+            "lower_bound": 0.4,
+            "mean_probability": 0.4523492489997869,
+            "observations": 243,
+            "upper_bound": 0.5
+          },
+          {
+            "event_rate": 0.5746753246753247,
+            "index": 5,
+            "lower_bound": 0.5,
+            "mean_probability": 0.5560253333246554,
+            "observations": 308,
+            "upper_bound": 0.6000000000000001
+          },
+          {
+            "event_rate": 0.6254980079681275,
+            "index": 6,
+            "lower_bound": 0.6000000000000001,
+            "mean_probability": 0.6463373927377126,
+            "observations": 251,
+            "upper_bound": 0.7000000000000001
+          },
+          {
+            "event_rate": 0.6546762589928058,
+            "index": 7,
+            "lower_bound": 0.7000000000000001,
+            "mean_probability": 0.7552999060295249,
+            "observations": 278,
+            "upper_bound": 0.8
+          },
+          {
+            "event_rate": 0.8758823529411764,
+            "index": 8,
+            "lower_bound": 0.8,
+            "mean_probability": 0.8627793017434677,
+            "observations": 1700,
+            "upper_bound": 0.9
+          },
+          {
+            "event_rate": 0.9520958083832335,
+            "index": 9,
+            "lower_bound": 0.9,
+            "mean_probability": 0.9201782297254587,
+            "observations": 334,
+            "upper_bound": 1.0
+          }
+        ],
+        "scored_rows": 8756
+      },
+      "FWD": {
+        "brier_score": 0.07392647920409184,
+        "event_rate": 0.25612702795995856,
+        "log_loss": 0.24598687247725012,
+        "log_loss_clip": 1e-15,
+        "mean_calibration_bias": 0.025509805458041712,
+        "mean_probability": 0.2816368334180003,
+        "reliability_bins": [
+          {
+            "event_rate": 0.006211180124223602,
+            "index": 0,
+            "lower_bound": 0.0,
+            "mean_probability": 0.03197309584923938,
+            "observations": 1610,
+            "upper_bound": 0.1
+          },
+          {
+            "event_rate": 0.16071428571428573,
+            "index": 1,
+            "lower_bound": 0.1,
+            "mean_probability": 0.14775746723044061,
+            "observations": 224,
+            "upper_bound": 0.2
+          },
+          {
+            "event_rate": 0.23577235772357724,
+            "index": 2,
+            "lower_bound": 0.2,
+            "mean_probability": 0.24669382960399552,
+            "observations": 123,
+            "upper_bound": 0.30000000000000004
+          },
+          {
+            "event_rate": 0.24705882352941178,
+            "index": 3,
+            "lower_bound": 0.30000000000000004,
+            "mean_probability": 0.3417977906101608,
+            "observations": 85,
+            "upper_bound": 0.4
+          },
+          {
+            "event_rate": 0.3382352941176471,
+            "index": 4,
+            "lower_bound": 0.4,
+            "mean_probability": 0.4456617000562447,
+            "observations": 68,
+            "upper_bound": 0.5
+          },
+          {
+            "event_rate": 0.5147058823529411,
+            "index": 5,
+            "lower_bound": 0.5,
+            "mean_probability": 0.5538336316497545,
+            "observations": 68,
+            "upper_bound": 0.6000000000000001
+          },
+          {
+            "event_rate": 0.7105263157894737,
+            "index": 6,
+            "lower_bound": 0.6000000000000001,
+            "mean_probability": 0.6512464182094164,
+            "observations": 76,
+            "upper_bound": 0.7000000000000001
+          },
+          {
+            "event_rate": 0.675,
+            "index": 7,
+            "lower_bound": 0.7000000000000001,
+            "mean_probability": 0.7516583485058905,
+            "observations": 120,
+            "upper_bound": 0.8
+          },
+          {
+            "event_rate": 0.8498402555910544,
+            "index": 8,
+            "lower_bound": 0.8,
+            "mean_probability": 0.8611641251637744,
+            "observations": 313,
+            "upper_bound": 0.9
+          },
+          {
+            "event_rate": 0.8904761904761904,
+            "index": 9,
+            "lower_bound": 0.9,
+            "mean_probability": 0.9272743469285986,
+            "observations": 210,
+            "upper_bound": 1.0
+          }
+        ],
+        "scored_rows": 2897
+      },
+      "GK": {
+        "brier_score": 0.05468999121452588,
+        "event_rate": 0.26520947176684884,
+        "log_loss": 0.20134395214540604,
+        "log_loss_clip": 1e-15,
+        "mean_calibration_bias": -0.018261409043169474,
+        "mean_probability": 0.24694806272367936,
+        "reliability_bins": [
+          {
+            "event_rate": 0.02490726020137785,
+            "index": 0,
+            "lower_bound": 0.0,
+            "mean_probability": 0.023593324024038468,
+            "observations": 1887,
+            "upper_bound": 0.1
+          },
+          {
+            "event_rate": 0.3614457831325301,
+            "index": 1,
+            "lower_bound": 0.1,
+            "mean_probability": 0.16064012001652622,
+            "observations": 83,
+            "upper_bound": 0.2
+          },
+          {
+            "event_rate": 0.4,
+            "index": 2,
+            "lower_bound": 0.2,
+            "mean_probability": 0.23397775429833664,
+            "observations": 40,
+            "upper_bound": 0.30000000000000004
+          },
+          {
+            "event_rate": 0.3333333333333333,
+            "index": 3,
+            "lower_bound": 0.30000000000000004,
+            "mean_probability": 0.36976243027799155,
+            "observations": 6,
+            "upper_bound": 0.4
+          },
+          {
+            "event_rate": 0.5555555555555556,
+            "index": 4,
+            "lower_bound": 0.4,
+            "mean_probability": 0.47278836071592445,
+            "observations": 18,
+            "upper_bound": 0.5
+          },
+          {
+            "event_rate": 0.5111111111111111,
+            "index": 5,
+            "lower_bound": 0.5,
+            "mean_probability": 0.5516746753985007,
+            "observations": 45,
+            "upper_bound": 0.6000000000000001
+          },
+          {
+            "event_rate": 0.5882352941176471,
+            "index": 6,
+            "lower_bound": 0.6000000000000001,
+            "mean_probability": 0.639045178360118,
+            "observations": 51,
+            "upper_bound": 0.7000000000000001
+          },
+          {
+            "event_rate": 0.6666666666666666,
+            "index": 7,
+            "lower_bound": 0.7000000000000001,
+            "mean_probability": 0.7491436046028199,
+            "observations": 3,
+            "upper_bound": 0.8
+          },
+          {
+            "event_rate": 0.922920892494929,
+            "index": 8,
+            "lower_bound": 0.8,
+            "mean_probability": 0.8738435223701266,
+            "observations": 493,
+            "upper_bound": 0.9
+          },
+          {
+            "event_rate": 0.9495798319327731,
+            "index": 9,
+            "lower_bound": 0.9,
+            "mean_probability": 0.9198476697789921,
+            "observations": 119,
+            "upper_bound": 1.0
+          }
+        ],
+        "scored_rows": 2745
+      },
+      "MID": {
+        "brier_score": 0.10167565928215462,
+        "event_rate": 0.30697793303229104,
+        "log_loss": 0.3201238563061527,
+        "log_loss_clip": 1e-15,
+        "mean_calibration_bias": 0.009890691691013698,
+        "mean_probability": 0.31686862472330474,
+        "reliability_bins": [
+          {
+            "event_rate": 0.019645340751043114,
+            "index": 0,
+            "lower_bound": 0.0,
+            "mean_probability": 0.031493792707450875,
+            "observations": 5752,
+            "upper_bound": 0.1
+          },
+          {
+            "event_rate": 0.1971995332555426,
+            "index": 1,
+            "lower_bound": 0.1,
+            "mean_probability": 0.14433753504839456,
+            "observations": 857,
+            "upper_bound": 0.2
+          },
+          {
+            "event_rate": 0.2903225806451613,
+            "index": 2,
+            "lower_bound": 0.2,
+            "mean_probability": 0.24788346623701762,
+            "observations": 558,
+            "upper_bound": 0.30000000000000004
+          },
+          {
+            "event_rate": 0.35391923990498814,
+            "index": 3,
+            "lower_bound": 0.30000000000000004,
+            "mean_probability": 0.3499480115773338,
+            "observations": 421,
+            "upper_bound": 0.4
+          },
+          {
+            "event_rate": 0.46649484536082475,
+            "index": 4,
+            "lower_bound": 0.4,
+            "mean_probability": 0.4486575405510745,
+            "observations": 388,
+            "upper_bound": 0.5
+          },
+          {
+            "event_rate": 0.5579868708971554,
+            "index": 5,
+            "lower_bound": 0.5,
+            "mean_probability": 0.551542012221395,
+            "observations": 457,
+            "upper_bound": 0.6000000000000001
+          },
+          {
+            "event_rate": 0.5954825462012321,
+            "index": 6,
+            "lower_bound": 0.6000000000000001,
+            "mean_probability": 0.6467783644543297,
+            "observations": 487,
+            "upper_bound": 0.7000000000000001
+          },
+          {
+            "event_rate": 0.6621823617339312,
+            "index": 7,
+            "lower_bound": 0.7000000000000001,
+            "mean_probability": 0.7544320914307794,
+            "observations": 669,
+            "upper_bound": 0.8
+          },
+          {
+            "event_rate": 0.8369152970922883,
+            "index": 8,
+            "lower_bound": 0.8,
+            "mean_probability": 0.8585736725242689,
+            "observations": 1582,
+            "upper_bound": 0.9
+          },
+          {
+            "event_rate": 0.9134275618374559,
+            "index": 9,
+            "lower_bound": 0.9,
+            "mean_probability": 0.9266729509620936,
+            "observations": 566,
+            "upper_bound": 1.0
+          }
+        ],
+        "scored_rows": 11737
+      }
+    },
+    "pooled": {
+      "brier_score": 0.0929235023719177,
+      "event_rate": 0.3075569160130094,
+      "log_loss": 0.30092569492814797,
+      "log_loss_clip": 1e-15,
+      "mean_calibration_bias": -0.0018324481152312555,
+      "mean_probability": 0.30572446789777813,
+      "reliability_bins": [
+        {
+          "event_rate": 0.026754890678941313,
+          "index": 0,
+          "lower_bound": 0.0,
+          "mean_probability": 0.029529493138196552,
+          "observations": 13904,
+          "upper_bound": 0.1
+        },
+        {
+          "event_rate": 0.2216838279830406,
+          "index": 1,
+          "lower_bound": 0.1,
+          "mean_probability": 0.1458953740343324,
+          "observations": 1651,
+          "upper_bound": 0.2
+        },
+        {
+          "event_rate": 0.3047808764940239,
+          "index": 2,
+          "lower_bound": 0.2,
+          "mean_probability": 0.24601035396673457,
+          "observations": 1004,
+          "upper_bound": 0.30000000000000004
+        },
+        {
+          "event_rate": 0.3662551440329218,
+          "index": 3,
+          "lower_bound": 0.30000000000000004,
+          "mean_probability": 0.35014452306131905,
+          "observations": 729,
+          "upper_bound": 0.4
+        },
+        {
+          "event_rate": 0.45885634588563456,
+          "index": 4,
+          "lower_bound": 0.4,
+          "mean_probability": 0.45023037564501595,
+          "observations": 717,
+          "upper_bound": 0.5
+        },
+        {
+          "event_rate": 0.5580865603644647,
+          "index": 5,
+          "lower_bound": 0.5,
+          "mean_probability": 0.5532990314285732,
+          "observations": 878,
+          "upper_bound": 0.6000000000000001
+        },
+        {
+          "event_rate": 0.6138728323699422,
+          "index": 6,
+          "lower_bound": 0.6000000000000001,
+          "mean_probability": 0.646587029996192,
+          "observations": 865,
+          "upper_bound": 0.7000000000000001
+        },
+        {
+          "event_rate": 0.6616822429906543,
+          "index": 7,
+          "lower_bound": 0.7000000000000001,
+          "mean_probability": 0.7543316595120697,
+          "observations": 1070,
+          "upper_bound": 0.8
+        },
+        {
+          "event_rate": 0.8644814090019569,
+          "index": 8,
+          "lower_bound": 0.8,
+          "mean_probability": 0.8623624243155633,
+          "observations": 4088,
+          "upper_bound": 0.9
+        },
+        {
+          "event_rate": 0.9235150528885273,
+          "index": 9,
+          "lower_bound": 0.9,
+          "mean_probability": 0.9243498002697753,
+          "observations": 1229,
+          "upper_bound": 1.0
+        }
+      ],
+      "scored_rows": 26135
+    }
+  },
+  "conditional_start": {
+    "by_position": {
+      "DEF": {
+        "brier_score": 0.111083724310233,
+        "event_rate": 0.8154565456545655,
+        "log_loss": 0.3513111279836992,
+        "log_loss_clip": 1e-15,
+        "mean_calibration_bias": -0.034856102691613766,
+        "mean_probability": 0.7806004429629517,
+        "reliability_bins": [
+          {
+            "event_rate": null,
+            "index": 0,
+            "lower_bound": 0.0,
+            "mean_probability": null,
+            "observations": 0,
+            "upper_bound": 0.1
+          },
+          {
+            "event_rate": 0.20512820512820512,
+            "index": 1,
+            "lower_bound": 0.1,
+            "mean_probability": 0.16864973132183558,
+            "observations": 39,
+            "upper_bound": 0.2
+          },
+          {
+            "event_rate": 0.35294117647058826,
+            "index": 2,
+            "lower_bound": 0.2,
+            "mean_probability": 0.2564871779643944,
+            "observations": 153,
+            "upper_bound": 0.30000000000000004
+          },
+          {
+            "event_rate": 0.44533333333333336,
+            "index": 3,
+            "lower_bound": 0.30000000000000004,
+            "mean_probability": 0.355698982259437,
+            "observations": 375,
+            "upper_bound": 0.4
+          },
+          {
+            "event_rate": 0.5859375,
+            "index": 4,
+            "lower_bound": 0.4,
+            "mean_probability": 0.44334763997714427,
+            "observations": 128,
+            "upper_bound": 0.5
+          },
+          {
+            "event_rate": 0.695364238410596,
+            "index": 5,
+            "lower_bound": 0.5,
+            "mean_probability": 0.5575220219369259,
+            "observations": 151,
+            "upper_bound": 0.6000000000000001
+          },
+          {
+            "event_rate": 0.7431192660550459,
+            "index": 6,
+            "lower_bound": 0.6000000000000001,
+            "mean_probability": 0.648732011103151,
+            "observations": 218,
+            "upper_bound": 0.7000000000000001
+          },
+          {
+            "event_rate": 0.7670454545454546,
+            "index": 7,
+            "lower_bound": 0.7000000000000001,
+            "mean_probability": 0.7519308392700107,
+            "observations": 176,
+            "upper_bound": 0.8
+          },
+          {
+            "event_rate": 0.8595744680851064,
+            "index": 8,
+            "lower_bound": 0.8,
+            "mean_probability": 0.8591380353609793,
+            "observations": 470,
+            "upper_bound": 0.9
+          },
+          {
+            "event_rate": 0.9631360332294912,
+            "index": 9,
+            "lower_bound": 0.9,
+            "mean_probability": 0.9556405028736655,
+            "observations": 1926,
+            "upper_bound": 1.0
+          }
+        ],
+        "scored_rows": 3636
+      },
+      "FWD": {
+        "brier_score": 0.13357401387199752,
+        "event_rate": 0.6091954022988506,
+        "log_loss": 0.42447365992507863,
+        "log_loss_clip": 1e-15,
+        "mean_calibration_bias": 0.053495046851740446,
+        "mean_probability": 0.662690449150591,
+        "reliability_bins": [
+          {
+            "event_rate": 0.0,
+            "index": 0,
+            "lower_bound": 0.0,
+            "mean_probability": 0.09717293311768682,
+            "observations": 2,
+            "upper_bound": 0.1
+          },
+          {
+            "event_rate": 0.2,
+            "index": 1,
+            "lower_bound": 0.1,
+            "mean_probability": 0.16858981127519004,
+            "observations": 65,
+            "upper_bound": 0.2
+          },
+          {
+            "event_rate": 0.16153846153846155,
+            "index": 2,
+            "lower_bound": 0.2,
+            "mean_probability": 0.2533481413543343,
+            "observations": 130,
+            "upper_bound": 0.30000000000000004
+          },
+          {
+            "event_rate": 0.17261904761904762,
+            "index": 3,
+            "lower_bound": 0.30000000000000004,
+            "mean_probability": 0.3471731802144185,
+            "observations": 168,
+            "upper_bound": 0.4
+          },
+          {
+            "event_rate": 0.28,
+            "index": 4,
+            "lower_bound": 0.4,
+            "mean_probability": 0.4422205690381328,
+            "observations": 75,
+            "upper_bound": 0.5
+          },
+          {
+            "event_rate": 0.40425531914893614,
+            "index": 5,
+            "lower_bound": 0.5,
+            "mean_probability": 0.5482583625905221,
+            "observations": 47,
+            "upper_bound": 0.6000000000000001
+          },
+          {
+            "event_rate": 0.7,
+            "index": 6,
+            "lower_bound": 0.6000000000000001,
+            "mean_probability": 0.6475608226822445,
+            "observations": 70,
+            "upper_bound": 0.7000000000000001
+          },
+          {
+            "event_rate": 0.7704918032786885,
+            "index": 7,
+            "lower_bound": 0.7000000000000001,
+            "mean_probability": 0.755250694330296,
+            "observations": 61,
+            "upper_bound": 0.8
+          },
+          {
+            "event_rate": 0.8387096774193549,
+            "index": 8,
+            "lower_bound": 0.8,
+            "mean_probability": 0.8555566737098058,
+            "observations": 155,
+            "upper_bound": 0.9
+          },
+          {
+            "event_rate": 0.9280898876404494,
+            "index": 9,
+            "lower_bound": 0.9,
+            "mean_probability": 0.9478615971408357,
+            "observations": 445,
+            "upper_bound": 1.0
+          }
+        ],
+        "scored_rows": 1218
+      },
+      "GK": {
+        "brier_score": 0.03652127861884158,
+        "event_rate": 0.986449864498645,
+        "log_loss": 0.13491505169757492,
+        "log_loss_clip": 1e-15,
+        "mean_calibration_bias": -0.09434146785398012,
+        "mean_probability": 0.8921083966446649,
+        "reliability_bins": [
+          {
+            "event_rate": null,
+            "index": 0,
+            "lower_bound": 0.0,
+            "mean_probability": null,
+            "observations": 0,
+            "upper_bound": 0.1
+          },
+          {
+            "event_rate": null,
+            "index": 1,
+            "lower_bound": 0.1,
+            "mean_probability": null,
+            "observations": 0,
+            "upper_bound": 0.2
+          },
+          {
+            "event_rate": null,
+            "index": 2,
+            "lower_bound": 0.2,
+            "mean_probability": null,
+            "observations": 0,
+            "upper_bound": 0.30000000000000004
+          },
+          {
+            "event_rate": 0.8235294117647058,
+            "index": 3,
+            "lower_bound": 0.30000000000000004,
+            "mean_probability": 0.36467539215674477,
+            "observations": 51,
+            "upper_bound": 0.4
+          },
+          {
+            "event_rate": 1.0,
+            "index": 4,
+            "lower_bound": 0.4,
+            "mean_probability": 0.4418142484240738,
+            "observations": 4,
+            "upper_bound": 0.5
+          },
+          {
+            "event_rate": 1.0,
+            "index": 5,
+            "lower_bound": 0.5,
+            "mean_probability": 0.5051303921547261,
+            "observations": 3,
+            "upper_bound": 0.6000000000000001
+          },
+          {
+            "event_rate": 0.9743589743589743,
+            "index": 6,
+            "lower_bound": 0.6000000000000001,
+            "mean_probability": 0.6632911295316642,
+            "observations": 39,
+            "upper_bound": 0.7000000000000001
+          },
+          {
+            "event_rate": 1.0,
+            "index": 7,
+            "lower_bound": 0.7000000000000001,
+            "mean_probability": 0.7348740586505312,
+            "observations": 8,
+            "upper_bound": 0.8
+          },
+          {
+            "event_rate": 1.0,
+            "index": 8,
+            "lower_bound": 0.8,
+            "mean_probability": 0.872822732795987,
+            "observations": 54,
+            "upper_bound": 0.9
+          },
+          {
+            "event_rate": 1.0,
+            "index": 9,
+            "lower_bound": 0.9,
+            "mean_probability": 0.9630658539925488,
+            "observations": 579,
+            "upper_bound": 1.0
+          }
+        ],
+        "scored_rows": 738
+      },
+      "MID": {
+        "brier_score": 0.15653390216153168,
+        "event_rate": 0.6554484264144078,
+        "log_loss": 0.4798598870827751,
+        "log_loss_clip": 1e-15,
+        "mean_calibration_bias": 0.03379136070286892,
+        "mean_probability": 0.6892397871172767,
+        "reliability_bins": [
+          {
+            "event_rate": 0.0,
+            "index": 0,
+            "lower_bound": 0.0,
+            "mean_probability": 0.08494391374923888,
+            "observations": 4,
+            "upper_bound": 0.1
+          },
+          {
+            "event_rate": 0.11464968152866242,
+            "index": 1,
+            "lower_bound": 0.1,
+            "mean_probability": 0.1680405484590507,
+            "observations": 157,
+            "upper_bound": 0.2
+          },
+          {
+            "event_rate": 0.2575452716297787,
+            "index": 2,
+            "lower_bound": 0.2,
+            "mean_probability": 0.2542117786123423,
+            "observations": 497,
+            "upper_bound": 0.30000000000000004
+          },
+          {
+            "event_rate": 0.2640625,
+            "index": 3,
+            "lower_bound": 0.30000000000000004,
+            "mean_probability": 0.34855454492350196,
+            "observations": 640,
+            "upper_bound": 0.4
+          },
+          {
+            "event_rate": 0.45962732919254656,
+            "index": 4,
+            "lower_bound": 0.4,
+            "mean_probability": 0.44901883359669087,
+            "observations": 322,
+            "upper_bound": 0.5
+          },
+          {
+            "event_rate": 0.5722713864306784,
+            "index": 5,
+            "lower_bound": 0.5,
+            "mean_probability": 0.5500064479505191,
+            "observations": 339,
+            "upper_bound": 0.6000000000000001
+          },
+          {
+            "event_rate": 0.6694214876033058,
+            "index": 6,
+            "lower_bound": 0.6000000000000001,
+            "mean_probability": 0.6507141185773319,
+            "observations": 363,
+            "upper_bound": 0.7000000000000001
+          },
+          {
+            "event_rate": 0.6703056768558951,
+            "index": 7,
+            "lower_bound": 0.7000000000000001,
+            "mean_probability": 0.755524741459724,
+            "observations": 458,
+            "upper_bound": 0.8
+          },
+          {
+            "event_rate": 0.7792207792207793,
+            "index": 8,
+            "lower_bound": 0.8,
+            "mean_probability": 0.8554090563997775,
+            "observations": 847,
+            "upper_bound": 0.9
+          },
+          {
+            "event_rate": 0.9283422459893048,
+            "index": 9,
+            "lower_bound": 0.9,
+            "mean_probability": 0.9490927955203905,
+            "observations": 1870,
+            "upper_bound": 1.0
+          }
+        ],
+        "scored_rows": 5497
+      }
+    },
+    "pooled": {
+      "brier_score": 0.1311221150952065,
+      "event_rate": 0.7248624763278925,
+      "log_loss": 0.4086692475953017,
+      "log_loss_clip": 1e-15,
+      "mean_calibration_bias": 0.004919044475258816,
+      "mean_probability": 0.7297815208031513,
+      "reliability_bins": [
+        {
+          "event_rate": 0.0,
+          "index": 0,
+          "lower_bound": 0.0,
+          "mean_probability": 0.0890202535387215,
+          "observations": 6,
+          "upper_bound": 0.1
+        },
+        {
+          "event_rate": 0.14942528735632185,
+          "index": 1,
+          "lower_bound": 0.1,
+          "mean_probability": 0.16826836537360115,
+          "observations": 261,
+          "upper_bound": 0.2
+        },
+        {
+          "event_rate": 0.2602564102564103,
+          "index": 2,
+          "lower_bound": 0.2,
+          "mean_probability": 0.2545141674037819,
+          "observations": 780,
+          "upper_bound": 0.30000000000000004
+        },
+        {
+          "event_rate": 0.32982171799027554,
+          "index": 3,
+          "lower_bound": 0.30000000000000004,
+          "mean_probability": 0.35120386253998903,
+          "observations": 1234,
+          "upper_bound": 0.4
+        },
+        {
+          "event_rate": 0.46880907372400754,
+          "index": 4,
+          "lower_bound": 0.4,
+          "mean_probability": 0.44662828356666384,
+          "observations": 529,
+          "upper_bound": 0.5
+        },
+        {
+          "event_rate": 0.5944444444444444,
+          "index": 5,
+          "lower_bound": 0.5,
+          "mean_probability": 0.5517065655294825,
+          "observations": 540,
+          "upper_bound": 0.6000000000000001
+        },
+        {
+          "event_rate": 0.7130434782608696,
+          "index": 6,
+          "lower_bound": 0.6000000000000001,
+          "mean_probability": 0.6504788624689136,
+          "observations": 690,
+          "upper_bound": 0.7000000000000001
+        },
+        {
+          "event_rate": 0.7069701280227596,
+          "index": 7,
+          "lower_bound": 0.7000000000000001,
+          "mean_probability": 0.7543662078569384,
+          "observations": 703,
+          "upper_bound": 0.8
+        },
+        {
+          "event_rate": 0.817824377457405,
+          "index": 8,
+          "lower_bound": 0.8,
+          "mean_probability": 0.8571887676187908,
+          "observations": 1526,
+          "upper_bound": 0.9
+        },
+        {
+          "event_rate": 0.9508298755186722,
+          "index": 9,
+          "lower_bound": 0.9,
+          "mean_probability": 0.9532739992421508,
+          "observations": 4820,
+          "upper_bound": 1.0
+        }
+      ],
+      "scored_rows": 11089
+    }
+  },
+  "contract_version": "participation_calibration_v1",
+  "created_utc": "2026-09-14T01:10:01+00:00",
+  "declared_seasons": [
+    "2023-24",
+    "2024-25"
+  ],
+  "descriptive_only": true,
+  "environment": {
+    "logical_cpu_count": 10,
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "processor": "arm",
+    "python": "3.13.15"
+  },
+  "feature_columns": [
+    "minutes_last_3",
+    "minutes_last_5",
+    "points_last_3",
+    "points_last_5",
+    "appearance_rate_last_3",
+    "appearance_rate_last_5",
+    "price_tenths",
+    "fixture_count",
+    "home_fixture_count",
+    "team_points_last_5"
+  ],
+  "locked_holdout_accessed": false,
+  "model_version": "participation_conditional_start_v1",
+  "operational_control_changed": false,
+  "prereg": "docs/participation_model_prereg.md",
+  "promotion_decision": "none",
+  "provenance": {
+    "archive_commit": "8c97b2adb123863c3dd581e730f1360e89815ac2",
+    "archive_manifest_sha256": "c792682c004ab480a902b4ec526b3872928081d169e988e51d0e67eae4df83dd",
+    "archive_repository": "vaastav/Fantasy-Premier-League",
+    "experiment_contract_version": "screening_doe_v1",
+    "feature_generation_contract_version": "form_window_v1",
+    "history_rows": 55661,
+    "history_seasons": [
+      "2023-24",
+      "2024-25"
+    ],
+    "repository_commit": "0d4533ac36670d42ec8df546a3d8fecef5c818e8",
+    "working_tree_dirty": false
+  },
+  "scoring_appeared_rows": 11431,
+  "scoring_rows": 26919,
+  "scoring_season": "2024-25",
+  "training_rows": 10746,
+  "training_season": "2023-24"
+}
