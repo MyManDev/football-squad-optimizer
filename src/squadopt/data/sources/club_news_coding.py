@@ -243,18 +243,23 @@ def response_schema() -> dict[str, object]:
     }
 
 
-def coding_prompt_sha256() -> str:
-    """Fingerprint the instrument: the contract, the frozen prompt and the schema.
+def coding_prompt_sha256(model_identifier: str = CODING_MODEL_IDENTIFIER) -> str:
+    """Fingerprint the instrument: the contract, the frozen prompt, the schema and the model.
 
     Canonical JSON with sorted keys, because a digest that moved when a dictionary happened
     to iterate differently would be recording nothing. The model identifier is in here too:
     the same words put to a different model are a different question.
+
+    It is an argument now rather than a constant read, because the model became configuration.
+    The default is the contract's own model, so an unconfigured run still produces exactly the
+    digest this contract describes; a run that asked a different model gets a different
+    fingerprint, which is the sentence above holding rather than being asserted.
     """
 
     envelope = {
         "contract_version": ROTATION_CLAIM_CODING_CONTRACT_VERSION,
         "effort": CODING_EFFORT,
-        "model_identifier": CODING_MODEL_IDENTIFIER,
+        "model_identifier": model_identifier,
         "system_prompt": SYSTEM_PROMPT,
         "response_schema": response_schema(),
     }
