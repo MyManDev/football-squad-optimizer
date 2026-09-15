@@ -490,6 +490,7 @@ def test_a_publish_refused_after_the_preview_keeps_its_record_deliberately(
     [
         [],
         ["--decide", "--chip", "bboost", "--rotation", "--publish"],
+        ["--rotation", "--rotation-capture", "club-news-abc123456789"],
         ["--snapshot-id", "capture", "--skip-top100", "--projection", "component-only"],
     ],
 )
@@ -544,3 +545,63 @@ def test_a_weekly_run_leaves_the_same_kind_of_run_log_record_a_tick_does(tmp_pat
     plan = next(event for event in events if event.message == "tick.week.plan")
     assert plan.fields["season"] == "2026-27" and plan.fields["gameweek"] == 2
     assert plan.level == "INFO" and plan.ts
+
+
+# --- the rotation stage's source --------------------------------------------
+
+
+def test_a_named_capture_reaches_the_export_and_names_its_artifact() -> None:
+    """The eighth field, finally set.
+
+    `RotationExportRequest` has carried `club_news_snapshot` and its exactly-one-source
+    refusal since the capture path landed, and the weekly stage never set it -- because it
+    built the request positionally and the eighth field was never reached. The artifact name
+    follows the capture the claims came from, so it has to move with it.
+    """
+
+    from squadopt.application.weekly_plan import (
+        WeeklyRequest,
+        rotation_artifact,
+        rotation_source_capture,
+    )
+
+    capture = "club-news-abcdef012345"
+    decision = "decision-999999999999"
+    request = WeeklyRequest(
+        season="2026-27", gameweek=5, league_id=1, rotation=True, rotation_capture=capture
+    )
+
+    assert request.rotation_capture == capture
+    assert rotation_source_capture(decision, capture) == capture
+    assert rotation_source_capture(decision, None) == decision
+
+    named, _manifest = rotation_artifact(
+        Path("out"), "2026-27", 5, rotation_source_capture(decision, capture)
+    )
+    from_fixture, _unused = rotation_artifact(
+        Path("out"), "2026-27", 5, rotation_source_capture(decision, None)
+    )
+    assert named != from_fixture
+    assert capture[-12:] in named.name
+
+
+def test_a_capture_without_the_rotation_stage_is_refused() -> None:
+    """Naming a source for a step nobody asked for looks like a run and is not one."""
+
+    from squadopt.application.weekly_plan import WeekError, WeeklyRequest
+
+    with pytest.raises(WeekError, match="without --rotation"):
+        WeeklyRequest(
+            season="2026-27", gameweek=5, league_id=1, rotation_capture="club-news-abc"
+        ).plan()
+
+
+def test_no_capture_keeps_todays_behaviour_exactly() -> None:
+    """With no flag the fixture is read and the plan says so, as it always did."""
+
+    from squadopt.application.weekly_plan import WeeklyRequest
+
+    plan = WeeklyRequest(season="2026-27", gameweek=5, league_id=1, rotation=True).plan()
+
+    assert "rotation" in plan.steps
+    assert WeeklyRequest(season="2026-27", gameweek=5, league_id=1).rotation_capture is None
