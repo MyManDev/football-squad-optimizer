@@ -8,15 +8,14 @@
  * producer chose is the default and is labelled as such. Where it named no default, no
  * rival is shown as chosen — the request would name none, and a control that displayed
  * one would demand a choice the member appeared to have made. Windows are enabled only
- * where the index lists them — pure points at three and five weeks when this publish
- * solved them — and the note says what a longer window assumes; a rival strategy stays at
- * one week, and a window nobody computed is shown disabled rather than hidden. A window
- * carried in from another strategy falls back to one the index lists, and says it did.
+ * where the index lists results or explicit refusals. With a backend, valid unpublished
+ * combinations can also be requested. The note states the longer window's assumptions;
+ * rival strategies constrain only the opening squad. Static selections fall back to an
+ * offered window when switching strategies.
  *
  * One option may carry the producer's declared rule as a label: the rule reads the
  * member's points gap to their rival and the gameweeks left, and names one of the three.
- * It marks, it does not choose — the checked option is still whatever the URL says — and
- * the note beside it says the rule is written down rather than measured.
+ * This label appears only at one week. It does not change the URL's checked option.
  *
  * Selection lives in the URL (`mode`, `rival`, `window`), the same parameters the
  * templates set and the compute panel reads, so the whole state stays shareable.
@@ -30,6 +29,7 @@ import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../moves/modePrices";
 import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
 import { resolvePublishedAdvice } from "./adviceSelection";
+import { MULTIWEEK_MESSAGES } from "./multiweekMessages";
 import styles from "./MemberDecisionControls.module.css";
 
 /** The gap as the rule read it: signed, so behind and ahead are visibly different. */
@@ -48,8 +48,9 @@ export function MemberDecisionControls({
   index: EntryAdviceIndex | null;
   allowCompute?: boolean;
 }) {
-  const { messages } = useLanguage();
+  const { messages, language } = useLanguage();
   const copy = messages.leagueMembers;
+  const windowCopy = MULTIWEEK_MESSAGES[language];
   const [searchParams, setSearchParams] = useSearchParams();
   const selection = resolvePublishedAdvice(
     searchParams,
@@ -148,7 +149,7 @@ export function MemberDecisionControls({
                   </span>
                   <span className={styles.description}>
                     {windowSize > 1 && slug !== "saf-puan"
-                      ? copy.windowStrategyDescriptions[slug]
+                      ? windowCopy.windowStrategyDescriptions[slug]
                       : copy.strategies[slug].description}
                   </span>
                 </span>

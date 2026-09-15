@@ -2,9 +2,8 @@ import { AS_A_CHANCE } from "../../../testSupport/honesty";
 /**
  * The member's controls name only what the producer computed: the catalogue's
  * strategies, the league's rivals with the producer's default marked, and the windows
- * the index lists — pure points at three and five weeks where this publish solved them,
- * one week for a rival strategy. Everything else is shown disabled with its reason,
- * never hidden.
+ * the index lists, with valid unpublished combinations enabled when a backend is present.
+ * Longer rival windows state their strict opening-squad policy and hide the weekly rule.
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -16,6 +15,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdviceIndex } from "../types";
 import { MemberDecisionControls } from "./MemberDecisionControls";
+import { MULTIWEEK_MESSAGES } from "./multiweekMessages";
 
 afterEach(cleanup);
 
@@ -50,7 +50,9 @@ describe("member decision controls", () => {
   it("uses the strict first-week policy and hides the weekly rule on a longer window", () => {
     renderControls(`/league/members/${ENTRY}?mode=ortak-koru&window=3`);
     const copy = MESSAGES.tr.leagueMembers;
-    expect(screen.getByText(copy.windowStrategyDescriptions["ortak-koru"])).toBeInTheDocument();
+    expect(
+      screen.getByText(MULTIWEEK_MESSAGES.tr.windowStrategyDescriptions["ortak-koru"]),
+    ).toBeInTheDocument();
     expect(screen.queryByText(copy.rulePickBadge)).not.toBeInTheDocument();
     expect(screen.queryByText(copy.strategies["ortak-koru"].description)).not.toBeInTheDocument();
   });

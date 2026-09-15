@@ -1,3 +1,4 @@
+import { MULTIWEEK_MESSAGES } from "./multiweekMessages";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
@@ -10,16 +11,17 @@ export function WindowComparison({
   advice: EntryAdvice;
   rivalName: string;
 }) {
-  const { locale, messages } = useLanguage();
+  const { locale, messages, language } = useLanguage();
   const c = advice.window_comparison;
   if (!c) return null;
   const copy = messages.leagueMembers;
+  const windowCopy = MULTIWEEK_MESSAGES[language];
   const gap = (value: number | null) => (value === null ? "—" : points(value, 1, locale));
   return (
-    <section aria-label={copy.windowComparisonTitle}>
-      <h3>{copy.windowComparisonTitle}</h3>
+    <section aria-label={windowCopy.windowComparisonTitle}>
+      <h3>{windowCopy.windowComparisonTitle}</h3>
       <p>
-        {copy.windowRivalBasis(
+        {windowCopy.windowRivalBasis(
           rivalName,
           c.rival_gameweek,
           c.overlap_actual,
@@ -30,8 +32,8 @@ export function WindowComparison({
         <thead>
           <tr>
             <th>{copy.strategyLegend}</th>
-            <th>{copy.windowFirstNet}</th>
-            <th>{copy.windowTotalNet(advice.window)}</th>
+            <th>{windowCopy.windowFirstNet}</th>
+            <th>{windowCopy.windowTotalNet(advice.window)}</th>
           </tr>
         </thead>
         <tbody>
@@ -52,9 +54,11 @@ export function WindowComparison({
         </tbody>
       </table>
       <p>
-        <strong>{copy.windowDifference(signedPoints(c.net_points_difference, 1, locale))}</strong>
+        <strong>
+          {windowCopy.windowDifference(signedPoints(c.net_points_difference, 1, locale))}
+        </strong>
       </p>
-      <p>{copy.windowComparisonNote}</p>
+      <p>{windowCopy.windowComparisonNote}</p>
       <p>
         {copy.strategyLegend}: {c.solver_status}; {copy.strategies["saf-puan"].name}:{" "}
         {c.control_solver_status}.
