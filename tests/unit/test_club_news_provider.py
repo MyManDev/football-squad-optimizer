@@ -10,7 +10,12 @@ from collections.abc import Mapping, Sequence
 
 import pytest
 
-from squadopt.data.sources.club_news import ClaimResponse, RawDocument, RosterPlayer
+from squadopt.data.sources.club_news import (
+    ClaimResponse,
+    ClubNewsError,
+    RawDocument,
+    RosterPlayer,
+)
 from squadopt.data.sources.club_news_coding import CODING_MODEL_IDENTIFIER, coding_prompt_sha256
 from squadopt.platform.club_news_provider import (
     DEFAULT_PROVIDER,
@@ -21,6 +26,7 @@ from squadopt.platform.club_news_provider import (
     ClubNewsProviderError,
     CodingProviderConfig,
     build_coding_provider,
+    code_week_by_club,
     register_provider,
     registered_providers,
     resolve_provider_config,
@@ -183,3 +189,128 @@ def test_the_environment_is_not_read_when_a_mapping_is_given() -> None:
 
     with pytest.raises(ClubNewsProviderError):
         resolve_provider_config(empty)
+
+
+# --- the request unit -------------------------------------------------------
+
+
+def _document(club: str, path: str) -> RawDocument:
+    return RawDocument(
+        club=club,
+        requested_url=f"https://club.example/{path}",
+        final_url=f"https://club.example/{path}",
+        http_status=200,
+        content_type="text/html; charset=utf-8",
+        byte_length=1,
+        fetched_at_utc="2026-09-12T14:00:00Z",
+        content=b"x",
+        readable=b"x",
+    )
+
+
+def _response(text: str = "{}") -> ClaimResponse:
+    return ClaimResponse(text=text, model_identifier="m", model_version="v")
+
+
+class _Recorder:
+    """Counts calls and can be told to fail for one named club."""
+
+    def __init__(self, *, fails_for: str | None = None) -> None:
+        self.calls: list[tuple[str, ...]] = []
+        self._fails_for = fails_for
+
+    def fetch(self, url: str) -> RawDocument:  # pragma: no cover - never called here
+        raise AssertionError(f"not a fetcher: {url!r}")
+
+    def code(
+        self, documents: Sequence[RawDocument], roster: Sequence[RosterPlayer]
+    ) -> ClaimResponse:
+        clubs = tuple(dict.fromkeys(document.club for document in documents))
+        self.calls.append(clubs)
+        if self._fails_for is not None and self._fails_for in clubs:
+            raise ClubNewsError(
+                f"The response reached the ceiling and is truncated, for {self._fails_for}."
+            )
+        return _response()
+
+
+CONFIG = CodingProviderConfig(
+    provider=DEFAULT_PROVIDER, model_identifier=CODING_MODEL_IDENTIFIER, api_key="k"
+)
+
+
+def test_each_club_is_one_call_and_no_call_carries_two_clubs() -> None:
+    """Counted, not assumed. The ceiling is per call, so the unit decides what it costs."""
+
+    documents = [
+        _document("Arsenal", "arsenal/team-news"),
+        _document("Man Utd", "united/press"),
+        _document("Man Utd", "united/injuries"),
+        _document("Everton", "everton/news"),
+    ]
+    recorder = _Recorder()
+
+    coded, refused = code_week_by_club(recorder, CONFIG, documents, ())
+
+    assert refused == ()
+    assert len(recorder.calls) == 3
+    assert all(len(clubs) == 1 for clubs in recorder.calls)
+    assert [club.club for club in coded] == ["Arsenal", "Man Utd", "Everton"]
+
+
+def test_a_club_whose_answer_hits_the_ceiling_does_not_cost_the_week() -> None:
+    """The failure this lane already models: one club failing does not fail the week.
+
+    In one call for the whole week, the same truncation loses every club's read at once --
+    which is the reason the unit changed rather than the constants.
+    """
+
+    documents = [
+        _document("Arsenal", "arsenal/team-news"),
+        _document("Man Utd", "united/press"),
+        _document("Everton", "everton/news"),
+    ]
+
+    coded, refused = code_week_by_club(_Recorder(fails_for="Man Utd"), CONFIG, documents, ())
+
+    assert [club.club for club in coded] == ["Arsenal", "Everton"]
+    assert [club for club, _reason in refused] == ["Man Utd"]
+    assert "ceiling" in refused[0][1]
+
+
+def test_a_club_s_pages_arrive_together_in_its_one_call() -> None:
+    """Two registered pages are one question about one club, not two."""
+
+    documents = [
+        _document("Man Utd", "united/press"),
+        _document("Man Utd", "united/injuries"),
+    ]
+    recorder = _Recorder()
+
+    code_week_by_club(recorder, CONFIG, documents, ())
+
+    assert len(recorder.calls) == 1
+
+
+def test_every_coded_club_carries_the_fingerprint_of_the_model_that_was_asked() -> None:
+    """A response is only interpretable against the question that produced it."""
+
+    coded, _refused = code_week_by_club(
+        _Recorder(), CONFIG, [_document("Arsenal", "arsenal/team-news")], ()
+    )
+
+    assert coded[0].prompt_sha256 == coding_prompt_sha256(CODING_MODEL_IDENTIFIER)
+
+
+def test_a_different_model_produces_a_different_recorded_question() -> None:
+    """Genericity does not blur the record: two weeks coded by two models stay apart."""
+
+    other = CodingProviderConfig(
+        provider=DEFAULT_PROVIDER, model_identifier="another-model", api_key="k"
+    )
+
+    coded, _refused = code_week_by_club(
+        _Recorder(), other, [_document("Arsenal", "arsenal/team-news")], ()
+    )
+
+    assert coded[0].prompt_sha256 != coding_prompt_sha256(CODING_MODEL_IDENTIFIER)
