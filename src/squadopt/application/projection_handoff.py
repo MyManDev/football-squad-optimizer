@@ -329,6 +329,7 @@ def build(
     if development_only:
         diagnostics["fallback_training_seasons"] = list(COMPONENT_TRAINING_SEASONS)
     evidence_fingerprint: str | None = None
+    elite_start_counts: dict[int, int] | None = None
     # The base projection first — the component model when the capture carries settled
     # history, the legacy blend otherwise or on request — then, when the Top-100 evidence
     # is supplied, the same bounded uplift on whichever base was chosen. The two used to
@@ -389,6 +390,10 @@ def build(
             decision_captured_at_utc=captured_at,
         )
         projected_table = adjusted.table
+        evidence_counts = evidence.set_index("player_id")["elite_start_count_lag1"].to_dict()
+        elite_start_counts = {
+            int(code): int(evidence_counts.get(code, 0)) for code in projected_table["player_id"]
+        }
         on_component = model_version == COMPONENT_MODEL_VERSION
         model_version = (
             COMPONENT_ELITE_MODEL_VERSION if on_component else ELITE_EVIDENCE_MODEL_VERSION
@@ -426,6 +431,7 @@ def build(
         feature_contract_version=feature_contract_version,
         expected_points=expected,
         evidence_fingerprint=evidence_fingerprint,
+        elite_start_counts=elite_start_counts,
         diagnostics=diagnostics,
     )
 

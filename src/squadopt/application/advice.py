@@ -641,6 +641,10 @@ def window_stated_limits(projection: Projection) -> list[str]:
     """
 
     carries_uplift = projection.diagnostics.get("projection_evidence_fingerprint") is not None
+    if "personal_top100_weight_percent" in projection.diagnostics:
+        # The member's selected weight is stated beside the result; the frozen
+        # five-percent sentence no longer describes this explicit preference.
+        carries_uplift = False
     return [
         sentence
         for sentence in WINDOW_STATED_LIMITS

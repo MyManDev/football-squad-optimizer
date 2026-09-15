@@ -344,6 +344,9 @@ def test_verified_elite_evidence_changes_identity_and_round_trips(
     reread = read_projection_handoff(written)
     assert reread.fingerprint == projection.fingerprint
     assert projection.model_version == ELITE_EVIDENCE_MODEL_VERSION
+    assert reread.elite_start_counts == projection.elite_start_counts
+    assert projection.elite_start_counts[1001] == 100
+    assert set(projection.elite_start_counts) == set(projection.expected_points)
     assert projection.expected_points[1001] == pytest.approx(control.expected_points[1001] * 1.05)
     last_player = ordered_players[-1]
     assert projection.expected_points[last_player] == pytest.approx(

@@ -102,6 +102,7 @@ class InSeasonProjection:
     evidence_fingerprint: str | None = None
     diagnostics: Mapping[str, object] = field(default_factory=dict)
     contract_version: str = PROJECTION_HANDOFF_CONTRACT_VERSION
+    elite_start_counts: Mapping[int, int] | None = None
 
     def __post_init__(self) -> None:
         if self.contract_version != PROJECTION_HANDOFF_CONTRACT_VERSION:
@@ -164,11 +165,31 @@ class InSeasonProjection:
                 f"the exact feature contract {COMPONENT_FEATURE_CONTRACT_VERSION!r}."
             )
         object.__setattr__(self, "expected_points", MappingProxyType(points))
+        if self.elite_start_counts is not None:
+            counts = dict(self.elite_start_counts)
+            if (
+                self.model_version
+                not in (ELITE_EVIDENCE_MODEL_VERSION, COMPONENT_ELITE_MODEL_VERSION)
+                or self.evidence_fingerprint is None
+                or set(counts) != set(points)
+                or any(
+                    isinstance(code, bool)
+                    or not isinstance(code, int)
+                    or isinstance(count, bool)
+                    or not isinstance(count, int)
+                    or not 0 <= count <= 100
+                    for code, count in counts.items()
+                )
+            ):
+                raise DataSourceError(
+                    "Elite counts require an evidence-aware handoff and integer counts 0..100."
+                )
+            object.__setattr__(self, "elite_start_counts", MappingProxyType(counts))
         object.__setattr__(self, "diagnostics", MappingProxyType(dict(self.diagnostics)))
 
     @property
     def fingerprint(self) -> str:
-        payload = {
+        payload: dict[str, object] = {
             "season": self.season,
             "gameweek": self.gameweek,
             "source_snapshot_id": self.source_snapshot_id,
@@ -182,6 +203,10 @@ class InSeasonProjection:
         }
         if self.evidence_fingerprint is not None:
             payload["evidence_fingerprint"] = self.evidence_fingerprint
+        if self.elite_start_counts is not None:
+            payload["elite_start_counts"] = {
+                str(player): count for player, count in sorted(self.elite_start_counts.items())
+            }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
 
@@ -205,6 +230,10 @@ def write_projection_handoff(path: Path, projection: InSeasonProjection) -> Path
     }
     if projection.evidence_fingerprint is not None:
         document["evidence_fingerprint"] = projection.evidence_fingerprint
+    if projection.elite_start_counts is not None:
+        document["elite_start_counts"] = {
+            str(player): count for player, count in sorted(projection.elite_start_counts.items())
+        }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
@@ -221,6 +250,9 @@ def read_projection_handoff(path: Path) -> InSeasonProjection:
     rows = document.get("expected_points")
     if not isinstance(rows, dict):
         raise DataSourceError("Projection handoff must map player codes to expected points.")
+    counts = document.get("elite_start_counts")
+    if counts is not None and (not isinstance(counts, dict) or not document.get("fingerprint")):
+        raise DataSourceError("Elite counts require a mapping and a recorded handoff fingerprint.")
     try:
         projection = InSeasonProjection(
             season=str(document.get("season", "")),
@@ -236,6 +268,11 @@ def read_projection_handoff(path: Path) -> InSeasonProjection:
                 else None
             ),
             diagnostics=dict(document.get("diagnostics") or {}),
+            elite_start_counts=(
+                {int(player): count for player, count in document["elite_start_counts"].items()}
+                if document.get("elite_start_counts") is not None
+                else None
+            ),
             contract_version=str(document.get("contract_version", "")),
         )
     except (TypeError, ValueError) as error:

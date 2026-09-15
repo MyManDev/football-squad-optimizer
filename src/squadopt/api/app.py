@@ -39,7 +39,11 @@ from squadopt.platform.advice_submit import (
     IdempotencyConflictError,
     RateLimitedError,
 )
-from squadopt.platform.api_contract import BackendApiContractError
+from squadopt.platform.api_contract import (
+    TOP100_WEIGHT_PERCENTAGES,
+    BackendApiContractError,
+    validate_top100_weight,
+)
 from squadopt.platform.queue_contracts import AdviceQueueError, AdviceQueueIntegrityError
 
 DEFAULT_SITE_DATA_ROOT: Final = Path("web") / "public" / "data"
@@ -67,7 +71,7 @@ def _log_exception(message: str, request: Request, error: Exception) -> None:
     )
 
 
-def _parse_advise_body(body: object) -> tuple[str, int, int | None]:
+def _parse_advise_body(body: object) -> tuple[str, int, int | None, int | None]:
     """The AdviseRequestBody schema, enforced in one place.
 
     Exactly the declared keys (additionalProperties: false), a string strategy, an
@@ -78,7 +82,7 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None]:
 
     if not isinstance(body, dict):
         raise BackendApiContractError("The POST body must be an object.")
-    allowed = {"strategy", "window", "rival_entry_id"}
+    allowed = {"strategy", "window", "rival_entry_id", "top100_weight_percent"}
     unexpected = set(body) - allowed
     if unexpected:
         raise BackendApiContractError(f"Unexpected body fields: {sorted(unexpected)!r}.")
@@ -91,7 +95,13 @@ def _parse_advise_body(body: object) -> tuple[str, int, int | None]:
     rival = body.get("rival_entry_id")
     if rival is not None and (isinstance(rival, bool) or not isinstance(rival, int) or rival < 1):
         raise BackendApiContractError("rival_entry_id must be null or a positive integer.")
-    return strategy, window, rival
+    weight = body.get("top100_weight_percent")
+    if weight is not None:
+        try:
+            weight = validate_top100_weight(weight)
+        except ValueError as error:
+            raise BackendApiContractError(str(error)) from error
+    return strategy, window, rival, weight
 
 
 def create_app(
@@ -242,11 +252,17 @@ def create_app(
         strategy: Annotated[str, Query(pattern=r"^[a-z][a-z0-9._-]{0,63}$")],
         window: Annotated[int, Query()],
         rival: Annotated[int | None, Query(ge=1)] = None,
+        top100_weight_percent: Annotated[int | None, Query()] = None,
     ) -> Response:
         if advice_store is None:
             return _contract_error(503, "ADVICE_BACKEND_DISABLED", "No advice backend here.")
         if window not in (1, 3, 5):
             return _contract_error(422, "VALIDATION_FAILED", "window must be 1, 3, or 5.")
+        if (
+            top100_weight_percent is not None
+            and top100_weight_percent not in TOP100_WEIGHT_PERCENTAGES
+        ):
+            return _contract_error(422, "VALIDATION_FAILED", "Unsupported Top-100 weight.")
         try:
             payload = advice_store.read_advice(
                 league_id=league_id,
@@ -254,6 +270,7 @@ def create_app(
                 strategy=strategy,
                 window=window,
                 rival_entry_id=rival,
+                top100_weight_percent=top100_weight_percent,
             )
         except AdviceNotComputedError:
             if metrics is not None:
@@ -289,7 +306,7 @@ def create_app(
         except Exception:
             return _contract_error(422, "VALIDATION_FAILED", "The POST body must be JSON.")
         try:
-            strategy, window, rival = _parse_advise_body(body)
+            strategy, window, rival, weight = _parse_advise_body(body)
         except BackendApiContractError as error:
             return _contract_error(422, "VALIDATION_FAILED", str(error))
         current = datetime.now(UTC) if utc_now is None else utc_now()
@@ -302,6 +319,7 @@ def create_app(
             strategy=strategy,
             window=window,
             rival_entry_id=rival,
+            top100_weight_percent=weight,
             idempotency_key=request.headers.get("Idempotency-Key"),
             client_bucket=request.client.host if request.client else "unknown",
             at_utc=current.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),

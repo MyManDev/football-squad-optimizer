@@ -266,6 +266,8 @@ export interface AdvicePlanWeek {
 }
 
 export interface EntryAdvice {
+  top100_weight_percent?: number;
+  top100_weight_source?: "published" | "personal";
   league_id: number;
   season: string;
   gameweek: number;

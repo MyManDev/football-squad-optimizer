@@ -42,6 +42,7 @@ export function useMemberAdviceView(
     request.strategy,
     request.window,
     request.rivalEntryId ?? "",
+    request.top100WeightPercent ?? "published",
     selection.status,
     selection.path,
   ].join(":");
