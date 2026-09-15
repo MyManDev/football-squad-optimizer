@@ -182,4 +182,15 @@ Linux/amd64 Docker imajında dört kabul testi 43,52 saniyede geçti. Konteyner 
 bu backend değişikliği için yerel doğrulamaya dahil edildi; mevcut GitHub korumasında
 ayrı zorunlu merge kapısı değildir. Bu sonuç bulut NFS veya canlı dağıtım kanıtı değildir.
 
-Son tam Python/web kapılarının sonuçları son doğrulama tamamlandığında kaydedilecektir.
+Son düzeltmelerin tamamından sonra tam Python paketi yeniden çalıştırıldı:
+**5.549 geçti, 15 koşullu atlandı, 604,42 saniye**. Önceki başarısız koşunun ardından
+sadece alt küme çalıştırmakla yetinilmedi. Atlanan Docker, tarayıcı ve Python→web
+kabul kontrolleri yukarıdaki ayrı koşularda etkinleştirilerek geçti. Altı sentetik
+kapasite senaryosu ve isteğe bağlı Parquet motoru kontrolü bu toplamda atlandı.
+
+Web paketinde **779 test geçti, 2 koşullu test atlandı**. Ruff lint/format, strict
+mypy, üç import sınırı, TypeScript, web lint ve üretim derlemesi geçti. İlk JavaScript
+153.576 / 153.600 bayt gzip: bütçenin yalnız 24 bayt altında. #559 ile birlikte
+entegrasyon, iki özelliğin toplam paketini yeniden ölçmeyi gerektirir; bu çalışma
+ADR 0008'in ayrı paket yükleme optimizasyonunu uygulamaz. GitHub'da web ve Docker
+kapıları da geçti; Python 3.11/3.13 matrisinin durumu PR'dan izlenir.
