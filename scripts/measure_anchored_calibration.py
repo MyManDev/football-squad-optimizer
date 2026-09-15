@@ -23,7 +23,6 @@ Population, edge series and leave-one-season-out pools are identical to
 """
 
 import argparse
-import json
 import logging
 import sys
 from datetime import UTC, datetime
@@ -33,6 +32,9 @@ import numpy as np
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
+    _bootstrap_gap_interval,
+    _edge_series,
+    _leave_one_out,
     artifact_metadata,
     write_json,
     write_text,
@@ -57,33 +59,6 @@ GAP_TOLERANCE = 0.10
 IDENTITY_TOLERANCE = 0.02
 BOOTSTRAP_DRAWS = 2_000
 MINIMUM_HISTORY_FOLDS = 8
-
-
-def _edge_series(root: Path) -> dict[str, list[float]]:
-    series: dict[str, list[float]] = {}
-    for season in DEVELOPMENT_SEASONS:
-        suffix = "" if season == "2024-25" else f"_{season}"
-        document = json.loads(
-            (root / f"template_rival_strength{suffix}.json").read_text(encoding="utf-8")
-        )
-        series[season] = [float(row["difference"]) for row in document["rows"]]
-    return series
-
-
-def _leave_one_out(series: dict[str, list[float]], season: str) -> tuple[float, ...]:
-    return tuple(v for other, values in series.items() if other != season for v in values)
-
-
-def _bootstrap_gap_interval(
-    claimed: np.ndarray, realized: np.ndarray, seed: int
-) -> tuple[float, float]:
-    generator = np.random.default_rng(seed)
-    gaps = []
-    n = len(claimed)
-    for _ in range(BOOTSTRAP_DRAWS):
-        pick = generator.integers(0, n, size=n)
-        gaps.append(float(claimed[pick].mean() - realized[pick].mean()))
-    return float(np.quantile(gaps, 0.05)), float(np.quantile(gaps, 0.95))
 
 
 def _parse_arguments() -> argparse.Namespace:

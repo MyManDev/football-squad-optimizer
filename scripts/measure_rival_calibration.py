@@ -33,6 +33,7 @@ import numpy as np
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
+    _bootstrap_gap_interval,
     artifact_metadata,
     write_json,
     write_text,
@@ -70,18 +71,6 @@ def _edge_series(root: Path) -> dict[str, list[float]]:
 def _leave_one_out(series: dict[str, list[float]], season: str) -> tuple[float, ...]:
     pooled = [v for other, values in series.items() if other != season for v in values]
     return tuple(pooled)
-
-
-def _bootstrap_gap_interval(
-    claimed: np.ndarray, realized: np.ndarray, seed: int
-) -> tuple[float, float]:
-    generator = np.random.default_rng(seed)
-    gaps = []
-    n = len(claimed)
-    for _ in range(BOOTSTRAP_DRAWS):
-        pick = generator.integers(0, n, size=n)
-        gaps.append(float(claimed[pick].mean() - realized[pick].mean()))
-    return float(np.quantile(gaps, 0.05)), float(np.quantile(gaps, 0.95))
 
 
 def _parse_arguments() -> argparse.Namespace:
