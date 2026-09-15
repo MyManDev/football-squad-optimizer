@@ -270,8 +270,8 @@ export interface WindowComparison {
   rival_entry_id: number;
   rival_gameweek: number;
   overlap_scope: "first_week_squad_vs_captured_rival_xi";
-  overlap_minimum: 9 | null;
-  overlap_maximum: 5 | null;
+  overlap_minimum: number | null;
+  overlap_maximum: number | null;
   overlap_actual: number;
   first_week_net_points: number;
   control_first_week_net_points: number;

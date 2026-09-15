@@ -128,7 +128,10 @@ export function AdviceCard({
   // unproven and carries no ceiling has no honest figure to print, so it prints none;
   // and a price below zero is a giveaway no constrained plan can hand out, so no
   // producer's number is rendered as one.
-  const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
+  const unproven =
+    view.window > 1 ||
+    view.solver_status === "FEASIBLE" ||
+    view.control_solver_status === "FEASIBLE";
   const priceCeiling = view.expected_points_cost_ceiling;
   const price = unproven ? priceCeiling : (priceCeiling ?? view.expected_points_cost);
   const showsPrice = view.mode !== "saf-puan" && finiteNumber(price) && price >= 0;

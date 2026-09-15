@@ -29,7 +29,6 @@ import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../moves/modePrices";
 import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
 import { resolvePublishedAdvice } from "./adviceSelection";
-import { MULTIWEEK_MESSAGES } from "./multiweekMessages";
 import styles from "./MemberDecisionControls.module.css";
 
 /** The gap as the rule read it: signed, so behind and ahead are visibly different. */
@@ -48,9 +47,9 @@ export function MemberDecisionControls({
   index: EntryAdviceIndex | null;
   allowCompute?: boolean;
 }) {
-  const { messages, language } = useLanguage();
+  const { messages } = useLanguage();
   const copy = messages.leagueMembers;
-  const windowCopy = MULTIWEEK_MESSAGES[language];
+  const windowCopy = messages.multiweek;
   const [searchParams, setSearchParams] = useSearchParams();
   const selection = resolvePublishedAdvice(
     searchParams,
@@ -149,7 +148,7 @@ export function MemberDecisionControls({
                   </span>
                   <span className={styles.description}>
                     {windowSize > 1 && slug !== "saf-puan"
-                      ? windowCopy.windowStrategyDescriptions[slug]
+                      ? windowCopy.windowStrategyDescription
                       : copy.strategies[slug].description}
                   </span>
                 </span>

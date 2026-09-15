@@ -84,6 +84,8 @@ it("validates the whole multiweek comparison and rejects inconsistent or extra f
     optimality_gap: 0,
     control_optimality_gap: 0,
   };
+  payload.expected_points_cost = 0;
+  payload.expected_points_cost_ceiling = 1;
   payload.solver_status = "OPTIMAL";
   payload.optimality_gap = 0;
   expect(isAdvicePayload(payload)).toBe(true);

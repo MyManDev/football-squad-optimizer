@@ -118,6 +118,25 @@ describe("advice selection", () => {
       1, 3,
     ]);
   });
+
+  it("only offers the selected rival's published windows", () => {
+    const index = mockEntryAdviceIndex(ENTRY).payload;
+    index.windows = { ...index.windows, "ortak-koru": [1, 3, 5] };
+    index.computed.push({
+      strategy: "ortak-koru",
+      rival_entry_id: RIVAL,
+      path: `advice/${ENTRY}/ortak-koru/3/vs-${RIVAL}.json`,
+    });
+    expect(availableWindows(index, "ortak-koru", RIVAL)).toEqual([1, 3]);
+    expect(availableWindows(index, "ortak-koru", 999999)).toEqual([]);
+    index.unavailable.push({
+      strategy: "ortak-koru",
+      rival_entry_id: RIVAL,
+      window: 3,
+      reason: "SOLVER_EXECUTION_FAILED",
+    });
+    expect(availableWindows(index, "ortak-koru", RIVAL)).toEqual([1]);
+  });
 });
 
 describe("index-authoritative advice selection", () => {

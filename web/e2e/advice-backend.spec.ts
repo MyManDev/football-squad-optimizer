@@ -97,7 +97,7 @@ test("a browser computes through the worker, then reads the same answer from cac
     await expect(
       page.getByRole("heading", { name: "Aynı pencere için plan karşılaştırması" }),
     ).toBeVisible();
-    await expect(page.getByText("Saf puana göre fark:", { exact: false })).toBeVisible();
+    await expect(page.getByText("Saf puan eksi seçilen plan:", { exact: false })).toBeVisible();
     await page.setViewportSize({ width: 390, height: 844 });
     const comparisonCard = page.getByRole("region", {
       name: "Aynı pencere için plan karşılaştırması",

@@ -12,10 +12,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { mockEntryAdviceIndex, mockLeagueMembersEnvelope } from "../../../fixtures/league";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
-import { MESSAGES } from "../../../i18n/messages";
 import type { EntryAdviceIndex } from "../types";
 import { MemberDecisionControls } from "./MemberDecisionControls";
-import { MULTIWEEK_MESSAGES } from "./multiweekMessages";
+import { MESSAGES } from "../../../i18n/messages";
 
 afterEach(cleanup);
 
@@ -51,7 +50,7 @@ describe("member decision controls", () => {
     renderControls(`/league/members/${ENTRY}?mode=ortak-koru&window=3`);
     const copy = MESSAGES.tr.leagueMembers;
     expect(
-      screen.getByText(MULTIWEEK_MESSAGES.tr.windowStrategyDescriptions["ortak-koru"]),
+      screen.getAllByText(MESSAGES.tr.multiweek.windowStrategyDescription)[0],
     ).toBeInTheDocument();
     expect(screen.queryByText(copy.rulePickBadge)).not.toBeInTheDocument();
     expect(screen.queryByText(copy.strategies["ortak-koru"].description)).not.toBeInTheDocument();

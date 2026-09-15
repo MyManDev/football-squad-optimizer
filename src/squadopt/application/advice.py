@@ -120,6 +120,7 @@ class WindowControl:
     rules: SeasonRules
     horizon_builder: HorizonBuilder | None
     payload: dict[str, object]
+    net_points_ceiling: float
 
 
 def build_window_control(
@@ -132,21 +133,25 @@ def build_window_control(
     window: int,
     horizon_builder: HorizonBuilder | None,
 ) -> WindowControl:
+    payload = build_window_payload(
+        picks,
+        inputs,
+        projection,
+        rules,
+        league_id=league_id,
+        window=window,
+        horizon_builder=horizon_builder,
+        include_price_bound=True,
+    )
+    ceiling = float(str(payload.pop("net_points_ceiling")))
     return WindowControl(
         picks,
         inputs,
         projection,
         rules,
         horizon_builder,
-        build_window_payload(
-            picks,
-            inputs,
-            projection,
-            rules,
-            league_id=league_id,
-            window=window,
-            horizon_builder=horizon_builder,
-        ),
+        payload,
+        ceiling,
     )
 
 
@@ -708,6 +713,7 @@ def build_window_payload(
     window: int,
     horizon_builder: HorizonBuilder | None,
     first_week_overlap: FirstWeekOverlap | None = None,
+    include_price_bound: bool = False,
 ) -> dict[str, object]:
     """One member's ``saf-puan`` advice over a three- or five-week window.
 
@@ -750,15 +756,16 @@ def build_window_payload(
         for _, row in inputs.players.iterrows()
     }
     held = held_squad_from_picks(picks, current_prices=prices)
-    plan, _transfer_config = plan_transfer_horizon(
+    settings = OptimizationConfig(
+        solver_time_limit_seconds=WINDOW_WALL_CEILING_SECONDS,
+        solver_deterministic_time_limit=WINDOW_DETERMINISTIC_UNITS_PER_WEEK * window,
+    )
+    plan, transfer_config = plan_transfer_horizon(
         inputs,
         horizon,
         held,
         rules,
-        optimization=OptimizationConfig(
-            solver_time_limit_seconds=WINDOW_WALL_CEILING_SECONDS,
-            solver_deterministic_time_limit=WINDOW_DETERMINISTIC_UNITS_PER_WEEK * window,
-        ),
+        optimization=settings,
         first_week_overlap=first_week_overlap,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
@@ -775,6 +782,28 @@ def build_window_payload(
     pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
     by_id = {int(str(row["player_id"])): row for _, row in first.selected_squad.iterrows()}
     raw_gap = plan.diagnostics.get("absolute_optimality_gap")
+    # The solver bounds its objective, which includes bench value and a transfer
+    # caution margin. Convert that bound before pricing XI + captain - actual hits.
+    # No chips are offered here. Use a roster-only ceiling if discounting changes.
+    roster_ceiling = 0.0
+    negative_bench = 0.0
+    for _, rows in horizon.table.groupby("gameweek"):
+        scores = rows["expected_points"].sort_values(ascending=False)
+        roster_ceiling += float(scores.head(11).sum() + scores.iloc[0])
+        negative_bench += settings.bench_weight * float(scores.tail(4).clip(upper=0).sum())
+    net_ceiling = roster_ceiling
+    bound = plan.diagnostics.get("best_objective_bound")
+    if transfer_config.horizon_discount_factor == 1.0 and bound is not None:
+        cap = transfer_config.max_transfers_per_gameweek or 15
+        margin = max(
+            0.0, transfer_config.transfer_hit_cost_points - transfer_config.hit_points_charged
+        )
+        # At most 27 rounded player coefficients and `cap` rounded hit coefficients
+        # per week; a full unit per coefficient conservatively covers both roundings.
+        rounding = window * (27 + cap) / settings.expected_points_scale
+        net_ceiling = min(
+            net_ceiling, float(str(bound)) + window * cap * margin - negative_bench + rounding
+        )
     missing = _missing_fields(picks)
     moves, gain_vs_hold = _moves(
         [int(str(v)) for v in first.transfers_out["player_id"].tolist()],
@@ -802,6 +831,15 @@ def build_window_payload(
         # first week's lineup total; the later weeks are in ``plan_weeks``.
         "expected_gain_vs_hold": gain_vs_hold,
         "expected_points_cost": 0.0,
+        **(
+            {
+                "net_points_ceiling": max(
+                    net_ceiling, sum(w.projected_score - w.transfer_hit_points for w in plan.weeks)
+                )
+            }
+            if include_price_bound
+            else {}
+        ),
         "rival_label": None,
         # The solver's own account of the whole window: OPTIMAL is a proof, FEASIBLE is
         # the plan it found with the measured bound gap beside it.
@@ -1016,12 +1054,17 @@ def _advise_window_against_rival(
     eleven, bench = payload["starting_xi"], payload["bench"]
     assert isinstance(eleven, list) and isinstance(bench, list)
     overlap = len(rival_eleven & {p["player_id"] for p in [*eleven, *bench]})
-    payload.pop("expected_points_cost")  # the single-week price contract does not apply
+    cost = max(0.0, control_total - total_net)
+    cost_ceiling = max(cost, control.net_points_ceiling - total_net)
     payload.update(
         {
             "mode": request.strategy,
             "rival_entry_id": rival.entry_id,
             "rival_label": str(rival.entry_id),
+            "expected_points_cost": cost,
+            "expected_points_cost_ceiling": cost_ceiling,
+            "control_solver_status": control.payload["solver_status"],
+            "control_optimality_gap": control.payload["optimality_gap"],
             "window_comparison": {
                 "policy_id": WINDOW_RIVAL_POLICY,
                 "rival_entry_id": rival.entry_id,
@@ -1034,7 +1077,7 @@ def _advise_window_against_rival(
                 "control_first_week_net_points": control_first,
                 "total_net_points": total_net,
                 "control_total_net_points": control_total,
-                "net_points_difference": total_net - control_total,
+                "net_points_difference": control_total - total_net,
                 "solver_status": payload["solver_status"],
                 "optimality_gap": payload["optimality_gap"],
                 "control_solver_status": control.payload["solver_status"],

@@ -3,6 +3,18 @@ export type Language = "tr" | "en";
 export type ReasonParams = Record<string, string | number | undefined>;
 
 const en = {
+  multiweek: {
+    windowComparisonTitle: "Same-window plan comparison",
+    windowStrategyDescription:
+      "The fixed overlap applies only to the opening squad, against the captured rival XI.",
+    windowFirstNet: "First week · net",
+    windowTotalNet: (weeks: number) => `${weeks} weeks · net total`,
+    windowDifference: (value: string) => `Pure points minus selected plan: ${value}`,
+    windowRivalBasis: (rival: string, week: number, actual: number, target: string) =>
+      `${rival}, GW${week} XI: ${actual} in opening squad; target ${target}.`,
+    windowComparisonNote:
+      "Net: XI + captain − hits. Positive means points given up; the ceiling covers solver and policy slack.",
+  },
   suggestionHistory: {
     title: "Weekly Suggestion History",
     overview: "Overview",
@@ -990,6 +1002,18 @@ type MessageSchema<T> = {
 };
 
 const tr: MessageSchema<typeof en> = {
+  multiweek: {
+    windowComparisonTitle: "Aynı pencere için plan karşılaştırması",
+    windowStrategyDescription:
+      "Sabit ortaklık sınırı yalnız ilk hafta kadrosuna, kayıtlı rakip ilk 11'ine göre uygulanır.",
+    windowFirstNet: "İlk hafta · net",
+    windowTotalNet: (weeks) => `${weeks} hafta · net toplam`,
+    windowDifference: (value) => `Saf puan eksi seçilen plan: ${value}`,
+    windowRivalBasis: (rival, week, actual, target) =>
+      `${rival}, H${week} ilk 11: ilk kadroda ${actual} ortak; hedef ${target}.`,
+    windowComparisonNote:
+      "Net: ilk 11 + kaptan − cezalar. Pozitif fark vazgeçilen puandır; üst sınır çözüm ve politika payını kapsar.",
+  },
   suggestionHistory: {
     title: "Haftalık Öneri Geçmişi",
     overview: "Genel Bakış",

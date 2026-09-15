@@ -1,4 +1,3 @@
-import { MULTIWEEK_MESSAGES } from "./multiweekMessages";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
@@ -11,11 +10,11 @@ export function WindowComparison({
   advice: EntryAdvice;
   rivalName: string;
 }) {
-  const { locale, messages, language } = useLanguage();
+  const { locale, messages } = useLanguage();
   const c = advice.window_comparison;
   if (!c) return null;
   const copy = messages.leagueMembers;
-  const windowCopy = MULTIWEEK_MESSAGES[language];
+  const windowCopy = messages.multiweek;
   const gap = (value: number | null) => (value === null ? "—" : points(value, 1, locale));
   return (
     <section aria-label={windowCopy.windowComparisonTitle}>

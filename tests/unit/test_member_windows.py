@@ -24,7 +24,6 @@ from tests.unit.test_live_recommendation import (
     SEASON,
 )
 from tests.unit.test_projection_horizon_builder import _in_season_handoff
-from tests.unit.test_public_probability_guards import _FORBIDDEN_TEXT
 
 from squadopt.application import advice as advice_module
 from squadopt.application.advice import (
@@ -41,6 +40,7 @@ from squadopt.application.advice import (
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
 from squadopt.application.league_views import build_league_views
 from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN
+from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN as _FORBIDDEN_TEXT
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live.recommendation import project
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY

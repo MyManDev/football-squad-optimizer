@@ -81,8 +81,8 @@ const comparisonFields: Record<string, Predicate> = {
   rival_entry_id: identity,
   rival_gameweek: identity,
   overlap_scope: oneOf("first_week_squad_vs_captured_rival_xi"),
-  overlap_minimum: oneOf(null, 9),
-  overlap_maximum: oneOf(null, 5),
+  overlap_minimum: nullable((v) => integer(v) && Number(v) <= 11),
+  overlap_maximum: nullable((v) => integer(v) && Number(v) <= 11),
   overlap_actual: (v) => integer(v) && Number(v) <= 11,
   first_week_net_points: finite,
   control_first_week_net_points: finite,
@@ -116,14 +116,15 @@ function validWindowComparison(value: unknown): boolean {
     weeks.some((w, i) => !record(w) || w.gameweek !== Number(value.gameweek) + i)
   )
     return false;
-  const minimum = value.mode === "ortak-koru" ? 9 : null;
-  const maximum = value.mode === "fark-yarat" ? 5 : null;
+  const minimum = c.overlap_minimum === null ? null : Number(c.overlap_minimum);
+  const maximum = c.overlap_maximum === null ? null : Number(c.overlap_maximum);
   if (
     c.rival_entry_id !== value.rival_entry_id ||
     c.rival_entry_id === value.entry_id ||
     c.rival_gameweek !== Number(value.gameweek) - 1 ||
-    c.overlap_minimum !== minimum ||
-    c.overlap_maximum !== maximum ||
+    (value.mode === "ortak-koru"
+      ? minimum === null || maximum !== null
+      : maximum === null || minimum !== null) ||
     (minimum !== null && Number(c.overlap_actual) < minimum) ||
     (maximum !== null && Number(c.overlap_actual) > maximum) ||
     c.solver_status !== value.solver_status ||
@@ -135,9 +136,13 @@ function validWindowComparison(value: unknown): boolean {
   const close = (a: unknown, b: number) =>
     Math.abs(Number(a) - b) <= Math.max(1e-8, 1e-9 * Math.max(Math.abs(Number(a)), Math.abs(b)));
   return (
+    finite(value.expected_points_cost) &&
+    finite(value.expected_points_cost_ceiling) &&
+    close(value.expected_points_cost, Math.max(0, Number(c.control_total_net_points) - total)) &&
+    Number(value.expected_points_cost_ceiling) >= Number(value.expected_points_cost) &&
     close(c.first_week_net_points, nets[0]!) &&
     close(c.total_net_points, total) &&
-    close(c.net_points_difference, total - Number(c.control_total_net_points))
+    close(c.net_points_difference, Number(c.control_total_net_points) - total)
   );
 }
 

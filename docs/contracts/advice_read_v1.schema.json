@@ -646,15 +646,19 @@
               "type": "integer"
             },
             "overlap_maximum": {
-              "enum": [
-                null,
-                5
+              "maximum": 11,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
               ]
             },
             "overlap_minimum": {
-              "enum": [
-                null,
-                9
+              "maximum": 11,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
               ]
             },
             "overlap_scope": {

@@ -141,7 +141,7 @@ def build_advice_compute(
                 horizon_builder=capture.horizon_builder,
             )
         except MultiweekAdviceUnavailable as error:
-            raise AdviceComputeRefused(error.code, str(error)) from error
+            raise AdviceComputeRefused(error.code, error.code) from error
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a

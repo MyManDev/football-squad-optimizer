@@ -31,9 +31,18 @@ cannot stand in for the captured XI. This version reports missing rival inputs.
 
 Report first-week net points separately from the sum of projected starting-eleven
 and captain points less actual hit charges across the window. The signed difference
-against the same-window saf-puan control is a comparison of returned plans, not a
+is `control_total - strategy_total`: positive means points given up, matching the
+one-week direction. It is a comparison of returned plans, not a
 proof of the strategy's true cost or a confidence interval. Bench weight and the
 solver's transfer caution belong to its objective, not the displayed net-points sum.
+
+Publish `expected_points_cost = max(0, control_total - strategy_total)` and
+`expected_points_cost_ceiling` beside it. The ceiling converts the control's solver
+bound to the displayed net basis: allow for the maximum transfer caution margin,
+negative bench contributions and integer rounding, and cap it by the relaxed
+roster upper bound. Discounted policies use the relaxed roster bound directly.
+The card labels the ceiling as a ceiling even when the objective solve is OPTIMAL.
+No extra pricing solve is added. Existing saf-puan payloads remain byte-compatible.
 
 Record the policy id, rival id and captured gameweek, overlap target and achieved
 count, both net totals and both solver statuses/gaps. Preserve the old payload
@@ -70,7 +79,16 @@ advice record, alongside the published payload digest.
 
 `render_member` reuses each member/window control and publishes longer rival plans
 only for the default rival. Exact rival paths and their default aliases contain the
-same bytes. The index lists successful windows and records explicit refusals.
+same bytes. The index lists successful windows and records explicit refusals. Static controls
+filter windows by the selected rival's actual file path. Python validates overlap
+limits from STRATEGY_CATALOG; the browser checks the declared band's shape and
+whether the achieved overlap satisfies it, without another hard-coded 9/5 policy.
+
+SolverExecutionError is caught at each member/control/rival-window boundary;
+a failed solve records SOLVER_EXECUTION_FAILED and does not abort other members.
+Multiweek product refusals publish only their stable code, without diagnostics.
+The main bilingual MESSAGES catalog owns the new copy. Both rendered rival-window
+cards and actual generated 3/5-week rival documents are swept by the honesty guards.
 
 The API read/submit capability checks accept the same 1/3/5 windows as the producer.
 The existing request/cache identity separates member, rival, window, capture,

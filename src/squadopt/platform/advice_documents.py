@@ -24,6 +24,8 @@ from typing import Any, Final
 
 import jsonschema
 
+from squadopt.application.strategies import STRATEGY_CATALOG
+
 LEAGUE_STATE_CONTRACT_VERSION: Final = "league_state_v1"
 ADVICE_READ_SCHEMA_PATH: Final = Path("docs") / "contracts" / "advice_read_v1.schema.json"
 LEAGUE_STATE_SCHEMA_PATH: Final = Path("docs") / "contracts" / "league_state_v1.schema.json"
@@ -78,8 +80,8 @@ def advice_read_schema() -> dict[str, Any]:
         "rival_entry_id": {"type": "integer", "minimum": 1},
         "rival_gameweek": {"type": "integer", "minimum": 1},
         "overlap_scope": {"const": "first_week_squad_vs_captured_rival_xi"},
-        "overlap_minimum": {"enum": [None, 9]},
-        "overlap_maximum": {"enum": [None, 5]},
+        "overlap_minimum": {"type": ["integer", "null"], "minimum": 0, "maximum": 11},
+        "overlap_maximum": {"type": ["integer", "null"], "minimum": 0, "maximum": 11},
         "overlap_actual": {"type": "integer", "minimum": 0, "maximum": 11},
         **{
             name: {"type": "number"}
@@ -282,7 +284,8 @@ def _validate_window_comparison(payload: dict[str, Any]) -> None:
         range(payload["gameweek"], payload["gameweek"] + payload["window"])
     ):
         raise AdviceDocumentError("The comparison must carry the whole consecutive window.")
-    minimum, maximum = (9, None) if payload["mode"] == "ortak-koru" else (None, 5)
+    constraints = STRATEGY_CATALOG[payload["mode"]].constraints
+    minimum, maximum = constraints.overlap_floor, constraints.overlap_ceiling
     if (
         comparison["rival_entry_id"] != payload.get("rival_entry_id")
         or comparison["rival_entry_id"] == payload["entry_id"]
@@ -296,10 +299,21 @@ def _validate_window_comparison(payload: dict[str, Any]) -> None:
     ):
         raise AdviceDocumentError("The comparison disagrees with the rival plan or policy.")
     nets = [w["expected_points"] - w["transfer_hit_points"] for w in weeks]
+    cost = payload.get("expected_points_cost")
+    ceiling = payload.get("expected_points_cost_ceiling")
+    if (
+        cost is None
+        or ceiling is None
+        or not math.isclose(
+            cost, max(0.0, comparison["control_total_net_points"] - sum(nets)), abs_tol=1e-8
+        )
+        or ceiling < cost
+    ):
+        raise AdviceDocumentError("A window comparison needs a nonnegative price and its ceiling.")
     for actual, expected in (
         (comparison["first_week_net_points"], nets[0]),
         (comparison["total_net_points"], sum(nets)),
-        (comparison["net_points_difference"], sum(nets) - comparison["control_total_net_points"]),
+        (comparison["net_points_difference"], comparison["control_total_net_points"] - sum(nets)),
     ):
         if not math.isclose(actual, expected, rel_tol=1e-9, abs_tol=1e-8):
             raise AdviceDocumentError("The comparison totals do not match the net plan points.")

@@ -41,6 +41,7 @@ from squadopt.application.advice import (
     MEMBER_WINDOWS,
     AdviseEntryRequest,
     HorizonBuilder,
+    MultiweekAdviceUnavailable,
     advise_entry,
     build_advice_payload,
     build_window_control,
@@ -79,8 +80,18 @@ from squadopt.live import (
     SeasonRules,
 )
 from squadopt.live.transfers import plan_transfer_menu
+from squadopt.optimization import SolverExecutionError
 from squadopt.scenarios import RivalSquad
 from squadopt.scenarios.paths import ScenarioPathSet
+
+
+def _public_failure(error: Exception) -> str:
+    if isinstance(error, SolverExecutionError):
+        return "SOLVER_EXECUTION_FAILED"
+    if isinstance(error, MultiweekAdviceUnavailable):
+        return error.code
+    return str(error)
+
 
 LEAGUE_VIEW_CONTRACT_VERSION = "provisional_league_ui_v1"
 
@@ -177,8 +188,8 @@ def render_member(
             rules=rules,
             control=control,
         )
-    except (EntryError, DataError) as error:
-        return MemberRender(task.entry_id, None, str(error), (), ())
+    except (EntryError, DataError, SolverExecutionError) as error:
+        return MemberRender(task.entry_id, None, _public_failure(error), (), ())
     payloads: list[tuple[str, int, dict[str, object]]] = []
     unavailable: list[tuple[str, int, str]] = []
     for strategy in task.rival_strategies:
@@ -199,8 +210,8 @@ def render_member(
                     rules=rules,
                     control=control,
                 )
-            except (EntryError, DataError) as error:
-                unavailable.append((strategy, rival_id, str(error)))
+            except (EntryError, DataError, SolverExecutionError) as error:
+                unavailable.append((strategy, rival_id, _public_failure(error)))
                 continue
             payloads.append((strategy, rival_id, payload))
     window_payloads: list[tuple[int, dict[str, object]]] = []
@@ -217,11 +228,11 @@ def render_member(
                 window=window,
                 horizon_builder=horizon_builder,
             )
-        except (EntryError, DataError) as error:
-            window_unavailable.append((window, str(error)))
+        except (EntryError, DataError, SolverExecutionError) as error:
+            window_unavailable.append((window, _public_failure(error)))
             if task.default_rival_id is not None:
                 rival_window_unavailable.extend(
-                    (strategy, task.default_rival_id, window, str(error))
+                    (strategy, task.default_rival_id, window, _public_failure(error))
                     for strategy in task.rival_strategies
                 )
             continue
@@ -248,9 +259,9 @@ def render_member(
                         horizon_builder=horizon_builder,
                         window_control=window_control,
                     )
-                except (EntryError, DataError) as error:
+                except (EntryError, DataError, SolverExecutionError) as error:
                     rival_window_unavailable.append(
-                        (strategy, task.default_rival_id, window, str(error))
+                        (strategy, task.default_rival_id, window, _public_failure(error))
                     )
                     continue
                 payloads.append((strategy, task.default_rival_id, payload))
@@ -925,8 +936,8 @@ def build_league_views(
         entry_id = int(registration.entry_id)
         try:
             fetched[entry_id] = provider.picks(entry_id, season, gameweek - 1)
-        except (EntryError, DataError) as error:
-            fetched[entry_id] = str(error)
+        except (EntryError, DataError, SolverExecutionError) as error:
+            fetched[entry_id] = _public_failure(error)
     rival_squads: dict[int, RivalSquad] = {}
     for registration in registrations:
         entry_id = int(registration.entry_id)
@@ -1343,9 +1354,9 @@ def build_league_views(
             try:
                 record_member_advice(Path(advice_record_root), record)
             except AdviceRecordConflictError as error:
-                conflicts.append(str(error))
+                conflicts.append(_public_failure(error))
             except AdviceRecordNotLandedError as error:
-                unlanded.append(str(error))
+                unlanded.append(_public_failure(error))
         if unlanded:
             # A week that recorded nothing for a member decides the type when both
             # happened: a conflict names two answers that are both on disk to compare,

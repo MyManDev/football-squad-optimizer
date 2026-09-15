@@ -65,8 +65,9 @@ def test_rival_window_keeps_policy_and_compares_the_same_window(
     total = sum(w["expected_points"] - w["transfer_hit_points"] for w in payload["plan_weeks"])
     assert comparison["control_total_net_points"] == pytest.approx(control_total)
     assert comparison["total_net_points"] == pytest.approx(total)
-    assert comparison["net_points_difference"] == pytest.approx(total - control_total)
-    assert "expected_points_cost" not in payload
+    assert comparison["net_points_difference"] == pytest.approx(control_total - total)
+    assert payload["expected_points_cost"] == pytest.approx(max(0, control_total - total))
+    assert payload["expected_points_cost_ceiling"] >= payload["expected_points_cost"]
     validate_advice_document(_document(payload))
     assert _advise(window_world, strategy=mode, window=window, rival_entry_id=202) == payload
 
@@ -212,4 +213,54 @@ def test_static_menu_is_bounded_and_reuses_each_window_control(
     assert index["windows"]["ortak-koru"] == [1, 3, 5]
     failures = [r for r in index["unavailable"] if r.get("window") in (3, 5)]
     assert len(failures) == 2
-    assert all(r["reason"].startswith("WINDOW_INFEASIBLE:") for r in failures)
+    assert all(r["reason"] == "WINDOW_INFEASIBLE" for r in failures)
+
+
+@pytest.mark.parametrize("stage", ["baseline", "rival", "control", "window-rival"])
+def test_solver_failure_is_confined_to_its_member_or_window(
+    window_world: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    stage: str,
+) -> None:
+    from squadopt.application import league_views as module
+
+    _rival(window_world)
+    original_advice = module.advise_entry
+    original_control = module.build_window_control
+
+    def advice(request: Any, **kwargs: Any) -> Any:
+        if (
+            (stage == "baseline" and request.strategy == "saf-puan")
+            or (stage == "rival" and request.strategy == "ortak-koru" and request.window == 1)
+            or (
+                stage == "window-rival" and request.strategy == "ortak-koru" and request.window == 3
+            )
+        ):
+            raise SolverExecutionError("private wall-clock diagnostics")
+        return original_advice(request, **kwargs)
+
+    def control(*args: Any, **kwargs: Any) -> Any:
+        if stage == "control" and kwargs["window"] == 3:
+            raise SolverExecutionError("private wall-clock diagnostics")
+        return original_control(*args, **kwargs)
+
+    monkeypatch.setattr(module, "advise_entry", advice)
+    monkeypatch.setattr(module, "build_window_control", control)
+    world = window_world
+    result = module.render_member(
+        module.MemberRenderTask(
+            ENTRY, "member", SEASON, 2, 352490, (202,), 202, ("ortak-koru",), (3, 5)
+        ),
+        provider=world["provider"],
+        inputs=world["inputs"],
+        projection=world["projection"],
+        rules=world["rules"],
+        horizon_builder=world["builder"],
+    )
+    assert "private" not in repr(result)
+    assert "SOLVER_EXECUTION_FAILED" in repr(result)
+    if stage == "baseline":
+        assert result.baseline is None
+    else:
+        assert result.baseline is not None
+        assert any(w == 5 for w, _ in result.window_payloads)
