@@ -3,6 +3,7 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
+import { WindowComparison } from "../advice/WindowComparison";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
   AdviceMove,
@@ -48,9 +49,10 @@ export function MissingAdviceCard({
       <p className={styles.muted}>{issueCopy[1]}</p>
       {reason ? (
         <p className={styles.muted}>
-          {Object.hasOwn(copy.publicationReasons, reason)
-            ? copy.publicationReasons[reason]
-            : copy.publicationReasonUnknown}
+          {copy.windowFailure(reason.split(":")[0]) ||
+            (Object.hasOwn(copy.publicationReasons, reason)
+              ? copy.publicationReasons[reason]
+              : copy.publicationReasonUnknown)}
         </p>
       ) : null}
       {onRetry ? (
@@ -160,6 +162,7 @@ export function AdviceCard({
       ) : null}
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      <WindowComparison advice={view} rivalName={rivalName ?? String(view.rival_entry_id ?? "—")} />
       {basisNote ? (
         <p className={styles.honesty}>
           {basisNote.kind === "week"
@@ -361,7 +364,7 @@ function WindowSection({ view }: { view: EntryAdvice }) {
     <section className={styles.window} aria-label={title}>
       <h3 className={styles.lineupTitle}>{title}</h3>
       <p className={styles.honesty}>{copy.windowRule}</p>
-      <div className={styles.windowScroll}>
+      <div className={styles.windowScroll} tabIndex={0} role="group" aria-label={title}>
         <table className={styles.windowTable}>
           <thead>
             <tr>

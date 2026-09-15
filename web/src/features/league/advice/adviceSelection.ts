@@ -82,12 +82,11 @@ export function selectedAdviceRequest(
 
 /**
  * The combinations connected to the application compute path: pure points at any of
- * its windows, or a one-week member strategy with a rival named. A rival strategy at a
- * longer window and the legacy play modes are shown from the published tree only.
+ * its windows, or a member strategy with a rival named at one, three or five weeks.
+ * Legacy play modes are shown from the published tree only.
  */
 export function canComputeAdvice(request: AdviceRequest): boolean {
   if (request.strategy === "saf-puan") return true;
-  if (request.window !== 1) return false;
   return isMemberStrategy(request.strategy) && request.rivalEntryId != null;
 }
 

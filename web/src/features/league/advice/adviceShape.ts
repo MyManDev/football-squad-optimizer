@@ -76,49 +76,117 @@ const alternative: Predicate = (value) =>
     { expected_points_cost_ceiling: finite },
   );
 
+const comparisonFields: Record<string, Predicate> = {
+  policy_id: oneOf("first_week_rival_horizon_v1"),
+  rival_entry_id: identity,
+  rival_gameweek: identity,
+  overlap_scope: oneOf("first_week_squad_vs_captured_rival_xi"),
+  overlap_minimum: oneOf(null, 9),
+  overlap_maximum: oneOf(null, 5),
+  overlap_actual: (v) => integer(v) && Number(v) <= 11,
+  first_week_net_points: finite,
+  control_first_week_net_points: finite,
+  total_net_points: finite,
+  control_total_net_points: finite,
+  net_points_difference: finite,
+  solver_status: oneOf("OPTIMAL", "FEASIBLE"),
+  control_solver_status: oneOf("OPTIMAL", "FEASIBLE"),
+  optimality_gap: nullable(finite),
+  control_optimality_gap: nullable(finite),
+};
+
+function validWindowComparison(value: unknown): boolean {
+  if (!record(value)) return false;
+  const c = "window_comparison" in value ? value.window_comparison : undefined;
+  const multiRival =
+    [3, 5].includes(Number(value.window)) &&
+    ["ortak-koru", "fark-yarat"].includes(String(value.mode));
+  if (c === undefined && !multiRival) return true;
+  if (
+    !multiRival ||
+    !record(c) ||
+    !fields(c, comparisonFields) ||
+    Object.keys(c).some((k) => !Object.hasOwn(comparisonFields, k))
+  )
+    return false;
+  const weeks = value.plan_weeks;
+  if (
+    !Array.isArray(weeks) ||
+    weeks.length !== value.window ||
+    weeks.some((w, i) => !record(w) || w.gameweek !== Number(value.gameweek) + i)
+  )
+    return false;
+  const minimum = value.mode === "ortak-koru" ? 9 : null;
+  const maximum = value.mode === "fark-yarat" ? 5 : null;
+  if (
+    c.rival_entry_id !== value.rival_entry_id ||
+    c.rival_entry_id === value.entry_id ||
+    c.rival_gameweek !== Number(value.gameweek) - 1 ||
+    c.overlap_minimum !== minimum ||
+    c.overlap_maximum !== maximum ||
+    (minimum !== null && Number(c.overlap_actual) < minimum) ||
+    (maximum !== null && Number(c.overlap_actual) > maximum) ||
+    c.solver_status !== value.solver_status ||
+    c.optimality_gap !== value.optimality_gap
+  )
+    return false;
+  const nets = weeks.map((w) => Number(w.expected_points) - Number(w.transfer_hit_points));
+  const total = nets.reduce((sum, n) => sum + n, 0);
+  const close = (a: unknown, b: number) =>
+    Math.abs(Number(a) - b) <= Math.max(1e-8, 1e-9 * Math.max(Math.abs(Number(a)), Math.abs(b)));
+  return (
+    close(c.first_week_net_points, nets[0]!) &&
+    close(c.total_net_points, total) &&
+    close(c.net_points_difference, total - Number(c.control_total_net_points))
+  );
+}
+
 export function isAdvicePayload(value: unknown): boolean {
-  return fields(
-    value,
-    {
-      league_id: identity,
-      season: text,
-      gameweek: identity,
-      entry_id: identity,
-      mode: text,
-      window: oneOf(1, 3, 5),
-      moves: array(move),
-      data_quality: oneOf("complete", "partial", "empty"),
-      missing_fields: array(text),
-    },
-    {
-      source_snapshot_id: nullable(text),
-      rival_entry_id: identity,
-      rival_label: nullable(text),
-      transfer_hit_points: finite,
-      expected_gain_vs_hold: nullable(finite),
-      expected_points_cost: finite,
-      expected_points_cost_ceiling: finite,
-      overlap_count: finite,
-      expected_gap_vs_rival: finite,
-      transfer_cap: finite,
-      overlap_target: finite,
-      overlap_applied: finite,
-      captain_agreement: oneOf(true, false),
-      solver_status: nullable(text),
-      control_solver_status: nullable(text),
-      optimality_gap: nullable(finite),
-      control_optimality_gap: nullable(finite),
-      expected_own_points: nullable(finite),
-      captain: nullable(player),
-      vice_captain: nullable(player),
-      starting_xi: nullable(array(player)),
-      bench: nullable(array(player)),
-      chip,
-      plan_weeks: nullable(array(planWeek)),
-      stated_limits: nullable(array(text)),
-      squad_basis: text,
-      plan_kind: planKind,
-      alternative_plan: nullable(alternative),
-    },
+  return (
+    validWindowComparison(value) &&
+    fields(
+      value,
+      {
+        league_id: identity,
+        season: text,
+        gameweek: identity,
+        entry_id: identity,
+        mode: text,
+        window: oneOf(1, 3, 5),
+        moves: array(move),
+        data_quality: oneOf("complete", "partial", "empty"),
+        missing_fields: array(text),
+      },
+      {
+        source_snapshot_id: nullable(text),
+        rival_entry_id: identity,
+        rival_label: nullable(text),
+        transfer_hit_points: finite,
+        expected_gain_vs_hold: nullable(finite),
+        expected_points_cost: finite,
+        expected_points_cost_ceiling: finite,
+        overlap_count: finite,
+        expected_gap_vs_rival: finite,
+        transfer_cap: finite,
+        overlap_target: finite,
+        overlap_applied: finite,
+        captain_agreement: oneOf(true, false),
+        solver_status: nullable(text),
+        control_solver_status: nullable(text),
+        optimality_gap: nullable(finite),
+        control_optimality_gap: nullable(finite),
+        expected_own_points: nullable(finite),
+        captain: nullable(player),
+        vice_captain: nullable(player),
+        starting_xi: nullable(array(player)),
+        bench: nullable(array(player)),
+        chip,
+        plan_weeks: nullable(array(planWeek)),
+        stated_limits: nullable(array(text)),
+        squad_basis: text,
+        plan_kind: planKind,
+        alternative_plan: nullable(alternative),
+      },
+    )
   );
 }

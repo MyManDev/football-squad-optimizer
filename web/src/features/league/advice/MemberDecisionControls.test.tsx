@@ -47,6 +47,13 @@ function renderControls(
 }
 
 describe("member decision controls", () => {
+  it("uses the strict first-week policy and hides the weekly rule on a longer window", () => {
+    renderControls(`/league/members/${ENTRY}?mode=ortak-koru&window=3`);
+    const copy = MESSAGES.tr.leagueMembers;
+    expect(screen.getByText(copy.windowStrategyDescriptions["ortak-koru"])).toBeInTheDocument();
+    expect(screen.queryByText(copy.rulePickBadge)).not.toBeInTheDocument();
+    expect(screen.queryByText(copy.strategies["ortak-koru"].description)).not.toBeInTheDocument();
+  });
   it.each(["tr", "en"] as const)(
     "describes requested minimum and maximum overlap bounds in %s",
     (language) => {

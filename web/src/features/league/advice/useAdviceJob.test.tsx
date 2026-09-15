@@ -86,6 +86,23 @@ function describePhase(state: ComputePhase): string {
 }
 
 describe("useAdviceJob", () => {
+  it("pauses a long job and resumes polling its same identity without another POST", async () => {
+    const client = new ScriptedClient();
+    client.statuses = Array(151).fill("running");
+    const submit = vi.spyOn(client, "requestAdvice");
+    const poll = vi.spyOn(client, "readJob");
+    render(<Harness client={client} />);
+    await act(async () => screen.getByText("go").click());
+    await act(async () => vi.advanceTimersByTimeAsync(300_000));
+    expect(screen.getByTestId("phase")).toHaveTextContent("paused");
+    expect(submit).toHaveBeenCalledTimes(1);
+    client.statuses = ["completed"];
+    await act(async () => screen.getByText("go").click());
+    await act(async () => vi.advanceTimersByTimeAsync(2100));
+    expect(submit).toHaveBeenCalledTimes(1);
+    expect(poll.mock.calls.every((call) => call[0] === "job-1")).toBe(true);
+    expect(screen.getByTestId("phase")).toHaveTextContent("done:api-cache");
+  });
   it("reset and unmount abort the actual request", async () => {
     const client = new ScriptedClient();
     const signals: AbortSignal[] = [];

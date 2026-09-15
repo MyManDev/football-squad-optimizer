@@ -82,7 +82,7 @@ describe("advice selection", () => {
     expect(stranger.rivalEntryId).toBe(RIVAL);
   });
 
-  it("cannot compute a rival strategy without any rival, nor over a longer window", () => {
+  it("requires a rival and supports longer windows", () => {
     const alone = selectedAdviceRequest(new URLSearchParams("mode=ortak-koru"), 352490, ENTRY, []);
     expect(alone.rivalEntryId).toBeNull();
     expect(canComputeAdvice(alone)).toBe(false);
@@ -92,7 +92,7 @@ describe("advice selection", () => {
       ENTRY,
       MEMBERS,
     );
-    expect(canComputeAdvice(long)).toBe(false);
+    expect(canComputeAdvice(long)).toBe(true);
   });
 
   it("computes pure points at three and five weeks", () => {
@@ -200,7 +200,7 @@ describe("index-authoritative advice selection", () => {
         publication,
       );
       expect(selection).toMatchObject({ status: "ready", path: window === 1 ? pair.path : three });
-      expect(canComputeAdvice(selection.request)).toBe(window === 1);
+      expect(canComputeAdvice(selection.request)).toBe(true);
     }
   });
 });

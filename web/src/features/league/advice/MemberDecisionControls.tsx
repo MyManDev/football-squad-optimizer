@@ -41,10 +41,12 @@ export function MemberDecisionControls({
   entryId,
   members,
   index,
+  allowCompute = false,
 }: {
   entryId: number;
   members: EntryView[];
   index: EntryAdviceIndex | null;
+  allowCompute?: boolean;
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -62,13 +64,25 @@ export function MemberDecisionControls({
   );
   const rivalIds = selection.rivals.map((rival) => rival.entryId);
   const defaultRival = index?.default_rival_entry_id ?? null;
-  const windows = selection.windows;
+  const windows = allowCompute
+    ? WINDOWS
+    : [
+        ...selection.windows,
+        ...(index?.unavailable ?? []).flatMap((row) =>
+          row.strategy === strategy &&
+          row.rival_entry_id === chosenRival &&
+          row.window &&
+          row.window > 1
+            ? [row.window]
+            : [],
+        ),
+      ];
 
   function strategySelection(slug: string) {
     const next = new URLSearchParams(searchParams);
     next.set("mode", slug);
     const offered = resolvePublishedAdvice(next, index?.league_id ?? 0, entryId, members, index);
-    if (!offered.windows.includes(offered.request.window) && offered.windows[0]) {
+    if (!allowCompute && !offered.windows.includes(offered.request.window) && offered.windows[0]) {
       next.set("window", String(offered.windows[0]));
     }
     return {
@@ -95,7 +109,7 @@ export function MemberDecisionControls({
   // The producer's declared rule marks one of the three from the member's points gap
   // and the weeks left. It is a label on an option the member may ignore, never a
   // preselection: the checked strategy is still whatever the URL says.
-  const suggested = index?.suggested_strategy ?? null;
+  const suggested = windowSize === 1 ? (index?.suggested_strategy ?? null) : null;
 
   return (
     <Card
@@ -118,9 +132,10 @@ export function MemberDecisionControls({
                     (!searchParams.has("mode") || searchParams.get("mode") === slug)
                   }
                   disabled={
-                    strategySelection(slug).offered.windows.length === 0 ||
-                    (strategyNeedsRival(slug) &&
-                      !strategySelection(slug).offered.rivals.some((rival) => rival.path))
+                    !allowCompute &&
+                    (strategySelection(slug).offered.windows.length === 0 ||
+                      (strategyNeedsRival(slug) &&
+                        !strategySelection(slug).offered.rivals.some((rival) => rival.path)))
                   }
                   onChange={() => setSearchParams(strategySelection(slug).next)}
                 />
@@ -131,7 +146,11 @@ export function MemberDecisionControls({
                       <Badge tone="neutral">{copy.rulePickBadge}</Badge>
                     ) : null}
                   </span>
-                  <span className={styles.description}>{copy.strategies[slug].description}</span>
+                  <span className={styles.description}>
+                    {windowSize > 1 && slug !== "saf-puan"
+                      ? copy.windowStrategyDescriptions[slug]
+                      : copy.strategies[slug].description}
+                  </span>
                 </span>
               </label>
             ))}
@@ -173,7 +192,10 @@ export function MemberDecisionControls({
                     <option
                       key={rivalId}
                       value={rivalId}
-                      disabled={!selection.rivals.find((rival) => rival.entryId === rivalId)?.path}
+                      disabled={
+                        !allowCompute &&
+                        !selection.rivals.find((rival) => rival.entryId === rivalId)?.path
+                      }
                     >
                       {nameOf(rivalId)}
                       {rivalId === defaultRival ? ` ${copy.rivalDefaultSuffix}` : ""}

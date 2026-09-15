@@ -48,3 +48,58 @@ it("checks exactly the payload keys the served schema declares", () => {
     Object.keys(schema.properties.payload.properties).sort(),
   );
 });
+
+it("validates the whole multiweek comparison and rejects inconsistent or extra fields", () => {
+  const payload = mockEntryAdviceEnvelope(101, "saf-puan", 3).payload;
+  payload.plan_weeks = Array.from({ length: 3 }, (_, i) => ({
+    gameweek: payload.gameweek + i,
+    transfers_in: [],
+    transfers_out: [],
+    transfer_hit_points: 0,
+    chip: null,
+    free_transfers_before: 1,
+    free_transfers_after: 2,
+    expected_points: 40 + i,
+  }));
+  const weeks = payload.plan_weeks!;
+  const nets = weeks.map((w) => w.expected_points - w.transfer_hit_points);
+  const total = nets.reduce((sum, value) => sum + value, 0);
+  payload.mode = "ortak-koru";
+  payload.rival_entry_id = 202;
+  payload.window_comparison = {
+    policy_id: "first_week_rival_horizon_v1",
+    rival_entry_id: 202,
+    rival_gameweek: payload.gameweek - 1,
+    overlap_scope: "first_week_squad_vs_captured_rival_xi",
+    overlap_minimum: 9,
+    overlap_maximum: null,
+    overlap_actual: 9,
+    first_week_net_points: nets[0]!,
+    control_first_week_net_points: nets[0]!,
+    total_net_points: total,
+    control_total_net_points: total,
+    net_points_difference: 0,
+    solver_status: "OPTIMAL",
+    control_solver_status: "OPTIMAL",
+    optimality_gap: 0,
+    control_optimality_gap: 0,
+  };
+  payload.solver_status = "OPTIMAL";
+  payload.optimality_gap = 0;
+  expect(isAdvicePayload(payload)).toBe(true);
+  for (const change of [
+    { total_net_points: total + 1 },
+    { rival_entry_id: 101 },
+    { overlap_actual: 8 },
+    { toString: "extra" },
+  ]) {
+    expect(
+      isAdvicePayload({
+        ...payload,
+        window_comparison: { ...payload.window_comparison, ...change },
+      }),
+    ).toBe(false);
+  }
+  expect(isAdvicePayload({ ...payload, window: 1 })).toBe(false);
+  expect(isAdvicePayload({ ...payload, window_comparison: undefined })).toBe(false);
+});

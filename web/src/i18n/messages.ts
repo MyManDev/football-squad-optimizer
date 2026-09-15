@@ -537,6 +537,34 @@ const en = {
     computeStaticFallback: "The backend was unreachable; this is the published static answer.",
     computeUnavailable:
       "Only the published site is available right now; this combination was not published.",
+    computeResume: "Continue waiting",
+    windowFailure: (code?: string): string => {
+      switch (code) {
+        case "WINDOW_INFEASIBLE":
+          return "Overlap target infeasible; no relaxation.";
+        case "WINDOW_NO_SOLUTION":
+          return "No plan within budget; infeasibility unproven.";
+        case "WINDOW_INPUTS_UNAVAILABLE":
+          return "Missing squad/calendar inputs.";
+        default:
+          return "";
+      }
+    },
+    computePaused: "Waiting paused; resume this job.",
+    windowComparisonTitle: "Same-window plan comparison",
+    windowStrategyDescriptions: {
+      "ortak-koru":
+        "At least 9 captured rival XI players in our first-week fifteen. No relaxation or later-week constraint.",
+      "fark-yarat":
+        "At most 5 captured rival XI players in our first-week fifteen. No relaxation or later-week constraint.",
+    },
+    windowFirstNet: "First week · net",
+    windowTotalNet: (weeks: number) => `${weeks} weeks · net total`,
+    windowDifference: (value: string) => `Difference from pure points: ${value}`,
+    windowRivalBasis: (rival: string, week: number, actual: number, target: string) =>
+      `${rival}, captured GW${week} XI: ${actual} in our first-week fifteen; target ${target}.`,
+    windowComparisonNote:
+      "Net: XI + captain − hits; returned-plan difference, not proven cost.",
     computeFailed:
       "The computation did not finish. The published plan, where one exists, still stands.",
     adviceComputedBadge: "Computation result",
@@ -1498,6 +1526,34 @@ const tr: MessageSchema<typeof en> = {
     computeProvenance: (capture: string, at: string) => `Capture ${capture}, sonuç tarihi ${at}.`,
     computeStaticFallback: "Backend'e ulaşılamadı; bu, yayınlanmış statik cevap.",
     computeUnavailable: "Şu an yalnız yayınlanmış site var; bu kombinasyon yayınlanmamış.",
+    computeResume: "Takibe devam et",
+    windowFailure: (code) => {
+      switch (code) {
+        case "WINDOW_INFEASIBLE":
+          return "Ortak oyuncu hedefi uygulanamaz; sınır gevşetilmedi.";
+        case "WINDOW_NO_SOLUTION":
+          return "Bütçede plan bulunamadı; imkânsızlık kanıtlanmadı.";
+        case "WINDOW_INPUTS_UNAVAILABLE":
+          return "Kadro veya fikstür verisi eksik.";
+        default:
+          return "";
+      }
+    },
+    computePaused: "Bekleme duraklatıldı; aynı işi sürdürebilirsin.",
+    windowComparisonTitle: "Aynı pencere için plan karşılaştırması",
+    windowStrategyDescriptions: {
+      "ortak-koru":
+        "Rakibin kayıtlı ilk 11'inden ilk hafta 15'imizde en az 9 oyuncu. Sınır gevşetilmez, sonraki haftalara uygulanmaz.",
+      "fark-yarat":
+        "Rakibin kayıtlı ilk 11'inden ilk hafta 15'imizde en fazla 5 oyuncu. Sınır gevşetilmez, sonraki haftalara uygulanmaz.",
+    },
+    windowFirstNet: "İlk hafta · net",
+    windowTotalNet: (weeks) => `${weeks} hafta · net toplam`,
+    windowDifference: (value) => `Saf puana göre fark: ${value}`,
+    windowRivalBasis: (rival, week, actual, target) =>
+      `${rival}, H${week} kayıtlı ilk 11: ilk hafta 15'imizde ${actual} ortak; hedef ${target}.`,
+    windowComparisonNote:
+      "Net: ilk 11 + kaptan − cezalar; bulunan planların farkı, kesin maliyet değil.",
     computeFailed: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
     adviceComputedBadge: "Hesap sonucu",
     advicePublishedWhileComputing: "Hesap sürerken yayınlanmış plan gösteriliyor.",
