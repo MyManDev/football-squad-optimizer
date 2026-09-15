@@ -155,26 +155,35 @@ class AnthropicClubNewsProvider:
     """
 
     _client: CodingClient
+    _model_identifier: str
 
     def __init__(
         self,
         *,
         environ: Mapping[str, str] | None = None,
         client: CodingClient | None = None,
+        api_key: str | None = None,
+        model_identifier: str = CODING_MODEL_IDENTIFIER,
     ) -> None:
         """Build a client, or accept one.
 
         ``client`` exists so the request this class assembles can be inspected offline: the
         tests pass a recorder and assert on what would have been sent -- that the prompt is
-        the frozen constant, that no tools are attached, that the model is the one the
-        contract names. Handing in a client skips the key entirely, which is the point; a
-        test that needed a key would not be an offline test.
+        the frozen constant, that no tools are attached, that the model is the one asked for.
+        Handing in a client skips the key entirely, which is the point; a test that needed a
+        key would not be an offline test.
+
+        ``api_key`` and ``model_identifier`` come from ``club_news_provider``, which resolves
+        them once from the environment. They are parameters rather than reads so that this
+        class states what it was given instead of consulting a global halfway through a run,
+        and so the recorded identifier is the one that was actually asked.
         """
 
+        self._model_identifier = model_identifier
         if client is not None:
             self._client = client
             return
-        api_key = read_api_key(environ)
+        api_key = read_api_key(environ) if api_key is None else api_key
         try:
             import anthropic
         except ImportError as error:
@@ -216,7 +225,7 @@ class AnthropicClubNewsProvider:
 
         user_content = build_user_content(documents, roster)
         message = self._client.messages.create(
-            model=CODING_MODEL_IDENTIFIER,
+            model=self._model_identifier,
             max_tokens=MAX_OUTPUT_TOKENS,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
@@ -225,10 +234,10 @@ class AnthropicClubNewsProvider:
                 "format": {"type": "json_schema", "schema": response_schema()},
             },
         )
-        return _claim_response(message)
+        return _claim_response(message, asked_for=self._model_identifier)
 
 
-def _claim_response(message: object) -> ClaimResponse:
+def _claim_response(message: object, *, asked_for: str) -> ClaimResponse:
     """Read one finished message into a :class:`ClaimResponse`, or refuse it.
 
     Three refusals, in the order they can arise. A declined request has no claims in it and
@@ -273,7 +282,7 @@ def _claim_response(message: object) -> ClaimResponse:
         )
     return ClaimResponse(
         text=text,
-        model_identifier=CODING_MODEL_IDENTIFIER,
+        model_identifier=asked_for,
         model_version=served,
     )
 
