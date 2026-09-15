@@ -25,6 +25,21 @@ but are not applied by this policy; applying them here would count the same evid
 An unavailable held player may remain on the bench, as the game permits, but the live
 verifier does not allow one in the starting XI.
 
+## Personal calculation weights (15 September 2026)
+
+The owner requested a comparison of 0, 5, 10, 20, 30, 40 and 50 per cent and a
+member-controlled setting. These are explicit personal calculation preferences; the
+published operational model versions below retain their five-per-cent rule. Omitting
+the setting uses the actual published projection, including a zero-effect component-only
+handoff. Increasing the coefficient does not establish better prediction accuracy.
+
+The producer now includes validated, roster-aligned `elite_start_counts` in evidence-aware
+handoffs and in their fingerprint. Personal calculations replace the existing uplift
+with the selected weight in each requested week. They cannot infer counts from an old
+handoff: changing its weight returns `TOP100_INPUTS_UNAVAILABLE` when counts are absent.
+See [the comparison and activation instructions](research/top100_weight_comparison.md) for
+measurement coverage, transport identity and operational prerequisites.
+
 ## Frozen rule
 
 For player `i`, let `m_i` be the control expected-points estimate and let `x_i` be the number
