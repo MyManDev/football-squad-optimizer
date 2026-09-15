@@ -123,3 +123,69 @@ Deployment and new published production data are separate operational actions.
 Disable the new multi-week capabilities to roll back; never erase historical
 advice or measurement records. Week-specific model research and an automatic
 multi-week strategy selector are outside this first release.
+
+## GW4 capacity observation, 15–16 September 2026
+
+The completed local comparison uses develop `e34f508a` and candidate `c4399da0`,
+league 352490, all 15 registered members, capture
+`fpl-live-20260912T100000Z-24613792ef57`, the existing
+`2026-27-gw04.json` handoff and eight workers. Both runs used
+`python -m scripts.build_league_site`, isolated output directories and
+`--no-advice-record`; neither used `--publish`. Input hashes and detailed counts
+are in [the measurement artifact](../research/multiweek_rival_capacity_20260916.json).
+
+| Observed result | Develop | Candidate |
+| --- | ---: | ---: |
+| Wall time | 4,411.910 s (73m32s) | 4,307.858 s (71m48s) |
+| Members rendered / requested | 15 / 15 | 15 / 15 |
+| Process exit code | 0 | 0 |
+| Computed rival entries | 420 | 444 |
+| Multiweek plans, excluding default aliases | 30 | 54 |
+| Validated advice documents, including aliases | 495 | 543 |
+| Actual files under the isolated site output | 541 | 589 |
+
+These are wall-time observations, not a speedup result. The runs were sequential,
+but the baseline shared the host with validation work. Neither measures deployment,
+production hardware, a worst-case capture, or a service-level runtime guarantee.
+The earlier 35m45s rehearsal is not a comparable replacement for this baseline.
+
+The extra static menu contains 60 requested rival/window combinations: two
+strategies, two longer windows and 15 members. Together with 30 controls this is
+90 possible multiweek solve requests, not 90 measured solver invocations: input
+refusals can happen before solving. The outcomes were:
+
+| Strategy and window | Computed | WINDOW_INFEASIBLE | WINDOW_INPUTS_UNAVAILABLE |
+| --- | ---: | ---: | ---: |
+| ortak-koru, 3 weeks | 0 | 12 | 3 |
+| ortak-koru, 5 weeks | 0 | 12 | 3 |
+| fark-yarat, 3 weeks | 12 | 0 | 3 |
+| fark-yarat, 5 weeks | 12 | 0 | 3 |
+
+Every extra combination has exactly one computed result or explicit refusal.
+Every computed path resolves to the declared member, strategy, rival and window;
+all 24 longer default aliases match their canonical file byte for byte. Refused
+combinations have no success file and expose only stable codes. There were no
+`SOLVER_EXECUTION_FAILED` or `WINDOW_NO_SOLUTION` outcomes in this run; solver
+failure isolation is covered by injected-failure tests, not demonstrated by this
+capture. All 543 candidate advice documents pass the runtime schema, arithmetic,
+overlap and public-text checks. All 495 pre-existing payload objects match the
+baseline exactly; the comparison excludes the wrapper's generation timestamp.
+
+All 24 new plans are FEASIBLE, with absolute objective gaps of 16.875–59.882 points.
+Their returned-plan prices are 0–0.492244 points, while their conservative price
+ceilings are 27.335936–83.716120 points. The wide bounds do not support a precise
+claim about the strategy's true cost or benefit. No longer ortak-koru result was
+available in this capture; the overlap target was not silently relaxed.
+
+This closes the missing local measurement, not the production capacity approval.
+Keep the feature out of the Friday GW5 publication. Enabling it still requires
+an operational runtime budget and a production-representative rehearsal, including
+the publication stage. No merge, deployment or production-data activation was
+performed as part of this review.
+
+The reviewed code passed the complete Python suite (5,532 passed, 15 conditional
+skips), 773 web tests, three real Chromium/API/worker/cache scenarios for 1/3/5
+weeks, the Python-to-web publication contract, lint, types, import boundaries and
+the existing bundle budget. Python 3.11, Python 3.13, web and linux/amd64 container
+CI passed on `c4399da0` in run `35020508991`. The independent Top100 change is
+PR #566; combining the branches requires fresh integration and bundle checks.
