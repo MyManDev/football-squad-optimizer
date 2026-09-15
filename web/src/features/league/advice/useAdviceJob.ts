@@ -128,20 +128,29 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
             return;
           }
 
-          // A job: fetch the published baseline once, show it while we wait.
-          let fallback: LeagueViewEnvelope<EntryAdvice> | null = null;
+          // Keep the accepted identity even if fetching the optional baseline hangs.
+          // Resuming an existing job reuses its baseline and goes straight to polling.
+          let fallback: LeagueViewEnvelope<EntryAdvice> | null = resume?.fallback ?? null;
+          resumable.current = {
+            phase: "waiting",
+            request,
+            jobId: outcome.jobId,
+            status: resume?.status ?? "queued",
+            fallback,
+          };
           try {
-            const published = allowPublishedBaseline
-              ? await new StaticOnlyAdviceClient().readAdvice(
-                  {
-                    ...request,
-                    strategy: "saf-puan",
-                    window: 1,
-                    rivalEntryId: null,
-                  },
-                  options,
-                )
-              : null;
+            const published =
+              !resume && allowPublishedBaseline
+                ? await new StaticOnlyAdviceClient().readAdvice(
+                    {
+                      ...request,
+                      strategy: "saf-puan",
+                      window: 1,
+                      rivalEntryId: null,
+                    },
+                    options,
+                  )
+                : null;
             if (published?.kind === "advice") fallback = published.envelope;
           } catch {
             fallback = null; // the wait is just quieter

@@ -86,6 +86,28 @@ function describePhase(state: ComputePhase): string {
 }
 
 describe("useAdviceJob", () => {
+  it("keeps the accepted job when its static baseline hangs and resumes without rereading it", async () => {
+    const baseline = vi
+      .spyOn(StaticOnlyAdviceClient.prototype, "readAdvice")
+      .mockImplementation(() => new Promise(() => {}));
+    try {
+      const client = new ScriptedClient();
+      const submit = vi.spyOn(client, "requestAdvice");
+      const poll = vi.spyOn(client, "readJob");
+      render(<Harness client={client} />);
+      await act(async () => screen.getByText("go").click());
+      await act(async () => vi.advanceTimersByTimeAsync(300_000));
+      expect(screen.getByTestId("phase")).toHaveTextContent("paused");
+      await act(async () => screen.getByText("go").click());
+      await act(async () => vi.advanceTimersByTimeAsync(2100));
+      expect(submit).toHaveBeenCalledTimes(1);
+      expect(baseline).toHaveBeenCalledTimes(1);
+      expect(poll).toHaveBeenCalledWith("job-1", expect.anything());
+      expect(screen.getByTestId("phase")).toHaveTextContent("done:api-cache");
+    } finally {
+      baseline.mockRestore();
+    }
+  });
   it("pauses a long job and resumes polling its same identity without another POST", async () => {
     const client = new ScriptedClient();
     client.statuses = Array(151).fill("running");
