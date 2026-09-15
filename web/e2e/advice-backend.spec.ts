@@ -46,6 +46,9 @@ test("a browser computes through the worker, then reads the same answer from cac
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText("Listelenen öneri dosyası bulunamadı.")).toBeVisible();
 
+  if (context.window > 1) {
+    await page.getByRole("radio", { name: `${context.window} hafta`, exact: true }).click();
+  }
   if (context.top100Weight != null) {
     await page
       .getByRole("combobox", { name: "Top100 etkisi" })
@@ -83,7 +86,7 @@ test("a browser computes through the worker, then reads the same answer from cac
     season: context.season,
     gameweek: context.gameweek,
     mode: "saf-puan",
-    window: 1,
+    window: context.window,
     source_snapshot_id: context.snapshotId,
   });
   expect(answer.payload.top100_weight_percent).toBe(context.top100Weight ?? 0);
@@ -91,8 +94,14 @@ test("a browser computes through the worker, then reads the same answer from cac
     context.top100Weight == null ? "published" : "personal",
   );
   await expect(
-    page.getByText(`Top100 etkisi: en fazla %${context.top100Weight ?? 0}`, { exact: false }),
+    page.getByText(`Top100 etkisi: ${context.top100Weight ?? 0} / 100`, { exact: false }),
   ).toBeVisible();
+  if (context.top100Weight != null) {
+    expect(answer.payload.top100_price.expected_points_cost_ceiling).toBeGreaterThanOrEqual(
+      answer.payload.top100_price.expected_points_cost,
+    );
+    await expect(page.getByText("Temel modelde bedel:", { exact: false })).toBeVisible();
+  }
   const distinct = await page.request.get(
     `${route}?strategy=${context.strategy}&window=${context.window}${context.rivalId ? `&rival=${context.rivalId}` : ""}&top100_weight_percent=40`,
   );

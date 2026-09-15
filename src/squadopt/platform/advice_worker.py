@@ -134,22 +134,58 @@ def build_advice_compute(
                     requested_weight=spec.top100_weight_percent,
                     counts=capture.elite_start_counts,
                 )
+            request = AdviseEntryRequest(
+                season=spec.context.season,
+                gameweek=spec.context.gameweek,
+                league_id=spec.league_id,
+                entry_id=spec.entry_id,
+                strategy=spec.strategy,
+                window=spec.window,
+                rival_entry_id=spec.rival_entry_id,
+            )
             advice = advise_entry(
-                AdviseEntryRequest(
-                    season=spec.context.season,
-                    gameweek=spec.context.gameweek,
-                    league_id=spec.league_id,
-                    entry_id=spec.entry_id,
-                    strategy=spec.strategy,
-                    window=spec.window,
-                    rival_entry_id=spec.rival_entry_id,
-                ),
+                request,
                 provider=capture.provider,
                 inputs=capture.inputs,
                 projection=projection,
                 rules=capture.rules,
                 horizon_builder=horizon_builder,
             )
+            if spec.top100_weight_percent is not None:
+                selected_net = float(str(advice.pop("_top100_base_net")))
+                advice.pop("_top100_base_ceiling")
+                if spec.top100_weight_percent == 0:
+                    reference_net, ceiling = selected_net, selected_net
+                    reference_status = advice["solver_status"]
+                else:
+                    base, base_horizon = weighted_member_inputs(
+                        capture.projection,
+                        capture.horizon_builder,
+                        source_weight=capture.top100_source_weight,
+                        requested_weight=0,
+                        counts=capture.elite_start_counts,
+                    )
+                    reference = advise_entry(
+                        request,
+                        provider=capture.provider,
+                        inputs=capture.inputs,
+                        projection=base,
+                        rules=capture.rules,
+                        horizon_builder=base_horizon,
+                    )
+                    reference_net = float(str(reference["_top100_base_net"]))
+                    ceiling = float(str(reference["_top100_base_ceiling"]))
+                    reference_status = reference["solver_status"]
+                cost = max(0.0, reference_net - selected_net)
+                advice["top100_price"] = {
+                    "basis": "base_model_same_strategy_v1",
+                    "selected_net_points": selected_net,
+                    "reference_net_points": reference_net,
+                    "expected_points_cost": cost,
+                    "expected_points_cost_ceiling": max(cost, ceiling - selected_net),
+                    "reference_solver_status": reference_status,
+                    "ceiling_basis": "relaxed_roster_v1",
+                }
         except Top100InputsUnavailable as error:
             raise AdviceComputeRefused("TOP100_INPUTS_UNAVAILABLE", str(error)) from error
         advice["top100_weight_percent"] = (

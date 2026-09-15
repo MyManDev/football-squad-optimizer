@@ -85,7 +85,7 @@ def _process(
     [
         ("saf-puan", 1, None),
         ("saf-puan", 1, 50),
-        ("saf-puan", 1, 20),
+        ("saf-puan", 5, 20),
     ],
 )
 def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
@@ -113,7 +113,7 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         allowed_origins=(web_origin,),
     )
     config.store_root.mkdir()
-    snapshot_id = worker_fixture._capture_with_entries(config.snapshot_root)
+    snapshot_id = worker_fixture._capture_with_entries(config.snapshot_root, multiweek=window > 1)
     if weight is None:
         deployment_fixture._handoff(config.handoff_root, snapshot_id)
     else:

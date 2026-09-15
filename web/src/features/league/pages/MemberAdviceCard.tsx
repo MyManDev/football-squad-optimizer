@@ -3,7 +3,6 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
-import { TOP100_MESSAGES } from "../advice/top100Weight";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
   AdviceMove,
@@ -108,7 +107,7 @@ export function AdviceCard({
   squad: LeagueViewEnvelope<EntrySquad>;
   rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
 }) {
-  const { locale, messages, language } = useLanguage();
+  const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
   const view = envelope.payload;
@@ -163,13 +162,24 @@ export function AdviceCard({
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
       {view.top100_weight_percent !== undefined ? (
         <p className={styles.honesty}>
-          {TOP100_MESSAGES[language].result(
+          {messages.top100.result(
             view.top100_weight_percent,
             view.top100_weight_source === "personal",
           )}
         </p>
       ) : null}
 
+      {view.top100_price ? (
+        <div className={styles.honesty}>
+          <p>
+            {messages.top100.price(
+              points(view.top100_price.expected_points_cost, 2, locale),
+              points(view.top100_price.expected_points_cost_ceiling, 2, locale),
+            )}
+          </p>
+          <p>{messages.top100.priceNote}</p>
+        </div>
+      ) : null}
       {basisNote ? (
         <p className={styles.honesty}>
           {basisNote.kind === "week"

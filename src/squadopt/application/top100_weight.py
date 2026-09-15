@@ -29,6 +29,8 @@ def weighted_member_inputs(
         raise Top100InputsUnavailable(
             "The handoff has no fingerprinted Top-100 counts for this adjustment."
         )
+    if counts is None and weight != 0:
+        raise Top100InputsUnavailable("Verified counts are required to price this preference.")
 
     def adjusted(table: pd.DataFrame) -> pd.DataFrame:
         result = table.copy(deep=True)
@@ -54,5 +56,9 @@ def weighted_member_inputs(
         diagnostics={
             **dict(projection.diagnostics),
             "personal_top100_weight_percent": weight,
+            "top100_base_point_ratios": {
+                int(player): 1 / (1 + weight * (counts or {}).get(int(player), 0) / 10_000)
+                for player in projection.table["player_id"]
+            },
         },
     ), horizon

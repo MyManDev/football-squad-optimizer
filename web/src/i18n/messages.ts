@@ -3,6 +3,21 @@ export type Language = "tr" | "en";
 export type ReasonParams = Record<string, string | number | undefined>;
 
 const en = {
+  top100: {
+    label: "Top100 influence",
+    published: "Use published setting",
+    help: "Zero disables prior-week Top100 influence. The setting caps extra points per hundred base points for unanimously picked players. Higher values may return the same plan or fewer shared players; no points gain is guaranteed. The card shows the base-model price.",
+    offline: "A personal setting requires the compute service.",
+    unavailable:
+      "This capture has no verified Top100 selections to price the preference. Use the published setting or wait for updated inputs.",
+    result: (weight: number, personal: boolean) =>
+      `Top100 influence: ${weight} / 100 · ${personal ? "personal choice" : "published setting"}`,
+    price: (cost: string, ceiling: string) =>
+      `Base-model price: ${cost} points; ceiling: ${ceiling} points.`,
+    priceNote:
+      "Compared with the returned zero-influence plan for the same strategy and window. The ceiling relaxes roster constraints, so it can be loose; it also covers incomplete solves. This is a preference price, not measured future performance.",
+  },
+
   suggestionHistory: {
     title: "Weekly Suggestion History",
     overview: "Overview",
@@ -976,6 +991,21 @@ type MessageSchema<T> = {
 };
 
 const tr: MessageSchema<typeof en> = {
+  top100: {
+    label: "Top100 etkisi",
+    published: "Yayınlanan ayarı kullan",
+    help: "Sıfır kapatır. Ayar, önceki haftada yüz Top100 takımının da seçtiği oyuncuya her yüz temel puan için eklenecek üst sınırdır. Daha yüksek ayar aynı planı veya daha az ortak oyuncu verebilir; puan kazancı garantisi değildir. Temel modeldeki bedeli kartta gösterilir.",
+    offline: "Kişisel ayar için hesaplama servisi gerekli.",
+    unavailable:
+      "Bu kayıtta tercihin bedelini hesaplamak için doğrulanmış Top100 seçimleri yok. Yayınlanan ayarı kullanabilir veya verinin güncellenmesini bekleyebilirsin.",
+    result: (weight: number, personal: boolean) =>
+      `Top100 etkisi: ${weight} / 100 · ${personal ? "kişisel seçim" : "yayınlanan ayar"}`,
+    price: (cost: string, ceiling: string) =>
+      `Temel modelde bedel: ${cost} puan; üst sınır: ${ceiling} puan.`,
+    priceNote:
+      "Aynı strateji ve pencerede sıfır etkiyle bulunan planla karşılaştırılır. Üst sınır kadro kısıtlarını gevşettiği için geniş olabilir; tamamlanmayan çözümleri de kapsar. Bu tercih bedelidir, ölçülmüş gelecek performansı değildir.",
+  },
+
   suggestionHistory: {
     title: "Haftalık Öneri Geçmişi",
     overview: "Genel Bakış",

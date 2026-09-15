@@ -24,6 +24,15 @@ it.each(TOP100_WEIGHTS)(
     const envelope = mockEntryAdviceEnvelope(101, "saf-puan", 1);
     envelope.payload.top100_weight_percent = weight;
     envelope.payload.top100_weight_source = "personal";
+    envelope.payload.top100_price = {
+      basis: "base_model_same_strategy_v1",
+      selected_net_points: 40,
+      reference_net_points: 41,
+      expected_points_cost: 1,
+      expected_points_cost_ceiling: 5,
+      reference_solver_status: "FEASIBLE",
+      ceiling_basis: "relaxed_roster_v1",
+    };
     const transport = vi.fn(async () => new Response(JSON.stringify(envelope)));
     const client = new HttpAdviceClient("https://api.example", transport);
     const selected = { ...request, top100WeightPercent: weight };

@@ -89,8 +89,11 @@ _SHA = "ab" * 32
 #: reading nothing from a squad verdict and stating no spread around either.
 #: ``movement`` and ``movement_places`` describe the difference between two captured
 #: league ranks; neither is a squad-calibration diagnostic (#533).
+#: ``top100_price`` is base-model arithmetic and a relaxed-roster upper bound for an
+#: explicit personal preference (#565), independent of every calibration verdict.
 _PUBLISHED_ENVELOPE = frozenset(
     {
+        "top100_price",
         "moves",
         "movement",
         "movement_places",

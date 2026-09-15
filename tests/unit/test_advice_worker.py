@@ -64,8 +64,15 @@ def _entry_payloads(entry_id: int, gameweek: int) -> dict[str, bytes]:
     }
 
 
-def _capture_with_entries(snapshot_root: Path) -> str:
+def _capture_with_entries(snapshot_root: Path, *, multiweek: bool = False) -> str:
+    from tests.unit.test_projection_horizon_builder import _calendar
+
     gw1_finished = [dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]]
+    if multiweek:
+        gw1_finished.extend(
+            {"id": week, "deadline_time": f"2026-10-{week:02d}T17:30:00Z", "finished": False}
+            for week in range(4, 7)
+        )
     written = write_snapshot(
         snapshot_root,
         source="fpl-live",
@@ -74,8 +81,9 @@ def _capture_with_entries(snapshot_root: Path) -> str:
             BOOTSTRAP_PAYLOAD: world_module._bootstrap(
                 events=gw1_finished, elements=world_module._elements(event_points=2)
             ),
-            FIXTURES_PAYLOAD: b"[]",
+            FIXTURES_PAYLOAD: _calendar(gameweeks=tuple(range(1, 7))) if multiweek else b"[]",
             **_entry_payloads(ENTRY_ID, 1),
+            **(_entry_payloads(RIVAL_ID, 1) if multiweek else {}),
         },
     )
     return written.snapshot_id

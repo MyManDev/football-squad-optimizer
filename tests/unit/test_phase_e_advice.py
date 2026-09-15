@@ -137,7 +137,7 @@ def test_advice_keeps_control_bytes_and_compute_counts_while_recording_a_better_
         deadline=SimpleNamespace(gameweek=TARGET.gameweek),
         players=pool,
     )
-    projection = SimpleNamespace(table=pool)
+    projection = SimpleNamespace(table=pool, diagnostics={})
     rules = SimpleNamespace(season=TARGET.season, source_snapshot_id="capture-a")
     decision = SimpleNamespace(
         as_record=lambda: {

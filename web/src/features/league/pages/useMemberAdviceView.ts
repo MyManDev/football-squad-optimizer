@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 
 import { createAdviceClient } from "../advice/adviceClient";
-import { resolvePublishedAdvice } from "../advice/adviceSelection";
+import { canComputeAdvice, resolvePublishedAdvice } from "../advice/adviceSelection";
 import { AdviceContextError, checkedAdvice } from "../advice/adviceResponse";
 import { sameAdviceRequest, useAdviceJob } from "../advice/useAdviceJob";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
@@ -33,6 +33,12 @@ export function useMemberAdviceView(
   const { request } = selection;
   const indexReadable = adviceIssue !== "index-missing" && adviceIssue !== "index-error";
   const selectionAvailable = !adviceLoading && indexReadable && selection.status === "ready";
+  const allowCompute =
+    adviceClient.supportsCompute === true &&
+    indexReadable &&
+    selection.status !== "index-error" &&
+    selection.status !== "index-missing";
+  const canRequest = selectionAvailable || (allowCompute && canComputeAdvice(request));
   const baselineAvailable =
     resolve(new URLSearchParams("mode=saf-puan&window=1")).status === "ready";
   const job = useAdviceJob(adviceClient, baselineAvailable);
@@ -55,9 +61,7 @@ export function useMemberAdviceView(
   }, [requestKey, reset]);
 
   const current =
-    selectionAvailable &&
-    job.state.phase !== "idle" &&
-    sameAdviceRequest(job.state.request, request)
+    canRequest && job.state.phase !== "idle" && sameAdviceRequest(job.state.request, request)
       ? job.state
       : null;
   const computed = current?.phase === "done" ? current : null;
@@ -96,6 +100,8 @@ export function useMemberAdviceView(
     selection,
     indexReadable,
     selectionAvailable,
+    canRequest,
+    allowCompute,
     job,
     request,
     shown,

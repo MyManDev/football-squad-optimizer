@@ -134,6 +134,23 @@ def test_api_job_worker_and_cache_keep_the_selected_weight(backend, weight):
     assert served.status_code == 200, served.text
     assert served.json()["payload"]["top100_weight_percent"] == weight
     assert served.json()["payload"]["top100_weight_source"] == "personal"
+    payload = served.json()["payload"]
+    price = payload["top100_price"]
+    assert not any(key.startswith("_top100") for key in payload)
+    assert price["expected_points_cost"] == pytest.approx(
+        max(0, price["reference_net_points"] - price["selected_net_points"])
+    )
+    assert price["expected_points_cost_ceiling"] >= price["expected_points_cost"] >= 0
+    if weight == 0:
+        assert price["expected_points_cost_ceiling"] == 0
+    for missing in ("top100_price", "expected_points_cost_ceiling"):
+        damaged_price = json.loads(served.content)
+        if missing == "top100_price":
+            del damaged_price["payload"][missing]
+        else:
+            del damaged_price["payload"]["top100_price"][missing]
+        with pytest.raises(AdviceDocumentError):
+            validate_advice_document(json.dumps(damaged_price).encode())
     assert client.post(route, json=body).content == served.content
     assert client.get(route, params={"strategy": "saf-puan", "window": 1}).status_code == 404
     for other in TOP100_WEIGHT_PERCENTAGES:
@@ -173,14 +190,16 @@ def test_missing_counts_cannot_be_guessed(backend):
             requested_weight=50,
             counts=None,
         )
-    unchanged, _ = weighted_member_inputs(
-        capture.projection,
-        capture.horizon_builder,
-        source_weight=5,
-        requested_weight=5,
-        counts=None,
-    )
-    pd.testing.assert_frame_equal(unchanged.table, capture.projection.table)
+    # The published setting remains usable without reweighting. An explicit personal
+    # setting, even the same number, needs counts to undo the uplift and price it.
+    with pytest.raises(Top100InputsUnavailable):
+        weighted_member_inputs(
+            capture.projection,
+            capture.horizon_builder,
+            source_weight=5,
+            requested_weight=5,
+            counts=None,
+        )
 
 
 @pytest.mark.parametrize("damage", ["count", "fingerprint", "shape", "boolean"])
@@ -244,3 +263,30 @@ def test_partial_support_scales_the_selected_maximum():
         top100_weight_percent=50,
     )
     assert result.table.expected_points.iloc[:2].tolist() == pytest.approx([4 * 1.2, 5 * 1.3])
+
+
+@pytest.mark.parametrize("window", [3, 5])
+def test_long_window_price_covers_the_whole_plan_and_has_a_ceiling(backend, window):
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{worker_fixture.LEAGUE_ID}/entries/{worker_fixture.ENTRY_ID}/advice"
+    body = {"strategy": "saf-puan", "window": window, "top100_weight_percent": 20}
+    assert client.post(route, json=body).status_code == 202
+    job = run_advice_worker_once(
+        backend.queue,
+        backend.cache,
+        build_advice_compute(backend.contexts, backend.job_specs),
+        at_utc=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    )
+    assert job.status == "completed", job.error
+    payload = client.get(route, params=body).json()["payload"]
+    assert len(payload["plan_weeks"]) == window
+    price = payload["top100_price"]
+    assert price["expected_points_cost_ceiling"] >= price["expected_points_cost"] >= 0
+    assert (
+        price["selected_net_points"]
+        <= sum(
+            week["expected_points"] - week["transfer_hit_points"] for week in payload["plan_weeks"]
+        )
+        + 1e-8
+    )
+    assert price["reference_solver_status"] in ("OPTIMAL", "FEASIBLE")

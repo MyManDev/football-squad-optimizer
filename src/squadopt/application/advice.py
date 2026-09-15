@@ -34,6 +34,7 @@ from squadopt.application.advice_capabilities import (
 from squadopt.application.advice_capabilities import (
     validate_advice_selection,
 )
+from squadopt.application.advice_prices import base_model_values
 from squadopt.application.entries import (
     EntryError,
     EntryPicks,
@@ -589,6 +590,11 @@ def build_advice_payload(
         # eleven in pitch order, the bench in the order the game's autosubs walk it,
         # and the chip — all in expected points, none of it a probability.
         **lineup,
+        **(
+            base_model_values((week,), projection.table, projection.diagnostics)
+            if week is not None
+            else {}
+        ),
         # What this plan assumes, in the producer's own sentence. A one-week solve is
         # handed no chip either, and the payload said nothing about it, so a reader had
         # no way to tell a chip that was weighed and declined from one never offered.
@@ -760,6 +766,7 @@ def build_window_payload(
         "solver_status": plan.solver_status.name,
         "optimality_gap": float(str(raw_gap)) if raw_gap is not None else None,
         **lineup_fields(first),
+        **base_model_values(plan.weeks, horizon.table, projection.diagnostics),
         # One row per gameweek. ``expected_points`` is the planner's projected score
         # for that week's eleven with the captain's multiplier, before hits.
         "plan_weeks": [

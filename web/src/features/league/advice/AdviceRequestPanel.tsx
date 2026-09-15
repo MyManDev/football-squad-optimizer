@@ -16,7 +16,6 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import type { AdviceRequest } from "./adviceClient";
-import { TOP100_MESSAGES } from "./top100Weight";
 import { canComputeAdvice } from "./adviceSelection";
 import type { AdviceJob } from "./useAdviceJob";
 import styles from "./AdviceRequestPanel.module.css";
@@ -30,7 +29,7 @@ export function AdviceRequestPanel({
   job: AdviceJob;
   selectionAvailable?: boolean;
 }) {
-  const { messages, language } = useLanguage();
+  const { messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { viewer } = useViewerEntry();
   const { state, compute } = job;
@@ -83,7 +82,7 @@ export function AdviceRequestPanel({
       {state.phase === "failed" ? (
         <p className={styles.state}>
           {state.errorCode === "TOP100_INPUTS_UNAVAILABLE"
-            ? TOP100_MESSAGES[language].unavailable
+            ? messages.top100.unavailable
             : copy.computeFailed}
         </p>
       ) : null}

@@ -22,8 +22,43 @@ import type { Language } from "../../../i18n/messages";
 import { ScoreboardCard } from "../components/ScoreboardCard";
 import type { EntryAdvice, LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { AdviceCard } from "./MemberAdviceCard";
+import { MESSAGES } from "../../../i18n/messages";
 
 afterEach(cleanup);
+
+it.each(["tr", "en"] as const)(
+  "%s: a personal Top100 price and ceiling stay inside the guard",
+  (language) => {
+    const envelope = mockEntryAdviceEnvelope(35249001, "saf-puan", 3);
+    envelope.payload.top100_weight_percent = 50;
+    envelope.payload.top100_weight_source = "personal";
+    envelope.payload.top100_price = {
+      basis: "base_model_same_strategy_v1",
+      selected_net_points: 100,
+      reference_net_points: 103,
+      expected_points_cost: 3,
+      expected_points_cost_ceiling: 20,
+      reference_solver_status: "FEASIBLE",
+      ceiling_basis: "relaxed_roster_v1",
+    };
+    const { container } = render(
+      <LanguageProvider initialLanguage={language}>
+        <MemoryRouter>
+          <AdviceCard
+            shown={{ envelope, origin: "computed" }}
+            squad={mockEntrySquadEnvelopes[35249001]!}
+            rivalSquad={null}
+          />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    const text = container.textContent ?? "";
+    expect(text).toContain(MESSAGES[language].top100.priceNote);
+    expect(text.match(FORBIDDEN)).toBeNull();
+    expect(text.match(MODE_PROMISE)).toBeNull();
+  },
+);
 
 // Keep the original patterns and cover the plan's full forbidden vocabulary.
 // The exact causal word "yüzden" means "because", not the numerical term "yüzde".

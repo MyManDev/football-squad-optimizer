@@ -19,8 +19,9 @@ Kaynak projeksiyonda zaten %5 varsa kişisel hesaplama onu değiştirir:
 `mevcut_puan × (1 + yeni_ağırlık × destek) / (1 + 0.05 × destek)`.
 Artışlar üst üste uygulanmaz. Sakatlık/uygunluk düzeltmesi tekrar uygulanmaz;
 sıfırlanmış bir oyuncunun puanı sıfır kalır. Aynı oran 1, 3 ve 5 haftalık
-pencerelerin her haftasında kullanılır. Saf puan ve rakip stratejileri aynı
-kişisel projeksiyonu kullanır; bütçe, transfer ve ilk hafta ortak oyuncu sınırları korunur.
+pencerelerin her haftasında kullanılır. Bu bağımsız dalda saf puan 1/3/5 hafta, rakip stratejileri yalnız 1 hafta desteklenir.
+Hepsi aynı kişisel projeksiyonu kullanır; bütçe ve transfer kuralları korunur.
+Çok haftalık rakip stratejileri ayrı #559 çalışmasıdır.
 
 ## Veri ve kapsam
 
@@ -54,15 +55,15 @@ transfer, ilk 11 kümesi veya kaptanın değişmesi. Sadece sayısal puan artı�
 karar değişikliği sayılmaz. Temel puan farkı, seçilen ilk 11 ve kaptanın **aynı
 ağırlıksız modeldeki** puanları eksi transfer cezasıdır; gerçekleşen puan değildir.
 
-| Top100 ayarı | Kararı değişen | Transferi değişen | Kaptanı değişen | Ortalama temel net puan farkı | İlk 11 ortalama Top100 desteği |
+| Top100 ayarı | Kararı değişen | Transferi değişen | Kaptanı değişen | Ortalama tercih bedeli (temel puan) | İlk 11 ortalama Top100 desteği |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | %0 | 0/15 | 0/15 | 0/15 | 0,000 | %20,15 |
-| %5 | 3/15 | 3/15 | 0/15 | −0,015 | %21,29 |
-| %10 | 7/15 | 7/15 | 2/15 | −0,140 | %22,86 |
-| %20 | 13/15 | 13/15 | 3/15 | −0,471 | %25,90 |
-| %30 | 14/15 | 13/15 | 3/15 | −0,556 | %26,93 |
-| %40 | 14/15 | 13/15 | 3/15 | −0,556 | %26,93 |
-| %50 | 14/15 | 14/15 | 4/15 | −0,711 | %26,01 |
+| %5 | 3/15 | 3/15 | 0/15 | 0,015 | %21,29 |
+| %10 | 7/15 | 7/15 | 2/15 | 0,140 | %22,86 |
+| %20 | 13/15 | 13/15 | 3/15 | 0,471 | %25,90 |
+| %30 | 14/15 | 13/15 | 3/15 | 0,556 | %26,93 |
+| %40 | 14/15 | 13/15 | 3/15 | 0,556 | %26,93 |
+| %50 | 14/15 | 14/15 | 4/15 | 0,711 | %26,01 |
 
 %30 ve %40 bu örnekte aynı ilk 11, transfer ve kaptan seçimlerini üretti.
 %50'nin daha büyük katsayısı, ilk 11'in ortalama destek payını zorunlu olarak
@@ -72,6 +73,12 @@ seçimlerin birbirini etkilemesine neden olur.
 Bu sonuçlar %20–%50'nin temel modelin tercihlerine belirgin müdahale ettiğini
 gösterir. Bir doğruluk veya başarı sıralaması değildir. Varsayılanı ölçümden
 bir kazanan seçerek değiştirmek için yeterli kanıt yoktur.
+
+Bu sütun ağırlıksız modeldeki **tercih bedelidir**: sıfır ağırlıklı plan eksi seçilen
+plan. Ham ölçüm dosyası ters yöndeki farkı saklamaya devam eder. Aynı uygun kadrolar
+arasında yalnız hedef katsayıları değiştiğinden bu tablo Top100 sinyalinin gelecek
+puanlara etkisini ölçmez. OPTIMAL, yedek ve transfer temkin payı da içeren çözücü
+hedefinin ispatıdır; gösterilen ilk 11 net puanının ayrı bir optimum ispatı değildir.
 
 ## Üç ve beş haftalık örnek
 
@@ -96,6 +103,28 @@ haftaların transferleri ham raporda ayrıca saklanır. Toplam **119 hesaplaman�
 kullanıcı kimliği içermeyen sayısal özeti ve her uzun vadeli planın çözücü farkı
 [ölçüm dosyasında](../top100_weights_20260915.json) bulunur.
 
+Uzun pencerelerde kontrol ve adayların çözüm açıkları üç haftada 17,3–32,1,
+beş haftada 38,9–59,2 puandır. Küçük pozitif hücreler bir kazanç bulgusu değildir.
+
+## Tercihin canlı fiyatı
+
+Kişisel yanıtta `top100_price`, aynı strateji, rakip ve pencerenin sıfır ağırlıklı
+planıyla karşılaştırmayı taşır. Seçilen **gerçek ilk 11 ve kaptan**, her haftada
+Top100 çarpanı geri alınarak temel modelde puanlanır; transfer cezaları bir kez düşer.
+Plan yeniden kadro seçilerek puanlanmaz. Bedel `max(0, kontrol_net - seçilen_net)`tir.
+
+`expected_points_cost_ceiling` her kişisel fiyatla birlikte zorunludur. Üst sınır,
+her haftanın en yüksek temel puanlı on bir oyuncusunu ve en yüksek kaptan puanını
+kullanarak bütçe, pozisyon, takım ve transfer kısıtlarını gevşetir. Bu yüzden geniş
+olabilir; FEASIBLE sonuçlarda veya yedek değerinin hedefe girdiği durumda da geçerlidir.
+Arayüz bulunan planların bedelini ve bu muhafazakâr üst sınırı ayrı gösterir.
+
+Sıfır ayarı ek çözüm gerektirmez ve tercih bedeli sıfırdır. Diğer kişisel ayarlar
+aynı koşullarda bir sıfır-ağırlık referans hesabı daha yapar; bu ek süre yalnız
+istek üzerine hesaplamaya aittir, haftalık lig yayınına ek çözüm getirmez. Referans
+hesaplanamazsa fiyatı eksik bir kişisel sonuç yayımlanmaz. Yedi seçenek korunur;
+ayrı yedi davranış veya monoton ortaklık artışı vaat edilmez.
+
 ## Sisteme bağlantı
 
 Arayüzde hesaplama servisi bağlıysa **Top100 etkisi** seçimi görünür. Varsayılan
@@ -113,7 +142,7 @@ kişisel oranla hesaplanmış gibi gösterilmez.
 Yeni kanıtlı handoff üretimi, doğrulanmış `elite_start_counts` alanını dosyaya ve
 parmak izine ekler. Normal haftalık `component` akışı zaten Top100 kanıt çiftini
 `build_handoff` çağrısına geçirir. API için yeni bir haricî veri servisi gerekmez.
-Eski handoff dosyaları okunmaya devam eder; sayımlar yoksa oran değişikliği
+Eski handoff dosyaları okunmaya devam eder; sayımlar yoksa sıfır dışındaki kişisel ayarın fiyatlandırılması
 `TOP100_INPUTS_UNAVAILABLE` ile açıkça reddedilir.
 
 **Yayına alma önkoşulu:** backend ve web sürümünün birlikte dağıtılması ve geçerli
@@ -143,21 +172,14 @@ GW4 sonuçlarıyla değerlendirmek; ardından birden fazla son tarih öncesi kay
 
 ## Doğrulama
 
-- Her oran için API → iş kuyruğu → gerçek çözücü → disk önbelleği ve yanlış oranı
-  reddetme testleri; eski dosyada açık hata, %0 ve yayınlanan ayarın ayrımı.
-- Handoff üretici/okuyucu, değiştirilen sayımın parmak iziyle reddi, kısmi destek,
-  bütün haftalarda mevcut artışı değiştirme ve sıfır puanın korunması.
-- 781 web testi; üretim derlemesi, biçim, tip, lint ve dağıtım dosyası kontrolleri.
-  İlk JavaScript paketi 149,6 kB gzip; mevcut 150 kB bütçesi içinde.
-- 79 standart Playwright senaryosu; ek 5 gerçek Chromium → HTTP API → işçi
-  senaryosu. Bunlar %50 tek hafta ve %20 beş haftalık kişisel seçimleri, yeniden
-  yüklemeden sonra önbellek cevabını ve başka oran için önbellek bulunmamasını kapsar.
+#565 düzeltmesi `develop` tabanındaki bağımsız `codex/top100-565-fixes` dalındadır;
+#559 kodu bu dalın önkoşulu değildir. Yeni metinlerin tamamı iki dilde ana `MESSAGES`
+sözlüğündedir. `AS_A_CHANCE` değiştirilmedi; kontrol değerleri `50 / 100` gibi gösterilir.
 
-- Tam Python çalıştırması: 5.542 geçti, 17 koşullu atlandı; yeni iki sonuç alanının
-  açık sözleşme alan listesinde eksik olması nedeniyle bir kontrol başarısız oldu.
-  Alan listesi tamamlandıktan sonra başarısız kontrolü de kapsayan 84 test geçti.
-  Son formül/üretici/ölçüm kontrollerini kapsayan ayrı 86 test ve ölçüm dizininin
-  14 testi geçti. Tam paket bu iki satırlık test kaydı düzeltmesinden sonra tekrar
-  çalıştırılmadı; üretim kodu bu düzeltmede değişmedi.
-- Python→web yayın kabul testi geçti. Ruff, strict mypy ve üç bağımlılık sınırı geçti.
-  Docker tabanlı kabul testleri bu yerel çalışmanın kapsamına alınmadı.
+Üç gerçek Chromium → API → worker → cache senaryosu 235,00 saniyede geçti.
+Bunlar yayınlanan tek haftayı, kişisel 50 tek haftayı ve kişisel 20 beş haftayı kapsar.
+Linux/amd64 Docker imajında dört kabul testi 43,52 saniyede geçti. Konteyner kontrolü
+bu backend değişikliği için yerel doğrulamaya dahil edildi; mevcut GitHub korumasında
+ayrı zorunlu merge kapısı değildir. Bu sonuç bulut NFS veya canlı dağıtım kanıtı değildir.
+
+Son tam Python/web kapılarının sonuçları son doğrulama tamamlandığında kaydedilecektir.

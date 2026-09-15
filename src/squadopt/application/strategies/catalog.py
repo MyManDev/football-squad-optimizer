@@ -52,6 +52,7 @@ class StrategyConfigurationError(ValueError):
 #: measurement, and this list is where it is enforced structurally.
 PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
     {
+        "top100_price",
         "moves",
         # The week's hit charge, once. It belongs to the week — the game takes four
         # points for each transfer beyond the free ones — not to any one move, so it is
