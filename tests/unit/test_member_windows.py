@@ -153,6 +153,23 @@ def _walk(node: object, path: str, offenders: list[str]) -> None:
         offenders.append(f"{path} (text: {node[:60]!r})")
 
 
+def test_existing_five_plans_keep_their_recorded_results(window_world: dict[str, Any]) -> None:
+    """Pin the old product outputs before introducing multiweek rival advice."""
+    picks = window_world["provider"].picks(ENTRY, SEASON, 1)
+    window_world["provider"]._picks[202] = dataclasses.replace(picks, entry_id=202)
+    reference = json.loads(
+        (Path(__file__).parents[1] / "fixtures/member_advice_baseline.json").read_text()
+    )
+    for key, expected in reference.items():
+        strategy, window = key.split("/")
+        payload = _advise(
+            window_world, strategy=strategy, window=int(window),
+            rival_entry_id=None if strategy == "saf-puan" else 202,
+        )
+        payload.pop("source_snapshot_id", None)
+        assert payload == expected, key
+
+
 @pytest.mark.parametrize("window", [3, 5])
 def test_a_window_publishes_the_first_week_and_the_whole_plan(
     window_world: dict[str, Any], window: int
