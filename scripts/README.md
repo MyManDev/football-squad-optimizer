@@ -21,6 +21,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `build_projection_handoff.py` | shim | `squadopt.application.projection_handoff`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `build_scoreboard.py` | shim (load-bearing) | subprocessed by `platform/weekly_publish.py`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `build_site.py` | shim (load-bearing) | subprocessed by `platform/weekly_publish.py`; `docs/weekly_runbook.md` | 2026-09-10 |
+| `capture_club_news.py` | shim | `squadopt.platform.club_news_acquire`; `docs/weekly_runbook.md` | 2026-09-15 |
 | `capture_elite_picks.py` | shim | `squadopt.platform.elite_capture`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `capture_top100_cohort.py` | shim | `squadopt.platform.cohort_capture`; `docs/weekly_runbook.md` | 2026-09-10 |
 | `export_player_evidence.py` | shim | `squadopt.application.player_evidence`; `docs/weekly_runbook.md` | 2026-09-10 |

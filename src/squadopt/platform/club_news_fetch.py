@@ -230,7 +230,7 @@ class _Read:
 Opener = Callable[[urllib.request.Request, float], Any]
 
 
-def _default_opener(request: urllib.request.Request, timeout: float) -> Any:
+def default_opener(request: urllib.request.Request, timeout: float) -> Any:
     return urllib.request.urlopen(request, timeout=timeout)
 
 
@@ -273,7 +273,7 @@ def _read_once(url: str, *, opener: Opener) -> _Read:
 def read_url(
     url: str,
     *,
-    opener: Opener = _default_opener,
+    opener: Opener = default_opener,
     attempts: int = RETRY_ATTEMPTS,
     sleeper: Callable[[float], None] = time.sleep,
 ) -> _Read:
@@ -374,7 +374,7 @@ class HostManners:
 def robots_allows(
     source: ClubSource,
     *,
-    opener: Opener = _default_opener,
+    opener: Opener = default_opener,
     sleeper: Callable[[float], None] = time.sleep,
     manners: HostManners | None = None,
 ) -> bool:
@@ -418,7 +418,7 @@ def robots_allows(
 def fetch_club_document(
     source: ClubSource,
     *,
-    opener: Opener = _default_opener,
+    opener: Opener = default_opener,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     sleeper: Callable[[float], None] = time.sleep,
     check_robots: bool = True,
@@ -484,7 +484,7 @@ def fetch_club_document(
 def fetch_registered_documents(
     sources: Sequence[ClubSource],
     *,
-    opener: Opener = _default_opener,
+    opener: Opener = default_opener,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     sleeper: Callable[[float], None] = time.sleep,
     check_robots: bool = True,
@@ -532,6 +532,7 @@ __all__ = [
     "ClubNewsFetchError",
     "ClubSource",
     "HostManners",
+    "default_opener",
     "fetch_club_document",
     "fetch_registered_documents",
     "load_club_sources",

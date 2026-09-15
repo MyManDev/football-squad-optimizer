@@ -108,8 +108,12 @@ net columns beside it.
   it cannot run earlier; and it refuses a week whose club documents carry a fetch instant at
   or after the capture, because words fetched after a capture could have been chosen by
   looking at it first. So the club-news fetch belongs in the same window as everything else,
-  ahead of the capture rather than after it. The model call, when there is one, is bound by
-  the same rule and more tightly — that is a step of its own and does not exist yet.
+  ahead of the capture rather than after it. The fetch and the model call are one step and it
+  now exists: `python -m scripts.capture_club_news --roster-snapshot <capture>` reads the
+  registry, fetches the registered pages, codes them one club per call and prints the capture
+  id that `--rotation` then reads. It runs **before** the capture, for the reason above, and
+  its roster comes from a capture already on disk so its only network reach is the club hosts
+  the registry names.
 - The Top-100 captures refuse at or after the deadline, and read the cohort's picks for
   the gameweek that just closed — so they need those picks to be public (after the
   previous deadline) and the coming deadline still open.
