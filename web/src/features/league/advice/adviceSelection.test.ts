@@ -127,6 +127,11 @@ describe("advice selection", () => {
       rival_entry_id: RIVAL,
       path: `advice/${ENTRY}/ortak-koru/3/vs-${RIVAL}.json`,
     });
+    index.computed.push({
+      strategy: "ortak-koru",
+      rival_entry_id: RIVAL,
+      path: `advice/999999/ortak-koru/5/vs-${RIVAL}.json`,
+    });
     expect(availableWindows(index, "ortak-koru", RIVAL)).toEqual([1, 3]);
     expect(availableWindows(index, "ortak-koru", 999999)).toEqual([]);
     index.unavailable.push({

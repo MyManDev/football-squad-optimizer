@@ -32,7 +32,8 @@ export function availableWindows(
               (row) =>
                 row.strategy === strategy &&
                 row.rival_entry_id === rivalEntryId &&
-                row.path.endsWith(`/${window}/vs-${rivalEntryId}.json`),
+                row.path ===
+                  `advice/${index.entry_id}/${strategy}/${window}/vs-${rivalEntryId}.json`,
             )) &&
           !index.unavailable?.some(
             (row) =>
