@@ -48,6 +48,14 @@ LEDGER_TRANSFERS_CONTRACT_VERSION: Final = "ledger_transfers_v1"
 FREE_TRANSFERS_AFTER_OPENING: Final = 1
 
 
+class HorizonNoSolutionError(DataSourceError):
+    """A completed solver attempt with no plan, preserving its actual status."""
+
+    def __init__(self, message: str, status: SolverStatus) -> None:
+        super().__init__(message)
+        self.status = status
+
+
 @dataclass(frozen=True, slots=True)
 class HeldSquad:
     """What the ledger says is held going into a deadline."""
@@ -853,9 +861,10 @@ def plan_transfer_horizon(
     if not plan.has_solution or not plan.weeks:
         used = plan.diagnostics.get("deterministic_time_used")
         relative_gap = plan.diagnostics.get("relative_optimality_gap")
-        raise DataSourceError(
+        raise HorizonNoSolutionError(
             f"The transfer planner produced no {len(projection_horizon.target_gameweeks)}-"
             f"week solution; solver status was {plan.solver_status.name}, "
-            f"deterministic time used was {used!r}, relative gap was {relative_gap!r}."
+            f"deterministic time used was {used!r}, relative gap was {relative_gap!r}.",
+            plan.solver_status,
         )
     return plan, planning_policy

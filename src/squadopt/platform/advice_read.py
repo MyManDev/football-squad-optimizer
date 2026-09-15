@@ -23,10 +23,9 @@ from pathlib import Path
 from typing import Final, Protocol
 
 from squadopt.application.advice_capabilities import (
-    COMPUTED_MODE,
     COMPUTED_WINDOW,
-    MEMBER_WINDOWS,
     AdviceCapability,
+    advice_capabilities,
     validate_advice_selection,
 )
 from squadopt.application.entries import EntryError
@@ -194,7 +193,10 @@ class AdviceReadStore:
         self._strategies = dict(strategies)
         self._capabilities = {
             slug: AdviceCapability(
-                MEMBER_WINDOWS if slug == COMPUTED_MODE else (COMPUTED_WINDOW,), rival
+                advice_capabilities()
+                .get(slug, AdviceCapability((COMPUTED_WINDOW,), rival))
+                .windows,
+                rival,
             )
             for slug, rival in strategies.items()
         }

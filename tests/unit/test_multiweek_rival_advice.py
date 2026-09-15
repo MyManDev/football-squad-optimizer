@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -9,7 +10,6 @@ from tests.unit.test_member_windows import ENTRY, SEASON, _advise, _window_world
 
 from squadopt.application.advice import build_window_control
 from squadopt.application.entries import EntryError
-from squadopt.data.errors import DataSourceError
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
 
 window_world = _window_world
@@ -71,7 +71,7 @@ def test_rival_window_keeps_policy_and_compares_the_same_window(
 
 def test_impossible_band_is_reported_without_relaxing_it(window_world: dict[str, Any]) -> None:
     _rival(window_world)
-    with pytest.raises(DataSourceError, match="INFEASIBLE"):
+    with pytest.raises(EntryError, match="WINDOW_INFEASIBLE"):
         _advise(window_world, strategy="fark-yarat", window=3, rival_entry_id=202)
 
 
@@ -118,3 +118,52 @@ def test_precomputed_control_cannot_cross_windows(window_world: dict[str, Any]) 
             horizon_builder=world["builder"],
             window_control=control,
         )
+
+
+def test_static_menu_is_bounded_and_reuses_each_window_control(
+    window_world: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from squadopt.application import advice as module
+    from squadopt.application.entries import EntryRegistration
+    from squadopt.application.league_views import MemberStanding, build_league_views
+
+    _rival(window_world)
+    calls: list[object] = []
+    original = module.plan_transfer_horizon
+
+    def solve(*args: Any, **kwargs: Any) -> Any:
+        calls.append(kwargs.get("first_week_overlap"))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(module, "plan_transfer_horizon", solve)
+    world = window_world
+    report = build_league_views(
+        world["provider"],
+        tuple(EntryRegistration(i, str(i), "2026-08-23T00:00:00Z") for i in (ENTRY, 202)),
+        world["inputs"],
+        world["projection"],
+        world["rules"],
+        league_id=352490,
+        league_name="Synthetic",
+        out_dir=tmp_path / "site",
+        horizon_builder=world["builder"],
+        standings={
+            i: MemberStanding(entry_id=i, team_name=str(i), manager_name=str(i), rank=rank)
+            for rank, i in enumerate((ENTRY, 202), 1)
+        },
+    )
+    assert report.rendered_count == 2
+    assert calls.count(None) == 4  # two members, two windows; never one per strategy
+    assert len(calls) == 12  # four controls and eight bounded rival attempts
+    for window in (3, 5):
+        base = tmp_path / f"site/advice/{ENTRY}/ortak-koru/{window}"
+        direct = base / "vs-202.json"
+        assert direct.read_bytes() == base.with_suffix(".json").read_bytes()
+        validate_advice_document(direct.read_bytes())
+    index = json.loads((tmp_path / f"site/advice/{ENTRY}/index.json").read_text())["payload"]
+    assert index["windows"]["ortak-koru"] == [1, 3, 5]
+    failures = [r for r in index["unavailable"] if r.get("window") in (3, 5)]
+    assert len(failures) == 2
+    assert all(r["reason"].startswith("WINDOW_INFEASIBLE:") for r in failures)

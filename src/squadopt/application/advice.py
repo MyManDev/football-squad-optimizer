@@ -57,7 +57,7 @@ from squadopt.live import (
     plan_transfers_with_overlap,
 )
 from squadopt.live.recommendation import InSeasonProjection
-from squadopt.live.transfers import HeldSquad, TransferDecision
+from squadopt.live.transfers import HeldSquad, HorizonNoSolutionError, TransferDecision
 from squadopt.optimization import (
     OptimizationConfig,
     SolverExecutionError,
@@ -100,6 +100,14 @@ WINDOW_WALL_CEILING_SECONDS = 1800.0
 HorizonBuilder = Callable[[tuple[int, ...]], ProjectionHorizon]
 
 WINDOW_RIVAL_POLICY = "first_week_rival_horizon_v1"
+
+
+class MultiweekAdviceUnavailable(EntryError):
+    """A product refusal that the API and static index can explain consistently."""
+
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(f"{code}: {detail}")
+        self.code = code
 
 
 @dataclass(frozen=True, slots=True)
@@ -906,15 +914,25 @@ def advise_entry(
     ceiling = strategy.constraints.overlap_ceiling
     assert request.rival_entry_id is not None  # validated by the shared capability contract
     if request.window != COMPUTED_WINDOW:
-        return _advise_window_against_rival(
-            request,
-            provider=provider,
-            inputs=inputs,
-            projection=projection,
-            rules=rules,
-            horizon_builder=horizon_builder,
-            control=window_control,
-        )
+        try:
+            return _advise_window_against_rival(
+                request,
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+                horizon_builder=horizon_builder,
+                control=window_control,
+            )
+        except HorizonNoSolutionError as error:
+            code = (
+                "WINDOW_INFEASIBLE"
+                if error.status is SolverStatus.INFEASIBLE
+                else "WINDOW_NO_SOLUTION"
+            )
+            raise MultiweekAdviceUnavailable(code, str(error)) from error
+        except (EntryError, DataSourceError) as error:
+            raise MultiweekAdviceUnavailable("WINDOW_INPUTS_UNAVAILABLE", str(error)) from error
     return _advise_against_rival(
         request,
         rival_entry_id=request.rival_entry_id,

@@ -64,8 +64,15 @@ def _entry_payloads(entry_id: int, gameweek: int) -> dict[str, bytes]:
     }
 
 
-def _capture_with_entries(snapshot_root: Path) -> str:
+def _capture_with_entries(snapshot_root: Path, *, multiweek: bool = False) -> str:
+    from tests.unit.test_projection_horizon_builder import _calendar
+
     gw1_finished = [dict(world_module.EVENTS[0], finished=True), *world_module.EVENTS[1:]]
+    if multiweek:
+        gw1_finished.extend(
+            {"id": week, "deadline_time": f"2026-10-{week:02d}T17:30:00Z", "finished": False}
+            for week in range(4, 7)
+        )
     written = write_snapshot(
         snapshot_root,
         source="fpl-live",
@@ -74,11 +81,62 @@ def _capture_with_entries(snapshot_root: Path) -> str:
             BOOTSTRAP_PAYLOAD: world_module._bootstrap(
                 events=gw1_finished, elements=world_module._elements(event_points=2)
             ),
-            FIXTURES_PAYLOAD: b"[]",
+            FIXTURES_PAYLOAD: _calendar(gameweeks=tuple(range(1, 7))) if multiweek else b"[]",
             **_entry_payloads(ENTRY_ID, 1),
+            **(_entry_payloads(RIVAL_ID, 1) if multiweek else {}),
         },
     )
     return written.snapshot_id
+
+
+@pytest.mark.parametrize("window", [3, 5])
+def test_multiweek_rival_api_worker_cache_and_refusal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    window: int,
+) -> None:
+    monkeypatch.setenv("SQUADOPT_REPOSITORY_COMMIT", "c" * 40)
+    snapshot_root, handoff_root, site_root = (
+        tmp_path / p for p in ("snapshots", "handoffs", "site")
+    )
+    snapshot_id = _capture_with_entries(snapshot_root, multiweek=True)
+    deployment_module._handoff(handoff_root, snapshot_id)
+    deployment_module._publish_members(site_root, RIVAL_ID)
+    store = tmp_path / "store"
+    store.mkdir()
+    backend = build_backend(
+        BackendConfig(
+            store_root=store,
+            site_data_root=site_root,
+            snapshot_root=snapshot_root,
+            handoff_root=handoff_root,
+        )
+    )
+    client = TestClient(app_for_backend(backend))
+    route = f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice"
+    for strategy in ("ortak-koru", "fark-yarat"):
+        body = {"strategy": strategy, "window": window, "rival_entry_id": RIVAL_ID}
+        accepted = client.post(route, json=body)
+        assert accepted.status_code == 202, accepted.text
+        assert client.post(route, json=body).json()["job_id"] == accepted.json()["job_id"]
+        job = run_advice_worker_once(
+            backend.queue,
+            backend.cache,
+            build_advice_compute(backend.contexts, backend.job_specs),
+            at_utc=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        )
+        assert job is not None
+        if strategy == "fark-yarat":
+            assert job.status == "failed"
+            assert job.error.code == "WINDOW_INFEASIBLE"
+            assert backend.cache.get(job.cache_key) is None
+        else:
+            assert job.status == "completed", job.error
+            served = client.post(route, json=body)
+            assert served.status_code == 200
+            comparison = served.json()["payload"]["window_comparison"]
+            assert comparison["rival_entry_id"] == RIVAL_ID
+            assert comparison["overlap_actual"] >= 9
 
 
 @pytest.fixture(name="running")

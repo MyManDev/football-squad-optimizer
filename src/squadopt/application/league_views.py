@@ -43,6 +43,7 @@ from squadopt.application.advice import (
     HorizonBuilder,
     advise_entry,
     build_advice_payload,
+    build_window_control,
     solve_member_control,
 )
 from squadopt.application.advice_record import (
@@ -135,6 +136,7 @@ class MemberRender:
     #: under, carried out of the task because the advice record has to state it and the
     #: control it comes from does not cross a process pool. Empty when the baseline failed.
     transfer_config_fingerprint: str = ""
+    rival_window_unavailable: tuple[tuple[str, int, int, str], ...] = ()
 
 
 def render_member(
@@ -203,26 +205,55 @@ def render_member(
             payloads.append((strategy, rival_id, payload))
     window_payloads: list[tuple[int, dict[str, object]]] = []
     window_unavailable: list[tuple[int, str]] = []
+    rival_window_unavailable: list[tuple[str, int, int, str]] = []
     for window in task.windows:
         try:
-            payload = advise_entry(
-                AdviseEntryRequest(
-                    season=task.season,
-                    gameweek=task.gameweek,
-                    league_id=task.league_id,
-                    entry_id=task.entry_id,
-                    window=window,
-                ),
-                provider=provider,
-                inputs=inputs,
-                projection=projection,
-                rules=rules,
+            window_control = build_window_control(
+                picks,
+                inputs,
+                projection,
+                rules,
+                league_id=task.league_id,
+                window=window,
                 horizon_builder=horizon_builder,
             )
         except (EntryError, DataError) as error:
             window_unavailable.append((window, str(error)))
+            if task.default_rival_id is not None:
+                rival_window_unavailable.extend(
+                    (strategy, task.default_rival_id, window, str(error))
+                    for strategy in task.rival_strategies
+                )
             continue
-        window_payloads.append((window, payload))
+        window_payloads.append((window, window_control.payload))
+        # A bounded static menu: only the standings neighbour gets longer windows.
+        # Other rivals remain available on demand. Each control is solved once.
+        if task.default_rival_id is not None:
+            for strategy in task.rival_strategies:
+                try:
+                    payload = advise_entry(
+                        AdviseEntryRequest(
+                            season=task.season,
+                            gameweek=task.gameweek,
+                            league_id=task.league_id,
+                            entry_id=task.entry_id,
+                            strategy=strategy,
+                            window=window,
+                            rival_entry_id=task.default_rival_id,
+                        ),
+                        provider=provider,
+                        inputs=inputs,
+                        projection=projection,
+                        rules=rules,
+                        horizon_builder=horizon_builder,
+                        window_control=window_control,
+                    )
+                except (EntryError, DataError) as error:
+                    rival_window_unavailable.append(
+                        (strategy, task.default_rival_id, window, str(error))
+                    )
+                    continue
+                payloads.append((strategy, task.default_rival_id, payload))
     return MemberRender(
         task.entry_id,
         baseline,
@@ -232,6 +263,7 @@ def render_member(
         tuple(window_payloads),
         tuple(window_unavailable),
         control.transfer_config.configuration_fingerprint,
+        tuple(rival_window_unavailable),
     )
 
 
@@ -1053,24 +1085,32 @@ def build_league_views(
         # at the strategy's plain path, and an index that says what exists and why not.
         computed: list[dict[str, object]] = []
         for strategy, rival_id, payload in render.rival_payloads:
-            relative = f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}/vs-{rival_id}.json"
+            payload_window = int(str(payload["window"]))
+            relative = f"advice/{entry_id}/{strategy}/{payload_window}/vs-{rival_id}.json"
             emitted.append(
                 PublishedAdvice(
                     strategy,
-                    COMPUTED_WINDOW,
+                    payload_window,
                     rival_id,
                     relative,
                     payload,
                     _write(relative, payload),
                 )
             )
-            computed.append({"strategy": strategy, "rival_entry_id": rival_id, "path": relative})
+            computed.append(
+                {
+                    "strategy": strategy,
+                    "rival_entry_id": rival_id,
+                    "path": relative,
+                    **({"window": payload_window} if payload_window != COMPUTED_WINDOW else {}),
+                }
+            )
             if rival_id == task.default_rival_id:
-                default_relative = f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}.json"
+                default_relative = f"advice/{entry_id}/{strategy}/{payload_window}.json"
                 emitted.append(
                     PublishedAdvice(
                         strategy,
-                        COMPUTED_WINDOW,
+                        payload_window,
                         rival_id,
                         default_relative,
                         payload,
@@ -1096,6 +1136,15 @@ def build_league_views(
                 }
                 for window, reason in render.window_unavailable
             )
+            unavailable.extend(
+                {
+                    "strategy": strategy,
+                    "rival_entry_id": rival_id,
+                    "window": window,
+                    "reason": reason,
+                }
+                for strategy, rival_id, window, reason in render.rival_window_unavailable
+            )
             _write(
                 f"advice/{entry_id}/index.json",
                 {
@@ -1111,7 +1160,19 @@ def build_league_views(
                             COMPUTED_WINDOW,
                             *(window for window, _payload in render.window_payloads),
                         ],
-                        **{strategy: [COMPUTED_WINDOW] for strategy in task.rival_strategies},
+                        **{
+                            strategy: sorted(
+                                {
+                                    COMPUTED_WINDOW,
+                                    *(
+                                        int(str(p["window"]))
+                                        for s, _r, p in render.rival_payloads
+                                        if s == strategy
+                                    ),
+                                }
+                            )
+                            for strategy in task.rival_strategies
+                        },
                     },
                     "strategies": [COMPUTED_MODE, *task.rival_strategies],
                     "rival_entry_ids": list(task.rival_ids),
