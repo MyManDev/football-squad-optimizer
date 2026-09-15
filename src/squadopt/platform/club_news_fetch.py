@@ -354,6 +354,11 @@ class HostManners:
 
         A recorded refusal is re-raised rather than retried, so every page of a host whose
         preference could not be read refuses for the same stated reason.
+
+        What is remembered is the **host-level** reason and nothing else. Caching the whole
+        composed refusal was a defect: the message names the page that could not be fetched,
+        so every later page of that host inherited the first page's URL and a club was told
+        its own page was refused under another club's address.
         """
 
         refusal = self._refusals.get(origin)
@@ -404,14 +409,18 @@ def robots_allows(
                 # so an empty file is remembered exactly like a served one.
                 parser.parse([])
                 return parser
-            raise ClubNewsFetchError(
-                f"{robots_url} could not be read, so this host's preference is unknown and "
-                f"{source.url} is not fetched: {error}"
-            ) from error
+            # Host-level only. The page this refusal costs is added by the caller below, so a
+            # remembered reason cannot carry the first page's URL to the second page's club.
+            raise ClubNewsFetchError(f"{robots_url} could not be read: {error}") from error
         parser.parse(read.content.decode("utf-8", errors="replace").splitlines())
         return parser
 
-    parser = _read() if manners is None else manners.robots(source.origin, _read)
+    try:
+        parser = _read() if manners is None else manners.robots(source.origin, _read)
+    except ClubNewsFetchError as error:
+        raise ClubNewsFetchError(
+            f"This host's preference is unknown, so {source.url} is not fetched: {error}"
+        ) from error
     return bool(parser.can_fetch(USER_AGENT, source.url))
 
 
