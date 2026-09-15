@@ -1,6 +1,7 @@
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import type { EntryAdvice } from "../types";
+import styles from "./WindowComparison.module.css";
 
 export function WindowComparison({
   advice,
@@ -25,7 +26,7 @@ export function WindowComparison({
           c.overlap_minimum === null ? `≤ ${c.overlap_maximum}` : `≥ ${c.overlap_minimum}`,
         )}
       </p>
-      <table>
+      <table className={styles.table}>
         <thead>
           <tr>
             <th>{copy.strategyLegend}</th>

@@ -38,13 +38,20 @@ test("a browser computes through the worker, then reads the same answer from cac
   await leagueField.fill(String(context.leagueId));
   await findLeague.click();
   await expect(page).toHaveURL("/league/members");
-  await page.getByRole("button", { name: "Bu benim", exact: true }).click();
+  await page.getByRole("button", { name: "Bu benim", exact: true }).first().click();
   await expect(page).toHaveURL(`/league/members/${context.entryId}`);
   expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
   await expect(page.getByRole("button", { name: "Seçimi Kaldır" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText("Listelenen öneri dosyası bulunamadı.")).toBeVisible();
+  if (context.window > 1) {
+    const strategy = page.getByRole("radio", { name: /Ortak çekirdeği koru/i });
+    await strategy.click();
+    await expect(strategy).toBeChecked();
+    await page.getByRole("radio", { name: `${context.window} hafta`, exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`window=${context.window}`));
+  }
   const compute = page.getByRole("button", { name: "Hesapla", exact: true });
   const accepted = page.waitForResponse(
     (response) => response.url().startsWith(route) && response.request().method() === "POST",
@@ -59,9 +66,9 @@ test("a browser computes through the worker, then reads the same answer from cac
   const post = await accepted;
   expect(post.status()).toBe(202);
   expect(post.request().postDataJSON()).toEqual({
-    strategy: "saf-puan",
-    window: 1,
-    rival_entry_id: null,
+    strategy: context.strategy,
+    window: context.window,
+    rival_entry_id: context.rivalId,
   });
   expect(post.headers()["access-control-allow-origin"]).toBe(context.webOrigin);
   const { job_id: jobId } = await post.json();
@@ -74,14 +81,33 @@ test("a browser computes through the worker, then reads the same answer from cac
     league_id: context.leagueId,
     season: context.season,
     gameweek: context.gameweek,
-    mode: "saf-puan",
-    window: 1,
+    mode: context.strategy,
+    window: context.window,
     source_snapshot_id: context.snapshotId,
   });
   const job = await page.request.get(`${context.apiOrigin}/api/v1/advice-jobs/${jobId}`);
   expect(await job.json()).toMatchObject({ job_id: jobId, status: "completed" });
   await expect(page.getByText("Plan hazır", { exact: true })).toBeVisible();
   await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+  if (context.window > 1) {
+    const comparison = answer.payload.window_comparison!;
+    expect(comparison.policy_id).toBe("first_week_rival_horizon_v1");
+    expect(comparison.overlap_actual).toBeGreaterThanOrEqual(9);
+    expect(answer.payload.plan_weeks).toHaveLength(context.window);
+    await expect(
+      page.getByRole("heading", { name: "Aynı pencere için plan karşılaştırması" }),
+    ).toBeVisible();
+    await expect(page.getByText("Saf puana göre fark:", { exact: false })).toBeVisible();
+    await page.setViewportSize({ width: 390, height: 844 });
+    const comparisonCard = page.getByRole("region", {
+      name: "Aynı pencere için plan karşılaştırması",
+    });
+    await comparisonCard.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: test.info().outputPath("multiweek-mobile.png") });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  }
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await expect(page.getByText(context.snapshotId, { exact: false })).toBeVisible();
   const advice = page.locator('[aria-labelledby="entry-advice-title"]');

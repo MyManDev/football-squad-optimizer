@@ -277,9 +277,8 @@ MemberMapper = Callable[
 # one — is always computed, and it is always the deterministic planner's own answer.
 # The competitive modes are computed only when the caller supplies scenario paths to
 # price the member's menu on (`mode_paths`); without them the other combinations are
-# simply absent and the page says so. The saf-puan windows beyond one are computed only
-# when the caller supplies a projection horizon builder for the capture; a rival
-# strategy stays at one week. Publishing a file for a combination nobody computed would
+# simply absent and the page says so. Longer saf-puan and default-rival windows require
+# a projection horizon builder for the capture. Publishing an uncomputed combination would
 # make the site show an answer where none was measured, so the index names exactly the
 # windows that solved and records the ones that did not, with the reason.
 
@@ -808,7 +807,7 @@ def build_league_views(
     reader can re-apply the rule. It is a pointer at one of the files below, not an
     input to any of them, and it is ``null`` whenever either total is unproven.
 
-    ``horizon_builder`` turns on the saf-puan windows beyond one week
+    ``horizon_builder`` turns on saf-puan and default-rival windows beyond one week
     (``advice/{id}/saf-puan/3.json``, ``5.json``): the index then lists, per strategy,
     the windows that solved (``windows``), and a window that did not is in
     ``unavailable`` with its reason. The one-week baseline's bytes are the same with or
@@ -1154,7 +1153,7 @@ def build_league_views(
                     "entry_id": entry_id,
                     "window": COMPUTED_WINDOW,
                     # Per strategy, the windows whose file exists: saf-puan's solved
-                    # windows, every rival strategy at one week.
+                    # windows, and the default rival's successful longer windows.
                     "windows": {
                         COMPUTED_MODE: [
                             COMPUTED_WINDOW,

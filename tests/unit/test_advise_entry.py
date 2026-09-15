@@ -114,7 +114,7 @@ def test_uncomputed_combinations_are_refused_not_faked(world: dict[str, Any]) ->
     # A saf-puan window is computed, but only from the capture's horizon builder.
     with pytest.raises(EntryError, match="horizon builder"):
         call(_request(window=3))
-    with pytest.raises(EntryError, match=r"supports windows \(1,\) only"):
+    with pytest.raises(EntryError, match="WINDOW_INPUTS_UNAVAILABLE"):
         call(_request(strategy="fark-yarat", rival_entry_id=202, window=5))
     with pytest.raises(EntryError, match="not computed on this path yet"):
         call(_request(strategy="kaptan-taklidi"))

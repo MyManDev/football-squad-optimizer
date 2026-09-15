@@ -79,8 +79,12 @@ def _process(
                     process.wait(timeout=5)
 
 
+@pytest.mark.parametrize("strategy,window", [("saf-puan", 1), ("ortak-koru", 3), ("ortak-koru", 5)])
 def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    strategy: str,
+    window: int,
 ) -> None:
     node = shutil.which("node")
     assert node is not None, "Install the web toolchain before running the browser smoke."
@@ -100,9 +104,10 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         allowed_origins=(web_origin,),
     )
     config.store_root.mkdir()
-    snapshot_id = worker_fixture._capture_with_entries(config.snapshot_root)
+    snapshot_id = worker_fixture._capture_with_entries(config.snapshot_root, multiweek=window > 1)
     deployment_fixture._handoff(config.handoff_root, snapshot_id)
-    deployment_fixture._publish_members(config.site_data_root)
+    rival_id = worker_fixture.RIVAL_ID if window > 1 else None
+    deployment_fixture._publish_members(config.site_data_root, *([rival_id] if rival_id else []))
     backend = build_backend(config)
     context = backend.contexts.current()
     assert context is not None
@@ -116,7 +121,10 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
     league_id = deployment_fixture.LEAGUE_ID
     report = build_league_views(
         capture.provider,
-        (EntryRegistration(entry_id, "browser-member", capture.inputs.captured_at_utc),),
+        tuple(
+            EntryRegistration(i, f"browser-member-{i}", capture.inputs.captured_at_utc)
+            for i in ([entry_id, rival_id] if rival_id else [entry_id])
+        ),
         capture.inputs,
         capture.projection,
         capture.rules,
@@ -124,15 +132,24 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         league_name="Browser smoke league",
         out_dir=config.site_data_root / "league",
         standings={
+            **(
+                {
+                    rival_id: MemberStanding(
+                        entry_id=rival_id, team_name="Rival", manager_name="Synthetic rival", rank=2
+                    )
+                }
+                if rival_id
+                else {}
+            ),
             entry_id: MemberStanding(
                 entry_id=entry_id,
                 team_name="Browser smoke team",
                 manager_name="Synthetic member",
                 rank=1,
-            )
+            ),
         },
     )
-    assert report.rendered_count == 1
+    assert report.rendered_count == (2 if rival_id else 1)
     baseline_path = (
         config.site_data_root / "league" / "advice" / str(entry_id) / "saf-puan" / "1.json"
     )
@@ -157,6 +174,9 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
                 "season": context.season,
                 "gameweek": context.gameweek,
                 "snapshotId": snapshot_id,
+                "strategy": strategy,
+                "window": window,
+                "rivalId": rival_id,
                 "buildName": f"advice-backend-smoke-{uuid4().hex}",
             }
         ),
@@ -219,5 +239,9 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
     assert len(jobs) == 1
     assert jobs[0].status == "completed"
     assert fresh.cache.get(jobs[0].cache_key) == fresh.reader.read_advice(
-        league_id=league_id, entry_id=entry_id, strategy="saf-puan", window=1
+        league_id=league_id,
+        entry_id=entry_id,
+        strategy=strategy,
+        window=window,
+        rival_entry_id=rival_id,
     )

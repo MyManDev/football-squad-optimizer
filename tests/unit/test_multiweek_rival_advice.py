@@ -10,6 +10,8 @@ from tests.unit.test_member_windows import ENTRY, SEASON, _advise, _window_world
 
 from squadopt.application.advice import build_window_control
 from squadopt.application.entries import EntryError
+from squadopt.live.transfers import HorizonNoSolutionError
+from squadopt.optimization import SolverExecutionError, SolverStatus
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
 
 window_world = _window_world
@@ -73,6 +75,50 @@ def test_impossible_band_is_reported_without_relaxing_it(window_world: dict[str,
     _rival(window_world)
     with pytest.raises(EntryError, match="WINDOW_INFEASIBLE"):
         _advise(window_world, strategy="fark-yarat", window=3, rival_entry_id=202)
+
+
+def test_budget_exhaustion_is_not_infeasibility(
+    window_world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from squadopt.application import advice as module
+
+    _rival(window_world)
+
+    def refuse(*args: Any, **kwargs: Any) -> Any:
+        raise HorizonNoSolutionError(
+            "No plan within the deterministic budget", SolverStatus.UNKNOWN
+        )
+
+    monkeypatch.setattr(module, "plan_transfer_horizon", refuse)
+    with pytest.raises(EntryError, match="WINDOW_NO_SOLUTION"):
+        _advise(window_world, strategy="ortak-koru", window=3, rival_entry_id=202)
+
+
+def test_solver_failure_is_not_presented_as_missing_inputs(
+    window_world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from squadopt.application import advice as module
+
+    _rival(window_world)
+
+    def refuse(*args: Any, **kwargs: Any) -> Any:
+        raise SolverExecutionError("wall-clock safety cap")
+
+    monkeypatch.setattr(module, "plan_transfer_horizon", refuse)
+    with pytest.raises(SolverExecutionError, match="wall-clock"):
+        _advise(window_world, strategy="ortak-koru", window=3, rival_entry_id=202)
+
+
+def test_restored_free_hit_squad_cannot_impersonate_the_captured_rival_xi(
+    window_world: dict[str, Any],
+) -> None:
+    _rival(window_world)
+    provider = window_world["provider"]
+    provider._picks[202] = dataclasses.replace(
+        provider._picks[202], squad_basis="pre_free_hit_gw01"
+    )
+    with pytest.raises(EntryError, match="WINDOW_INPUTS_UNAVAILABLE"):
+        _advise(window_world, strategy="ortak-koru", window=3, rival_entry_id=202)
 
 
 @pytest.mark.parametrize("change", ["window", "total", "rival", "band", "missing"])

@@ -850,9 +850,9 @@ def advise_entry(
     gameweek must be the capture's own, and the strategy and window must be a
     combination that is actually computed — an advice file for a combination nobody
     computed would make the site show an answer where none was measured. ``saf-puan``
-    is computed at every window in ``MEMBER_WINDOWS``; a rival strategy at window one
-    only, because its band is a first-week constraint and nothing about a later week
-    is known that would let it be priced there. The rival parameter is validated
+    and the two overlap strategies are computed at every window in ``MEMBER_WINDOWS``.
+    Multiweek rival bands constrain only the opening squad, with an equal-window
+    control under the same transfer policy. The rival parameter is validated
     against the strategy that asks for it: ``saf-puan`` is rival-free and refuses one,
     a catalogue strategy whose overlap band reaches the solver requires one, and
     nobody may name themselves.
