@@ -158,7 +158,10 @@ def test_existing_five_plans_keep_their_recorded_results(window_world: dict[str,
     picks = window_world["provider"].picks(ENTRY, SEASON, 1)
     window_world["provider"]._picks[202] = dataclasses.replace(picks, entry_id=202)
     reference = json.loads(
-        (Path(__file__).parents[1] / "fixtures/member_advice_baseline.json").read_text()
+        (Path(__file__).parents[1] / "fixtures/member_advice_baseline.json").read_text(),
+        # Runtime float summation can differ in the last binary digits (observed
+        # below 2e-15 on Python 3.11). Keep every key, identity and ordering exact.
+        parse_float=lambda value: pytest.approx(float(value), rel=0, abs=1e-12),
     )
     for key, expected in reference.items():
         strategy, window = key.split("/")
