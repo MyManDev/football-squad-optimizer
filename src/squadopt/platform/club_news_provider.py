@@ -34,12 +34,22 @@ apart; a convenience default here would undo it in one line.
 """
 
 import os
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from squadopt.data.sources.club_news import ClubNewsError, ClubNewsProvider
-from squadopt.data.sources.club_news_coding import CODING_MODEL_IDENTIFIER
+from squadopt.data.sources.club_news import (
+    ClubNewsError,
+    ClubNewsProvider,
+    RawDocument,
+    RosterPlayer,
+)
+from squadopt.data.sources.club_news_capture import CodedClub
+from squadopt.data.sources.club_news_coding import (
+    CODING_MODEL_IDENTIFIER,
+    ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+    coding_prompt_sha256,
+)
 
 #: Which adapter codes the week. No vendor name, by contract.
 PROVIDER_ENVIRONMENT_VARIABLE: Final = "SQUADOPT_LLM_PROVIDER"
@@ -180,6 +190,67 @@ def build_coding_provider(
     return _FACTORIES[config.provider](config), config
 
 
+def code_week_by_club(
+    provider: ClubNewsProvider,
+    config: CodingProviderConfig,
+    documents: Sequence[RawDocument],
+    roster: Sequence[RosterPlayer],
+) -> tuple[tuple[CodedClub, ...], tuple[tuple[str, str], ...]]:
+    """Code a week one club at a time, returning what was coded and why the rest was not.
+
+    **The request unit is one club, and that is a decision about failure rather than about
+    tidiness.** ``MAX_OUTPUT_TOKENS`` and ``REQUEST_TIMEOUT_SECONDS`` are each justified in
+    their own comments for one club's page and a squad list, and
+    :func:`~squadopt.platform.club_news_model._claim_response` *raises* when a response stops
+    at the ceiling rather than degrading. Put every club in one call and that ceiling costs
+    the entire week's read; put one club in each and it costs that club, which is the failure
+    this lane already models correctly -- the same shape
+    :func:`~squadopt.platform.club_news_fetch.fetch_registered_documents` returns, for the
+    same reason.
+
+    The arithmetic behind it, measured on the committed fixture: thirteen claims came to 5,121
+    bytes, about 393 bytes each. A full registry is twenty clubs against a 656-player roster;
+    if a quarter of those players are written about, one call's answer is roughly 164 claims,
+    some 64 KB, which is about sixteen thousand tokens -- the ceiling exactly. Half of them
+    and it is double. Per club that answer is a twentieth of the size and nowhere near it.
+
+    **The roster is not narrowed to the club.** It would shrink each call further, and it
+    would also change what a claim can resolve to: a club's page that mentions an opponent's
+    player would stop resolving. That is a semantic change wearing a performance change's
+    clothes, so it is not made here. The input budget does not need it -- one club's pages and
+    the whole roster come to a few tens of kilobytes against
+    :data:`~squadopt.data.sources.club_news_coding.MAXIMUM_USER_CONTENT_BYTES`, which is two
+    megabytes.
+
+    Clubs are coded in the order their documents arrive, so two runs over one capture ask the
+    same questions in the same order. A club whose call fails is named with its reason and the
+    week carries on.
+    """
+
+    by_club: dict[str, list[RawDocument]] = {}
+    for document in documents:
+        by_club.setdefault(document.club, []).append(document)
+
+    prompt_sha256 = coding_prompt_sha256(config.model_identifier)
+    coded: list[CodedClub] = []
+    refused: list[tuple[str, str]] = []
+    for club, club_documents in by_club.items():
+        try:
+            response = provider.code(club_documents, roster)
+        except ClubNewsError as error:
+            refused.append((club, str(error)))
+            continue
+        coded.append(
+            CodedClub(
+                club=club,
+                response=response,
+                prompt_contract_version=ROTATION_CLAIM_CODING_CONTRACT_VERSION,
+                prompt_sha256=prompt_sha256,
+            )
+        )
+    return tuple(coded), tuple(refused)
+
+
 def _anthropic(config: CodingProviderConfig) -> ClubNewsProvider:
     """Build the one adapter that ships, importing it only when it is selected."""
 
@@ -202,6 +273,7 @@ __all__ = [
     "ClubNewsProviderError",
     "CodingProviderConfig",
     "build_coding_provider",
+    "code_week_by_club",
     "register_provider",
     "registered_providers",
     "resolve_provider_config",

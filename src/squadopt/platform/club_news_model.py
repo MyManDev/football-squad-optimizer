@@ -74,6 +74,14 @@ API_KEY_ENVIRONMENT_VARIABLE: Final = "ANTHROPIC_API_KEY"
 #: request will not hit an HTTP timeout, and one unstreamed request is a far simpler shape to
 #: freeze and to replay than a stream. A response that reaches this limit is refused below
 #: rather than parsed as far as it got: half a JSON document is not a partial answer.
+#:
+#: **"One club's coding" is now enforced rather than assumed.** This comment described a unit
+#: no caller kept: the only implemented one sent every club's documents in a single request,
+#: where the refusal below costs the whole week instead of one club.
+#: :func:`~squadopt.platform.club_news_provider.code_week_by_club` is the unit, and the
+#: measurement that chose it is there: on the committed fixture a claim runs about 393 bytes,
+#: so a full registry answering about a quarter of a 656-player roster is roughly 164 claims
+#: and some sixteen thousand tokens -- this ceiling exactly, in one call, for everybody.
 MAX_OUTPUT_TOKENS: Final = 16_000
 
 #: Transport retries only, and left to the SDK: it already backs off on connection errors,
