@@ -117,6 +117,8 @@ def advice_read_schema() -> dict[str, Any]:
     optional_fields.update(
         {
             "source_snapshot_id": {"type": ["string", "null"]},
+            "top100_weight_percent": {"type": "integer", "enum": [0, 5, 10, 20, 30, 40, 50]},
+            "top100_weight_source": {"enum": ["published", "personal"]},
             "window_comparison": {
                 "type": "object",
                 "properties": comparison_fields,
@@ -218,6 +220,10 @@ def advice_read_schema() -> dict[str, Any]:
                     "data_quality",
                     "missing_fields",
                 ],
+                "dependentRequired": {
+                    "top100_weight_percent": ["top100_weight_source"],
+                    "top100_weight_source": ["top100_weight_percent"],
+                },
                 "additionalProperties": True,
             },
         },
@@ -264,7 +270,10 @@ def validate_advice_document(raw: bytes) -> None:
         raise AdviceDocumentError(
             f"The advice document violates advice_read_v1: {errors[0].message}"
         )
-    _validate_window_comparison(document["payload"])
+    payload = document["payload"]
+    if ("top100_weight_percent" in payload) != ("top100_weight_source" in payload):
+        raise AdviceDocumentError("Top-100 weight and source must be supplied together.")
+    _validate_window_comparison(payload)
 
 
 def _validate_window_comparison(payload: dict[str, Any]) -> None:

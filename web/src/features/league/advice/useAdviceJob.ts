@@ -57,6 +57,7 @@ export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): bo
     left.window === right.window &&
     left.season === right.season &&
     left.gameweek === right.gameweek &&
+    (left.top100WeightPercent ?? null) === (right.top100WeightPercent ?? null) &&
     (left.rivalEntryId ?? null) === (right.rivalEntryId ?? null)
   );
 }
@@ -147,6 +148,7 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
                       strategy: "saf-puan",
                       window: 1,
                       rivalEntryId: null,
+                      top100WeightPercent: null,
                     },
                     options,
                   )

@@ -132,6 +132,7 @@ def configuration_fingerprint() -> str:
     document = {
         "contract_version": "backend_configuration_v1",
         "multiweek_rival_policy": "first_week_rival_horizon_v1",
+        "personal_top100_policy": "personal_top100_weight_v1",
         "advice_document_contract": LEAGUE_VIEW_CONTRACT_VERSION,
         "computed_mode": COMPUTED_MODE,
         "computed_window": COMPUTED_WINDOW,

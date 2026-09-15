@@ -36,6 +36,7 @@ from squadopt.platform.advice_documents import (
     validate_advice_document,
     validate_league_state,
 )
+from squadopt.prediction.elite_evidence import validate_top100_weight
 
 LEAGUE_TREE_CONTRACT_VERSION: Final = LEAGUE_VIEW_CONTRACT_VERSION
 
@@ -232,6 +233,7 @@ class AdviceReadStore:
         strategy: str,
         window: int,
         rival_entry_id: int | None = None,
+        top100_weight_percent: int | None = None,
     ) -> tuple[str, AdviceRequestContext]:
         """Validate one request against what this deployment knows and address it.
 
@@ -242,6 +244,11 @@ class AdviceReadStore:
 
         if strategy not in self._strategies:
             raise UnknownStrategyError(f"Strategy {strategy!r} is not computed here.")
+        if top100_weight_percent is not None:
+            try:
+                validate_top100_weight(top100_weight_percent)
+            except ValueError as error:
+                raise UnsupportedAdviceRequestError(str(error)) from error
         payload = self._directory.league(league_id)
         if payload is None:
             raise LeagueNotConnectedError(f"League {league_id} is not connected here.")
@@ -277,6 +284,7 @@ class AdviceReadStore:
             configuration_fingerprint=context.configuration_fingerprint,
             rival_entry_id=rival_entry_id,
             strategy_uses_rival=self._strategies[strategy],
+            top100_weight_percent=top100_weight_percent,
         )
         return key, context
 
@@ -308,6 +316,7 @@ class AdviceReadStore:
         strategy: str,
         window: int,
         rival_entry_id: int | None = None,
+        top100_weight_percent: int | None = None,
     ) -> bytes:
         """The cached answer under the complete key, or a typed refusal."""
 
@@ -317,6 +326,7 @@ class AdviceReadStore:
             strategy=strategy,
             window=window,
             rival_entry_id=rival_entry_id,
+            top100_weight_percent=top100_weight_percent,
         )
         cached = self.cached(key)
         if cached is None:

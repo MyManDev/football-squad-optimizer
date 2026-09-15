@@ -144,6 +144,9 @@ function validWindowComparison(value: unknown): boolean {
 export function isAdvicePayload(value: unknown): boolean {
   return (
     validWindowComparison(value) &&
+    record(value) &&
+    Object.hasOwn(value, "top100_weight_percent") ===
+      Object.hasOwn(value, "top100_weight_source") &&
     fields(
       value,
       {
@@ -158,6 +161,8 @@ export function isAdvicePayload(value: unknown): boolean {
         missing_fields: array(text),
       },
       {
+        top100_weight_percent: oneOf(0, 5, 10, 20, 30, 40, 50),
+        top100_weight_source: oneOf("published", "personal"),
         source_snapshot_id: nullable(text),
         rival_entry_id: identity,
         rival_label: nullable(text),

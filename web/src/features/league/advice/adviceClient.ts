@@ -23,6 +23,7 @@ export interface AdviceRequest {
   strategy: AdviceStrategy;
   window: WindowSize;
   rivalEntryId?: number | null;
+  top100WeightPercent?: number | null;
   /** Display context only; the server resolves its own immutable computation inputs. */
   season?: string;
   gameweek?: number;
@@ -73,6 +74,7 @@ export class StaticOnlyAdviceClient implements AdviceClient {
   }
 
   async readAdvice(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult> {
+    if (request.top100WeightPercent != null) return { kind: "not-computed" };
     try {
       const envelope = checkedAdvice(
         await withRequestDeadline(
@@ -142,9 +144,13 @@ export class HttpAdviceClient implements AdviceClient {
   private adviceUrl(request: AdviceRequest): string {
     const rival =
       request.rivalEntryId == null ? "" : `&rival=${encodeURIComponent(request.rivalEntryId)}`;
+    const weight =
+      request.top100WeightPercent == null
+        ? ""
+        : `&top100_weight_percent=${encodeURIComponent(request.top100WeightPercent)}`;
     return (
       `${this.origin}/api/v1/leagues/${request.leagueId}/entries/${request.entryId}/advice` +
-      `?strategy=${encodeURIComponent(request.strategy)}&window=${request.window}${rival}`
+      `?strategy=${encodeURIComponent(request.strategy)}&window=${request.window}${rival}${weight}`
     );
   }
 
@@ -174,6 +180,9 @@ export class HttpAdviceClient implements AdviceClient {
           strategy: request.strategy,
           window: request.window,
           rival_entry_id: request.rivalEntryId ?? null,
+          ...(request.top100WeightPercent != null
+            ? { top100_weight_percent: request.top100WeightPercent }
+            : {}),
         }),
       });
       if (response.status === 202) {

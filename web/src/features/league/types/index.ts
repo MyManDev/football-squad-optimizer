@@ -285,6 +285,8 @@ export interface WindowComparison {
 }
 
 export interface EntryAdvice {
+  top100_weight_percent?: number;
+  top100_weight_source?: "published" | "personal";
   window_comparison?: WindowComparison;
   league_id: number;
   season: string;

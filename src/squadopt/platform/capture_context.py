@@ -25,6 +25,7 @@ itself unready rather than answering from whatever it can find.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,6 +52,10 @@ from squadopt.live import (
 )
 from squadopt.live.tick import handoff_path_for
 from squadopt.platform.advice_read import AdviceRequestContext
+from squadopt.prediction.elite_evidence import (
+    COMPONENT_ELITE_MODEL_VERSION,
+    ELITE_EVIDENCE_MODEL_VERSION,
+)
 
 __all__ = [
     "AdviceCaptureContext",
@@ -92,6 +97,8 @@ class AdviceCaptureContext:
     rules: SeasonRules
     provider: CapturePicksProvider
     horizon_builder: HorizonBuilder
+    top100_source_weight: int = 0
+    elite_start_counts: Mapping[int, int] | None = None
 
 
 def latest_snapshot_id(snapshot_root: Path | str) -> str | None:
@@ -196,6 +203,13 @@ def load_capture_context(identity: CaptureIdentity) -> AdviceCaptureContext:
         projection=projection,
         rules=rules,
         provider=CapturePicksProvider(identity.snapshot, inputs.snapshot_id),
+        top100_source_weight=(
+            5
+            if identity.handoff.model_version
+            in (COMPONENT_ELITE_MODEL_VERSION, ELITE_EVIDENCE_MODEL_VERSION)
+            else 0
+        ),
+        elite_start_counts=identity.handoff.elite_start_counts,
         # The same capture and handoff, as the multi-week windows read them; built once
         # per window for the life of this context and shared by every request.
         horizon_builder=member_horizon_builder(

@@ -3,6 +3,7 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints } from "../../../lib/format";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
+import { TOP100_MESSAGES } from "../advice/top100Weight";
 import { WindowComparison } from "../advice/WindowComparison";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
@@ -109,7 +110,7 @@ export function AdviceCard({
   squad: LeagueViewEnvelope<EntrySquad>;
   rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
 }) {
-  const { locale, messages } = useLanguage();
+  const { locale, messages, language } = useLanguage();
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
   const view = envelope.payload;
@@ -162,6 +163,15 @@ export function AdviceCard({
       ) : null}
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      {view.top100_weight_percent !== undefined ? (
+        <p className={styles.honesty}>
+          {TOP100_MESSAGES[language].result(
+            view.top100_weight_percent,
+            view.top100_weight_source === "personal",
+          )}
+        </p>
+      ) : null}
+
       <WindowComparison advice={view} rivalName={rivalName ?? String(view.rival_entry_id ?? "—")} />
       {basisNote ? (
         <p className={styles.honesty}>

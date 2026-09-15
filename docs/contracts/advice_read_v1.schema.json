@@ -13,6 +13,14 @@
     },
     "payload": {
       "additionalProperties": true,
+      "dependentRequired": {
+        "top100_weight_percent": [
+          "top100_weight_source"
+        ],
+        "top100_weight_source": [
+          "top100_weight_percent"
+        ]
+      },
       "properties": {
         "alternative_plan": {
           "properties": {
@@ -548,6 +556,24 @@
           "type": [
             "array",
             "null"
+          ]
+        },
+        "top100_weight_percent": {
+          "enum": [
+            0,
+            5,
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          "type": "integer"
+        },
+        "top100_weight_source": {
+          "enum": [
+            "published",
+            "personal"
           ]
         },
         "transfer_cap": {

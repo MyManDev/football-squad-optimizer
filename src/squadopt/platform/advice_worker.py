@@ -42,6 +42,7 @@ from typing import Final
 
 from squadopt.application.advice import AdviseEntryRequest, MultiweekAdviceUnavailable, advise_entry
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.application.top100_weight import Top100InputsUnavailable, weighted_member_inputs
 from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.advice_documents import validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpecStore
@@ -124,6 +125,15 @@ def build_advice_compute(
                 "answers from; ask again to be answered from the current one.",
             )
         try:
+            projection, horizon_builder = capture.projection, capture.horizon_builder
+            if spec.top100_weight_percent is not None:
+                projection, horizon_builder = weighted_member_inputs(
+                    projection,
+                    horizon_builder,
+                    source_weight=capture.top100_source_weight,
+                    requested_weight=spec.top100_weight_percent,
+                    counts=capture.elite_start_counts,
+                )
             advice = advise_entry(
                 AdviseEntryRequest(
                     season=spec.context.season,
@@ -136,12 +146,22 @@ def build_advice_compute(
                 ),
                 provider=capture.provider,
                 inputs=capture.inputs,
-                projection=capture.projection,
+                projection=projection,
                 rules=capture.rules,
-                horizon_builder=capture.horizon_builder,
+                horizon_builder=horizon_builder,
             )
+        except Top100InputsUnavailable as error:
+            raise AdviceComputeRefused("TOP100_INPUTS_UNAVAILABLE", str(error)) from error
         except MultiweekAdviceUnavailable as error:
             raise AdviceComputeRefused(error.code, str(error)) from error
+        advice["top100_weight_percent"] = (
+            capture.top100_source_weight
+            if spec.top100_weight_percent is None
+            else spec.top100_weight_percent
+        )
+        advice["top100_weight_source"] = (
+            "published" if spec.top100_weight_percent is None else "personal"
+        )
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a

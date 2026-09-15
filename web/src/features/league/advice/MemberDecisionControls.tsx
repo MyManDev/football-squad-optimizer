@@ -29,6 +29,7 @@ import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../moves/modePrices";
 import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
 import { resolvePublishedAdvice } from "./adviceSelection";
+import { TOP100_MESSAGES, TOP100_WEIGHTS } from "./top100Weight";
 import { MULTIWEEK_MESSAGES } from "./multiweekMessages";
 import styles from "./MemberDecisionControls.module.css";
 
@@ -50,6 +51,7 @@ export function MemberDecisionControls({
 }) {
   const { messages, language } = useLanguage();
   const copy = messages.leagueMembers;
+  const top100Copy = TOP100_MESSAGES[language];
   const windowCopy = MULTIWEEK_MESSAGES[language];
   const [searchParams, setSearchParams] = useSearchParams();
   const selection = resolvePublishedAdvice(
@@ -236,6 +238,30 @@ export function MemberDecisionControls({
             {windows.length > 1 ? copy.windowLimits : copy.windowNotComputed}
           </p>
         </fieldset>
+        {allowCompute ? (
+          <fieldset className={styles.fieldset}>
+            <legend>{top100Copy.label}</legend>
+            <label className={styles.rivalField}>
+              <span>{top100Copy.label}</span>
+              <select
+                aria-label={top100Copy.label}
+                value={searchParams.get("top100") ?? ""}
+                disabled={!allowCompute}
+                onChange={(event) => update({ top100: event.target.value || null })}
+              >
+                <option value="">{top100Copy.published}</option>
+                {TOP100_WEIGHTS.map((weight) => (
+                  <option key={weight} value={weight}>
+                    %{weight}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className={styles.note}>{top100Copy.help}</p>
+          </fieldset>
+        ) : (
+          <p className={styles.note}>{top100Copy.offline}</p>
+        )}
       </div>
       <p className={styles.honesty}>{copy.honestyRule}</p>
     </Card>

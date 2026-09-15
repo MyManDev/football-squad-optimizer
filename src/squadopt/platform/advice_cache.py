@@ -32,6 +32,8 @@ import tempfile
 from pathlib import Path
 from typing import Final, Protocol
 
+from squadopt.prediction.elite_evidence import validate_top100_weight
+
 ADVICE_CACHE_CONTRACT_VERSION: Final = "advice_cache_v1"
 
 _KEY_PATTERN: Final = re.compile(r"^[0-9a-f]{64}$")
@@ -60,6 +62,7 @@ def advice_cache_key(
     configuration_fingerprint: str,
     rival_entry_id: int | None = None,
     strategy_uses_rival: bool = False,
+    top100_weight_percent: int | None = None,
 ) -> str:
     """The complete address of one advice answer, as a SHA-256 digest.
 
@@ -110,6 +113,8 @@ def advice_cache_key(
         "repository_commit": repository_commit,
         "configuration_fingerprint": configuration_fingerprint,
     }
+    if top100_weight_percent is not None:
+        payload["top100_weight_percent"] = validate_top100_weight(top100_weight_percent)
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 

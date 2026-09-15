@@ -25,6 +25,8 @@ ENVELOPE_FIELDS: Final[frozenset[str]] = frozenset(
         "league_id",  # address: whose rivals it was solved against
         "mode",  # address: the strategy slug the document answers for
         "window",  # address: how many weeks the plan spans (1, 3, 5)
+        "top100_weight_percent",  # address: the selected maximum uplift, not outcome odds
+        "top100_weight_source",  # provenance: personal preference or the published setting
         "source_snapshot_id",  # provenance: the capture the advice was computed from
         "rival_entry_id",  # provenance: the rival the strategy was solved against
         "rival_label",  # provenance: that rival's display name, or null

@@ -41,6 +41,10 @@ export function checkedAdvice(
     payload.entry_id !== request.entryId ||
     payload.mode !== request.strategy ||
     payload.window !== request.window ||
+    (request.top100WeightPercent != null &&
+      (payload.top100_weight_percent !== request.top100WeightPercent ||
+        payload.top100_weight_source !== "personal")) ||
+    (request.top100WeightPercent == null && payload.top100_weight_source === "personal") ||
     (request.season !== undefined && payload.season !== request.season) ||
     (request.gameweek !== undefined && payload.gameweek !== request.gameweek) ||
     (request.rivalEntryId != null && payload.rival_entry_id !== request.rivalEntryId)

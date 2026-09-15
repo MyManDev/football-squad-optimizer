@@ -52,6 +52,12 @@ test("a browser computes through the worker, then reads the same answer from cac
     await page.getByRole("radio", { name: `${context.window} hafta`, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`window=${context.window}`));
   }
+  if (context.top100Weight != null) {
+    await page
+      .getByRole("combobox", { name: "Top100 etkisi" })
+      .selectOption(String(context.top100Weight));
+    await expect(page).toHaveURL(new RegExp(`top100=${context.top100Weight}`));
+  }
   const compute = page.getByRole("button", { name: "Hesapla", exact: true });
   const accepted = page.waitForResponse(
     (response) => response.url().startsWith(route) && response.request().method() === "POST",
@@ -69,6 +75,7 @@ test("a browser computes through the worker, then reads the same answer from cac
     strategy: context.strategy,
     window: context.window,
     rival_entry_id: context.rivalId,
+    ...(context.top100Weight != null ? { top100_weight_percent: context.top100Weight } : {}),
   });
   expect(post.headers()["access-control-allow-origin"]).toBe(context.webOrigin);
   const { job_id: jobId } = await post.json();
@@ -85,6 +92,17 @@ test("a browser computes through the worker, then reads the same answer from cac
     window: context.window,
     source_snapshot_id: context.snapshotId,
   });
+  expect(answer.payload.top100_weight_percent).toBe(context.top100Weight ?? 0);
+  expect(answer.payload.top100_weight_source).toBe(
+    context.top100Weight == null ? "published" : "personal",
+  );
+  await expect(
+    page.getByText(`Top100 etkisi: en fazla %${context.top100Weight ?? 0}`, { exact: false }),
+  ).toBeVisible();
+  const distinct = await page.request.get(
+    `${route}?strategy=${context.strategy}&window=${context.window}${context.rivalId ? `&rival=${context.rivalId}` : ""}&top100_weight_percent=40`,
+  );
+  expect(distinct.status()).toBe(404);
   const job = await page.request.get(`${context.apiOrigin}/api/v1/advice-jobs/${jobId}`);
   expect(await job.json()).toMatchObject({ job_id: jobId, status: "completed" });
   await expect(page.getByText("Plan hazır", { exact: true })).toBeVisible();

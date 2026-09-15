@@ -19,6 +19,7 @@ from uuid import uuid4
 import pytest
 import tests.unit.test_advice_worker as worker_fixture
 import tests.unit.test_backend_runtime as deployment_fixture
+from tests.unit.test_top100_weight import evidence_handoff
 
 from squadopt.application.entries import EntryRegistration
 from squadopt.application.league_views import MemberStanding, build_league_views
@@ -79,12 +80,22 @@ def _process(
                     process.wait(timeout=5)
 
 
-@pytest.mark.parametrize("strategy,window", [("saf-puan", 1), ("ortak-koru", 3), ("ortak-koru", 5)])
+@pytest.mark.parametrize(
+    "strategy,window,weight",
+    [
+        ("saf-puan", 1, None),
+        ("ortak-koru", 3, None),
+        ("ortak-koru", 5, None),
+        ("saf-puan", 1, 50),
+        ("ortak-koru", 5, 20),
+    ],
+)
 def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     strategy: str,
     window: int,
+    weight: int | None,
 ) -> None:
     node = shutil.which("node")
     assert node is not None, "Install the web toolchain before running the browser smoke."
@@ -105,7 +116,10 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
     )
     config.store_root.mkdir()
     snapshot_id = worker_fixture._capture_with_entries(config.snapshot_root, multiweek=window > 1)
-    deployment_fixture._handoff(config.handoff_root, snapshot_id)
+    if weight is None:
+        deployment_fixture._handoff(config.handoff_root, snapshot_id)
+    else:
+        evidence_handoff(config.handoff_root, snapshot_id)
     rival_id = worker_fixture.RIVAL_ID if window > 1 else None
     deployment_fixture._publish_members(config.site_data_root, *([rival_id] if rival_id else []))
     backend = build_backend(config)
@@ -176,6 +190,7 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
                 "snapshotId": snapshot_id,
                 "strategy": strategy,
                 "window": window,
+                "top100Weight": weight,
                 "rivalId": rival_id,
                 "buildName": f"advice-backend-smoke-{uuid4().hex}",
             }
@@ -244,4 +259,5 @@ def test_browser_computes_a_member_plan_and_reuses_its_cached_answer(
         strategy=strategy,
         window=window,
         rival_entry_id=rival_id,
+        top100_weight_percent=weight,
     )

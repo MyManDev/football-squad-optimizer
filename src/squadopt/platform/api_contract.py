@@ -19,6 +19,13 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Final, Literal, Protocol, TypeAlias
 
+from squadopt.prediction.elite_evidence import (
+    TOP100_WEIGHT_PERCENTAGES as TOP100_WEIGHT_PERCENTAGES,
+)
+from squadopt.prediction.elite_evidence import (
+    validate_top100_weight as validate_top100_weight,
+)
+
 BACKEND_API_CONTRACT_VERSION: Final = "backend_api_v1"
 BACKEND_API_VERSION: Final = "v1"
 BACKEND_API_SCHEMA_PATH: Final = Path("docs") / "contracts" / "backend_api_v1.schema.json"
@@ -139,8 +146,16 @@ class ApiCommandRequest:
     """Server-resolved, never client-supplied: which capture answers this request.
     Part of the advise fingerprint so deduplication cannot outlive the capture."""
     contract_version: str = BACKEND_API_CONTRACT_VERSION
+    top100_weight_percent: int | None = None
 
     def __post_init__(self) -> None:
+        if self.top100_weight_percent is not None:
+            try:
+                validate_top100_weight(self.top100_weight_percent)
+            except ValueError as error:
+                raise BackendApiContractError(str(error)) from error
+            if self.operation != "league.advise":
+                raise BackendApiContractError("Top 100 weight is only an advice option.")
         if self.contract_version != BACKEND_API_CONTRACT_VERSION:
             raise BackendApiContractError(
                 f"contract_version must be {BACKEND_API_CONTRACT_VERSION!r}."
@@ -330,6 +345,8 @@ class ApiCommandRequest:
             )
         else:
             payload["dry_run"] = self.dry_run
+        if self.top100_weight_percent is not None:
+            payload["top100_weight_percent"] = self.top100_weight_percent
         return payload
 
     @property
@@ -383,6 +400,8 @@ class ApiCommandRequest:
             },
         }[operation]
         expected = common | specific
+        if operation == "league.advise" and "top100_weight_percent" in document:
+            expected.add("top100_weight_percent")
         actual = set(document)
         if actual != expected:
             raise BackendApiContractError(
@@ -407,6 +426,7 @@ class ApiCommandRequest:
             window=document.get("window"),  # type: ignore[arg-type]
             rival_entry_id=document.get("rival_entry_id"),  # type: ignore[arg-type]
             capture_snapshot_id=document.get("capture_snapshot_id"),  # type: ignore[arg-type]
+            top100_weight_percent=document.get("top100_weight_percent"),  # type: ignore[arg-type]
         )
         if document["request_fingerprint"] != request.request_fingerprint:
             raise BackendApiContractError(
@@ -679,6 +699,10 @@ def backend_api_schema() -> dict[str, Any]:
             "capture_snapshot_id": identifier,
         }
     )
+    advise["properties"]["top100_weight_percent"] = {
+        "type": "integer",
+        "enum": list(TOP100_WEIGHT_PERCENTAGES),
+    }
     decide_body = _object(
         {
             "snapshot_id": nullable_identifier,
@@ -703,6 +727,9 @@ def backend_api_schema() -> dict[str, Any]:
             "rival_entry_id": _nullable({"type": "integer", "minimum": 1}),
         },
         required=["strategy", "window"],
+    )
+    advise_body["properties"]["top100_weight_percent"] = _nullable(
+        {"type": "integer", "enum": list(TOP100_WEIGHT_PERCENTAGES)}
     )
     error = _object(
         {
