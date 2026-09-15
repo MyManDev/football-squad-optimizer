@@ -163,7 +163,9 @@ def test_existing_five_plans_keep_their_recorded_results(window_world: dict[str,
     for key, expected in reference.items():
         strategy, window = key.split("/")
         payload = _advise(
-            window_world, strategy=strategy, window=int(window),
+            window_world,
+            strategy=strategy,
+            window=int(window),
             rival_entry_id=None if strategy == "saf-puan" else 202,
         )
         payload.pop("source_snapshot_id", None)
@@ -262,7 +264,7 @@ def test_the_first_week_of_a_window_reads_the_one_week_numbers(
     )
 
 
-def test_windows_are_saf_puan_only_and_need_the_horizon_builder(
+def test_windows_need_valid_rival_inputs_and_the_horizon_builder(
     window_world: dict[str, Any],
 ) -> None:
     """A rival strategy stays at one week; a window nobody computes is refused; a
@@ -270,7 +272,7 @@ def test_windows_are_saf_puan_only_and_need_the_horizon_builder(
     one-week plan."""
 
     assert MEMBER_WINDOWS == (1, 3, 5)
-    with pytest.raises(EntryError, match=r"supports windows \(1,\) only"):
+    with pytest.raises(EntryError, match="No picks captured"):
         _advise(window_world, strategy="fark-yarat", rival_entry_id=202, window=3)
     with pytest.raises(EntryError, match=r"supports windows \(1, 3, 5\) only"):
         _advise(window_world, window=2)
