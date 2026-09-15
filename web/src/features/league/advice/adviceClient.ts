@@ -41,6 +41,7 @@ export type AdviceRequestResult =
   | { kind: "unavailable" };
 
 export interface AdviceClient {
+  readonly supportsCompute?: boolean;
   /** Read an already-computed answer; never triggers computation. */
   readAdvice(request: AdviceRequest, options?: RequestOptions): Promise<AdviceReadResult>;
   /** Ask for the answer, computing it if needed (202 + job when it will take time). */
@@ -50,6 +51,7 @@ export interface AdviceClient {
 }
 
 export interface AdviceJobStatus {
+  errorCode?: string;
   jobId: string;
   status: "queued" | "running" | "completed" | "failed";
 }
@@ -128,6 +130,7 @@ function isRequestRejection(error: unknown): boolean {
 
 /** Talks to the advice backend; understands 200 (hit), 202 (job), and 404 (not computed). */
 export class HttpAdviceClient implements AdviceClient {
+  readonly supportsCompute = true;
   private readonly origin: string;
   private readonly fetcher: FetchLike;
 
@@ -193,14 +196,22 @@ export class HttpAdviceClient implements AdviceClient {
         { cache: "no-cache", signal },
       );
       if (!response.ok) throw new AdviceApiError(response.status);
-      const body = (await response.json()) as { job_id: string; status: AdviceJobStatus["status"] };
+      const body = (await response.json()) as {
+        job_id: string;
+        status: AdviceJobStatus["status"];
+        error_code?: unknown;
+      };
       if (
         body?.job_id !== jobId ||
         !["queued", "running", "completed", "failed"].includes(body?.status)
       ) {
         throw new AdviceResponseError("Advice job response has an invalid identity or status.");
       }
-      return { jobId: body.job_id, status: body.status };
+      return {
+        jobId: body.job_id,
+        status: body.status,
+        ...(typeof body.error_code === "string" ? { errorCode: body.error_code } : {}),
+      };
     }, options);
   }
 }
@@ -212,6 +223,9 @@ export class HttpAdviceClient implements AdviceClient {
  * to answer, because the published baseline may exist where the cache is empty.
  */
 export class FallbackAdviceClient implements AdviceClient {
+  get supportsCompute(): boolean {
+    return this.primary.supportsCompute === true;
+  }
   private readonly primary: AdviceClient;
   private readonly fallback: StaticOnlyAdviceClient;
 

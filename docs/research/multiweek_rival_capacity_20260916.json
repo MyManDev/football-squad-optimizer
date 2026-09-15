@@ -1,0 +1,106 @@
+{
+  "baseline": {
+    "timing": {
+      "baseline": "e34f508a",
+      "started": "2026-09-15T19:29:15.2429355Z",
+      "elapsed_seconds": 4411.9096828,
+      "exit_code": 0,
+      "workers": 8
+    },
+    "members": 15,
+    "files": 541,
+    "validated_advice_documents_including_aliases": 495,
+    "computed_rival_entries": 420,
+    "multiweek_rival_outcomes": {},
+    "refusals": {},
+    "successful_multiweek_rival_statuses": {},
+    "successful_multiweek_rival_gap_range_points": null,
+    "successful_multiweek_rival_returned_cost_range_points": null,
+    "successful_multiweek_rival_cost_ceiling_range_points": null,
+    "verified_multiweek_default_aliases": 0,
+    "multiweek_plans_excluding_aliases": 30
+  },
+  "candidate": {
+    "timing": {
+      "candidate": "codex/review-559-fixes",
+      "started": "2026-09-15T23:42:51.3377296+03:00",
+      "elapsed_seconds": 4307.8584031,
+      "exit_code": 0,
+      "workers": 8
+    },
+    "members": 15,
+    "files": 589,
+    "validated_advice_documents_including_aliases": 543,
+    "computed_rival_entries": 444,
+    "multiweek_rival_outcomes": {
+      "fark-yarat/3/WINDOW_INPUTS_UNAVAILABLE": 3,
+      "fark-yarat/3/computed": 12,
+      "fark-yarat/5/WINDOW_INPUTS_UNAVAILABLE": 3,
+      "fark-yarat/5/computed": 12,
+      "ortak-koru/3/WINDOW_INFEASIBLE": 12,
+      "ortak-koru/3/WINDOW_INPUTS_UNAVAILABLE": 3,
+      "ortak-koru/5/WINDOW_INFEASIBLE": 12,
+      "ortak-koru/5/WINDOW_INPUTS_UNAVAILABLE": 3
+    },
+    "refusals": {
+      "WINDOW_INFEASIBLE": 24,
+      "WINDOW_INPUTS_UNAVAILABLE": 12
+    },
+    "successful_multiweek_rival_statuses": {
+      "3/FEASIBLE": 12,
+      "5/FEASIBLE": 12
+    },
+    "successful_multiweek_rival_gap_range_points": [
+      16.875,
+      59.882000000000005
+    ],
+    "successful_multiweek_rival_returned_cost_range_points": [
+      0.0,
+      0.4922435343352731
+    ],
+    "successful_multiweek_rival_cost_ceiling_range_points": [
+      27.335935724651563,
+      83.71612027465096
+    ],
+    "verified_multiweek_default_aliases": 24,
+    "multiweek_plans_excluding_aliases": 54
+  },
+  "existing_payload_comparison": {
+    "common_documents_including_aliases": 495,
+    "identical_payloads": 495,
+    "different_payload_paths": [],
+    "missing_paths": [],
+    "basis": "payload object only; excludes wrapper generated_at_utc"
+  },
+  "input_sha256": {
+    "data\\handoffs\\2026-27-gw04.json": "0727b28ff30e589aac49650d6f80bed2d36a1293bffe3ecd1a3042ccd223248d",
+    "data\\entries\\registry.json": "80dc010ca767a398ad262dec126a0854c15f4cf1dc610e528b255b2012c992dc"
+  },
+  "method": {
+    "league_id": 352490,
+    "season": "2026-27",
+    "gameweek": 4,
+    "snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
+    "baseline_commit": "e34f508ac9509236dea9db87ae01d52865cd529c",
+    "candidate_commit": "c4399da082cd8f06987cf74770eefbe7ff139ace",
+    "entrypoint": "python -m scripts.build_league_site",
+    "workers": 8,
+    "publish": false,
+    "advice_record": false,
+    "isolated_output": true,
+    "sequential_runs": true,
+    "baseline_shared_host_with_validation": true,
+    "controlled_speed_comparison": false,
+    "production_capacity_approved": false,
+    "new_rival_window_request_slots": 60,
+    "measured_solver_invocation_count": null,
+    "limitations": [
+      "Single capture on local hardware; baseline overlapped validation workload.",
+      "No publication-stage timing or operational runtime budget.",
+      "Input refusals can occur before a solver invocation.",
+      "All new successful plans are FEASIBLE with wide objective and price bounds.",
+      "No new ortak-koru plan was available in this capture.",
+      "No solver execution failure occurred in this run; isolation is tested separately."
+    ]
+  }
+}

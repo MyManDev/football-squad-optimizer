@@ -57,7 +57,7 @@ from squadopt.live import (
     plan_transfers_with_overlap,
 )
 from squadopt.live.recommendation import InSeasonProjection
-from squadopt.live.transfers import HeldSquad, TransferDecision
+from squadopt.live.transfers import HeldSquad, HorizonNoSolutionError, TransferDecision
 from squadopt.optimization import (
     OptimizationConfig,
     SolverExecutionError,
@@ -98,6 +98,61 @@ WINDOW_WALL_CEILING_SECONDS = 1800.0
 #: so the request stays wire-shaped and the horizon is built once per window, not per
 #: member: it depends on the capture and the handoff only, never on whose squad asks.
 HorizonBuilder = Callable[[tuple[int, ...]], ProjectionHorizon]
+
+WINDOW_RIVAL_POLICY = "first_week_rival_horizon_v1"
+
+
+class MultiweekAdviceUnavailable(EntryError):
+    """A product refusal that the API and static index can explain consistently."""
+
+    def __init__(self, code: str, detail: str) -> None:
+        super().__init__(f"{code}: {detail}")
+        self.code = code
+
+
+@dataclass(frozen=True, slots=True)
+class WindowControl:
+    """One batch-local control, tied to the exact inputs that produced it."""
+
+    picks: EntryPicks
+    inputs: RecommendationInputs
+    projection: Projection
+    rules: SeasonRules
+    horizon_builder: HorizonBuilder | None
+    payload: dict[str, object]
+    net_points_ceiling: float
+
+
+def build_window_control(
+    picks: EntryPicks,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    *,
+    league_id: int,
+    window: int,
+    horizon_builder: HorizonBuilder | None,
+) -> WindowControl:
+    payload = build_window_payload(
+        picks,
+        inputs,
+        projection,
+        rules,
+        league_id=league_id,
+        window=window,
+        horizon_builder=horizon_builder,
+        include_price_bound=True,
+    )
+    ceiling = float(str(payload.pop("net_points_ceiling")))
+    return WindowControl(
+        picks,
+        inputs,
+        projection,
+        rules,
+        horizon_builder,
+        payload,
+        ceiling,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -657,6 +712,8 @@ def build_window_payload(
     league_id: int,
     window: int,
     horizon_builder: HorizonBuilder | None,
+    first_week_overlap: FirstWeekOverlap | None = None,
+    include_price_bound: bool = False,
 ) -> dict[str, object]:
     """One member's ``saf-puan`` advice over a three- or five-week window.
 
@@ -699,15 +756,17 @@ def build_window_payload(
         for _, row in inputs.players.iterrows()
     }
     held = held_squad_from_picks(picks, current_prices=prices)
-    plan, _transfer_config = plan_transfer_horizon(
+    settings = OptimizationConfig(
+        solver_time_limit_seconds=WINDOW_WALL_CEILING_SECONDS,
+        solver_deterministic_time_limit=WINDOW_DETERMINISTIC_UNITS_PER_WEEK * window,
+    )
+    plan, transfer_config = plan_transfer_horizon(
         inputs,
         horizon,
         held,
         rules,
-        optimization=OptimizationConfig(
-            solver_time_limit_seconds=WINDOW_WALL_CEILING_SECONDS,
-            solver_deterministic_time_limit=WINDOW_DETERMINISTIC_UNITS_PER_WEEK * window,
-        ),
+        optimization=settings,
+        first_week_overlap=first_week_overlap,
     )
     if wall_clock_stopped_the_search(plan.solver_status, plan.diagnostics):
         raise SolverExecutionError(
@@ -723,6 +782,28 @@ def build_window_payload(
     pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
     by_id = {int(str(row["player_id"])): row for _, row in first.selected_squad.iterrows()}
     raw_gap = plan.diagnostics.get("absolute_optimality_gap")
+    # The solver bounds its objective, which includes bench value and a transfer
+    # caution margin. Convert that bound before pricing XI + captain - actual hits.
+    # No chips are offered here. Use a roster-only ceiling if discounting changes.
+    roster_ceiling = 0.0
+    negative_bench = 0.0
+    for _, rows in horizon.table.groupby("gameweek"):
+        scores = rows["expected_points"].sort_values(ascending=False)
+        roster_ceiling += float(scores.head(11).sum() + scores.iloc[0])
+        negative_bench += settings.bench_weight * float(scores.tail(4).clip(upper=0).sum())
+    net_ceiling = roster_ceiling
+    bound = plan.diagnostics.get("best_objective_bound")
+    if transfer_config.horizon_discount_factor == 1.0 and bound is not None:
+        cap = transfer_config.max_transfers_per_gameweek or 15
+        margin = max(
+            0.0, transfer_config.transfer_hit_cost_points - transfer_config.hit_points_charged
+        )
+        # At most 27 rounded player coefficients and `cap` rounded hit coefficients
+        # per week; a full unit per coefficient conservatively covers both roundings.
+        rounding = window * (27 + cap) / settings.expected_points_scale
+        net_ceiling = min(
+            net_ceiling, float(str(bound)) + window * cap * margin - negative_bench + rounding
+        )
     missing = _missing_fields(picks)
     moves, gain_vs_hold = _moves(
         [int(str(v)) for v in first.transfers_out["player_id"].tolist()],
@@ -750,6 +831,15 @@ def build_window_payload(
         # first week's lineup total; the later weeks are in ``plan_weeks``.
         "expected_gain_vs_hold": gain_vs_hold,
         "expected_points_cost": 0.0,
+        **(
+            {
+                "net_points_ceiling": max(
+                    net_ceiling, sum(w.projected_score - w.transfer_hit_points for w in plan.weeks)
+                )
+            }
+            if include_price_bound
+            else {}
+        ),
         "rival_label": None,
         # The solver's own account of the whole window: OPTIMAL is a proof, FEASIBLE is
         # the plan it found with the measured bound gap beside it.
@@ -790,6 +880,7 @@ def advise_entry(
     control: MemberControl | None = None,
     phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
     horizon_builder: HorizonBuilder | None = None,
+    window_control: WindowControl | None = None,
 ) -> dict[str, object]:
     """Compute one member's advice for a validated request.
 
@@ -797,9 +888,9 @@ def advise_entry(
     gameweek must be the capture's own, and the strategy and window must be a
     combination that is actually computed — an advice file for a combination nobody
     computed would make the site show an answer where none was measured. ``saf-puan``
-    is computed at every window in ``MEMBER_WINDOWS``; a rival strategy at window one
-    only, because its band is a first-week constraint and nothing about a later week
-    is known that would let it be priced there. The rival parameter is validated
+    and the two overlap strategies are computed at every window in ``MEMBER_WINDOWS``.
+    Multiweek rival bands constrain only the opening squad, with an equal-window
+    control under the same transfer policy. The rival parameter is validated
     against the strategy that asks for it: ``saf-puan`` is rival-free and refuses one,
     a catalogue strategy whose overlap band reaches the solver requires one, and
     nobody may name themselves.
@@ -860,6 +951,26 @@ def advise_entry(
     floor = strategy.constraints.overlap_floor
     ceiling = strategy.constraints.overlap_ceiling
     assert request.rival_entry_id is not None  # validated by the shared capability contract
+    if request.window != COMPUTED_WINDOW:
+        try:
+            return _advise_window_against_rival(
+                request,
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+                horizon_builder=horizon_builder,
+                control=window_control,
+            )
+        except HorizonNoSolutionError as error:
+            code = (
+                "WINDOW_INFEASIBLE"
+                if error.status is SolverStatus.INFEASIBLE
+                else "WINDOW_NO_SOLUTION"
+            )
+            raise MultiweekAdviceUnavailable(code, str(error)) from error
+        except (EntryError, DataSourceError) as error:
+            raise MultiweekAdviceUnavailable("WINDOW_INPUTS_UNAVAILABLE", str(error)) from error
     return _advise_against_rival(
         request,
         rival_entry_id=request.rival_entry_id,
@@ -871,6 +982,110 @@ def advise_entry(
         rules=rules,
         control=control,
     )
+
+
+def _window_net_points(payload: dict[str, object]) -> tuple[float, float]:
+    weeks = payload["plan_weeks"]
+    assert isinstance(weeks, list) and weeks
+    nets = [float(w["expected_points"]) - float(w["transfer_hit_points"]) for w in weeks]
+    return nets[0], sum(nets)
+
+
+def _advise_window_against_rival(
+    request: AdviseEntryRequest,
+    *,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    horizon_builder: HorizonBuilder | None,
+    control: WindowControl | None,
+) -> dict[str, object]:
+    """Constrain only the opening fifteen; compare returned plans over the same window."""
+    assert request.rival_entry_id is not None
+    picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
+    rival = _requested_picks(request, request.rival_entry_id, provider=provider, inputs=inputs)
+    if rival.squad_basis != "captured":
+        raise EntryError("The rival's captured XI is unavailable after Free Hit squad restoration.")
+    rival_eleven = frozenset(rival.starting_xi)
+    if len(rival_eleven) != 11 or rival.captain not in rival_eleven:
+        raise EntryError("Multiweek rival advice needs a captured starting XI and captain.")
+    known = set(projection.table["player_id"])
+    if not rival_eleven <= known:
+        raise EntryError("The projection is missing players from the rival's captured XI.")
+    if control is None:
+        control = build_window_control(
+            picks,
+            inputs,
+            projection,
+            rules,
+            league_id=request.league_id,
+            window=request.window,
+            horizon_builder=horizon_builder,
+        )
+    if (
+        control.picks != picks
+        or control.inputs is not inputs
+        or control.projection is not projection
+        or control.rules is not rules
+        or control.horizon_builder is not horizon_builder
+        or control.payload["window"] != request.window
+        or control.payload["league_id"] != request.league_id
+    ):
+        raise EntryError("The multiweek control belongs to different inputs or window.")
+    constraints = STRATEGY_CATALOG[request.strategy].constraints
+    band = FirstWeekOverlap(
+        player_ids=rival_eleven,
+        minimum=constraints.overlap_floor,
+        maximum=constraints.overlap_ceiling,
+    )
+    payload = build_window_payload(
+        picks,
+        inputs,
+        projection,
+        rules,
+        league_id=request.league_id,
+        window=request.window,
+        horizon_builder=horizon_builder,
+        first_week_overlap=band,
+    )
+    first_net, total_net = _window_net_points(payload)
+    control_first, control_total = _window_net_points(control.payload)
+    eleven, bench = payload["starting_xi"], payload["bench"]
+    assert isinstance(eleven, list) and isinstance(bench, list)
+    overlap = len(rival_eleven & {p["player_id"] for p in [*eleven, *bench]})
+    cost = max(0.0, control_total - total_net)
+    cost_ceiling = max(cost, control.net_points_ceiling - total_net)
+    payload.update(
+        {
+            "mode": request.strategy,
+            "rival_entry_id": rival.entry_id,
+            "rival_label": str(rival.entry_id),
+            "expected_points_cost": cost,
+            "expected_points_cost_ceiling": cost_ceiling,
+            "control_solver_status": control.payload["solver_status"],
+            "control_optimality_gap": control.payload["optimality_gap"],
+            "window_comparison": {
+                "policy_id": WINDOW_RIVAL_POLICY,
+                "rival_entry_id": rival.entry_id,
+                "rival_gameweek": rival.gameweek,
+                "overlap_scope": "first_week_squad_vs_captured_rival_xi",
+                "overlap_minimum": band.minimum,
+                "overlap_maximum": band.maximum,
+                "overlap_actual": overlap,
+                "first_week_net_points": first_net,
+                "control_first_week_net_points": control_first,
+                "total_net_points": total_net,
+                "control_total_net_points": control_total,
+                "net_points_difference": control_total - total_net,
+                "solver_status": payload["solver_status"],
+                "optimality_gap": payload["optimality_gap"],
+                "control_solver_status": control.payload["solver_status"],
+                "control_optimality_gap": control.payload["optimality_gap"],
+            },
+        }
+    )
+    return payload
 
 
 def _solve_within_free_transfers(

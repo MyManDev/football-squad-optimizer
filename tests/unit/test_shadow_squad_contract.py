@@ -118,6 +118,7 @@ _PUBLISHED_ENVELOPE = frozenset(
         "plan_kind",
         "alternative_plan",
         "plan_weeks",
+        "window_comparison",
         "stated_limits",
         "suggested_strategy",
         "squad_basis",

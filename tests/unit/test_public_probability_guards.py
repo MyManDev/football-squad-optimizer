@@ -25,6 +25,7 @@ populated risk view breaks a named test instead of silently shipping probabiliti
 pages that already render them.
 """
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,7 @@ from typing import Any
 import pytest
 import tests.unit.test_live_transfers as world_module
 from scripts.build_scoreboard import CohortCapture, CohortPicks, scoreboard_payload
+from tests.unit.test_member_windows import ENTRY, _window_world
 
 from squadopt.application.build import _risk_from_status
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
@@ -52,6 +54,37 @@ from squadopt.live.recommendation import project, read_projection_handoff
 SEASON = world_module.SEASON
 
 world = world_module._world  # re-register the fixture in this module
+window_world = _window_world
+
+
+def test_real_multiweek_rival_documents_are_inside_the_public_guard(
+    window_world: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    world = window_world
+    picks = world["provider"].picks(ENTRY, SEASON, 1)
+    world["provider"]._picks[202] = dataclasses.replace(picks, entry_id=202)
+    out = tmp_path / "public-windows"
+    build_league_views(
+        world["provider"],
+        tuple(EntryRegistration(i, str(i), "2026-08-23T00:00:00Z") for i in (ENTRY, 202)),
+        world["inputs"],
+        world["projection"],
+        world["rules"],
+        league_id=352490,
+        league_name="Synthetic",
+        out_dir=out,
+        horizon_builder=world["builder"],
+        standings={
+            i: MemberStanding(entry_id=i, team_name=str(i), manager_name=str(i), rank=rank)
+            for rank, i in enumerate((ENTRY, 202), 1)
+        },
+    )
+    for window in (3, 5):
+        path = out / f"advice/{ENTRY}/ortak-koru/{window}/vs-202.json"
+        assert "window_comparison" in json.loads(path.read_text())["payload"]
+    assert _sweep(out) == []
+
 
 #: The producer's own rule, used as the sweep's rule: one pattern decides what a
 #: published file may contain, so the two cannot drift apart.

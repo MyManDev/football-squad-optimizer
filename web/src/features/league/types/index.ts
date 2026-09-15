@@ -265,7 +265,27 @@ export interface AdvicePlanWeek {
   expected_points: number;
 }
 
+export interface WindowComparison {
+  policy_id: "first_week_rival_horizon_v1";
+  rival_entry_id: number;
+  rival_gameweek: number;
+  overlap_scope: "first_week_squad_vs_captured_rival_xi";
+  overlap_minimum: number | null;
+  overlap_maximum: number | null;
+  overlap_actual: number;
+  first_week_net_points: number;
+  control_first_week_net_points: number;
+  total_net_points: number;
+  control_total_net_points: number;
+  net_points_difference: number;
+  solver_status: "OPTIMAL" | "FEASIBLE";
+  control_solver_status: "OPTIMAL" | "FEASIBLE";
+  optimality_gap: number | null;
+  control_optimality_gap: number | null;
+}
+
 export interface EntryAdvice {
+  window_comparison?: WindowComparison;
   league_id: number;
   season: string;
   gameweek: number;

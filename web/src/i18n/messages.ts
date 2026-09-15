@@ -3,6 +3,18 @@ export type Language = "tr" | "en";
 export type ReasonParams = Record<string, string | number | undefined>;
 
 const en = {
+  multiweek: {
+    windowComparisonTitle: "Same-window plan comparison",
+    windowStrategyDescription:
+      "The fixed overlap applies only to the opening squad, against the captured rival XI.",
+    windowFirstNet: "First week · net",
+    windowTotalNet: (weeks: number) => `${weeks} weeks · net total`,
+    windowDifference: (value: string) => `Pure points minus selected plan: ${value}`,
+    windowRivalBasis: (rival: string, week: number, actual: number, target: string) =>
+      `${rival}, GW${week} XI: ${actual} in opening squad; target ${target}.`,
+    windowComparisonNote:
+      "Net: XI + captain − hits. Positive means points given up; the ceiling covers solver and policy slack.",
+  },
   suggestionHistory: {
     title: "Weekly Suggestion History",
     overview: "Overview",
@@ -537,6 +549,20 @@ const en = {
     computeStaticFallback: "The backend was unreachable; this is the published static answer.",
     computeUnavailable:
       "Only the published site is available right now; this combination was not published.",
+    computeResume: "Continue waiting",
+    windowFailure: (code?: string): string => {
+      switch (code) {
+        case "WINDOW_INFEASIBLE":
+          return "Overlap target infeasible; no relaxation.";
+        case "WINDOW_NO_SOLUTION":
+          return "No plan within compute budget; infeasibility unproven.";
+        case "WINDOW_INPUTS_UNAVAILABLE":
+          return "Missing squad/calendar inputs.";
+        default:
+          return "";
+      }
+    },
+    computePaused: "Waiting paused; resume this job.",
     computeFailed:
       "The computation did not finish. The published plan, where one exists, still stands.",
     adviceComputedBadge: "Computation result",
@@ -976,6 +1002,18 @@ type MessageSchema<T> = {
 };
 
 const tr: MessageSchema<typeof en> = {
+  multiweek: {
+    windowComparisonTitle: "Aynı pencere için plan karşılaştırması",
+    windowStrategyDescription:
+      "Sabit ortaklık sınırı yalnız ilk hafta kadrosuna, kayıtlı rakip ilk 11'ine göre uygulanır.",
+    windowFirstNet: "İlk hafta · net",
+    windowTotalNet: (weeks) => `${weeks} hafta · net toplam`,
+    windowDifference: (value) => `Saf puan eksi seçilen plan: ${value}`,
+    windowRivalBasis: (rival, week, actual, target) =>
+      `${rival}, H${week} ilk 11: ilk kadroda ${actual} ortak; hedef ${target}.`,
+    windowComparisonNote:
+      "Net: ilk 11 + kaptan − cezalar. Pozitif fark vazgeçilen puandır; üst sınır çözüm ve politika payını kapsar.",
+  },
   suggestionHistory: {
     title: "Haftalık Öneri Geçmişi",
     overview: "Genel Bakış",
@@ -1498,6 +1536,20 @@ const tr: MessageSchema<typeof en> = {
     computeProvenance: (capture: string, at: string) => `Capture ${capture}, sonuç tarihi ${at}.`,
     computeStaticFallback: "Backend'e ulaşılamadı; bu, yayınlanmış statik cevap.",
     computeUnavailable: "Şu an yalnız yayınlanmış site var; bu kombinasyon yayınlanmamış.",
+    computeResume: "Takibe devam et",
+    windowFailure: (code) => {
+      switch (code) {
+        case "WINDOW_INFEASIBLE":
+          return "Ortak oyuncu hedefi uygulanamaz; sınır gevşetilmedi.";
+        case "WINDOW_NO_SOLUTION":
+          return "Hesaplama bütçesinde plan bulunamadı; imkânsızlık kanıtlanmadı.";
+        case "WINDOW_INPUTS_UNAVAILABLE":
+          return "Kadro veya fikstür verisi eksik.";
+        default:
+          return "";
+      }
+    },
+    computePaused: "Bekleme duraklatıldı; aynı işi sürdürebilirsin.",
     computeFailed: "Hesap tamamlanamadı. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
     adviceComputedBadge: "Hesap sonucu",
     advicePublishedWhileComputing: "Hesap sürerken yayınlanmış plan gösteriliyor.",

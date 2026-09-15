@@ -22,7 +22,7 @@ def advice_capabilities() -> dict[str, AdviceCapability]:
     for slug, strategy in STRATEGY_CATALOG.items():
         constraints = strategy.constraints
         if constraints.overlap_floor is not None or constraints.overlap_ceiling is not None:
-            capabilities[slug] = AdviceCapability((COMPUTED_WINDOW,), True)
+            capabilities[slug] = AdviceCapability(MEMBER_WINDOWS, True)
     return capabilities
 
 

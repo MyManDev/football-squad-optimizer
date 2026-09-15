@@ -91,6 +91,7 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # The multi-week window: one row per gameweek (transfers, hit points, chip,
         # expected points) and the sentences naming what the window assumes.
         "plan_weeks",
+        "window_comparison",
         "stated_limits",
         # The declared rule's pick for the week, with the gap and the weeks remaining it
         # read (``strategies/rule.py``). A band on points, stamped with the rule's id and
@@ -384,6 +385,8 @@ _BASELINE_PUBLISHES: Final = frozenset(
 )
 _RIVAL_PUBLISHES: Final = _BASELINE_PUBLISHES | frozenset(
     {
+        "plan_weeks",
+        "window_comparison",
         "expected_gap_vs_rival",
         # A rival plan is priced against a control this member's own solve produced, so
         # it is the one path that knows how far that control's proof got.

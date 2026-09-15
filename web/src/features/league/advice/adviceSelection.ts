@@ -18,6 +18,7 @@ import type { AdviceRequest } from "./adviceClient";
 export function availableWindows(
   index: EntryAdviceIndex | null | undefined,
   strategy: AdviceStrategy,
+  rivalEntryId: number | null = index?.default_rival_entry_id ?? null,
 ): WindowSize[] {
   if (!index?.strategies?.includes(strategy)) return [];
   const windows = index.windows === undefined ? [index.window] : (index.windows[strategy] ?? []);
@@ -26,10 +27,18 @@ export function availableWindows(
       windows.filter(
         (window) =>
           [1, 3, 5].includes(window) &&
+          (!strategyNeedsRival(strategy) ||
+            index.computed.some(
+              (row) =>
+                row.strategy === strategy &&
+                row.rival_entry_id === rivalEntryId &&
+                row.path ===
+                  `advice/${index.entry_id}/${strategy}/${window}/vs-${rivalEntryId}.json`,
+            )) &&
           !index.unavailable?.some(
             (row) =>
               row.strategy === strategy &&
-              row.rival_entry_id === null &&
+              (row.rival_entry_id === null || row.rival_entry_id === rivalEntryId) &&
               (row.window ?? index.window) === window,
           ),
       ),
@@ -82,12 +91,11 @@ export function selectedAdviceRequest(
 
 /**
  * The combinations connected to the application compute path: pure points at any of
- * its windows, or a one-week member strategy with a rival named. A rival strategy at a
- * longer window and the legacy play modes are shown from the published tree only.
+ * its windows, or a member strategy with a rival named at one, three or five weeks.
+ * Legacy play modes are shown from the published tree only.
  */
 export function canComputeAdvice(request: AdviceRequest): boolean {
   if (request.strategy === "saf-puan") return true;
-  if (request.window !== 1) return false;
   return isMemberStrategy(request.strategy) && request.rivalEntryId != null;
 }
 
@@ -147,7 +155,6 @@ export function resolvePublishedAdvice(
   }
   result.status = "not-listed";
   result.strategies = [...new Set(index.strategies.filter(isMemberStrategy))];
-  result.windows = availableWindows(index, request.strategy);
   const { strategy, window } = request;
   if (strategyNeedsRival(strategy)) {
     const rivalIds = [
@@ -182,6 +189,7 @@ export function resolvePublishedAdvice(
   } else {
     request.rivalEntryId = null;
   }
+  result.windows = availableWindows(index, request.strategy, request.rivalEntryId ?? null);
   const mode = searchParams.get("mode");
   const rawWindow = searchParams.get("window");
   if (

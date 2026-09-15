@@ -22,8 +22,59 @@ import type { Language } from "../../../i18n/messages";
 import { ScoreboardCard } from "../components/ScoreboardCard";
 import type { EntryAdvice, LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import { LeagueMemberView } from "./LeagueMemberPage";
+import { AdviceCard } from "./MemberAdviceCard";
+import { MESSAGES } from "../../../i18n/messages";
 
 afterEach(cleanup);
+
+it.each(["en", "tr"] as const)(
+  "%s: renders and sweeps both multiweek rival comparisons",
+  (language) => {
+    for (const mode of ["ortak-koru", "fark-yarat"] as const) {
+      const envelope = mockEntryAdviceEnvelope(35249001, "saf-puan", 3);
+      Object.assign(envelope.payload, {
+        mode,
+        rival_entry_id: 35249002,
+        expected_points_cost: 3,
+        expected_points_cost_ceiling: 8,
+        window_comparison: {
+          policy_id: "first_week_rival_horizon_v1",
+          rival_entry_id: 35249002,
+          rival_gameweek: envelope.payload.gameweek - 1,
+          overlap_scope: "first_week_squad_vs_captured_rival_xi",
+          overlap_minimum: mode === "ortak-koru" ? 9 : null,
+          overlap_maximum: mode === "fark-yarat" ? 5 : null,
+          overlap_actual: mode === "ortak-koru" ? 9 : 5,
+          first_week_net_points: 40,
+          control_first_week_net_points: 41,
+          total_net_points: 120,
+          control_total_net_points: 123,
+          net_points_difference: 3,
+          solver_status: "FEASIBLE",
+          control_solver_status: "FEASIBLE",
+          optimality_gap: 2,
+          control_optimality_gap: 4,
+        },
+      });
+      const { container, unmount } = render(
+        <LanguageProvider initialLanguage={language}>
+          <MemoryRouter>
+            <AdviceCard
+              shown={{ envelope, origin: "published" }}
+              squad={mockEntrySquadEnvelopes[35249001]!}
+              rivalSquad={null}
+            />
+          </MemoryRouter>
+        </LanguageProvider>,
+      );
+      const text = container.textContent ?? "";
+      expect(text).toContain(MESSAGES[language].multiweek.windowComparisonTitle);
+      expect(text.match(FORBIDDEN)).toBeNull();
+      expect(text.match(MODE_PROMISE)).toBeNull();
+      unmount();
+    }
+  },
+);
 
 // Keep the original patterns and cover the plan's full forbidden vocabulary.
 // The exact causal word "yüzden" means "because", not the numerical term "yüzde".

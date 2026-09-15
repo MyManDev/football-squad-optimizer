@@ -56,6 +56,8 @@ function LeagueMemberContent({
     selection,
     indexReadable,
     selectionAvailable,
+    canRequest,
+    allowCompute,
     job,
     request,
     shown,
@@ -208,11 +210,12 @@ function LeagueMemberContent({
           }
         />
         <MemberDecisionControls
+          allowCompute={allowCompute}
           entryId={entryId}
           members={members}
           index={selection.status === "index-error" ? null : index}
         />
-        <AdviceRequestPanel request={request} job={job} selectionAvailable={selectionAvailable} />
+        <AdviceRequestPanel request={request} job={job} selectionAvailable={canRequest} />
         {adviceLoading ? (
           <EmptyState title={copy.loadingAdvice} />
         ) : shown ? (

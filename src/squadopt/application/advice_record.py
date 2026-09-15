@@ -396,6 +396,11 @@ def _advice_document(advice: PublishedAdvice) -> dict[str, object]:
         "scoring_complete": bool(starting_xi and bench and captain is not None),
         "published_sha256": _sha256(advice.raw),
         "advice_sha256": _sha256(encoded),
+        **(
+            {"window_comparison": payload["window_comparison"]}
+            if "window_comparison" in payload
+            else {}
+        ),
     }
 
 

@@ -606,6 +606,104 @@
             5
           ],
           "type": "integer"
+        },
+        "window_comparison": {
+          "additionalProperties": false,
+          "properties": {
+            "control_first_week_net_points": {
+              "type": "number"
+            },
+            "control_optimality_gap": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "control_solver_status": {
+              "enum": [
+                "OPTIMAL",
+                "FEASIBLE"
+              ]
+            },
+            "control_total_net_points": {
+              "type": "number"
+            },
+            "first_week_net_points": {
+              "type": "number"
+            },
+            "net_points_difference": {
+              "type": "number"
+            },
+            "optimality_gap": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "overlap_actual": {
+              "maximum": 11,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "overlap_maximum": {
+              "maximum": 11,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "overlap_minimum": {
+              "maximum": 11,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "overlap_scope": {
+              "const": "first_week_squad_vs_captured_rival_xi"
+            },
+            "policy_id": {
+              "const": "first_week_rival_horizon_v1"
+            },
+            "rival_entry_id": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "rival_gameweek": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "solver_status": {
+              "enum": [
+                "OPTIMAL",
+                "FEASIBLE"
+              ]
+            },
+            "total_net_points": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "policy_id",
+            "rival_entry_id",
+            "rival_gameweek",
+            "overlap_scope",
+            "overlap_minimum",
+            "overlap_maximum",
+            "overlap_actual",
+            "first_week_net_points",
+            "control_first_week_net_points",
+            "total_net_points",
+            "control_total_net_points",
+            "net_points_difference",
+            "solver_status",
+            "control_solver_status",
+            "optimality_gap",
+            "control_optimality_gap"
+          ],
+          "type": "object"
         }
       },
       "required": [

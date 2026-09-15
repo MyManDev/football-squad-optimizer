@@ -82,7 +82,7 @@ describe("advice selection", () => {
     expect(stranger.rivalEntryId).toBe(RIVAL);
   });
 
-  it("cannot compute a rival strategy without any rival, nor over a longer window", () => {
+  it("requires a rival and supports longer windows", () => {
     const alone = selectedAdviceRequest(new URLSearchParams("mode=ortak-koru"), 352490, ENTRY, []);
     expect(alone.rivalEntryId).toBeNull();
     expect(canComputeAdvice(alone)).toBe(false);
@@ -92,7 +92,7 @@ describe("advice selection", () => {
       ENTRY,
       MEMBERS,
     );
-    expect(canComputeAdvice(long)).toBe(false);
+    expect(canComputeAdvice(long)).toBe(true);
   });
 
   it("computes pure points at three and five weeks", () => {
@@ -117,6 +117,30 @@ describe("advice selection", () => {
     expect(availableWindows({ ...index, windows: { "saf-puan": [1, 3] } }, "saf-puan")).toEqual([
       1, 3,
     ]);
+  });
+
+  it("only offers the selected rival's published windows", () => {
+    const index = mockEntryAdviceIndex(ENTRY).payload;
+    index.windows = { ...index.windows, "ortak-koru": [1, 3, 5] };
+    index.computed.push({
+      strategy: "ortak-koru",
+      rival_entry_id: RIVAL,
+      path: `advice/${ENTRY}/ortak-koru/3/vs-${RIVAL}.json`,
+    });
+    index.computed.push({
+      strategy: "ortak-koru",
+      rival_entry_id: RIVAL,
+      path: `advice/999999/ortak-koru/5/vs-${RIVAL}.json`,
+    });
+    expect(availableWindows(index, "ortak-koru", RIVAL)).toEqual([1, 3]);
+    expect(availableWindows(index, "ortak-koru", 999999)).toEqual([]);
+    index.unavailable.push({
+      strategy: "ortak-koru",
+      rival_entry_id: RIVAL,
+      window: 3,
+      reason: "SOLVER_EXECUTION_FAILED",
+    });
+    expect(availableWindows(index, "ortak-koru", RIVAL)).toEqual([1]);
   });
 });
 
@@ -200,7 +224,7 @@ describe("index-authoritative advice selection", () => {
         publication,
       );
       expect(selection).toMatchObject({ status: "ready", path: window === 1 ? pair.path : three });
-      expect(canComputeAdvice(selection.request)).toBe(window === 1);
+      expect(canComputeAdvice(selection.request)).toBe(true);
     }
   });
 });

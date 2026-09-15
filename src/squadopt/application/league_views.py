@@ -41,8 +41,10 @@ from squadopt.application.advice import (
     MEMBER_WINDOWS,
     AdviseEntryRequest,
     HorizonBuilder,
+    MultiweekAdviceUnavailable,
     advise_entry,
     build_advice_payload,
+    build_window_control,
     solve_member_control,
 )
 from squadopt.application.advice_record import (
@@ -78,8 +80,18 @@ from squadopt.live import (
     SeasonRules,
 )
 from squadopt.live.transfers import plan_transfer_menu
+from squadopt.optimization import SolverExecutionError
 from squadopt.scenarios import RivalSquad
 from squadopt.scenarios.paths import ScenarioPathSet
+
+
+def _public_failure(error: Exception) -> str:
+    if isinstance(error, SolverExecutionError):
+        return "SOLVER_EXECUTION_FAILED"
+    if isinstance(error, MultiweekAdviceUnavailable):
+        return error.code
+    return str(error)
+
 
 LEAGUE_VIEW_CONTRACT_VERSION = "provisional_league_ui_v1"
 
@@ -135,6 +147,7 @@ class MemberRender:
     #: under, carried out of the task because the advice record has to state it and the
     #: control it comes from does not cross a process pool. Empty when the baseline failed.
     transfer_config_fingerprint: str = ""
+    rival_window_unavailable: tuple[tuple[str, int, int, str], ...] = ()
 
 
 def render_member(
@@ -175,8 +188,8 @@ def render_member(
             rules=rules,
             control=control,
         )
-    except (EntryError, DataError) as error:
-        return MemberRender(task.entry_id, None, str(error), (), ())
+    except (EntryError, DataError, SolverExecutionError) as error:
+        return MemberRender(task.entry_id, None, _public_failure(error), (), ())
     payloads: list[tuple[str, int, dict[str, object]]] = []
     unavailable: list[tuple[str, int, str]] = []
     for strategy in task.rival_strategies:
@@ -197,32 +210,61 @@ def render_member(
                     rules=rules,
                     control=control,
                 )
-            except (EntryError, DataError) as error:
-                unavailable.append((strategy, rival_id, str(error)))
+            except (EntryError, DataError, SolverExecutionError) as error:
+                unavailable.append((strategy, rival_id, _public_failure(error)))
                 continue
             payloads.append((strategy, rival_id, payload))
     window_payloads: list[tuple[int, dict[str, object]]] = []
     window_unavailable: list[tuple[int, str]] = []
+    rival_window_unavailable: list[tuple[str, int, int, str]] = []
     for window in task.windows:
         try:
-            payload = advise_entry(
-                AdviseEntryRequest(
-                    season=task.season,
-                    gameweek=task.gameweek,
-                    league_id=task.league_id,
-                    entry_id=task.entry_id,
-                    window=window,
-                ),
-                provider=provider,
-                inputs=inputs,
-                projection=projection,
-                rules=rules,
+            window_control = build_window_control(
+                picks,
+                inputs,
+                projection,
+                rules,
+                league_id=task.league_id,
+                window=window,
                 horizon_builder=horizon_builder,
             )
-        except (EntryError, DataError) as error:
-            window_unavailable.append((window, str(error)))
+        except (EntryError, DataError, SolverExecutionError) as error:
+            window_unavailable.append((window, _public_failure(error)))
+            if task.default_rival_id is not None:
+                rival_window_unavailable.extend(
+                    (strategy, task.default_rival_id, window, _public_failure(error))
+                    for strategy in task.rival_strategies
+                )
             continue
-        window_payloads.append((window, payload))
+        window_payloads.append((window, window_control.payload))
+        # A bounded static menu: only the standings neighbour gets longer windows.
+        # Other rivals remain available on demand. Each control is solved once.
+        if task.default_rival_id is not None:
+            for strategy in task.rival_strategies:
+                try:
+                    payload = advise_entry(
+                        AdviseEntryRequest(
+                            season=task.season,
+                            gameweek=task.gameweek,
+                            league_id=task.league_id,
+                            entry_id=task.entry_id,
+                            strategy=strategy,
+                            window=window,
+                            rival_entry_id=task.default_rival_id,
+                        ),
+                        provider=provider,
+                        inputs=inputs,
+                        projection=projection,
+                        rules=rules,
+                        horizon_builder=horizon_builder,
+                        window_control=window_control,
+                    )
+                except (EntryError, DataError, SolverExecutionError) as error:
+                    rival_window_unavailable.append(
+                        (strategy, task.default_rival_id, window, _public_failure(error))
+                    )
+                    continue
+                payloads.append((strategy, task.default_rival_id, payload))
     return MemberRender(
         task.entry_id,
         baseline,
@@ -232,6 +274,7 @@ def render_member(
         tuple(window_payloads),
         tuple(window_unavailable),
         control.transfer_config.configuration_fingerprint,
+        tuple(rival_window_unavailable),
     )
 
 
@@ -245,9 +288,8 @@ MemberMapper = Callable[
 # one — is always computed, and it is always the deterministic planner's own answer.
 # The competitive modes are computed only when the caller supplies scenario paths to
 # price the member's menu on (`mode_paths`); without them the other combinations are
-# simply absent and the page says so. The saf-puan windows beyond one are computed only
-# when the caller supplies a projection horizon builder for the capture; a rival
-# strategy stays at one week. Publishing a file for a combination nobody computed would
+# simply absent and the page says so. Longer saf-puan and default-rival windows require
+# a projection horizon builder for the capture. Publishing an uncomputed combination would
 # make the site show an answer where none was measured, so the index names exactly the
 # windows that solved and records the ones that did not, with the reason.
 
@@ -776,7 +818,7 @@ def build_league_views(
     reader can re-apply the rule. It is a pointer at one of the files below, not an
     input to any of them, and it is ``null`` whenever either total is unproven.
 
-    ``horizon_builder`` turns on the saf-puan windows beyond one week
+    ``horizon_builder`` turns on saf-puan and default-rival windows beyond one week
     (``advice/{id}/saf-puan/3.json``, ``5.json``): the index then lists, per strategy,
     the windows that solved (``windows``), and a window that did not is in
     ``unavailable`` with its reason. The one-week baseline's bytes are the same with or
@@ -894,8 +936,8 @@ def build_league_views(
         entry_id = int(registration.entry_id)
         try:
             fetched[entry_id] = provider.picks(entry_id, season, gameweek - 1)
-        except (EntryError, DataError) as error:
-            fetched[entry_id] = str(error)
+        except (EntryError, DataError, SolverExecutionError) as error:
+            fetched[entry_id] = _public_failure(error)
     rival_squads: dict[int, RivalSquad] = {}
     for registration in registrations:
         entry_id = int(registration.entry_id)
@@ -1053,24 +1095,32 @@ def build_league_views(
         # at the strategy's plain path, and an index that says what exists and why not.
         computed: list[dict[str, object]] = []
         for strategy, rival_id, payload in render.rival_payloads:
-            relative = f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}/vs-{rival_id}.json"
+            payload_window = int(str(payload["window"]))
+            relative = f"advice/{entry_id}/{strategy}/{payload_window}/vs-{rival_id}.json"
             emitted.append(
                 PublishedAdvice(
                     strategy,
-                    COMPUTED_WINDOW,
+                    payload_window,
                     rival_id,
                     relative,
                     payload,
                     _write(relative, payload),
                 )
             )
-            computed.append({"strategy": strategy, "rival_entry_id": rival_id, "path": relative})
+            computed.append(
+                {
+                    "strategy": strategy,
+                    "rival_entry_id": rival_id,
+                    "path": relative,
+                    **({"window": payload_window} if payload_window != COMPUTED_WINDOW else {}),
+                }
+            )
             if rival_id == task.default_rival_id:
-                default_relative = f"advice/{entry_id}/{strategy}/{COMPUTED_WINDOW}.json"
+                default_relative = f"advice/{entry_id}/{strategy}/{payload_window}.json"
                 emitted.append(
                     PublishedAdvice(
                         strategy,
-                        COMPUTED_WINDOW,
+                        payload_window,
                         rival_id,
                         default_relative,
                         payload,
@@ -1096,6 +1146,15 @@ def build_league_views(
                 }
                 for window, reason in render.window_unavailable
             )
+            unavailable.extend(
+                {
+                    "strategy": strategy,
+                    "rival_entry_id": rival_id,
+                    "window": window,
+                    "reason": reason,
+                }
+                for strategy, rival_id, window, reason in render.rival_window_unavailable
+            )
             _write(
                 f"advice/{entry_id}/index.json",
                 {
@@ -1105,13 +1164,25 @@ def build_league_views(
                     "entry_id": entry_id,
                     "window": COMPUTED_WINDOW,
                     # Per strategy, the windows whose file exists: saf-puan's solved
-                    # windows, every rival strategy at one week.
+                    # windows, and the default rival's successful longer windows.
                     "windows": {
                         COMPUTED_MODE: [
                             COMPUTED_WINDOW,
                             *(window for window, _payload in render.window_payloads),
                         ],
-                        **{strategy: [COMPUTED_WINDOW] for strategy in task.rival_strategies},
+                        **{
+                            strategy: sorted(
+                                {
+                                    COMPUTED_WINDOW,
+                                    *(
+                                        int(str(p["window"]))
+                                        for s, _r, p in render.rival_payloads
+                                        if s == strategy
+                                    ),
+                                }
+                            )
+                            for strategy in task.rival_strategies
+                        },
                     },
                     "strategies": [COMPUTED_MODE, *task.rival_strategies],
                     "rival_entry_ids": list(task.rival_ids),
@@ -1283,9 +1354,9 @@ def build_league_views(
             try:
                 record_member_advice(Path(advice_record_root), record)
             except AdviceRecordConflictError as error:
-                conflicts.append(str(error))
+                conflicts.append(_public_failure(error))
             except AdviceRecordNotLandedError as error:
-                unlanded.append(str(error))
+                unlanded.append(_public_failure(error))
         if unlanded:
             # A week that recorded nothing for a member decides the type when both
             # happened: a conflict names two answers that are both on disk to compare,

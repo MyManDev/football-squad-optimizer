@@ -24,6 +24,8 @@ from typing import Any, Final
 
 import jsonschema
 
+from squadopt.application.strategies import STRATEGY_CATALOG
+
 LEAGUE_STATE_CONTRACT_VERSION: Final = "league_state_v1"
 ADVICE_READ_SCHEMA_PATH: Final = Path("docs") / "contracts" / "advice_read_v1.schema.json"
 LEAGUE_STATE_SCHEMA_PATH: Final = Path("docs") / "contracts" / "league_state_v1.schema.json"
@@ -73,6 +75,34 @@ def advice_read_schema() -> dict[str, Any]:
         ],
     }
     nullable_number = {"type": ["number", "null"]}
+    comparison_fields: dict[str, Any] = {
+        "policy_id": {"const": "first_week_rival_horizon_v1"},
+        "rival_entry_id": {"type": "integer", "minimum": 1},
+        "rival_gameweek": {"type": "integer", "minimum": 1},
+        "overlap_scope": {"const": "first_week_squad_vs_captured_rival_xi"},
+        "overlap_minimum": {"type": ["integer", "null"], "minimum": 0, "maximum": 11},
+        "overlap_maximum": {"type": ["integer", "null"], "minimum": 0, "maximum": 11},
+        "overlap_actual": {"type": "integer", "minimum": 0, "maximum": 11},
+        **{
+            name: {"type": "number"}
+            for name in (
+                "first_week_net_points",
+                "control_first_week_net_points",
+                "total_net_points",
+                "control_total_net_points",
+                "net_points_difference",
+            )
+        },
+        **{
+            name: {"enum": ["OPTIMAL", "FEASIBLE"]}
+            for name in (
+                "solver_status",
+                "control_solver_status",
+            )
+        },
+        "optimality_gap": nullable_number,
+        "control_optimality_gap": nullable_number,
+    }
     optional_fields: dict[str, Any] = {
         name: {"type": "number"}
         for name in (
@@ -89,6 +119,12 @@ def advice_read_schema() -> dict[str, Any]:
     optional_fields.update(
         {
             "source_snapshot_id": {"type": ["string", "null"]},
+            "window_comparison": {
+                "type": "object",
+                "properties": comparison_fields,
+                "required": list(comparison_fields),
+                "additionalProperties": False,
+            },
             "rival_label": {"type": ["string", "null"]},
             "rival_entry_id": {"type": "integer", "minimum": 1},
             "solver_status": {"type": ["string", "null"]},
@@ -230,6 +266,57 @@ def validate_advice_document(raw: bytes) -> None:
         raise AdviceDocumentError(
             f"The advice document violates advice_read_v1: {errors[0].message}"
         )
+    _validate_window_comparison(document["payload"])
+
+
+def _validate_window_comparison(payload: dict[str, Any]) -> None:
+    comparison = payload.get("window_comparison")
+    multi_rival = payload["window"] in (3, 5) and payload["mode"] in (
+        "ortak-koru",
+        "fark-yarat",
+    )
+    if comparison is None and not multi_rival:
+        return
+    if comparison is None or not multi_rival:
+        raise AdviceDocumentError("A window comparison requires a multiweek rival plan.")
+    weeks = payload.get("plan_weeks")
+    if not isinstance(weeks, list) or [w["gameweek"] for w in weeks] != list(
+        range(payload["gameweek"], payload["gameweek"] + payload["window"])
+    ):
+        raise AdviceDocumentError("The comparison must carry the whole consecutive window.")
+    constraints = STRATEGY_CATALOG[payload["mode"]].constraints
+    minimum, maximum = constraints.overlap_floor, constraints.overlap_ceiling
+    if (
+        comparison["rival_entry_id"] != payload.get("rival_entry_id")
+        or comparison["rival_entry_id"] == payload["entry_id"]
+        or comparison["rival_gameweek"] != payload["gameweek"] - 1
+        or comparison["overlap_minimum"] != minimum
+        or comparison["overlap_maximum"] != maximum
+        or (minimum is not None and comparison["overlap_actual"] < minimum)
+        or (maximum is not None and comparison["overlap_actual"] > maximum)
+        or comparison["solver_status"] != payload.get("solver_status")
+        or comparison["optimality_gap"] != payload.get("optimality_gap")
+    ):
+        raise AdviceDocumentError("The comparison disagrees with the rival plan or policy.")
+    nets = [w["expected_points"] - w["transfer_hit_points"] for w in weeks]
+    cost = payload.get("expected_points_cost")
+    ceiling = payload.get("expected_points_cost_ceiling")
+    if (
+        cost is None
+        or ceiling is None
+        or not math.isclose(
+            cost, max(0.0, comparison["control_total_net_points"] - sum(nets)), abs_tol=1e-8
+        )
+        or ceiling < cost
+    ):
+        raise AdviceDocumentError("A window comparison needs a nonnegative price and its ceiling.")
+    for actual, expected in (
+        (comparison["first_week_net_points"], nets[0]),
+        (comparison["total_net_points"], sum(nets)),
+        (comparison["net_points_difference"], comparison["control_total_net_points"] - sum(nets)),
+    ):
+        if not math.isclose(actual, expected, rel_tol=1e-9, abs_tol=1e-8):
+            raise AdviceDocumentError("The comparison totals do not match the net plan points.")
 
 
 def _invalid_number(value: str) -> None:

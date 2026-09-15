@@ -373,7 +373,7 @@ def test_the_public_job_view_carries_no_private_fields(tmp_path: Path) -> None:
     [
         {"strategy": "saf-puan", "window": 1, "rival_entry_id": 2199732},
         {"strategy": "fark-yarat", "window": 1},
-        {"strategy": "fark-yarat", "window": 3, "rival_entry_id": 2199732},
+        {"strategy": "fark-yarat", "window": 3, "rival_entry_id": 313686},
         {"strategy": "fark-yarat", "window": 1, "rival_entry_id": 313686},
     ],
 )

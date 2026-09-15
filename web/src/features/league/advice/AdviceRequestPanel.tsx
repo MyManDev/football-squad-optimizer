@@ -49,7 +49,7 @@ export function AdviceRequestPanel({
             if (supported) compute(request);
           }}
         >
-          {copy.computeButton}
+          {state.phase === "paused" ? copy.computeResume : copy.computeButton}
         </button>
       </div>
 
@@ -64,6 +64,7 @@ export function AdviceRequestPanel({
           {state.fallback !== null ? copy.computeWaitingWithFallback : copy.computeWaiting}
         </div>
       ) : null}
+      {state.phase === "paused" ? <p className={styles.state}>{copy.computePaused}</p> : null}
       {state.phase === "done" ? (
         <div className={styles.state}>
           <Badge tone={state.source === "api-cache" ? "good" : "accent"}>
@@ -79,7 +80,9 @@ export function AdviceRequestPanel({
       {state.phase === "unavailable" ? (
         <p className={styles.state}>{copy.computeUnavailable}</p>
       ) : null}
-      {state.phase === "failed" ? <p className={styles.state}>{copy.computeFailed}</p> : null}
+      {state.phase === "failed" ? (
+        <p className={styles.state}>{copy.windowFailure(state.errorCode) || copy.computeFailed}</p>
+      ) : null}
     </Card>
   );
 }

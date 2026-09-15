@@ -35,13 +35,19 @@ def test_real_worker_capacity(tmp_path: Path, users: int, replicas: int) -> None
     except ImportError:
         pytest.fail("Install psutil in the measurement environment to collect process resources.")
     seed_root = tmp_path / "seed"
-    seed_id = fixtures._capture_with_entries(seed_root)
+    window = int(os.environ.get("SQUADOPT_CAPACITY_WINDOW", "1"))
+    assert window in (1, 3, 5)
+    strategy = "saf-puan" if window == 1 else "ortak-koru"
+    rival_id = None if window == 1 else 999
+    seed_id = fixtures._capture_with_entries(seed_root, multiweek=window > 1)
     seed = read_snapshot(seed_root, seed_id)
     snapshots = tmp_path / "snapshots"
     identifiers = list(range(101, 101 + users))
     payloads = dict(seed.payloads)
     for identifier in identifiers:
         payloads.update(fixtures._entry_payloads(identifier, 1))
+    if rival_id is not None:
+        payloads.update(fixtures._entry_payloads(rival_id, 1))
     captured = write_snapshot(
         snapshots,
         source="fpl-live",
@@ -51,9 +57,15 @@ def test_real_worker_capacity(tmp_path: Path, users: int, replicas: int) -> None
     handoffs = tmp_path / "handoffs"
     deployment._handoff(handoffs, captured.snapshot_id)
     site = tmp_path / "site"
-    deployment._publish_members(site, *identifiers[1:])
+    deployment._publish_members(site, *identifiers[1:], *([rival_id] if rival_id else []))
     requests = [
-        {"league_id": 352490, "entry_id": identifier, "strategy": "saf-puan", "window": 1}
+        {
+            "league_id": 352490,
+            "entry_id": identifier,
+            "strategy": strategy,
+            "window": window,
+            **({"rival_entry_id": rival_id} if rival_id else {}),
+        }
         for identifier in identifiers
     ]
     reports = []
@@ -191,6 +203,8 @@ def test_real_worker_capacity(tmp_path: Path, users: int, replicas: int) -> None
                             "worker_idle_seconds": 0.05,
                         },
                         "capture_id": captured.snapshot_id,
+                        "strategy": strategy,
+                        "window": window,
                         "source_sha256": source_hashes,
                         "runtime_commit_is_synthetic": True,
                         "results": reports,

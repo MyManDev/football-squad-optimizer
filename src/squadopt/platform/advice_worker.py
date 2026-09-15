@@ -40,7 +40,7 @@ from datetime import UTC, datetime
 from types import FrameType
 from typing import Final
 
-from squadopt.application.advice import AdviseEntryRequest, advise_entry
+from squadopt.application.advice import AdviseEntryRequest, MultiweekAdviceUnavailable, advise_entry
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.advice_documents import validate_advice_document
@@ -123,22 +123,25 @@ def build_advice_compute(
                 f"{spec.context.capture_snapshot_id}) is no longer the one this backend "
                 "answers from; ask again to be answered from the current one.",
             )
-        advice = advise_entry(
-            AdviseEntryRequest(
-                season=spec.context.season,
-                gameweek=spec.context.gameweek,
-                league_id=spec.league_id,
-                entry_id=spec.entry_id,
-                strategy=spec.strategy,
-                window=spec.window,
-                rival_entry_id=spec.rival_entry_id,
-            ),
-            provider=capture.provider,
-            inputs=capture.inputs,
-            projection=capture.projection,
-            rules=capture.rules,
-            horizon_builder=capture.horizon_builder,
-        )
+        try:
+            advice = advise_entry(
+                AdviseEntryRequest(
+                    season=spec.context.season,
+                    gameweek=spec.context.gameweek,
+                    league_id=spec.league_id,
+                    entry_id=spec.entry_id,
+                    strategy=spec.strategy,
+                    window=spec.window,
+                    rival_entry_id=spec.rival_entry_id,
+                ),
+                provider=capture.provider,
+                inputs=capture.inputs,
+                projection=capture.projection,
+                rules=capture.rules,
+                horizon_builder=capture.horizon_builder,
+            )
+        except MultiweekAdviceUnavailable as error:
+            raise AdviceComputeRefused(error.code, error.code) from error
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a

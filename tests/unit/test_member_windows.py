@@ -24,7 +24,6 @@ from tests.unit.test_live_recommendation import (
     SEASON,
 )
 from tests.unit.test_projection_horizon_builder import _in_season_handoff
-from tests.unit.test_public_probability_guards import _FORBIDDEN_TEXT
 
 from squadopt.application import advice as advice_module
 from squadopt.application.advice import (
@@ -41,6 +40,7 @@ from squadopt.application.advice import (
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
 from squadopt.application.league_views import build_league_views
 from squadopt.application.strategies.catalog import FORBIDDEN_FIELD_PATTERN
+from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN as _FORBIDDEN_TEXT
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live.recommendation import project
 from squadopt.live.transfers import MEMBER_PLANNING_POLICY
@@ -153,6 +153,28 @@ def _walk(node: object, path: str, offenders: list[str]) -> None:
         offenders.append(f"{path} (text: {node[:60]!r})")
 
 
+def test_existing_five_plans_keep_their_recorded_results(window_world: dict[str, Any]) -> None:
+    """Pin the old product outputs before introducing multiweek rival advice."""
+    picks = window_world["provider"].picks(ENTRY, SEASON, 1)
+    window_world["provider"]._picks[202] = dataclasses.replace(picks, entry_id=202)
+    reference = json.loads(
+        (Path(__file__).parents[1] / "fixtures/member_advice_baseline.json").read_text(),
+        # Runtime float summation can differ in the last binary digits (observed
+        # below 2e-15 on Python 3.11). Keep every key, identity and ordering exact.
+        parse_float=lambda value: pytest.approx(float(value), rel=0, abs=1e-12),
+    )
+    for key, expected in reference.items():
+        strategy, window = key.split("/")
+        payload = _advise(
+            window_world,
+            strategy=strategy,
+            window=int(window),
+            rival_entry_id=None if strategy == "saf-puan" else 202,
+        )
+        payload.pop("source_snapshot_id", None)
+        assert payload == expected, key
+
+
 @pytest.mark.parametrize("window", [3, 5])
 def test_a_window_publishes_the_first_week_and_the_whole_plan(
     window_world: dict[str, Any], window: int
@@ -245,7 +267,7 @@ def test_the_first_week_of_a_window_reads_the_one_week_numbers(
     )
 
 
-def test_windows_are_saf_puan_only_and_need_the_horizon_builder(
+def test_windows_need_valid_rival_inputs_and_the_horizon_builder(
     window_world: dict[str, Any],
 ) -> None:
     """A rival strategy stays at one week; a window nobody computes is refused; a
@@ -253,7 +275,7 @@ def test_windows_are_saf_puan_only_and_need_the_horizon_builder(
     one-week plan."""
 
     assert MEMBER_WINDOWS == (1, 3, 5)
-    with pytest.raises(EntryError, match=r"supports windows \(1,\) only"):
+    with pytest.raises(EntryError, match="No picks captured"):
         _advise(window_world, strategy="fark-yarat", rival_entry_id=202, window=3)
     with pytest.raises(EntryError, match=r"supports windows \(1, 3, 5\) only"):
         _advise(window_world, window=2)

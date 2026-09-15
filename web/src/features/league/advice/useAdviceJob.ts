@@ -21,13 +21,13 @@ import { AdviceResponseError, checkedAdvice } from "./adviceResponse";
 import type { EntryAdvice, LeagueViewEnvelope } from "../types";
 
 const POLL_INTERVAL_MS = 2000;
-const MAX_POLLS = 150; // five minutes of patience, then an honest failure
+const MAX_POLLS = 150; // pause the browser wait; the worker keeps the same job
 
 export type ComputePhase =
   | { phase: "idle" }
   | { phase: "requesting"; request: AdviceRequest }
   | {
-      phase: "waiting";
+      phase: "waiting" | "paused";
       request: AdviceRequest;
       jobId: string;
       status: "queued" | "running";
@@ -40,7 +40,7 @@ export type ComputePhase =
       source: AdviceSource;
     }
   | { phase: "unavailable"; request: AdviceRequest }
-  | { phase: "failed"; request: AdviceRequest };
+  | { phase: "failed"; request: AdviceRequest; errorCode?: string };
 
 export interface AdviceJob {
   state: ComputePhase;
@@ -65,6 +65,7 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
   const [state, setState] = useState<ComputePhase>({ phase: "idle" });
   const generation = useRef(0);
   const active = useRef<AbortController | null>(null);
+  const resumable = useRef<Extract<ComputePhase, { phase: "waiting" | "paused" }> | null>(null);
 
   useEffect(() => {
     return () => {
@@ -76,6 +77,7 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
   const reset = useCallback(() => {
     generation.current += 1;
     active.current?.abort();
+    resumable.current = null;
     setState({ phase: "idle" });
   }, []);
 
@@ -88,6 +90,14 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
       let taskSignal = controller.signal;
       const alive = () => generation.current === run && !taskSignal.aborted;
       setState({ phase: "requesting", request });
+      const previous = resumable.current;
+      const resume = previous && sameAdviceRequest(previous.request, request) ? previous : null;
+      resumable.current = resume;
+      const pause = () => {
+        if (generation.current !== run) return;
+        if (resumable.current) setState({ ...resumable.current, phase: "paused" });
+        else setState({ phase: "failed", request });
+      };
 
       void withRequestDeadline(
         async (signal) => {
@@ -95,7 +105,9 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
           const options = { signal };
           let outcome;
           try {
-            outcome = await client.requestAdvice(request, options);
+            outcome = resume
+              ? { kind: "job" as const, jobId: resume.jobId }
+              : await client.requestAdvice(request, options);
             if (outcome.kind === "advice") checkedAdvice(outcome.envelope, request);
           } catch {
             if (alive()) setState({ phase: "failed", request });
@@ -116,26 +128,42 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
             return;
           }
 
-          // A job: fetch the published baseline once, show it while we wait.
-          let fallback: LeagueViewEnvelope<EntryAdvice> | null = null;
+          // Keep the accepted identity even if fetching the optional baseline hangs.
+          // Resuming an existing job reuses its baseline and goes straight to polling.
+          let fallback: LeagueViewEnvelope<EntryAdvice> | null = resume?.fallback ?? null;
+          resumable.current = {
+            phase: "waiting",
+            request,
+            jobId: outcome.jobId,
+            status: resume?.status ?? "queued",
+            fallback,
+          };
           try {
-            const published = allowPublishedBaseline
-              ? await new StaticOnlyAdviceClient().readAdvice(
-                  {
-                    ...request,
-                    strategy: "saf-puan",
-                    window: 1,
-                    rivalEntryId: null,
-                  },
-                  options,
-                )
-              : null;
+            const published =
+              !resume && allowPublishedBaseline
+                ? await new StaticOnlyAdviceClient().readAdvice(
+                    {
+                      ...request,
+                      strategy: "saf-puan",
+                      window: 1,
+                      rivalEntryId: null,
+                    },
+                    options,
+                  )
+                : null;
             if (published?.kind === "advice") fallback = published.envelope;
           } catch {
             fallback = null; // the wait is just quieter
           }
           if (!alive()) return;
           setState({ phase: "waiting", request, jobId: outcome.jobId, status: "queued", fallback });
+          resumable.current = {
+            phase: "waiting",
+            request,
+            jobId: outcome.jobId,
+            status: "queued",
+            fallback,
+          };
 
           for (let attempt = 0; attempt < MAX_POLLS; attempt += 1) {
             await cancellableDelay(POLL_INTERVAL_MS, signal);
@@ -149,6 +177,7 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
                 error instanceof AdviceResponseError ||
                 (error instanceof AdviceApiError && error.status >= 400 && error.status < 500)
               ) {
+                if (alive()) resumable.current = null;
                 if (alive()) setState({ phase: "failed", request });
                 return;
               }
@@ -156,6 +185,7 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
             }
             if (!alive()) return;
             if (job.status === "completed") {
+              resumable.current = null;
               let read;
               try {
                 read = await client.readAdvice(request, options);
@@ -175,7 +205,8 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
               return;
             }
             if (job.status === "failed") {
-              setState({ phase: "failed", request });
+              resumable.current = null;
+              setState({ phase: "failed", request, errorCode: job.errorCode });
               return;
             }
             setState({
@@ -186,12 +217,12 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
               fallback,
             });
           }
-          if (alive()) setState({ phase: "failed", request });
+          if (alive()) pause();
         },
         { signal: controller.signal, timeoutMs: MAX_POLLS * POLL_INTERVAL_MS },
       )
         .catch(() => {
-          if (generation.current === run) setState({ phase: "failed", request });
+          pause();
         })
         .finally(() => {
           if (active.current === controller) active.current = null;
