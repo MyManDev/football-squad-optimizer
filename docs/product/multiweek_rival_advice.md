@@ -1,6 +1,6 @@
 # Multi-week rival advice
 
-Policy: first_week_rival_horizon_v1. Implementation in progress on a feature branch.
+Policy: first_week_rival_horizon_v1.
 
 A member may compare saf-puan, ortak-koru and fark-yarat over three or five
 gameweeks. Only the first decision is committed by this recommendation; future
@@ -23,6 +23,9 @@ Missing rival inputs, proven infeasibility, no solution within the budget and
 infrastructure failure are different outcomes. FEASIBLE plans may be served with
 their measured gap under the existing deterministic-budget rule. A wall-clock
 cutoff cannot be published as a reproducible plan.
+
+If the picks provider restored a rival's pre-Free-Hit squad, that restored squad
+cannot stand in for the captured XI. This version reports missing rival inputs.
 
 ## Comparison
 
@@ -53,6 +56,39 @@ requests share a job; changing rival or window must not reuse the wrong answer.
 A long-running job stays addressable after the browser stops waiting. Static
 fallback remains visibly distinct from the requested computed answer.
 
+## Integration
+
+The existing `advise_entry` entry point serves both the batch publisher and the
+worker. `build_window_payload` passes `FirstWeekOverlap` into `plan_transfer_horizon`;
+the existing optimizer applies it to `squad_vars[0]`. No additional solver, queue,
+database or forecast model is introduced.
+
+`window_comparison` is an additive object in `advice_read_v1`. Python validates its
+identity, bounds, consecutive weeks and net arithmetic before caching and reading.
+The browser mirrors these checks. The comparison is also retained in the member
+advice record, alongside the published payload digest.
+
+`render_member` reuses each member/window control and publishes longer rival plans
+only for the default rival. Exact rival paths and their default aliases contain the
+same bytes. The index lists successful windows and records explicit refusals.
+
+The API read/submit capability checks accept the same 1/3/5 windows as the producer.
+The existing request/cache identity separates member, rival, window, capture,
+handoff, revision and configuration; the configuration includes this policy id.
+The worker maps product refusals to `WINDOW_INFEASIBLE`, `WINDOW_NO_SOLUTION` or
+`WINDOW_INPUTS_UNAVAILABLE`. Infrastructure failures remain worker failures.
+
+With a backend, the web permits valid unpublished combinations to be requested.
+After five minutes it preserves the current job and offers to resume polling that
+job, without another submission. Changing selection cancels the old browser wait.
+The first-week suggested-strategy rule is hidden on longer windows. Both plan
+statuses are shown; FEASIBLE controls use the existing whole-window bound explanation.
+
+The opt-in browser test starts a real API and worker, sends 1/3/5-week requests,
+reads the result and repeats the request from cache. It also checks mobile overflow
+and keyboard accessibility. The capacity probe supports
+`SQUADOPT_CAPACITY_WINDOW=5` with its existing dedup, distinct and cache-hit scenarios.
+
 ## Acceptance and release
 
 - Same inputs reproduce the same semantic answer under a fixed metadata clock.
@@ -69,4 +105,3 @@ Deployment and new published production data are separate operational actions.
 Disable the new multi-week capabilities to roll back; never erase historical
 advice or measurement records. Week-specific model research and an automatic
 multi-week strategy selector are outside this first release.
-
