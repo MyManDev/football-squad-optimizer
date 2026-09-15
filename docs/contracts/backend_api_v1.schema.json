@@ -54,6 +54,18 @@
           "pattern": "^[a-z][a-z0-9._-]{0,63}$",
           "type": "string"
         },
+        "top100_weight_percent": {
+          "enum": [
+            0,
+            5,
+            10,
+            20,
+            30,
+            40,
+            50
+          ],
+          "type": "integer"
+        },
         "window": {
           "enum": [
             1,
@@ -96,6 +108,25 @@
         "strategy": {
           "pattern": "^[a-z][a-z0-9._-]{0,63}$",
           "type": "string"
+        },
+        "top100_weight_percent": {
+          "anyOf": [
+            {
+              "enum": [
+                0,
+                5,
+                10,
+                20,
+                30,
+                40,
+                50
+              ],
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "window": {
           "enum": [

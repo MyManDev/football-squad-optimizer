@@ -79,7 +79,13 @@ export function AdviceRequestPanel({
       {state.phase === "unavailable" ? (
         <p className={styles.state}>{copy.computeUnavailable}</p>
       ) : null}
-      {state.phase === "failed" ? <p className={styles.state}>{copy.computeFailed}</p> : null}
+      {state.phase === "failed" ? (
+        <p className={styles.state}>
+          {state.errorCode === "TOP100_INPUTS_UNAVAILABLE"
+            ? messages.top100.unavailable
+            : copy.computeFailed}
+        </p>
+      ) : null}
     </Card>
   );
 }

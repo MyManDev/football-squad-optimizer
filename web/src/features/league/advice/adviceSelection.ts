@@ -10,6 +10,7 @@ import {
   type MemberStrategy,
 } from "../types";
 import type { AdviceRequest } from "./adviceClient";
+import { TOP100_WEIGHTS } from "./top100Weight";
 
 /**
  * The windows the producer published for a strategy, from the index. A tree from
@@ -77,7 +78,12 @@ export function selectedAdviceRequest(
   ) {
     rivalEntryId = defaultRivalEntryId;
   }
-  return { leagueId, entryId, strategy, window, rivalEntryId, ...context };
+  const rawWeight = searchParams.get("top100");
+  const top100 =
+    rawWeight === null
+      ? {}
+      : { top100WeightPercent: /^(0|5|10|20|30|40|50)$/.test(rawWeight) ? Number(rawWeight) : NaN };
+  return { leagueId, entryId, strategy, window, rivalEntryId, ...context, ...top100 };
 }
 
 /**
@@ -86,6 +92,8 @@ export function selectedAdviceRequest(
  * longer window and the legacy play modes are shown from the published tree only.
  */
 export function canComputeAdvice(request: AdviceRequest): boolean {
+  if (request.top100WeightPercent != null && !TOP100_WEIGHTS.includes(request.top100WeightPercent))
+    return false;
   if (request.strategy === "saf-puan") return true;
   if (request.window !== 1) return false;
   return isMemberStrategy(request.strategy) && request.rivalEntryId != null;
@@ -182,6 +190,7 @@ export function resolvePublishedAdvice(
   } else {
     request.rivalEntryId = null;
   }
+  if (request.top100WeightPercent != null) return result;
   const mode = searchParams.get("mode");
   const rawWindow = searchParams.get("window");
   if (

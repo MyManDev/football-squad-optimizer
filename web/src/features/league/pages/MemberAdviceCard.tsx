@@ -160,6 +160,26 @@ export function AdviceCard({
       ) : null}
       <p className={styles.honesty}>{copy.honestyRule}</p>
       <p className={styles.honesty}>{copy.independentAdviceRule}</p>
+      {view.top100_weight_percent !== undefined ? (
+        <p className={styles.honesty}>
+          {messages.top100.result(
+            view.top100_weight_percent,
+            view.top100_weight_source === "personal",
+          )}
+        </p>
+      ) : null}
+
+      {view.top100_price ? (
+        <div className={styles.honesty}>
+          <p>
+            {messages.top100.price(
+              points(view.top100_price.expected_points_cost, 2, locale),
+              points(view.top100_price.expected_points_cost_ceiling, 2, locale),
+            )}
+          </p>
+          <p>{messages.top100.priceNote}</p>
+        </div>
+      ) : null}
       {basisNote ? (
         <p className={styles.honesty}>
           {basisNote.kind === "week"

@@ -148,6 +148,7 @@ class AdviceSubmitService:
         idempotency_key: str | None,
         client_bucket: str,
         at_utc: str,
+        top100_weight_percent: int | None = None,
     ) -> SubmitOutcome:
         """Validate, rate-limit, dedupe, and enqueue — in that order.
 
@@ -170,6 +171,7 @@ class AdviceSubmitService:
             strategy=strategy,
             window=window,
             rival_entry_id=rival_entry_id,
+            top100_weight_percent=top100_weight_percent,
         )
         if self._limiter is not None:
             entry_bucket = f"entry:{context.capture_snapshot_id}:{entry_id}"
@@ -194,6 +196,7 @@ class AdviceSubmitService:
             # Server-resolved: the same client fields on a newer capture become a
             # different fingerprint, so dedup cannot serve stale work (review, #288).
             capture_snapshot_id=context.capture_snapshot_id,
+            top100_weight_percent=top100_weight_percent,
         )
         fingerprint = command.request_fingerprint
 
@@ -251,6 +254,7 @@ class AdviceSubmitService:
                     strategy=strategy,
                     window=int(window),
                     context=context,
+                    top100_weight_percent=top100_weight_percent,
                     rival_entry_id=(
                         rival_entry_id if self._reader.strategy_uses_rival(strategy) else None
                     ),

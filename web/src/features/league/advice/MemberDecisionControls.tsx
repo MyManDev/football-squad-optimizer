@@ -29,7 +29,8 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../moves/modePrices";
 import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
-import { resolvePublishedAdvice } from "./adviceSelection";
+import { canComputeAdvice, resolvePublishedAdvice } from "./adviceSelection";
+import { TOP100_WEIGHTS } from "./top100Weight";
 import styles from "./MemberDecisionControls.module.css";
 
 /** The gap as the rule read it: signed, so behind and ahead are visibly different. */
@@ -41,13 +42,16 @@ export function MemberDecisionControls({
   entryId,
   members,
   index,
+  allowCompute = false,
 }: {
   entryId: number;
   members: EntryView[];
   index: EntryAdviceIndex | null;
+  allowCompute?: boolean;
 }) {
   const { messages } = useLanguage();
   const copy = messages.leagueMembers;
+  const top100Copy = messages.top100;
   const [searchParams, setSearchParams] = useSearchParams();
   const selection = resolvePublishedAdvice(
     searchParams,
@@ -202,7 +206,10 @@ export function MemberDecisionControls({
                   name="window"
                   value={window}
                   checked={windowSize === window}
-                  disabled={!windows.includes(window)}
+                  disabled={
+                    !windows.includes(window) &&
+                    !(allowCompute && canComputeAdvice({ ...selection.request, window }))
+                  }
                   onChange={() => update({ window: String(window) })}
                 />
                 <span>{messages.decision.week(window)}</span>
@@ -213,6 +220,30 @@ export function MemberDecisionControls({
             {windows.length > 1 ? copy.windowLimits : copy.windowNotComputed}
           </p>
         </fieldset>
+        {allowCompute ? (
+          <fieldset className={styles.fieldset}>
+            <legend>{top100Copy.label}</legend>
+            <label className={styles.rivalField}>
+              <span>{top100Copy.label}</span>
+              <select
+                aria-label={top100Copy.label}
+                value={searchParams.get("top100") ?? ""}
+                disabled={!allowCompute}
+                onChange={(event) => update({ top100: event.target.value || null })}
+              >
+                <option value="">{top100Copy.published}</option>
+                {TOP100_WEIGHTS.map((weight) => (
+                  <option key={weight} value={weight}>
+                    {weight} / 100
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className={styles.note}>{top100Copy.help}</p>
+          </fieldset>
+        ) : (
+          <p className={styles.note}>{top100Copy.offline}</p>
+        )}
       </div>
       <p className={styles.honesty}>{copy.honestyRule}</p>
     </Card>

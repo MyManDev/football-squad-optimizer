@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Final, Protocol
 
 from squadopt.platform.advice_read import AdviceRequestContext
+from squadopt.prediction.elite_evidence import validate_top100_weight
 
 __all__ = [
     "ADVICE_JOB_SPEC_CONTRACT_VERSION",
@@ -69,8 +70,14 @@ class AdviceJobSpec:
     context: AdviceRequestContext
     rival_entry_id: int | None = None
     contract_version: str = ADVICE_JOB_SPEC_CONTRACT_VERSION
+    top100_weight_percent: int | None = None
 
     def __post_init__(self) -> None:
+        if self.top100_weight_percent is not None:
+            try:
+                validate_top100_weight(self.top100_weight_percent)
+            except ValueError as error:
+                raise AdviceJobSpecError(str(error)) from error
         if self.contract_version != ADVICE_JOB_SPEC_CONTRACT_VERSION:
             raise AdviceJobSpecError("Unsupported advice job spec contract_version.")
         for label, value in (
@@ -99,6 +106,11 @@ class AdviceJobSpec:
             "strategy": self.strategy,
             "window": self.window,
             "rival_entry_id": self.rival_entry_id,
+            **(
+                {"top100_weight_percent": self.top100_weight_percent}
+                if self.top100_weight_percent is not None
+                else {}
+            ),
             "context": {
                 "advice_contract_version": self.context.advice_contract_version,
                 "capture_snapshot_id": self.context.capture_snapshot_id,
@@ -135,6 +147,7 @@ class AdviceJobSpec:
                 window=int(str(payload["window"])),
                 context=request_context,
                 rival_entry_id=None if rival is None else int(str(rival)),
+                top100_weight_percent=payload.get("top100_weight_percent"),
                 contract_version=str(payload.get("contract_version", "")),
             )
         except (KeyError, TypeError, ValueError) as error:

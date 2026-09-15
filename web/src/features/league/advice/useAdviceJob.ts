@@ -40,7 +40,7 @@ export type ComputePhase =
       source: AdviceSource;
     }
   | { phase: "unavailable"; request: AdviceRequest }
-  | { phase: "failed"; request: AdviceRequest };
+  | { phase: "failed"; request: AdviceRequest; errorCode?: string };
 
 export interface AdviceJob {
   state: ComputePhase;
@@ -57,6 +57,7 @@ export function sameAdviceRequest(left: AdviceRequest, right: AdviceRequest): bo
     left.window === right.window &&
     left.season === right.season &&
     left.gameweek === right.gameweek &&
+    (left.top100WeightPercent ?? null) === (right.top100WeightPercent ?? null) &&
     (left.rivalEntryId ?? null) === (right.rivalEntryId ?? null)
   );
 }
@@ -126,6 +127,7 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
                     strategy: "saf-puan",
                     window: 1,
                     rivalEntryId: null,
+                    top100WeightPercent: null,
                   },
                   options,
                 )
@@ -175,7 +177,7 @@ export function useAdviceJob(client: AdviceClient, allowPublishedBaseline = true
               return;
             }
             if (job.status === "failed") {
-              setState({ phase: "failed", request });
+              setState({ phase: "failed", request, errorCode: job.errorCode });
               return;
             }
             setState({

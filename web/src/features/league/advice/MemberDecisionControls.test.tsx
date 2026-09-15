@@ -35,11 +35,17 @@ function renderControls(
   initial = `/league/members/${ENTRY}`,
   index: EntryAdviceIndex | null = mockEntryAdviceIndex(ENTRY).payload,
   language: "tr" | "en" = "tr",
+  allowCompute = false,
 ) {
   return render(
     <LanguageProvider initialLanguage={language}>
       <MemoryRouter initialEntries={[initial]}>
-        <MemberDecisionControls entryId={ENTRY} members={MEMBERS} index={index} />
+        <MemberDecisionControls
+          entryId={ENTRY}
+          members={MEMBERS}
+          index={index}
+          allowCompute={allowCompute}
+        />
         <Selection />
       </MemoryRouter>
     </LanguageProvider>,
@@ -325,4 +331,23 @@ describe("member decision controls", () => {
       }
     }
   });
+});
+
+it("offers all personal weights only with a compute service", () => {
+  renderControls(
+    `/league/members/${ENTRY}?mode=ortak-koru&window=3&top100=20`,
+    undefined,
+    "tr",
+    true,
+  );
+  const control = screen.getByRole("combobox", { name: "Top100 etkisi" });
+  expect(control).toHaveValue("20");
+  for (const weight of [0, 5, 10, 20, 30, 40, 50]) {
+    fireEvent.change(control, { target: { value: String(weight) } });
+    expect(control).toHaveValue(String(weight));
+    expect(screen.getByTestId("selection").textContent).toBe("ortak-koru/3/-");
+  }
+  fireEvent.change(control, { target: { value: "" } });
+  expect(control).toHaveValue("");
+  expect(screen.getByText(/puan kazancı garantisi değildir/)).toBeInTheDocument();
 });

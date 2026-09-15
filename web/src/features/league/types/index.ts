@@ -266,6 +266,17 @@ export interface AdvicePlanWeek {
 }
 
 export interface EntryAdvice {
+  top100_price?: {
+    basis: "base_model_same_strategy_v1";
+    selected_net_points: number;
+    reference_net_points: number;
+    expected_points_cost: number;
+    expected_points_cost_ceiling: number;
+    reference_solver_status: "OPTIMAL" | "FEASIBLE";
+    ceiling_basis: "relaxed_roster_v1";
+  };
+  top100_weight_percent?: number;
+  top100_weight_source?: "published" | "personal";
   league_id: number;
   season: string;
   gameweek: number;

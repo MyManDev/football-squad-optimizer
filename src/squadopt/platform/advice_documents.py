@@ -89,6 +89,30 @@ def advice_read_schema() -> dict[str, Any]:
     optional_fields.update(
         {
             "source_snapshot_id": {"type": ["string", "null"]},
+            "top100_weight_percent": {"type": "integer", "enum": [0, 5, 10, 20, 30, 40, 50]},
+            "top100_weight_source": {"enum": ["published", "personal"]},
+            "top100_price": {
+                "type": "object",
+                "properties": {
+                    "basis": {"const": "base_model_same_strategy_v1"},
+                    "selected_net_points": {"type": "number"},
+                    "reference_net_points": {"type": "number"},
+                    "expected_points_cost": {"type": "number", "minimum": 0},
+                    "expected_points_cost_ceiling": {"type": "number", "minimum": 0},
+                    "reference_solver_status": {"enum": ["OPTIMAL", "FEASIBLE"]},
+                    "ceiling_basis": {"const": "relaxed_roster_v1"},
+                },
+                "required": [
+                    "basis",
+                    "selected_net_points",
+                    "reference_net_points",
+                    "expected_points_cost",
+                    "expected_points_cost_ceiling",
+                    "reference_solver_status",
+                    "ceiling_basis",
+                ],
+                "additionalProperties": False,
+            },
             "rival_label": {"type": ["string", "null"]},
             "rival_entry_id": {"type": "integer", "minimum": 1},
             "solver_status": {"type": ["string", "null"]},
@@ -184,6 +208,10 @@ def advice_read_schema() -> dict[str, Any]:
                     "data_quality",
                     "missing_fields",
                 ],
+                "dependentRequired": {
+                    "top100_weight_percent": ["top100_weight_source"],
+                    "top100_weight_source": ["top100_weight_percent"],
+                },
                 "additionalProperties": True,
             },
         },
@@ -230,6 +258,21 @@ def validate_advice_document(raw: bytes) -> None:
         raise AdviceDocumentError(
             f"The advice document violates advice_read_v1: {errors[0].message}"
         )
+    payload = document["payload"]
+    if ("top100_weight_percent" in payload) != ("top100_weight_source" in payload):
+        raise AdviceDocumentError("Top-100 weight and source must be supplied together.")
+    price = payload.get("top100_price")
+    if (payload.get("top100_weight_source") == "personal") != (price is not None):
+        raise AdviceDocumentError("A personal Top100 answer must publish its price.")
+    if price is not None and (
+        not math.isclose(
+            price["expected_points_cost"],
+            max(0.0, price["reference_net_points"] - price["selected_net_points"]),
+            abs_tol=1e-8,
+        )
+        or price["expected_points_cost_ceiling"] < price["expected_points_cost"]
+    ):
+        raise AdviceDocumentError("The Top100 price disagrees with its base-model totals.")
 
 
 def _invalid_number(value: str) -> None:

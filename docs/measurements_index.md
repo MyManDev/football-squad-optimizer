@@ -221,6 +221,12 @@ was written.
 | --- | --- | --- |
 | `measurement_instrument` | On 147 fixed Phase C versus historical ridge folds, the strongest pre-decision covariate is total component-pool projection, r=0.380786. The conditional 90% half-width moves 2.048151 to 1.893850; conditional MDE moves 3.488499 to 3.225687. Same-sample centering does not validate an unconditional mean-precision gain. Existing scoreboard diagnostics retain missing legacy fields; availability has 656 unique forecast player/weeks and no checked outcome pairs, so all realized rates remain null. Changes no decision or promotion rule. | Issue #525 |
 
+## Personal Top100 preferences
+
+| Artifact | Finding | PR |
+| --- | --- | --- |
+| `top100_weights_20260915` (+ `research/top100_weight_comparison.md`) | Seven weights (0/5/10/20/30/40/50) on one deadline-safe GW4 capture: 105 one-week solves over 15 members, all optimal; decisions change for 0/3/7/13/14/14/14 members relative to zero. Weights 30 and 40 produce identical first-week XI, transfers and captain choices in this sample. Fourteen longer-window solves on one fixed member are feasible, not proven optimal. GW4 was not settled; no realized improvement or best weight is established. Adds personal calculation choices while preserving the published default; no model promotion. | Owner request; `codex/top100-weight-comparison` |
+
 ## Process references
 
 `handoff_acceptance_checklist.md` · `candidate_declaration_review.md` ·

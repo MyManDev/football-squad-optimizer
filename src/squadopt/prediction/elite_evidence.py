@@ -22,6 +22,19 @@ COMPONENT_ELITE_FEATURE_CONTRACT_VERSION: Final = "phase-c-component-elite-top10
 ELITE_COHORT_SIZE: Final = 100
 ELITE_XI_SIZE: Final = 11
 MAXIMUM_RELATIVE_UPLIFT: Final = 0.05
+TOP100_WEIGHT_PERCENTAGES: Final = (0, 5, 10, 20, 30, 40, 50)
+
+
+def validate_top100_weight(value: object) -> int:
+    """Discrete user/measurement weights; a missing value is handled by the caller."""
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value not in TOP100_WEIGHT_PERCENTAGES
+    ):
+        raise ValueError("Top 100 weight must be one of 0, 5, 10, 20, 30, 40, 50 percent.")
+    return value
+
 
 _PROJECTION_COLUMNS: Final = ("player_id", "expected_points")
 _EVIDENCE_COLUMNS: Final = (
@@ -85,13 +98,17 @@ def apply_elite_evidence(
     target_gameweek: int,
     deadline_timestamp_utc: str,
     decision_captured_at_utc: str,
+    top100_weight_percent: int = 5,
 ) -> EliteEvidenceAdjustment:
-    """Apply the frozen Top-100 XI-support rule to an in-season point projection.
+    """Apply Top-100 XI support; the published rule keeps its default five per cent.
+
+    Explicit weights are personal/measurement preferences, not promoted model versions.
 
     The elite signal is a lagged FPL selection frequency, not an appearance
     probability. It supplies a bounded relative uplift and never penalises a player.
     """
 
+    weight = validate_top100_weight(top100_weight_percent)
     if not isinstance(projection, pd.DataFrame) or not isinstance(evidence, pd.DataFrame):
         raise PredictionConfigurationError("projection and evidence must be pandas DataFrames.")
     _require_columns(projection, _PROJECTION_COLUMNS, "Projection")
@@ -198,7 +215,7 @@ def apply_elite_evidence(
     if bool(points.lt(0.0).any()):
         raise PredictionConfigurationError("Projected points must be non-negative.")
 
-    multiplier = 1.0 + MAXIMUM_RELATIVE_UPLIFT * support
+    multiplier = 1.0 + (weight / 100.0) * support
     adjusted = points.mul(multiplier)
     if not bool(adjusted.map(math.isfinite).all()) or bool(adjusted.lt(0.0).any()):
         raise PredictionConfigurationError("Elite-adjusted points must be finite and non-negative.")
@@ -213,15 +230,17 @@ def apply_elite_evidence(
     )
     diagnostics = MappingProxyType(
         {
-            "elite_evidence_policy_version": ELITE_EVIDENCE_POLICY_VERSION,
+            "elite_evidence_policy_version": (
+                ELITE_EVIDENCE_POLICY_VERSION if weight == 5 else "personal_top100_weight_v1"
+            ),
             "elite_evidence_cohort_size": ELITE_COHORT_SIZE,
             "elite_evidence_members_observed": ELITE_COHORT_SIZE,
-            "elite_evidence_maximum_relative_uplift": MAXIMUM_RELATIVE_UPLIFT,
+            "elite_evidence_maximum_relative_uplift": weight / 100.0,
             "elite_evidence_players": len(output),
             "elite_evidence_players_matched": len(output) - len(missing_ids),
             "elite_evidence_players_missing": len(missing_ids),
             "elite_evidence_players_not_on_roster": len(extra_ids),
-            "elite_evidence_players_uplifted": int(support.gt(0.0).sum()),
+            "elite_evidence_players_uplifted": int(support.gt(0.0).sum()) if weight else 0,
             "elite_evidence_mean_points_delta": float(delta.mean()),
             "elite_evidence_max_points_delta": float(delta.max()),
             "elite_evidence_table_sha256": str(evidence.attrs.get("table_sha256", "")),

@@ -42,6 +42,7 @@ from typing import Final
 
 from squadopt.application.advice import AdviseEntryRequest, advise_entry
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
+from squadopt.application.top100_weight import Top100InputsUnavailable, weighted_member_inputs
 from squadopt.platform.advice_cache import AdviceCacheRepository
 from squadopt.platform.advice_documents import validate_advice_document
 from squadopt.platform.advice_job_spec import AdviceJobSpecStore
@@ -123,8 +124,17 @@ def build_advice_compute(
                 f"{spec.context.capture_snapshot_id}) is no longer the one this backend "
                 "answers from; ask again to be answered from the current one.",
             )
-        advice = advise_entry(
-            AdviseEntryRequest(
+        try:
+            projection, horizon_builder = capture.projection, capture.horizon_builder
+            if spec.top100_weight_percent is not None:
+                projection, horizon_builder = weighted_member_inputs(
+                    projection,
+                    horizon_builder,
+                    source_weight=capture.top100_source_weight,
+                    requested_weight=spec.top100_weight_percent,
+                    counts=capture.elite_start_counts,
+                )
+            request = AdviseEntryRequest(
                 season=spec.context.season,
                 gameweek=spec.context.gameweek,
                 league_id=spec.league_id,
@@ -132,12 +142,59 @@ def build_advice_compute(
                 strategy=spec.strategy,
                 window=spec.window,
                 rival_entry_id=spec.rival_entry_id,
-            ),
-            provider=capture.provider,
-            inputs=capture.inputs,
-            projection=capture.projection,
-            rules=capture.rules,
-            horizon_builder=capture.horizon_builder,
+            )
+            advice = advise_entry(
+                request,
+                provider=capture.provider,
+                inputs=capture.inputs,
+                projection=projection,
+                rules=capture.rules,
+                horizon_builder=horizon_builder,
+            )
+            if spec.top100_weight_percent is not None:
+                selected_net = float(str(advice.pop("_top100_base_net")))
+                advice.pop("_top100_base_ceiling")
+                if spec.top100_weight_percent == 0:
+                    reference_net, ceiling = selected_net, selected_net
+                    reference_status = advice["solver_status"]
+                else:
+                    base, base_horizon = weighted_member_inputs(
+                        capture.projection,
+                        capture.horizon_builder,
+                        source_weight=capture.top100_source_weight,
+                        requested_weight=0,
+                        counts=capture.elite_start_counts,
+                    )
+                    reference = advise_entry(
+                        request,
+                        provider=capture.provider,
+                        inputs=capture.inputs,
+                        projection=base,
+                        rules=capture.rules,
+                        horizon_builder=base_horizon,
+                    )
+                    reference_net = float(str(reference["_top100_base_net"]))
+                    ceiling = float(str(reference["_top100_base_ceiling"]))
+                    reference_status = reference["solver_status"]
+                cost = max(0.0, reference_net - selected_net)
+                advice["top100_price"] = {
+                    "basis": "base_model_same_strategy_v1",
+                    "selected_net_points": selected_net,
+                    "reference_net_points": reference_net,
+                    "expected_points_cost": cost,
+                    "expected_points_cost_ceiling": max(cost, ceiling - selected_net),
+                    "reference_solver_status": reference_status,
+                    "ceiling_basis": "relaxed_roster_v1",
+                }
+        except Top100InputsUnavailable as error:
+            raise AdviceComputeRefused("TOP100_INPUTS_UNAVAILABLE", str(error)) from error
+        advice["top100_weight_percent"] = (
+            capture.top100_source_weight
+            if spec.top100_weight_percent is None
+            else spec.top100_weight_percent
+        )
+        advice["top100_weight_source"] = (
+            "published" if spec.top100_weight_percent is None else "personal"
         )
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,

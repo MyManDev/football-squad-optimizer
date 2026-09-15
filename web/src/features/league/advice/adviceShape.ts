@@ -76,49 +76,87 @@ const alternative: Predicate = (value) =>
     { expected_points_cost_ceiling: finite },
   );
 
-export function isAdvicePayload(value: unknown): boolean {
-  return fields(
-    value,
-    {
-      league_id: identity,
-      season: text,
-      gameweek: identity,
-      entry_id: identity,
-      mode: text,
-      window: oneOf(1, 3, 5),
-      moves: array(move),
-      data_quality: oneOf("complete", "partial", "empty"),
-      missing_fields: array(text),
-    },
-    {
-      source_snapshot_id: nullable(text),
-      rival_entry_id: identity,
-      rival_label: nullable(text),
-      transfer_hit_points: finite,
-      expected_gain_vs_hold: nullable(finite),
+function validTop100Price(value: Record<string, unknown>): boolean {
+  const price = "top100_price" in value ? value.top100_price : undefined;
+  const personal = "top100_weight_source" in value && value.top100_weight_source === "personal";
+  if (personal !== (price !== undefined)) return false;
+  if (price === undefined) return true;
+  if (
+    !fields(price, {
+      basis: oneOf("base_model_same_strategy_v1"),
+      selected_net_points: finite,
+      reference_net_points: finite,
       expected_points_cost: finite,
       expected_points_cost_ceiling: finite,
-      overlap_count: finite,
-      expected_gap_vs_rival: finite,
-      transfer_cap: finite,
-      overlap_target: finite,
-      overlap_applied: finite,
-      captain_agreement: oneOf(true, false),
-      solver_status: nullable(text),
-      control_solver_status: nullable(text),
-      optimality_gap: nullable(finite),
-      control_optimality_gap: nullable(finite),
-      expected_own_points: nullable(finite),
-      captain: nullable(player),
-      vice_captain: nullable(player),
-      starting_xi: nullable(array(player)),
-      bench: nullable(array(player)),
-      chip,
-      plan_weeks: nullable(array(planWeek)),
-      stated_limits: nullable(array(text)),
-      squad_basis: text,
-      plan_kind: planKind,
-      alternative_plan: nullable(alternative),
-    },
+      reference_solver_status: oneOf("OPTIMAL", "FEASIBLE"),
+      ceiling_basis: oneOf("relaxed_roster_v1"),
+    }) ||
+    !record(price)
+  )
+    return false;
+  return (
+    Object.keys(price).length === 7 &&
+    Number(price.expected_points_cost) >= 0 &&
+    Math.abs(
+      Number(price.expected_points_cost) -
+        Math.max(0, Number(price.reference_net_points) - Number(price.selected_net_points)),
+    ) <= 1e-8 &&
+    Number(price.expected_points_cost_ceiling) >= Number(price.expected_points_cost)
+  );
+}
+
+export function isAdvicePayload(value: unknown): boolean {
+  return (
+    record(value) &&
+    validTop100Price(value) &&
+    Object.hasOwn(value, "top100_weight_percent") ===
+      Object.hasOwn(value, "top100_weight_source") &&
+    fields(
+      value,
+      {
+        league_id: identity,
+        season: text,
+        gameweek: identity,
+        entry_id: identity,
+        mode: text,
+        window: oneOf(1, 3, 5),
+        moves: array(move),
+        data_quality: oneOf("complete", "partial", "empty"),
+        missing_fields: array(text),
+      },
+      {
+        top100_weight_percent: oneOf(0, 5, 10, 20, 30, 40, 50),
+        top100_weight_source: oneOf("published", "personal"),
+        top100_price: record,
+        source_snapshot_id: nullable(text),
+        rival_entry_id: identity,
+        rival_label: nullable(text),
+        transfer_hit_points: finite,
+        expected_gain_vs_hold: nullable(finite),
+        expected_points_cost: finite,
+        expected_points_cost_ceiling: finite,
+        overlap_count: finite,
+        expected_gap_vs_rival: finite,
+        transfer_cap: finite,
+        overlap_target: finite,
+        overlap_applied: finite,
+        captain_agreement: oneOf(true, false),
+        solver_status: nullable(text),
+        control_solver_status: nullable(text),
+        optimality_gap: nullable(finite),
+        control_optimality_gap: nullable(finite),
+        expected_own_points: nullable(finite),
+        captain: nullable(player),
+        vice_captain: nullable(player),
+        starting_xi: nullable(array(player)),
+        bench: nullable(array(player)),
+        chip,
+        plan_weeks: nullable(array(planWeek)),
+        stated_limits: nullable(array(text)),
+        squad_basis: text,
+        plan_kind: planKind,
+        alternative_plan: nullable(alternative),
+      },
+    )
   );
 }
