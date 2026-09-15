@@ -6,6 +6,7 @@
 | Registered findings and evidence | [Measurements index](../measurements_index.md) |
 | Operational component model | [Component policy](../phase_c_operational_component.md) |
 | Operational component and Top-100 composition | [Elite policy](../phase_c_operational_elite_policy.md) |
+| Personal Top100 weights and measured decision changes | [Weight comparison](top100_weight_comparison.md) |
 | Deadline-safe evidence | [Phase B contract](../phase_b_evidence_contract.md) |
 | Rotation/news evidence | [Rotation contract](../rotation_evidence_contract.md) |
 | Residual exports | [Residual contract](../residual_export_contract.md) |
