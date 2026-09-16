@@ -160,6 +160,34 @@ def test_a_roll_states_why_and_from_which_week(tmp_path: Path) -> None:
     assert "claims nothing about points" in report
 
 
+def test_a_roll_carries_a_legacy_entry_as_it_is(tmp_path: Path) -> None:
+    """The real GW1 entry predates the frozen bench order and the vice-captain: it has no
+    ``ordered_bench_player_ids``, no ``vice_captain_player_id``, no ``completion_policy``.
+    The roll carries that absence rather than refusing or inventing an order."""
+
+    root = _opening(tmp_path)
+    directory = root / SEASON / "gw01"
+    decision_path = directory / "decision.json"
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    for key in ("ordered_bench_player_ids", "vice_captain_player_id", "completion_policy"):
+        del decision[key]
+    decision_path.write_text(
+        json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    write_manifest(directory)
+    legacy = load_entry(root, SEASON, 1)
+
+    _roll(root, 2)
+
+    entry = load_entry(root, SEASON, 2)
+    assert _ids(entry.decision, "squad_player_ids") == _ids(legacy.decision, "squad_player_ids")
+    assert _ids(entry.decision, "bench_player_ids") == _ids(legacy.decision, "bench_player_ids")
+    assert entry.decision["ordered_bench_player_ids"] is None
+    assert entry.decision["vice_captain_player_id"] is None
+    assert entry.decision["completion_policy"] is None
+    assert _block(entry.decision)["free_transfers_after"] == 2
+
+
 @pytest.mark.parametrize("reason", ["", "   "])
 def test_a_roll_without_a_reason_is_refused(tmp_path: Path, reason: str) -> None:
     root = _opening(tmp_path)
