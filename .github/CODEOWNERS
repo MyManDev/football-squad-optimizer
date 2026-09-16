@@ -37,6 +37,34 @@
 /docs/architecture/                @tunayaslan @ErtugrulS32175
 /web/                              @ErtugrulS32175
 
+# --- the weekly run path: whoever owns the path writes what it refuses
+#
+# These files execute the Friday publish from the operator's checkout, and the run has one
+# property nothing else here has: it cannot be retried inside its own window. A refusal that
+# arrives late arrives after the solve is spent.
+#
+#   src/squadopt/platform/weekly_operations.py
+#   src/squadopt/platform/weekly_publish.py
+#   src/squadopt/application/weekly_plan.py
+#
+# Ownership below is unchanged and deliberately so: a change here still needs all three roles,
+# and the point is not to keep anyone out. Crossing into these files is often exactly right.
+# Issue #551 asked SpeedyV5 to teach the runner a new flag and that was the correct call.
+#
+# The rule is about what must travel WITH the crossing. **A change that adds an input to the
+# run path lands with the refusal that input needs, and the owner of the path writes that
+# refusal**, because the refusal conventions live in the path and not in the feature.
+#
+# The case that produced this rule: --rotation-capture arrived correctly and without a shape
+# check on its value, which the runner joined onto the snapshot root and handed to the journal
+# to walk and digest. '../../..' resolved outside the repository and an empty string resolved
+# to the snapshot root, so a mistyped identifier did not fail: it succeeded at reading the
+# wrong thing. The flag was right, the refusal was missing, and the refusal was one function
+# in the file whose owner knows that every other input there already has one.
+#
+# CODEOWNERS cannot enforce this; it decides approvals, not contents. It is written here
+# because this is the file a reviewer of these paths already opens.
+
 # --- platform / backend: implementation and integration review
 /src/squadopt/platform/            @SpeedyV5 @tunayaslan @ErtugrulS32175
 /src/squadopt/api/                 @SpeedyV5 @tunayaslan @ErtugrulS32175
