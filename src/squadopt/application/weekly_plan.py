@@ -60,6 +60,12 @@ def _require_capture_name(value: str) -> None:
     The rule is stated as "one directory name" rather than as the identifier's own format,
     because the format belongs to ``snapshots`` and a new source name must not have to come
     back and change this refusal too.
+
+    Both separators are named explicitly rather than left to ``Path``. A backslash is a
+    separator on Windows and an ordinary filename character on Linux, so ``Path(value).name``
+    alone refuses ``nested\\name`` on the operator's machine and accepts it in CI. A refusal
+    that depends on where it runs is not a refusal, and this runner is meant to execute on
+    either.
     """
 
     if not value or value.strip() != value:
@@ -68,7 +74,7 @@ def _require_capture_name(value: str) -> None:
             "reads as the snapshot root, which is every capture we hold rather than the one "
             "the week was read from."
         )
-    if value in {".", ".."} or Path(value).name != value:
+    if value in {".", ".."} or "/" in value or "\\" in value or Path(value).name != value:
         raise WeekError(
             f"A club-news capture must be named by its own directory name, not by a path: "
             f"{value!r}. The runner joins this onto the snapshot root, so a separator or a "

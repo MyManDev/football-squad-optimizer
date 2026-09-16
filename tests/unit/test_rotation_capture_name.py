@@ -38,7 +38,12 @@ def test_a_real_capture_name_is_accepted() -> None:
         ".",
         "a/../..",
         "nested/name",
+        # A backslash is a separator on Windows and an ordinary filename character on Linux,
+        # so Path(value).name alone refuses these on the operator's machine and accepts them
+        # in CI. Both are refused on both, because a refusal that depends on where it runs is
+        # not a refusal, and this runner is meant to execute on either.
         "nested\\name",
+        "..\\..\\..",
     ],
 )
 def test_a_path_is_refused(value: str) -> None:
