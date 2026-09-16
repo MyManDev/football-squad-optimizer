@@ -414,8 +414,21 @@ class _Carried:
     chips_available: list[str] | None
 
 
-def _player_id_list(decision: Mapping[str, object], key: str) -> list[int]:
+def _player_id_list(
+    decision: Mapping[str, object], key: str, *, required: bool = True
+) -> list[int] | None:
+    """A player-id list as the entry recorded it; ``None`` when an optional one is absent.
+
+    An entry recorded before the bench order and the vice-captain were frozen has neither.
+    A roll carries that absence forward as it is: inventing an order the entry never held
+    would be a claim, and absent is not zero.
+    """
+
     value = decision.get(key)
+    if value is None:
+        if required:
+            raise LedgerError(f"Ledger decision {key} is missing.")
+        return None
     if not isinstance(value, list):
         raise LedgerError(f"Ledger decision {key} is not a list.")
     return [int(str(item)) for item in value]
@@ -557,7 +570,9 @@ def record_roll(
         "bench_player_ids": _player_id_list(before, "bench_player_ids"),
         "captain_player_id": before.get("captain_player_id"),
         "vice_captain_player_id": before.get("vice_captain_player_id"),
-        "ordered_bench_player_ids": _player_id_list(before, "ordered_bench_player_ids"),
+        "ordered_bench_player_ids": _player_id_list(
+            before, "ordered_bench_player_ids", required=False
+        ),
         "completion_policy": before.get("completion_policy"),
         "total_cost_tenths": int(str(before["total_cost_tenths"])),
         "projected_score": None,
