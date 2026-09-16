@@ -245,6 +245,44 @@ def test_a_row_count_that_is_not_the_roster_size_is_refused(
         read_rotation_evidence_artifact(table_path, manifest_path)
 
 
+def test_the_partial_coverage_the_manifest_requires_reaches_the_reader(
+    published: tuple[Path, Path],
+) -> None:
+    """A field the reader demands and never hands on is a field nobody can act on.
+
+    ``clubs_partially_covered`` has been required of every manifest since the export contract
+    gained it, but the frame the reader returns carried the covered list and not this one, so a
+    consumer could not narrow coverage even though the artifact said how. It cannot be
+    recomputed downstream either: from the payloads alone a club whose second page was refused
+    is indistinguishable from one that only ever registered a single page.
+    """
+
+    table_path, manifest_path = published
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    table = read_rotation_evidence_artifact(table_path, manifest_path)
+
+    assert table.attrs["clubs_partially_covered"] == tuple(manifest["clubs_partially_covered"])
+    assert set(table.attrs["clubs_partially_covered"]) <= set(table.attrs["clubs_covered"])
+
+
+def test_a_club_named_partly_covered_and_not_covered_at_all_is_refused(
+    published: tuple[Path, Path],
+) -> None:
+    """Partly covered narrows coverage; it never stands in for it.
+
+    The export holds to this when it writes. This is the reader holding to it when it reads,
+    so an artifact that arrives from anywhere else cannot say a club was partly read and never
+    read in the same breath.
+    """
+
+    table_path, manifest_path = published
+    _rewrite_manifest(manifest_path, clubs_partially_covered=["Nowhere FC"])
+
+    with pytest.raises(DataValidationError, match="partial coverage narrows coverage"):
+        read_rotation_evidence_artifact(table_path, manifest_path)
+
+
 def test_a_manifest_that_disagrees_with_a_column_is_refused(
     published: tuple[Path, Path],
 ) -> None:
