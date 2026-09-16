@@ -1,11 +1,11 @@
 /**
  * The remaining-time tile is a claim about now, so it is held against a fixed now.
  *
- * The fixture is the published status document itself, unedited, whose `hours_to_deadline`
- * was 1.67 at a deadline that has since closed. Read off that field the tile would announce
- * time that ran out long ago; read off `next_deadline_utc` against the browser's clock it
- * says the deadline has passed. The three states below are the whole of what the tile may
- * say, and none of them is a zero or a negative number.
+ * The fixture is the published status document itself, unedited. Read off its own
+ * `hours_to_deadline` the tile would announce time measured at the moment of publication;
+ * read off `next_deadline_utc` against the browser's clock it says what is true now. The
+ * three states below are the whole of what the tile may say, and none of them is a zero or
+ * a negative number.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -18,17 +18,29 @@ import type { DataClient, Loaded } from "../../../data/client";
 import { DataClientContext } from "../../../data/queries";
 import type { SiteIndex, StatusView } from "../../../data/schema";
 import { LanguageProvider } from "../../../i18n/LanguageProvider";
-import type { Language } from "../../../i18n/messages";
+import { MESSAGES, type Language } from "../../../i18n/messages";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import { StatusPage } from "../pages/StatusPage";
 
-/** A day after the published document was written, which is the defect as it was found. */
-const NOW = new Date("2026-09-13T09:00:00Z");
-
 const PUBLISHED = publishedStatus.payload as unknown as StatusView;
 
+/**
+ * Every instant here is derived from the fixture's own deadline, never written as a date.
+ *
+ * The first version of this file pinned `NOW` to a literal the week it was written, when the
+ * published document happened to carry a deadline that had already closed. That made the file
+ * a hostage of the data: the next publication moved the deadline into the future and ten tests
+ * that assume it has passed failed, on a release, for a reason that had nothing to do with the
+ * page. The property under test is a relationship between two instants and not a fact about
+ * any particular week, so the instants are now computed from the document that ships.
+ */
+const PUBLISHED_DEADLINE = new Date(PUBLISHED.next_deadline_utc!);
+
+/** A day after the published deadline: the state the tiles are about. */
+const NOW = new Date(PUBLISHED_DEADLINE.getTime() + 24 * 60 * 60 * 1000);
+
 /** Two days and ninety minutes past NOW, so the countdown cannot round to nothing. */
-const FUTURE_DEADLINE = "2026-09-15T10:30:00Z";
+const FUTURE_DEADLINE = new Date(NOW.getTime() + (48 * 60 + 90) * 60 * 1000).toISOString();
 
 function loaded<T>(payload: T): Loaded<T> {
   return { payload, generatedAtUtc: publishedStatus.generated_at_utc };
@@ -107,7 +119,8 @@ describe("the remaining-time tile", () => {
     { language: "en", expected: "deadline passed" },
     { language: "tr", expected: "son tarih geçti" },
   ] as const)("says the deadline has passed, in $language", async ({ language, expected }) => {
-    // The document exactly as published: 1.67 hours to a deadline that closed yesterday.
+    // The document exactly as published, held at a now the fixture itself defines: the
+    // published figure is positive and the deadline it was measured against has closed.
     expect(PUBLISHED.hours_to_deadline).toBeGreaterThan(0);
     expect(new Date(PUBLISHED.next_deadline_utc!).getTime()).toBeLessThan(NOW.getTime());
     renderStatus(PUBLISHED, language);
@@ -143,15 +156,19 @@ describe("the remaining-time tile", () => {
     },
   );
 
-  it.each([
-    { language: "en", note: "1.7 h remained when this was published" },
-    { language: "tr", note: "yayımlandığında 1,7 sa kalmıştı" },
-  ] as const)(
-    "keeps the published figure, labelled as the publishing moment, in $language",
-    async ({ language, note }) => {
+  it.each(["en", "tr"] as const)(
+    "keeps the published figure, labelled as the publishing moment, in %s",
+    async (language) => {
+      // The figure comes from the document rather than from a literal, for the same reason
+      // NOW does: this asserts that the published number survives to the page unchanged, and
+      // a literal would make that assertion expire the next time the week is published.
+      const hours = PUBLISHED.hours_to_deadline!.toLocaleString(
+        language === "tr" ? "tr-TR" : "en-GB",
+        { maximumFractionDigits: 1 },
+      );
       renderStatus(PUBLISHED, language);
       await screen.findByText(LABEL[language]);
-      expect(screen.getByText(note)).toBeInTheDocument();
+      expect(screen.getByText(MESSAGES[language].status.atPublish(hours))).toBeInTheDocument();
     },
   );
 
