@@ -136,6 +136,7 @@ def test_the_words_are_cut_from_the_bytes_that_hash_to_the_citation(
         ],
         columns=list(ROTATION_EVIDENCE_COLUMNS),
     )
+    table.attrs["clubs_covered"] = ("Arsenal",)
     monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
 
     words = manager_words_from_artifact(
@@ -157,6 +158,77 @@ def test_the_words_are_cut_from_the_bytes_that_hash_to_the_citation(
     unresolved = words.words[1]
     assert unresolved.words is None and unresolved.club is None and unresolved.source_url is None
     assert unresolved.role == "not_captain"
+
+
+def test_covered_is_what_the_capture_recorded_and_not_what_was_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A club read but not coded is not covered, and the documents alone cannot say so.
+
+    The fixture holds pages for two clubs, so a set derived from the documents in hand names
+    both. Covered means read **and** coded, and ``rotation_export`` narrows it again when a
+    club's claims lose their citations, so the manifest's list is the only one that carries
+    those two facts. Publishing the derived set would tell a member they are reading a club's
+    news when that club's coding failed and nothing it said survived.
+    """
+
+    documents, kind, label = documents_from_source(FIXTURE)
+    assert {document.club for document in documents} == {"Arsenal", "Man Utd"}
+    table = pd.DataFrame(
+        [
+            {
+                **dict.fromkeys(ROTATION_EVIDENCE_COLUMNS, pd.NA),
+                "season": "2026-27",
+                "target_gameweek": 5,
+                "player_id": 7,
+                "rotation_disposition": "stated_expected_absent",
+            }
+        ],
+        columns=list(ROTATION_EVIDENCE_COLUMNS),
+    )
+    table.attrs["clubs_covered"] = ("Arsenal",)
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
+
+    words = manager_words_from_artifact(
+        Path("table.csv"),
+        Path("table.manifest.json"),
+        documents=documents,
+        source_kind=kind,
+        source_label=label,
+    )
+
+    assert words.clubs_covered == ("Arsenal",)
+    assert "Man Utd" not in words.as_source_record()["clubs_covered"]
+
+
+def test_a_table_that_arrives_without_its_coverage_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Not guessed from the documents, which is the mistake this refusal replaces."""
+
+    documents, kind, label = documents_from_source(FIXTURE)
+    table = pd.DataFrame(
+        [
+            {
+                **dict.fromkeys(ROTATION_EVIDENCE_COLUMNS, pd.NA),
+                "season": "2026-27",
+                "target_gameweek": 5,
+                "player_id": 7,
+                "rotation_disposition": "stated_expected_absent",
+            }
+        ],
+        columns=list(ROTATION_EVIDENCE_COLUMNS),
+    )
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
+
+    with pytest.raises(ManagerWordsError, match="cannot be recomputed"):
+        manager_words_from_artifact(
+            Path("table.csv"),
+            Path("table.manifest.json"),
+            documents=documents,
+            source_kind=kind,
+            source_label=label,
+        )
 
 
 def test_a_source_that_is_neither_fixture_nor_capture_is_refused(tmp_path: Path) -> None:

@@ -160,6 +160,31 @@ def _resolve(
     return None, None
 
 
+def _covered(table: pd.DataFrame, table_path: Path) -> tuple[str, ...]:
+    """The clubs the manifest recorded as covered, never a set recomputed from documents.
+
+    Covered means read **and** coded, and ``rotation_export`` narrows it once more when a
+    club's claims lose their citations. The documents in hand only say what was *read*, so
+    deriving coverage from them would publish a club whose page was fetched and whose coding
+    failed as though the member were reading that club's news. The distinction cannot be
+    recovered later either -- from the payloads alone, a club whose second page was refused is
+    indistinguishable from one that only ever registered a single page -- which is exactly why
+    the capture records the lists rather than leaving them to be recomputed.
+
+    A frame without them did not come from ``read_rotation_evidence_artifact``, and guessing
+    is the one thing this function exists to refuse.
+    """
+
+    covered = table.attrs.get("clubs_covered")
+    if covered is None:
+        raise ManagerWordsError(
+            f"{Path(table_path).name} arrived without its manifest's coverage lists, so which "
+            "clubs were covered is not known. Coverage is recorded when the week is captured "
+            "and cannot be recomputed from the table."
+        )
+    return tuple(str(club) for club in covered)
+
+
 def manager_words_from_artifact(
     table_path: Path,
     manifest_path: Path,
@@ -178,15 +203,7 @@ def manager_words_from_artifact(
             f"{Path(table_path).name} spans seasons {sorted(seasons)} and gameweeks "
             f"{sorted(gameweeks)}; one artifact is one decision week."
         )
-    clubs = tuple(
-        sorted(
-            {
-                str(document.club)
-                for document in documents
-                if _text(getattr(document, "club", None)) is not None
-            }
-        )
-    )
+    clubs = _covered(table, table_path)
     words: list[ManagerWord] = []
     for row in table.to_dict(orient="records"):
         disposition = _text(row.get("rotation_disposition"))
