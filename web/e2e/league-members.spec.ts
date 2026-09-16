@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { installLeagueMocks } from "./leagueMocks";
-import indexFixture from "../public/data/index.json";
+import indexFixture from "../public/data/index.json" with { type: "json" };
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
 
