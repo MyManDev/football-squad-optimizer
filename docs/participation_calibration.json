@@ -4,11 +4,14 @@
     "by_position": {
       "DEF": {
         "brier_score": 0.0994631664409882,
+        "brier_skill_score": 0.5558849156938324,
         "event_rate": 0.3386249428962997,
         "log_loss": 0.32458727926862724,
         "log_loss_clip": 1e-15,
         "mean_calibration_bias": -0.021442715675815682,
         "mean_probability": 0.317182227220484,
+        "reference_brier_score": 0.22395809094477745,
+        "reference_forecast": "constant_at_scored_event_rate",
         "reliability_bins": [
           {
             "event_rate": 0.04339419978517723,
@@ -95,11 +98,14 @@
       },
       "FWD": {
         "brier_score": 0.07392647920409184,
+        "brier_skill_score": 0.6119873955093627,
         "event_rate": 0.25612702795995856,
         "log_loss": 0.24598687247725012,
         "log_loss_clip": 1e-15,
         "mean_calibration_bias": 0.025509805458041712,
         "mean_probability": 0.2816368334180003,
+        "reference_brier_score": 0.19052597350835718,
+        "reference_forecast": "constant_at_scored_event_rate",
         "reliability_bins": [
           {
             "event_rate": 0.006211180124223602,
@@ -186,11 +192,14 @@
       },
       "GK": {
         "brier_score": 0.05468999121452588,
+        "brier_skill_score": 0.7193563153775104,
         "event_rate": 0.26520947176684884,
         "log_loss": 0.20134395214540604,
         "log_loss_clip": 1e-15,
         "mean_calibration_bias": -0.018261409043169474,
         "mean_probability": 0.24694806272367936,
+        "reference_brier_score": 0.19487340785199786,
+        "reference_forecast": "constant_at_scored_event_rate",
         "reliability_bins": [
           {
             "event_rate": 0.02490726020137785,
@@ -277,11 +286,14 @@
       },
       "MID": {
         "brier_score": 0.10167565928215462,
+        "brier_skill_score": 0.5220716685867604,
         "event_rate": 0.30697793303229104,
         "log_loss": 0.3201238563061527,
         "log_loss_clip": 1e-15,
         "mean_calibration_bias": 0.009890691691013698,
         "mean_probability": 0.31686862472330474,
+        "reference_brier_score": 0.21274248166351328,
+        "reference_forecast": "constant_at_scored_event_rate",
         "reliability_bins": [
           {
             "event_rate": 0.019645340751043114,
@@ -369,11 +381,14 @@
     },
     "pooled": {
       "brier_score": 0.0929235023719177,
+      "brier_skill_score": 0.5636690787493317,
       "event_rate": 0.3075569160130094,
       "log_loss": 0.30092569492814797,
       "log_loss_clip": 1e-15,
       "mean_calibration_bias": -0.0018324481152312555,
       "mean_probability": 0.30572446789777813,
+      "reference_brier_score": 0.21296565942557608,
+      "reference_forecast": "constant_at_scored_event_rate",
       "reliability_bins": [
         {
           "event_rate": 0.026754890678941313,
@@ -463,11 +478,14 @@
     "by_position": {
       "DEF": {
         "brier_score": 0.111083724310233,
+        "brier_skill_score": 0.26183922568639173,
         "event_rate": 0.8154565456545655,
         "log_loss": 0.3513111279836992,
         "log_loss_clip": 1e-15,
         "mean_calibration_bias": -0.034856102691613766,
         "mean_probability": 0.7806004429629517,
+        "reference_brier_score": 0.15048716780368904,
+        "reference_forecast": "constant_at_scored_event_rate",
         "reliability_bins": [
           {
             "event_rate": null,
@@ -554,11 +572,14 @@
       },
       "FWD": {
         "brier_score": 0.13357401387199752,
+        "brier_skill_score": 0.438944666483269,
         "event_rate": 0.6091954022988506,
         "log_loss": 0.42447365992507863,
         "log_loss_clip": 1e-15,
         "mean_calibration_bias": 0.053495046851740446,
         "mean_probability": 0.662690449150591,
+        "reference_brier_score": 0.23807636411679217,
+        "reference_forecast": "constant_at_scored_event_rate",
         "reliability_bins": [
           {
             "event_rate": 0.0,
@@ -645,11 +666,14 @@
       },
       "GK": {
         "brier_score": 0.03652127861884158,
+        "brier_skill_score": -1.732293306604452,
         "event_rate": 0.986449864498645,
         "log_loss": 0.13491505169757492,
         "log_loss_clip": 1e-15,
         "mean_calibration_bias": -0.09434146785398012,
         "mean_probability": 0.8921083966446649,
+        "reference_brier_score": 0.013366529329249895,
+        "reference_forecast": "constant_at_scored_event_rate",
         "reliability_bins": [
           {
             "event_rate": null,
@@ -736,11 +760,14 @@
       },
       "MID": {
         "brier_score": 0.15653390216153168,
+        "brier_skill_score": 0.3068684798306758,
         "event_rate": 0.6554484264144078,
         "log_loss": 0.4798598870827751,
         "log_loss_clip": 1e-15,
         "mean_calibration_bias": 0.03379136070286892,
         "mean_probability": 0.6892397871172767,
+        "reference_brier_score": 0.22583578672528443,
+        "reference_forecast": "constant_at_scored_event_rate",
         "reliability_bins": [
           {
             "event_rate": 0.0,
@@ -828,11 +855,14 @@
     },
     "pooled": {
       "brier_score": 0.1311221150952065,
+      "brier_skill_score": 0.34253823157805785,
       "event_rate": 0.7248624763278925,
       "log_loss": 0.4086692475953017,
       "log_loss_clip": 1e-15,
       "mean_calibration_bias": 0.004919044475258816,
       "mean_probability": 0.7297815208031513,
+      "reference_brier_score": 0.199436866739688,
+      "reference_forecast": "constant_at_scored_event_rate",
       "reliability_bins": [
         {
           "event_rate": 0.0,
@@ -918,8 +948,8 @@
       "scored_rows": 11089
     }
   },
-  "contract_version": "participation_calibration_v1",
-  "created_utc": "2026-09-14T01:10:01+00:00",
+  "contract_version": "participation_calibration_v2",
+  "created_utc": "2026-09-16T18:49:36+00:00",
   "declared_seasons": [
     "2023-24",
     "2024-25"
@@ -961,7 +991,7 @@
       "2023-24",
       "2024-25"
     ],
-    "repository_commit": "0d4533ac36670d42ec8df546a3d8fecef5c818e8",
+    "repository_commit": "18f18f38641189270d11b5d2ba7ecc9c7d5a06db",
     "working_tree_dirty": false
   },
   "scoring_appeared_rows": 11431,
