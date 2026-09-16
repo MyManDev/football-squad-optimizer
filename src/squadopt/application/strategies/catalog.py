@@ -99,18 +99,62 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # Which squad the advice stands on: ``captured``, or ``pre_free_hit_gwNN`` when
         # a Free Hit voided the captured week's fifteen. A label, never a number.
         "squad_basis",
+        # Observed changes between ranks in one captured standings document.
+        "movement",
+        "movement_places",
     }
 )
 
 #: Words a strategy without a gated pass may not use about itself, in either language.
 _SAFETY_LANGUAGE: Final = re.compile(r"g[üu]venli|riskli?|safe|daha az riskli", re.IGNORECASE)
 
-#: Field names that could smuggle a probability into the envelope; a meta-test keeps
-#: PUBLISHABLE_FIELDS clean against this, so the envelope cannot quietly widen. The
-#: last alternative is the ``p_`` naming convention for a probability, and it needs
-#: the word boundary: bare ``p_`` would also match ``overlap_count`` and the rest of
-#: the overlap fields, which are set arithmetic and publishable.
-FORBIDDEN_FIELD_PATTERN: Final = re.compile(r"probab|olas.l.k|quantile|spread|\bp_")
+#: Field names that could smuggle a probability **or a spread** into the envelope; a
+#: meta-test keeps PUBLISHABLE_FIELDS clean against this, so the envelope cannot quietly
+#: widen. ``tests/unit/test_strategy_catalog.py`` pins the refused names and the passing
+#: ones by hand, so a later widening has to be written down rather than noticed.
+#:
+#: The rule is the one the envelope states: expected points, expected gap, overlap counts
+#: and a price in points may be published; the *spread* of any of them may not. A variance
+#: is a spread under another name, and so is a standard deviation, a covariance, a
+#: correlation, a percentile, an interval and a tail. This pattern reads all of them,
+#: because a rank-aware strategy's internals are exactly those quantities and a name is
+#: the only thing standing between them and a member's page.
+#:
+#: Three alternatives carry a boundary, and each one is load-bearing:
+#:
+#: - ``\b`` before ``p_``: bare ``p_`` would also match ``overlap_count`` and the rest of
+#:   the overlap fields, which are set arithmetic and publishable.
+#: - ``(?<!in)`` before ``varian``: the bare stem reads ``covariance`` as well as
+#:   ``variance``, which is why covariance needs no alternative of its own, but it would
+#:   also read ``invariance``, the word this repository uses for the rule that a member's
+#:   advice depends on that member's squad alone, which is not a spread of anything.
+#: - ``(?<![a-z])`` around ``sd``, ``std`` and ``tail``: without it ``sd`` falls inside
+#:   ``used``, ``std`` inside ``stdout``, and ``tail`` inside ``details``, which is a real
+#:   field name in ``docs/contracts/backend_api_v1.schema.json``. With it, ``sd_points``,
+#:   ``points_sd``, ``std_dev`` and ``left_tail`` are all still read, because ``_`` is not
+#:   a letter.
+#:
+#: The Turkish word for probability is read as a stem, ``olas.l``, rather than as the
+#: whole word: the full spelling missed the inflected ``olas\u0131l\u0131\u011f\u0131``, and the
+#: text pattern below already carries the same stem.
+#:
+#: ``IGNORECASE`` is set so a capitalised spelling is not a way through. Every published
+#: name is snake_case today, so the flag refuses names rather than admitting them.
+#:
+#: The dotless i and the soft g are written as escapes, as in the text pattern below.
+FORBIDDEN_FIELD_PATTERN: Final = re.compile(
+    # A probability by name, in either language, and the ``p_`` naming convention.
+    r"probab|olas.l|quantile|spread|\bp_"
+    # A second moment under any of its own names.
+    r"|(?<!in)varian|varyans|correlat|korelasyon"
+    r"|stddev|std_dev|stdev|std_err|standard_error"
+    r"|(?<![a-z])std(?![a-z])|(?<![a-z])sd(?![a-z])"
+    r"|sigma|deviat|sapma|dispersion|volatilit"
+    # A cut through a distribution, or a piece of one.
+    r"|quartile|percentil|interval|(?<![a-z])tail"
+    r"|y[\u00fcu]zdelik|aral[\u0131i][k\u011fg]",
+    re.IGNORECASE,
+)
 
 #: The same rule applied to *text* rather than to field names, in both languages the
 #: site publishes. Its subject is the text **this repository generates**: strategy names,

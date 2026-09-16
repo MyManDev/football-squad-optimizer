@@ -8,7 +8,11 @@ from typing import Any
 import pandas as pd
 
 from squadopt.data.errors import DataError
-from squadopt.evaluation.models import EvaluationValidationError, FrozenSquadDecision
+from squadopt.evaluation.models import (
+    EvaluationValidationError,
+    FrozenSquadDecision,
+    ScoringBasis,
+)
 from squadopt.evaluation.scoring import score_frozen_squad_decision
 from squadopt.live.ledger import score_named_eleven
 
@@ -125,7 +129,7 @@ def score_recorded_decision(
     if chip not in (None, "3xc", "bboost", "freehit", "wildcard"):
         raise DataError("Frozen decision names an unsupported chip.")
     gross = score_named_eleven(decision, points)
-    basis = "named_eleven_no_autosubs"
+    basis = ScoringBasis.NAMED_ELEVEN_NO_AUTOSUBS
     vice = decision.get("vice_captain_player_id")
     bench = decision.get("ordered_bench_player_ids")
     if vice is not None and bench is not None:
@@ -157,10 +161,10 @@ def score_recorded_decision(
         elif chip == "bboost":
             gross = sum(points[player] for player in squad) + score.captain_bonus_points
             diagnostics["autosub_recovery"] = 0.0
-        basis = "official_autosub_captain_v2"
+        basis = ScoringBasis.OFFICIAL_AUTOSUB_CAPTAIN_V2
     return {
         "net": gross - hits,
         "xi": gross,
-        "scoring_basis": basis,
+        "scoring_basis": str(basis),
         "diagnostics": diagnostics,
     }

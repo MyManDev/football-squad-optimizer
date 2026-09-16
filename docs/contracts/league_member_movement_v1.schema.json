@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Captured league member movement",
+  "description": "Validates the existing rank, movement and movement_places fields of a provisional_league_ui_v1 member row. Other member fields remain outside this focused schema.",
+  "type": "object",
+  "required": [
+    "rank",
+    "movement",
+    "movement_places"
+  ],
+  "properties": {
+    "rank": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "movement": {
+      "enum": [
+        "up",
+        "down",
+        "same",
+        "new",
+        "unknown"
+      ]
+    },
+    "movement_places": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "rank": {
+          "minimum": 1
+        },
+        "movement": {
+          "enum": [
+            "up",
+            "down"
+          ]
+        },
+        "movement_places": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "rank": {
+          "minimum": 1
+        },
+        "movement": {
+          "const": "same"
+        },
+        "movement_places": {
+          "const": 0
+        }
+      }
+    },
+    {
+      "properties": {
+        "movement": {
+          "enum": [
+            "unknown",
+            "new"
+          ]
+        },
+        "movement_places": {
+          "type": "null"
+        }
+      }
+    }
+  ]
+}

@@ -87,9 +87,13 @@ _SHA = "ab" * 32
 #: plan was solved from: the plan's eleven with the captain doubled, less the same total
 #: for the fifteen the member already holds. Two expected-points totals subtracted,
 #: reading nothing from a squad verdict and stating no spread around either.
+#: ``movement`` and ``movement_places`` describe the difference between two captured
+#: league ranks; neither is a squad-calibration diagnostic (#533).
 _PUBLISHED_ENVELOPE = frozenset(
     {
         "moves",
+        "movement",
+        "movement_places",
         "transfer_hit_points",
         "expected_own_points",
         "expected_gain_vs_hold",

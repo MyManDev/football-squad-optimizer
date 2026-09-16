@@ -28,7 +28,18 @@ Where each number comes from, and what it is:
   Frozen bench order and vice-captain permit ``official_autosub_captain_v2`` from
   finished, checked event-live captures. Settlement is computed in memory; ledger
   files remain unchanged. Missing decision-time inputs yield null diagnostics.
-  When the local ledger is empty, already published rows are retained as before.
+  When the local ledger is empty, already published rows are retained as before,
+  unless a retained row states a score without a basis, which is dropped instead.
+  A row that is not settled carries ``net`` and ``scoring_basis`` both null: the basis
+  describes the number, and there is no number.
+- ``cumulative.ours_net``: the running total, on one basis and one only, named by
+  ``cumulative.ours_basis``. A finished week scored on any other basis stays published in
+  its own row and is listed in ``cumulative.ours_excluded_gameweeks`` with the basis that
+  produced it, rather than being added in. Gameweek 1 of 2026-27 is such a week: its
+  decision froze no bench order and no vice-captain, so no autosub scorer could score it,
+  and its number is not the same measurement as the weeks that follow. ``ours_net`` is
+  null while no week is on the series basis, which reads as "nothing to total" and never
+  as zero.
 - ``top100``: the Top-100 cohort's mean week, for the cohort capture's current gameweek
   only. The cohort is re-ranked every week, so a total is never differenced across
   captures; ``final`` says whether the gameweek was finished and checked in the cohort
@@ -47,7 +58,7 @@ Where each number comes from, and what it is:
 
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -69,6 +80,7 @@ from squadopt.data.sources.fpl_live import (
     scored_gameweeks,
 )
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
+from squadopt.evaluation.models import ScoringBasis
 from squadopt.live import (
     LedgerEntry,
     decision_mode,
@@ -88,8 +100,13 @@ COMPARISON_KINDS: Final = (
     "league_mean",
     "game_mean",
 )
-#: What our own row's numbers are, and are not: see the module docstring.
-OUR_SCORING_BASIS: Final = "named_eleven_no_autosubs"
+#: The basis the running total is kept on. A week scored on any other basis is a different
+#: measurement, so it is published with its own basis named and left out of the total
+#: rather than folded in. Named here once, deliberately fixed rather than inferred from
+#: the weeks on hand: a total that quietly re-bases itself whenever the scorer changes is
+#: the exact failure this constant exists to prevent. Moving the series to a new basis is
+#: a decision about the record, and it should cost an edit here and an explanation.
+SERIES_SCORING_BASIS: Final = str(ScoringBasis.OFFICIAL_AUTOSUB_CAPTAIN_V2)
 #: The Overall standings pages a cohort capture holds, in page order.
 _COHORT_PAGE = re.compile(r"^league-314-standings-page-(\d+)\.json$")
 #: One cohort member's picks inside an elite-picks capture.
@@ -240,17 +257,24 @@ def _ours(entry: LedgerEntry) -> dict[str, object]:
     transfers = decision.get("transfers")
     block = transfers if isinstance(transfers, Mapping) else {}
     outcome = entry.outcome
+    net = None if outcome is None else _number(outcome.get("realized_net_score"))
+    basis = None if outcome is None else outcome.get("scoring_basis")
+    if net is not None and basis is None:
+        raise DataError(
+            f"GW{entry.gameweek} publishes a settled score of {net} and no scoring_basis. "
+            "The rule that produced a number is not recoverable from the number, so it is "
+            "stated or the row is refused; it is never supplied by the reader."
+        )
     return {
-        "net": None if outcome is None else _number(outcome.get("realized_net_score")),
+        "net": net,
         "xi": None if outcome is None else _number(outcome.get("realized_xi_score")),
         "hits": float(str(block.get("transfer_hit_points", 0.0))),
         "projected": float(str(decision["projected_score"])),
         "mode": decision_mode(decision),
-        "scoring_basis": (
-            OUR_SCORING_BASIS
-            if outcome is None
-            else outcome.get("scoring_basis", OUR_SCORING_BASIS)
-        ),
+        # The basis describes the number beside it. An unsettled row has no number, so it
+        # states no basis: claiming one here would assert a rule that never ran, and from
+        # GW2 on it would name the wrong one, since those decisions settle officially.
+        "scoring_basis": None if net is None else str(basis),
         "diagnostics": empty_diagnostics()
         if outcome is None
         else outcome.get("diagnostics", empty_diagnostics()),
@@ -259,11 +283,21 @@ def _ours(entry: LedgerEntry) -> dict[str, object]:
     }
 
 
+def _states_its_basis(ours: Mapping[str, object]) -> bool:
+    """Whether a published row says what produced its number, if it has one."""
+
+    return _number(ours.get("net")) is None or ours.get("scoring_basis") is not None
+
+
 def _published_ours(path: Path, season: str) -> dict[int, dict[str, object]]:
     """Our rows the scoreboard at ``path`` already publishes for ``season``, by gameweek.
 
     Empty when there is no such file or it describes another season; a row is taken only
     where the published ``ours`` is an object, never made up for a gameweek without one.
+
+    A row carrying a score but no stated basis is dropped rather than carried. Inertia is
+    not evidence: a row that cannot say what produced its number does not earn a place in
+    the series by having been published once before.
     """
 
     try:
@@ -282,6 +316,7 @@ def _published_ours(path: Path, season: str) -> dict[int, dict[str, object]]:
         if isinstance(row, dict)
         and isinstance(row.get("gameweek"), int)
         and isinstance(row.get("ours"), dict)
+        and _states_its_basis(row["ours"])
     }
 
 
@@ -297,6 +332,40 @@ def _member_row(entry_id: int, week: EntryGameweekPoints) -> dict[str, object]:
 
 def _mean(values: Sequence[float]) -> float | None:
     return sum(values) / len(values) if values else None
+
+
+def single_basis(rows: Iterable[Mapping[str, object]]) -> str | None:
+    """The one scoring basis a group of settled rows shares, or a refusal.
+
+    Handed rows on two bases this raises instead of picking one, because the caller was
+    about to combine them and the combination means nothing: a week completed by automatic
+    substitutions and a week scored on the eleven that were named measure different
+    things, and their sum is not a season score. Handed a settled row that states no basis
+    it raises too, for the same reason in a weaker form: an unknown basis cannot be shown
+    to match a known one.
+
+    Handed nothing settled it returns ``None``, which reads as "there is nothing to
+    combine". That is not zero, and a caller must not render it as one.
+    """
+
+    bases: set[str] = set()
+    for row in rows:
+        if _number(row.get("net")) is None:
+            continue
+        basis = row.get("scoring_basis")
+        if basis is None:
+            raise DataError(
+                "A settled row states no scoring basis, so it cannot be shown to share "
+                "one with the rows it would be totalled with."
+            )
+        bases.add(str(basis))
+    if len(bases) > 1:
+        raise DataError(
+            f"Two scoring bases cannot enter one total: {sorted(bases)}. Weeks scored "
+            "under different rules are different measurements; publish each with its "
+            "basis named rather than summing across them."
+        )
+    return next(iter(bases), None)
 
 
 def scoreboard_payload(
@@ -438,6 +507,14 @@ def scoreboard_payload(
                 scoring_basis=basis,
                 source_snapshot_id=source_snapshot_id,
             )
+        for comparison in comparisons:
+            if comparison["net"] is not None and comparison["scoring_basis"] not in (
+                "named_eleven_no_autosubs",
+                "official_autosub_captain_v2",
+                "net",
+                "source_average",
+            ):
+                raise DataError("A measured scoreboard row must name its scoring basis.")
         rows.append(
             {
                 "gameweek": gameweek,
@@ -464,16 +541,37 @@ def scoreboard_payload(
     # they have played through it, finished or not. Those coincide while the finished
     # weeks run without a gap, and a gap (a week left unfinished by a postponed fixture,
     # with later weeks finished) is exactly when they do not.
+    #
+    # Our running total is kept on one basis and one only. A week scored under a different
+    # rule is still published, with its own basis named, and appears in
+    # ``ours_excluded_gameweeks`` rather than being added in: the reader is told the week
+    # exists and is told why it is not in the total. Summing across bases would produce a
+    # number that looks like a season score and is not one, which is worse than no total.
     finished_rows = [row for row in rows if row["finished"]]
     finished_gameweeks = [int(str(row["gameweek"])) for row in finished_rows]
-    ours_nets: dict[int, float] = {}
+    settled_ours: dict[int, Mapping[str, object]] = {}
     averages: list[float] = []
     for row in finished_rows:
         ours = row["ours"]
         if isinstance(ours, dict) and ours["net"] is not None:
-            ours_nets[int(str(row["gameweek"]))] = float(str(ours["net"]))
+            settled_ours[int(str(row["gameweek"]))] = ours
         if row["average_entry_score"] is not None:
             averages.append(float(str(row["average_entry_score"])))
+    on_basis = {
+        week: ours
+        for week, ours in settled_ours.items()
+        if str(ours.get("scoring_basis")) == SERIES_SCORING_BASIS
+    }
+    ours_excluded = [
+        {"gameweek": week, "scoring_basis": str(settled_ours[week].get("scoring_basis"))}
+        for week in sorted(settled_ours)
+        if week not in on_basis
+    ]
+    # The filter above already leaves one basis behind. This re-derives it from the rows
+    # actually being summed, so that a later edit which widens or drops that filter meets
+    # a refusal here instead of silently producing a mixed total.
+    ours_basis = single_basis(on_basis.values())
+    ours_nets = {week: float(str(ours["net"])) for week, ours in on_basis.items()}
     through = finished_gameweeks[-1] if finished_gameweeks else None
     totals = [
         float(weeks[entry_id][through].total_points)
@@ -485,6 +583,8 @@ def scoreboard_payload(
         "gameweeks": finished_gameweeks,
         "ours_net": sum(ours_nets.values()) if ours_nets else None,
         "ours_gameweeks": sorted(ours_nets),
+        "ours_basis": ours_basis,
+        "ours_excluded_gameweeks": ours_excluded,
         "members_mean_total_points": _mean(totals),
         "members_gameweeks": (
             [] if through is None else [week for week in played if week <= through]

@@ -102,6 +102,13 @@ const en = {
     notFound: "There is no page here.",
     metaDescription: "SquadOpt: a weekly FPL decision, and what it rests on.",
   },
+  admin: {
+    title: "Admin",
+    notice: "This admin page is unlisted, not protected; anyone with its address can open it.",
+    analysis: "Measurement archive",
+    status: "Operational state",
+    decisions: "Decision log (GitHub)",
+  },
   language: {
     label: "Language",
     tr: "Türkçe",
@@ -384,6 +391,34 @@ const en = {
     gameAverage: "official FPL average",
     lastWeek: (points: string) => `last scored week difference: ${points}`,
   },
+  liveSeries: {
+    title: "Accumulating member record",
+    loading: "Reading recorded member weeks…",
+    unavailable: "The member record could not be read.",
+    accumulated: (rows: number, weeks: number) =>
+      `${rows} member-week comparisons across ${weeks} settled weeks; members in the same week belong to one weekly group.`,
+    unknown: "Not yet: the record does not establish how many more weeks are needed.",
+    remaining: (weeks: number) =>
+      `Not yet: the recorded measurement calls for ${weeks} more settled week${weeks === 1 ? "" : "s"}.`,
+    reached:
+      "The recorded measurement's week target has been reached; this alone does not establish an improvement.",
+    limits:
+      "These are recorded suggestions compared with what members actually scored. They do not prove that a member followed the suggestion or that it caused an improvement.",
+    missing: (count: number) =>
+      `${count} members have no readable history for this capture; their rows are excluded.`,
+    mean: (value: string) =>
+      `Mean suggested minus actual net score per member-week: ${value} points.`,
+    weekSummary: "Weekly groups — one row per settled week",
+    population: "Members with a recorded suggestion and actual score",
+    net: "Transfer costs deducted on both sides",
+    week: "GW",
+    members: "Member-weeks",
+    member: "Member",
+    basis: "Scoring basis and population",
+    suggested: "Suggested net",
+    actual: "Actual net",
+    difference: "Suggested minus actual",
+  },
   scoreboardComparisons: {
     title: "Weekly comparison and error breakdown",
     week: "GW",
@@ -394,7 +429,12 @@ const en = {
     captain: "Captain shortfall",
     autosub: "Autosub recovery",
     missing:
-      "- means not measured. Minutes shortfall covers starters who played; negative means more minutes than projected. Captain shortfall is expected minus received bonus points.",
+      "A dash (—) means not measured, not settled or not applicable. Minutes shortfall covers starters who played; negative means more minutes than projected. Captain shortfall is expected minus received bonus points.",
+    memberNet: "Official member score minus transfer costs",
+    basisUnknown: "Scoring basis unavailable",
+    memberPopulation: (count: number) => `${count} registered members with a recorded net score`,
+    gamePopulation: "All entries in the game's published average",
+    paperPopulation: "One recorded paper squad",
     legacy: "Named eleven; autosubs and vice-captain recovery unavailable",
     synthetic: "Reconstructed legal squad within the opening budget; no transfer history",
     game: "Game's published average",
@@ -418,9 +458,9 @@ const en = {
       "The scoreboard is not published yet. It appears after the first weekly run that writes it.",
     notAvailable: "The scoreboard could not be read.",
     caption:
-      "Per finished gameweek: our paper ledger, the league members' mean net, the Top-100 mean, the FPL average and the highest score",
+      "Per finished gameweek: our paper ledger, the league members' mean net, the Top-100 mean, the FPL average, the highest score, starters with no minutes, minutes shortfall, captain shortfall and autosub recovery",
     gameweek: "GW",
-    ours: "SquadOpt · named eleven",
+    ours: "SquadOpt · net",
     members: "league members · mean net",
     membersCounted: (count: number) => `${count} member${count === 1 ? "" : "s"}`,
     top100: "Top-100 · mean",
@@ -435,6 +475,7 @@ const en = {
     cumulative: (gameweek: number) => `cumulative through GW${gameweek}`,
     oursCovers: (gameweeks: string) => `GW ${gameweeks} only`,
     oursNone: "no settled week",
+    oursOtherBasis: (gameweeks: string) => `GW ${gameweeks} scored another way, not added in`,
     membersTotal: (count: number) => `mean total of ${count}`,
     membersCovers: (gameweeks: string) => `covers GW ${gameweeks}`,
     paperLedger:
@@ -719,10 +760,13 @@ const en = {
       "No gameweek has been finalised yet, so no scores are published: points are only final once the platform has added bonus and checked the week.",
     total: "total",
     movement: "movement",
+    noPreviousRank: "Previous rank unavailable",
+    movementNote:
+      "Movement compares the game's current and previous weekly ranks in this capture; the points beside it are from the last completed and checked gameweek.",
     unknown: "unknown",
     newMember: "new",
     movementLabel: (movement: "up" | "down" | "same", places: number) =>
-      movement === "same" ? "—" : `${movement === "up" ? "↑" : "↓"} ${places}`,
+      movement === "same" ? "unchanged" : `${movement === "up" ? "↑" : "↓"} ${places}`,
     unknownMember: "Unknown Member",
     unknownTeam: "Unnamed Team",
     publicDataTitle: "Public after the deadline",
@@ -739,7 +783,7 @@ const en = {
       `The source did not provide: ${fields}. Nothing is invented to fill it.`,
     entryAssumptionsTitle: "Public-data limits",
     currentPriceFallback:
-      "Purchase prices are not public. Current prices are used as selling prices, which may overstate the available budget after a price rise.",
+      "Purchase prices are not public, so what each player alone would sell for is unknown. What the whole squad sells for is published, and the plan spends that and the bank, never more.",
     memberSquad: "Member Squad",
     heldViceCaptainUnavailable: "The published squad does not name the vice-captain.",
     starterCount: (count: number) => `${count} starters`,
@@ -868,7 +912,9 @@ const en = {
     kicker: (contract: string, time: string) => `season tick · ${contract} · as of ${time}`,
     title: "Status",
     nextGameweek: "next gameweek",
+    publishedGameweek: "gameweek in this publication",
     deadline: (time: string) => `deadline ${time}`,
+    deadlineClosedAt: (time: string) => `deadline ${time}, already passed`,
     noDeadline: "no open deadline in the latest capture",
     timeToDeadline: "time to deadline",
     deadlinePassed: "deadline passed",
@@ -1025,6 +1071,14 @@ const tr: MessageSchema<typeof en> = {
     operations: "Operasyon Durumu",
     notFound: "Burada bir sayfa yok.",
     metaDescription: "SquadOpt: haftalık FPL kararı ve dayandığı kanıt.",
+  },
+  admin: {
+    title: "Yönetim",
+    notice:
+      "Bu yönetim sayfası menüde listelenmez, korumalı değildir; adresini bilen herkes açabilir.",
+    analysis: "Ölçüm arşivi",
+    status: "Operasyon durumu",
+    decisions: "Karar kaydı (GitHub)",
   },
   language: { label: "Dil", tr: "Türkçe", en: "English" },
   theme: {
@@ -1301,6 +1355,33 @@ const tr: MessageSchema<typeof en> = {
     gameAverage: "resmi FPL ortalaması",
     lastWeek: (pointsValue) => `son puanlanan hafta farkı: ${pointsValue}`,
   },
+  liveSeries: {
+    title: "Biriken üye kayıtları",
+    loading: "Kayıtlı üye haftaları okunuyor…",
+    unavailable: "Üye kayıtları okunamadı.",
+    accumulated: (rows, weeks) =>
+      `${weeks} yerleşmiş haftada ${rows} üye-hafta karşılaştırması; aynı haftanın üyeleri tek haftalık gruba aittir.`,
+    unknown: "Henüz değil: kaç hafta daha gerektiği bu kayıtlardan belirlenemiyor.",
+    remaining: (weeks) =>
+      `Henüz değil: kayıtlı ölçüme göre ${weeks} yerleşmiş hafta daha gerekiyor.`,
+    reached:
+      "Kayıtlı ölçümün hafta hedefine ulaşıldı; bu tek başına iyileşme olduğunu göstermiyor.",
+    limits:
+      "Kayıtlı öneriler üyelerin gerçekten aldığı puanlarla karşılaştırılır. Üyenin öneriyi uyguladığını veya önerinin iyileşmeye neden olduğunu göstermez.",
+    missing: (count) =>
+      `${count} üyenin bu yakalamaya ait okunabilir geçmişi yok; satırları dahil edilmedi.`,
+    mean: (value) => `Üye-hafta başına önerilen eksi gerçekleşen ortalama net puan: ${value}.`,
+    weekSummary: "Haftalık gruplar — yerleşmiş hafta başına bir satır",
+    population: "Kayıtlı önerisi ve gerçekleşen puanı olan üyeler",
+    net: "Her iki tarafta transfer bedeli düşülmüş",
+    week: "OH",
+    members: "Üye-hafta",
+    member: "Üye",
+    basis: "Puanlama temeli ve kapsanan grup",
+    suggested: "Önerilen net",
+    actual: "Gerçekleşen net",
+    difference: "Önerilen eksi gerçekleşen",
+  },
   scoreboardComparisons: {
     title: "Haftalık karşılaştırma ve hata ayrıştırması",
     week: "GW",
@@ -1311,7 +1392,12 @@ const tr: MessageSchema<typeof en> = {
     captain: "Kaptan açığı",
     autosub: "Otomatik değişiklik getirisi",
     missing:
-      "- ölçülmedi demektir. Dakika açığı oynayan ilk 11 oyuncularını kapsar; negatif değer tahminden fazla dakika oynandığını gösterir. Kaptan açığı, beklenen ile gerçekleşen ek puan farkıdır.",
+      "Tire (—) ölçülmedi, henüz yerleşmedi veya bu hücreye uygulanmıyor demektir. Dakika açığı oynayan ilk 11 oyuncularını kapsar; negatif değer tahminden fazla dakika oynandığını gösterir. Kaptan açığı, beklenen ile gerçekleşen ek puan farkıdır.",
+    memberNet: "Üyenin resmi puanı eksi transfer bedeli",
+    basisUnknown: "Puanlama temeli bilinmiyor",
+    memberPopulation: (count) => `Net puanı kayıtlı ${count} lig üyesi`,
+    gamePopulation: "Oyunun yayımladığı ortalamadaki tüm katılımcılar",
+    paperPopulation: "Kayıtlı tek kâğıt kadro",
     legacy: "Adı konan ilk 11; otomatik değişiklik ve ikinci kaptan getirisi bilinmiyor",
     synthetic: "Açılış bütçesiyle kurallara uygun yeniden kurulan kadro; transfer geçmişi yok",
     game: "Oyunun yayımladığı ortalama",
@@ -1335,9 +1421,9 @@ const tr: MessageSchema<typeof en> = {
       "Skor tablosu henüz yayımlanmadı. Onu yazan ilk haftalık çalıştırmadan sonra görünür.",
     notAvailable: "Skor tablosu okunamadı.",
     caption:
-      "Biten her oyun haftası için: kâğıt ledger'ımız, lig üyelerinin ortalama neti, Top-100 ortalaması, FPL ortalaması ve en yüksek puan",
+      "Biten her oyun haftası için: kâğıt ledger'ımız, lig üyelerinin ortalama neti, Top-100 ortalaması, FPL ortalaması, en yüksek puan, sıfır dakikalı ilk 11, dakika açığı, kaptan açığı ve otomatik değişiklik getirisi",
     gameweek: "OH",
-    ours: "SquadOpt · yazılan on bir",
+    ours: "SquadOpt · net",
     members: "lig üyeleri · ortalama net",
     membersCounted: (count) => `${count} üye`,
     top100: "Top-100 · ortalama",
@@ -1352,6 +1438,7 @@ const tr: MessageSchema<typeof en> = {
     cumulative: (gameweek) => `OH${gameweek} sonuna kadar kümülatif`,
     oursCovers: (gameweeks) => `yalnız OH ${gameweeks}`,
     oursNone: "sonuçlanmış hafta yok",
+    oursOtherBasis: (gameweeks) => `OH ${gameweeks} başka türlü puanlandı, toplama eklenmedi`,
     membersTotal: (count) => `${count} üyenin ortalama toplamı`,
     membersCovers: (gameweeks) => `OH ${gameweeks} kapsıyor`,
     paperLedger:
@@ -1620,10 +1707,13 @@ const tr: MessageSchema<typeof en> = {
       "Henüz kesinleşmiş oyun haftası yok, o yüzden puan yayınlanmıyor: puanlar ancak platform bonusu ekleyip haftayı kontrol edince kesinleşir.",
     total: "toplam",
     movement: "hareket",
+    noPreviousRank: "Önceki sıra bilinmiyor",
+    movementNote:
+      "Hareket, oyunun bu yakalamada bildirdiği mevcut ve önceki haftalık sıraları karşılaştırır; yanındaki puanlar son tamamlanmış ve kontrol edilmiş haftadandır.",
     unknown: "bilinmiyor",
     newMember: "yeni",
     movementLabel: (movement, places) =>
-      movement === "same" ? "—" : `${movement === "up" ? "↑" : "↓"} ${places}`,
+      movement === "same" ? "yerinde kaldı" : `${movement === "up" ? "↑" : "↓"} ${places}`,
     unknownMember: "Bilinmeyen Üye",
     unknownTeam: "İsimsiz takım",
     publicDataTitle: "Son tarihten sonra herkese açık",
@@ -1640,7 +1730,7 @@ const tr: MessageSchema<typeof en> = {
       `Kaynak şu alanları sağlamadı: ${fields}. Boşlukları doldurmak için veri uydurulmaz.`,
     entryAssumptionsTitle: "Herkese Açık Veri Sınırları",
     currentPriceFallback:
-      "Satın alma fiyatları herkese açık değildir. Satış fiyatı olarak mevcut fiyat kullanılır; fiyatı yükselen bir oyuncu için kullanılabilir bütçe olduğundan yüksek görünebilir.",
+      "Satın alma fiyatları herkese açık değil, yani tek bir oyuncunun kaça satılacağı bilinmiyor. Kadronun tamamının satış değeri ise yayımlanıyor; plan onu ve bankayı harcar, fazlasını değil.",
     memberSquad: "Üye kadrosu",
     heldViceCaptainUnavailable: "Yayımlanan kadroda yedek kaptan belirtilmiyor.",
     starterCount: (count) => `${count} ilk 11 oyuncusu`,
@@ -1762,7 +1852,9 @@ const tr: MessageSchema<typeof en> = {
     kicker: (contract, time) => `sezon tick'i · ${contract} · ${time} itibarıyla`,
     title: "Durum",
     nextGameweek: "sıradaki oyun haftası",
+    publishedGameweek: "bu yayının oyun haftası",
     deadline: (time) => `son tarih ${time}`,
+    deadlineClosedAt: (time) => `son tarih ${time}, geçti`,
     noDeadline: "son capture'da açık son tarih yok",
     timeToDeadline: "son tarihe kalan süre",
     deadlinePassed: "son tarih geçti",

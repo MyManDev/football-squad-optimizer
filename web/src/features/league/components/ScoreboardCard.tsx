@@ -3,11 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { points } from "../../../lib/format";
+import { points, signedPoints } from "../../../lib/format";
 import { LeagueDataMissing, loadScoreboard } from "../data";
 import type { LeagueViewEnvelope, Scoreboard, ScoreboardGameweek } from "../types";
 import styles from "./ScoreboardCard.module.css";
 import { ScoreboardComparisons } from "./ScoreboardComparisons";
+import { LiveSeriesSection } from "./LiveSeriesCard";
 
 /**
  * The scoreboard as the `/league` page shows it: read, or say why not. A missing file is
@@ -39,7 +40,12 @@ export function ScoreboardSection() {
       </Card>
     );
   }
-  return <ScoreboardCard envelope={query.data} />;
+  return (
+    <>
+      <ScoreboardCard envelope={query.data} />
+      <LiveSeriesSection view={query.data.payload} />
+    </>
+  );
 }
 
 export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scoreboard> }) {
@@ -52,9 +58,16 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
   // column read as one more net figure.
   const anyGross = finished.some((week) => week.top100?.basis === "gross");
   const anyProvisional = finished.some((week) => !week.data_checked);
+  // A null total has two different causes and they must not read alike. No week has
+  // settled at all, or weeks have settled but were scored under another rule and are not
+  // summed with this one. Saying "no settled week" in the second case would contradict the
+  // settled row sitting in the table above it.
+  const oursExcluded = total.ours_excluded_gameweeks ?? [];
   const oursCovers =
     total.ours_net === null
-      ? copy.oursNone
+      ? oursExcluded.length > 0
+        ? copy.oursOtherBasis(oursExcluded.map((week) => `${week.gameweek}`).join(", "))
+        : copy.oursNone
       : total.ours_gameweeks.length === total.gameweeks.length
         ? null
         : copy.oursCovers(total.ours_gameweeks.join(", "));
@@ -95,6 +108,16 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
                 <th scope="col" className={styles.right}>
                   {copy.highest}
                 </th>
+                {[
+                  messages.scoreboardComparisons.zero,
+                  messages.scoreboardComparisons.minutes,
+                  messages.scoreboardComparisons.captain,
+                  messages.scoreboardComparisons.autosub,
+                ].map((label) => (
+                  <th key={label} scope="col">
+                    {label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -126,12 +149,17 @@ export function ScoreboardCard({ envelope }: { envelope: LeagueViewEnvelope<Scor
                       : points(total.average_entry_score, 0, locale)}
                   </td>
                   <td className={`${styles.right} num`}>—</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
       )}
+      <p className={styles.notice}>{messages.scoreboardComparisons.missing}</p>
       {anyGross && <p className={styles.notice}>{copy.grossNote}</p>}
       <ScoreboardComparisons weeks={view.gameweeks} />
       {anyProvisional && <p className={styles.notice}>{copy.provisionalNote}</p>}
@@ -145,6 +173,8 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
   const copy = messages.leagueScoreboard;
   const ours = week.ours;
   const top100 = week.top100;
+  const errors =
+    week.finished && week.data_checked && ours?.net != null ? ours.diagnostics : undefined;
   return (
     <tr>
       <th scope="row" className="num">
@@ -165,6 +195,14 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
               </>
             )}
             {ours.net === null && <div className={styles.sub}>{copy.notSettled}</div>}
+            <div className={styles.sub}>
+              {ours.scoring_basis === "named_eleven_no_autosubs"
+                ? messages.scoreboardComparisons.legacy
+                : ours.scoring_basis === "official_autosub_captain_v2"
+                  ? messages.scoreboardComparisons.official
+                  : messages.scoreboardComparisons.basisUnknown}
+            </div>
+            <div className={styles.sub}>{messages.scoreboardComparisons.paperPopulation}</div>
           </>
         )}
       </td>
@@ -191,6 +229,20 @@ function WeekRow({ week, locale }: { week: ScoreboardGameweek; locale: string })
       <td className={`${styles.right} num`}>
         {week.highest_score === null ? "—" : points(week.highest_score, 0, locale)}
       </td>
+      {[
+        errors?.zero_minute_starters,
+        errors?.minutes_shortfall,
+        errors?.captain_shortfall,
+        errors?.autosub_recovery,
+      ].map((value, index) => (
+        <td key={index} className={`${styles.right} num`}>
+          {value != null && Number.isFinite(value)
+            ? index === 1 || index === 2
+              ? signedPoints(value, 1, locale)
+              : points(value, index === 0 ? 0 : 1, locale)
+            : "—"}
+        </td>
+      ))}
     </tr>
   );
 }

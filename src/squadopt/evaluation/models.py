@@ -27,6 +27,30 @@ class ScoringPolicy(StrEnum):
     OFFICIAL_AUTOSUB_CAPTAIN_V2 = "official_autosub_captain_v2"
 
 
+class ScoringBasis(StrEnum):
+    """Which rule turned settled player points into the number a record carries.
+
+    A basis is a property of a *record*, not of the evaluator. ``ScoringPolicy`` above
+    names the policies the evaluator can apply; this names what actually produced a
+    number that is now written down. The two overlap where the official scorer is the
+    thing that ran, and they are pinned equal in the tests so they cannot drift apart.
+
+    ``NAMED_ELEVEN_NO_AUTOSUBS`` has no ``ScoringPolicy`` counterpart on purpose: no
+    evaluator applies it. It is what the named-eleven scorer produces for a decision that
+    froze neither a bench order nor a vice-captain, leaving nothing to complete the eleven
+    with. Such a number is a real measurement of a real decision; it is simply not the
+    same measurement as one the official scorer produced, because automatic substitutions
+    and the vice-captain fallback are in the second and absent from the first.
+
+    Two numbers on different bases are different measurements. They cannot be summed,
+    differenced or ranked against each other, so every record states its own basis and no
+    reader may supply one it was not given.
+    """
+
+    NAMED_ELEVEN_NO_AUTOSUBS = "named_eleven_no_autosubs"
+    OFFICIAL_AUTOSUB_CAPTAIN_V2 = "official_autosub_captain_v2"
+
+
 @dataclass(frozen=True, slots=True)
 class FrozenSquadDecision:
     """A complete, ordered squad decision that can be scored after settlement."""

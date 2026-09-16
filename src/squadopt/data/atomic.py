@@ -10,20 +10,76 @@ reports a replay when they agree, and refuses when they do not.
 "Create once" means exactly what ``projection_retention`` and the live ledger mean by it:
 an occupant holding the same bytes is a success (``"replay"``), an occupant holding
 different bytes is an error, and nothing on disk is ever overwritten.
+
+The other half of publishing is here too, and for the same reason: :func:`replace_retrying`
+is the one rename a record lands by. A writer that stages bytes in a sibling and moves them
+into place with ``os.replace`` is publishing, and on Windows that last move is refused with
+``PermissionError`` while anything still holds a handle on what was written a moment ago.
+Every writer that owned its own rename owned its own answer to that, which is how a record
+came to be deleted for a refusal the next attempt would have survived.
 """
 
 import contextlib
 import json
 import os
 import secrets
+import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
+from typing import Final
 
 from squadopt.data._long_paths import addressable
-from squadopt.data.errors import AtomicWriteError, ConflictingBytesError
+from squadopt.data.errors import AtomicWriteError, ConflictingBytesError, RenameRefusedError
 
 WRITTEN = "written"
 REPLAY = "replay"
+
+RENAME_RETRY_ATTEMPTS: Final = 5
+"""How many times a rename refused with ``PermissionError`` is attempted in all."""
+RENAME_RETRY_INITIAL_SECONDS: Final = 0.05
+"""The first pause before a retry; it doubles, so five attempts span 0.75 s of waiting."""
+
+
+def replace_retrying(source: Path, destination: Path) -> None:
+    """``os.replace``, retried for a moment while the operating system refuses it.
+
+    Windows refuses a rename with ``PermissionError`` (WinError 5) while any process still
+    holds a handle on a path involved - a scanner or an indexer reading bytes that were
+    written a moment ago, which is likelier when the suite runs many workers at once. The
+    same rename then succeeds, so that error alone is retried, ``RENAME_RETRY_ATTEMPTS``
+    times with a doubling pause, and the last refusal is reported rather than swallowed,
+    as ``RenameRefusedError`` naming how long it waited.
+
+    One case that is not transient arrives as the very same error: Windows refuses a
+    rename onto a destination that already exists as a directory. Retrying that would turn
+    a real refusal into a slow one, so the original ``PermissionError`` is re-raised at
+    once, and a caller that can tell what an occupied destination means - a record already
+    written by someone else - separates the two by catching it. This function never decides
+    whether a record may be written; create-once is the caller's check under its own lock.
+
+    Both paths go through ``addressable``, so a destination past Windows' MAX_PATH is still
+    reachable: the staging sibling a record is built in is longer than the record's own
+    name, and the rename is the call that writes the shorter one.
+    """
+
+    delay = RENAME_RETRY_INITIAL_SECONDS
+    waited = 0.0
+    for attempt in range(1, RENAME_RETRY_ATTEMPTS + 1):
+        try:
+            os.replace(addressable(source), addressable(destination))
+            return
+        except PermissionError as error:
+            if Path(addressable(destination)).is_dir():
+                raise
+            if attempt == RENAME_RETRY_ATTEMPTS:
+                raise RenameRefusedError(
+                    f"Renaming {source} onto {destination} was refused on all "
+                    f"{RENAME_RETRY_ATTEMPTS} attempts over {waited:.2f} s; something "
+                    "still holds a handle on it."
+                ) from error
+        time.sleep(delay)
+        waited += delay
+        delay *= 2
 
 
 def write_bytes_once(
@@ -120,9 +176,12 @@ def write_document_once(
 
 
 __all__: tuple[str, ...] = (
+    "RENAME_RETRY_ATTEMPTS",
+    "RENAME_RETRY_INITIAL_SECONDS",
     "REPLAY",
     "WRITTEN",
     "document_bytes",
+    "replace_retrying",
     "write_bytes_once",
     "write_document_once",
 )

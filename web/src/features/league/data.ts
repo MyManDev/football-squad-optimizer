@@ -138,7 +138,26 @@ export async function loadEntryAdviceIndex(
  * says "not published yet".
  */
 export async function loadScoreboard(): Promise<LeagueViewEnvelope<Scoreboard>> {
-  return read<Scoreboard>("scoreboard.json");
+  const envelope = await read<Scoreboard>("scoreboard.json");
+  if (!Array.isArray(envelope.payload?.gameweeks))
+    throw new LeagueDataError("Missing scoreboard weeks.");
+  for (const week of envelope.payload.gameweeks) {
+    const rows = [week.ours, ...(week.comparisons ?? [])];
+    for (const row of rows) {
+      if (
+        row?.net != null &&
+        ![
+          "named_eleven_no_autosubs",
+          "official_autosub_captain_v2",
+          "net",
+          "source_average",
+        ].includes(row.scoring_basis ?? "")
+      ) {
+        throw new LeagueDataError("A measured scoreboard row must name its scoring basis.");
+      }
+    }
+  }
+  return envelope;
 }
 
 export const SUPPORTED_LEAGUE_ID = 352490;

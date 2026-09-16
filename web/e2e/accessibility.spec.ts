@@ -14,6 +14,7 @@ const ROUTES = [
   "/league/members/35249001?mode=saf-puan&window=3",
   "/league/members/squadopt",
   "/analysis",
+  "/admin",
   "/status",
 ] as const;
 const BLOCKING_IMPACTS = new Set(["critical", "serious"]);
@@ -90,5 +91,5 @@ test("skip link and primary navigation expose visible keyboard focus", async ({ 
   await expect(league).toHaveCSS("outline-style", "solid");
 
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: "Analiz", exact: true })).toBeFocused();
+  await expect(page.getByRole("button", { name: /^TR/ })).toBeFocused();
 });

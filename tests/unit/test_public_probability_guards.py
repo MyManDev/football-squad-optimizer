@@ -475,7 +475,13 @@ def _scoreboard_document(basis: str) -> dict[str, Any]:
         "metadata": {"mode": "replay"},
         "transfers": {"transfer_hit_points": 4.0, "chip": "bboost"},
     }
-    outcome = {"realized_net_score": 26.0, "realized_xi_score": 30.0}
+    # A settled outcome states the rule that produced its numbers; the publisher refuses
+    # one that does not, so the sweep needs a record it would actually publish.
+    outcome = {
+        "realized_net_score": 26.0,
+        "realized_xi_score": 30.0,
+        "scoring_basis": "official_autosub_captain_v2",
+    }
     entries = (
         LedgerEntry("2026-27", 1, decision, outcome, Path(".")),
         LedgerEntry("2026-27", 2, decision, None, Path(".")),

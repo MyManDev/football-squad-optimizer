@@ -23,6 +23,7 @@ import pytest
 from squadopt.platform.club_news_fetch import (
     CLUB_NEWS_SOURCES_CONTRACT_VERSION,
     MAXIMUM_DOCUMENT_BYTES,
+    PER_ORIGIN_DELAY_SECONDS,
     ClubNewsFetchError,
     ClubSource,
     fetch_club_document,
@@ -325,6 +326,140 @@ def test_reading_no_source_is_refused() -> None:
         fetch_registered_documents(())
 
 
+# --- one host, asked once -----------------------------------------------------
+
+
+def _three_pages_on_one_host() -> tuple[tuple[ClubSource, ...], _Opener]:
+    """One club publishing on three paths, which the registry now permits."""
+
+    sources = tuple(
+        ClubSource(club="Example FC", url=f"https://club.example/{path}")
+        for path in ("team-news", "injuries", "press-conference")
+    )
+    replies: dict[str, Any] = {ROBOTS: _allowing_robots()}
+    for source in sources:
+        replies[source.url] = _Reply(final_url=source.url)
+    return sources, _Opener(replies)
+
+
+def test_one_host_is_asked_for_its_robots_once_however_many_pages_it_serves() -> None:
+    """Counted, not assumed. Three pages used to mean three identical questions.
+
+    The verdicts are unchanged: one `robots.txt` decides every path of its host, so deciding
+    them locally removes requests without moving a single answer.
+    """
+
+    sources, opener = _three_pages_on_one_host()
+
+    documents, refused = fetch_registered_documents(
+        sources, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert refused == ()
+    assert len(documents) == 3
+    assert opener.requested.count(ROBOTS) == 1
+
+
+def test_a_second_request_to_one_host_waits() -> None:
+    """Politeness is owed to the machine answering, and it is measured through the clock."""
+
+    sources, opener = _three_pages_on_one_host()
+    delays, sleeper = _slept()
+
+    fetch_registered_documents(sources, opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper)
+
+    # One robots request and three documents: the first contact is free, the other three wait.
+    assert delays == [PER_ORIGIN_DELAY_SECONDS] * 3
+
+
+def test_two_hosts_do_not_wait_for_each_other() -> None:
+    """The debt is owed per host, so a slow neighbour does not slow an unrelated club."""
+
+    other = ClubSource(club="Other FC", url="https://other.example/news")
+    opener = _Opener(
+        {
+            ROBOTS: _allowing_robots(),
+            PAGE: _Reply(),
+            "https://other.example/robots.txt": _allowing_robots(),
+            other.url: _Reply(final_url=other.url),
+        }
+    )
+    delays, sleeper = _slept()
+
+    documents, refused = fetch_registered_documents(
+        (SOURCE, other), opener=opener, now=lambda: FIXED_NOW, sleeper=sleeper
+    )
+
+    assert refused == ()
+    assert len(documents) == 2
+    # Each host is contacted twice -- its robots and its one page -- so each waits once.
+    assert delays == [PER_ORIGIN_DELAY_SECONDS, PER_ORIGIN_DELAY_SECONDS]
+
+
+def test_a_host_whose_robots_cannot_be_read_is_asked_once_and_refuses_every_page() -> None:
+    """Re-asking would not make the answer less unknown; it would only ask again."""
+
+    sources, _opener = _three_pages_on_one_host()
+    broken = urllib.error.HTTPError(ROBOTS, 500, "Server Error", {}, None)  # type: ignore[arg-type]
+    replies: dict[str, Any] = {ROBOTS: broken}
+    for source in sources:
+        replies[source.url] = _Reply(final_url=source.url)
+    opener = _Opener(replies)
+
+    documents, refused = fetch_registered_documents(
+        sources, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert documents == ()
+    assert len(refused) == 3
+    assert all("preference is unknown" in reason for _club, reason in refused)
+    assert opener.requested.count(ROBOTS) == 1
+
+
+def test_each_refused_page_is_named_in_its_own_refusal() -> None:
+    """A club is not told its page was refused under another club's address.
+
+    Remembering the host's answer once is right; remembering the whole composed refusal was
+    not. That message names the page it costs, so every later page of the host inherited the
+    first page's URL -- and since one host can serve several clubs, a club could be handed a
+    refusal pointing at a page that is not its own.
+    """
+
+    sources, _unused = _three_pages_on_one_host()
+    broken = urllib.error.HTTPError(ROBOTS, 500, "Server Error", {}, None)  # type: ignore[arg-type]
+    replies: dict[str, Any] = {ROBOTS: broken}
+    for source in sources:
+        replies[source.url] = _Reply(final_url=source.url)
+
+    _documents, refused = fetch_registered_documents(
+        sources, opener=_Opener(replies), now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert len(refused) == len(sources)
+    for source, (_club, reason) in zip(sources, refused, strict=True):
+        assert source.url in reason, reason
+        others = [other.url for other in sources if other.url != source.url]
+        assert not any(other in reason for other in others), reason
+
+
+def test_a_host_serving_no_robots_is_asked_once_and_allows_every_page() -> None:
+    """A 404 is silence, and silence is stated once for the whole host."""
+
+    sources, _opener = _three_pages_on_one_host()
+    replies: dict[str, Any] = {}
+    for source in sources:
+        replies[source.url] = _Reply(final_url=source.url)
+    opener = _Opener(replies)
+
+    documents, refused = fetch_registered_documents(
+        sources, opener=opener, now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert refused == ()
+    assert len(documents) == 3
+    assert opener.requested.count(ROBOTS) == 1
+
+
 # --- the registry -----------------------------------------------------------
 
 
@@ -364,20 +499,86 @@ def test_every_registered_source_points_at_a_terms_reading(tmp_path: Path) -> No
         load_club_sources(path)
 
 
-def test_a_club_registered_twice_is_refused(tmp_path: Path) -> None:
-    """Two pages for one club makes "which is this club's" a question with two answers."""
+def _registry(tmp_path: Path, *entries: dict[str, str]) -> Path:
+    """A registry file carrying exactly ``entries``, each with its terms pointer."""
 
     path = tmp_path / "sources.json"
-    entry = {"club": "Example FC", "url": PAGE, "terms_record": "docs/club_news_sources.md"}
     path.write_text(
         json.dumps(
-            {"contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION, "sources": [entry, entry]}
+            {
+                "contract_version": CLUB_NEWS_SOURCES_CONTRACT_VERSION,
+                "sources": [
+                    {"terms_record": "docs/club_news_sources.md", **entry} for entry in entries
+                ],
+            }
         ),
         encoding="utf-8",
+    )
+    return path
+
+
+def test_one_page_registered_twice_is_refused(tmp_path: Path) -> None:
+    """The same address twice is read twice and coded twice, from one sentence."""
+
+    path = _registry(
+        tmp_path, {"club": "Example FC", "url": PAGE}, {"club": "Example FC", "url": PAGE}
     )
 
     with pytest.raises(ClubNewsFetchError, match="twice"):
         load_club_sources(path)
+
+
+def test_a_club_may_register_more_than_one_page(tmp_path: Path) -> None:
+    """A club that splits team news and its injury table is registered, not refused.
+
+    Nothing below joins a claim to a club's page -- a claim cites a document by digest and
+    byte span -- so two pages for one club leave no question with two answers. Both entries
+    survive in the declared order, because the fetch order is what makes two runs over one
+    registry produce the same capture.
+    """
+
+    path = _registry(
+        tmp_path,
+        {"club": "Example FC", "url": "https://club.example/team-news"},
+        {"club": "Example FC", "url": "https://club.example/injuries"},
+    )
+
+    sources = load_club_sources(path)
+
+    assert [source.club for source in sources] == ["Example FC", "Example FC"]
+    assert [source.url for source in sources] == [
+        "https://club.example/team-news",
+        "https://club.example/injuries",
+    ]
+
+
+def test_two_spellings_of_one_host_are_one_address(tmp_path: Path) -> None:
+    """Host names are case-insensitive, so this is the same page registered twice."""
+
+    path = _registry(
+        tmp_path,
+        {"club": "Example FC", "url": "https://club.example/team-news"},
+        {"club": "Example FC", "url": "https://Club.Example/team-news"},
+    )
+
+    with pytest.raises(ClubNewsFetchError, match="twice"):
+        load_club_sources(path)
+
+
+def test_two_paths_differing_only_in_case_are_two_addresses(tmp_path: Path) -> None:
+    """Paths are case-sensitive, and folding them would refuse a truthful registry.
+
+    Whether a host serves the same bytes at both is the host's business and not something
+    this module may assume; refusing here would turn a guess into a rejected permission.
+    """
+
+    path = _registry(
+        tmp_path,
+        {"club": "Example FC", "url": "https://club.example/team-news"},
+        {"club": "Example FC", "url": "https://club.example/Team-News"},
+    )
+
+    assert len(load_club_sources(path)) == 2
 
 
 def test_an_empty_registry_is_refused(tmp_path: Path) -> None:

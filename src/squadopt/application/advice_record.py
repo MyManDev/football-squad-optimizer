@@ -48,10 +48,8 @@ ledger. It records; a review page is a separate piece of work reading these docu
 
 import hashlib
 import json
-import os
 import re
 import shutil
-import subprocess
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -59,7 +57,9 @@ from pathlib import Path
 from typing import Final
 
 from squadopt.application.entries import EntryPicks
-from squadopt.data.errors import DataError
+from squadopt.data.atomic import replace_retrying
+from squadopt.data.errors import DataError, RenameRefusedError
+from squadopt.data.source_revision import is_source_revision, source_revision
 from squadopt.data.timestamps import as_instant, normalize_utc_timestamp
 from squadopt.live.ledger import (
     prune_stale_staging,
@@ -87,7 +87,6 @@ PLAYER_ID_SPACE: Final = "fpl_element_code"
 
 RECORD_FILE: Final = "advice.json"
 
-_COMMIT_PATTERN: Final = re.compile(r"[0-9a-f]{40}")
 #: How many differing fields a refusal names before it stops listing them.
 _DIFFERENCE_LIMIT: Final = 12
 #: What may be a capture's path segment. A snapshot identifier is
@@ -125,6 +124,18 @@ class AdviceRecordError(DataError):
 
 class AdviceRecordConflictError(AdviceRecordError):
     """A capture already recorded was built again with different bytes."""
+
+
+class AdviceRecordNotLandedError(AdviceRecordError):
+    """A complete record could not be moved into place, so nothing was recorded.
+
+    Deliberately not a conflict. A conflict is two different answers for one capture and
+    needs a person to decide which is true; this is the filesystem refusing a rename for
+    the whole retry budget, with the record staged, verified and never published. Nothing
+    on disk disagrees with anything, and re-running the publish of this capture records
+    it. Reporting the two as one error would have an operator hunting a divergence that
+    does not exist while the week's evidence is simply missing.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,33 +198,29 @@ class PublishedAdvice:
 
 
 def repository_commit() -> str | None:
-    """The commit the emitting process is running, or ``None`` when it cannot be read.
+    """The commit the emitting process is running, or ``None`` when none can be stood behind.
 
-    ``SQUADOPT_REPOSITORY_COMMIT`` wins, as it does for the CLI's run context, so a build
-    from an exported tree can still state its provenance. Otherwise ``git rev-parse HEAD``
-    in the working tree this module was imported from. A commit that cannot be resolved is
-    recorded as absent: an unknown provenance and a wrong one are not the same thing, and
-    only one of them can be published.
+    Resolved by ``data/source_revision``, which every stamp in this repository now shares.
+    This is the one caller that uses the answer as a *description* rather than an identity,
+    so it is also the one that publishes absence: an unknown provenance and a wrong one are
+    not the same thing, and only one of them may be written down.
+
+    Two cases read as absent. Nothing named the commit at all, and the checkout on disk is
+    not that commit -- it is modified, or it is on a different HEAD than the value that was
+    declared. The second is the one that used to publish a falsehood: measured on a modified
+    checkout, this function returned a full SHA describing none of the bytes that produced the
+    advice. A record is evidence, so it says nothing rather than something untrue, and a
+    reader of ``provenance.repository_commit`` can take a value there as the tree that ran.
+
+    What it deliberately does not do is refuse. The record is the only evidence of what a
+    member was told; losing it because git is missing would protect a footnote by destroying
+    the document it annotates.
     """
 
-    supplied = os.environ.get("SQUADOPT_REPOSITORY_COMMIT", "").strip().lower()
-    if _COMMIT_PATTERN.fullmatch(supplied):
-        return supplied
-    root = Path(__file__).resolve().parents[3]
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "HEAD"],
-            capture_output=True,
-            check=False,
-            text=True,
-            shell=False,
-        )
-    except OSError:
+    resolved = source_revision()
+    if resolved is None or resolved.matches_checkout is False:
         return None
-    if result.returncode != 0:
-        return None
-    value = result.stdout.strip().lower()
-    return value if _COMMIT_PATTERN.fullmatch(value) else None
+    return resolved.commit
 
 
 def entry_directory(root: Path, season: str, gameweek: int, entry_id: int) -> Path:
@@ -643,33 +650,72 @@ def _document_without_publication_clock(document: object) -> object:
     return {**document, "published_sha256": _REPLAYED}
 
 
+def _reconciled(
+    recorded: Mapping[str, object], incoming: Mapping[str, object]
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Both records, prepared for comparison: clock blanked, and an unknown revision matched.
+
+    The clock blanking is :func:`_without_publication_clock` and is explained there. What is
+    added here is the one case where a difference is not a disagreement: exactly one side
+    knows ``provenance.repository_commit`` and the other published ``null``.
+
+    That is one publish not knowing, not two publishes contradicting each other. It happens
+    when a capture is published once from a checkout that could not be stood behind -- git
+    absent, or the tree modified -- and published again from one that could. Nothing about
+    the advice changed; one record simply declined to guess. Refusing the week over it would
+    fail a run on a footnote, which is the opposite of what recording provenance is for.
+
+    Four things this deliberately does not do. It does not touch the bytes on disk: the known
+    value is copied onto the unknown side **for the comparison only**, so a record that said
+    ``null`` still says ``null`` afterwards and is never quietly upgraded. It does not forgive
+    two differing commits -- catching those is the entire reason the field exists, and they
+    still conflict and are still named. It requires the field present on both sides, so a
+    record missing it altogether is still a difference rather than a match. And the known side
+    has to be spelled like a revision: ``null`` against something that is not a commit is not
+    a build declining to guess, it is a document this system did not write, and forgiving that
+    would forgive anything at all appearing in the provenance block.
+    """
+
+    left = _without_publication_clock(recorded)
+    right = _without_publication_clock(incoming)
+    left_provenance, right_provenance = left.get("provenance"), right.get("provenance")
+    if not isinstance(left_provenance, Mapping) or not isinstance(right_provenance, Mapping):
+        return left, right
+    if "repository_commit" not in left_provenance or "repository_commit" not in right_provenance:
+        return left, right
+    was, now = left_provenance["repository_commit"], right_provenance["repository_commit"]
+    if was is None and is_source_revision(now):
+        left["provenance"] = {**left_provenance, "repository_commit": now}
+    elif now is None and is_source_revision(was):
+        right["provenance"] = {**right_provenance, "repository_commit": was}
+    return left, right
+
+
 def _is_replay(recorded: Mapping[str, object], incoming: Mapping[str, object]) -> bool:
     """Whether the incoming record says exactly what the recorded one says.
 
-    The same comparison the refusal message is built from, run over both records with the
-    publication clock blanked, so the predicate and the message can never drift apart: if
-    nothing else differs, one capture was published twice and said the same thing both
-    times, which is a replay rather than a disagreement.
+    The same comparison the refusal message is built from, run over both records as
+    :func:`_reconciled` prepares them, so the predicate and the message can never drift
+    apart: if nothing else differs, one capture was published twice and said the same thing
+    both times, which is a replay rather than a disagreement.
     """
 
-    return not _differences(
-        _without_publication_clock(recorded), _without_publication_clock(incoming)
-    )
+    return not _differences(*_reconciled(recorded, incoming))
 
 
 def _conflict(directory: Path, recorded: Mapping[str, object], record: Mapping[str, object]) -> str:
     """The refusal, naming what disagreed — which is never the publication clock.
 
-    The clock is blanked on both sides before the comparison, exactly as :func:`_is_replay`
-    blanks it. A refusal getting this far means something other than the clock moved, so
+    Both sides go through :func:`_reconciled` first, exactly as :func:`_is_replay` does. A
+    refusal getting this far means something other than the publication clock moved, so
     listing the clock would be worse than useless: it always moves on a re-publish, it is
     never the reason, and at four fields on a three-document member it displaces the fields
     that *are* the reason out of a message that only names the first ``_DIFFERENCE_LIMIT``.
+    The same argument covers a revision one side did not know: reconciled there too, so it
+    cannot displace the real difference out of the list either.
     """
 
-    differences = _differences(
-        _without_publication_clock(recorded), _without_publication_clock(record)
-    )
+    differences = _differences(*_reconciled(recorded, record))
     shown = differences[:_DIFFERENCE_LIMIT]
     more = len(differences) - len(shown)
     lines = [
@@ -853,6 +899,12 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
     A *different* capture is not that. It is the next publish of the week — the mid-week
     build and the one taken shortly before the deadline are both real advice — and it lands
     at its own address rather than colliding with the earlier one.
+
+    The record is built in a staging sibling and published by one rename, so it exists
+    complete or not at all. A rename the system refuses while it still holds a handle on
+    the bytes just written is waited out rather than treated as a verdict, and only a
+    refusal that outlasts the whole budget gives up, as ``AdviceRecordNotLandedError``,
+    which says the run recorded nothing, not that anything disagreed.
     """
 
     season = str(record["season"])
@@ -888,15 +940,44 @@ def record_member_advice(root: Path, record: Mapping[str, object]) -> Path:
         prune_stale_staging(Path(root) / season / f"gw{gameweek:02d}", f"entry-{entry_id}")
         staging = staging_directory(directory)
         staging.mkdir(parents=True)
+        landed = False
         try:
             (staging / RECORD_FILE).write_bytes(payload)
             write_manifest(staging, contract_version=MEMBER_ADVICE_RECORD_CONTRACT_VERSION)
             verify_manifest(staging)
-            # One rename: the record exists complete or does not exist at all.
-            os.replace(staging, directory)
-        except BaseException:
-            shutil.rmtree(staging, ignore_errors=True)
-            raise
+            # One rename: the record exists complete or does not exist at all. Windows
+            # refuses that rename while anything still holds a handle on the bytes written
+            # a moment ago, and the same rename then succeeds, so it is waited out rather
+            # than failed. It used to be a plain os.replace inside a clause that deleted
+            # the staging and re-raised: a scanner reading advice.json for a fraction of a
+            # second was enough to destroy a complete record of a capture that is already
+            # spent, and to do it for a reason the next attempt would not have had.
+            try:
+                replace_retrying(staging, directory)
+                landed = True
+            except PermissionError:
+                if not directory.exists():
+                    raise
+                # The one refusal no retry survives: a record is already at this address.
+                # Under the lock that means another writer landed between the check above
+                # and here, and the occupant is the answer - the same advice replays, and
+                # different advice is the conflict it has always been. Ours is redundant
+                # either way, so it is the staging that goes, not the record.
+                return _settled()
+            except RenameRefusedError as error:
+                raise AdviceRecordNotLandedError(
+                    f"The advice record for entry {entry_id} in {season} gameweek "
+                    f"{gameweek} was staged complete and could not be published: {error} "
+                    "Nothing was recorded for this capture and nothing was overwritten; "
+                    "re-run the publish of this capture to record it."
+                ) from error
+        finally:
+            # Everything that did not land is removed here, and only here: a staging that
+            # landed *is* the record directory, and a staging that did not holds bytes
+            # that are either incomplete or now redundant. Leaving one behind would leave
+            # a half-written record beside the real ones for the stale sweep to find.
+            if not landed:
+                shutil.rmtree(staging, ignore_errors=True)
     return directory
 
 
@@ -907,6 +988,7 @@ __all__: tuple[str, ...] = (
     "RECORD_FILE",
     "AdviceRecordConflictError",
     "AdviceRecordError",
+    "AdviceRecordNotLandedError",
     "PublishedAdvice",
     "RecordCapture",
     "build_member_advice_record",

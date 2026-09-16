@@ -23,7 +23,7 @@ historical source is reconstructed.
 ## Measurements
 
 All four diagnostic keys are present. Missing evidence is JSON `null`, never a
-measured zero. The web table shows missing measurements as `-` in both languages.
+measured zero. The web table shows missing measurements as `—` in both languages.
 
 | Diagnostic | Definition |
 | --- | --- |
@@ -52,6 +52,39 @@ are scored without inventing a bench order or vice. Decisions with explicitly
 recorded bench order and vice use `official_autosub_captain_v2`, the existing
 validated scorer. The `ours` row additionally exposes the same diagnostics and
 `outcome_snapshot_id`; `vice_captain_named` describes the frozen decision.
+
+## One basis per number, and one basis per total
+
+A number does not carry the rule that produced it, so the rule is recorded beside it
+and is never supplied by a reader. `scoring_basis` is present wherever a score is
+present and is `null` exactly where the score is `null`: an unsettled row has no
+number for a basis to describe, and claiming one there would name a rule that never
+ran. A record that states a score and no basis is refused rather than defaulted, at
+each place one could enter: the ledger refuses it on read, settlement refuses to
+carry it through, the producer refuses to publish it, a previously published row
+carrying it is dropped instead of republished, and the schema above refuses the
+document. The single exception is entailed, not assumed: a decision that froze
+neither an ordered bench nor a vice-captain cannot have been scored by the official
+scorer, which refuses such a decision outright, so the named eleven is the only rule
+that could have produced its number. A basis read off a decision this way is marked
+`basis_source: entailed_by_legacy_decision` on the loaded entry, so the record says
+the basis was derived rather than recorded. Nothing is written back to the ledger.
+
+`cumulative.ours_net` is kept on one basis, named by `cumulative.ours_basis`. A
+finished week scored on any other basis keeps its own published row, with its own
+number and its own basis, and is listed in `cumulative.ours_excluded_gameweeks`
+alongside the basis that produced it. It is not added in. Weeks scored under
+different rules are different measurements, and a sum across them would read as a
+season score without being one, which is worse than publishing no total. `ours_net`
+and `ours_basis` are both `null` while no finished week sits on the series basis;
+that reads as nothing to total, never as zero. The series basis is fixed in the
+producer rather than inferred from the weeks on hand, so a total cannot quietly
+re-base itself when the scorer changes.
+
+Gameweek 1 of 2026-27 is such a week. Its decision froze no bench order and no
+vice-captain, so nothing could complete its eleven and its number is on
+`named_eleven_no_autosubs`, while every week from gameweek 2 on settles officially.
+It is published, and it is excluded from the running total.
 
 The publication reads verified ledger entries and event-live captures. The archive
 is scanned once, retaining at most one capture per requested gameweek. Settlement

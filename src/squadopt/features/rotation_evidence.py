@@ -568,6 +568,7 @@ def build_rotation_evidence_table(
     clubs_declared: Sequence[str],
     clubs_covered: Sequence[str],
     model: ClubModelProvenance | None,
+    clubs_partially_covered: Sequence[str] = (),
     unverifiable_claims: Sequence[UnlocatableClaim] = (),
     club_news_snapshot_id: str | None = None,
 ) -> pd.DataFrame:
@@ -609,6 +610,13 @@ def build_rotation_evidence_table(
         raise InvalidValueError(
             f"Clubs {uncovered!r} are covered but were never declared; coverage cannot exceed "
             "what the week set out to read."
+        )
+    unread = sorted(set(clubs_partially_covered) - set(clubs_covered))
+    if unread:
+        raise InvalidValueError(
+            f"Clubs {unread!r} are recorded as partly read but are not covered. A club none "
+            "of whose pages were read is unread, not partly read, and collapsing the two "
+            "would assert that something was read from a club nobody reached."
         )
     deadline = as_instant(deadline_timestamp_utc)
 
@@ -751,6 +759,10 @@ def build_rotation_evidence_table(
             "source_snapshot_ids": _union_of_row_sources(table),
             "clubs_declared": tuple(sorted(set(clubs_declared))),
             "clubs_covered": tuple(sorted(covered)),
+            # Covered, and not covered in full. Since a club may register several pages,
+            # "his club was read" and "all of his club's pages were read" stopped being the
+            # same statement; without this the second silently borrows the first's answer.
+            "clubs_partially_covered": tuple(sorted(set(clubs_partially_covered))),
             "documents_read": len(documents),
             "document_sha256s": tuple(
                 sorted({claim.source_sha256 for claim in claims}),

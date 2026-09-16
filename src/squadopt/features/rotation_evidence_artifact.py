@@ -39,8 +39,11 @@ from squadopt.features.rotation_evidence import (
 )
 
 #: The export's own contract, separate from the table's. The table is what the rows mean; this
-#: is how the pair on disk is shaped, and either can move without the other.
-ARTIFACT_CONTRACT_VERSION: Final = "rotation_evidence_export_v1"
+#: is how the pair on disk is shaped, and either can move without the other. It moved to v2
+#: when the manifest gained ``clubs_partially_covered``; the table's own version did not,
+#: because no column changed -- partial coverage is a club-level fact and the manifest is
+#: where club-level facts live.
+ARTIFACT_CONTRACT_VERSION: Final = "rotation_evidence_export_v2"
 
 #: Every manifest field the reader requires. A missing one refuses the pair: the manifest is
 #: what makes the table checkable, and a manifest with a hole in it checks less than it claims.
@@ -61,6 +64,7 @@ REQUIRED_MANIFEST_FIELDS: Final[frozenset[str]] = frozenset(
         "source_snapshot_ids",
         "clubs_declared",
         "clubs_covered",
+        "clubs_partially_covered",
         "documents_read",
         "document_sha256s",
         "model_identifier",

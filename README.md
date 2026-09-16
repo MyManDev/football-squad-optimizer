@@ -30,6 +30,26 @@ transition: what it changed, what was accepted and what still waits on a real en
 | `artifacts/` | Git-ignored local experiment outputs; generated, never source |
 | `.codex-tmp/` | Git-ignored agent worktrees and scratch; not project content |
 
+## Where to make a change
+
+| Task | Start here |
+| --- | --- |
+| League/member pages and scoreboard display | [League UI](web/src/features/league/) and [publication builder](src/squadopt/application/league_views.py) |
+| Other website screens | [Features](web/src/features/), [shared design](web/src/design/) and [translations](web/src/i18n/) |
+| Published JSON shape and frontend validation | [Versioned contracts](docs/contracts/) and [web data adapters](web/src/data/) |
+| Advice generation | [Advice workflow](src/squadopt/application/advice.py), then [planning](src/squadopt/planning/) and [optimization](src/squadopt/optimization/) |
+| Captured inputs and prediction | [Data](src/squadopt/data/), [features](src/squadopt/features/) and [prediction](src/squadopt/prediction/) |
+| Settled results and decision history | [Live records](src/squadopt/live/), [evaluation](src/squadopt/evaluation/) and [scoreboard](src/squadopt/application/scoreboard.py) |
+| Weekly commands and publication | [CLI](src/squadopt/platform/cli.py), [weekly operations](src/squadopt/platform/weekly_operations.py) and [weekly runbook](docs/weekly_runbook.md) |
+| HTTP requests and queued advice | [API](src/squadopt/api/), [advice worker](src/squadopt/platform/advice_worker.py) and [backend runbook](docs/backend_runbook.md) |
+| Research or reproducing a measurement | [Experiments](src/squadopt/experiments/), [script catalog](scripts/README.md) and [evidence index](docs/measurements_index.md) |
+| Tests | [Python unit](tests/unit/), [integration](tests/integration/) and frontend tests beside their features |
+
+Use the [dependency rules](docs/architecture/dependency_rules.md) before moving Python modules.
+The [script catalog](scripts/README.md) separates operational commands, research runners and
+compatibility entry points. The [documentation guide](docs/README.md) groups documents by topic;
+historical record paths also appear in code and provenance.
+
 ## Development
 
 Python 3.11 is the supported floor. Python 3.13 with `constraints.txt` reproduces the pinned

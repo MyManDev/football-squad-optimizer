@@ -1,11 +1,11 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-12T10:50:08Z",
+  "generated_at_utc": "2026-09-16T06:21:15Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
     "season": "2026-27",
-    "gameweek": 4,
+    "gameweek": 5,
     "entry_id": 7018833,
     "window": 1,
     "windows": {
@@ -42,16 +42,16 @@
       8548384,
       8883467
     ],
-    "default_rival_entry_id": 6654210,
+    "default_rival_entry_id": 5662073,
     "suggested_strategy": {
       "strategy": "saf-puan",
       "rule_id": "gap_and_weeks_strategy_rule_v1",
       "band": "level",
-      "rival_entry_id": 6654210,
+      "rival_entry_id": 5662073,
       "points_ahead_of_rival": -10,
-      "scored_gameweek": 3,
-      "gameweeks_remaining": 35,
-      "band_edge_points": 125.4
+      "scored_gameweek": 4,
+      "gameweeks_remaining": 34,
+      "band_edge_points": 123.6
     },
     "computed": [
       {

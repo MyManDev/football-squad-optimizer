@@ -1,8 +1,8 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-09-12T10:50:05Z",
+  "generated_at_utc": "2026-09-16T06:50:48Z",
   "payload": {
-    "captured_at_utc": "2026-09-12T10:00:00.227050Z",
+    "captured_at_utc": "2026-09-15T17:52:25.802810Z",
     "league_total_average_score": 50.0,
     "our_total_realized_net_score": 26.0,
     "ownership": {
@@ -15,27 +15,27 @@
         484420,
         178301
       ],
-      "effective_ownership": 255.89999999999998,
+      "effective_ownership": 258.8,
       "gameweek": 1,
       "least_owned_starter": 499604,
-      "mean_starter_ownership": 16.79090909090909,
+      "mean_starter_ownership": 16.945454545454545,
       "most_owned_starter": 223094,
       "ownership_percent": {
-        "178301": 3.0,
-        "200834": 2.2,
-        "204936": 7.5,
-        "216616": 3.0,
-        "223094": 71.2,
-        "244723": 6.9,
-        "244850": 34.4,
-        "437730": 16.2,
-        "446008": 23.5,
-        "484420": 4.3,
+        "178301": 2.8,
+        "200834": 2.0,
+        "204936": 7.6,
+        "216616": 2.9,
+        "223094": 72.4,
+        "244723": 6.4,
+        "244850": 37.7,
+        "437730": 15.5,
+        "446008": 22.8,
+        "484420": 4.0,
         "490145": 1.3,
-        "494521": 3.4,
-        "499604": 1.9,
-        "67089": 18.0,
-        "97032": 17.1
+        "494521": 3.2,
+        "499604": 1.7,
+        "67089": 17.6,
+        "97032": 16.7
       },
       "squad": [
         {
@@ -237,14 +237,14 @@
     },
     "scored_gameweeks": 1,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
+    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
     "total_difference_to_average": -24.0,
     "verdict": "-24 points against the game's average over 1 scored gameweek — one gameweek is noise, not evidence; the starting eleven averages 17% ownership.",
     "verdict_code": "standing",
     "verdict_params": {
       "caveat": "noise",
       "difference": -24.0,
-      "mean_starter_ownership": 16.8,
+      "mean_starter_ownership": 16.9,
       "scored": 1
     },
     "weeks": [
@@ -282,12 +282,12 @@
         "our_realized_score": null
       },
       {
-        "average_entry_score": null,
+        "average_entry_score": 69.0,
         "deadline_utc": "2026-09-12T12:30:00Z",
         "difference_to_average": null,
-        "finished": false,
+        "finished": true,
         "gameweek": 4,
-        "highest_score": null,
+        "highest_score": 151.0,
         "our_projected_score": null,
         "our_realized_net_score": null,
         "our_realized_score": null

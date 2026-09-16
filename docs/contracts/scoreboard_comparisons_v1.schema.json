@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Scoreboard comparisons v1 gameweek extension",
-  "description": "Validates one scoreboard gameweek. The comparisons field is optional for legacy publications.",
+  "description": "Validates one scoreboard gameweek. The comparisons field is optional for legacy publications. A number that states no basis is refused: scoring_basis says which rule produced a score, is required wherever a score is present, and is null exactly where the score is null. The payload-level cumulative block is validated separately against #/$defs/cumulative.",
   "type": "object",
   "required": [
     "gameweek",
@@ -109,6 +109,16 @@
           ]
         }
       ]
+    },
+    "ours": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ours"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "allOf": [
@@ -197,6 +207,32 @@
     },
     "comparison": {
       "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "net": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "net"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scoring_basis": {
+                "enum": [
+                  "named_eleven_no_autosubs",
+                  "official_autosub_captain_v2",
+                  "net",
+                  "source_average"
+                ]
+              }
+            }
+          }
+        }
+      ],
       "required": [
         "kind",
         "net",
@@ -243,7 +279,209 @@
         "outcome_snapshot_id": {
           "type": "string"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "net": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "net"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scoring_basis": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "basis": {
+      "description": "The rule that produced a recorded number. Two numbers on different bases are different measurements and cannot be summed or compared.",
+      "enum": [
+        "named_eleven_no_autosubs",
+        "official_autosub_captain_v2"
+      ]
+    },
+    "ours": {
+      "type": "object",
+      "description": "Our row for the gameweek. Additional properties are permitted so that a row published by an earlier version still validates; the basis rule below is not optional for any of them.",
+      "required": [
+        "net",
+        "scoring_basis"
+      ],
+      "properties": {
+        "net": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "xi": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "scoring_basis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/basis"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "diagnostics": {
+          "$ref": "#/$defs/diagnostics"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "net": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "net"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scoring_basis": {
+                "$ref": "#/$defs/basis"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "net": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "net"
+            ]
+          },
+          "then": {
+            "properties": {
+              "scoring_basis": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "cumulative": {
+      "type": "object",
+      "description": "The payload-level running totals. Our total is kept on one basis, named by ours_basis; a finished week on any other basis is listed in ours_excluded_gameweeks with the basis that produced it rather than added in.",
+      "required": [
+        "ours_net",
+        "ours_gameweeks",
+        "ours_basis",
+        "ours_excluded_gameweeks"
+      ],
+      "properties": {
+        "ours_net": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "ours_gameweeks": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "ours_basis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/basis"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ours_excluded_gameweeks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "gameweek",
+              "scoring_basis"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "gameweek": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "scoring_basis": {
+                "$ref": "#/$defs/basis"
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ours_net": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "ours_net"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ours_basis": {
+                "$ref": "#/$defs/basis"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ours_net": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "ours_net"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ours_basis": {
+                "type": "null"
+              },
+              "ours_gameweeks": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

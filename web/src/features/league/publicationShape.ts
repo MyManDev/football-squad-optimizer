@@ -22,6 +22,18 @@ function nullableNumber(value: unknown): boolean {
   return value === null || finite(value);
 }
 
+function validMovement(value: Record<string, unknown>): boolean {
+  if (value.movement === "unknown" || value.movement === "new")
+    return value.movement_places == null;
+  if (value.movement === "same") return Number(value.rank) > 0 && value.movement_places === 0;
+  return (
+    (value.movement === "up" || value.movement === "down") &&
+    Number(value.rank) > 0 &&
+    Number.isSafeInteger(value.movement_places) &&
+    Number(value.movement_places) > 0
+  );
+}
+
 function publicMember(value: unknown): boolean {
   if (!record(value)) return false;
   return (
@@ -31,13 +43,12 @@ function publicMember(value: unknown): boolean {
       (value.member_kind === "system" && value.entry_id === null)) &&
     (value.manager_name === null || typeof value.manager_name === "string") &&
     (value.team_name === null || typeof value.team_name === "string") &&
-    finite(value.rank) &&
+    Number.isSafeInteger(value.rank) &&
+    Number(value.rank) >= 0 &&
     nullableNumber(value.gameweek_points) &&
     nullableNumber(value.total_points) &&
     (value.transfer_cost === undefined || nullableNumber(value.transfer_cost)) &&
-    typeof value.movement === "string" &&
-    ["up", "down", "same", "new", "unknown"].includes(value.movement) &&
-    (value.movement_places === undefined || nullableNumber(value.movement_places))
+    validMovement(value)
   );
 }
 

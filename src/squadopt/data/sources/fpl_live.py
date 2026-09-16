@@ -1501,6 +1501,17 @@ class LeagueStanding:
     player_name: str
     rank: int
     rank_sort: int | None = None
+    last_rank: int | None = None
+    """Previous rank as captured; missing, null and the zero sentinel mean unavailable."""
+
+
+def _previous_league_rank(record: Mapping[str, object]) -> int | None:
+    if record.get("last_rank") is None:
+        return None
+    previous = _integer(record, "last_rank", "League standing")
+    if previous < 0:
+        raise InvalidValueError("League standing last_rank cannot be negative.")
+    return previous or None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1562,6 +1573,7 @@ def fpl_league_standings_page(
                 player_name=_text(record, "player_name", "League standing"),
                 rank=_positive(_integer(record, "rank", "League standing"), "rank"),
                 rank_sort=rank_sort,
+                last_rank=_previous_league_rank(record),
             )
         )
     updated = document.get("last_updated_data")
@@ -1627,6 +1639,7 @@ def fpl_league_standings(standings: bytes, *, league_id: int) -> tuple[LeagueSta
                 entry_name=_text(record, "entry_name", "League standing"),
                 player_name=_text(record, "player_name", "League standing"),
                 rank=_integer(record, "rank", "League standing"),
+                last_rank=_previous_league_rank(record),
             )
         )
     return tuple(members)

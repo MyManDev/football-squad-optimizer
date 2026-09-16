@@ -70,6 +70,16 @@ class SnapshotIntegrityError(SnapshotError):
     """
 
 
+class SourceRevisionError(DataError):
+    """Raised when the commit that produced this build cannot be named, or is contradicted.
+
+    Both halves are the same failure: something asked which commit it is running and got no
+    answer it can stand behind. A caller that needs the revision as an identity lets this
+    out; a caller that only describes the build catches it, or asks for the outcome that
+    returns nothing instead.
+    """
+
+
 class AtomicWriteError(DataError):
     """Raised when a create-once write cannot be completed or its occupant cannot be read."""
 
@@ -79,4 +89,13 @@ class ConflictingBytesError(AtomicWriteError):
 
     Distinct from a failure to write: the filesystem did its job, and the writer is
     refusing to let a recorded artifact be replaced in place.
+    """
+
+
+class RenameRefusedError(AtomicWriteError):
+    """Raised when a publishing rename was refused for the whole retry budget.
+
+    Distinct from a conflict in the other direction: nothing decided that the write may
+    not happen. The operating system refused to move bytes that are complete, on every
+    attempt, so the writer never landed them and a caller may say so plainly.
     """

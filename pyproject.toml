@@ -144,6 +144,13 @@ forbidden_modules = [
     "squadopt.bayesopt",
     "squadopt.recalibration",
     "squadopt.preflight",
+    # Laboratory by use, not by name. Outside its own package nothing under src imports
+    # `risk` at all, and `uncertainty` is imported only by `risk` and by one experiments
+    # module, so both are research surfaces the contract classified as product. Listing them
+    # costs no import change today and refuses the first product import rather than the
+    # ninth, which is the lesson ADR 0001 recorded when the original eight were removed.
+    "squadopt.risk",
+    "squadopt.uncertainty",
 ]
 allow_indirect_imports = false
 # No baseline: the eight original ignore_imports entries have all been removed (ADR 0001);

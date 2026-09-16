@@ -1046,6 +1046,41 @@ def test_the_league_page_yields_its_members_in_rank_order() -> None:
     )
 
 
+@pytest.mark.parametrize("paged", [False, True])
+@pytest.mark.parametrize("previous", ["missing", None, 0, 1, 2, 12])
+def test_previous_rank_survives_both_parsers_without_inventing_a_zero_rank(
+    paged: bool, previous: Any
+) -> None:
+    document = json.loads(_paged_standings_payload() if paged else _standings_payload())
+    record = document["standings"]["results"][0]
+    if previous == "missing":
+        record.pop("last_rank", None)
+    else:
+        record["last_rank"] = previous
+    payload = json.dumps(document).encode("utf-8")
+    members = (
+        fpl_league_standings_page(payload, league_id=314, expected_page=1).members
+        if paged
+        else fpl_league_standings(payload, league_id=352490)
+    )
+    assert members[0].last_rank == (previous if previous not in ("missing", None, 0) else None)
+
+
+@pytest.mark.parametrize("paged", [False, True])
+@pytest.mark.parametrize("previous", [-1, True, 1.5, "2"])
+def test_malformed_previous_ranks_are_not_coerced_into_movements(
+    paged: bool, previous: Any
+) -> None:
+    document = json.loads(_paged_standings_payload() if paged else _standings_payload())
+    document["standings"]["results"][0]["last_rank"] = previous
+    payload = json.dumps(document).encode("utf-8")
+    with pytest.raises(InvalidValueError):
+        if paged:
+            fpl_league_standings_page(payload, league_id=314, expected_page=1)
+        else:
+            fpl_league_standings(payload, league_id=352490)
+
+
 def test_a_league_with_further_pages_is_refused_rather_than_truncated() -> None:
     with pytest.raises(DataSourceError, match="more standings pages"):
         fpl_league_standings(_standings_payload(has_next=True), league_id=352490)
