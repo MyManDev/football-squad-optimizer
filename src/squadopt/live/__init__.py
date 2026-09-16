@@ -120,6 +120,7 @@ from squadopt.live.transfers import (
     TransferDecision,
     plan_transfer_horizon,
     plan_transfers,
+    plan_transfers_with_exclusion,
     plan_transfers_with_overlap,
 )
 
@@ -200,6 +201,7 @@ __all__ = [
     "plan_tick",
     "plan_transfer_horizon",
     "plan_transfers",
+    "plan_transfers_with_exclusion",
     "plan_transfers_with_overlap",
     "project",
     "projection_fingerprint",

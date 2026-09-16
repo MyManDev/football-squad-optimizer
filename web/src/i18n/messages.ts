@@ -635,6 +635,45 @@ const en = {
     rivalNoDefault:
       "This publish named no standings neighbour for you, so no rival is chosen on your behalf: pick one and the plan against them can be computed.",
     rivalNote: "The rival's public eleven is a constraint and a comparison, nothing more.",
+    evidenceLegend: "The manager's word (club news read by a model)",
+    evidenceSwitch: "Apply what the club's own page said",
+    evidenceUnavailable: (reason: string | null) =>
+      reason === null || reason === "no_evidence_this_run"
+        ? "No club news was read for this publish, so there is nothing to switch on."
+        : `Not available for this member: ${reason}`,
+    evidenceOnlyBaseline:
+      "The manager's word applies to the one-week pure-points plan; switch to that plan to use it.",
+    evidenceSourceSynthetic:
+      "Example data: this publish read the committed synthetic club-news fixture, not a real club page. It shows how the word enters a plan once a real source is registered.",
+    evidenceSourceCapture:
+      "Read from the registered club pages before this capture. The words shown are the pages' own, cut from the bytes captured.",
+    evidenceTitle: "What the club's page said",
+    evidenceIntro: (clubs: number) =>
+      `A model coded each statement into one of eight categories. The rule below is declared, not measured: a stated absence keeps a player out of the eleven, a stated doubt keeps him from the armband. Pages read: ${clubs}.`,
+    evidenceNone:
+      "Nothing the pages said binds this plan, so switching the word on changed nothing.",
+    evidenceWordsUnresolved:
+      "The cited words could not be resolved from the captured bytes, so none are shown.",
+    evidenceSaid: (speaker: string | null, when: string | null) =>
+      `${speaker ?? "The club"}${when ? `, ${when}` : ""}.`,
+    evidenceReadSource: "Read the source →",
+    evidenceRoles: {
+      not_starting: "Out of the eleven",
+      not_captain: "Not captain",
+      none: "No constraint",
+    } as Record<string, string>,
+    evidenceDispositions: {
+      stated_expected_absent: "stated absent",
+      stated_rotation_risk: "stated may be rotated",
+      stated_minutes_limited: "stated limited minutes",
+      stated_expected_to_start: "stated expected to start",
+      stated_returning_from_injury: "stated returning from injury",
+      ambiguous: "ambiguous",
+      not_addressed: "not addressed",
+      no_statement: "no statement",
+    } as Record<string, string>,
+    managerWordReason:
+      "Made because the club's page ruled a player out of this role; the price is stated above.",
     windowLegend: "Window",
     windowNotComputed:
       "Only the one-week plan is on hand for this choice: three- and five-week plans exist for pure points only, and only where this publish solved them; a rival strategy is one week at a time.",
@@ -1589,6 +1628,42 @@ const tr: MessageSchema<typeof en> = {
     rivalNoDefault:
       "Bu yayın senin için sıralamada bir komşu belirlemedi, o yüzden yerine bir rakip seçilmiyor: birini seç, ona karşı plan hesaplanabilsin.",
     rivalNote: "Rakibin açık on biri bir kısıt ve bir karşılaştırmadır, başka bir şey değil.",
+    evidenceLegend: "Hocanın sözü (modelin okuduğu kulüp haberi)",
+    evidenceSwitch: "Kulübün kendi sayfasının dediğini uygula",
+    evidenceUnavailable: (reason) =>
+      reason === null || reason === "no_evidence_this_run"
+        ? "Bu yayında kulüp haberi okunmadı; açılacak bir şey yok."
+        : `Bu üye için kullanılamıyor: ${reason}`,
+    evidenceOnlyBaseline:
+      "Hocanın sözü bir haftalık saf puan planına uygulanır; kullanmak için o plana geç.",
+    evidenceSourceSynthetic:
+      "Örnek veri: bu yayın gerçek bir kulüp sayfasını değil, depodaki sentetik kulüp haberi fixture'ını okudu. Gerçek bir kaynak kaydedilince sözün plana nasıl gireceğini gösterir.",
+    evidenceSourceCapture:
+      "Bu capture'dan önce kayıtlı kulüp sayfalarından okundu. Gösterilen sözler sayfaların kendi sözleri; yakalanan baytlardan kesildi.",
+    evidenceTitle: "Kulübün sayfası ne dedi",
+    evidenceIntro: (clubs) =>
+      `Bir model her ifadeyi sekiz kategoriden birine kodladı. Aşağıdaki kural beyan edilmiştir, ölçülmemiştir: söylenmiş bir yokluk oyuncuyu on birin dışında tutar, söylenmiş bir şüphe kaptanlıktan uzak tutar. Okunan sayfa: ${clubs}.`,
+    evidenceNone: "Sayfaların dedikleri bu planı bağlamıyor; sözü açmak hiçbir şeyi değiştirmedi.",
+    evidenceWordsUnresolved: "Alıntılanan sözler yakalanan baytlardan çözülemedi; gösterilmiyor.",
+    evidenceSaid: (speaker, when) => `${speaker ?? "Kulüp"}${when ? `, ${when}` : ""}.`,
+    evidenceReadSource: "Kaynağı oku →",
+    evidenceRoles: {
+      not_starting: "On birin dışında",
+      not_captain: "Kaptan değil",
+      none: "Kısıt yok",
+    },
+    evidenceDispositions: {
+      stated_expected_absent: "yok denildi",
+      stated_rotation_risk: "rotasyona girebilir denildi",
+      stated_minutes_limited: "sınırlı dakika denildi",
+      stated_expected_to_start: "başlaması bekleniyor denildi",
+      stated_returning_from_injury: "sakatlıktan dönüyor denildi",
+      ambiguous: "belirsiz",
+      not_addressed: "değinilmedi",
+      no_statement: "açıklama yok",
+    },
+    managerWordReason:
+      "Kulübün sayfası bir oyuncuyu bu rolün dışında tuttuğu için yapıldı; fiyatı yukarıda yazılı.",
     windowLegend: "Pencere",
     windowNotComputed:
       "Bu seçim için yalnız bir haftalık plan var: üç ve beş haftalık planlar yalnız saf puan için ve yalnız bu yayının çözdüğü yerde var; rakip stratejisi hafta hafta oynanır.",

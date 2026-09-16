@@ -43,6 +43,7 @@ from squadopt.application.entries import (
 from squadopt.application.lineup_publication import advice_player as _advice_player
 from squadopt.application.lineup_publication import best_eleven_points as best_eleven_points
 from squadopt.application.lineup_publication import lineup_fields as lineup_fields
+from squadopt.application.manager_words import ManagerWord, ManagerWords
 from squadopt.application.phase_e import TransferAdviceDiagnostic, run_transfer_advice_diagnostic
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.data.errors import DataSourceError
@@ -54,6 +55,7 @@ from squadopt.live import (
     make_projection_horizon_builder,
     plan_transfer_horizon,
     plan_transfers,
+    plan_transfers_with_exclusion,
     plan_transfers_with_overlap,
 )
 from squadopt.live.recommendation import InSeasonProjection
@@ -484,6 +486,7 @@ def build_advice_payload(
     week: PlanningWeekResult | None = None,
     control: MemberControl | None = None,
     phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
+    reason_code: str | None = None,
 ) -> dict[str, object]:
     """One member's advice payload — from their squad and the shared projection only.
 
@@ -532,7 +535,7 @@ def build_advice_payload(
     # sentence about a longer window belongs only to a payload that solved one
     # (``build_window_payload``); this function solves a single week, so the pure-points
     # baseline gets its own reason and a competitive mode keeps its trade-off.
-    reason_code = "points_gain" if mode == COMPUTED_MODE else "mode_tradeoff"
+    reason_code = reason_code or ("points_gain" if mode == COMPUTED_MODE else "mode_tradeoff")
     moves: list[dict[str, object]] = []
     transfer_hit_points = 0.0
     # No transfers is a measured answer, not an absent one: the plan's fifteen is the
@@ -913,6 +916,129 @@ def _solve_within_free_transfers(
     return None
 
 
+def advise_with_managers_word(
+    request: AdviseEntryRequest,
+    *,
+    words: ManagerWords,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    control: MemberControl | None = None,
+) -> dict[str, object]:
+    """The one-week pure-points plan with the manager's word switched on, priced.
+
+    The member's own squad is still the only starting point; the club's own page
+    contributes a constraint (``manager_words``' declared rule: an absence keeps a
+    player out of the eleven, a stated doubt keeps him from the armband) and nothing
+    else. No projection number moves. The plan is solved under that exclusion and priced
+    exactly as a rival band is: against the member's own control at the game's charge,
+    net of hits, with the ceiling published beside the tag whenever a proof is missing,
+    so a reader is never told the constraint hands them points.
+
+    The payload carries the statements the rule acted on, with the manager's own words
+    as captured, the speaker, the source's dateline and the page, so the member reads the
+    source. When the manager said nothing that binds this fifteen, the payload is the
+    baseline plan with an empty ``applied`` list and a zero price: switching the word on
+    changed nothing, and the document says so rather than hiding the switch.
+    """
+
+    if request.strategy != COMPUTED_MODE or request.window != COMPUTED_WINDOW:
+        raise EntryError("The manager's word applies to the one-week pure-points plan only.")
+    if (words.season, words.gameweek) != (inputs.season, request.gameweek):
+        raise EntryError(
+            f"The manager's word is for {words.season} gameweek {words.gameweek}, not "
+            f"{inputs.season} gameweek {request.gameweek}."
+        )
+    picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
+    solved = _control_for(picks, control, inputs, projection, rules)
+    pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
+
+    def _name(player_id: int) -> str | None:
+        row = pool_by_id.get(player_id)
+        return None if row is None or "name" not in row else str(row["name"])
+
+    exclusion = words.exclusion()
+
+    def _evidence(applied: tuple[ManagerWord, ...]) -> dict[str, object]:
+        return {
+            **words.as_source_record(),
+            "applied": [
+                {
+                    "player_id": word.player_id,
+                    "name": _name(word.player_id),
+                    "disposition": word.disposition,
+                    "role": word.role,
+                    "speaker": word.speaker,
+                    "published_at_utc": word.published_at_utc,
+                    "published_precision": word.published_precision,
+                    "club": word.club,
+                    "source_url": word.source_url,
+                    "fetched_at_utc": word.fetched_at_utc,
+                    "words": word.words,
+                }
+                for word in applied
+            ],
+        }
+
+    if exclusion is None:
+        payload = build_advice_payload(
+            picks, inputs, projection, rules, league_id=request.league_id, control=solved
+        )
+        payload["evidence"] = _evidence(())
+        return payload
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    held = held_squad_from_picks(picks, current_prices=prices)
+    plan, decision, _config = plan_transfers_with_exclusion(
+        inputs, projection, held, rules, exclusion
+    )
+    # The same anchor the rival band prices against: the control solved at the game's
+    # own charge, so the tag compares maximisers of one objective (see
+    # ``_advise_against_rival`` for the arithmetic and the ceiling's derivation).
+    pricing_plan, _pricing_decision, _pricing_config = plan_transfers(
+        inputs,
+        projection,
+        held,
+        rules,
+        transfer_hit_cost_points=solved.transfer_config.hit_points_charged,
+    )
+    constrained_net = net_expected_points(plan)
+    pricing_net = net_expected_points(pricing_plan)
+    control_net = max(pricing_net, constrained_net)
+    control_ceiling = max(control_net, pricing_net + bound_slack(pricing_plan))
+    raw_gap = plan.diagnostics.get("absolute_optimality_gap")
+    raw_control_gap = pricing_plan.diagnostics.get("absolute_optimality_gap")
+    cost = control_net - constrained_net
+    payload = build_advice_payload(
+        picks,
+        inputs,
+        projection,
+        rules,
+        league_id=request.league_id,
+        decision=decision,
+        expected_points_cost=cost,
+        solver_status=plan.solver_status.name,
+        optimality_gap=float(str(raw_gap)) if raw_gap is not None else None,
+        week=plan.weeks[0],
+        reason_code="manager_word",
+    )
+    payload["expected_points_cost_ceiling"] = max(cost, control_ceiling - constrained_net)
+    payload["control_solver_status"] = pricing_plan.solver_status.name
+    payload["control_optimality_gap"] = (
+        float(str(raw_control_gap)) if raw_control_gap is not None else None
+    )
+    # What the member reads: the statements that touch their own plan, the fifteen they
+    # hold and the fifteen this plan ends with. A word about a player neither holds nor
+    # buys still constrained the solve (he could not be bought and started), but it is
+    # not this member's news to weigh.
+    plan_squad = {int(str(value)) for value in plan.weeks[0].selected_squad["player_id"]}
+    payload["evidence"] = _evidence(words.about({*picks.squad, *plan_squad}))
+    return payload
+
+
 def _requested_picks(
     request: AdviseEntryRequest,
     entry_id: int,
@@ -1190,6 +1316,7 @@ __all__: tuple[str, ...] = (
     "HorizonBuilder",
     "MemberControl",
     "advise_entry",
+    "advise_with_managers_word",
     "best_eleven_points",
     "bound_slack",
     "build_advice_payload",

@@ -94,6 +94,7 @@ _PUBLISHED_ENVELOPE = frozenset(
         "moves",
         "movement",
         "movement_places",
+        "evidence",
         "transfer_hit_points",
         "expected_own_points",
         "expected_gain_vs_hold",

@@ -15,6 +15,7 @@ import tests.unit.test_live_transfers as world_module
 import squadopt.live.transfers as live_transfers
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
 from squadopt.application.league_views import MemberStanding, build_league_views
+from squadopt.application.manager_words import ManagerWord, ManagerWords
 from squadopt.data.snapshots import read_snapshot
 from squadopt.live import read_inputs, read_season_rules
 from squadopt.live.recommendation import project, read_projection_handoff
@@ -1785,3 +1786,79 @@ def test_files_the_rule_does_not_understand_are_left_alone(
 
     assert (out / "scoreboard.json").is_file()
     assert (out / "entries" / "README.json").is_file()
+
+
+def test_the_managers_word_is_published_beside_the_baseline_or_named_absent(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """With evidence, the switched-on plan is a file of its own and the index says where
+    it is and what it came from; without, the index says there is none, so the page's
+    switch never points at a document nobody solved."""
+
+    inputs, projection, rules = _world_context(world)
+    squad = _legal_squad(world)
+    provider = _Provider({101: _member_picks(world, 101, squad)})
+    registrations = (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),)
+    words = ManagerWords(
+        season="2026-27",
+        gameweek=2,
+        source_kind="synthetic_fixture",
+        source_label="club_news_v1.fixture.json",
+        evidence_table="rotation_evidence_v2_2026-27_gw02.csv",
+        clubs_covered=("Club 1",),
+        words=(
+            ManagerWord(
+                player_id=squad[0],
+                disposition="stated_expected_absent",
+                speaker="the manager",
+                published_at_utc="2026-08-21T10:00:00Z",
+                published_precision="instant",
+                club="Club 1",
+                source_url="https://club.example/club-1/news",
+                fetched_at_utc="2026-08-22T11:00:00Z",
+                words="He will not travel.",
+            ),
+        ),
+    )
+
+    build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "with",
+        manager_words=words,
+    )
+    index = json.loads(
+        (tmp_path / "with" / "advice" / "101" / "index.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert index["evidence"]["available"] is True
+    assert index["evidence"]["path"] == "advice/101/saf-puan/1/hoca-sozu.json"
+    assert index["evidence"]["applied_count"] == 1
+    assert index["evidence"]["source_kind"] == "synthetic_fixture"
+    published = json.loads(
+        (tmp_path / "with" / "advice" / "101" / "saf-puan" / "1" / "hoca-sozu.json").read_text(
+            encoding="utf-8"
+        )
+    )["payload"]
+    assert published["evidence"]["applied"][0]["player_id"] == squad[0]
+    assert squad[0] not in {int(str(p["player_id"])) for p in published["starting_xi"]}
+
+    build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "without",
+    )
+    index = json.loads(
+        (tmp_path / "without" / "advice" / "101" / "index.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert index["evidence"] == {"available": False, "reason": "no_evidence_this_run"}
+    assert not (tmp_path / "without" / "advice" / "101" / "saf-puan" / "1").exists()

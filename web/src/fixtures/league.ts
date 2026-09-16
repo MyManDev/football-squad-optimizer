@@ -603,6 +603,8 @@ export function mockEntryAdviceIndex(entryId: number): LeagueViewEnvelope<EntryA
     rival_entry_ids: rivals,
     default_rival_entry_id: mockDefaultRival(entryId),
     suggested_strategy: mockSuggestedStrategy(entryId),
+    // The mock publish read no club news; a test that wants the word switches this.
+    evidence: { available: false, reason: "no_evidence_this_run" },
     computed,
     unavailable,
   });
