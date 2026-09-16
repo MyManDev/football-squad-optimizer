@@ -416,6 +416,32 @@ def test_a_host_whose_robots_cannot_be_read_is_asked_once_and_refuses_every_page
     assert opener.requested.count(ROBOTS) == 1
 
 
+def test_each_refused_page_is_named_in_its_own_refusal() -> None:
+    """A club is not told its page was refused under another club's address.
+
+    Remembering the host's answer once is right; remembering the whole composed refusal was
+    not. That message names the page it costs, so every later page of the host inherited the
+    first page's URL -- and since one host can serve several clubs, a club could be handed a
+    refusal pointing at a page that is not its own.
+    """
+
+    sources, _unused = _three_pages_on_one_host()
+    broken = urllib.error.HTTPError(ROBOTS, 500, "Server Error", {}, None)  # type: ignore[arg-type]
+    replies: dict[str, Any] = {ROBOTS: broken}
+    for source in sources:
+        replies[source.url] = _Reply(final_url=source.url)
+
+    _documents, refused = fetch_registered_documents(
+        sources, opener=_Opener(replies), now=lambda: FIXED_NOW, sleeper=lambda _: None
+    )
+
+    assert len(refused) == len(sources)
+    for source, (_club, reason) in zip(sources, refused, strict=True):
+        assert source.url in reason, reason
+        others = [other.url for other in sources if other.url != source.url]
+        assert not any(other in reason for other in others), reason
+
+
 def test_a_host_serving_no_robots_is_asked_once_and_allows_every_page() -> None:
     """A 404 is silence, and silence is stated once for the whole host."""
 
