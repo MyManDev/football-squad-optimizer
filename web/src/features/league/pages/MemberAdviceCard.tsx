@@ -437,10 +437,7 @@ function EvidenceSection({ view }: { view: EntryAdvice }) {
           {evidence.applied.map((item) => (
             <li key={item.player_id}>
               <strong>{item.name ?? `#${item.player_id}`}</strong>{" "}
-              <Badge tone="neutral">{copy.evidenceRoles[item.role ?? "none"]}</Badge>{" "}
-              <span className={styles.muted}>
-                {copy.evidenceDispositions[item.disposition] ?? item.disposition}
-              </span>
+              {item.role ? <Badge tone="neutral">{copy.evidenceRoles[item.role]}</Badge> : null}{" "}
               {item.words ? (
                 <blockquote>{item.words}</blockquote>
               ) : (

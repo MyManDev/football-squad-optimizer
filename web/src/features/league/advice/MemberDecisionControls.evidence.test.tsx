@@ -52,7 +52,7 @@ describe("the manager's word switch", () => {
       available: false,
       reason: "no_evidence_this_run",
     });
-    const box = screen.getByRole("checkbox", { name: /Kulübün kendi sayfasının dediğini/ });
+    const box = screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ });
     expect(box).toBeDisabled();
     expect(box).not.toBeChecked();
     expect(screen.getByText(MESSAGES.tr.leagueMembers.evidenceUnavailable(null))).toBeTruthy();
@@ -60,20 +60,16 @@ describe("the manager's word switch", () => {
 
   it("switches the URL on and off where the producer solved it, and says it is example data", () => {
     const { container } = renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, SOLVED);
-    const box = screen.getByRole("checkbox", { name: /Kulübün kendi sayfasının dediğini/ });
+    const box = screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ });
     expect(box).toBeEnabled();
     expect(box).not.toBeChecked();
     expect(container.textContent).toContain(MESSAGES.tr.leagueMembers.exampleData);
     expect(container.textContent).toContain(MESSAGES.tr.leagueMembers.evidenceSourceSynthetic);
 
     fireEvent.click(box);
-    expect(
-      screen.getByRole("checkbox", { name: /Kulübün kendi sayfasının dediğini/ }),
-    ).toBeChecked();
-    fireEvent.click(screen.getByRole("checkbox", { name: /Kulübün kendi sayfasının dediğini/ }));
-    expect(
-      screen.getByRole("checkbox", { name: /Kulübün kendi sayfasının dediğini/ }),
-    ).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ })).toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ }));
+    expect(screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ })).not.toBeChecked();
   });
 
   it("is disabled on a longer window with the note, in English too", () => {
@@ -82,7 +78,7 @@ describe("the manager's word switch", () => {
       SOLVED,
       "en",
     );
-    const box = screen.getByRole("checkbox", { name: /Apply what the club's own page said/ });
+    const box = screen.getByRole("checkbox", { name: /Apply what the club's page said/ });
     expect(box).toBeDisabled();
     expect(box).not.toBeChecked();
     expect(container.textContent).toContain(MESSAGES.en.leagueMembers.evidenceOnlyBaseline);

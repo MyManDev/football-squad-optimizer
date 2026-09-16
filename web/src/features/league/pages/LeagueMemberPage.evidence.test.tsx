@@ -100,7 +100,6 @@ describe("the manager's word on the advice card", () => {
     expect(text).toContain("Kulübün sayfası ne dedi");
     expect(text).toContain("Havertz will not travel.");
     expect(text).toContain("On birin dışında");
-    expect(text).toContain("yok denildi");
     expect(text).toContain("Örnek veri");
     const link = section?.querySelector("a[href='https://club.example/arsenal/news']");
     expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
@@ -115,7 +114,7 @@ describe("the manager's word on the advice card", () => {
     const { container } = renderPage("en", advice);
     const text = container.querySelector('[data-testid="managers-word"]')?.textContent ?? "";
     expect(text).toContain("What the club's page said");
-    expect(text).toContain("switching the word on changed nothing");
+    expect(text).toContain("nothing that binds this plan");
   });
 
   it("renders no section on a document solved without the word", () => {
