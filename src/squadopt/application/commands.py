@@ -7,8 +7,9 @@ published, and successful calls return typed descriptions of the files they wrot
 """
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -17,6 +18,7 @@ import pandas as pd
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import CapturedSnapshot, list_snapshot_ids, read_snapshot
 from squadopt.data.sources import FPL_LIVE_SOURCE
+from squadopt.data.sources.fpl_live import BOOTSTRAP_PAYLOAD
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
     CONTROL_MODEL_NAME,
@@ -39,6 +41,7 @@ from squadopt.live import (
     read_season_rules,
     record_decision,
     record_outcome,
+    record_roll,
     render,
     render_rules,
     summary_markdown,
@@ -127,6 +130,56 @@ class SettleRequest:
             or self.gameweek < 1
         ):
             raise DataError("settle requires a positive gameweek.")
+
+
+@dataclass(frozen=True, slots=True)
+class RollRequest:
+    """Everything required to record that the squad stood still through one deadline.
+
+    The capture named (or the latest live one) supplies the season's rules and the
+    deadline the roll records; it must have been taken after that deadline, because a
+    roll states what the game did with a week that is over.
+    """
+
+    snapshot_root: Path
+    ledger_root: Path
+    summary_root: Path
+    gameweek: int
+    reason: str
+    snapshot_id: str | None = None
+    season: str | None = None
+    recorded_at_utc: str | None = None
+    summary_output: Path | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "snapshot_root", Path(self.snapshot_root))
+        object.__setattr__(self, "ledger_root", Path(self.ledger_root))
+        object.__setattr__(self, "summary_root", Path(self.summary_root))
+        if self.summary_output is not None:
+            object.__setattr__(self, "summary_output", Path(self.summary_output))
+        if (
+            isinstance(self.gameweek, bool)
+            or not isinstance(self.gameweek, int)
+            or self.gameweek < 1
+        ):
+            raise DataError("roll requires a positive gameweek.")
+        if not isinstance(self.reason, str) or not self.reason.strip():
+            raise DataError("roll requires a reason: say why the week was not decided.")
+
+
+@dataclass(frozen=True, slots=True)
+class RollResult:
+    """A recorded roll and the regenerated human-readable season summary."""
+
+    season: str
+    gameweek: int
+    rules_snapshot_id: str
+    deadline_utc: str
+    decision_directory: Path
+    report: str
+    summary_path: Path
+    summary: str
+    output_paths: tuple[Path, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -464,4 +517,91 @@ def settle(request: SettleRequest) -> SettleResult:
         outcome_path=outcome_path,
         summary_path=summary_path,
         summary=summary,
+    )
+
+
+def _instant(value: str, *, label: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise DataError(f"{label} {value!r} is not an ISO-8601 instant.") from error
+    if parsed.tzinfo is None:
+        raise DataError(f"{label} {value!r} carries no timezone.")
+    return parsed.astimezone(UTC)
+
+
+def _event_deadline(snapshot: CapturedSnapshot, gameweek: int) -> str:
+    """The deadline the capture states for one gameweek, read from its bootstrap events."""
+
+    payload = snapshot.payloads.get(BOOTSTRAP_PAYLOAD)
+    if payload is None:
+        raise DataError(f"Capture {snapshot.metadata.snapshot_id!r} carries no bootstrap payload.")
+    events = json.loads(payload.decode("utf-8")).get("events")
+    for event in events if isinstance(events, list) else []:
+        if isinstance(event, Mapping) and event.get("id") == gameweek:
+            deadline = event.get("deadline_time")
+            if not isinstance(deadline, str) or not deadline.strip():
+                raise DataError(
+                    f"Capture {snapshot.metadata.snapshot_id!r} states no deadline for "
+                    f"gameweek {gameweek}."
+                )
+            return deadline
+    raise DataError(
+        f"Capture {snapshot.metadata.snapshot_id!r} lists no gameweek {gameweek}; a roll "
+        "records a deadline the capture can name."
+    )
+
+
+def roll(request: RollRequest) -> RollResult:
+    """Record that the squad stood still through one deadline, then regenerate the summary.
+
+    Nothing is calculated: no projection, no solver. The capture supplies the season's
+    rules (the free-transfer cap, the budget) and the deadline being rolled through, and
+    is refused if it was taken before that deadline.
+    """
+
+    snapshot_id, snapshot = _resolve_snapshot(request.snapshot_root, request.snapshot_id)
+    season = request.season or infer_season(snapshot)
+    rules = read_season_rules(snapshot, season=season)
+    deadline = _event_deadline(snapshot, request.gameweek)
+    captured_at = snapshot.metadata.captured_at_utc
+    if _instant(captured_at, label="captured_at_utc") <= _instant(deadline, label="deadline"):
+        raise DataError(
+            f"Gameweek {request.gameweek}'s deadline {deadline} has not passed in capture "
+            f"{snapshot_id!r} (taken {captured_at}); a roll records a week that is over."
+        )
+    recorded_at = request.recorded_at_utc or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    directory = record_roll(
+        request.ledger_root,
+        season,
+        request.gameweek,
+        max_free_transfers=rules.transfers.max_free_transfers,
+        budget_tenths=rules.transfers.budget_tenths,
+        recorded_at_utc=recorded_at,
+        reason=request.reason,
+        deadline_utc=deadline,
+        rules_snapshot_id=snapshot_id,
+        metadata={
+            "ops_phase": "roll",
+            "season_rules_contract_version": rules.contract_version,
+            "season_rules_fingerprint": rules.fingerprint,
+        },
+    )
+    summary_path = request.summary_output or request.summary_root / f"season_ledger_{season}.md"
+    summary = summary_markdown(request.ledger_root, season)
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(summary, encoding="utf-8")
+    return RollResult(
+        season=season,
+        gameweek=request.gameweek,
+        rules_snapshot_id=snapshot_id,
+        deadline_utc=deadline,
+        decision_directory=directory,
+        report=(directory / "report.txt").read_text(encoding="utf-8"),
+        summary_path=summary_path,
+        summary=summary,
+        output_paths=(
+            *sorted(path for path in directory.iterdir() if path.is_file()),
+            summary_path,
+        ),
     )

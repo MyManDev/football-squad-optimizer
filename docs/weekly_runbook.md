@@ -126,16 +126,12 @@ net columns beside it.
   32 min and 49.5 min, so treat half an hour as the floor and not the estimate. This
   figure is the run **without** `--publish`; the publish stage was rewritten since the
   last run that used it and its cost is not currently measured.
-- `--decide` needs the ledger to hold the previous gameweek. A week that was skipped
-  must be recorded first (below); the pre-flight says so before anything is captured.
-  **This is currently blocking and will not clear on its own.** `held_squad_from_ledger`
-  (`src/squadopt/live/ledger.py`) refuses when no decision exists for the previous week,
-  and the ledger holds `[1]`. So deciding GW4 needs GW3, GW3 needs a pre-deadline capture
-  that no longer exists, and every later week inherits the same break. Note that
-  `--dry-run` prints `decide run` regardless: it prints the plan and does not reach this
-  check, so the refusal appears only in a real run. The error names the way out itself —
-  record the missing weeks as a no-transfer roll — but that is a decision about what our
-  paper record claims, not a command to run without deciding it first.
+- `--decide` needs the ledger to hold the previous gameweek. A week nothing was decided
+  for is recorded first as a roll (`squadopt gameweek roll`, below); the pre-flight says
+  so before anything is captured. `held_squad_from_ledger` (`src/squadopt/live/ledger.py`)
+  refuses when the ledger holds nothing for the previous week, and the error names the
+  way out. Note that `--dry-run` prints `decide run` regardless: it prints the plan and
+  does not reach this check, so the refusal appears only in a real run.
 
 ## Our own squad: catching the ledger up, then deciding, then settling
 
@@ -154,6 +150,31 @@ each player's status, news and chance of playing *as they stood at that moment* 
 API only ever serves the present. Earlier revisions of this section listed three capture
 ids and two handoff files for these commands; none of the five is on disk, so every
 command in that block would have refused. They are removed rather than corrected.
+
+### Rolling a week that was not decided
+
+A roll records what the game did with a week no decision was made for: the squad, the
+picks and the purchase prices carried over unchanged, the bank where it was, one free
+transfer accrued up to the season's cap. It names no capture, no projection and no
+solver, so it claims nothing about points. The season ledger shows it as `roll` with
+dashes where a decision has numbers; the scoreboard, the site and the calibration never
+see it (`load_ledger` hides rolls unless asked); an outcome can never be attached to it.
+It is recorded only from the entry of the week before, so the ledger stays a chain, and
+like every entry it is written once.
+
+```bash
+squadopt gameweek roll --season 2026-27 --gameweek 2 --snapshot-id fpl-live-20260912T100000Z-24613792ef57 --reason "no run happened; the pre-deadline capture was destroyed on 2026-09-10"
+squadopt gameweek roll --season 2026-27 --gameweek 3 --snapshot-id fpl-live-20260912T100000Z-24613792ef57 --reason "no run happened; the pre-deadline capture was destroyed on 2026-09-10"
+```
+
+The capture named supplies the season's rules (the free-transfer cap, the budget) and the
+deadline being rolled through, and is refused if it was taken before that deadline: a
+roll can only describe a week that is over. Rolling GW2 and GW3 from the 12 September
+capture, deciding GW4 from that same capture with its handoff (recorded `replay`), then
+settling GW4 from a capture in which it is finished and checked, gives the ledger
+`[1, 2, 3, 4]` with GW4 its first settled row. Each command regenerates
+`docs/season_ledger_2026-27.md`, which is tracked, so commit it before the next weekly
+run or the pre-flight refuses the modified tree.
 
 The check that tells you where the season actually stands, before spending anything:
 

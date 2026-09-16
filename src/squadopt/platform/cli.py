@@ -21,6 +21,8 @@ from squadopt.application import (
     DecideRequest,
     DecideResult,
     DecisionVerifier,
+    RollRequest,
+    RollResult,
     SettleRequest,
     SettleResult,
     TickObserver,
@@ -28,6 +30,7 @@ from squadopt.application import (
     TickResult,
     TickValue,
     decide,
+    roll,
     run_season_tick,
     settle,
     verify_decision,
@@ -224,6 +227,20 @@ def build_parser() -> argparse.ArgumentParser:
         help=argparse.SUPPRESS,
     )
     decide_parser.add_argument("--chip", choices=sorted(set(CHIP_NAMES) & set(PLANNER_CHIP_NAMES)))
+
+    roll_parser = gameweek_commands.add_parser(
+        "roll", help="record that the squad stood still through a deadline"
+    )
+    _add_common_paths(roll_parser)
+    roll_parser.add_argument(
+        "--snapshot-id",
+        help="the capture that supplies the season's rules and the deadline; it must have "
+        "been taken after that deadline (default: the latest live capture)",
+    )
+    roll_parser.add_argument("--gameweek", type=int, required=True)
+    roll_parser.add_argument("--season")
+    roll_parser.add_argument("--reason", required=True, help="why the week was not decided")
+    roll_parser.add_argument("--summary-output", type=Path)
 
     settle_parser = gameweek_commands.add_parser("settle", help="settle a frozen decision")
     _add_common_paths(settle_parser)
@@ -437,6 +454,16 @@ def _print_decide(result: DecideResult) -> None:
     print(f"Recorded decision at {result.decision_directory}")
 
 
+def _print_roll(result: RollResult) -> None:
+    print(
+        f"roll: {result.season} gameweek {result.gameweek}, deadline {result.deadline_utc}, "
+        f"rules from snapshot {result.rules_snapshot_id}"
+    )
+    print(result.report)
+    print(f"Recorded roll at {result.decision_directory}")
+    print(f"Wrote {result.summary_path}")
+
+
 def _print_settle(result: SettleResult) -> None:
     print(f"Recorded outcome at {result.outcome_path}")
     print(result.summary)
@@ -492,6 +519,42 @@ def _run_decide(arguments: argparse.Namespace, paths: _Paths, services: CliServi
         except DataError as error:
             raise _KnownCliFailure(str(error)) from error
         _print_decide(result)
+        return RuntimeOperationResult(result, tuple(_output(path) for path in result.output_paths))
+
+    return _finish(runner.execute(request, operation, events=log))
+
+
+def _run_roll(arguments: argparse.Namespace, paths: _Paths, services: CliServices) -> int:
+    snapshot_id, snapshot_files = _snapshot_files(paths.snapshot, arguments.snapshot_id)
+    inputs = [*(_Input(path, "fpl_snapshot", SNAPSHOT_SCHEMA_VERSION) for path in snapshot_files)]
+    inputs.extend(
+        _Input(path, "season_ledger", SEASON_LEDGER_CONTRACT_VERSION)
+        for path in _files(paths.ledger)
+    )
+    runner, request, log = _runtime(
+        arguments, paths, inputs, operation="gameweek_roll", services=services
+    )
+    summary_output = _optional_path(paths.workspace, arguments.summary_output)
+    recorded_at = services.clock().astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def operation() -> RuntimeOperationResult[RollResult]:
+        try:
+            result = roll(
+                RollRequest(
+                    snapshot_root=paths.snapshot,
+                    ledger_root=paths.ledger,
+                    summary_root=paths.summary,
+                    gameweek=arguments.gameweek,
+                    reason=arguments.reason,
+                    snapshot_id=snapshot_id,
+                    season=arguments.season,
+                    recorded_at_utc=recorded_at,
+                    summary_output=summary_output,
+                )
+            )
+        except DataError as error:
+            raise _KnownCliFailure(str(error)) from error
+        _print_roll(result)
         return RuntimeOperationResult(result, tuple(_output(path) for path in result.output_paths))
 
     return _finish(runner.execute(request, operation, events=log))
@@ -617,6 +680,8 @@ def main(argv: Sequence[str] | None = None, *, services: CliServices | None = No
         paths = _paths(arguments)
         if arguments.area == "gameweek" and arguments.operation == "decide":
             return _run_decide(arguments, paths, dependencies)
+        if arguments.area == "gameweek" and arguments.operation == "roll":
+            return _run_roll(arguments, paths, dependencies)
         if arguments.area == "gameweek" and arguments.operation == "settle":
             return _run_settle(arguments, paths, dependencies)
         return _run_tick(arguments, paths, dependencies)
