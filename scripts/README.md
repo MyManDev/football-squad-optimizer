@@ -56,6 +56,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_capture_lead_time.py` | measurement runner | `docs/capture_lead_time.json`; also `docs/weekly_runbook.md` | 2026-09-08 |
 | `measure_capture_season_phase.py` | measurement runner | `docs/capture_season_phase.json` | 2026-09-08 |
 | `measure_component_fidelity.py` | measurement runner | `docs/phase_d_component_fidelity.json` | 2026-09-07 |
+| `measure_double_reduction.py` | measurement runner | `docs/double_reduction.json`, `docs/double_reduction.md` | 2026-09-16 |
 | `measure_export_precision.py` | measurement runner | `docs/export_precision.json` | 2026-08-16 |
 | `measure_in_season_blend.py` | measurement runner | `docs/in_season_blend_benchmark.json` | 2026-08-23 |
 | `measure_mode_plan_selection.py` | measurement runner | `docs/mode_plan_selection.json` | 2026-09-10 |
