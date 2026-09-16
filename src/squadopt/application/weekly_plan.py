@@ -46,6 +46,36 @@ class WeekError(RuntimeError):
     """A step refused; the message says which and why."""
 
 
+def _require_capture_name(value: str) -> None:
+    """Refuse a club-news capture that is not a capture name.
+
+    The runner joins this value onto the snapshot root and hands the result to the journal,
+    which walks the directory and digests every file it finds. A snapshot identifier is a
+    single directory name by construction (``build_snapshot_id`` composes source, stamp and
+    digest), so anything that is not one directory name is a typo rather than a request, and
+    the shapes it takes are not harmless: ``../../..`` resolves clean out of the repository,
+    and an empty string silently becomes the snapshot root itself, which would digest every
+    capture we hold.
+
+    The rule is stated as "one directory name" rather than as the identifier's own format,
+    because the format belongs to ``snapshots`` and a new source name must not have to come
+    back and change this refusal too.
+    """
+
+    if not value or value.strip() != value:
+        raise WeekError(
+            "A club-news capture name must not be empty or padded with spaces. An empty name "
+            "reads as the snapshot root, which is every capture we hold rather than the one "
+            "the week was read from."
+        )
+    if value in {".", ".."} or Path(value).name != value:
+        raise WeekError(
+            f"A club-news capture must be named by its own directory name, not by a path: "
+            f"{value!r}. The runner joins this onto the snapshot root, so a separator or a "
+            "parent reference points the week's evidence somewhere that is not a capture."
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class WeekPlan:
     """What one run will do, decided before anything runs."""
@@ -94,6 +124,8 @@ class WeeklyRequest:
                 "read it is not in this week's plan. Naming a source for a step nobody asked "
                 "for is the kind of silence that looks like a run and is not one."
             )
+        if self.rotation_capture is not None:
+            _require_capture_name(self.rotation_capture)
         return plan_week(
             season=self.season,
             gameweek=self.gameweek,
