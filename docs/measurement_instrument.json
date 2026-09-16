@@ -1,0 +1,2313 @@
+{
+  "availability": {
+    "bins": [
+      {
+        "forecasts": 67,
+        "observed": 0,
+        "played": null,
+        "realized_rate": null,
+        "stated_value": 100,
+        "status": "a"
+      },
+      {
+        "forecasts": 407,
+        "observed": 0,
+        "played": null,
+        "realized_rate": null,
+        "stated_value": null,
+        "status": "a"
+      },
+      {
+        "forecasts": 2,
+        "observed": 0,
+        "played": null,
+        "realized_rate": null,
+        "stated_value": 25,
+        "status": "d"
+      },
+      {
+        "forecasts": 3,
+        "observed": 0,
+        "played": null,
+        "realized_rate": null,
+        "stated_value": 50,
+        "status": "d"
+      },
+      {
+        "forecasts": 8,
+        "observed": 0,
+        "played": null,
+        "realized_rate": null,
+        "stated_value": 75,
+        "status": "d"
+      },
+      {
+        "forecasts": 64,
+        "observed": 0,
+        "played": null,
+        "realized_rate": null,
+        "stated_value": 0,
+        "status": "i"
+      },
+      {
+        "forecasts": 1,
+        "observed": 0,
+        "played": null,
+        "realized_rate": null,
+        "stated_value": 0,
+        "status": "s"
+      },
+      {
+        "forecasts": 104,
+        "observed": 0,
+        "played": null,
+        "realized_rate": null,
+        "stated_value": 0,
+        "status": "u"
+      }
+    ],
+    "captured_forecasts": 3934,
+    "excluded_captures": [
+      {
+        "reason": "no_bootstrap",
+        "snapshot_id": "fpl-elite-picks-20260912T081954Z-260fbe653d58"
+      },
+      {
+        "reason": "no_bootstrap",
+        "snapshot_id": "fpl-elite-picks-20260912T095941Z-a0f72a506e05"
+      }
+    ],
+    "interpretation": "descriptive empirical rates; missing stated values are not zero or one hundred",
+    "observed_player_weeks": 0,
+    "per_capture": [
+      {
+        "bins": [
+          {
+            "forecasts": 63,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 100,
+            "status": "a"
+          },
+          {
+            "forecasts": 412,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": null,
+            "status": "a"
+          },
+          {
+            "forecasts": 3,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 25,
+            "status": "d"
+          },
+          {
+            "forecasts": 3,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 50,
+            "status": "d"
+          },
+          {
+            "forecasts": 13,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 75,
+            "status": "d"
+          },
+          {
+            "forecasts": 60,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "i"
+          },
+          {
+            "forecasts": 1,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "s"
+          },
+          {
+            "forecasts": 100,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "u"
+          }
+        ],
+        "snapshot_id": "fpl-live-20260910T190328Z-e46daae991bd"
+      },
+      {
+        "bins": [
+          {
+            "forecasts": 63,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 100,
+            "status": "a"
+          },
+          {
+            "forecasts": 412,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": null,
+            "status": "a"
+          },
+          {
+            "forecasts": 3,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 25,
+            "status": "d"
+          },
+          {
+            "forecasts": 3,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 50,
+            "status": "d"
+          },
+          {
+            "forecasts": 13,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 75,
+            "status": "d"
+          },
+          {
+            "forecasts": 60,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "i"
+          },
+          {
+            "forecasts": 1,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "s"
+          },
+          {
+            "forecasts": 100,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "u"
+          }
+        ],
+        "snapshot_id": "fpl-live-20260910T190430Z-369360398135"
+      },
+      {
+        "bins": [
+          {
+            "forecasts": 67,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 100,
+            "status": "a"
+          },
+          {
+            "forecasts": 407,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": null,
+            "status": "a"
+          },
+          {
+            "forecasts": 2,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 25,
+            "status": "d"
+          },
+          {
+            "forecasts": 3,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 50,
+            "status": "d"
+          },
+          {
+            "forecasts": 8,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 75,
+            "status": "d"
+          },
+          {
+            "forecasts": 64,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "i"
+          },
+          {
+            "forecasts": 1,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "s"
+          },
+          {
+            "forecasts": 104,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "u"
+          }
+        ],
+        "snapshot_id": "fpl-live-20260912T082014Z-6d6236f98aaf"
+      },
+      {
+        "bins": [
+          {
+            "forecasts": 67,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 100,
+            "status": "a"
+          },
+          {
+            "forecasts": 407,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": null,
+            "status": "a"
+          },
+          {
+            "forecasts": 2,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 25,
+            "status": "d"
+          },
+          {
+            "forecasts": 3,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 50,
+            "status": "d"
+          },
+          {
+            "forecasts": 8,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 75,
+            "status": "d"
+          },
+          {
+            "forecasts": 64,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "i"
+          },
+          {
+            "forecasts": 1,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "s"
+          },
+          {
+            "forecasts": 104,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "u"
+          }
+        ],
+        "snapshot_id": "fpl-live-20260912T100000Z-24613792ef57"
+      },
+      {
+        "bins": [
+          {
+            "forecasts": 67,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 100,
+            "status": "a"
+          },
+          {
+            "forecasts": 407,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": null,
+            "status": "a"
+          },
+          {
+            "forecasts": 2,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 25,
+            "status": "d"
+          },
+          {
+            "forecasts": 3,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 50,
+            "status": "d"
+          },
+          {
+            "forecasts": 8,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 75,
+            "status": "d"
+          },
+          {
+            "forecasts": 64,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "i"
+          },
+          {
+            "forecasts": 1,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "s"
+          },
+          {
+            "forecasts": 104,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "u"
+          }
+        ],
+        "snapshot_id": "fpl-top100-20260912T081931Z-e715e11216fc"
+      },
+      {
+        "bins": [
+          {
+            "forecasts": 67,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 100,
+            "status": "a"
+          },
+          {
+            "forecasts": 407,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": null,
+            "status": "a"
+          },
+          {
+            "forecasts": 2,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 25,
+            "status": "d"
+          },
+          {
+            "forecasts": 3,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 50,
+            "status": "d"
+          },
+          {
+            "forecasts": 8,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 75,
+            "status": "d"
+          },
+          {
+            "forecasts": 64,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "i"
+          },
+          {
+            "forecasts": 1,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "s"
+          },
+          {
+            "forecasts": 104,
+            "observed": 0,
+            "played": null,
+            "realized_rate": null,
+            "stated_value": 0,
+            "status": "u"
+          }
+        ],
+        "snapshot_id": "fpl-top100-20260912T095914Z-3f0b69089266"
+      }
+    ],
+    "primary_sampling": "latest pre-deadline capture per season/gameweek/player; no repeated-capture weighting",
+    "status": "insufficient_settled_pairs",
+    "unique_player_weeks": 656
+  },
+  "comparison": "Phase C component base minus historical ridge control; official_autosub_captain_v2",
+  "contract_version": "measurement_instrument_v1",
+  "covariate_timing": "OOF manifest's structural pre-decision contract; archive deadline timestamps absent, never inferred from kickoff",
+  "decisions_changed": false,
+  "environment": {
+    "numpy": "2.5.2",
+    "ortools": "9.15.6755",
+    "pandas": "3.0.5",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.18.0"
+  },
+  "error_decomposition": [
+    {
+      "data_checked": true,
+      "finished": true,
+      "gameweek": 1,
+      "system": {
+        "diagnostics": {
+          "autosub_recovery": null,
+          "captain_shortfall": 4.166051660516605,
+          "minutes_shortfall": null,
+          "zero_minute_starters": 2
+        },
+        "kind": "system",
+        "net": 26.0,
+        "scoring_basis": "named_eleven_no_autosubs",
+        "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57"
+      }
+    },
+    {
+      "data_checked": true,
+      "finished": true,
+      "gameweek": 2,
+      "system": {
+        "diagnostics": {
+          "autosub_recovery": null,
+          "captain_shortfall": null,
+          "minutes_shortfall": null,
+          "zero_minute_starters": null
+        },
+        "kind": "system",
+        "net": null,
+        "scoring_basis": null,
+        "source_snapshot_id": null
+      }
+    },
+    {
+      "data_checked": true,
+      "finished": true,
+      "gameweek": 3,
+      "system": {
+        "diagnostics": {
+          "autosub_recovery": null,
+          "captain_shortfall": null,
+          "minutes_shortfall": null,
+          "zero_minute_starters": null
+        },
+        "kind": "system",
+        "net": null,
+        "scoring_basis": null,
+        "source_snapshot_id": null
+      }
+    }
+  ],
+  "folds": [
+    {
+      "component_projected_pool_mean": 1.6256640791412618,
+      "component_projected_pool_total": 920.1258687939542,
+      "control_projected_pool_total": 920.1258687939542,
+      "difference": 0.0,
+      "fold_id": "2021-22-gw02"
+    },
+    {
+      "component_projected_pool_mean": 1.4497869413700186,
+      "component_projected_pool_total": 836.5270651705007,
+      "control_projected_pool_total": 893.5409436439247,
+      "difference": 1.0,
+      "fold_id": "2021-22-gw03"
+    },
+    {
+      "component_projected_pool_mean": 1.3473846268181684,
+      "component_projected_pool_total": 807.0833914640829,
+      "control_projected_pool_total": 890.2759619989407,
+      "difference": -6.0,
+      "fold_id": "2021-22-gw04"
+    },
+    {
+      "component_projected_pool_mean": 1.3504544015806208,
+      "component_projected_pool_total": 818.3753673578562,
+      "control_projected_pool_total": 890.8272444851851,
+      "difference": 18.0,
+      "fold_id": "2021-22-gw05"
+    },
+    {
+      "component_projected_pool_mean": 1.349973209054442,
+      "component_projected_pool_total": 824.833630732264,
+      "control_projected_pool_total": 881.9097516410852,
+      "difference": -29.0,
+      "fold_id": "2021-22-gw06"
+    },
+    {
+      "component_projected_pool_mean": 1.3167271777986012,
+      "component_projected_pool_total": 807.1537599905425,
+      "control_projected_pool_total": 867.1761989133282,
+      "difference": 0.0,
+      "fold_id": "2021-22-gw07"
+    },
+    {
+      "component_projected_pool_mean": 1.2902391195806733,
+      "component_projected_pool_total": 796.0775367812754,
+      "control_projected_pool_total": 855.734864168572,
+      "difference": -2.0,
+      "fold_id": "2021-22-gw08"
+    },
+    {
+      "component_projected_pool_mean": 1.300865595443237,
+      "component_projected_pool_total": 803.9349379839205,
+      "control_projected_pool_total": 855.0631773424261,
+      "difference": 2.0,
+      "fold_id": "2021-22-gw09"
+    },
+    {
+      "component_projected_pool_mean": 1.301839763870857,
+      "component_projected_pool_total": 811.046172891544,
+      "control_projected_pool_total": 856.2607885286156,
+      "difference": 1.0,
+      "fold_id": "2021-22-gw10"
+    },
+    {
+      "component_projected_pool_mean": 1.3008672012225395,
+      "component_projected_pool_total": 811.7411335628647,
+      "control_projected_pool_total": 850.2417792138427,
+      "difference": 2.0,
+      "fold_id": "2021-22-gw11"
+    },
+    {
+      "component_projected_pool_mean": 1.2794256303015346,
+      "component_projected_pool_total": 807.3175727202683,
+      "control_projected_pool_total": 850.6549451487984,
+      "difference": 8.0,
+      "fold_id": "2021-22-gw12"
+    },
+    {
+      "component_projected_pool_mean": 1.277813641072862,
+      "component_projected_pool_total": 733.4650299758227,
+      "control_projected_pool_total": 770.8233745339226,
+      "difference": 1.0,
+      "fold_id": "2021-22-gw13"
+    },
+    {
+      "component_projected_pool_mean": 1.2798616845918074,
+      "component_projected_pool_total": 813.9920314003895,
+      "control_projected_pool_total": 849.9228559180135,
+      "difference": -1.0,
+      "fold_id": "2021-22-gw14"
+    },
+    {
+      "component_projected_pool_mean": 1.262168307961512,
+      "component_projected_pool_total": 807.7877170953677,
+      "control_projected_pool_total": 846.0377239247048,
+      "difference": 9.0,
+      "fold_id": "2021-22-gw15"
+    },
+    {
+      "component_projected_pool_mean": 1.2525558635503957,
+      "component_projected_pool_total": 730.2400684498807,
+      "control_projected_pool_total": 761.6573926812441,
+      "difference": 26.0,
+      "fold_id": "2021-22-gw16"
+    },
+    {
+      "component_projected_pool_mean": 1.2454702328761116,
+      "component_projected_pool_total": 572.9163071230113,
+      "control_projected_pool_total": 593.9846552092572,
+      "difference": -30.0,
+      "fold_id": "2021-22-gw17"
+    },
+    {
+      "component_projected_pool_mean": 1.3569705464264197,
+      "component_projected_pool_total": 355.5262831637219,
+      "control_projected_pool_total": 367.5303283211128,
+      "difference": 1.0,
+      "fold_id": "2021-22-gw18"
+    },
+    {
+      "component_projected_pool_mean": 1.2911467668218213,
+      "component_projected_pool_total": 581.0160450698196,
+      "control_projected_pool_total": 602.4734254305333,
+      "difference": -15.0,
+      "fold_id": "2021-22-gw19"
+    },
+    {
+      "component_projected_pool_mean": 1.2701226328785118,
+      "component_projected_pool_total": 585.5265337569939,
+      "control_projected_pool_total": 610.2742974546829,
+      "difference": -7.0,
+      "fold_id": "2021-22-gw20"
+    },
+    {
+      "component_projected_pool_mean": 1.2007355023698238,
+      "component_projected_pool_total": 742.0545404645511,
+      "control_projected_pool_total": 774.2879488117344,
+      "difference": -4.0,
+      "fold_id": "2021-22-gw21"
+    },
+    {
+      "component_projected_pool_mean": 1.560219183911576,
+      "component_projected_pool_total": 972.0165515769119,
+      "control_projected_pool_total": 786.2438624873723,
+      "difference": -12.0,
+      "fold_id": "2021-22-gw22"
+    },
+    {
+      "component_projected_pool_mean": 1.3294286475890005,
+      "component_projected_pool_total": 926.6117673695334,
+      "control_projected_pool_total": 899.8155822645098,
+      "difference": -14.0,
+      "fold_id": "2021-22-gw23"
+    },
+    {
+      "component_projected_pool_mean": 1.232550686131793,
+      "component_projected_pool_total": 782.6696856936885,
+      "control_projected_pool_total": 819.7238959146275,
+      "difference": 0.0,
+      "fold_id": "2021-22-gw24"
+    },
+    {
+      "component_projected_pool_mean": 1.3248540304719845,
+      "component_projected_pool_total": 838.6326012887662,
+      "control_projected_pool_total": 807.1009552161375,
+      "difference": 15.0,
+      "fold_id": "2021-22-gw25"
+    },
+    {
+      "component_projected_pool_mean": 1.6455126879232453,
+      "component_projected_pool_total": 1169.9595211134274,
+      "control_projected_pool_total": 922.3722979675445,
+      "difference": 59.0,
+      "fold_id": "2021-22-gw26"
+    },
+    {
+      "component_projected_pool_mean": 1.2817860669850505,
+      "component_projected_pool_total": 771.6352123250003,
+      "control_projected_pool_total": 781.4494044658165,
+      "difference": -3.0,
+      "fold_id": "2021-22-gw27"
+    },
+    {
+      "component_projected_pool_mean": 1.7179196542703081,
+      "component_projected_pool_total": 1226.594633149,
+      "control_projected_pool_total": 951.5922743870561,
+      "difference": 8.0,
+      "fold_id": "2021-22-gw28"
+    },
+    {
+      "component_projected_pool_mean": 1.6550149510462184,
+      "component_projected_pool_total": 1181.680675047,
+      "control_projected_pool_total": 983.0020046825177,
+      "difference": 9.0,
+      "fold_id": "2021-22-gw29"
+    },
+    {
+      "component_projected_pool_mean": 1.2690862612671234,
+      "component_projected_pool_total": 370.57318829,
+      "control_projected_pool_total": 395.22381818067504,
+      "difference": 0.0,
+      "fold_id": "2021-22-gw30"
+    },
+    {
+      "component_projected_pool_mean": 1.4211789909144428,
+      "component_projected_pool_total": 1023.2488734583987,
+      "control_projected_pool_total": 1024.2268524118492,
+      "difference": 14.0,
+      "fold_id": "2021-22-gw31"
+    },
+    {
+      "component_projected_pool_mean": 1.2703833674321916,
+      "component_projected_pool_total": 917.2167912860424,
+      "control_projected_pool_total": 998.3865076606116,
+      "difference": 10.0,
+      "fold_id": "2021-22-gw32"
+    },
+    {
+      "component_projected_pool_mean": 1.6589186064530133,
+      "component_projected_pool_total": 1015.2581871492441,
+      "control_projected_pool_total": 829.6356060030745,
+      "difference": 21.0,
+      "fold_id": "2021-22-gw33"
+    },
+    {
+      "component_projected_pool_mean": 1.3243511292968406,
+      "component_projected_pool_total": 964.1276221281,
+      "control_projected_pool_total": 995.5414742900687,
+      "difference": 22.0,
+      "fold_id": "2021-22-gw34"
+    },
+    {
+      "component_projected_pool_mean": 1.1974757676513945,
+      "component_projected_pool_total": 874.157310385518,
+      "control_projected_pool_total": 949.5044604129342,
+      "difference": 13.0,
+      "fold_id": "2021-22-gw35"
+    },
+    {
+      "component_projected_pool_mean": 1.8247211688226288,
+      "component_projected_pool_total": 1339.3453379158095,
+      "control_projected_pool_total": 925.0751380549102,
+      "difference": 33.0,
+      "fold_id": "2021-22-gw36"
+    },
+    {
+      "component_projected_pool_mean": 1.4947863070440737,
+      "component_projected_pool_total": 1050.8347738519838,
+      "control_projected_pool_total": 928.5198842437803,
+      "difference": 26.0,
+      "fold_id": "2021-22-gw37"
+    },
+    {
+      "component_projected_pool_mean": 1.250018312112808,
+      "component_projected_pool_total": 921.2634960271395,
+      "control_projected_pool_total": 1012.6635220793064,
+      "difference": -1.0,
+      "fold_id": "2021-22-gw38"
+    },
+    {
+      "component_projected_pool_mean": 1.405231880307779,
+      "component_projected_pool_total": 816.4397224588196,
+      "control_projected_pool_total": 829.3505582571627,
+      "difference": 0.0,
+      "fold_id": "2022-23-gw02"
+    },
+    {
+      "component_projected_pool_mean": 1.3808656411776181,
+      "component_projected_pool_total": 817.47245957715,
+      "control_projected_pool_total": 839.724907719683,
+      "difference": 1.0,
+      "fold_id": "2022-23-gw03"
+    },
+    {
+      "component_projected_pool_mean": 1.355373931675588,
+      "component_projected_pool_total": 814.5797329370283,
+      "control_projected_pool_total": 840.6610825271232,
+      "difference": 15.0,
+      "fold_id": "2022-23-gw04"
+    },
+    {
+      "component_projected_pool_mean": 1.33826605337314,
+      "component_projected_pool_total": 813.6657604508691,
+      "control_projected_pool_total": 841.46409399214,
+      "difference": 13.0,
+      "fold_id": "2022-23-gw05"
+    },
+    {
+      "component_projected_pool_mean": 1.3030248791012478,
+      "component_projected_pool_total": 813.0875245591786,
+      "control_projected_pool_total": 847.2213473544863,
+      "difference": 18.0,
+      "fold_id": "2022-23-gw06"
+    },
+    {
+      "component_projected_pool_mean": 1.2666237233186728,
+      "component_projected_pool_total": 557.314438260216,
+      "control_projected_pool_total": 579.6942117155788,
+      "difference": -2.0,
+      "fold_id": "2022-23-gw08"
+    },
+    {
+      "component_projected_pool_mean": 1.2650210422797117,
+      "component_projected_pool_total": 807.0834249744561,
+      "control_projected_pool_total": 840.9200966802565,
+      "difference": 1.0,
+      "fold_id": "2022-23-gw09"
+    },
+    {
+      "component_projected_pool_mean": 1.264660726092352,
+      "component_projected_pool_total": 810.6475254251976,
+      "control_projected_pool_total": 839.3642948647112,
+      "difference": 30.0,
+      "fold_id": "2022-23-gw10"
+    },
+    {
+      "component_projected_pool_mean": 1.253407703061662,
+      "component_projected_pool_total": 805.9411530686486,
+      "control_projected_pool_total": 833.0419047435907,
+      "difference": 4.0,
+      "fold_id": "2022-23-gw11"
+    },
+    {
+      "component_projected_pool_mean": 1.2192111209174368,
+      "component_projected_pool_total": 713.2385057367005,
+      "control_projected_pool_total": 732.1506906918469,
+      "difference": 9.0,
+      "fold_id": "2022-23-gw12"
+    },
+    {
+      "component_projected_pool_mean": 1.25579580211264,
+      "component_projected_pool_total": 813.7556797689907,
+      "control_projected_pool_total": 832.8934571164607,
+      "difference": -15.0,
+      "fold_id": "2022-23-gw13"
+    },
+    {
+      "component_projected_pool_mean": 1.2455971586357373,
+      "component_projected_pool_total": 817.1117360650437,
+      "control_projected_pool_total": 837.6927764299114,
+      "difference": -3.0,
+      "fold_id": "2022-23-gw14"
+    },
+    {
+      "component_projected_pool_mean": 1.2259947263834605,
+      "component_projected_pool_total": 810.3825141394674,
+      "control_projected_pool_total": 835.5182787258917,
+      "difference": -7.0,
+      "fold_id": "2022-23-gw15"
+    },
+    {
+      "component_projected_pool_mean": 1.210785706424677,
+      "component_projected_pool_total": 807.5940661852595,
+      "control_projected_pool_total": 835.1081976383193,
+      "difference": -3.0,
+      "fold_id": "2022-23-gw16"
+    },
+    {
+      "component_projected_pool_mean": 1.1937617996437886,
+      "component_projected_pool_total": 805.7892147595574,
+      "control_projected_pool_total": 834.6640680372208,
+      "difference": -13.0,
+      "fold_id": "2022-23-gw17"
+    },
+    {
+      "component_projected_pool_mean": 1.1736291622914927,
+      "component_projected_pool_total": 795.720572033632,
+      "control_projected_pool_total": 830.2914862861182,
+      "difference": 6.0,
+      "fold_id": "2022-23-gw18"
+    },
+    {
+      "component_projected_pool_mean": 1.2801977075380206,
+      "component_projected_pool_total": 882.0562204936962,
+      "control_projected_pool_total": 835.8801036170435,
+      "difference": 16.0,
+      "fold_id": "2022-23-gw19"
+    },
+    {
+      "component_projected_pool_mean": 1.3958535911961183,
+      "component_projected_pool_total": 975.7016602460867,
+      "control_projected_pool_total": 852.1282219093368,
+      "difference": 19.0,
+      "fold_id": "2022-23-gw20"
+    },
+    {
+      "component_projected_pool_mean": 1.217093945226434,
+      "component_projected_pool_total": 860.4854192750888,
+      "control_projected_pool_total": 886.2925531509666,
+      "difference": 3.0,
+      "fold_id": "2022-23-gw21"
+    },
+    {
+      "component_projected_pool_mean": 1.2947096562291767,
+      "component_projected_pool_total": 958.0851456095907,
+      "control_projected_pool_total": 909.4921926070276,
+      "difference": 3.0,
+      "fold_id": "2022-23-gw22"
+    },
+    {
+      "component_projected_pool_mean": 1.2856505402864293,
+      "component_projected_pool_total": 957.8096525133898,
+      "control_projected_pool_total": 930.0200038140933,
+      "difference": 12.0,
+      "fold_id": "2022-23-gw23"
+    },
+    {
+      "component_projected_pool_mean": 1.1513679543660769,
+      "component_projected_pool_total": 858.9204939570933,
+      "control_projected_pool_total": 927.6047385921959,
+      "difference": -18.0,
+      "fold_id": "2022-23-gw24"
+    },
+    {
+      "component_projected_pool_mean": 1.3648559971943521,
+      "component_projected_pool_total": 821.6433103109999,
+      "control_projected_pool_total": 722.6667298498605,
+      "difference": -1.0,
+      "fold_id": "2022-23-gw25"
+    },
+    {
+      "component_projected_pool_mean": 1.1607047456287587,
+      "component_projected_pool_total": 867.0464449846828,
+      "control_projected_pool_total": 909.6783214980592,
+      "difference": 9.0,
+      "fold_id": "2022-23-gw26"
+    },
+    {
+      "component_projected_pool_mean": 1.3193509643911208,
+      "component_projected_pool_total": 989.5132232933406,
+      "control_projected_pool_total": 893.4631873654795,
+      "difference": 34.0,
+      "fold_id": "2022-23-gw27"
+    },
+    {
+      "component_projected_pool_mean": 1.104604602818833,
+      "component_projected_pool_total": 595.381880919351,
+      "control_projected_pool_total": 615.8104068202542,
+      "difference": -16.0,
+      "fold_id": "2022-23-gw28"
+    },
+    {
+      "component_projected_pool_mean": 1.7430584325499148,
+      "component_projected_pool_total": 1314.2660581426358,
+      "control_projected_pool_total": 911.6955341828121,
+      "difference": -2.0,
+      "fold_id": "2022-23-gw29"
+    },
+    {
+      "component_projected_pool_mean": 1.2175722487068965,
+      "component_projected_pool_total": 918.0494755249999,
+      "control_projected_pool_total": 969.2709037319672,
+      "difference": -7.0,
+      "fold_id": "2022-23-gw30"
+    },
+    {
+      "component_projected_pool_mean": 1.1802699008644968,
+      "component_projected_pool_total": 895.8248547561531,
+      "control_projected_pool_total": 950.7163027085836,
+      "difference": 15.0,
+      "fold_id": "2022-23-gw31"
+    },
+    {
+      "component_projected_pool_mean": 1.1315825395358574,
+      "component_projected_pool_total": 691.3969316564089,
+      "control_projected_pool_total": 724.2819279863509,
+      "difference": 4.0,
+      "fold_id": "2022-23-gw32"
+    },
+    {
+      "component_projected_pool_mean": 1.1126123787274553,
+      "component_projected_pool_total": 846.6980202115935,
+      "control_projected_pool_total": 918.8500302472518,
+      "difference": 11.0,
+      "fold_id": "2022-23-gw33"
+    },
+    {
+      "component_projected_pool_mean": 1.3931371392982317,
+      "component_projected_pool_total": 1061.5705001452525,
+      "control_projected_pool_total": 917.3757256513703,
+      "difference": 16.0,
+      "fold_id": "2022-23-gw34"
+    },
+    {
+      "component_projected_pool_mean": 1.110628519118087,
+      "component_projected_pool_total": 847.4095600871003,
+      "control_projected_pool_total": 896.6934920386146,
+      "difference": 8.0,
+      "fold_id": "2022-23-gw35"
+    },
+    {
+      "component_projected_pool_mean": 1.206362843332915,
+      "component_projected_pool_total": 922.86757514968,
+      "control_projected_pool_total": 880.4065466263146,
+      "difference": 35.0,
+      "fold_id": "2022-23-gw36"
+    },
+    {
+      "component_projected_pool_mean": 1.33143627901296,
+      "component_projected_pool_total": 1031.863116235044,
+      "control_projected_pool_total": 897.8825708253758,
+      "difference": 17.0,
+      "fold_id": "2022-23-gw37"
+    },
+    {
+      "component_projected_pool_mean": 1.0989212231216205,
+      "component_projected_pool_total": 854.9607115886208,
+      "control_projected_pool_total": 919.6571071145838,
+      "difference": 37.0,
+      "fold_id": "2022-23-gw38"
+    },
+    {
+      "component_projected_pool_mean": 1.2556642191135836,
+      "component_projected_pool_total": 747.1202103725823,
+      "control_projected_pool_total": 767.2690811241667,
+      "difference": 0.0,
+      "fold_id": "2023-24-gw02"
+    },
+    {
+      "component_projected_pool_mean": 1.1971330470500492,
+      "component_projected_pool_total": 820.0361372292837,
+      "control_projected_pool_total": 844.9625444658361,
+      "difference": -2.0,
+      "fold_id": "2023-24-gw03"
+    },
+    {
+      "component_projected_pool_mean": 1.1564446195969378,
+      "component_projected_pool_total": 812.9805675766472,
+      "control_projected_pool_total": 845.5335429438671,
+      "difference": 5.0,
+      "fold_id": "2023-24-gw04"
+    },
+    {
+      "component_projected_pool_mean": 1.1340424416710662,
+      "component_projected_pool_total": 813.1084306781545,
+      "control_projected_pool_total": 849.7396319422965,
+      "difference": -4.0,
+      "fold_id": "2023-24-gw05"
+    },
+    {
+      "component_projected_pool_mean": 1.1192231632141647,
+      "component_projected_pool_total": 803.6022311877703,
+      "control_projected_pool_total": 847.4079085833085,
+      "difference": -12.0,
+      "fold_id": "2023-24-gw06"
+    },
+    {
+      "component_projected_pool_mean": 1.2221691104317893,
+      "component_projected_pool_total": 882.406097731752,
+      "control_projected_pool_total": 843.4576994784071,
+      "difference": -17.0,
+      "fold_id": "2023-24-gw07"
+    },
+    {
+      "component_projected_pool_mean": 1.1105592494357255,
+      "component_projected_pool_total": 805.1554558409009,
+      "control_projected_pool_total": 851.4331740110606,
+      "difference": 11.0,
+      "fold_id": "2023-24-gw08"
+    },
+    {
+      "component_projected_pool_mean": 1.0983371981255439,
+      "component_projected_pool_total": 801.786154631647,
+      "control_projected_pool_total": 846.8661403669896,
+      "difference": -1.0,
+      "fold_id": "2023-24-gw09"
+    },
+    {
+      "component_projected_pool_mean": 1.0967834141006692,
+      "component_projected_pool_total": 801.7486757075892,
+      "control_projected_pool_total": 843.429792981734,
+      "difference": -7.0,
+      "fold_id": "2023-24-gw10"
+    },
+    {
+      "component_projected_pool_mean": 1.0848906567421512,
+      "component_projected_pool_total": 795.2248513919968,
+      "control_projected_pool_total": 843.7077426803551,
+      "difference": -10.0,
+      "fold_id": "2023-24-gw11"
+    },
+    {
+      "component_projected_pool_mean": 1.0706837580408557,
+      "component_projected_pool_total": 795.5180322243558,
+      "control_projected_pool_total": 844.5748946865365,
+      "difference": -5.0,
+      "fold_id": "2023-24-gw12"
+    },
+    {
+      "component_projected_pool_mean": 1.053318674291608,
+      "component_projected_pool_total": 786.8290496958313,
+      "control_projected_pool_total": 832.6881755817888,
+      "difference": -5.0,
+      "fold_id": "2023-24-gw13"
+    },
+    {
+      "component_projected_pool_mean": 1.0387737553755636,
+      "component_projected_pool_total": 782.1966377977993,
+      "control_projected_pool_total": 834.3734208319568,
+      "difference": 4.0,
+      "fold_id": "2023-24-gw14"
+    },
+    {
+      "component_projected_pool_mean": 1.0307200425736602,
+      "component_projected_pool_total": 780.2550722282608,
+      "control_projected_pool_total": 833.6227283014439,
+      "difference": -4.0,
+      "fold_id": "2023-24-gw15"
+    },
+    {
+      "component_projected_pool_mean": 1.0341935655853536,
+      "component_projected_pool_total": 783.918722713698,
+      "control_projected_pool_total": 834.9422784055816,
+      "difference": -12.0,
+      "fold_id": "2023-24-gw16"
+    },
+    {
+      "component_projected_pool_mean": 1.043838511828142,
+      "component_projected_pool_total": 716.0732191141053,
+      "control_projected_pool_total": 760.618786964259,
+      "difference": 4.0,
+      "fold_id": "2023-24-gw17"
+    },
+    {
+      "component_projected_pool_mean": 1.0166710951345588,
+      "component_projected_pool_total": 711.6697665941912,
+      "control_projected_pool_total": 752.9287838024298,
+      "difference": -12.0,
+      "fold_id": "2023-24-gw18"
+    },
+    {
+      "component_projected_pool_mean": 1.022875922903691,
+      "component_projected_pool_total": 788.6373365587458,
+      "control_projected_pool_total": 837.777754350912,
+      "difference": -7.0,
+      "fold_id": "2023-24-gw19"
+    },
+    {
+      "component_projected_pool_mean": 1.0139024499218716,
+      "component_projected_pool_total": 783.7465937896068,
+      "control_projected_pool_total": 838.2002221456141,
+      "difference": 4.0,
+      "fold_id": "2023-24-gw20"
+    },
+    {
+      "component_projected_pool_mean": 1.0094179524320042,
+      "component_projected_pool_total": 794.4119285639872,
+      "control_projected_pool_total": 843.6297396363019,
+      "difference": 13.0,
+      "fold_id": "2023-24-gw21"
+    },
+    {
+      "component_projected_pool_mean": 0.9965601547117027,
+      "component_projected_pool_total": 796.2515636146504,
+      "control_projected_pool_total": 853.841611629857,
+      "difference": 20.0,
+      "fold_id": "2023-24-gw22"
+    },
+    {
+      "component_projected_pool_mean": 0.9861043737619793,
+      "component_projected_pool_total": 797.7584383734413,
+      "control_projected_pool_total": 853.2771289617201,
+      "difference": 2.0,
+      "fold_id": "2023-24-gw23"
+    },
+    {
+      "component_projected_pool_mean": 0.994410265428705,
+      "component_projected_pool_total": 809.4499560589659,
+      "control_projected_pool_total": 860.4950857093995,
+      "difference": 11.0,
+      "fold_id": "2023-24-gw24"
+    },
+    {
+      "component_projected_pool_mean": 1.1844651036538505,
+      "component_projected_pool_total": 974.814780307119,
+      "control_projected_pool_total": 859.3101089576107,
+      "difference": -8.0,
+      "fold_id": "2023-24-gw25"
+    },
+    {
+      "component_projected_pool_mean": 0.9861450565165429,
+      "component_projected_pool_total": 640.0081416792364,
+      "control_projected_pool_total": 681.1556340869407,
+      "difference": 4.0,
+      "fold_id": "2023-24-gw26"
+    },
+    {
+      "component_projected_pool_mean": 0.9956610476422902,
+      "component_projected_pool_total": 828.3899916383855,
+      "control_projected_pool_total": 877.3580943073831,
+      "difference": 2.0,
+      "fold_id": "2023-24-gw27"
+    },
+    {
+      "component_projected_pool_mean": 1.0884429231253812,
+      "component_projected_pool_total": 912.1151695790694,
+      "control_projected_pool_total": 877.8329631925264,
+      "difference": 3.0,
+      "fold_id": "2023-24-gw28"
+    },
+    {
+      "component_projected_pool_mean": 0.9378720888139536,
+      "component_projected_pool_total": 322.627998552,
+      "control_projected_pool_total": 340.3462967762947,
+      "difference": 0.0,
+      "fold_id": "2023-24-gw29"
+    },
+    {
+      "component_projected_pool_mean": 0.9836971840851421,
+      "component_projected_pool_total": 828.2730289996896,
+      "control_projected_pool_total": 882.9883706229566,
+      "difference": 9.0,
+      "fold_id": "2023-24-gw30"
+    },
+    {
+      "component_projected_pool_mean": 0.9695629872197213,
+      "component_projected_pool_total": 818.3111612134448,
+      "control_projected_pool_total": 879.5713158360853,
+      "difference": 9.0,
+      "fold_id": "2023-24-gw31"
+    },
+    {
+      "component_projected_pool_mean": 0.958522504172704,
+      "component_projected_pool_total": 810.9100385301076,
+      "control_projected_pool_total": 865.2226545394678,
+      "difference": 6.0,
+      "fold_id": "2023-24-gw32"
+    },
+    {
+      "component_projected_pool_mean": 0.9519659386986192,
+      "component_projected_pool_total": 810.123013832525,
+      "control_projected_pool_total": 855.3868479402937,
+      "difference": -7.0,
+      "fold_id": "2023-24-gw33"
+    },
+    {
+      "component_projected_pool_mean": 1.2815441543677848,
+      "component_projected_pool_total": 1044.4584858097446,
+      "control_projected_pool_total": 809.0477874684061,
+      "difference": 47.0,
+      "fold_id": "2023-24-gw34"
+    },
+    {
+      "component_projected_pool_mean": 1.0967311671401354,
+      "component_projected_pool_total": 942.0920725733763,
+      "control_projected_pool_total": 895.5449546437161,
+      "difference": 11.0,
+      "fold_id": "2023-24-gw35"
+    },
+    {
+      "component_projected_pool_mean": 1.0014550345669382,
+      "component_projected_pool_total": 860.2498746929999,
+      "control_projected_pool_total": 907.0553844851726,
+      "difference": 15.0,
+      "fold_id": "2023-24-gw36"
+    },
+    {
+      "component_projected_pool_mean": 1.308918195718172,
+      "component_projected_pool_total": 1126.978566513346,
+      "control_projected_pool_total": 912.2728690433416,
+      "difference": 24.0,
+      "fold_id": "2023-24-gw37"
+    },
+    {
+      "component_projected_pool_mean": 1.0152844694149181,
+      "component_projected_pool_total": 878.2210660439041,
+      "control_projected_pool_total": 951.4307767120733,
+      "difference": 3.0,
+      "fold_id": "2023-24-gw38"
+    },
+    {
+      "component_projected_pool_mean": 1.3366160136011593,
+      "component_projected_pool_total": 838.058240527927,
+      "control_projected_pool_total": 845.6732884206544,
+      "difference": 5.0,
+      "fold_id": "2024-25-gw02"
+    },
+    {
+      "component_projected_pool_mean": 1.307617161653893,
+      "component_projected_pool_total": 847.3359207517226,
+      "control_projected_pool_total": 864.8038418239408,
+      "difference": -12.0,
+      "fold_id": "2024-25-gw03"
+    },
+    {
+      "component_projected_pool_mean": 1.2584196104896188,
+      "component_projected_pool_total": 829.2985233126587,
+      "control_projected_pool_total": 854.1708842589766,
+      "difference": -2.0,
+      "fold_id": "2024-25-gw04"
+    },
+    {
+      "component_projected_pool_mean": 1.2429908232544957,
+      "component_projected_pool_total": 821.6169341712216,
+      "control_projected_pool_total": 853.4879890784067,
+      "difference": -15.0,
+      "fold_id": "2024-25-gw05"
+    },
+    {
+      "component_projected_pool_mean": 1.2288584018669457,
+      "component_projected_pool_total": 815.9619788396519,
+      "control_projected_pool_total": 851.911681602895,
+      "difference": 2.0,
+      "fold_id": "2024-25-gw06"
+    },
+    {
+      "component_projected_pool_mean": 1.2196838651978394,
+      "component_projected_pool_total": 812.3094542217611,
+      "control_projected_pool_total": 843.4607918205412,
+      "difference": 6.0,
+      "fold_id": "2024-25-gw07"
+    },
+    {
+      "component_projected_pool_mean": 1.2122714409242898,
+      "component_projected_pool_total": 808.5850510965014,
+      "control_projected_pool_total": 838.8300160166591,
+      "difference": -7.0,
+      "fold_id": "2024-25-gw08"
+    },
+    {
+      "component_projected_pool_mean": 1.2068494843694937,
+      "component_projected_pool_total": 808.5891545275608,
+      "control_projected_pool_total": 837.4000738639818,
+      "difference": 19.0,
+      "fold_id": "2024-25-gw09"
+    },
+    {
+      "component_projected_pool_mean": 1.196724020383815,
+      "component_projected_pool_total": 806.5919897386913,
+      "control_projected_pool_total": 835.8613086061974,
+      "difference": 10.0,
+      "fold_id": "2024-25-gw10"
+    },
+    {
+      "component_projected_pool_mean": 1.1830200978543086,
+      "component_projected_pool_total": 802.0876263452212,
+      "control_projected_pool_total": 834.4976690996598,
+      "difference": -8.0,
+      "fold_id": "2024-25-gw11"
+    },
+    {
+      "component_projected_pool_mean": 1.1711748672158826,
+      "component_projected_pool_total": 801.0836091756637,
+      "control_projected_pool_total": 838.0430525181627,
+      "difference": -9.0,
+      "fold_id": "2024-25-gw12"
+    },
+    {
+      "component_projected_pool_mean": 1.1619454483566523,
+      "component_projected_pool_total": 801.74235936609,
+      "control_projected_pool_total": 836.7721187841446,
+      "difference": 21.0,
+      "fold_id": "2024-25-gw13"
+    },
+    {
+      "component_projected_pool_mean": 1.1555797366362803,
+      "component_projected_pool_total": 800.8167574889422,
+      "control_projected_pool_total": 838.3816780964497,
+      "difference": 22.0,
+      "fold_id": "2024-25-gw14"
+    },
+    {
+      "component_projected_pool_mean": 1.1449452963619047,
+      "component_projected_pool_total": 721.315536708,
+      "control_projected_pool_total": 749.6313208303975,
+      "difference": -1.0,
+      "fold_id": "2024-25-gw15"
+    },
+    {
+      "component_projected_pool_mean": 1.161869783182444,
+      "component_projected_pool_total": 814.4707180108933,
+      "control_projected_pool_total": 843.0635829969233,
+      "difference": 2.0,
+      "fold_id": "2024-25-gw16"
+    },
+    {
+      "component_projected_pool_mean": 1.1536039915734664,
+      "component_projected_pool_total": 808.676398093,
+      "control_projected_pool_total": 841.3976815002184,
+      "difference": 0.0,
+      "fold_id": "2024-25-gw17"
+    },
+    {
+      "component_projected_pool_mean": 1.1499247104255992,
+      "component_projected_pool_total": 810.6969208500474,
+      "control_projected_pool_total": 845.5002881353498,
+      "difference": -2.0,
+      "fold_id": "2024-25-gw18"
+    },
+    {
+      "component_projected_pool_mean": 1.1419586049032076,
+      "component_projected_pool_total": 809.6486508763742,
+      "control_projected_pool_total": 846.7257200846219,
+      "difference": 2.0,
+      "fold_id": "2024-25-gw19"
+    },
+    {
+      "component_projected_pool_mean": 1.1445363261745976,
+      "component_projected_pool_total": 813.7653279101389,
+      "control_projected_pool_total": 846.1030458502357,
+      "difference": -27.0,
+      "fold_id": "2024-25-gw20"
+    },
+    {
+      "component_projected_pool_mean": 1.1173996752269455,
+      "component_projected_pool_total": 808.9973648643086,
+      "control_projected_pool_total": 847.3371643710673,
+      "difference": 10.0,
+      "fold_id": "2024-25-gw21"
+    },
+    {
+      "component_projected_pool_mean": 1.1034292196950921,
+      "component_projected_pool_total": 804.3999011577221,
+      "control_projected_pool_total": 848.7980521540032,
+      "difference": -2.0,
+      "fold_id": "2024-25-gw22"
+    },
+    {
+      "component_projected_pool_mean": 1.0897668339220075,
+      "component_projected_pool_total": 802.0683897665974,
+      "control_projected_pool_total": 849.1116580091199,
+      "difference": 6.0,
+      "fold_id": "2024-25-gw23"
+    },
+    {
+      "component_projected_pool_mean": 1.1854422504997606,
+      "component_projected_pool_total": 879.5981498708223,
+      "control_projected_pool_total": 850.1334930439994,
+      "difference": 77.0,
+      "fold_id": "2024-25-gw24"
+    },
+    {
+      "component_projected_pool_mean": 1.1921736582595646,
+      "component_projected_pool_total": 904.8598066190095,
+      "control_projected_pool_total": 868.3644610626949,
+      "difference": 1.0,
+      "fold_id": "2024-25-gw25"
+    },
+    {
+      "component_projected_pool_mean": 1.101552532769033,
+      "component_projected_pool_total": 840.4845825027721,
+      "control_projected_pool_total": 891.8326828105146,
+      "difference": -11.0,
+      "fold_id": "2024-25-gw26"
+    },
+    {
+      "component_projected_pool_mean": 1.0963560680630136,
+      "component_projected_pool_total": 837.6160360001423,
+      "control_projected_pool_total": 887.1666059048016,
+      "difference": -2.0,
+      "fold_id": "2024-25-gw27"
+    },
+    {
+      "component_projected_pool_mean": 1.0777307743821287,
+      "component_projected_pool_total": 828.774965499857,
+      "control_projected_pool_total": 882.8116518555607,
+      "difference": 5.0,
+      "fold_id": "2024-25-gw28"
+    },
+    {
+      "component_projected_pool_mean": 1.0178057823964688,
+      "component_projected_pool_total": 634.093002433,
+      "control_projected_pool_total": 675.6718574227064,
+      "difference": -4.0,
+      "fold_id": "2024-25-gw29"
+    },
+    {
+      "component_projected_pool_mean": 1.0639132261007815,
+      "component_projected_pool_total": 820.2770973237026,
+      "control_projected_pool_total": 868.9505455932403,
+      "difference": 18.0,
+      "fold_id": "2024-25-gw30"
+    },
+    {
+      "component_projected_pool_mean": 1.0475314661472306,
+      "component_projected_pool_total": 808.6942918656621,
+      "control_projected_pool_total": 858.5501193792039,
+      "difference": -2.0,
+      "fold_id": "2024-25-gw31"
+    },
+    {
+      "component_projected_pool_mean": 1.1429117611064306,
+      "component_projected_pool_total": 889.1853501408029,
+      "control_projected_pool_total": 852.8455097214421,
+      "difference": 49.0,
+      "fold_id": "2024-25-gw32"
+    },
+    {
+      "component_projected_pool_mean": 1.2772652873811348,
+      "component_projected_pool_total": 994.9896588699039,
+      "control_projected_pool_total": 860.6873050298466,
+      "difference": 13.0,
+      "fold_id": "2024-25-gw33"
+    },
+    {
+      "component_projected_pool_mean": 1.0166737537158783,
+      "component_projected_pool_total": 639.4877910872874,
+      "control_projected_pool_total": 658.5807648414248,
+      "difference": -3.0,
+      "fold_id": "2024-25-gw34"
+    },
+    {
+      "component_projected_pool_mean": 1.0921828607584054,
+      "component_projected_pool_total": 852.9948142523147,
+      "control_projected_pool_total": 886.699886332329,
+      "difference": 1.0,
+      "fold_id": "2024-25-gw35"
+    },
+    {
+      "component_projected_pool_mean": 1.0789690012138282,
+      "component_projected_pool_total": 842.6747899479999,
+      "control_projected_pool_total": 883.7668993413808,
+      "difference": -7.0,
+      "fold_id": "2024-25-gw36"
+    },
+    {
+      "component_projected_pool_mean": 1.075639996471191,
+      "component_projected_pool_total": 840.074837244,
+      "control_projected_pool_total": 883.3114914441946,
+      "difference": 8.0,
+      "fold_id": "2024-25-gw37"
+    },
+    {
+      "component_projected_pool_mean": 1.0428067221193982,
+      "component_projected_pool_total": 817.5604701416082,
+      "control_projected_pool_total": 878.5052133687291,
+      "difference": -2.0,
+      "fold_id": "2024-25-gw38"
+    }
+  ],
+  "generated_at_utc": "2026-09-13T13:36:58.406605+00:00",
+  "input_sha256": {
+    ".codex-tmp/phase-e-frozen-inputs/phase_c_component_oof_v1.csv": "b05f10c3fd3ab5058fe1ff720cc6ef0a4b1362a70a19dd979ad0eb0f47d12c01",
+    ".codex-tmp/phase-e-frozen-inputs/phase_c_component_oof_v1.manifest.json": "1a06b69abb3d7fe98afde6983885a9a7723463d351a2432dc9e0a11082f5eba8",
+    ".codex-tmp/phase-e-frozen-inputs/phase_c_component_oof_v1.roster.csv": "3ef0c5717fa63c3c4772512f019cd750d3fae6cd9a7567d20dd4bfa24003678e",
+    "data/entries/registry.json": "80dc010ca767a398ad262dec126a0854c15f4cf1dc610e528b255b2012c992dc",
+    "data/ledger/2026-27/gw01/decision.json": "a4c2c885b5ef8d12880c125583fb84eb462321d6c6f75bef38a62dc956269779",
+    "data/ledger/2026-27/gw01/manifest.json": "e6e0313871fa82853713cc677221c6c237215af0f7e173f3429a41e0f2a43601",
+    "data/ledger/2026-27/gw01/outcome.json": "40a5c8c00c90790c2f434f88ec898f3febc03860294e2d68d508230ebedb44fe",
+    "data/ledger/2026-27/gw01/projections.csv": "042d5c57145742026e3d7559e97d9d00e34fbd3b2017416408fb55529af33248",
+    "data/ledger/2026-27/gw01/report.txt": "003687258ebae0eb714692260036a8dcc0b25e5373a0b9958cc4420fbacb617a",
+    "data/raw/vaastav-fpl/data/2020-21/fixtures.csv": "75ca4859c7898bff9c73055337651893c041e596462d08935f2a6964c437f65d",
+    "data/raw/vaastav-fpl/data/2020-21/gws/merged_gw.csv": "fb2a2bc54b6cfbe835a39183b096b382f7961e3828e7845e9288671cccca3ad8",
+    "data/raw/vaastav-fpl/data/2020-21/players_raw.csv": "e3aff899fc2486bd96fe5d11d8c8e8c066dea36cc71de2bf8a85e8aa7245ed32",
+    "data/raw/vaastav-fpl/data/2020-21/teams.csv": "0e3b9fdad72feefb88db3b848e4d579020327f4bf9975fa82fb2085dbe7f0fae",
+    "data/raw/vaastav-fpl/data/2021-22/fixtures.csv": "9fc11cc675ff49dd5b8858211aa5cbe08375e064810536931e0ac38c060dee64",
+    "data/raw/vaastav-fpl/data/2021-22/gws/merged_gw.csv": "29770bbe305feee681f7122c0bd08451783366e0a3a9604194f528a0880f23de",
+    "data/raw/vaastav-fpl/data/2021-22/players_raw.csv": "78e185fb0b5c81f58c2b89f232358b1097bededc9852d4171edaea2e9d3bd887",
+    "data/raw/vaastav-fpl/data/2021-22/teams.csv": "c1dd02ed25fe832ba7bf6ce846ac506a00a0f0babdacb6bf2a011dc9eaa8cfad",
+    "data/raw/vaastav-fpl/data/2022-23/fixtures.csv": "e783060da73700d4ec6fd12acec4568524eac8bb3ba3ccd8ce68a374dadba8f8",
+    "data/raw/vaastav-fpl/data/2022-23/gws/merged_gw.csv": "b78a6d0456141f9033c32fc4122931baae780ac4a4938683451b1fce7a4fdd15",
+    "data/raw/vaastav-fpl/data/2022-23/players_raw.csv": "a874c12817bbf4d454e60a5765629742b528d4ad0c2f39f56e4fc89640605f7f",
+    "data/raw/vaastav-fpl/data/2022-23/teams.csv": "be6a1fe120a61f9c441a0751ca177c933bcbf234c1d28d49b3cd8827ca18066b",
+    "data/raw/vaastav-fpl/data/2023-24/fixtures.csv": "d8521bdbb80edb5141bc17df71bf6026275f2e56fd6a6dc6041b3ae23a39ce6a",
+    "data/raw/vaastav-fpl/data/2023-24/gws/merged_gw.csv": "e9c09c8856f1c86b4f920f46ddd5033af83409439dfda53be925df2a3e7c8a9e",
+    "data/raw/vaastav-fpl/data/2023-24/players_raw.csv": "43d8cf5efb3d901f2499558c40b392b7f0ee22afe28030f36266ad29024c63d9",
+    "data/raw/vaastav-fpl/data/2023-24/teams.csv": "7795f091ccea17fda0752cb07b935e1515b09a9d3f924147997cbf28139edd49",
+    "data/raw/vaastav-fpl/data/2024-25/fixtures.csv": "ce696e187569ca7c45da2562811d3c38f525b58e65575531be37bebd0769ee28",
+    "data/raw/vaastav-fpl/data/2024-25/gws/merged_gw.csv": "5bbbcba6353b4c72ad273adcc8e3aa451946a826564679788f45b1cb3325b84e",
+    "data/raw/vaastav-fpl/data/2024-25/players_raw.csv": "75686051b265cbe7755ac71213ecaad21b26ee1cc46a8bafbba19c39ce894b05",
+    "data/raw/vaastav-fpl/data/2024-25/teams.csv": "d10a6db8feca6db9e44a3ba50b15168396667ea387fee9235d6b211c7f598c3b",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/metadata.json": "b80e096bd8bf6cb246d1e98e2637e406b4c7247cbb09cfab238542096c463673",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1050186-picks-gw03.json": "39ba0648ad4efa9c2e0edfb434a6fd0d04b508af043287b6be9bc1099697d140",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1062962-picks-gw03.json": "1210f67d46ec94d661d61605adeaaa125a0a6703d22dd93fd13b6fc2398c2e32",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1072260-picks-gw03.json": "ae0c38a82c4f013c9a16b616556419040c5ff90d9a67ca3721242047267d2049",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-112255-picks-gw03.json": "93aeaa9b847f245010290ed76d030589e89254a35ce9df227e965b4fc188a4a9",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-11678-picks-gw03.json": "160bf6ef010c54c65359cc154685b39f5ab6216312a21b4469c09c8c5c4f10b0",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-118094-picks-gw03.json": "1611530f3aa248de452f8cd9d811df4bef3de671dd8f64bd4c72a81cd401fa31",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1183876-picks-gw03.json": "8594c0e3d48b6378a98d08ea6e63ed361530bef442128cce680c15563ab55280",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1197832-picks-gw03.json": "c11278471742b228521139867cdf2da5fcdf46345a18868091d772ca70e1663d",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1205939-picks-gw03.json": "281f8df7201da7dad4a364c21dae3d4eddc51e07390448e2205bf7dcd01637f5",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1210651-picks-gw03.json": "8747e83f5ccd06d0457a9ef6c52c255562917f12681bf12fdf36266526e8f90b",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1237023-picks-gw03.json": "5f4f9c9445a82d05a59b061a2b04c1e956ccd7cd55a72483b4604c443d58769b",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1246686-picks-gw03.json": "e973bcfe66532d9c1437b47a83bf65214747bf08bde87861c64ae8f49c01b24c",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-126319-picks-gw03.json": "5a6e9cbafa83885d1e02747b8f721340030ee7bf7a009c3dc0e719f966b7928b",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1317461-picks-gw03.json": "33d9e67ee439acea2f9ea761d7c9883ac9434ed0a1feea3c1ee8ac552c56b3dd",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1360989-picks-gw03.json": "8f43f909005d0fd25be7e77e4d1c7fef09d437dbf014da0de6dc193c869d9a11",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-141417-picks-gw03.json": "af768875bcb42ece947d1e09dcc703cc58f77682c640c10cc9d3fd8b675a229d",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1464306-picks-gw03.json": "ead3c93d449eb257a8487ea5a689f358d8a3df85cb7f24ad0403079834521a19",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1717192-picks-gw03.json": "3548e2beb80f06f55be39a8b35da3d9e6b63c4ce23ac4b98d542ce2faa4603b5",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1722522-picks-gw03.json": "d461c63d419bb7d4e9aaa5bb1d8c51f29caba3e993f2c29cd5c63905c18de9a8",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1772902-picks-gw03.json": "9f40f6ddc6a475b707bf77c5b2f42348e65f2811ceb754bc120323f703590d2a",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1793880-picks-gw03.json": "030b5f46ed8e394f95b1abea2e807c364c0e92d695eec2be3ea64f5a1e45de0b",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1850318-picks-gw03.json": "88f6659b7a13926b1c22a54f4b1fba68cfc703ec8a3e41244013baf15722e951",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1851681-picks-gw03.json": "c89026e68fc472a808710a14024c7f83cde2f22248237f041e4e115492f51cde",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-1856158-picks-gw03.json": "bf70cfa1fd98539f06d050d87f64a069d6e48a198413797d48f5b0b9b69ab7d0",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-215163-picks-gw03.json": "fa40c764c5b25e9f30f6d3ffd86478b74574fe365286b84b1b131d2e8d167a1f",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-2163-picks-gw03.json": "59f2855db842177252b91d58cf52e87dd8c7715f8e1bc335d0e2752a9692f771",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-2224056-picks-gw03.json": "670a38b8d75f66dae4bf95c14a70121ff748e29d180d7a751808abd933ecd28c",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-227712-picks-gw03.json": "1e2ca70187b8bd3ba2334bb05684c33d511bc1aeb80fbeb94fc85dbce2388842",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-252493-picks-gw03.json": "599bf1cbbc9bda8ba5a902ce1b9910c4ec5182f0bb55adb7dbe56873357a56de",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-2589585-picks-gw03.json": "496f3cee056e75bac1892adf776eafa2fb6decbc5b5a4cf540f50ebbb5b4931d",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-2682346-picks-gw03.json": "3c71b21dcc6f70c6c591ed77295c89e9a2b8177a11522a2f71c93f99b8a3f54f",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-28848-picks-gw03.json": "6787d9f5b63e3c574a14363eea16819f0261a34ec6a887753d178fa75e726c3d",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-2922217-picks-gw03.json": "1cf6257aa52fcb724f5ecdd873ff9e7daa9440d18501f04f1b3adf218931dbd2",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-2965832-picks-gw03.json": "60a5c9c9e21196bda098d47c71e9baf455a20e21e76f64e1e521fe54a67fc061",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-3056663-picks-gw03.json": "a49c25678df921455423656825325766b45f305901a3c762da26a2e7937d4ed4",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-3232830-picks-gw03.json": "3ef3c5c53bb5d9ff4eaddbda278a6b501f40872390da31dcdb3d6b34a3f2a280",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-3294824-picks-gw03.json": "8ed21b6d524b7838d2194cdaad6e76ea0ab34295ee35a30661cc97f1a6efe80c",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-33116-picks-gw03.json": "3c642f2acbcf85b144e9774dae89773a2cefe27aea20ef68508431796a799fc0",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-334099-picks-gw03.json": "12200c71c56bd3970c7ddc8c282192f1e699adfd09c3de7150a41fa2569072f1",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-3484452-picks-gw03.json": "a492af25d5c92a6834e47f2f2677511b9ae4009ae38122a4966019979dab3edd",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-3550231-picks-gw03.json": "48a192118dd9ab10df4ca7c020242a1c41aa10261fcd3228c04fdea155348931",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-3550837-picks-gw03.json": "48cb88ccdffd0970c6d4d7d4d3ca1292f7cbb2ba8360fefe420944a6b5b5b0e4",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-3652059-picks-gw03.json": "61dc431a53ee3aeb979dad4f714feb57e393b90fb6dc650863a31707a2c696b7",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-3783180-picks-gw03.json": "097e40132fc8856e3e56a4e357e52612d6db7336415a7dbc0713e1b677126a9d",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-3855899-picks-gw03.json": "107a541e282362245114ce7325fb34562900f10b049e6bfde111fc0eef144f56",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-3921581-picks-gw03.json": "b70c849b876d802970f4bf78858e10073d5c4f3a10583bf48693514f2e821bab",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-398576-picks-gw03.json": "f88dcf15908d7263bc67e974c29d08d5a8b285a2e53ecd3f5d5a5fb90c391dfe",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-4014754-picks-gw03.json": "5610f3fcda0d7b21fec1021151088110e30b5e14a9365f4d7c3ea9c76fc3b2a4",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-4089628-picks-gw03.json": "2576aeffdde821eafadc82233135d896d7589a366eb22549293addf5219713df",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-4186713-picks-gw03.json": "fab99a3ea3e12c8552120742f5f4ff8682f2d19d020beb568505f778bee12c02",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-424232-picks-gw03.json": "76b21f1d0caf00fc2e01903a8ff61408942e34cf8a2d9cd16c5c9b6256bcab45",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-436819-picks-gw03.json": "f5c7e8d4d5d65d81c68054fcd47a5491a7aabf19a0a89f5f91c7fbc5d71fb4f7",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-4410802-picks-gw03.json": "ad402b60385b867f95ab83c5d7026891ffd00082ceacdc5eb891f1f937c38986",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-4604654-picks-gw03.json": "91481419870b0683b2f27395cfc5685cc773a6b3f52a472e29ad6a2d10a13265",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-473968-picks-gw03.json": "fcc6f6238cd3dc4c7d201cfc82030ec88edd959d7671bb732ff535cfff35f895",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-4742522-picks-gw03.json": "1a4dde256b8ac177930e45bb35cf84ca190323ba67012e492a69d812ed5847c0",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-5070417-picks-gw03.json": "26b21194b4ebbf9d2ef7058e1210f53964f9806aa887c4247c43594af9f264dd",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-5090461-picks-gw03.json": "5def85ca003d88195ae9d60388fd0133ef01665399644c50d25a24b9f1390113",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-5110391-picks-gw03.json": "814efeb27e3f2438c43772bc5ab1dd083936e1b60fe6eadd324641d7c7ee14a8",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-514417-picks-gw03.json": "8f1fe620acf15435d94db09f15b3ad704b94c99c54326220de11d6e373b0a818",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-520043-picks-gw03.json": "66322a62eaa992e597cd6c1e7504c8ba2be4cc2223a12a2f2a5cc272bf134ad5",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-52087-picks-gw03.json": "d6c34e8230585562aede5d29600d669b9783d1c448069236bc58178f5d4f1a1c",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-5219212-picks-gw03.json": "81d7b584f79f818465e47d1a95e9e556136809bc61644bc95a0631c490f9950e",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-546321-picks-gw03.json": "27ef7eb59b2ea852645789059dd64a637fa1c35f718e65a21f44e06e5202cc6e",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-5576702-picks-gw03.json": "b8ac0f5a71ea69e7241e7f00cac8699d8008055c3f8839df0242db365deadd79",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-5757280-picks-gw03.json": "1fa0c798557277f42938ea2febb1d7d8d86d516697cdf8db746cc0f83291a323",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-5859444-picks-gw03.json": "576728b85523b2924be222e2e53a1f54d30543865da240ff9184facb7f672f17",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-6017029-picks-gw03.json": "11147e7d994035bc40f4f463e2a0e8ac6008044fb7a9f6456ffc9f52df033841",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-625700-picks-gw03.json": "70104fcf56bcf102c8ed3919ca4e240c3f7427c58e335809561cb1e5d1e3ecd2",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-689819-picks-gw03.json": "60de68cc73fbf9957d9f346a1be9972f49668658b88cbfd6b7830e26e56e3003",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-691139-picks-gw03.json": "d1c4ba98eacbf26fcd070f26129003a716726618dd2a849955d4d397cc337313",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-6937378-picks-gw03.json": "c0c0245350b3dcc4319240af8f2964a16ff70749a17a949497fee652ad62cd22",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-6972741-picks-gw03.json": "a8ddd906a740d1b9f033b8085e7cc892b370e8e24dcbf7f4fa4b87c8922bc825",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-7174191-picks-gw03.json": "a79ce8941bd48ab54434863cc057f9858555666ec89c282f9d6c2b8e01d36321",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-72240-picks-gw03.json": "a0b3b33b658c9236e6f639d112d1d47e566f0e82b62a4226b0115fc0abba3763",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-730804-picks-gw03.json": "0090fc38b5445c86def74a0c5da70f338409ee396591deea49e8b0307b1e258a",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-7459981-picks-gw03.json": "837da618dfa94855e63b9bc19a80c6c146e1ff47130909de86cf5251aab6653b",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-7491201-picks-gw03.json": "bd4e9cf953513aa60f248b7ddc2d01f54171d7093f48d0fe001d1bc7fe3c6613",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-7633427-picks-gw03.json": "8cf4740cf9c0ba824905fdd8ac9a1b243f81786609e370f766a818f3b1b0b7b6",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-7720502-picks-gw03.json": "03b89bf1fe8cbf7ca789948186daad316b25429f24b23633826ca2bdf8802604",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-7824397-picks-gw03.json": "2ee7bf451c223418455d3ff44571d820101a06287c7ce199c996ed6c5ee2ab15",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-788922-picks-gw03.json": "0778ffdaf74ab8667026d9a0e2c22869dee8182fec1ae104e0fc13f41f58e719",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-793455-picks-gw03.json": "ea3ac8ffe2e89dd8eea9f7d818535f7e5ad3de8117fdb1e42a23e4c754050e30",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-8056564-picks-gw03.json": "e9d4482a04a958c657113d178321a69b891487028f0fbafb838eecb3fb9737da",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-8195689-picks-gw03.json": "ba1933a74537e1835798416814de169b195312de256ee1c76ba1bcadea34db0f",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-820768-picks-gw03.json": "d7c124f8b2bb29b70f1f080952200b1d77154381428407c702180749c0899973",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-8218717-picks-gw03.json": "675b3d87d4f74a615cd91d44cd958ae89913fc5c03972a6f4fdb66939dc51c29",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-823789-picks-gw03.json": "45b6d23e817ff633e801970987152c9e477b40c7d5f9f31e7a35dcf780bcd664",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-833996-picks-gw03.json": "10909b8398db50f72dc7744a07004878e5df9f758a1f50c34551591540491055",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-842361-picks-gw03.json": "734de7dbb271ddc293416fefd164f0eb028fc2137ddf0caeaf4d0976e99b9a30",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-8481006-picks-gw03.json": "e12bb9a6d3b1e320bfd763128619cf087d7526d17ff5a24fc56b9fd55877947e",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-8503718-picks-gw03.json": "20897418682cd40ac1b2417242ad6ac28569efd460b07d1fd89b8325539b7696",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-8526682-picks-gw03.json": "480f8d719988160171e4ba77113fbeccabec2038909bc6e33d00913888745740",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-8613314-picks-gw03.json": "69092569162fb6c8c7c458a858aeee4f8c46fb87a70c6aa5121901758bef3d41",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-8734338-picks-gw03.json": "84321169bc1e7f0f4604b1120ae8218900408d4c719724de9b683d79359a5411",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-878378-picks-gw03.json": "a41690140154c8a72213c0e5dfc5f36f5450a13cb96dec03f2f48617f5da3290",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-8817653-picks-gw03.json": "d556ebd5dc62346e055928675d9c9d9e4426b51d769f23b1f204258e4b730ba4",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-895045-picks-gw03.json": "3fc5c1b99dce062458763e72b3375767f8fa8c6dad0d3a844d4329eb5d1b2d88",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-909565-picks-gw03.json": "f1aab0f6138af717d238f3ccc948d482ef7495ab749e96ec009f2674abc705ea",
+    "data/snapshots/fpl-elite-picks-20260912T081954Z-260fbe653d58/payloads/entry-914322-picks-gw03.json": "59ef24815249d9e670ba6b9da1c796be1f7886b9ecd2bb0a18c728d5530173cf",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/metadata.json": "c0ebb064073814ad5c98b0999b5d3351eaf81f8d8d25210d86010e9c2fdfc64f",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1050186-picks-gw03.json": "39ba0648ad4efa9c2e0edfb434a6fd0d04b508af043287b6be9bc1099697d140",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1062962-picks-gw03.json": "1210f67d46ec94d661d61605adeaaa125a0a6703d22dd93fd13b6fc2398c2e32",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1072260-picks-gw03.json": "ae0c38a82c4f013c9a16b616556419040c5ff90d9a67ca3721242047267d2049",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-112255-picks-gw03.json": "93aeaa9b847f245010290ed76d030589e89254a35ce9df227e965b4fc188a4a9",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-11678-picks-gw03.json": "160bf6ef010c54c65359cc154685b39f5ab6216312a21b4469c09c8c5c4f10b0",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-118094-picks-gw03.json": "1611530f3aa248de452f8cd9d811df4bef3de671dd8f64bd4c72a81cd401fa31",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1183876-picks-gw03.json": "8594c0e3d48b6378a98d08ea6e63ed361530bef442128cce680c15563ab55280",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1197832-picks-gw03.json": "c11278471742b228521139867cdf2da5fcdf46345a18868091d772ca70e1663d",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1205939-picks-gw03.json": "281f8df7201da7dad4a364c21dae3d4eddc51e07390448e2205bf7dcd01637f5",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1210651-picks-gw03.json": "8747e83f5ccd06d0457a9ef6c52c255562917f12681bf12fdf36266526e8f90b",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1237023-picks-gw03.json": "5f4f9c9445a82d05a59b061a2b04c1e956ccd7cd55a72483b4604c443d58769b",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1246686-picks-gw03.json": "e973bcfe66532d9c1437b47a83bf65214747bf08bde87861c64ae8f49c01b24c",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-126319-picks-gw03.json": "5a6e9cbafa83885d1e02747b8f721340030ee7bf7a009c3dc0e719f966b7928b",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1317461-picks-gw03.json": "33d9e67ee439acea2f9ea761d7c9883ac9434ed0a1feea3c1ee8ac552c56b3dd",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1360989-picks-gw03.json": "8f43f909005d0fd25be7e77e4d1c7fef09d437dbf014da0de6dc193c869d9a11",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-141417-picks-gw03.json": "af768875bcb42ece947d1e09dcc703cc58f77682c640c10cc9d3fd8b675a229d",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1464306-picks-gw03.json": "ead3c93d449eb257a8487ea5a689f358d8a3df85cb7f24ad0403079834521a19",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1717192-picks-gw03.json": "3548e2beb80f06f55be39a8b35da3d9e6b63c4ce23ac4b98d542ce2faa4603b5",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1722522-picks-gw03.json": "d461c63d419bb7d4e9aaa5bb1d8c51f29caba3e993f2c29cd5c63905c18de9a8",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1772902-picks-gw03.json": "9f40f6ddc6a475b707bf77c5b2f42348e65f2811ceb754bc120323f703590d2a",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1793880-picks-gw03.json": "030b5f46ed8e394f95b1abea2e807c364c0e92d695eec2be3ea64f5a1e45de0b",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1850318-picks-gw03.json": "88f6659b7a13926b1c22a54f4b1fba68cfc703ec8a3e41244013baf15722e951",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1851681-picks-gw03.json": "c89026e68fc472a808710a14024c7f83cde2f22248237f041e4e115492f51cde",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-1856158-picks-gw03.json": "bf70cfa1fd98539f06d050d87f64a069d6e48a198413797d48f5b0b9b69ab7d0",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-215163-picks-gw03.json": "fa40c764c5b25e9f30f6d3ffd86478b74574fe365286b84b1b131d2e8d167a1f",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-2163-picks-gw03.json": "59f2855db842177252b91d58cf52e87dd8c7715f8e1bc335d0e2752a9692f771",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-2224056-picks-gw03.json": "670a38b8d75f66dae4bf95c14a70121ff748e29d180d7a751808abd933ecd28c",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-227712-picks-gw03.json": "1e2ca70187b8bd3ba2334bb05684c33d511bc1aeb80fbeb94fc85dbce2388842",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-252493-picks-gw03.json": "599bf1cbbc9bda8ba5a902ce1b9910c4ec5182f0bb55adb7dbe56873357a56de",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-2589585-picks-gw03.json": "496f3cee056e75bac1892adf776eafa2fb6decbc5b5a4cf540f50ebbb5b4931d",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-2682346-picks-gw03.json": "3c71b21dcc6f70c6c591ed77295c89e9a2b8177a11522a2f71c93f99b8a3f54f",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-28848-picks-gw03.json": "6787d9f5b63e3c574a14363eea16819f0261a34ec6a887753d178fa75e726c3d",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-2922217-picks-gw03.json": "1cf6257aa52fcb724f5ecdd873ff9e7daa9440d18501f04f1b3adf218931dbd2",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-2965832-picks-gw03.json": "60a5c9c9e21196bda098d47c71e9baf455a20e21e76f64e1e521fe54a67fc061",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-3056663-picks-gw03.json": "a49c25678df921455423656825325766b45f305901a3c762da26a2e7937d4ed4",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-3232830-picks-gw03.json": "3ef3c5c53bb5d9ff4eaddbda278a6b501f40872390da31dcdb3d6b34a3f2a280",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-3294824-picks-gw03.json": "8ed21b6d524b7838d2194cdaad6e76ea0ab34295ee35a30661cc97f1a6efe80c",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-33116-picks-gw03.json": "3c642f2acbcf85b144e9774dae89773a2cefe27aea20ef68508431796a799fc0",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-334099-picks-gw03.json": "12200c71c56bd3970c7ddc8c282192f1e699adfd09c3de7150a41fa2569072f1",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-3484452-picks-gw03.json": "a492af25d5c92a6834e47f2f2677511b9ae4009ae38122a4966019979dab3edd",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-3550231-picks-gw03.json": "48a192118dd9ab10df4ca7c020242a1c41aa10261fcd3228c04fdea155348931",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-3550837-picks-gw03.json": "48cb88ccdffd0970c6d4d7d4d3ca1292f7cbb2ba8360fefe420944a6b5b5b0e4",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-3652059-picks-gw03.json": "61dc431a53ee3aeb979dad4f714feb57e393b90fb6dc650863a31707a2c696b7",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-3783180-picks-gw03.json": "097e40132fc8856e3e56a4e357e52612d6db7336415a7dbc0713e1b677126a9d",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-3855899-picks-gw03.json": "107a541e282362245114ce7325fb34562900f10b049e6bfde111fc0eef144f56",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-3921581-picks-gw03.json": "b70c849b876d802970f4bf78858e10073d5c4f3a10583bf48693514f2e821bab",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-398576-picks-gw03.json": "f88dcf15908d7263bc67e974c29d08d5a8b285a2e53ecd3f5d5a5fb90c391dfe",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-4014754-picks-gw03.json": "5610f3fcda0d7b21fec1021151088110e30b5e14a9365f4d7c3ea9c76fc3b2a4",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-4089628-picks-gw03.json": "2576aeffdde821eafadc82233135d896d7589a366eb22549293addf5219713df",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-4186713-picks-gw03.json": "fab99a3ea3e12c8552120742f5f4ff8682f2d19d020beb568505f778bee12c02",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-424232-picks-gw03.json": "76b21f1d0caf00fc2e01903a8ff61408942e34cf8a2d9cd16c5c9b6256bcab45",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-436819-picks-gw03.json": "f5c7e8d4d5d65d81c68054fcd47a5491a7aabf19a0a89f5f91c7fbc5d71fb4f7",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-4410802-picks-gw03.json": "ad402b60385b867f95ab83c5d7026891ffd00082ceacdc5eb891f1f937c38986",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-4604654-picks-gw03.json": "91481419870b0683b2f27395cfc5685cc773a6b3f52a472e29ad6a2d10a13265",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-473968-picks-gw03.json": "fcc6f6238cd3dc4c7d201cfc82030ec88edd959d7671bb732ff535cfff35f895",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-4742522-picks-gw03.json": "1a4dde256b8ac177930e45bb35cf84ca190323ba67012e492a69d812ed5847c0",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-5070417-picks-gw03.json": "26b21194b4ebbf9d2ef7058e1210f53964f9806aa887c4247c43594af9f264dd",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-5090461-picks-gw03.json": "5def85ca003d88195ae9d60388fd0133ef01665399644c50d25a24b9f1390113",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-5110391-picks-gw03.json": "814efeb27e3f2438c43772bc5ab1dd083936e1b60fe6eadd324641d7c7ee14a8",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-514417-picks-gw03.json": "8f1fe620acf15435d94db09f15b3ad704b94c99c54326220de11d6e373b0a818",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-520043-picks-gw03.json": "66322a62eaa992e597cd6c1e7504c8ba2be4cc2223a12a2f2a5cc272bf134ad5",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-52087-picks-gw03.json": "d6c34e8230585562aede5d29600d669b9783d1c448069236bc58178f5d4f1a1c",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-5219212-picks-gw03.json": "81d7b584f79f818465e47d1a95e9e556136809bc61644bc95a0631c490f9950e",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-546321-picks-gw03.json": "27ef7eb59b2ea852645789059dd64a637fa1c35f718e65a21f44e06e5202cc6e",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-5576702-picks-gw03.json": "b8ac0f5a71ea69e7241e7f00cac8699d8008055c3f8839df0242db365deadd79",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-5757280-picks-gw03.json": "1fa0c798557277f42938ea2febb1d7d8d86d516697cdf8db746cc0f83291a323",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-5859444-picks-gw03.json": "576728b85523b2924be222e2e53a1f54d30543865da240ff9184facb7f672f17",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-6017029-picks-gw03.json": "11147e7d994035bc40f4f463e2a0e8ac6008044fb7a9f6456ffc9f52df033841",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-625700-picks-gw03.json": "70104fcf56bcf102c8ed3919ca4e240c3f7427c58e335809561cb1e5d1e3ecd2",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-689819-picks-gw03.json": "60de68cc73fbf9957d9f346a1be9972f49668658b88cbfd6b7830e26e56e3003",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-691139-picks-gw03.json": "d1c4ba98eacbf26fcd070f26129003a716726618dd2a849955d4d397cc337313",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-6937378-picks-gw03.json": "c0c0245350b3dcc4319240af8f2964a16ff70749a17a949497fee652ad62cd22",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-6972741-picks-gw03.json": "a8ddd906a740d1b9f033b8085e7cc892b370e8e24dcbf7f4fa4b87c8922bc825",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-7174191-picks-gw03.json": "a79ce8941bd48ab54434863cc057f9858555666ec89c282f9d6c2b8e01d36321",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-72240-picks-gw03.json": "a0b3b33b658c9236e6f639d112d1d47e566f0e82b62a4226b0115fc0abba3763",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-730804-picks-gw03.json": "0090fc38b5445c86def74a0c5da70f338409ee396591deea49e8b0307b1e258a",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-7459981-picks-gw03.json": "837da618dfa94855e63b9bc19a80c6c146e1ff47130909de86cf5251aab6653b",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-7491201-picks-gw03.json": "bd4e9cf953513aa60f248b7ddc2d01f54171d7093f48d0fe001d1bc7fe3c6613",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-7633427-picks-gw03.json": "8cf4740cf9c0ba824905fdd8ac9a1b243f81786609e370f766a818f3b1b0b7b6",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-7720502-picks-gw03.json": "03b89bf1fe8cbf7ca789948186daad316b25429f24b23633826ca2bdf8802604",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-7824397-picks-gw03.json": "2ee7bf451c223418455d3ff44571d820101a06287c7ce199c996ed6c5ee2ab15",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-788922-picks-gw03.json": "0778ffdaf74ab8667026d9a0e2c22869dee8182fec1ae104e0fc13f41f58e719",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-793455-picks-gw03.json": "ea3ac8ffe2e89dd8eea9f7d818535f7e5ad3de8117fdb1e42a23e4c754050e30",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-8056564-picks-gw03.json": "e9d4482a04a958c657113d178321a69b891487028f0fbafb838eecb3fb9737da",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-8195689-picks-gw03.json": "ba1933a74537e1835798416814de169b195312de256ee1c76ba1bcadea34db0f",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-820768-picks-gw03.json": "d7c124f8b2bb29b70f1f080952200b1d77154381428407c702180749c0899973",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-8218717-picks-gw03.json": "675b3d87d4f74a615cd91d44cd958ae89913fc5c03972a6f4fdb66939dc51c29",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-823789-picks-gw03.json": "45b6d23e817ff633e801970987152c9e477b40c7d5f9f31e7a35dcf780bcd664",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-833996-picks-gw03.json": "10909b8398db50f72dc7744a07004878e5df9f758a1f50c34551591540491055",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-842361-picks-gw03.json": "734de7dbb271ddc293416fefd164f0eb028fc2137ddf0caeaf4d0976e99b9a30",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-8481006-picks-gw03.json": "e12bb9a6d3b1e320bfd763128619cf087d7526d17ff5a24fc56b9fd55877947e",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-8503718-picks-gw03.json": "20897418682cd40ac1b2417242ad6ac28569efd460b07d1fd89b8325539b7696",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-8526682-picks-gw03.json": "480f8d719988160171e4ba77113fbeccabec2038909bc6e33d00913888745740",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-8613314-picks-gw03.json": "69092569162fb6c8c7c458a858aeee4f8c46fb87a70c6aa5121901758bef3d41",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-8734338-picks-gw03.json": "84321169bc1e7f0f4604b1120ae8218900408d4c719724de9b683d79359a5411",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-878378-picks-gw03.json": "a41690140154c8a72213c0e5dfc5f36f5450a13cb96dec03f2f48617f5da3290",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-8817653-picks-gw03.json": "d556ebd5dc62346e055928675d9c9d9e4426b51d769f23b1f204258e4b730ba4",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-895045-picks-gw03.json": "3fc5c1b99dce062458763e72b3375767f8fa8c6dad0d3a844d4329eb5d1b2d88",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-909565-picks-gw03.json": "f1aab0f6138af717d238f3ccc948d482ef7495ab749e96ec009f2674abc705ea",
+    "data/snapshots/fpl-elite-picks-20260912T095941Z-a0f72a506e05/payloads/entry-914322-picks-gw03.json": "59ef24815249d9e670ba6b9da1c796be1f7886b9ecd2bb0a18c728d5530173cf",
+    "data/snapshots/fpl-live-20260910T190328Z-e46daae991bd/metadata.json": "70864363c6b63faf38e55aafe57a48d574fadfbf780681444023405202c3cafe",
+    "data/snapshots/fpl-live-20260910T190328Z-e46daae991bd/payloads/bootstrap-static.json": "2b2fa00b3bfb4503bc2fed3718354c871b3e00d86b7fa91099b5f2572321243e",
+    "data/snapshots/fpl-live-20260910T190328Z-e46daae991bd/payloads/event-gw01-live.json": "0974be7e805ad6b65b3345bee327fee541c4e445837b2871473ed9ba1d794d87",
+    "data/snapshots/fpl-live-20260910T190328Z-e46daae991bd/payloads/event-gw02-live.json": "2bc0e5b3ca2035f0f0cce42a4c77d699d6c316bc290342cddf562b1a317f5715",
+    "data/snapshots/fpl-live-20260910T190328Z-e46daae991bd/payloads/event-gw03-live.json": "c33c2af4674b0a9d4276b412a441ebae8b87e01a3d093cd113446e7ef6a02482",
+    "data/snapshots/fpl-live-20260910T190328Z-e46daae991bd/payloads/fixtures.json": "78a6eb9299b4c6b832d5dc3c37b8a106873c2af92508d37c3df8a6f0c4d31a45",
+    "data/snapshots/fpl-live-20260910T190328Z-e46daae991bd/payloads/league-352490-standings.json": "701d13f0c191c5bf0d1872f6026dd6b23a83d5525ff6e3f9bd68dfc44080804e",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/metadata.json": "08214dcafd94244099eccb46f98b98eab181560e6e589bb8b3d30dff251e6349",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/bootstrap-static.json": "2b2fa00b3bfb4503bc2fed3718354c871b3e00d86b7fa91099b5f2572321243e",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-2199732-history.json": "5097c165aa5a74cd5aa751310ddbfa4cadf6c93967e0c5ef01eb691f6c756841",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-2199732-picks-gw03.json": "e83c3bb66fcbb055985577475771e309201b9c6cb200793c7dcf8ba5e2b89a2b",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-2199732.json": "78641e31dd76b4e3acb85f01c7979798c01e5290b5718cf1881d1d11bebce5c6",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-2281624-history.json": "b647894237b0bc96fa6e247012180e4b6af032fd8e65d254f101786bff826568",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-2281624-picks-gw03.json": "7efea445fa4f31e3c77316968c78295cbbb2510cb8ea48622b951f856277b159",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-2281624.json": "7989fbe8c8e6e0c7fab7b740c9d9a4b890bc6cc1c96a938d21ee85490411eb24",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-313686-history.json": "ea8d87c39751f26605b72ae741ccfefb32581a3ed739aeb85207e3eaee6f0db3",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-313686-picks-gw03.json": "e59a69b2b7e2f6fa641d317a357a77eb276e3148bb72dd5d791043c60ab9637e",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-313686.json": "380dbf8c6a8b95cd9424829f67e8aceedeb687732dcfc8bd73d59b5cf04e9564",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-3832237-history.json": "8cf5d55d351b084b99ef1d431ba9562f124f3f1d394e40f2cdd4bce7a406a670",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-3832237-picks-gw03.json": "5fabf4db4f7226548e4d3b86f96217b23801546f5ebc55489ef5494c1f31a799",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-3832237.json": "2ab052156366e8110abe3da35bcee63cbeaf1e577991330a85923a645241bb74",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-4287206-history.json": "0919c4ccf698c86d4717ca845e8116dfb465c5849b95b4a7e6dbeb6c5d0d25f0",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-4287206-picks-gw03.json": "e890d04649558bdfb7c03c50255b25f3726ffe97e74ce595dc442e8b002ce151",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-4287206.json": "1426564d11bad1cef274da2abcf4c78d1a025f790bbe71030fae7823f4c10dfd",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-5081114-history.json": "474d71ae57220dc5690751eb68696fec0a9048ba6bb6bb6ab48d5c22b17419c2",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-5081114-picks-gw03.json": "edc3d3f2b93611a34bc040966eb6bdd1eb2c22736beb8744064a2cd9665eab3b",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-5081114.json": "32f2073beb4e1c63e7626a1aefce91e7c5942b3534699c06b7a889d5aa2fe107",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-5349883-history.json": "94b3ae63ca04be1ffea42b55a42279567dc902e48e0d7afba32acb03ca3e4433",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-5349883-picks-gw03.json": "23b6359b4c0611eea707e905f497d14a808cbdcd51a078e279eae320c384ec8e",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-5349883.json": "a1c1c1187c1f8c12abee0f3e1c56746a3157fcbc5e9363eb073601467fa8570f",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-5662073-history.json": "df013c2788541a44eeff48543c52845ee9b14a99611c60d236d90e633257c434",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-5662073-picks-gw03.json": "79a68a2845513d9b9940f46467179523e7f05f6e7e626c19b1433694ba8dc53c",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-5662073.json": "72ff9f9db549746474f61285eba20bb8af8e5e0b374340f31ddcc5ebd4d0b600",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-6654210-history.json": "661357fb2e7a5c250f3988a7264ef1615b499134e3a876c244680d7f21d4cfc7",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-6654210-picks-gw03.json": "2886a4c037690576e5a403de6a31743167b9bf70547c2b0e8d0e1a5f3b1cb82d",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-6654210.json": "84fd1c7e28099d154401711574b28a74e7253d54f6396e0678acd376460c0200",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-6879786-history.json": "f754621466d99e0b9a4b7945061df63bc513e80400e9f47d1c5f7ba2e74dc34e",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-6879786-picks-gw03.json": "ce8707bb2333a8c73af581272e9f8387de45fbf944c5cadd4c1632b79da3ed2e",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-6879786.json": "5a369fdf1fcfaa8cfcb3b158b26fb07fbf7bb523148fd7813482d3070df299be",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-6880255-history.json": "b4b600481b87b337001380f1e7ff56bdd13d9e9a903eeaca0e848d312a26d328",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-6880255-picks-gw03.json": "2ecee9b5afe50aa516f1be9c341cfa1d22eef7501e095395a398fee3bc83f83a",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-6880255.json": "70c10016f1fc812b9005fd6928d88437c4d5137a6dc52d4c1c8bb27140896785",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-7018833-history.json": "aa0ae5fed8a295c47c22e26fa6091a3e961f4d234bdb063a4e28a682eefaa8d4",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-7018833-picks-gw03.json": "9e42ce9bbd478a9f6cdf76f87e6fb87f269f776e81bbeb3cd60a1685a29031d4",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-7018833.json": "30a4981cf33f446f95ac1f6db51abc8fd0f1424e361d64d7fc9e81c51d1f0237",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-7252721-history.json": "bb943267fc546b3591805a906309f15d7f090c9f3bbd5faab8c2e5ec886d5fd1",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-7252721-picks-gw03.json": "67df32524a470833cdc9e249ff2005e12da35a3d5617afa53374a74389df5111",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-7252721.json": "19824e1cddeb6eb0c61e7a3d3a3aead12d8e2ae0d5775a9422e2e5c83d351753",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-8548384-history.json": "bc83645db3d5ea6e2d6b18bc20617495f45f3e4569dff6c1760a9671b08ee741",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-8548384-picks-gw03.json": "b3d7dbd1170677d88de31ec9c652057f940b6470f8d6f7853ae08bebdeb58a43",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-8548384.json": "b527b023e6065d9f27a5d726e5a29a0b4da415cfdd3cd7eed46b5d3e3d6751d8",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-8883467-history.json": "f60c2e8a0c1ff7db4b69ecfb5818ff0532c27d124d53fe6d4b2d3bc78e2072f3",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-8883467-picks-gw03.json": "966b10101a23adb4e698b67e39f3e39a74569ea892566773b9bfe495add9a514",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/entry-8883467.json": "99614251cde680ed2fa3cae231c09d863a506cbd22499adc5fad9fdbf24c48a5",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/event-gw01-live.json": "0974be7e805ad6b65b3345bee327fee541c4e445837b2871473ed9ba1d794d87",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/event-gw02-live.json": "2bc0e5b3ca2035f0f0cce42a4c77d699d6c316bc290342cddf562b1a317f5715",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/event-gw03-live.json": "c33c2af4674b0a9d4276b412a441ebae8b87e01a3d093cd113446e7ef6a02482",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/fixtures.json": "78a6eb9299b4c6b832d5dc3c37b8a106873c2af92508d37c3df8a6f0c4d31a45",
+    "data/snapshots/fpl-live-20260910T190430Z-369360398135/payloads/league-352490-standings.json": "701d13f0c191c5bf0d1872f6026dd6b23a83d5525ff6e3f9bd68dfc44080804e",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/metadata.json": "c87a2619d535402cffc3c25dac4f21d35a784fbf3455b68686972be9d5858df3",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/bootstrap-static.json": "b1843d8abaf1bee110a3995b63560da39f6156a4fdad8aa401f7276a2a23110d",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-2199732-history.json": "5097c165aa5a74cd5aa751310ddbfa4cadf6c93967e0c5ef01eb691f6c756841",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-2199732-picks-gw03.json": "e83c3bb66fcbb055985577475771e309201b9c6cb200793c7dcf8ba5e2b89a2b",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-2199732.json": "c1e08b6ab5a755dcef29cb46b0b1f5c03b3b435599b6612f61a84a2de0743fea",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-2281624-history.json": "b647894237b0bc96fa6e247012180e4b6af032fd8e65d254f101786bff826568",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-2281624-picks-gw03.json": "7efea445fa4f31e3c77316968c78295cbbb2510cb8ea48622b951f856277b159",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-2281624.json": "ecb7666cc5f15d000f2599f7f8b4f023089cf0446691ba22522ce6fa130a97dd",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-313686-history.json": "ea8d87c39751f26605b72ae741ccfefb32581a3ed739aeb85207e3eaee6f0db3",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-313686-picks-gw03.json": "e59a69b2b7e2f6fa641d317a357a77eb276e3148bb72dd5d791043c60ab9637e",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-313686.json": "8552dcc51c034bb008554022bfecb8e3cb2b13d2e46b3647b9c56ddc368ac3c1",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-3832237-history.json": "8cf5d55d351b084b99ef1d431ba9562f124f3f1d394e40f2cdd4bce7a406a670",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-3832237-picks-gw03.json": "5fabf4db4f7226548e4d3b86f96217b23801546f5ebc55489ef5494c1f31a799",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-3832237.json": "3c513785a1fdbc0eb4f2ebe040376ffbc4ba6f6ce7a06c53d9391b30b72ee125",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-4287206-history.json": "0919c4ccf698c86d4717ca845e8116dfb465c5849b95b4a7e6dbeb6c5d0d25f0",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-4287206-picks-gw02.json": "1b3ad322df55bfedddbd8560458e2b8be80cc3e714af793ccca23bbf2789af0d",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-4287206-picks-gw03.json": "e890d04649558bdfb7c03c50255b25f3726ffe97e74ce595dc442e8b002ce151",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-4287206.json": "f6894488090e2272e6b7446012ee3545373e1338f52d1acb953e93314bdc6a24",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-5081114-history.json": "474d71ae57220dc5690751eb68696fec0a9048ba6bb6bb6ab48d5c22b17419c2",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-5081114-picks-gw03.json": "edc3d3f2b93611a34bc040966eb6bdd1eb2c22736beb8744064a2cd9665eab3b",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-5081114.json": "30d3e089e2dd49824c4d688a1fd92fd95fa465c304f7533f736064a13ddfaf2c",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-5349883-history.json": "94b3ae63ca04be1ffea42b55a42279567dc902e48e0d7afba32acb03ca3e4433",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-5349883-picks-gw03.json": "23b6359b4c0611eea707e905f497d14a808cbdcd51a078e279eae320c384ec8e",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-5349883.json": "f40d5d9f28d59cf0de3eeea164038e9b48f25bee5315ea537bcd0f135d7429ce",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-5662073-history.json": "df013c2788541a44eeff48543c52845ee9b14a99611c60d236d90e633257c434",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-5662073-picks-gw02.json": "16299424455754bf0a129d882c29d822231a82f1fb1d6ef9b98e076faaa1c91d",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-5662073-picks-gw03.json": "79a68a2845513d9b9940f46467179523e7f05f6e7e626c19b1433694ba8dc53c",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-5662073.json": "a6a767326dbd912aa712fbe8e47ab4d44ff3b34c111acda08435dc7e0ea12e47",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-6654210-history.json": "661357fb2e7a5c250f3988a7264ef1615b499134e3a876c244680d7f21d4cfc7",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-6654210-picks-gw03.json": "2886a4c037690576e5a403de6a31743167b9bf70547c2b0e8d0e1a5f3b1cb82d",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-6654210.json": "3ebf0cbf4f8a38555a68e8422b7d9a3b7ed0a8ac4142a2193ddbc065c90a3272",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-6879786-history.json": "f754621466d99e0b9a4b7945061df63bc513e80400e9f47d1c5f7ba2e74dc34e",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-6879786-picks-gw03.json": "ce8707bb2333a8c73af581272e9f8387de45fbf944c5cadd4c1632b79da3ed2e",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-6879786.json": "53e90351100104c205b6b0f6625e8e30b10a66cbcb174c0879890e97144c4974",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-6880255-history.json": "b4b600481b87b337001380f1e7ff56bdd13d9e9a903eeaca0e848d312a26d328",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-6880255-picks-gw03.json": "2ecee9b5afe50aa516f1be9c341cfa1d22eef7501e095395a398fee3bc83f83a",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-6880255.json": "a1188757771bef27782b7c27c6a03a2d48468809b3328424e874c15bfb90f24a",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-7018833-history.json": "aa0ae5fed8a295c47c22e26fa6091a3e961f4d234bdb063a4e28a682eefaa8d4",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-7018833-picks-gw03.json": "9e42ce9bbd478a9f6cdf76f87e6fb87f269f776e81bbeb3cd60a1685a29031d4",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-7018833.json": "ceadf9023b1b68bb7f305edf873f1b1e4fc461e1bd281f9db14819d2e30cf6dd",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-7252721-history.json": "bb943267fc546b3591805a906309f15d7f090c9f3bbd5faab8c2e5ec886d5fd1",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-7252721-picks-gw03.json": "67df32524a470833cdc9e249ff2005e12da35a3d5617afa53374a74389df5111",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-7252721.json": "fd5947b82c6cacaba761190cfe89190e152c354ebd23bff88e0e6e9f1ffadfac",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-8548384-history.json": "bc83645db3d5ea6e2d6b18bc20617495f45f3e4569dff6c1760a9671b08ee741",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-8548384-picks-gw03.json": "b3d7dbd1170677d88de31ec9c652057f940b6470f8d6f7853ae08bebdeb58a43",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-8548384.json": "ffac65debd21f925de17f5ab7813de3c0b7c8a160bc1091a753b6866d725d7a7",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-8883467-history.json": "f60c2e8a0c1ff7db4b69ecfb5818ff0532c27d124d53fe6d4b2d3bc78e2072f3",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-8883467-picks-gw03.json": "966b10101a23adb4e698b67e39f3e39a74569ea892566773b9bfe495add9a514",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/entry-8883467.json": "fbff0210442965d28a0e79a40923fa0a6d3ca2c96209a9abb8aafe9082c2905d",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/event-gw01-live.json": "0974be7e805ad6b65b3345bee327fee541c4e445837b2871473ed9ba1d794d87",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/event-gw02-live.json": "2bc0e5b3ca2035f0f0cce42a4c77d699d6c316bc290342cddf562b1a317f5715",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/event-gw03-live.json": "c33c2af4674b0a9d4276b412a441ebae8b87e01a3d093cd113446e7ef6a02482",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/fixtures.json": "78a6eb9299b4c6b832d5dc3c37b8a106873c2af92508d37c3df8a6f0c4d31a45",
+    "data/snapshots/fpl-live-20260912T082014Z-6d6236f98aaf/payloads/league-352490-standings.json": "7945d0f702dcd57662b86812570ffb670e162347a49ff9aeea96bd143713f42b",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/metadata.json": "5be8b41804d1bbad2a61ac848bef6a750f8d65284cd544fb40a3ba4ca185b39f",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/bootstrap-static.json": "d78f1075dcb1c6b07c2e6e735eb06777a2cf51b7cab0d256116532a98739327b",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-2199732-history.json": "5097c165aa5a74cd5aa751310ddbfa4cadf6c93967e0c5ef01eb691f6c756841",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-2199732-picks-gw03.json": "e83c3bb66fcbb055985577475771e309201b9c6cb200793c7dcf8ba5e2b89a2b",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-2199732.json": "9cc5b7b78acd7b1739d527990fcb688b37ec4e4509b87c361583a870e676fcea",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-2281624-history.json": "b647894237b0bc96fa6e247012180e4b6af032fd8e65d254f101786bff826568",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-2281624-picks-gw03.json": "7efea445fa4f31e3c77316968c78295cbbb2510cb8ea48622b951f856277b159",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-2281624.json": "9039dd119840ef1604ae867a7b843e13341f48b17c8090faa83ef1ffd4ce01ac",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-313686-history.json": "ea8d87c39751f26605b72ae741ccfefb32581a3ed739aeb85207e3eaee6f0db3",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-313686-picks-gw03.json": "e59a69b2b7e2f6fa641d317a357a77eb276e3148bb72dd5d791043c60ab9637e",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-313686.json": "b11251642c189561b88f38f554cb3ed378379ba76504e34c6993c6b37118ba8c",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-3832237-history.json": "8cf5d55d351b084b99ef1d431ba9562f124f3f1d394e40f2cdd4bce7a406a670",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-3832237-picks-gw03.json": "5fabf4db4f7226548e4d3b86f96217b23801546f5ebc55489ef5494c1f31a799",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-3832237.json": "35253ccb6b595cf44424738b5425dfdeca9712c3fc053146138765dd01309401",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-4287206-history.json": "0919c4ccf698c86d4717ca845e8116dfb465c5849b95b4a7e6dbeb6c5d0d25f0",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-4287206-picks-gw02.json": "1b3ad322df55bfedddbd8560458e2b8be80cc3e714af793ccca23bbf2789af0d",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-4287206-picks-gw03.json": "e890d04649558bdfb7c03c50255b25f3726ffe97e74ce595dc442e8b002ce151",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-4287206.json": "fc1ebb7f9619471d9f50b8c046c167c863499526473b922572ec2bad2667803f",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-5081114-history.json": "474d71ae57220dc5690751eb68696fec0a9048ba6bb6bb6ab48d5c22b17419c2",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-5081114-picks-gw03.json": "edc3d3f2b93611a34bc040966eb6bdd1eb2c22736beb8744064a2cd9665eab3b",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-5081114.json": "7f2859e433b998060b0120baa837e9192fbb9510274216115433c1ff0c7273b6",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-5349883-history.json": "94b3ae63ca04be1ffea42b55a42279567dc902e48e0d7afba32acb03ca3e4433",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-5349883-picks-gw03.json": "23b6359b4c0611eea707e905f497d14a808cbdcd51a078e279eae320c384ec8e",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-5349883.json": "85a232f3a5d214b3e9d222c6554f27404c4326e586c3fcc787a694d8d4b94ec6",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-5662073-history.json": "df013c2788541a44eeff48543c52845ee9b14a99611c60d236d90e633257c434",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-5662073-picks-gw02.json": "16299424455754bf0a129d882c29d822231a82f1fb1d6ef9b98e076faaa1c91d",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-5662073-picks-gw03.json": "79a68a2845513d9b9940f46467179523e7f05f6e7e626c19b1433694ba8dc53c",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-5662073.json": "ddaa63d8acf984ebc25f95035f0eba070447c5f7c4308a5d20f0e275f81f6451",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-6654210-history.json": "661357fb2e7a5c250f3988a7264ef1615b499134e3a876c244680d7f21d4cfc7",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-6654210-picks-gw03.json": "2886a4c037690576e5a403de6a31743167b9bf70547c2b0e8d0e1a5f3b1cb82d",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-6654210.json": "fc6e528eec49223d39d76a8632e5b34ccf03600d938887cfba5baff8686c563c",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-6879786-history.json": "f754621466d99e0b9a4b7945061df63bc513e80400e9f47d1c5f7ba2e74dc34e",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-6879786-picks-gw03.json": "ce8707bb2333a8c73af581272e9f8387de45fbf944c5cadd4c1632b79da3ed2e",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-6879786.json": "c352e3bce30154169e28cef74f493ab7a7a37d7a3d18cf4c2855f16acf509843",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-6880255-history.json": "b4b600481b87b337001380f1e7ff56bdd13d9e9a903eeaca0e848d312a26d328",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-6880255-picks-gw03.json": "2ecee9b5afe50aa516f1be9c341cfa1d22eef7501e095395a398fee3bc83f83a",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-6880255.json": "f58d3338d01c1877d2c438824288f56ef4f301fc0a0f33cbc9ff423863f2cecb",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-7018833-history.json": "aa0ae5fed8a295c47c22e26fa6091a3e961f4d234bdb063a4e28a682eefaa8d4",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-7018833-picks-gw03.json": "9e42ce9bbd478a9f6cdf76f87e6fb87f269f776e81bbeb3cd60a1685a29031d4",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-7018833.json": "e217681507f76d756e3310ad3773887897d5e45053ea3f22e76066edade580c6",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-7252721-history.json": "bb943267fc546b3591805a906309f15d7f090c9f3bbd5faab8c2e5ec886d5fd1",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-7252721-picks-gw03.json": "67df32524a470833cdc9e249ff2005e12da35a3d5617afa53374a74389df5111",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-7252721.json": "03bf16bb013745fc06e3d4c177df3e34b0bf4cc59e32da62a110d494bc8122b8",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-8548384-history.json": "bc83645db3d5ea6e2d6b18bc20617495f45f3e4569dff6c1760a9671b08ee741",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-8548384-picks-gw03.json": "b3d7dbd1170677d88de31ec9c652057f940b6470f8d6f7853ae08bebdeb58a43",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-8548384.json": "8e8ee873452852b21b31531e88f42520c4fcec2762c7e499ad33d6e6d857e52b",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-8883467-history.json": "f60c2e8a0c1ff7db4b69ecfb5818ff0532c27d124d53fe6d4b2d3bc78e2072f3",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-8883467-picks-gw03.json": "966b10101a23adb4e698b67e39f3e39a74569ea892566773b9bfe495add9a514",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/entry-8883467.json": "cf7ede2979694d81af0cc38d67a236934b9d1b0c2f1ae4b035ec1fe0b5fb7892",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/event-gw01-live.json": "0974be7e805ad6b65b3345bee327fee541c4e445837b2871473ed9ba1d794d87",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/event-gw02-live.json": "2bc0e5b3ca2035f0f0cce42a4c77d699d6c316bc290342cddf562b1a317f5715",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/event-gw03-live.json": "c33c2af4674b0a9d4276b412a441ebae8b87e01a3d093cd113446e7ef6a02482",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/fixtures.json": "78a6eb9299b4c6b832d5dc3c37b8a106873c2af92508d37c3df8a6f0c4d31a45",
+    "data/snapshots/fpl-live-20260912T100000Z-24613792ef57/payloads/league-352490-standings.json": "c94d488d7a075cdd97f153d08447356ff84de195f9cb6fe10ec04174650b44c8",
+    "data/snapshots/fpl-top100-20260912T081931Z-e715e11216fc/metadata.json": "d0575279388a5f87ef889f85d32b7ee3a327fe2e8a1d4de7b4c5c64885daf0f2",
+    "data/snapshots/fpl-top100-20260912T081931Z-e715e11216fc/payloads/bootstrap-static.json": "b1843d8abaf1bee110a3995b63560da39f6156a4fdad8aa401f7276a2a23110d",
+    "data/snapshots/fpl-top100-20260912T081931Z-e715e11216fc/payloads/league-314-standings-page-01.json": "8ff0ca2bfc3751132b9c86c063702cc806505b8a52315728baa90f27641e06ac",
+    "data/snapshots/fpl-top100-20260912T081931Z-e715e11216fc/payloads/league-314-standings-page-02.json": "c35d4261095ded41d55f4052c9c84ec8715c7001b323dfaae256a05ffae5b924",
+    "data/snapshots/fpl-top100-20260912T095914Z-3f0b69089266/metadata.json": "3307b27c538a0f60dc1e19ed5fdf06328ada2e73929c74f84e7e6c0e44ad0681",
+    "data/snapshots/fpl-top100-20260912T095914Z-3f0b69089266/payloads/bootstrap-static.json": "d78f1075dcb1c6b07c2e6e735eb06777a2cf51b7cab0d256116532a98739327b",
+    "data/snapshots/fpl-top100-20260912T095914Z-3f0b69089266/payloads/league-314-standings-page-01.json": "ccd59c5087da98ba842c1432384aafddce860564fe2778fc537f381130c7493d",
+    "data/snapshots/fpl-top100-20260912T095914Z-3f0b69089266/payloads/league-314-standings-page-02.json": "1fe444509fdc5a7f9b31b9b36439dee25d830c5cfbc2278b251a5bcde0b28268",
+    "docs/phase_c_component_evaluation.json": "90a955aa0fbbe0a30c63bd9bfb36ea9ad209fc480af8a9a6869d7164c35ebaf7"
+  },
+  "locked_holdout_used_as_input": false,
+  "method_source": "https://ai.stanford.edu/~ronnyk/2013-02CUPEDImprovingSensitivityOfControlledExperiments.pdf",
+  "population": [
+    "2021-22-gw02",
+    "2021-22-gw03",
+    "2021-22-gw04",
+    "2021-22-gw05",
+    "2021-22-gw06",
+    "2021-22-gw07",
+    "2021-22-gw08",
+    "2021-22-gw09",
+    "2021-22-gw10",
+    "2021-22-gw11",
+    "2021-22-gw12",
+    "2021-22-gw13",
+    "2021-22-gw14",
+    "2021-22-gw15",
+    "2021-22-gw16",
+    "2021-22-gw17",
+    "2021-22-gw18",
+    "2021-22-gw19",
+    "2021-22-gw20",
+    "2021-22-gw21",
+    "2021-22-gw22",
+    "2021-22-gw23",
+    "2021-22-gw24",
+    "2021-22-gw25",
+    "2021-22-gw26",
+    "2021-22-gw27",
+    "2021-22-gw28",
+    "2021-22-gw29",
+    "2021-22-gw30",
+    "2021-22-gw31",
+    "2021-22-gw32",
+    "2021-22-gw33",
+    "2021-22-gw34",
+    "2021-22-gw35",
+    "2021-22-gw36",
+    "2021-22-gw37",
+    "2021-22-gw38",
+    "2022-23-gw02",
+    "2022-23-gw03",
+    "2022-23-gw04",
+    "2022-23-gw05",
+    "2022-23-gw06",
+    "2022-23-gw08",
+    "2022-23-gw09",
+    "2022-23-gw10",
+    "2022-23-gw11",
+    "2022-23-gw12",
+    "2022-23-gw13",
+    "2022-23-gw14",
+    "2022-23-gw15",
+    "2022-23-gw16",
+    "2022-23-gw17",
+    "2022-23-gw18",
+    "2022-23-gw19",
+    "2022-23-gw20",
+    "2022-23-gw21",
+    "2022-23-gw22",
+    "2022-23-gw23",
+    "2022-23-gw24",
+    "2022-23-gw25",
+    "2022-23-gw26",
+    "2022-23-gw27",
+    "2022-23-gw28",
+    "2022-23-gw29",
+    "2022-23-gw30",
+    "2022-23-gw31",
+    "2022-23-gw32",
+    "2022-23-gw33",
+    "2022-23-gw34",
+    "2022-23-gw35",
+    "2022-23-gw36",
+    "2022-23-gw37",
+    "2022-23-gw38",
+    "2023-24-gw02",
+    "2023-24-gw03",
+    "2023-24-gw04",
+    "2023-24-gw05",
+    "2023-24-gw06",
+    "2023-24-gw07",
+    "2023-24-gw08",
+    "2023-24-gw09",
+    "2023-24-gw10",
+    "2023-24-gw11",
+    "2023-24-gw12",
+    "2023-24-gw13",
+    "2023-24-gw14",
+    "2023-24-gw15",
+    "2023-24-gw16",
+    "2023-24-gw17",
+    "2023-24-gw18",
+    "2023-24-gw19",
+    "2023-24-gw20",
+    "2023-24-gw21",
+    "2023-24-gw22",
+    "2023-24-gw23",
+    "2023-24-gw24",
+    "2023-24-gw25",
+    "2023-24-gw26",
+    "2023-24-gw27",
+    "2023-24-gw28",
+    "2023-24-gw29",
+    "2023-24-gw30",
+    "2023-24-gw31",
+    "2023-24-gw32",
+    "2023-24-gw33",
+    "2023-24-gw34",
+    "2023-24-gw35",
+    "2023-24-gw36",
+    "2023-24-gw37",
+    "2023-24-gw38",
+    "2024-25-gw02",
+    "2024-25-gw03",
+    "2024-25-gw04",
+    "2024-25-gw05",
+    "2024-25-gw06",
+    "2024-25-gw07",
+    "2024-25-gw08",
+    "2024-25-gw09",
+    "2024-25-gw10",
+    "2024-25-gw11",
+    "2024-25-gw12",
+    "2024-25-gw13",
+    "2024-25-gw14",
+    "2024-25-gw15",
+    "2024-25-gw16",
+    "2024-25-gw17",
+    "2024-25-gw18",
+    "2024-25-gw19",
+    "2024-25-gw20",
+    "2024-25-gw21",
+    "2024-25-gw22",
+    "2024-25-gw23",
+    "2024-25-gw24",
+    "2024-25-gw25",
+    "2024-25-gw26",
+    "2024-25-gw27",
+    "2024-25-gw28",
+    "2024-25-gw29",
+    "2024-25-gw30",
+    "2024-25-gw31",
+    "2024-25-gw32",
+    "2024-25-gw33",
+    "2024-25-gw34",
+    "2024-25-gw35",
+    "2024-25-gw36",
+    "2024-25-gw37",
+    "2024-25-gw38"
+  ],
+  "precision": {
+    "assumptions": "IID normal approximation only; overlapping squads and weeks can violate independence",
+    "centering_policy": "same-sample mean; adjusted mean estimator is algebraically unchanged",
+    "covariates": [
+      {
+        "conditional_residual_precision": {
+          "folds": 147,
+          "iid_90_interval_half_width": 2.0099451445617413,
+          "iid_mde_alpha_0_05_power_0_8": 3.4234247436706666,
+          "iid_standard_error": 1.2219598824041997,
+          "mean": 4.61904761904762,
+          "standard_deviation": 14.81547620794475
+        },
+        "correlation": 0.1922501592606249,
+        "forward_diagnostic": {
+          "adjusted": {
+            "folds": 123,
+            "iid_90_interval_half_width": 2.2259823069183167,
+            "iid_mde_alpha_0_05_power_0_8": 3.7913885008731842,
+            "iid_standard_error": 1.3533011512057116,
+            "mean": 8.371591557419269,
+            "standard_deviation": 15.008835821612836
+          },
+          "interpretation": "historically fitted center; descriptive, not an unbiased precision claim",
+          "minimum_training_folds": 24,
+          "raw_matched": {
+            "folds": 123,
+            "iid_90_interval_half_width": 2.2653370457052486,
+            "iid_mde_alpha_0_05_power_0_8": 3.85841917925185,
+            "iid_standard_error": 1.37722713351933,
+            "mean": 5.813008130081301,
+            "standard_deviation": 15.274187801913728
+          }
+        },
+        "name": "component_projected_pool_mean",
+        "residual_variance_ratio": 0.9630398762642643,
+        "sample_covariate_mean": 1.2136777351105945,
+        "status": "measured",
+        "theta": 17.708310441625116,
+        "unconditional_mean_precision": {
+          "folds": 147,
+          "iid_90_interval_half_width": 2.0481514615330734,
+          "iid_mde_alpha_0_05_power_0_8": 3.488499380776099,
+          "iid_standard_error": 1.2451876738291074,
+          "mean": 4.619047619047619,
+          "standard_deviation": 15.097098212213622
+        }
+      },
+      {
+        "conditional_residual_precision": {
+          "folds": 147,
+          "iid_90_interval_half_width": 1.99244103581531,
+          "iid_mde_alpha_0_05_power_0_8": 3.3936109951907287,
+          "iid_standard_error": 1.2113181399052801,
+          "mean": 4.619047619047619,
+          "standard_deviation": 14.686451937120395
+        },
+        "correlation": 0.2316480749243254,
+        "forward_diagnostic": {
+          "adjusted": {
+            "folds": 123,
+            "iid_90_interval_half_width": 2.2196055826427368,
+            "iid_mde_alpha_0_05_power_0_8": 3.780527390694307,
+            "iid_standard_error": 1.3494243781171553,
+            "mean": 5.378361955354723,
+            "standard_deviation": 14.965840328147138
+          },
+          "interpretation": "historically fitted center; descriptive, not an unbiased precision claim",
+          "minimum_training_folds": 24,
+          "raw_matched": {
+            "folds": 123,
+            "iid_90_interval_half_width": 2.2653370457052486,
+            "iid_mde_alpha_0_05_power_0_8": 3.85841917925185,
+            "iid_standard_error": 1.37722713351933,
+            "mean": 5.813008130081301,
+            "standard_deviation": 15.274187801913728
+          }
+        },
+        "name": "control_projected_pool_total",
+        "residual_variance_ratio": 0.9463391693838542,
+        "sample_covariate_mean": 838.3445744440645,
+        "status": "measured",
+        "theta": 0.0347433310279102,
+        "unconditional_mean_precision": {
+          "folds": 147,
+          "iid_90_interval_half_width": 2.0481514615330734,
+          "iid_mde_alpha_0_05_power_0_8": 3.488499380776099,
+          "iid_standard_error": 1.2451876738291074,
+          "mean": 4.619047619047619,
+          "standard_deviation": 15.097098212213622
+        }
+      },
+      {
+        "conditional_residual_precision": {
+          "folds": 147,
+          "iid_90_interval_half_width": 1.8938502218779965,
+          "iid_mde_alpha_0_05_power_0_8": 3.2256868939560035,
+          "iid_standard_error": 1.1513791810083482,
+          "mean": 4.619047619047618,
+          "standard_deviation": 13.959730681984515
+        },
+        "correlation": 0.38078605950584526,
+        "forward_diagnostic": {
+          "adjusted": {
+            "folds": 123,
+            "iid_90_interval_half_width": 2.1337391974050224,
+            "iid_mde_alpha_0_05_power_0_8": 3.6342760819619753,
+            "iid_standard_error": 1.2972213225803189,
+            "mean": 5.51835445264713,
+            "standard_deviation": 14.386880434969735
+          },
+          "interpretation": "historically fitted center; descriptive, not an unbiased precision claim",
+          "minimum_training_folds": 24,
+          "raw_matched": {
+            "folds": 123,
+            "iid_90_interval_half_width": 2.2653370457052486,
+            "iid_mde_alpha_0_05_power_0_8": 3.85841917925185,
+            "iid_standard_error": 1.37722713351933,
+            "mean": 5.813008130081301,
+            "standard_deviation": 15.274187801913728
+          }
+        },
+        "name": "component_projected_pool_total",
+        "residual_variance_ratio": 0.855001976886011,
+        "sample_covariate_mean": 832.0468195833041,
+        "status": "measured",
+        "theta": 0.04164150188177579,
+        "unconditional_mean_precision": {
+          "folds": 147,
+          "iid_90_interval_half_width": 2.0481514615330734,
+          "iid_mde_alpha_0_05_power_0_8": 3.488499380776099,
+          "iid_standard_error": 1.2451876738291074,
+          "mean": 4.619047619047619,
+          "standard_deviation": 15.097098212213622
+        }
+      }
+    ],
+    "largest_absolute_correlation": "component_projected_pool_total",
+    "raw": {
+      "folds": 147,
+      "iid_90_interval_half_width": 2.0481514615330734,
+      "iid_mde_alpha_0_05_power_0_8": 3.488499380776099,
+      "iid_standard_error": 1.2451876738291074,
+      "mean": 4.619047619047619,
+      "standard_deviation": 15.097098212213622
+    },
+    "validated_unconditional_precision_gain": false
+  },
+  "promotion_gate_changed": false,
+  "rejected_covariates": {
+    "same_week_game_average": "outcome unavailable at the deadline",
+    "same_week_realized_total_points": "outcome unavailable at the deadline",
+    "same_week_template_realized_score": "outcome unavailable at the deadline; historical ownership timing is also unverified"
+  },
+  "repository_commit": "3437e392be22a86a12ae4b3300658fd196fcc2b8"
+}

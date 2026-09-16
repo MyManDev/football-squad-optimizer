@@ -109,6 +109,7 @@ def capture_payloads(
     *,
     clubs_declared: Sequence[str],
     clubs_covered: Sequence[str],
+    clubs_partially_covered: Sequence[str] = (),
 ) -> dict[str, bytes]:
     """Lay one week's documents and responses out as named payloads plus an index.
 
@@ -117,6 +118,17 @@ def capture_payloads(
     club that was read and said nothing looks identical, from the payloads alone, to a club
     that was never read. That distinction is the one this whole lane exists to keep, so it
     is recorded at the moment it is still known.
+
+    ``clubs_partially_covered`` is there for exactly the same reason, and became necessary
+    when a club gained the right to register more than one page. A club whose second page
+    was refused looks identical, from the payloads alone, to a club that only ever
+    registered one -- both arrive with one document. Only the run that read the registry
+    knows which it was, so it says so here rather than leaving a later reader to assume the
+    more flattering of the two.
+
+    Partial coverage is a narrowing of coverage, never a substitute for it: a club named
+    here must also be covered, because a club none of whose pages were read is not partly
+    read, it is unread.
     """
 
     if not documents:
@@ -131,6 +143,13 @@ def capture_payloads(
         raise ClubNewsError(
             f"Clubs {uncovered!r} are covered but were never declared; coverage cannot "
             "exceed what the week set out to read."
+        )
+    unread = sorted(set(clubs_partially_covered) - set(clubs_covered))
+    if unread:
+        raise ClubNewsError(
+            f"Clubs {unread!r} are recorded as partly read but are not covered at all. A "
+            "club none of whose pages were read is unread, not partly read, and the two "
+            "are different facts about different weeks."
         )
 
     payloads: dict[str, bytes] = {}
@@ -176,6 +195,7 @@ def capture_payloads(
                 "readable_text_contract_version": READABLE_TEXT_CONTRACT_VERSION,
                 "clubs_declared": sorted(set(clubs_declared)),
                 "clubs_covered": sorted(set(clubs_covered)),
+                "clubs_partially_covered": sorted(set(clubs_partially_covered)),
                 "documents": document_index,
                 "responses": response_index,
             },
@@ -196,6 +216,7 @@ def write_club_news_capture(
     clubs_declared: Sequence[str],
     clubs_covered: Sequence[str],
     captured_at_utc: str,
+    clubs_partially_covered: Sequence[str] = (),
 ) -> SnapshotMetadata:
     """Write one week's club news as a snapshot, once.
 
@@ -213,6 +234,7 @@ def write_club_news_capture(
             coded,
             clubs_declared=clubs_declared,
             clubs_covered=clubs_covered,
+            clubs_partially_covered=clubs_partially_covered,
         ),
     )
 
@@ -349,17 +371,27 @@ def read_captured_responses(snapshot: CapturedSnapshot) -> tuple[CodedClub, ...]
     return tuple(coded)
 
 
-def read_captured_coverage(snapshot: CapturedSnapshot) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """The clubs the week set out to read, and the ones it read.
+def read_captured_coverage(
+    snapshot: CapturedSnapshot,
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    """The clubs the week set out to read, the ones it read, and the ones it read in part.
 
-    Returned as a pair rather than one list, because collapsing them is exactly the mistake
-    the evidence table's two columns exist to prevent.
+    Returned separately rather than as one list, because collapsing them is exactly the
+    mistake the evidence table's columns exist to prevent. The third is absent from captures
+    written before a club could register more than one page, and an absent list reads as
+    empty rather than as a refusal: those weeks had one page per club, so no club could be
+    partly read, and demanding the field would make a true statement about them unreadable.
     """
 
     document = _index(snapshot)
     declared = _entries_of_names(document, "clubs_declared")
     covered = _entries_of_names(document, "clubs_covered")
-    return declared, covered
+    partial = (
+        _entries_of_names(document, "clubs_partially_covered")
+        if "clubs_partially_covered" in document
+        else ()
+    )
+    return declared, covered, partial
 
 
 def _entries_of_names(document: Mapping[str, object], key: str) -> tuple[str, ...]:
@@ -376,8 +408,14 @@ def _entries_of_names(document: Mapping[str, object], key: str) -> tuple[str, ..
 
 def read_club_news_capture(
     snapshot: CapturedSnapshot,
-) -> tuple[tuple[RawDocument, ...], tuple[CodedClub, ...], tuple[str, ...], tuple[str, ...]]:
-    """Read a whole capture: documents, responses, declared clubs, covered clubs.
+) -> tuple[
+    tuple[RawDocument, ...],
+    tuple[CodedClub, ...],
+    tuple[str, ...],
+    tuple[str, ...],
+    tuple[str, ...],
+]:
+    """Read a whole capture: documents, responses, and the three coverage lists.
 
     One entry point for the replay path, so a caller cannot read the documents and forget
     the coverage lists -- which would leave it unable to tell a club that said nothing from
@@ -398,8 +436,8 @@ def read_club_news_capture(
         + [_text(entry, "readable_payload") for entry in described]
         + [_text(entry, "payload") for entry in _entries(_index(snapshot), "responses")],
     )
-    declared, covered = read_captured_coverage(snapshot)
-    return documents, coded, declared, covered
+    declared, covered, partial = read_captured_coverage(snapshot)
+    return documents, coded, declared, covered, partial
 
 
 __all__ = [

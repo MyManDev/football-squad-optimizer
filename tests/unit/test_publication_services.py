@@ -102,6 +102,40 @@ def test_preparing_a_named_capture_neither_solves_nor_writes(tmp_path: Path) -> 
     assert request.record_root is not None and not request.record_root.exists()
 
 
+@pytest.mark.parametrize("previous", [2, 0, None])
+def test_preparation_carries_the_captured_previous_rank(
+    tmp_path: Path, previous: int | None
+) -> None:
+    request = publication_world(tmp_path)
+    snapshot = read_snapshot(request.snapshot_root, request.snapshot_id)
+    payloads = dict(snapshot.payloads)
+    payloads["league-352490-standings.json"] = json.dumps(
+        {
+            "league": {"id": 352490},
+            "standings": {
+                "has_next": False,
+                "results": [
+                    {
+                        "entry": member_fixture.ENTRY_ID,
+                        "entry_name": "Synthetic member",
+                        "player_name": "Manager",
+                        "rank": 1,
+                        "last_rank": previous,
+                    }
+                ],
+            },
+        }
+    ).encode("utf-8")
+    snapshot_id = write_snapshot(
+        request.snapshot_root,
+        source="fpl-live",
+        captured_at_utc=snapshot.metadata.captured_at_utc,
+        payloads=payloads,
+    ).snapshot_id
+    prepared = prepare_league_publication(replace(request, snapshot_id=snapshot_id))
+    assert prepared.standings[member_fixture.ENTRY_ID].last_rank == (previous or None)
+
+
 def test_installed_member_publication_and_pool_write_the_same_contracts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

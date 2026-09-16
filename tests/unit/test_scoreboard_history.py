@@ -86,12 +86,18 @@ def test_latest_checked_capture_at_cutoff_is_used_without_mutating_ledger(tmp_pa
 def test_ineligible_captures_preserve_the_existing_ledger_outcome(
     tmp_path: Path, source: CapturedSnapshot
 ) -> None:
-    entry = entry_at(tmp_path, {"realized_net_score": 42.0})
+    entry = entry_at(
+        tmp_path,
+        {"realized_net_score": 42.0, "scoring_basis": "named_eleven_no_autosubs"},
+    )
     result = settled_scoreboard_entries(
         (entry,), (source,), season="2026-27", as_of_utc="2026-08-24T12:00:00Z"
     )
     assert result == (entry,)
     assert result[0] is entry
+    # Carried through, basis and all. The recorded outcome keeps saying what produced it;
+    # nothing here restates it and nothing supplies one it did not have.
+    assert result[0].outcome["scoring_basis"] == "named_eleven_no_autosubs"
 
 
 def test_empty_ledger_does_not_read_the_archive() -> None:

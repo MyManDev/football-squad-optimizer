@@ -1,66 +1,83 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-12T10:50:08Z",
+  "generated_at_utc": "2026-09-16T06:21:15Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 4,
+    "gameweek": 5,
     "entry_id": 2281624,
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
+    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
     "moves": [
       {
-        "move_id": "gw04-1",
+        "move_id": "gw05-1",
         "player_out": {
-          "player_id": 106760,
-          "name": "Luke Shaw",
-          "short_name": "Shaw",
+          "player_id": 199798,
+          "name": "Ezri Konsa Ngoyo",
+          "short_name": "Ngoyo",
           "position": "DEF",
-          "team": "Man Utd"
+          "team": "Arsenal"
         },
         "player_in": {
-          "player_id": 487838,
-          "name": "Lewis Hall",
-          "short_name": "Hall",
+          "player_id": 226182,
+          "name": "Jayden Bogle",
+          "short_name": "Bogle",
           "position": "DEF",
-          "team": "Newcastle"
+          "team": "Leeds"
         },
-        "expected_points_delta": 1.3997944240084987,
+        "expected_points_delta": 0.7318736825586996,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 0.7318736825586996,
     "expected_points_cost": 0.0,
     "rival_label": "entry-7018833",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 56.251954228931424,
+    "expected_own_points": 56.79011086089544,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.360382282553875
+      "expected_points": 8.37533371727625
     },
     "vice_captain": {
-      "player_id": 141746,
-      "name": "Bruno Borges Fernandes",
-      "short_name": "Fernandes",
+      "player_id": 244851,
+      "name": "Cole Palmer",
+      "short_name": "Palmer",
       "position": "MID",
-      "team": "Man Utd",
-      "expected_points": 7.066032835980204
+      "team": "Chelsea",
+      "expected_points": 5.199892083433812
     },
     "starting_xi": [
       {
-        "player_id": 204936,
-        "name": "Gianluigi Donnarumma",
-        "short_name": "Donnarumma",
+        "player_id": 473284,
+        "name": "Konstantinos Tzolakis",
+        "short_name": "Tzolakis",
         "position": "GK",
+        "team": "Hull City",
+        "expected_points": 3.1358433568150343
+      },
+      {
+        "player_id": 477424,
+        "name": "Jo\u0161ko Gvardiol",
+        "short_name": "Gvardiol",
+        "position": "DEF",
         "team": "Man City",
-        "expected_points": 2.960998405165074
+        "expected_points": 4.056371668311424
+      },
+      {
+        "player_id": 226182,
+        "name": "Jayden Bogle",
+        "short_name": "Bogle",
+        "position": "DEF",
+        "team": "Leeds",
+        "expected_points": 3.5483370784121617
       },
       {
         "player_id": 466075,
@@ -68,55 +85,47 @@
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
-        "expected_points": 3.6111564244775165
+        "expected_points": 3.54054506392718
       },
       {
-        "player_id": 487838,
-        "name": "Lewis Hall",
-        "short_name": "Hall",
-        "position": "DEF",
-        "team": "Newcastle",
-        "expected_points": 3.2907274863941556
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.237246793437091
-      },
-      {
-        "player_id": 141746,
-        "name": "Bruno Borges Fernandes",
-        "short_name": "Fernandes",
+        "player_id": 244851,
+        "name": "Cole Palmer",
+        "short_name": "Palmer",
         "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 7.066032835980204
+        "team": "Chelsea",
+        "expected_points": 5.199892083433812
       },
       {
-        "player_id": 424876,
-        "name": "Dominik Szoboszlai",
-        "short_name": "Szoboszlai",
+        "player_id": 244850,
+        "name": "Morgan Rogers",
+        "short_name": "Rogers",
+        "position": "MID",
+        "team": "Chelsea",
+        "expected_points": 4.414905789016978
+      },
+      {
+        "player_id": 243298,
+        "name": "Cody Gakpo",
+        "short_name": "Gakpo",
         "position": "MID",
         "team": "Liverpool",
-        "expected_points": 4.232677554424536
+        "expected_points": 3.909202148139112
       },
       {
-        "player_id": 449434,
-        "name": "Anthony Elanga",
-        "short_name": "Elanga",
+        "player_id": 184029,
+        "name": "Martin \u00d8degaard",
+        "short_name": "\u00d8degaard",
         "position": "MID",
-        "team": "Newcastle",
-        "expected_points": 3.516411504700961
+        "team": "Arsenal",
+        "expected_points": 3.780893844188471
       },
       {
-        "player_id": 440993,
-        "name": "Iliman Ndiaye",
-        "short_name": "Ndiaye",
+        "player_id": 215413,
+        "name": "Kiernan Dewsbury-Hall",
+        "short_name": "Dewsbury-Hall",
         "position": "MID",
-        "team": "Man City",
-        "expected_points": 3.436160025237239
+        "team": "Everton",
+        "expected_points": 3.73372343804937
       },
       {
         "player_id": 223094,
@@ -124,7 +133,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.360382282553875
+        "expected_points": 8.37533371727625
       },
       {
         "player_id": 475168,
@@ -132,52 +141,47 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.8089656617809755
-      },
-      {
-        "player_id": 177815,
-        "name": "Dominic Calvert-Lewin",
-        "short_name": "Calvert-Lewin",
-        "position": "FWD",
-        "team": "Leeds",
-        "expected_points": 3.3708129722259215
+        "expected_points": 4.719728956049396
       }
     ],
     "bench": [
       {
-        "player_id": 67089,
-        "name": "Martin Dubravka",
-        "short_name": "Dubravka",
+        "player_id": 489639,
+        "name": "Bart Verbruggen",
+        "short_name": "Verbruggen",
         "position": "GK",
-        "team": "Spurs",
-        "expected_points": 0.10027015579447286
+        "team": "Brighton",
+        "expected_points": 2.9398808352076324
       },
       {
-        "player_id": 439509,
-        "name": "Christos Tzolis",
-        "short_name": "Tzolis",
-        "position": "MID",
-        "team": "Arsenal",
-        "expected_points": 3.10088389206097
+        "player_id": 216646,
+        "name": "Yoane Wissa",
+        "short_name": "Wissa",
+        "position": "FWD",
+        "team": "Newcastle",
+        "expected_points": 3.5637000012914486
       },
       {
-        "player_id": 487676,
-        "name": "Trai Hume",
-        "short_name": "Hume",
+        "player_id": 108416,
+        "name": "John Egan",
+        "short_name": "Egan",
         "position": "DEF",
-        "team": "Sunderland",
-        "expected_points": 2.35319016432435
+        "team": "Hull City",
+        "expected_points": 2.8164633958534613
       },
       {
-        "player_id": 219924,
-        "name": "Issa Diop",
-        "short_name": "Diop",
+        "player_id": 244723,
+        "name": "Tyrick Mitchell",
+        "short_name": "Mitchell",
         "position": "DEF",
-        "team": "Ipswich Town",
-        "expected_points": 2.166625794419491
+        "team": "Crystal Palace",
+        "expected_points": 2.582386742483201
       }
     ],
     "chip": null,
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+    ],
     "data_quality": "partial",
     "missing_fields": [
       "purchase_prices"
@@ -185,7 +189,7 @@
     "squad_basis": "captured",
     "rival_entry_id": 7018833,
     "expected_points_cost_ceiling": 0.0,
-    "overlap_count": 3,
+    "overlap_count": 4,
     "transfer_cap": 1,
     "overlap_target": 5,
     "overlap_applied": 5,
@@ -197,7 +201,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 3.4932243903220552,
+    "expected_gap_vs_rival": 2.6928266920596045,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

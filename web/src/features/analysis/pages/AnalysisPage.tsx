@@ -48,6 +48,9 @@ function MeasurementCard({ entry }: { entry: MeasurementEntry }) {
       <h2 className={styles.cardTitle}>
         <Link to={`/analysis/${entry.slug}`}>{entry.title}</Link>
       </h2>
+      <p>
+        <code>{entry.slug}</code>
+      </p>
       <p>{entry.finding}</p>
     </article>
   );

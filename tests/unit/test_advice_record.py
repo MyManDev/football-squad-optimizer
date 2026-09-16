@@ -11,8 +11,10 @@ re-solving anything.
 
 import copy
 import datetime
+import errno
 import hashlib
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,7 @@ from squadopt.application.advice_record import (
     RECORD_FILE,
     AdviceRecordConflictError,
     AdviceRecordError,
+    AdviceRecordNotLandedError,
     entry_directory,
     load_member_advice_record,
     load_member_advice_record_for_deadline,
@@ -33,6 +36,7 @@ from squadopt.application.advice_record import (
 )
 from squadopt.application.entries import EntryError, EntryPicks, EntryRegistration
 from squadopt.application.league_views import MemberStanding, build_league_views
+from squadopt.data import atomic
 from squadopt.data.snapshots import read_snapshot, write_snapshot
 from squadopt.live import read_inputs, read_season_rules
 from squadopt.live.recommendation import project, read_projection_handoff
@@ -402,6 +406,96 @@ def test_a_replay_forgives_the_publication_clock_and_nothing_else(
     assert load_member_advice_record(records, SEASON, 2, 101, world["gw2_id"]) == recorded
 
 
+def test_one_publish_not_knowing_its_revision_is_not_two_publishes_disagreeing(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """A capture published once with a null revision and rebuilt with a real one is a replay.
+
+    ``provenance.repository_commit`` publishes ``null`` when the build cannot stand behind a
+    commit, which is the correct answer and is also a value the same capture will not produce
+    twice: rebuild it from a checkout that *can* be named and the field arrives populated.
+    Compared as bytes that is a difference, and it would fail a week over a footnote while
+    every word of the advice matched.
+
+    So it is reconciled, and the reconciliation is narrow in three ways that are each pinned
+    below. The bytes on disk never move, so the record that declined to guess still declines
+    afterwards and is not quietly upgraded. Both orders behave the same, because which build
+    ran first is an accident. And two revisions that *both* name a commit still conflict,
+    which is the case the field exists to catch.
+    """
+
+    source = tmp_path / "source"
+    _build(world, tmp_path / "site", record_root=source)
+    recorded = load_member_advice_record(source, SEASON, 2, 101, world["gw2_id"])
+
+    def _stamped(commit: str | None) -> dict[str, Any]:
+        """The same advice, from a build that could or could not name the commit it ran."""
+
+        document = copy.deepcopy(recorded)
+        provenance = document["provenance"]
+        assert isinstance(provenance, dict)
+        provenance["repository_commit"] = commit
+        return document
+
+    def _landed(root: Path) -> Any:
+        directory = record_directory(root, SEASON, 2, 101, world["gw2_id"])
+        return json.loads((directory / RECORD_FILE).read_text(encoding="utf-8"))["provenance"][
+            "repository_commit"
+        ]
+
+    unknown_first = tmp_path / "unknown-first"
+    directory = record_member_advice(unknown_first, _stamped(None))
+    assert record_member_advice(unknown_first, _stamped("a" * 40)) == directory
+    assert _landed(unknown_first) is None
+
+    known_first = tmp_path / "known-first"
+    directory = record_member_advice(known_first, _stamped("a" * 40))
+    assert record_member_advice(known_first, _stamped(None)) == directory
+    assert _landed(known_first) == "a" * 40
+
+    # Two builds that each named a commit, and named different ones, is the disagreement the
+    # field is carried for. Still refused, and still named in the refusal.
+    disagreed = tmp_path / "disagreed"
+    record_member_advice(disagreed, _stamped("a" * 40))
+    with pytest.raises(AdviceRecordConflictError, match="repository_commit"):
+        record_member_advice(disagreed, _stamped("b" * 40))
+
+    # And the allowance is for a build that did not know its revision, not for anything at
+    # all appearing opposite a null. An abbreviation is not a revision this system resolved.
+    abbreviated = tmp_path / "abbreviated"
+    record_member_advice(abbreviated, _stamped(None))
+    with pytest.raises(AdviceRecordConflictError, match="repository_commit"):
+        record_member_advice(abbreviated, _stamped("0123456789abcdef"))
+
+
+def test_a_revision_missing_from_a_record_is_still_a_difference(
+    world: dict[str, Any], tmp_path: Path
+) -> None:
+    """Reconciling ``null`` against a commit must not reconcile a field that is not there.
+
+    A record with no ``repository_commit`` at all is a differently shaped document, not a
+    build that declined to name itself, and forgiving that would forgive any future field
+    dropped out of the provenance block.
+    """
+
+    source = tmp_path / "source"
+    _build(world, tmp_path / "site", record_root=source)
+    recorded = load_member_advice_record(source, SEASON, 2, 101, world["gw2_id"])
+
+    absent = copy.deepcopy(recorded)
+    provenance = absent["provenance"]
+    assert isinstance(provenance, dict)
+    del provenance["repository_commit"]
+
+    records = tmp_path / "records"
+    record_member_advice(records, absent)
+    named = copy.deepcopy(recorded)
+    assert isinstance(named["provenance"], dict)
+    named["provenance"]["repository_commit"] = "a" * 40
+    with pytest.raises(AdviceRecordConflictError, match="repository_commit"):
+        record_member_advice(records, named)
+
+
 def test_two_publishes_of_one_week_from_two_captures_each_keep_their_record(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
@@ -632,3 +726,207 @@ def test_the_record_alone_reconstructs_the_advised_squads_multipliers(
         if item["published_path"] == told["published_path"]
     )
     assert players[str(document["bench"][0])]["position"] == "GK"
+
+
+# --- landing the record: the rename the system refuses --------------------------------
+#
+# The record is assembled in a staging sibling and published by one rename. On Windows that
+# rename is refused with PermissionError while anything at all still holds a handle on the
+# bytes just written - an indexer, a scanner, a backup agent - and the same rename then
+# succeeds. It used to be a plain os.replace inside a clause that deleted the staging and
+# re-raised, and the publish caught only a conflict, so a fraction of a second of someone
+# else's handle destroyed a complete record of a capture that is already spent and took
+# every member after it unrecorded too. These pin that it cannot happen again.
+
+CAPTURE = "fpl-live-20260828T090000Z-000000000000"
+
+
+def _bare_record(*, advice: str = "one") -> dict[str, Any]:
+    """A record carrying only what decides where it lands and whether it replays.
+
+    What a real record contains is built by ``build_member_advice_record`` and pinned
+    above. These tests are about the last step, which reads the key and nothing else, so
+    the document is kept small enough that the injected refusal is the only variable.
+    """
+
+    return {
+        "season": SEASON,
+        "gameweek": 2,
+        "entry_id": 101,
+        "capture": {"snapshot_id": CAPTURE, "captured_at_utc": LATER_CAPTURED_AT},
+        "told": {"strategy": advice},
+    }
+
+
+def _refuse_landing(monkeypatch: pytest.MonkeyPatch, *, times: int) -> list[float]:
+    """Refuse the landing rename ``times`` times; return the pauses the retry asks for.
+
+    The handle race cannot be provoked on demand, so the ``PermissionError`` it raises
+    (WinError 5) is injected instead - at the landing rename only, which is the one whose
+    source is the staging directory. The manifest written inside that staging lands by the
+    same retried rename and is left to the real call. The pauses are recorded rather than
+    slept, so proving the retry costs the suite no wall-clock time.
+    """
+
+    real_replace = atomic.os.replace
+    refused = 0
+    pauses: list[float] = []
+
+    def flaky(source: Any, destination: Any) -> None:
+        nonlocal refused
+        if Path(source).is_dir() and refused < times:
+            refused += 1
+            raise PermissionError(errno.EACCES, "Access is denied")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(atomic.os, "replace", flaky)
+    monkeypatch.setattr(atomic.time, "sleep", pauses.append)
+    return pauses
+
+
+def _rival_lands_first(monkeypatch: pytest.MonkeyPatch, winner: Path) -> list[float]:
+    """Another writer's record appears at the address between the check and our rename.
+
+    That is the only way this rename can meet an occupied destination: the existence check
+    under the lock has just answered it. Windows reports it with the very same error a held
+    handle raises, so the two have to be told apart by looking, not by waiting.
+    """
+
+    real_replace = atomic.os.replace
+    pauses: list[float] = []
+
+    def racing(source: Any, destination: Any) -> None:
+        if not Path(source).is_dir():
+            real_replace(source, destination)
+            return
+        shutil.copytree(winner, Path(destination))
+        raise PermissionError(errno.EACCES, "Access is denied")
+
+    monkeypatch.setattr(atomic.os, "replace", racing)
+    monkeypatch.setattr(atomic.time, "sleep", pauses.append)
+    return pauses
+
+
+def test_a_landing_rename_refused_for_a_moment_does_not_destroy_the_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A held handle is waited out, and the record it delayed still lands complete.
+
+    This is the whole failure. The record was staged, verified and one rename from being
+    evidence; the refusal was another process reading it, which passes. Deleting it there
+    lost the only account of what a member was told, and no rerun brings it back, because
+    the capture it belongs to has been published already.
+    """
+
+    pauses = _refuse_landing(monkeypatch, times=atomic.RENAME_RETRY_ATTEMPTS - 1)
+
+    directory = record_member_advice(tmp_path, _bare_record())
+
+    assert len(pauses) == atomic.RENAME_RETRY_ATTEMPTS - 1
+    assert directory == record_directory(tmp_path, SEASON, 2, 101, CAPTURE)
+    assert load_member_advice_record(tmp_path, SEASON, 2, 101, CAPTURE) == _bare_record()
+    # The staging that landed is the record; nothing else is left beside it.
+    week = entry_directory(tmp_path, SEASON, 2, 101)
+    assert [child.name for child in sorted(week.iterdir())] == [CAPTURE]
+
+
+def test_a_landing_rename_refused_past_the_budget_records_nothing_and_says_which_it_is(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Giving up is allowed; giving up in the language of a conflict is not.
+
+    A conflict is two different answers for one capture and needs a person to decide which
+    is true. This is neither: nothing on disk disagrees with anything, the run simply
+    recorded nothing, and re-running the publish of the capture records it. The message
+    says so, and nothing half-written is left where a reader would find it.
+    """
+
+    attempts = atomic.RENAME_RETRY_ATTEMPTS
+    pauses = _refuse_landing(monkeypatch, times=attempts)
+
+    with pytest.raises(AdviceRecordNotLandedError) as refusal:
+        record_member_advice(tmp_path, _bare_record())
+
+    message = str(refusal.value)
+    assert f"entry 101 in {SEASON} gameweek 2" in message
+    assert f"refused on all {attempts} attempts" in message
+    assert f"over {sum(pauses):.2f} s" in message
+    assert "re-run the publish of this capture" in message
+    assert not isinstance(refusal.value, AdviceRecordConflictError)
+    week = entry_directory(tmp_path, SEASON, 2, 101)
+    assert list(week.iterdir()) == []
+
+
+def test_a_record_another_writer_landed_first_is_a_conflict_and_not_a_held_handle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An occupied destination is answered by reading the occupant, not by waiting.
+
+    Retrying it would report a real disagreement as a slow transient failure, which is the
+    one confusion the two errors being the same error on Windows invites.
+    """
+
+    winner = record_member_advice(tmp_path / "winner", _bare_record(advice="one"))
+    records = tmp_path / "records"
+    pauses = _rival_lands_first(monkeypatch, winner)
+
+    with pytest.raises(AdviceRecordConflictError) as refusal:
+        record_member_advice(records, _bare_record(advice="two"))
+
+    assert pauses == []
+    assert "advises something different" in str(refusal.value)
+    assert "told.strategy: recorded 'one', now 'two'" in str(refusal.value)
+    # The occupant stands untouched, and the staging that lost is gone.
+    assert load_member_advice_record(records, SEASON, 2, 101, CAPTURE) == _bare_record(advice="one")
+    week = entry_directory(records, SEASON, 2, 101)
+    assert [child.name for child in sorted(week.iterdir())] == [CAPTURE]
+
+
+def test_the_same_record_another_writer_landed_first_is_the_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The loser of that race reports what create-once has always reported: a replay."""
+
+    winner = record_member_advice(tmp_path / "winner", _bare_record())
+    records = tmp_path / "records"
+    _rival_lands_first(monkeypatch, winner)
+
+    directory = record_member_advice(records, _bare_record())
+
+    assert directory == record_directory(records, SEASON, 2, 101, CAPTURE)
+    assert load_member_advice_record(records, SEASON, 2, 101, CAPTURE) == _bare_record()
+    week = entry_directory(records, SEASON, 2, 101)
+    assert [child.name for child in sorted(week.iterdir())] == [CAPTURE]
+
+
+def test_a_record_that_could_not_land_still_leaves_every_other_member_recorded(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One member's refusal is one member's refusal.
+
+    The publish caught only a conflict, so a refused rename left the loop by the door
+    nothing was waiting at: the members after it were never attempted, and a week lost
+    every record from the failure onwards rather than one.
+    """
+
+    real_replace = atomic.os.replace
+    pauses: list[float] = []
+
+    def refuse_the_first_member(source: Any, destination: Any) -> None:
+        if Path(source).is_dir() and "entry-101" in str(source):
+            raise PermissionError(errno.EACCES, "Access is denied")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(atomic.os, "replace", refuse_the_first_member)
+    monkeypatch.setattr(atomic.time, "sleep", pauses.append)
+    records = tmp_path / "records"
+
+    with pytest.raises(AdviceRecordNotLandedError) as refusal:
+        _build(world, tmp_path / "site", record_root=records)
+
+    assert f"entry 101 in {SEASON} gameweek 2" in str(refusal.value)
+    # One member failed, so the refusal names one member.
+    assert str(refusal.value).count("was staged complete") == 1
+    recorded = load_member_advice_record(records, SEASON, 2, 202, world["gw2_id"])
+    assert recorded["entry_id"] == 202
+    assert list(entry_directory(records, SEASON, 2, 101).iterdir()) == []

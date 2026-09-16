@@ -11,6 +11,7 @@ import pytest
 from pandas.testing import assert_frame_equal
 
 from squadopt.data.errors import DuplicateRecordsError
+from squadopt.data.sources.vaastav import SEASON_OPTIONAL_COLUMNS
 from squadopt.features.component_targets import (
     COMPONENT_TARGET_COLUMNS,
     START_SOURCE_COLUMN,
@@ -59,37 +60,71 @@ def test_appearance_is_never_missing() -> None:
     assert not bool(targets["appearance_target"].isna().any())
 
 
-# --- start, which is unavailable --------------------------------------------
+# --- start, over a declared population -------------------------------------
 
 
-def test_the_start_target_is_missing_because_no_season_supports_it() -> None:
-    """The pre-registration admits only a verified `starts` indicator, and the archive
-    adapter maps none, so the supported-season set is empty and every start label is
-    missing rather than zero."""
+def test_a_declared_season_carries_the_verified_start_label() -> None:
+    """`starts > 0`, not the count: a double gameweek can start twice and still be one start.
 
-    assert START_TARGET_SUPPORTED_SEASONS == ()
+    The pre-registration fixes the reading as "start means starting at least one fixture",
+    so a row with two started fixtures is labelled 1 rather than 2.
+    """
+
+    assert START_TARGET_SUPPORTED_SEASONS == ("2023-24", "2024-25")
+
+    panel = _panel(
+        [("2024-25", 1, 1, 90, 6), ("2024-25", 2, 1, 180, 12), ("2024-25", 3, 1, 20, 1)]
+    ).assign(**{START_SOURCE_COLUMN: pd.Series([1, 2, 0], dtype="int64")})
+
+    targets = build_component_targets(panel)
+
+    assert targets["start_target"].tolist() == [1, 1, 0]
+    assert str(targets["start_target"].dtype) == "Int64"
+
+
+def test_a_season_outside_the_declared_population_stays_missing() -> None:
+    """Missing, not zero, and missing even though the column is right there.
+
+    2025-26 is the locked holdout: the archive carries its `starts` completely, so the
+    column arrives populated and correct. What is absent is the declaration, and a zero
+    here would assert that nobody in that season started.
+    """
+
+    panel = _panel([("2025-26", 1, 1, 90, 6), ("2023-24", 1, 2, 90, 6)]).assign(
+        **{START_SOURCE_COLUMN: pd.Series([1, 1], dtype="int64")}
+    )
+
+    targets = build_component_targets(panel).set_index("season")["start_target"]
+
+    assert targets.loc["2025-26"] is pd.NA
+    assert targets.loc["2023-24"] == 1
+
+
+def test_a_declared_season_without_the_column_stays_missing() -> None:
+    """A panel assembled from seasons the adapter does not carry `starts` for.
+
+    `build_panel` validates each season alone and concatenates, so a mixed panel is normal
+    rather than a fault. The label follows the values, not the declaration alone.
+    """
 
     targets = build_component_targets(_panel([("2024-25", 1, 1, 90, 6)]))
 
     assert bool(targets["start_target"].isna().all())
-    assert str(targets["start_target"].dtype) == "Int64"
 
 
-def test_a_present_starts_column_does_not_enable_the_start_target() -> None:
-    """What is missing is the declared population, not only the column.
+def test_the_declared_population_never_exceeds_what_the_archive_carries() -> None:
+    """Two declarations, pinned together.
 
-    A live capture does publish `starts`. If its mere presence switched the label on, the
-    target would silently exist for some inputs and not others, and the model fitted on it
-    would have a population nobody declared. Declaring one is a pre-registration act.
+    `vaastav.SEASON_OPTIONAL_COLUMNS` says which seasons the archive carries `starts` for
+    completely; `START_TARGET_SUPPORTED_SEASONS` says which of those this contract labels.
+    They are deliberately separate statements -- 2025-26 is carried and not labelled -- but
+    the second may never name a season the first does not, because that would declare a
+    population the data cannot supply.
     """
 
-    panel = _panel([("2024-25", 1, 1, 90, 6)]).assign(
-        **{START_SOURCE_COLUMN: pd.Series([1], dtype="int64")}
-    )
+    carried = set(SEASON_OPTIONAL_COLUMNS[START_SOURCE_COLUMN])
 
-    targets = build_component_targets(panel)
-
-    assert bool(targets["start_target"].isna().all())
+    assert set(START_TARGET_SUPPORTED_SEASONS) <= carried
 
 
 # --- the conditional labels -------------------------------------------------

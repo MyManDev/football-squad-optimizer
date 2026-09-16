@@ -43,6 +43,9 @@ const LeagueMemberHistoryPage = lazy(() =>
 const AnalysisPage = lazy(() =>
   import("../features/analysis/pages/AnalysisPage").then((m) => ({ default: m.AnalysisPage })),
 );
+const AdminPage = lazy(() =>
+  import("../features/admin/pages/AdminPage").then((m) => ({ default: m.AdminPage })),
+);
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -78,6 +81,7 @@ function LocalizedApp({ basename }: { basename: string }) {
                 element={<LeagueMemberHistoryPage />}
               />
               <Route path="/status" element={<StatusPage />} />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="/analysis" element={<AnalysisPage />} />
               <Route path="/analysis/:slug" element={<AnalysisPage />} />
               <Route path="*" element={<EmptyState title={messages.shell.notFound} />} />

@@ -360,8 +360,12 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
     { movement: "up", places: null, expected: "unknown" },
     { movement: "down", places: undefined, expected: "unknown" },
     { movement: "up", places: Number.POSITIVE_INFINITY, expected: "unknown" },
-    { movement: "same", places: null, expected: "—" },
-    { movement: "up", places: 0, expected: "↑ 0" },
+    { movement: "same", places: null, expected: "unknown" },
+    { movement: "same", places: 0, expected: "same" },
+    { movement: "up", places: 0, expected: "unknown" },
+    { movement: "up", places: 1.5, expected: "unknown" },
+    { movement: "down", places: -1, expected: "unknown" },
+    { movement: "unknown", places: null, expected: "unknown" },
     { movement: "down", places: 2, expected: "↓ 2" },
     { movement: "new", places: null, expected: "new" },
   ] as const)(
@@ -383,7 +387,13 @@ describe.each(["tr", "en"] as const)("honest publication states in %s", (languag
       const row = screen.getByRole("link", { name: member.manager_name! }).closest("tr")!;
       const movementCell = within(row).getAllByRole("cell").at(-1)!;
       expect(movementCell).toHaveTextContent(
-        expected === "unknown" ? copy.unknown : expected === "new" ? copy.newMember : expected,
+        expected === "unknown"
+          ? copy.noPreviousRank
+          : expected === "same"
+            ? copy.movementLabel("same", 0)
+            : expected === "new"
+              ? copy.newMember
+              : expected,
       );
     },
   );

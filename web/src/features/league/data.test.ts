@@ -56,6 +56,12 @@ const published = {
 };
 
 describe("loadScoreboard", () => {
+  it("refuses a measured row without a named scoring basis", async () => {
+    const value = structuredClone(published);
+    Object.assign(value.payload, { gameweeks: [{ ours: { net: 26, scoring_basis: null } }] });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(value))));
+    await expect(loadScoreboard()).rejects.toBeInstanceOf(LeagueDataError);
+  });
   it("reads data/league/scoreboard.json without caching and returns its envelope", async () => {
     const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify(published)));
     vi.stubGlobal("fetch", fetcher);

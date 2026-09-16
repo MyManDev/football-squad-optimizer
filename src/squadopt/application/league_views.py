@@ -47,6 +47,7 @@ from squadopt.application.advice import (
 )
 from squadopt.application.advice_record import (
     AdviceRecordConflictError,
+    AdviceRecordNotLandedError,
     PublishedAdvice,
     RecordCapture,
     build_member_advice_record,
@@ -290,6 +291,19 @@ class MemberStanding:
     gameweek_points: int | None = None
     total_points: int | None = None
     transfer_cost: int | None = None
+    last_rank: int | None = None
+    """Previous position from the same standings capture, not from the points history."""
+
+
+def _rank_movement(placing: MemberStanding | None) -> tuple[str, int | None]:
+    if placing is None or any(
+        isinstance(value, bool) or not isinstance(value, int) or value <= 0
+        for value in (placing.rank, placing.last_rank)
+    ):
+        return "unknown", None
+    assert placing.last_rank is not None
+    difference = placing.last_rank - placing.rank
+    return ("up" if difference > 0 else "down" if difference < 0 else "same"), abs(difference)
 
 
 #: The longest team or manager name this publishes. Not a claim about what the game
@@ -845,6 +859,7 @@ def build_league_views(
 
     def _row(entry_id: int, label: str, quality: str) -> dict[str, object]:
         placing = placings.get(entry_id)
+        movement, movement_places = _rank_movement(placing)
         return {
             "member_kind": "human",
             "entry_id": entry_id,
@@ -856,8 +871,8 @@ def build_league_views(
             # one basis for everyone. Null stays null: no hit was proven, not no hit.
             "transfer_cost": placing.transfer_cost if placing else None,
             "total_points": placing.total_points if placing else None,
-            "movement": "unknown",
-            "movement_places": None,
+            "movement": movement,
+            "movement_places": movement_places,
             "data_quality": quality,
         }
 
@@ -1246,6 +1261,12 @@ def build_league_views(
         # from two captures leaves two records, and neither refuses the other.
         capture = RecordCapture(inputs.snapshot_id, inputs.captured_at_utc)
         conflicts: list[str] = []
+        # A record that never landed is a different failure from a record that disagrees,
+        # and it used to leave by a different door: the only handler here was the conflict
+        # one, so a rename the system refused for a moment travelled out of the loop and
+        # every member after it went unrecorded as well. Both are collected now, and every
+        # member is still attempted.
+        unlanded: list[str] = []
         for picks, fingerprint, emitted, told in publications:
             record = build_member_advice_record(
                 picks,
@@ -1263,6 +1284,14 @@ def build_league_views(
                 record_member_advice(Path(advice_record_root), record)
             except AdviceRecordConflictError as error:
                 conflicts.append(str(error))
+            except AdviceRecordNotLandedError as error:
+                unlanded.append(str(error))
+        if unlanded:
+            # A week that recorded nothing for a member decides the type when both
+            # happened: a conflict names two answers that are both on disk to compare,
+            # and this names advice that was published with no evidence of it kept. The
+            # conflicts are carried in the same message rather than dropped.
+            raise AdviceRecordNotLandedError("\n".join((*unlanded, *conflicts)))
         if conflicts:
             raise AdviceRecordConflictError("\n".join(conflicts))
 

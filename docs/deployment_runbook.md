@@ -27,7 +27,7 @@ answers 200 when curl is forced to send that request to the address `squadopt.pa
 resolves to — while sending SNI `squadopt.pages.dev` to the address that just answered gets the
 reset. So it is the name, not Cloudflare, the IP, or the deployment.
 `docs/handover_2026-08-23.md` recorded the same unreachability from a second network on
-2026-08-23. The custom domain answers 200 on all seven smoke paths and serves the current data.
+2026-08-23. The custom domain passes the full smoke gate (below) and serves the current data.
 
 ## Immediate credential rule
 
@@ -126,9 +126,9 @@ complete merely because the upload step started or an older canonical page still
 
 There are two normal publications per gameweek from GW2 onward:
 
-1. **Decision:** after the ~15:30Z capture/decision and human checks, regenerate
+1. **Decision:** after the capture/decision and human checks, regenerate
    `web/public/data`, merge the release revision to `main`, tag it `...-decision`, dispatch, and
-   require green smoke before the 17:30Z deadline.
+   require green smoke before the deadline.
 2. **Settled:** after outcomes are settled, regenerate the public data and season summary,
    merge to `main`, tag it `...-settled`, dispatch, and require green smoke.
 
@@ -136,6 +136,41 @@ No cron is used: a person is already operating the deadline, and only that perso
 decision has been accepted. GW1 on 2026-08-21 is a documented one-off exception: its approved
 run sheet publishes the decision view after the deadline. The pre-deadline order above becomes
 canonical at GW2.
+
+### Which days those two land on
+
+The agreed rhythm is **twice a week, settled on Tuesday and decision on Friday**. Tuesday
+because the week's own results are the thing a member comes back for and they are not final
+until the last fixture is checked; Friday because that is where the next deadline usually sits.
+
+**The two publications have roles, not weekdays, and the deadline decides.** Tuesday and Friday
+are where those roles land for most of the season, not a rule that outranks the calendar. Of the
+38 deadlines this season, 25 fall on Saturday, 6 on Friday, 3 on Wednesday, 2 on Tuesday and 2
+on Sunday, so a Friday decision run is in time for 33 of them. **Five are midweek and need their
+own day:** GW13 (Wed 2 Dec), GW18 (Tue 29 Dec), GW20 (Tue 5 Jan), GW25 (Wed 10 Feb) and GW28
+(Wed 3 Mar). For each of those, the preceding Friday is 126.5 hours before the deadline, so a
+fixed Friday run would decide the week on a capture more than five days stale — before team
+news, before injuries, before price changes. Move the decision run to the day before the
+deadline for those five and keep the capture lead time from `docs/weekly_runbook.md`.
+
+**The Tuesday run may publish nothing, and that is a pass, not a failure.** A gameweek counts as
+settled only when the source says both `finished` and `data_checked`
+(`application/scoreboard.py`), so a Tuesday that arrives before the check publishes "not settled
+yet" rather than a wrong number. Confirm the week is checked before spending a run:
+
+```bash
+curl -s https://fantasy.premierleague.com/api/bootstrap-static/ \
+  | python -c "import json,sys; [print(e['id'], e['finished'], e['data_checked']) for e in json.load(sys.stdin)['events']]"
+```
+
+**A run inside a fixture gap is not automatically safe.** Nothing in `weekly_operations` refuses
+a gameweek whose deadline is weeks away: `--expected-at` inspects a finished run's status and
+guards nothing, and `league`, `site` and `scoreboard` are unconditional stages. Between GW5
+(18 Sep) and GW6 (10 Oct) there are 22 days, and six of the eight Tuesday/Friday slots in that
+span fall inside the gap. Run the loop there and it will publish a GW6 plan more than a
+fortnight early, from a capture that cannot know the team news, with nothing on the page saying
+so. Inside a gap, publish the settled view once and then stop until the next deadline is inside
+the lead-time window.
 
 ## Daily circuit breaker
 
@@ -155,10 +190,27 @@ deployment job is running or queued and inspect the Cloudflare daily count.
 
 ## Post-deployment smoke
 
-The trusted smoke test checks `/`, `/moves`, `/rivals`, `/league`, `/analysis`, `/status`, and
-`/data/index.json`. All seven requests must return HTTP 200. Six routes must return the SPA
-document; the data endpoint must parse as JSON and carry the short-lived revalidation policy.
-Transient edge/propagation failures are retried for roughly one minute.
+The trusted smoke test makes **ten** checks, and they are not all "must return 200". The list
+lives in `SMOKE_CHECKS` in `web/scripts/smoke-deployment.mjs` and is the authority; this
+paragraph is a reading of it, not a second copy to keep in step.
+
+Seven are routes that must return HTTP 200 carrying the SPA document: `/`, `/moves`, `/rivals`,
+`/league`, `/league/members/0`, `/analysis`, `/status`. The nested member path is there
+deliberately, because a path-scoped not-found rule would break a nested client-side route first
+and nothing else on the list would notice.
+
+Two are published documents that must return 200, parse as JSON, and carry the short-lived
+revalidation policy: `/data/index.json` and `/data/league/members.json`.
+
+**The tenth is the opposite check, and reading it as a 200 inverts it.**
+`/data/league/entries/0.json` must be **absent**. Entry 0 does not exist, so a deployment that
+answers anything but a not-found there has lost the rule that an absent document answers 404
+rather than the application shell. A green smoke is seven 200s, two JSON 200s, and one 404.
+
+Transient edge and propagation failures are retried for roughly one minute.
+
+Two routes are **not** in the gate and their absence is worth knowing before someone assumes
+otherwise: `/gw/:season/:gameweek`, and `/admin`, which was added later. Neither is covered.
 
 Production runs it twice: once against the `pages.dev` alias, then against
 `https://squadopt.mymandev.com`. Both must pass. The second run is what makes a publication
@@ -195,8 +247,9 @@ Run the smoke command immediately against the production alias printed by Wrangl
 ## Rollback
 
 In Cloudflare, open **Workers & Pages → project → Deployments** and select the previous
-known-good production deployment by its site tag and commit SHA. Roll it back, run all seven
-smoke checks, and record that tag as the live version. Do not move a tag, reset `main`, or
+known-good production deployment by its site tag and commit SHA. Roll it back, run the full
+smoke gate (`npm run smoke:deployment -- https://squadopt.mymandev.com`), and record that tag
+as the live version. Do not move a tag, reset `main`, or
 rebuild old source.
 
 If content was wrong, correct or revert it through `develop` and `main`, then publish a new

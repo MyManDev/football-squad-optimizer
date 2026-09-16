@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from importlib.metadata import version
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from squadopt.data.sources.vaastav import ARCHIVE_COMMIT, ARCHIVE_REPOSITORY, SUPPORTED_SEASONS
@@ -20,6 +21,8 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ARCHIVE_ROOT = REPOSITORY_ROOT / "data" / "raw" / "vaastav-fpl"
 DEFAULT_ARTIFACT_ROOT = REPOSITORY_ROOT / "artifacts" / "sprint2"
 MANIFEST_PATH = REPOSITORY_ROOT / "data" / "sources" / "vaastav_fpl_manifest.json"
+DEVELOPMENT_SEASONS = ("2021-22", "2022-23", "2023-24", "2024-25")
+BOOTSTRAP_DRAWS = 2_000
 
 
 def _sha256(path: Path) -> str:
@@ -104,3 +107,30 @@ def write_text(path: Path, value: str) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(value, encoding="utf-8")
+
+
+def _edge_series(root: Path) -> dict[str, list[float]]:
+    series: dict[str, list[float]] = {}
+    for season in DEVELOPMENT_SEASONS:
+        suffix = "" if season == "2024-25" else f"_{season}"
+        document = json.loads(
+            (root / f"template_rival_strength{suffix}.json").read_text(encoding="utf-8")
+        )
+        series[season] = [float(row["difference"]) for row in document["rows"]]
+    return series
+
+
+def _leave_one_out(series: dict[str, list[float]], season: str) -> tuple[float, ...]:
+    return tuple(v for other, values in series.items() if other != season for v in values)
+
+
+def _bootstrap_gap_interval(
+    claimed: np.ndarray, realized: np.ndarray, seed: int
+) -> tuple[float, float]:
+    generator = np.random.default_rng(seed)
+    gaps = []
+    n = len(claimed)
+    for _ in range(BOOTSTRAP_DRAWS):
+        pick = generator.integers(0, n, size=n)
+        gaps.append(float(claimed[pick].mean() - realized[pick].mean()))
+    return float(np.quantile(gaps, 0.05)), float(np.quantile(gaps, 0.95))

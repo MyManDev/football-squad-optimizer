@@ -1,24 +1,24 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-12T10:50:08Z",
+  "generated_at_utc": "2026-09-16T06:21:15Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
-    "gameweek": 4,
+    "gameweek": 5,
     "entry_id": 7252721,
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
+    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
     "moves": [
       {
-        "move_id": "gw04-1",
+        "move_id": "gw05-1",
         "player_out": {
-          "player_id": 424876,
-          "name": "Dominik Szoboszlai",
-          "short_name": "Szoboszlai",
+          "player_id": 437730,
+          "name": "Antoine Semenyo",
+          "short_name": "Semenyo",
           "position": "MID",
-          "team": "Liverpool"
+          "team": "Man City"
         },
         "player_in": {
           "player_id": 141746,
@@ -27,23 +27,24 @@
           "position": "MID",
           "team": "Man Utd"
         },
-        "expected_points_delta": 2.8333552815556677,
+        "expected_points_delta": 1.8012207912118114,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 1.8012207912118114,
     "expected_points_cost": 0.0,
     "rival_label": "entry-5662073",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 58.06751900389946,
+    "expected_own_points": 58.36613147624266,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
       "short_name": "Haaland",
       "position": "FWD",
       "team": "Man City",
-      "expected_points": 8.360382282553875
+      "expected_points": 8.37533371727625
     },
     "vice_captain": {
       "player_id": 141746,
@@ -51,7 +52,7 @@
       "short_name": "Fernandes",
       "position": "MID",
       "team": "Man Utd",
-      "expected_points": 7.066032835980204
+      "expected_points": 6.421694651064867
     },
     "starting_xi": [
       {
@@ -60,7 +61,7 @@
         "short_name": "Verbruggen",
         "position": "GK",
         "team": "Brighton",
-        "expected_points": 2.495351765499311
+        "expected_points": 2.9398808352076324
       },
       {
         "player_id": 477424,
@@ -68,7 +69,15 @@
         "short_name": "Gvardiol",
         "position": "DEF",
         "team": "Man City",
-        "expected_points": 3.64230933799311
+        "expected_points": 4.056371668311424
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 146426,
@@ -76,15 +85,7 @@
         "short_name": "Ajayi",
         "position": "DEF",
         "team": "Hull City",
-        "expected_points": 3.0983922428810176
-      },
-      {
-        "player_id": 244723,
-        "name": "Tyrick Mitchell",
-        "short_name": "Mitchell",
-        "position": "DEF",
-        "team": "Crystal Palace",
-        "expected_points": 3.056313305016537
+        "expected_points": 2.7968548202938828
       },
       {
         "player_id": 141746,
@@ -92,15 +93,7 @@
         "short_name": "Fernandes",
         "position": "MID",
         "team": "Man Utd",
-        "expected_points": 7.066032835980204
-      },
-      {
-        "player_id": 446008,
-        "name": "Bryan Mbeumo",
-        "short_name": "Mbeumo",
-        "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 4.934679467666494
+        "expected_points": 6.421694651064867
       },
       {
         "player_id": 222531,
@@ -108,15 +101,15 @@
         "short_name": "Gibbs-White",
         "position": "MID",
         "team": "Nott'm Forest",
-        "expected_points": 4.470195299925821
+        "expected_points": 4.844613399405509
       },
       {
-        "player_id": 437730,
-        "name": "Antoine Semenyo",
-        "short_name": "Semenyo",
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
         "position": "MID",
-        "team": "Man City",
-        "expected_points": 4.435285999290234
+        "team": "Man Utd",
+        "expected_points": 4.415892336727386
       },
       {
         "player_id": 60307,
@@ -124,7 +117,15 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 3.339228522758007
+        "expected_points": 4.163808898150183
+      },
+      {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 3.7460561434034036
       },
       {
         "player_id": 223094,
@@ -132,7 +133,7 @@
         "short_name": "Haaland",
         "position": "FWD",
         "team": "Man City",
-        "expected_points": 8.360382282553875
+        "expected_points": 8.37533371727625
       },
       {
         "player_id": 475168,
@@ -140,7 +141,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.8089656617809755
+        "expected_points": 4.719728956049396
       }
     ],
     "bench": [
@@ -153,12 +154,12 @@
         "expected_points": 0.10027015579447286
       },
       {
-        "player_id": 451284,
-        "name": "Milan van Ewijk",
-        "short_name": "Ewijk",
+        "player_id": 244723,
+        "name": "Tyrick Mitchell",
+        "short_name": "Mitchell",
         "position": "DEF",
-        "team": "Coventry City",
-        "expected_points": 2.3873312073209636
+        "team": "Crystal Palace",
+        "expected_points": 2.582386742483201
       },
       {
         "player_id": 219924,
@@ -166,7 +167,7 @@
         "short_name": "Diop",
         "position": "DEF",
         "team": "Ipswich Town",
-        "expected_points": 2.166625794419491
+        "expected_points": 2.1138840416046176
       },
       {
         "player_id": 661313,
@@ -178,6 +179,9 @@
       }
     ],
     "chip": null,
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price."
+    ],
     "data_quality": "partial",
     "missing_fields": [
       "purchase_prices"
@@ -185,19 +189,19 @@
     "squad_basis": "captured",
     "rival_entry_id": 5662073,
     "expected_points_cost_ceiling": 0.0,
-    "overlap_count": 3,
+    "overlap_count": 4,
     "transfer_cap": 1,
     "overlap_target": 9,
-    "overlap_applied": 3,
+    "overlap_applied": 4,
     "plan_kind": "within_free_transfers",
     "alternative_plan": {
       "kind": "with_hits",
       "overlap_applied": 9,
-      "transfer_hit_points": 24.0,
-      "expected_points_cost": 25.59974408796119,
-      "expected_points_cost_ceiling": 25.59974408796119
+      "transfer_hit_points": 20.0,
+      "expected_points_cost": 21.16916980184022,
+      "expected_points_cost_ceiling": 21.16916980184022
     },
-    "expected_gap_vs_rival": 6.197302039664699,
+    "expected_gap_vs_rival": 9.632754935765107,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

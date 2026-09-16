@@ -1,0 +1,34 @@
+{
+  "artifact_contract_version": "settled_outcome_export_v1",
+  "artifact_type": "settled_outcomes",
+  "contract_version": "settled_outcome_v1",
+  "gameweeks": [
+    {
+      "appearances": 307,
+      "deadline_utc": "2026-09-12T12:30:00Z",
+      "fully_available_players": 474,
+      "fully_available_who_did_not_appear": 171,
+      "fully_available_who_did_not_start": 255,
+      "gameweek": 4,
+      "players_without_pre_deadline_availability": 3,
+      "pre_deadline_lead_time_hours": 2.5,
+      "pre_deadline_snapshot_id": "fpl-live-20260912T100000Z-24613792ef57",
+      "row_count": 659,
+      "settled_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+      "starts": 220,
+      "table_file": "settled_outcomes_v1_2026-27_gw04_382941835994.csv",
+      "table_sha256": "5783758ec1003979233c48a53ec27fde8c57c83d7d36b5216699775a869e558f"
+    }
+  ],
+  "gameweeks_exported": 1,
+  "gameweeks_skipped": 3,
+  "gate_evidence": false,
+  "locked_holdout_accessed": false,
+  "measurement_only": true,
+  "season": "2026-27",
+  "skipped": [
+    "gw01: no capture was taken before its deadline 2026-08-21T17:30:00Z, so the availability that applied was never recorded",
+    "gw02: no capture was taken before its deadline 2026-08-28T17:30:00Z, so the availability that applied was never recorded",
+    "gw03: no capture was taken before its deadline 2026-09-04T17:30:00Z, so the availability that applied was never recorded"
+  ]
+}

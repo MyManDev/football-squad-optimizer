@@ -199,6 +199,8 @@ function mockScoreboardEnvelope(state: "net" | "gross" | "empty"): LeagueViewEnv
         gameweeks: state === "empty" ? [] : [3],
         ours_net: state === "empty" ? null : 26,
         ours_gameweeks: state === "empty" ? [] : [3],
+        ours_basis: state === "empty" ? null : "official_autosub_captain_v2",
+        ours_excluded_gameweeks: [],
         members_mean_total_points: state === "empty" ? null : 199.2,
         members_gameweeks: state === "empty" ? [] : [3],
         members_counted: state === "empty" ? 0 : 15,

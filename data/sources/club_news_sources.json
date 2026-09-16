@@ -1,6 +1,6 @@
 {
   "contract_version": "club_news_sources_v1",
-  "note": "Which club pages this project may read, and where the terms reading for each host is recorded. No club's bytes are redistributed here and no real host is registered yet: the single entry below is a placeholder that keeps the shape readable and exercises the reader. A real host is added only after its terms of use and robots.txt have been read and the reading written into docs/club_news_sources.md, which is why terms_record is required rather than optional.",
+  "note": "Which club pages this project may read, and where the terms reading for each host is recorded. No club's bytes are redistributed here and no real host is registered yet: the single entry below is a placeholder that keeps the shape readable and exercises the reader. A real host is added only after its terms of use and robots.txt have been read and the reading written into docs/club_news_sources.md, which is why terms_record is required rather than optional. A club may appear on more than one line -- team news and an injury table are often separate pages -- because a claim cites a document by digest and byte span rather than citing a club. One url may appear only once: the same page registered twice is read twice and coded twice, which would enter one sentence in the evidence table as two claims.",
   "sources": [
     {
       "club": "Example FC",

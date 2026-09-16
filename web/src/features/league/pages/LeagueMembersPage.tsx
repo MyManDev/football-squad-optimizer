@@ -110,6 +110,7 @@ export function LeagueMembersView({ envelope }: { envelope: LeagueViewEnvelope<L
       </Card>
 
       <Card title={copy.members} aside={copy.memberCount(rows.length)}>
+        <p className={styles.notice}>{copy.movementNote}</p>
         <div className={styles.tableWrap}>
           <table id="league-member-list" className={styles.table}>
             <caption className="visually-hidden">{copy.caption(view.league_name)}</caption>
@@ -175,14 +176,18 @@ function MemberRow({
   const net = netWeekPoints(member);
   const movement =
     member.movement === "unknown"
-      ? copy.unknown
+      ? copy.noPreviousRank
       : member.movement === "new"
         ? copy.newMember
         : member.movement === "same"
-          ? copy.movementLabel("same", 0)
-          : typeof member.movement_places === "number" && Number.isFinite(member.movement_places)
+          ? member.movement_places === 0
+            ? copy.movementLabel("same", 0)
+            : copy.noPreviousRank
+          : typeof member.movement_places === "number" &&
+              Number.isSafeInteger(member.movement_places) &&
+              member.movement_places > 0
             ? copy.movementLabel(member.movement, member.movement_places)
-            : copy.unknown;
+            : copy.noPreviousRank;
   return (
     <tr className={member.member_kind === "system" ? styles.systemRow : undefined}>
       <td className="num">{member.rank === 0 ? "—" : member.rank}</td>

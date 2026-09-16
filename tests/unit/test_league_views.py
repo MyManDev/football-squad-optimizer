@@ -287,6 +287,52 @@ def test_the_members_page_carries_the_league_standing_and_its_order(
     assert all(row["gameweek_points"] is None and row["total_points"] is None for row in rows)
 
 
+@pytest.mark.parametrize(
+    "previous, movement, places",
+    [(5, "up", 2), (1, "down", 2), (3, "same", 0), (0, "unknown", None), (None, "unknown", None)],
+)
+def test_member_movement_is_published_without_inventing_a_previous_rank(
+    world: dict[str, Any], tmp_path: Path, previous: int | None, movement: str, places: int | None
+) -> None:
+    from jsonschema import Draft202012Validator, ValidationError
+
+    from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN, PUBLISHABLE_FIELDS
+
+    inputs, projection, rules = _world_context(world)
+    build_league_views(
+        _Provider({101: _member_picks(world, 101, _legal_squad(world))}),
+        (EntryRegistration(101, "member-a", "2026-08-23T00:00:00Z"),),
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "league",
+        standings={101: MemberStanding(101, "Ada FC", "Ada", 3, last_rank=previous)},
+    )
+    row = json.loads((tmp_path / "league/members.json").read_text(encoding="utf-8"))["payload"][
+        "members"
+    ][0]
+    assert (row["movement"], row["movement_places"]) == (movement, places)
+    assert {"movement", "movement_places"} <= PUBLISHABLE_FIELDS
+    assert not FORBIDDEN_TEXT_PATTERN.search(row["movement"])
+    schema = json.loads(
+        (
+            Path(__file__).parents[2] / "docs/contracts/league_member_movement_v1.schema.json"
+        ).read_text(encoding="utf-8")
+    )
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+    validator.validate(row)
+    for invalid in [
+        {**row, "movement": "up", "movement_places": 0},
+        {**row, "movement": "unknown", "movement_places": 1},
+        {**row, "movement": "same", "movement_places": None},
+    ]:
+        with pytest.raises(ValidationError):
+            validator.validate(invalid)
+
+
 def test_without_standings_the_page_still_renders_from_the_registry(
     world: dict[str, Any], tmp_path: Path
 ) -> None:
