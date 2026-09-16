@@ -28,11 +28,20 @@ REQUIRED_COLUMNS: tuple[str, ...] = (
 #: Reading a missing start probability as zero would bench every player nobody modelled, which
 #: is a larger behaviour change than supplying the column at all, and in the wrong direction.
 #:
-#: ``p_start`` is the pre-registration's own name for the composed probability that a player
-#: starts -- ``p_appearance * q_start_given_appearance`` (``docs/participation_model_prereg.md``)
-#: -- and not the conditional ``q`` the model fits. Nothing in this repository produces it into
-#: a live projection today; declaring it is what lets a consumer be written against it.
-OPTIONAL_COLUMNS: tuple[str, ...] = ("p_start",)
+#: ``start_probability`` is the probability the player starts, which the pre-registration
+#: writes as ``p_start = p_appearance * q_start_given_appearance``
+#: (``docs/participation_model_prereg.md``) -- the composition, not the conditional ``q`` the
+#: model fits. The name is the one the component prediction contract already uses
+#: (``prediction/components.py``), where the column exists and is deliberately left absent:
+#: ``start_component_status`` returns ``"unavailable"`` and every component row sets it to
+#: ``None``. One quantity keeps one name across the boundary it crosses, so the day that
+#: column carries a number it does not have to be renamed to reach the solve.
+#:
+#: Nothing produces it into a live projection today. ``application/projection_handoff`` narrows
+#: the component snapshot to ``player_id`` and ``expected_points`` before it becomes a
+#: projection, which is the producer-side half and is left alone here: widening it while every
+#: value is ``None`` would add an all-absent column to every live run for no consumer.
+OPTIONAL_COLUMNS: tuple[str, ...] = ("start_probability",)
 
 #: Every recognised projection column, required first then optional. The shape ``data/schema``
 #: has carried one layer down since it was written, now that the projection needs it too.
