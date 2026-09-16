@@ -146,6 +146,19 @@ def main() -> int:
         help="publish without recording what was published; a week built this way can "
         "never be reviewed",
     )
+    parser.add_argument(
+        "--rotation-evidence",
+        type=Path,
+        help="this week's rotation evidence table (rotation_evidence_v2 csv, its manifest "
+        "beside it); with --club-news-source, the manager's word is solved for every "
+        "member as a switchable, priced constraint",
+    )
+    parser.add_argument(
+        "--club-news-source",
+        type=Path,
+        help="what the evidence was coded from: the committed fixture file (example data, "
+        "labelled as such) or a club-news capture directory under the snapshot root",
+    )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     arguments = parser.parse_args()
     if arguments.workers < 1:
@@ -167,6 +180,8 @@ def main() -> int:
             record_root=None if arguments.no_advice_record else Path(arguments.advice_record_root),
             history_record_root=Path(arguments.advice_record_root),
             rival_menu=not arguments.no_rival_menu,
+            rotation_evidence=arguments.rotation_evidence,
+            club_news_source=arguments.club_news_source,
         )
         prepared = prepare_league_publication(request)
         _capture_note(prepared)

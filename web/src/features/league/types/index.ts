@@ -196,8 +196,53 @@ export interface AdviceMove {
    * not the same fact as a swap that gains nothing.
    */
   expected_points_delta: number | null;
-  reason_code: "window_value" | "mode_tradeoff" | "points_gain";
+  reason_code: "window_value" | "mode_tradeoff" | "points_gain" | "manager_word";
 }
+
+/**
+ * One coded statement from a club's own page, as the producer applied it to this plan:
+ * the category the model coded it into, the role the declared rule gave it, and the
+ * words themselves, cut from the captured bytes by digest and span so the member reads
+ * the source and not a paraphrase. `words` is null when the bytes could not be resolved.
+ */
+export interface AdviceEvidenceItem {
+  player_id: number;
+  name: string | null;
+  disposition: string;
+  role: "not_starting" | "not_captain" | null;
+  speaker: string | null;
+  published_at_utc: string | null;
+  published_precision: string | null;
+  club: string | null;
+  source_url: string | null;
+  fetched_at_utc: string | null;
+  words: string | null;
+}
+
+/** The manager's word as it entered a plan: a declared, priced constraint, never a projection input. */
+export interface AdviceEvidence {
+  kind: "managers_word";
+  rule_version: string;
+  /** `synthetic_fixture` is example data and every surface says so; `club_news_capture` is a real read. */
+  source_kind: string;
+  source_label: string;
+  evidence_table: string;
+  clubs_covered: string[];
+  applied: AdviceEvidenceItem[];
+}
+
+/** Whether the producer solved the switched-on plan for a member, and where it is. */
+export type IndexEvidence =
+  | {
+      available: true;
+      path: string;
+      applied_count: number;
+      source_kind: string | null;
+      source_label: string | null;
+      clubs_covered: string[];
+      rule_version: string | null;
+    }
+  | { available: false; reason: string };
 
 /** What the producer computed for one member, and what it could not, with the reason. */
 export interface EntryAdviceIndex {
@@ -215,6 +260,8 @@ export interface EntryAdviceIndex {
   strategies: string[];
   rival_entry_ids: number[];
   default_rival_entry_id: number | null;
+  /** The manager's word for this member: solved and where, or not and why. Absent before it existed. */
+  evidence?: IndexEvidence;
   /**
    * The declared rule's pick among the three strategies, and the two numbers it read:
    * the member's league points against their default rival (signed, negative when
@@ -321,6 +368,8 @@ export interface EntryAdvice {
   /** The control the price tag anchors on, with its own proof status and bound gap. */
   control_solver_status?: string | null;
   control_optimality_gap?: number | null;
+  /** Present on the switched-on document only; absent on every plan solved without the word. */
+  evidence?: AdviceEvidence;
   /**
    * The transfer rule the strategy played under: the free transfers it could spend
    * without hits, the overlap it asked for, the overlap it applied, and which of the

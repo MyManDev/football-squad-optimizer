@@ -42,6 +42,7 @@ from squadopt.application.advice import (
     AdviseEntryRequest,
     HorizonBuilder,
     advise_entry,
+    advise_with_managers_word,
     build_advice_payload,
     solve_member_control,
 )
@@ -62,6 +63,7 @@ from squadopt.application.entries import (
     chip_states,
     held_squad_from_picks,
 )
+from squadopt.application.manager_words import MANAGERS_WORD_FILE, ManagerWords
 from squadopt.application.mode_selection import (
     ModeSelectionError,
     choose_rival,
@@ -135,6 +137,9 @@ class MemberRender:
     #: under, carried out of the task because the advice record has to state it and the
     #: control it comes from does not cross a process pool. Empty when the baseline failed.
     transfer_config_fingerprint: str = ""
+    #: The one-week plan with the manager's word switched on, or why there is none.
+    evidence_payload: dict[str, object] | None = None
+    evidence_unavailable: str = ""
 
 
 def render_member(
@@ -145,6 +150,7 @@ def render_member(
     projection: Projection,
     rules: SeasonRules,
     horizon_builder: HorizonBuilder | None = None,
+    manager_words: ManagerWords | None = None,
 ) -> MemberRender:
     """Solve one member's control once, then every (rival strategy, rival) from it, and
     every saf-puan window the task names.
@@ -223,6 +229,28 @@ def render_member(
             window_unavailable.append((window, str(error)))
             continue
         window_payloads.append((window, payload))
+    # The manager's word: the baseline's own plan re-solved under the declared rule, from
+    # the same control, so the two documents differ by the constraint and nothing else.
+    evidence_payload: dict[str, object] | None = None
+    evidence_unavailable = ""
+    if manager_words is not None:
+        try:
+            evidence_payload = advise_with_managers_word(
+                AdviseEntryRequest(
+                    season=task.season,
+                    gameweek=task.gameweek,
+                    league_id=task.league_id,
+                    entry_id=task.entry_id,
+                ),
+                words=manager_words,
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+                control=control,
+            )
+        except (EntryError, DataError) as error:
+            evidence_unavailable = str(error)
     return MemberRender(
         task.entry_id,
         baseline,
@@ -232,6 +260,8 @@ def render_member(
         tuple(window_payloads),
         tuple(window_unavailable),
         control.transfer_config.configuration_fingerprint,
+        evidence_payload=evidence_payload,
+        evidence_unavailable=evidence_unavailable,
     )
 
 
@@ -755,6 +785,7 @@ def build_league_views(
     mapper: MemberMapper = map,
     horizon_builder: HorizonBuilder | None = None,
     advice_record_root: Path | None = None,
+    manager_words: ManagerWords | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
@@ -956,6 +987,7 @@ def build_league_views(
                 projection=projection,
                 rules=rules,
                 horizon_builder=horizon_builder,
+                manager_words=manager_words,
             ),
             tasks,
         )
@@ -1049,6 +1081,32 @@ def build_league_views(
                 )
             )
 
+        # The manager's word: the one-week plan with the evidence switched on, at its own
+        # path beside the rival files; the index says whether it exists and where the
+        # words came from, or why there is none, so the switch on the page never points
+        # at a document nobody solved.
+        evidence_index: dict[str, object]
+        if render.evidence_payload is not None:
+            relative = f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}/{MANAGERS_WORD_FILE}"
+            _write(relative, render.evidence_payload)
+            source = render.evidence_payload.get("evidence")
+            source = source if isinstance(source, Mapping) else {}
+            applied = source.get("applied")
+            evidence_index = {
+                "available": True,
+                "path": relative,
+                "applied_count": len(applied) if isinstance(applied, list) else 0,
+                "source_kind": source.get("source_kind"),
+                "source_label": source.get("source_label"),
+                "clubs_covered": source.get("clubs_covered", []),
+                "rule_version": source.get("rule_version"),
+            }
+        else:
+            evidence_index = {
+                "available": False,
+                "reason": render.evidence_unavailable or "no_evidence_this_run",
+            }
+
         # The rival menu: one file per (strategy, rival), the standings neighbour's copy
         # at the strategy's plain path, and an index that says what exists and why not.
         computed: list[dict[str, object]] = []
@@ -1104,6 +1162,7 @@ def build_league_views(
                     "gameweek": gameweek,
                     "entry_id": entry_id,
                     "window": COMPUTED_WINDOW,
+                    "evidence": evidence_index,
                     # Per strategy, the windows whose file exists: saf-puan's solved
                     # windows, every rival strategy at one week.
                     "windows": {

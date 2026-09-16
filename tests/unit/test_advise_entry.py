@@ -16,9 +16,14 @@ from tests.unit.test_league_views import (
 )
 
 from squadopt.application import advice as advice_service
-from squadopt.application.advice import AdviseEntryRequest, advise_entry
+from squadopt.application.advice import (
+    AdviseEntryRequest,
+    advise_entry,
+    advise_with_managers_word,
+)
 from squadopt.application.entries import EntryError, EntryRegistration
 from squadopt.application.league_views import build_league_views
+from squadopt.application.manager_words import ManagerWord, ManagerWords
 from squadopt.optimization import SolverStatus
 
 world = league_views_tests.world  # re-register the fixture in this module
@@ -1231,3 +1236,123 @@ def test_the_one_week_plan_states_that_no_chip_was_offered(world: dict[str, Any]
     assert payload["chip"] is None
     assert payload["stated_limits"] == [advice_service.NO_CHIP_LIMIT]
     assert advice_service.NO_CHIP_LIMIT in advice_service.WINDOW_STATED_LIMITS
+
+
+def _managers_word(player_id: int, disposition: str) -> ManagerWords:
+    return ManagerWords(
+        season="2026-27",
+        gameweek=2,
+        source_kind="synthetic_fixture",
+        source_label="club_news_v1.fixture.json",
+        evidence_table="rotation_evidence_v2_2026-27_gw02.csv",
+        clubs_covered=("Club 1",),
+        words=(
+            ManagerWord(
+                player_id=player_id,
+                disposition=disposition,
+                speaker="the manager",
+                published_at_utc="2026-08-21T10:00:00Z",
+                published_precision="instant",
+                club="Club 1",
+                source_url="https://club.example/club-1/news",
+                fetched_at_utc="2026-08-22T11:00:00Z",
+                words="He will not travel.",
+            ),
+        ),
+    )
+
+
+def _ids(players: object) -> set[int]:
+    assert isinstance(players, list)
+    return {int(str(player["player_id"])) for player in players}
+
+
+def test_the_managers_word_keeps_the_named_player_out_and_prices_it(
+    world: dict[str, Any],
+) -> None:
+    """Switched on, the word is a constraint with a price: the named player is out of
+    the eleven and the armband, the tag is never negative, the ceiling never below it,
+    and the payload carries the words the member is being asked to weigh. The baseline's
+    captain is chosen as the named player whether the member holds him or would buy him,
+    because a ruled-out player must not be bought and started either."""
+
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    baseline = advise_entry(
+        _request(), provider=provider, inputs=inputs, projection=projection, rules=rules
+    )
+    starter = int(str(baseline["captain"]["player_id"]))  # type: ignore[index]
+
+    payload = advise_with_managers_word(
+        _request(),
+        words=_managers_word(starter, "stated_expected_absent"),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+    assert payload["mode"] == "saf-puan" and payload["window"] == 1
+    assert starter not in _ids(payload["starting_xi"])
+    assert int(str(payload["captain"]["player_id"])) != starter  # type: ignore[index]
+    cost = float(str(payload["expected_points_cost"]))
+    assert cost >= 0.0
+    assert float(str(payload["expected_points_cost_ceiling"])) >= cost
+    assert payload["solver_status"] in {"OPTIMAL", "FEASIBLE"}
+    evidence = payload["evidence"]
+    assert isinstance(evidence, dict)
+    assert evidence["kind"] == "managers_word"
+    assert evidence["source_kind"] == "synthetic_fixture"
+    applied = evidence["applied"]
+    assert isinstance(applied, list) and len(applied) == 1
+    assert applied[0]["player_id"] == starter
+    assert applied[0]["role"] == "not_starting"
+    assert applied[0]["words"] == "He will not travel."
+    assert applied[0]["source_url"] == "https://club.example/club-1/news"
+    for move in payload["moves"]:  # type: ignore[union-attr]
+        assert move["reason_code"] == "manager_word"
+
+
+def test_a_word_that_binds_nobody_changes_nothing_and_says_so(world: dict[str, Any]) -> None:
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    baseline = advise_entry(
+        _request(), provider=provider, inputs=inputs, projection=projection, rules=rules
+    )
+
+    payload = advise_with_managers_word(
+        _request(),
+        words=_managers_word(999_999, "stated_expected_to_start"),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+    evidence = payload.pop("evidence")
+    assert isinstance(evidence, dict) and evidence["applied"] == []
+    assert payload == baseline
+
+
+def test_the_managers_word_is_one_week_pure_points_only(world: dict[str, Any]) -> None:
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    words = _managers_word(1001, "stated_expected_absent")
+    with pytest.raises(EntryError, match="one-week pure-points"):
+        advise_with_managers_word(
+            _request(window=3),
+            words=words,
+            provider=provider,
+            inputs=inputs,
+            projection=projection,
+            rules=rules,
+        )
+    with pytest.raises(EntryError, match="gameweek 2"):
+        advise_with_managers_word(
+            _request(),
+            words=dataclasses.replace(words, gameweek=3),
+            provider=provider,
+            inputs=inputs,
+            projection=projection,
+            rules=rules,
+        )

@@ -46,6 +46,7 @@ from squadopt.optimization.optimizer import (
 from squadopt.optimization.validation import validate_players
 from squadopt.planning.models import (
     ChipAvailability,
+    FirstWeekExclusion,
     FirstWeekOverlap,
     InitialSquadState,
     PlanningHorizon,
@@ -843,6 +844,30 @@ def _bound_first_week_overlap(
         artifacts.model.add(held <= band.maximum)
 
 
+def _exclude_first_week_roles(
+    artifacts: _PlanArtifacts,
+    first_week: pd.DataFrame,
+    exclusion: FirstWeekExclusion | None,
+) -> None:
+    """Fix the excluded players' first-week starter and captain variables to zero.
+
+    Matching mirrors ``_bound_first_week_overlap``: ids are whatever the horizon carries,
+    matched as they are, and a player it does not carry is skipped. The squad variable
+    is untouched, so an excluded player may still be held (and benched) or sold; only
+    starting and captaining him are ruled out, which is exactly what the caller declared.
+    """
+
+    if exclusion is None:
+        return
+    column_of = {player: index for index, player in enumerate(first_week["player_id"])}
+    for player in sorted(exclusion.not_starting, key=str):
+        if player in column_of:
+            artifacts.model.add(artifacts.starter_vars[0][column_of[player]] == 0)
+    for player in sorted(exclusion.not_captain, key=str):
+        if player in column_of:
+            artifacts.model.add(artifacts.captain_vars[0][column_of[player]] == 0)
+
+
 def _cap_later_week_transfers(
     artifacts: _PlanArtifacts,
     squad_size: int,
@@ -892,6 +917,7 @@ def optimize_transfer_plan(
     excluded_squads: Sequence[frozenset[object]] = (),
     first_week_overlap: FirstWeekOverlap | None = None,
     first_week_transfer_cap: int | None = None,
+    first_week_exclusion: FirstWeekExclusion | None = None,
 ) -> TransferPlanResult:
     """Optimize squads and transfers over one deterministic projection horizon.
 
@@ -964,6 +990,11 @@ def optimize_transfer_plan(
     if first_week_overlap is not None and not isinstance(first_week_overlap, FirstWeekOverlap):
         raise TransferPlanningValidationError("first_week_overlap must be a FirstWeekOverlap.")
     _bound_first_week_overlap(artifacts, players_by_week[0], first_week_overlap)
+    if first_week_exclusion is not None and not isinstance(
+        first_week_exclusion, FirstWeekExclusion
+    ):
+        raise TransferPlanningValidationError("first_week_exclusion must be a FirstWeekExclusion.")
+    _exclude_first_week_roles(artifacts, players_by_week[0], first_week_exclusion)
     # The admissible range is ``max_transfers_per_gameweek``'s: at least one transfer, or
     # ``None`` for no cap. A second range for the same quantity would be a second
     # contract to read.
@@ -1020,6 +1051,14 @@ def optimize_transfer_plan(
             }
         ),
         "first_week_transfer_cap": first_week_transfer_cap,
+        "first_week_exclusion": (
+            None
+            if first_week_exclusion is None
+            else {
+                "not_starting": len(first_week_exclusion.not_starting),
+                "not_captain": len(first_week_exclusion.not_captain),
+            }
+        ),
         "chips_available": {name: sorted(weeks) for name, weeks in availability.available.items()},
         "expected_points_scale": optimization_config.expected_points_scale,
         "objective_weight_scale": settings.objective_weight_scale,

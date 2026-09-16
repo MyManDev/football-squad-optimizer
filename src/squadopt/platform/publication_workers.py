@@ -17,6 +17,7 @@ from squadopt.application.league_views import (
     MemberRenderTask,
     render_member,
 )
+from squadopt.application.manager_words import load_manager_words
 from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.vaastav import build_panel
 from squadopt.live import (
@@ -37,6 +38,8 @@ def _worker_init(
     handoff: str | None,
     archive_root: str,
     gameweek: int | None = None,
+    rotation_evidence: str | None = None,
+    club_news_source: str | None = None,
 ) -> None:
     snapshot = read_snapshot(Path(snapshot_root), snapshot_id)
     season = season or infer_season(snapshot)
@@ -52,6 +55,15 @@ def _worker_init(
         # every member the worker renders; it is the same bytes in every process.
         horizon_builder=member_horizon_builder(
             snapshot, season=season, panel=panel, in_season=in_season
+        ),
+        manager_words=(
+            load_manager_words(
+                Path(rotation_evidence),
+                club_news_source=Path(club_news_source),
+                snapshot_root=Path(snapshot_root),
+            )
+            if rotation_evidence and club_news_source
+            else None
         ),
     )
 
@@ -105,6 +117,8 @@ def league_mapper(request: LeaguePublicationRequest, workers: int = 1) -> Iterat
             str(request.handoff_path) if request.handoff_path else None,
             str(request.archive_root),
             request.gameweek,
+            str(request.rotation_evidence) if request.rotation_evidence else None,
+            str(request.club_news_source) if request.club_news_source else None,
         ),
     ) as executor:
         yield pool_mapper(executor)

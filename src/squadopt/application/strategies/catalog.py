@@ -102,6 +102,10 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # Observed changes between ranks in one captured standings document.
         "movement",
         "movement_places",
+        # The manager's word as it entered a plan: the source's own words, the model's
+        # category, the declared rule's role, and the page they came from. Words and
+        # labels, never a number about the player; the price it cost is the field above.
+        "evidence",
     }
 )
 

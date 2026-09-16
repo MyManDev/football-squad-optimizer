@@ -635,6 +635,28 @@ const en = {
     rivalNoDefault:
       "This publish named no standings neighbour for you, so no rival is chosen on your behalf: pick one and the plan against them can be computed.",
     rivalNote: "The rival's public eleven is a constraint and a comparison, nothing more.",
+    evidenceLegend: "The manager's word",
+    evidenceSwitch: "Apply what the club's page said",
+    evidenceUnavailable: (reason: string | null) =>
+      reason === null || reason === "no_evidence_this_run"
+        ? "No club news was read for this publish."
+        : `Unavailable: ${reason}`,
+    evidenceOnlyBaseline: "One-week pure-points plan only.",
+    evidenceSourceSynthetic: "Example data: the synthetic fixture, not a real club page.",
+    evidenceSourceCapture: "Read from registered club pages before this capture.",
+    evidenceTitle: "What the club's page said",
+    evidenceIntro: (clubs: number) =>
+      `Declared rule, not measured: a stated absence keeps a player out of the eleven, a stated doubt off the armband. Pages: ${clubs}.`,
+    evidenceNone: "The pages said nothing that binds this plan.",
+    evidenceWordsUnresolved: "The cited words could not be resolved.",
+    evidenceSaid: (speaker: string | null, when: string | null) =>
+      `${speaker ?? "The club"}${when ? `, ${when}` : ""}.`,
+    evidenceReadSource: "Source →",
+    evidenceRoles: { not_starting: "Out of the eleven", not_captain: "Not captain" } as Record<
+      string,
+      string
+    >,
+    managerWordReason: "The club's page ruled him out of this role.",
     windowLegend: "Window",
     windowNotComputed:
       "Only the one-week plan is on hand for this choice: three- and five-week plans exist for pure points only, and only where this publish solved them; a rival strategy is one week at a time.",
@@ -1589,6 +1611,24 @@ const tr: MessageSchema<typeof en> = {
     rivalNoDefault:
       "Bu yayın senin için sıralamada bir komşu belirlemedi, o yüzden yerine bir rakip seçilmiyor: birini seç, ona karşı plan hesaplanabilsin.",
     rivalNote: "Rakibin açık on biri bir kısıt ve bir karşılaştırmadır, başka bir şey değil.",
+    evidenceLegend: "Hocanın sözü",
+    evidenceSwitch: "Kulübün sayfasının dediğini uygula",
+    evidenceUnavailable: (reason) =>
+      reason === null || reason === "no_evidence_this_run"
+        ? "Bu yayında kulüp haberi okunmadı."
+        : `Kullanılamıyor: ${reason}`,
+    evidenceOnlyBaseline: "Yalnız bir haftalık saf puan planında.",
+    evidenceSourceSynthetic: "Örnek veri: sentetik fixture, gerçek kulüp sayfası değil.",
+    evidenceSourceCapture: "Capture öncesi kayıtlı kulüp sayfalarından okundu.",
+    evidenceTitle: "Kulübün sayfası ne dedi",
+    evidenceIntro: (clubs) =>
+      `Beyan edilmiş kural, ölçülmemiş: söylenmiş yokluk on birin, söylenmiş şüphe kaptanlığın dışında tutar. Sayfa: ${clubs}.`,
+    evidenceNone: "Sayfalar bu planı bağlayan bir şey demedi.",
+    evidenceWordsUnresolved: "Alıntı çözülemedi.",
+    evidenceSaid: (speaker, when) => `${speaker ?? "Kulüp"}${when ? `, ${when}` : ""}.`,
+    evidenceReadSource: "Kaynak →",
+    evidenceRoles: { not_starting: "On birin dışında", not_captain: "Kaptan değil" },
+    managerWordReason: "Kulübün sayfası onu bu rolün dışında tuttu.",
     windowLegend: "Pencere",
     windowNotComputed:
       "Bu seçim için yalnız bir haftalık plan var: üç ve beş haftalık planlar yalnız saf puan için ve yalnız bu yayının çözdüğü yerde var; rakip stratejisi hafta hafta oynanır.",

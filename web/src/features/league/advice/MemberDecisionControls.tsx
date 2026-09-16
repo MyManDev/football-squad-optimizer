@@ -29,7 +29,7 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../moves/modePrices";
 import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
-import { resolvePublishedAdvice } from "./adviceSelection";
+import { EVIDENCE_PARAMETER, resolvePublishedAdvice } from "./adviceSelection";
 import styles from "./MemberDecisionControls.module.css";
 
 /** The gap as the rule read it: signed, so behind and ahead are visibly different. */
@@ -92,6 +92,9 @@ export function MemberDecisionControls({
   }
 
   const needsRival = strategyNeedsRival(strategy);
+  // The word is solved for the one-week pure-points plan only.
+  const evidenceApplies =
+    selection.evidence.available && strategy === "saf-puan" && windowSize === 1;
   // The producer's declared rule marks one of the three from the member's points gap
   // and the weeks left. It is a label on an option the member may ignore, never a
   // preselection: the checked strategy is still whatever the URL says.
@@ -211,6 +214,34 @@ export function MemberDecisionControls({
           </div>
           <p className={styles.note}>
             {windows.length > 1 ? copy.windowLimits : copy.windowNotComputed}
+          </p>
+        </fieldset>
+
+        <fieldset className={styles.fieldset}>
+          <legend>{copy.evidenceLegend}</legend>
+          <label className={styles.windowOption}>
+            <input
+              type="checkbox"
+              name={EVIDENCE_PARAMETER}
+              checked={selection.evidence.on}
+              disabled={!evidenceApplies}
+              onChange={(event) =>
+                update({ [EVIDENCE_PARAMETER]: event.target.checked ? "on" : null })
+              }
+            />
+            <span>{copy.evidenceSwitch}</span>
+            {selection.evidence.sourceKind === "synthetic_fixture" ? (
+              <Badge tone="warn">{copy.exampleData}</Badge>
+            ) : null}
+          </label>
+          <p className={styles.note}>
+            {!selection.evidence.available
+              ? copy.evidenceUnavailable(selection.evidence.reason)
+              : !evidenceApplies
+                ? copy.evidenceOnlyBaseline
+                : selection.evidence.sourceKind === "synthetic_fixture"
+                  ? copy.evidenceSourceSynthetic
+                  : copy.evidenceSourceCapture}
           </p>
         </fieldset>
       </div>

@@ -129,7 +129,10 @@ export function AdviceCard({
   const unproven = view.solver_status === "FEASIBLE" || view.control_solver_status === "FEASIBLE";
   const priceCeiling = view.expected_points_cost_ceiling;
   const price = unproven ? priceCeiling : (priceCeiling ?? view.expected_points_cost);
-  const showsPrice = view.mode !== "saf-puan" && finiteNumber(price) && price >= 0;
+  // The pure-points plan has no price of its own; switched on, the manager's word does,
+  // and it is priced against the same pure-points control a rival band is.
+  const wordApplied = (view.evidence?.applied.length ?? 0) > 0;
+  const showsPrice = (view.mode !== "saf-puan" || wordApplied) && finiteNumber(price) && price >= 0;
   const alternative = view.alternative_plan;
   const alternativePrice = unproven
     ? alternative?.expected_points_cost_ceiling
@@ -271,6 +274,7 @@ export function AdviceCard({
         </p>
       ) : null}
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
+      <EvidenceSection view={view} />
       <LineupSection view={view} />
       <StatedLimits view={view} />
       <WindowSection view={view} />
@@ -404,6 +408,57 @@ function WindowSection({ view }: { view: EntryAdvice }) {
  * when the producer published them — a document from before the producer carried the
  * plan week, or a decision handed over without it, shows the moves alone.
  */
+/**
+ * What the club's own page said, as the producer applied it. The words are the source's,
+ * cut from the captured bytes; the category is the model's; the role is the declared
+ * rule's. Example data says so on the section itself, not only in a badge elsewhere.
+ */
+function EvidenceSection({ view }: { view: EntryAdvice }) {
+  const { messages } = useLanguage();
+  const copy = messages.leagueMembers;
+  const evidence = view.evidence;
+  if (!evidence) return null;
+  const synthetic = evidence.source_kind === "synthetic_fixture";
+  return (
+    <section className={styles.adviceSection} data-testid="managers-word">
+      <h3 className={styles.lineupTitle}>{copy.evidenceTitle}</h3>
+      {synthetic ? (
+        <p className={styles.honesty}>
+          <Badge tone="warn">{copy.exampleData}</Badge> {copy.evidenceSourceSynthetic}
+        </p>
+      ) : (
+        <p className={styles.honesty}>{copy.evidenceSourceCapture}</p>
+      )}
+      <p className={styles.muted}>{copy.evidenceIntro(evidence.clubs_covered.length)}</p>
+      {evidence.applied.length === 0 ? (
+        <p className={styles.muted}>{copy.evidenceNone}</p>
+      ) : (
+        <ul className={styles.assumptionList}>
+          {evidence.applied.map((item) => (
+            <li key={item.player_id}>
+              <strong>{item.name ?? `#${item.player_id}`}</strong>{" "}
+              {item.role ? <Badge tone="neutral">{copy.evidenceRoles[item.role]}</Badge> : null}{" "}
+              {item.words ? (
+                <blockquote>{item.words}</blockquote>
+              ) : (
+                <p className={styles.muted}>{copy.evidenceWordsUnresolved}</p>
+              )}
+              <p className={styles.muted}>
+                {copy.evidenceSaid(item.speaker, item.published_at_utc)}{" "}
+                {item.source_url ? (
+                  <a href={item.source_url} rel="noopener noreferrer">
+                    {copy.evidenceReadSource}
+                  </a>
+                ) : null}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function LineupSection({ view }: { view: EntryAdvice }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -500,6 +555,7 @@ type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
 /** The caption under a move, keyed on the reason the producer stated for it. */
 function reasonFor(copy: MemberCopy, code: AdviceMove["reason_code"]): string {
   if (code === "window_value") return copy.windowValueReason;
+  if (code === "manager_word") return copy.managerWordReason;
   if (code === "points_gain") return copy.pointsGainReason;
   return copy.modeTradeoffReason;
 }

@@ -19,6 +19,7 @@ from squadopt.application.league_views import (
     MemberStanding,
     build_league_views,
 )
+from squadopt.application.manager_words import ManagerWords, load_manager_words
 from squadopt.application.mode_selection import build_mode_paths
 from squadopt.application.weekly_suggestion_eval import (
     SUPPORTED_LEAGUE_ID,
@@ -61,6 +62,12 @@ class LeaguePublicationRequest:
     rival_menu: bool = True
     now: datetime | None = None
     history_record_root: Path | None = None
+    #: The week's rotation evidence table (its manifest beside it) and the club-news
+    #: source it was coded from: the fixture file, or a capture directory. Both or
+    #: neither; one without the other is refused, because words without their evidence
+    #: are a paraphrase and evidence without its words is a claim nobody can read.
+    rotation_evidence: Path | None = None
+    club_news_source: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,6 +217,23 @@ def publish_league(
     return publish_prepared_league(prepared, mapper=mapper, on_mode_paths=on_mode_paths)
 
 
+def load_publication_manager_words(request: LeaguePublicationRequest) -> ManagerWords | None:
+    """The manager's word for this publication, or ``None`` when it names no evidence."""
+
+    if request.rotation_evidence is None and request.club_news_source is None:
+        return None
+    if request.rotation_evidence is None or request.club_news_source is None:
+        raise DataError(
+            "The manager's word needs both the rotation evidence table and the club-news "
+            "source it was coded from; one without the other is refused."
+        )
+    return load_manager_words(
+        request.rotation_evidence,
+        club_news_source=request.club_news_source,
+        snapshot_root=request.snapshot_root,
+    )
+
+
 def publish_prepared_league(
     prepared: PreparedLeaguePublication,
     *,
@@ -241,6 +265,7 @@ def publish_prepared_league(
                 )
             )
     out_dir = request.out_dir / "data" / "league"
+    manager_words = load_publication_manager_words(request)
     report = build_league_views(
         CapturePicksProvider(snapshot, request.snapshot_id),
         prepared.registrations,
@@ -263,6 +288,7 @@ def publish_prepared_league(
         ),
         advice_record_root=request.record_root,
         now=request.now,
+        manager_words=manager_words,
     )
     outputs = [out_dir / name for name in report.files]
     history_root = request.history_record_root or request.record_root

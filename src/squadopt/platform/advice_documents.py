@@ -95,6 +95,41 @@ def advice_read_schema() -> dict[str, Any]:
             "control_solver_status": {"type": ["string", "null"]},
             "optimality_gap": nullable_number,
             "control_optimality_gap": nullable_number,
+            # The manager's word as it entered this plan: present on the switched-on
+            # document only. The words are the source's, cut from captured bytes; the
+            # category is the model's; the role is the declared rule's. No probability.
+            "evidence": {
+                "type": "object",
+                "properties": {
+                    "kind": {"const": "managers_word"},
+                    "rule_version": {"type": "string"},
+                    "source_kind": {"type": "string"},
+                    "source_label": {"type": "string"},
+                    "evidence_table": {"type": "string"},
+                    "clubs_covered": {"type": "array", "items": {"type": "string"}},
+                    "applied": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "player_id": {"type": "integer", "minimum": 1},
+                                "name": {"type": ["string", "null"]},
+                                "disposition": {"type": "string"},
+                                "role": {"enum": ["not_starting", "not_captain", None]},
+                                "speaker": {"type": ["string", "null"]},
+                                "published_at_utc": {"type": ["string", "null"]},
+                                "published_precision": {"type": ["string", "null"]},
+                                "club": {"type": ["string", "null"]},
+                                "source_url": {"type": ["string", "null"]},
+                                "fetched_at_utc": {"type": ["string", "null"]},
+                                "words": {"type": ["string", "null"]},
+                            },
+                            "required": ["player_id", "disposition", "role", "words"],
+                        },
+                    },
+                },
+                "required": ["kind", "source_kind", "clubs_covered", "applied"],
+            },
             "expected_own_points": nullable_number,
             # Null where the comparison against holding could not be walked, which is
             # not the same fact as a plan that gains nothing.
@@ -157,7 +192,12 @@ def advice_read_schema() -> dict[str, Any]:
                                 # not be measured; the row still names the swap.
                                 "expected_points_delta": nullable_number,
                                 "reason_code": {
-                                    "enum": ["window_value", "mode_tradeoff", "points_gain"]
+                                    "enum": [
+                                        "window_value",
+                                        "mode_tradeoff",
+                                        "points_gain",
+                                        "manager_word",
+                                    ]
                                 },
                             },
                             "required": [
