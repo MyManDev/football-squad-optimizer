@@ -79,12 +79,21 @@ class WeeklyRequest:
     rotation: bool = False
     workers: int = 8
     publish: bool = False
+    #: A club-news capture to export the rotation evidence from. ``None`` keeps the committed
+    #: synthetic fixture, which is what every run did before an acquisition command existed.
+    rotation_capture: str | None = None
 
     def plan(self) -> WeekPlan:
         if self.workers < 1 or self.league_id < 1:
             raise WeekError("League id and worker count must be positive.")
         if self.projection not in {"component", "component-only"}:
             raise WeekError("Unknown weekly projection selection.")
+        if self.rotation_capture is not None and not self.rotation:
+            raise WeekError(
+                "A club-news capture was named without --rotation, so the stage that would "
+                "read it is not in this week's plan. Naming a source for a step nobody asked "
+                "for is the kind of silence that looks like a run and is not one."
+            )
         return plan_week(
             season=self.season,
             gameweek=self.gameweek,
@@ -238,6 +247,23 @@ def evidence_artifact(
 
     name = f"player_evidence_v1_{season}_gw{gameweek:02d}_top100_{elite_snapshot[-12:]}"
     return root / f"{name}.csv", root / f"{name}.manifest.json"
+
+
+def rotation_source_capture(decision_snapshot: str, club_news_snapshot: str | None) -> str:
+    """Which capture names the week's rotation artifact.
+
+    The export names its file after the capture the *claims* came from, because that is what
+    a second run within one week actually changes. Read from a club-news capture that is the
+    club-news capture; read from the fixture the claims are fixed, so the decision capture is
+    what varies and names it instead.
+
+    It is a function rather than an ``or`` at the call site because the weekly stage has to
+    agree with ``rotation_export._artifact_name`` exactly -- the stage computes the pair's
+    path before the export runs, to reuse one already on disk, and a disagreement would not
+    fail, it would quietly stop finding anything.
+    """
+
+    return club_news_snapshot or decision_snapshot
 
 
 def rotation_artifact(

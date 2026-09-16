@@ -39,6 +39,7 @@ from squadopt.application.weekly_plan import (
     new_snapshot,
     prepare_week,
     rotation_artifact,
+    rotation_source_capture,
 )
 from squadopt.data.errors import DataError, SourceRevisionError
 from squadopt.data.snapshots import list_snapshot_ids, read_snapshot
@@ -384,21 +385,44 @@ class WeeklyOperations:
             result.output_paths,
         )
 
+    def _rotation_source(self) -> Path:
+        """What the rotation stage reads from, as a path the journal can fingerprint.
+
+        A capture is a directory in the snapshot store and the fixture is a file; both are
+        paths, which is what the stage's input list needs. Naming the source rather than
+        always naming the fixture is what makes a resumed run notice that the week was read
+        from somewhere else.
+        """
+
+        if self.request.rotation_capture is None:
+            return self.paths.club_news_fixture
+        return self.paths.snapshots / self.request.rotation_capture
+
     def _rotation(self) -> WeeklyStageResult:
         identifier = self._capture_id()
+        news = self.request.rotation_capture
+        # The export names its artifact after whichever capture the *claims* came from, so a
+        # week read from a club-news capture is a different file from the same week read from
+        # the fixture. This has to agree with `rotation_export._artifact_name` or the reuse
+        # check silently stops finding anything.
+        distinguishing = rotation_source_capture(identifier, news)
         table, manifest = rotation_artifact(
-            self.paths.rotation, self.request.season, self.request.gameweek, identifier
+            self.paths.rotation, self.request.season, self.request.gameweek, distinguishing
         )
         if not (table.is_file() and manifest.is_file()):
             export_rotation_evidence(
+                # Keyword arguments, deliberately. Positionally the eighth field is never
+                # reached, which is why this stage could not name a capture at all: the field
+                # and its refusal have existed since the capture path landed.
                 RotationExportRequest(
-                    self.request.season,
-                    self.request.gameweek,
-                    str(self.values["capture"]["deadline_utc"]),
-                    identifier,
-                    self.paths.snapshots,
-                    self.paths.club_news_fixture,
-                    self.paths.rotation,
+                    season=self.request.season,
+                    target_gameweek=self.request.gameweek,
+                    deadline_utc=str(self.values["capture"]["deadline_utc"]),
+                    snapshot=identifier,
+                    snapshot_root=self.paths.snapshots,
+                    club_news_fixture=None if news else self.paths.club_news_fixture,
+                    output_dir=self.paths.rotation,
+                    club_news_snapshot=news,
                     table_name=table.stem,
                 ),
                 repository_commit=self.repository_commit,
@@ -703,7 +727,9 @@ class WeeklyOperations:
             if self.request.rotation:
                 self.values["rotation"] = dict(
                     self._stage(
-                        "rotation", inputs=[selected, p.club_news_fixture], operation=self._rotation
+                        "rotation",
+                        inputs=[selected, self._rotation_source()],
+                        operation=self._rotation,
                     ).value
                 )
             handoff_inputs = [selected]
@@ -793,6 +819,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--decide", action="store_true")
     parser.add_argument("--chip", choices=CHIP_CHOICES)
     parser.add_argument("--rotation", action="store_true")
+    parser.add_argument(
+        "--rotation-capture",
+        help=(
+            "a club-news capture id to export the rotation evidence from; without it the "
+            "committed synthetic fixture is read, which is what every run did before"
+        ),
+    )
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument(
         "--out", type=Path, help="Preview root; default: private run-directory/preview"
@@ -889,6 +922,7 @@ def main(argv: list[str] | None = None) -> int:
             args.rotation,
             args.workers,
             args.publish,
+            args.rotation_capture,
         )
         print(request.plan().describe())
         if args.dry_run:
