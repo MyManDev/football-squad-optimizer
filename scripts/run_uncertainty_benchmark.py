@@ -9,7 +9,6 @@ The pinned archive must first be fetched with:
 """
 
 import argparse
-import hashlib
 import json
 import platform
 import subprocess
@@ -20,6 +19,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 import pandas as pd
+from scripts._experiment_cli import _sha256
 
 from squadopt.backtest import build_walk_forward_folds, make_baseline_projection_builder
 from squadopt.data.sources.vaastav import (
@@ -60,14 +60,6 @@ def _parse_arguments() -> argparse.Namespace:
         default=DEFAULT_OUTPUT_ROOT / "uncertainty_benchmark.md",
     )
     return parser.parse_args()
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1 << 20):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _git_revision() -> tuple[str, bool]:

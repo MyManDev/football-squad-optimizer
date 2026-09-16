@@ -15,7 +15,6 @@ is selected here and no model is promoted by this report.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 import warnings
@@ -27,7 +26,12 @@ from pathlib import Path
 from typing import Final, cast
 
 import pandas as pd
-from scripts._experiment_cli import DEFAULT_ARCHIVE_ROOT, REPOSITORY_ROOT, artifact_metadata
+from scripts._experiment_cli import (
+    DEFAULT_ARCHIVE_ROOT,
+    REPOSITORY_ROOT,
+    _sha256,
+    artifact_metadata,
+)
 
 from squadopt.backtest import (
     BacktestConfigurationError,
@@ -72,14 +76,6 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--archive-root", type=Path, default=DEFAULT_ARCHIVE_ROOT)
     parser.add_argument("--json-output", type=Path, default=DEFAULT_OUTPUT)
     return parser.parse_args()
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1 << 20):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _producer_environment(

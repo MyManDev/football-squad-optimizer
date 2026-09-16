@@ -11,7 +11,6 @@ The historical archive must first be fetched and checksum-verified with:
 """
 
 import argparse
-import hashlib
 import json
 import os
 import platform
@@ -26,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from scripts._experiment_cli import _sha256
 
 from squadopt.backtest import (
     BASELINE_BENCHMARK_CONTRACT_VERSION,
@@ -60,14 +60,6 @@ def _parse_arguments() -> argparse.Namespace:
     parser.add_argument("--json-output", type=Path)
     parser.add_argument("--markdown-output", type=Path)
     return parser.parse_args()
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1 << 20):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _git_revision() -> tuple[str, bool]:
