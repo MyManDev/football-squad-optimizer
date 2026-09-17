@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,10 +33,10 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.3740207607157728,
-    "expected_points_cost": 0.16985108956521344,
+    "expected_points_cost": 0.0,
     "rival_label": "entry-7252721",
     "solver_status": "FEASIBLE",
-    "optimality_gap": 33.573999999999955,
+    "optimality_gap": 36.05500000000001,
     "expected_own_points": 54.575638891585605,
     "captain": {
       "player_id": 223094,
@@ -219,6 +219,32 @@
         ],
         "transfers_out": [
           {
+            "player_id": 513545,
+            "name": "Mamadou Sangar\u00e9",
+            "short_name": "Sangar\u00e9",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 55.24253150332901
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfers_out": [
+          {
             "player_id": 430871,
             "name": "Matheus Santos Carneiro da Cunha",
             "short_name": "Cunha",
@@ -230,10 +256,10 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 54.82847434339137
+        "expected_points": 55.511434895790146
       },
       {
-        "gameweek": 7,
+        "gameweek": 8,
         "transfers_in": [
           {
             "player_id": 17761,
@@ -256,33 +282,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.230868970010214
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 466075,
-            "name": "Riccardo Calafiori",
-            "short_name": "Calafiori",
-            "position": "DEF",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.23866098449519
+        "expected_points": 56.91382952240899
       },
       {
         "gameweek": 9,
@@ -297,18 +297,18 @@
         ],
         "transfers_out": [
           {
-            "player_id": 513545,
-            "name": "Mamadou Sangar\u00e9",
-            "short_name": "Sangar\u00e9",
+            "player_id": 244850,
+            "name": "Morgan Rogers",
+            "short_name": "Rogers",
             "position": "MID",
-            "team": "Brentford"
+            "team": "Chelsea"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.58644108531909
+        "expected_points": 57.386500551252965
       }
     ],
     "stated_limits": [
@@ -324,7 +324,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 36.22485108956522,
+    "expected_points_cost_ceiling": 41.458304020821345,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 36.05500000000001,
     "rival_entry_id": 7252721,

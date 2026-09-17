@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -210,6 +210,32 @@
         "gameweek": 6,
         "transfers_in": [
           {
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
+            "position": "DEF",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 572584,
+            "name": "Abdoul Ouattara",
+            "short_name": "Ouattara",
+            "position": "DEF",
+            "team": "Ipswich Town"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.669691311885856
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
             "player_id": 177815,
             "name": "Dominic Calvert-Lewin",
             "short_name": "Calvert-Lewin",
@@ -230,43 +256,17 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 55.75121552908186
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 473284,
-            "name": "Konstantinos Tzolakis",
-            "short_name": "Tzolakis",
-            "position": "GK",
-            "team": "Hull City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 67089,
-            "name": "Martin Dubravka",
-            "short_name": "Dubravka",
-            "position": "GK",
-            "team": "Spurs"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 55.75121552908186
+        "expected_points": 55.79173505152055
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
             "position": "DEF",
-            "team": "Brighton"
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 35.77225141702314,
+    "expected_points_cost_ceiling": 38.97913478800467,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 35.91699999999997,
     "rival_entry_id": 313686,

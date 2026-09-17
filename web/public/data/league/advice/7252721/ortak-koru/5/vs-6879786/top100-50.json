@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.8839512474707121,
-    "expected_points_cost": 6.126995536297841,
+    "expected_points_cost": 5.080838773601329,
     "rival_label": "entry-6879786",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -210,32 +210,6 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 177815,
-            "name": "Dominic Calvert-Lewin",
-            "short_name": "Calvert-Lewin",
-            "position": "FWD",
-            "team": "Leeds"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 661313,
-            "name": "Juan Angulo",
-            "short_name": "Angulo",
-            "position": "FWD",
-            "team": "Sunderland"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.39820638962787
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
             "player_id": 244850,
             "name": "Morgan Rogers",
             "short_name": "Rogers",
@@ -259,7 +233,7 @@
         "expected_points": 56.19263831879181
       },
       {
-        "gameweek": 8,
+        "gameweek": 7,
         "transfers_in": [
           {
             "player_id": 226182,
@@ -285,7 +259,7 @@
         "expected_points": 56.94412057691008
       },
       {
-        "gameweek": 9,
+        "gameweek": 8,
         "transfers_in": [
           {
             "player_id": 466075,
@@ -297,18 +271,44 @@
         ],
         "transfers_out": [
           {
-            "player_id": 477424,
-            "name": "Jo\u0161ko Gvardiol",
-            "short_name": "Gvardiol",
+            "player_id": 244723,
+            "name": "Tyrick Mitchell",
+            "short_name": "Mitchell",
             "position": "DEF",
-            "team": "Man City"
+            "team": "Crystal Palace"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.428293972525836
+        "expected_points": 56.9363285624251
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 224967,
+            "name": "Vitalii Mykolenko",
+            "short_name": "Mykolenko",
+            "position": "DEF",
+            "team": "Everton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 146426,
+            "name": "Semi Ajayi",
+            "short_name": "Ajayi",
+            "position": "DEF",
+            "team": "Hull City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 56.9363285624251
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 37.631995536297836,
+    "expected_points_cost_ceiling": 41.4041438042637,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 31.504999999999995,
     "rival_entry_id": 6879786,
