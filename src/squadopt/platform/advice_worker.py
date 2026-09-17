@@ -44,7 +44,11 @@ from types import FrameType
 from typing import Final
 
 from squadopt.application.advice_capabilities import menu_capabilities
-from squadopt.application.advice_menu import MenuRequest, advise_menu_entry
+from squadopt.application.advice_menu import (
+    ManagersWordNotSolved,
+    MenuRequest,
+    advise_menu_entry,
+)
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
 from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
 from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
@@ -243,17 +247,23 @@ def build_advice_compute(
                     f"{label} {entry} is not in the capture this backend answers from, so "
                     "there is no squad to advise from yet.",
                 )
-        advice = advise_menu_entry(
-            request,
-            provider=capture.provider,
-            inputs=capture.inputs,
-            projection=capture.projection,
-            rules=capture.rules,
-            horizon_builder=capture.horizon_builder,
-            top100_counts=capture.top100_counts,
-            manager_words=capture.manager_words,
-            prerequisite=lambda address: cached_plain(spec, address),
-        )
+        try:
+            advice = advise_menu_entry(
+                request,
+                provider=capture.provider,
+                inputs=capture.inputs,
+                projection=capture.projection,
+                rules=capture.rules,
+                horizon_builder=capture.horizon_builder,
+                top100_counts=capture.top100_counts,
+                manager_words=capture.manager_words,
+                prerequisite=lambda address: cached_plain(spec, address),
+            )
+        except ManagersWordNotSolved as error:
+            # One member's outcome, not a fault and not a missing input: the capture has
+            # the club news, and this member's plan under the word and the setting could
+            # not be produced. The same request without the word still answers.
+            raise AdviceComputeRefused("MANAGERS_WORD_NOT_SOLVED", str(error)) from error
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a

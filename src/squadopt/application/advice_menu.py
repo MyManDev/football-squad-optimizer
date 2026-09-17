@@ -49,6 +49,7 @@ from squadopt.live import Projection, RecommendationInputs, SeasonRules
 __all__ = [
     "MANAGER_WORDS_INPUT",
     "TOP100_COUNTS_INPUT",
+    "ManagersWordNotSolved",
     "MenuInputUnavailable",
     "MenuRequest",
     "PrerequisiteLookup",
@@ -65,6 +66,16 @@ class MenuInputUnavailable(EntryError):
     def __init__(self, input_name: str, detail: str) -> None:
         super().__init__(detail)
         self.input_name = input_name
+
+
+class ManagersWordNotSolved(EntryError):
+    """The word was asked for with a Top 100 setting and this member's plan has none.
+
+    Not a missing input, which is refused before anything is solved: the capture has the
+    coded club news, and the plan under the word could not be produced for this one
+    member. It has its own type so a caller that records why a request failed can say
+    this, rather than file a known outcome with the unexpected ones.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,7 +254,7 @@ def advise_menu_entry(
         if not request.managers_word:
             return advice.payload
         if advice.word_payload is None:
-            raise EntryError(
+            raise ManagersWordNotSolved(
                 advice.word_unavailable or "The manager's word could not be applied to this plan."
             )
         return advice.word_payload

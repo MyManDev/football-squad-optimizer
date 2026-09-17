@@ -156,16 +156,23 @@ mount and must never be reported as one.
 
 ## Readiness
 
-`GET /ready` reports three checks and is ready only when all three hold:
+`GET /ready` reports four checks and is ready only when all four hold:
 
 | Check | False when |
 | --- | --- |
 | `capture_context` | no capture, no handoff for it, or the pair cannot be read |
 | `league_tree` | ops has published no `league/members.json` under the site data root |
+| `league_tree_matches_capture` | `members.json` is for another season or gameweek than the one the current capture targets (or names no gameweek, or there is no context to compare with) |
 | `cache_store` | the store probe has not passed on this path — a root that does not exist counts, which is the common shape of a forgotten volume, though not proof of one |
 
 An unready backend answers advice routes with a coded 503. It does not present an empty cache as
 a computed absence.
+
+The tree and the capture are published separately, so one can be a week ahead of the other
+while both stay readable. When they disagree the advice routes answer `503 NOT_READY` and the
+message names both weeks, which says whether the site publish or the capture is the one that
+is behind. Publishing the missing half is the fix; nothing restarts. The comparison reads only
+`members.json` and the context the api already holds, so it projects nothing.
 
 ## A local two-process run
 
@@ -447,13 +454,15 @@ the command above, a bad data release is the `metadata.json` deletion under
 
 | Symptom | Where to look |
 | --- | --- |
-| every advice route 503 | `/ready` — one of the three checks is false, and it names which |
+| every advice route 503 | `/ready`: one of the four checks is false, and it names which |
+| advice routes answer `503 NOT_READY` naming two weeks | `league_tree_matches_capture` is false: the published `members.json` and the current capture are for different weeks; publish the one that is behind |
 | jobs queue but never finish | is a worker process running, and is it mounting the same `SQUADOPT_BACKEND_STORE_ROOT`? A worker that exited 1 at startup could not reach the store |
 | POST answers `503 NOT_READY` | the store probe is failing; `/ready` names the check, and a missing volume shows up as `cache_store` |
 | job `failed` with `CONTEXT_UNAVAILABLE` | the capture moved on between accepting and computing; asking again is the fix |
 | job `failed` with `REQUEST_UNREADABLE` | the spec beside the job's key is missing — the store lost a write, so check the probe |
 | job `failed` with `ENTRY_NOT_IN_CAPTURE` | `members.json` lists the member or the rival, but the current capture holds no picks for them; re-capture with `--entries` |
 | job `failed` with `SWITCH_INPUTS_CHANGED` | the Top 100 export or the rotation table was replaced between accepting and computing; asking again is the fix |
+| job `failed` with `MANAGERS_WORD_NOT_SOLVED` | the word was asked for together with a Top 100 setting and this member's plan under both could not be produced; the capture has the club news, so it is this member's outcome and not a missing input. The job's stored message says why, and the same request without the word still answers |
 | `422 TOP100_INPUTS_UNAVAILABLE` or `422 MANAGERS_WORD_UNAVAILABLE` | `SQUADOPT_BACKEND_ARTIFACT_ROOT` (and, for the word, `SQUADOPT_BACKEND_CLUB_NEWS_SOURCE`) unset, or no artifact for the current capture; the worker and api log `advice_switch_inputs_loaded` with the reason in `notes` |
 | POST answers `503 NOT_READY` with `Retry-After` | the queue lock stayed busy for five seconds; the client retries. The worker logs `advice_worker_queue_busy` for the same thing and carries on |
 | job `failed` with `TOO_MANY_ATTEMPTS` | a job that cannot finish; read the worker log rather than raising the limit |

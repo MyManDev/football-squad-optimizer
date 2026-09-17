@@ -122,6 +122,30 @@ class ResolvedAdviceRequest:
     switches: SwitchIdentity
 
 
+def league_tree_matches(payload: Mapping[str, object], context: AdviceRequestContext) -> bool:
+    """Whether the published member directory is for the week the capture targets.
+
+    The tree and the capture are published separately, so one can be a week ahead of the
+    other: last week's members beside this week's capture, or the reverse. Both are
+    readable, which is why being readable proves nothing about this. Only what the api
+    already holds is compared, the directory's own season and gameweek against the
+    context's, so nothing is loaded to find out. A tree that names no gameweek is an
+    older one and matches nothing.
+    """
+
+    gameweek = payload.get("gameweek")
+    if isinstance(gameweek, bool) or not isinstance(gameweek, int):
+        return False
+    return payload.get("season") == context.season and gameweek == context.gameweek
+
+
+def _tree_week(payload: Mapping[str, object]) -> str:
+    gameweek = payload.get("gameweek")
+    named = isinstance(gameweek, int) and not isinstance(gameweek, bool)
+    week = f"gameweek {gameweek}" if named else "no gameweek"
+    return f"{payload.get('season') or 'no season'} {week}"
+
+
 class LeagueDirectory(Protocol):
     """What the read side may know about connected leagues."""
 
@@ -194,6 +218,17 @@ class FileLeagueDirectory:
             return self._read() is not None
         except (AdviceBackendNotReadyError, OSError, UnicodeError):
             return False
+
+    def matches(self, context: AdviceRequestContext | None) -> bool:
+        """Whether the tree is there and is for ``context``'s week; never raises."""
+
+        if context is None:
+            return False
+        try:
+            payload = self._read()
+        except (AdviceBackendNotReadyError, OSError, UnicodeError):
+            return False
+        return payload is not None and league_tree_matches(payload, context)
 
 
 def _member_entry_ids(payload: Mapping[str, object]) -> frozenset[int]:
@@ -358,6 +393,16 @@ class AdviceReadStore:
         context = self._context.current()
         if context is None:
             raise AdviceBackendNotReadyError("No capture context is loaded yet.")
+        if not league_tree_matches(payload, context):
+            # Readiness, like the missing context: the members just checked are another
+            # week's, and an answer computed for this capture would be filed beside a
+            # league page that is not about it. Both weeks are named so the operator
+            # knows which of the two publications is behind.
+            raise AdviceBackendNotReadyError(
+                f"The published league tree is for {_tree_week(payload)}, and the current "
+                f"capture is for {context.season} gameweek {context.gameweek}; advice "
+                "waits until the two are for the same week."
+            )
         switches: SwitchIdentity = {}
         if top100_weight or managers_word:
             # Refused here, before a job exists: a switch whose input this capture does

@@ -7,6 +7,7 @@ is the payload ``render_member`` produced for the same member from the same inpu
 """
 
 import json
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -25,6 +26,7 @@ from squadopt.application.advice_capabilities import (
 from squadopt.application.advice_menu import (
     MANAGER_WORDS_INPUT,
     TOP100_COUNTS_INPUT,
+    ManagersWordNotSolved,
     MenuInputUnavailable,
     MenuRequest,
     advise_menu_entry,
@@ -158,6 +160,24 @@ def test_a_switch_without_its_input_is_refused_by_name(world: dict[str, Any]) ->
             _request(gameweek=3, strategy="ortak-koru", window=3, rival_entry_id=RIVAL),
             **collaborators,
         )
+
+
+def test_a_word_that_cannot_be_applied_under_a_setting_is_refused_by_its_own_name(
+    world: dict[str, Any],
+) -> None:
+    """The capture has the club news; this member's plan under it has no answer."""
+
+    another_week = replace(_words(1), gameweek=3)
+    with pytest.raises(ManagersWordNotSolved, match="gameweek 3, not") as refused:
+        advise_menu_entry(
+            _request(top100_weight=50, managers_word=True),
+            **_collaborators(world),
+            top100_counts=world["counts"],
+            manager_words=another_week,
+        )
+    # Still the error every caller already catches, and not the missing-input one.
+    assert isinstance(refused.value, EntryError)
+    assert not isinstance(refused.value, MenuInputUnavailable)
 
 
 # -- every other address is the batch's payload -------------------------------------------

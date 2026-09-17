@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 
 import squadopt.application.top100_weight as switches_module_top100
 import squadopt.platform.advice_switches as switches_module
+import squadopt.platform.advice_worker as worker_module
 from squadopt.api.runtime import app_for_backend
 from squadopt.application.advice import (
     COMPUTED_MODE,
@@ -33,6 +34,7 @@ from squadopt.application.advice import (
     advise_entry,
     advise_with_top100,
 )
+from squadopt.application.advice_menu import ManagersWordNotSolved
 from squadopt.application.weekly_plan import rotation_artifact
 from squadopt.data.snapshots import write_snapshot
 from squadopt.platform.advice_cache import FileAdviceCache
@@ -961,6 +963,46 @@ def test_a_member_the_capture_does_not_hold_is_named_not_a_generic_failure(
         assert job.error is not None and job.error.code == "ENTRY_NOT_IN_CAPTURE"
         view = client.get(f"/api/v1/advice-jobs/{job.job_id}").json()
         assert view["error_code"] == "ENTRY_NOT_IN_CAPTURE"
+
+
+def test_a_word_not_solved_for_one_member_is_named_not_a_generic_failure(
+    running: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The menu says the word could not be applied; the job carries that, not a fault."""
+
+    backend = running["backend"]
+    client = TestClient(app_for_backend(backend))
+
+    def not_solved(*_args: Any, **_kwargs: Any) -> dict[str, object]:
+        raise ManagersWordNotSolved("The manager's word could not be applied to this plan.")
+
+    monkeypatch.setattr(worker_module, "advise_menu_entry", not_solved)
+    accepted = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1},
+    )
+    assert accepted.status_code == 202, accepted.text
+    compute = build_advice_compute(backend.contexts, backend.job_specs)
+    job = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
+    assert job is not None and job.status == "failed"
+    assert job.error is not None and job.error.code == "MANAGERS_WORD_NOT_SOLVED"
+    assert job.error.message == "The manager's word could not be applied to this plan."
+    view = client.get(f"/api/v1/advice-jobs/{job.job_id}").json()
+    assert (view["status"], view["error_code"]) == ("failed", "MANAGERS_WORD_NOT_SOLVED")
+    # Any other refusal from the menu is still the unexpected failure it was.
+    monkeypatch.setattr(
+        worker_module,
+        "advise_menu_entry",
+        lambda *_a, **_k: (_ for _ in ()).throw(EntryError("something else")),
+    )
+    again = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": 1},
+    )
+    assert again.status_code == 202, again.text
+    other = run_advice_worker_once(backend.queue, backend.cache, compute, at_utc=_now_stamp())
+    assert other is not None and other.error is not None
+    assert other.error.code == "ADVICE_FAILED"
 
 
 # --- the member menu's switches, through the real solver ---------------------------------
