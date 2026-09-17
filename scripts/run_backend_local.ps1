@@ -55,6 +55,11 @@ param(
     [string]$SiteDataRoot = "",
     [string]$SnapshotRoot = "",
     [string]$HandoffRoot = "",
+    # Where the weekly run leaves the Top 100 export and the rotation table, and the
+    # club-news source it codes from (the committed example fixture until a real host
+    # is registered).
+    [string]$ArtifactRoot = "",
+    [string]$ClubNewsSource = "",
     # SITE_ORIGINS in src\squadopt\platform\backend_runtime.py, canonical first.
     [string]$AllowedOrigins = "https://squadopt.mymandev.com,https://squadopt.pages.dev",
     [int]$RateLimit = 30,
@@ -78,6 +83,8 @@ if (-not $StoreRoot) { $StoreRoot = Join-Path $RepoRoot "data\runtime\backend" }
 if (-not $SiteDataRoot) { $SiteDataRoot = Join-Path $RepoRoot "web\public\data" }
 if (-not $SnapshotRoot) { $SnapshotRoot = Join-Path $RepoRoot "data\snapshots" }
 if (-not $HandoffRoot) { $HandoffRoot = Join-Path $RepoRoot "data\handoffs" }
+if (-not $ArtifactRoot) { $ArtifactRoot = Join-Path $RepoRoot "artifacts" }
+if (-not $ClubNewsSource) { $ClubNewsSource = Join-Path $RepoRoot "data\sample\club_news_v1.fixture.json" }
 
 $RunDirectory = Join-Path $StoreRoot "run"
 $LogDirectory = Join-Path $StoreRoot "logs"
@@ -268,9 +275,12 @@ $environment = [ordered]@{
     OMP_NUM_THREADS                      = "1"
     OPENBLAS_NUM_THREADS                 = "1"
     MKL_NUM_THREADS                      = "1"
-    # Not read by the backend yet. Uncomment in the change that adds them:
-    # SQUADOPT_BACKEND_ARTIFACT_ROOT     = (Join-Path $RepoRoot "artifacts")
-    # SQUADOPT_BACKEND_CLUB_NEWS_SOURCE  = "<set by the change that defines it>"
+    # The per-capture inputs of the two member switches (#604): the week's Top 100 export
+    # and rotation table are found under artifacts\ by name, and the club-news source is
+    # the one the weekly run codes from. A week without them answers a switched request
+    # with a named refusal; plain requests do not need them.
+    SQUADOPT_BACKEND_ARTIFACT_ROOT       = $ArtifactRoot
+    SQUADOPT_BACKEND_CLUB_NEWS_SOURCE    = $ClubNewsSource
 }
 if ($commit) { $environment["SQUADOPT_REPOSITORY_COMMIT"] = $commit }
 
