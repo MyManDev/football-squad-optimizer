@@ -553,6 +553,9 @@ function Top100Section({ view }: { view: EntryAdvice }) {
       <p className={styles.honesty}>{copy.honesty}</p>
       <p className={styles.muted}>{copy.notStart}</p>
       <p className={styles.muted}>{copy.saturation}</p>
+      {view.moves.some((move) => (move.expected_points_delta ?? 0) < 0) ? (
+        <p className={styles.muted}>{copy.negativeRow}</p>
+      ) : null}
     </section>
   );
 }

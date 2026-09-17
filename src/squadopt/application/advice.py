@@ -94,6 +94,8 @@ from squadopt.planning import (
 #: deterministic units per gameweek, under one wall-clock ceiling. A plan the budget
 #: cannot prove is published FEASIBLE with its gap, never dropped.
 WINDOW_DETERMINISTIC_UNITS_PER_WEEK = 20.0
+#: The planner's bench weight, read from its own defaults rather than restated.
+_BENCH_WEIGHT: float = OptimizationConfig().bench_weight
 #: The wall-clock ceiling is a safety stop, never a budget. Only the deterministic budget
 #: above may decide where a truncated search stops, because only it is a function of the
 #: inputs; ``build_window_payload`` refuses a plan this ceiling cut short rather than
@@ -222,6 +224,7 @@ def _attributed_gains(
     lookup: dict[int, tuple[str, float]],
     exclusion: FirstWeekExclusion | None = None,
     choice: Mapping[int, float] | None = None,
+    expected_total: float | None = None,
 ) -> list[float] | None:
     """Each swap's share of what the plan is worth against holding the squad.
 
@@ -259,6 +262,7 @@ def _attributed_gains(
                     lookup[player][1],
                     exclusion is None or player not in exclusion.not_starting,
                     exclusion is None or player not in exclusion.not_captain,
+                    player,
                 )
                 for player in players
             )
@@ -288,6 +292,11 @@ def _attributed_gains(
             return None
         gains.append(value - previous)
         previous = value
+    # Rows are shares of the published total. A chain that ends anywhere else read a
+    # different eleven from the one the plan fields (a tie the solver broke another
+    # way), so its rows describe nothing the member will see, and none is published.
+    if expected_total is not None and abs(previous - expected_total) > 1e-6:
+        return None
     return gains
 
 
@@ -303,6 +312,7 @@ def _moves(
     exclusion: FirstWeekExclusion | None = None,
     move_reason: Callable[[int | None, int | None], str] | None = None,
     choice: Mapping[int, float] | None = None,
+    expected_total: float | None = None,
 ) -> tuple[list[dict[str, object]], float | None]:
     """The published moves and what the whole set is worth against holding the squad.
 
@@ -330,7 +340,14 @@ def _moves(
         for table in (pool_by_id, by_id)
         for player, row in table.items()
     }
-    gains = _attributed_gains(pairs, held=held, lookup=lookup, exclusion=exclusion, choice=choice)
+    gains = _attributed_gains(
+        pairs,
+        held=held,
+        lookup=lookup,
+        exclusion=exclusion,
+        choice=choice,
+        expected_total=expected_total if choice is not None else None,
+    )
     moves: list[dict[str, object]] = []
     for index, (player_out, player_in) in enumerate(pairs):
         moves.append(
@@ -353,6 +370,11 @@ def _moves(
             }
         )
     return moves, (None if gains is None else math.fsum(gains))
+
+
+def _published_total(lineup: Mapping[str, object]) -> float | None:
+    total = lineup.get("expected_own_points")
+    return float(str(total)) if total is not None else None
 
 
 def _missing_fields(picks: EntryPicks) -> list[str]:
@@ -612,6 +634,7 @@ def build_advice_payload(
             exclusion=exclusion,
             move_reason=move_reason,
             choice=choice_points,
+            expected_total=_published_total(lineup),
         )
     missing = _missing_fields(picks)
     return {
@@ -846,6 +869,7 @@ def window_payload(
         reason_code="window_value" if mode == COMPUTED_MODE else "mode_tradeoff",
         move_reason=move_reason,
         choice=choice_points,
+        expected_total=_published_total(lineup_fields(first)),
     )
     return {
         "season": picks.season,
@@ -904,6 +928,7 @@ def advise_entry(
     control: MemberControl | None = None,
     phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
     horizon_builder: HorizonBuilder | None = None,
+    pricing: TransferPlanResult | None = None,
 ) -> dict[str, object]:
     """Compute one member's advice for a validated request.
 
@@ -928,6 +953,10 @@ def advise_entry(
 
     ``phase_e_diagnostic`` is a local collaborator for saf-puan only, not a request
     field. It is dormant until a reviewed calibration pin exists.
+
+    ``pricing`` is the rival price tag's anchor (``solve_pricing_control``) already solved
+    for this member; it depends on neither the rival nor the strategy, so the batch solves
+    it once for the whole rival menu. The bytes are identical with or without it.
     """
 
     if request.season != str(inputs.season):
@@ -984,6 +1013,7 @@ def advise_entry(
         projection=projection,
         rules=rules,
         control=control,
+        pricing=pricing,
     )
 
 
@@ -1283,6 +1313,37 @@ class Top100Advice:
     notes: tuple[str, ...] = ()
 
 
+def unproven_bench_allowance(slack: float, control_bench_points: float) -> float:
+    """What an unproven control's bound leaves out of a price ceiling, in points.
+
+    The solver's gap is measured on its objective, which adds the bench at the planner's
+    bench weight to the eleven, while a price compares elevens. A better plan the search
+    did not reach could therefore out-score the control's eleven by the gap **plus** up
+    to the weighted bench the control carries. Under a proof the price is against the
+    plan the member is shown and nothing is added; without one, the ceiling carries this
+    too, so "at most" stays true of the eleven's points.
+    """
+
+    if slack <= 0.0:
+        return 0.0
+    return _BENCH_WEIGHT * max(0.0, control_bench_points)
+
+
+def _setting_rows(payload: dict[str, object]) -> None:
+    """A row the base model scores below zero is the setting's, whatever else it is.
+
+    A plan chosen under a setting can start a favoured player over a better-projected
+    one, so a swap the pure-points plan also makes can read negative on base points. It
+    is then in the plan as it stands because of the setting, and says so.
+    """
+
+    moves = payload.get("moves")
+    for move in moves if isinstance(moves, list) else []:
+        delta = move.get("expected_points_delta")
+        if isinstance(delta, float) and delta < -1e-9 and move.get("reason_code") != "manager_word":
+            move["reason_code"] = "top100_preference"
+
+
 def _move_ids(decision: TransferDecision) -> tuple[set[int], set[int]]:
     return set(decision.transfers_out_ids), set(decision.transfers_in_ids)
 
@@ -1374,6 +1435,9 @@ def advise_with_top100(
     control_week = solved.plan.weeks[0]
     control_value = base_net(control_week, points)
     slack = bound_slack(solved.plan)
+    bench_allowance = unproven_bench_allowance(
+        slack, float(solved.plan.total_projected_bench_points or 0.0)
+    )
     raw_control_gap = solved.plan.diagnostics.get("absolute_optimality_gap")
     control_outs, control_ins = _move_ids(solved.decision)
     preferred_outs, preferred_ins = _move_ids(preferred.decision)
@@ -1429,7 +1493,10 @@ def advise_with_top100(
             # on the weighted points; they are stated on the base ones.
             choice_points=weighted_points,
         )
-        payload["expected_points_cost_ceiling"] = max(cost, control_value + slack - selected)
+        payload["expected_points_cost_ceiling"] = max(
+            cost, control_value + slack + bench_allowance - selected
+        )
+        _setting_rows(payload)
         payload["control_solver_status"] = solved.plan.solver_status.name
         payload["control_optimality_gap"] = (
             float(str(raw_control_gap)) if raw_control_gap is not None else None

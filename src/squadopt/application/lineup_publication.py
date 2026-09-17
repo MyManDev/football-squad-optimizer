@@ -97,7 +97,9 @@ def best_eleven_points(squad: Iterable[tuple[str, float]]) -> float | None:
 
 
 def best_eleven_basis(
-    squad: Iterable[tuple[str, float, float, bool, bool]],
+    squad: Iterable[
+        tuple[str, float, float, bool, bool] | tuple[str, float, float, bool, bool, int]
+    ],
 ) -> float | None:
     """The published basis of the eleven a fifteen would field, chosen on other points.
 
@@ -108,18 +110,30 @@ def best_eleven_basis(
     (the Top 100 influence) is scored this way on the base model's points, so its rows
     and its total describe the eleven it actually fields.
 
+    A player may carry his id as a sixth element. The choice is then made the way the
+    solver makes it, so the eleven read here is the eleven the plan fields: on points
+    rounded to the solver's thousandths, ties falling to the lowest id. Without ids the
+    order handed in breaks ties, as ``best_eleven_points_under`` always did.
+
     ``None`` when no legal eleven with an eligible captain exists.
     """
 
-    players = [
-        (str(position), float(choice), float(basis), bool(may_start), bool(may_captain))
-        for position, choice, basis, may_start, may_captain in squad
-    ]
-    total = sum(choice for _position, choice, _basis, _start, _captain in players)
+    players = []
+    for item in squad:
+        position, choice, basis, may_start, may_captain = item[:5]
+        identity = int(item[5]) if len(item) > 5 else None
+        chosen_on = float(choice) if identity is None else round(float(choice) * 1000) / 1000
+        players.append(
+            (str(position), chosen_on, float(basis), bool(may_start), bool(may_captain), identity)
+        )
+    total = sum(choice for _position, choice, *_rest in players)
     starters: dict[str, list[tuple[float, float, bool]]] = {
         str(position): [] for position in _POSITION_ORDER
     }
-    for position, choice, basis, may_start, may_captain in players:
+    # Sorted by id first, so the stable sort on points below leaves ties to the lowest id.
+    for position, choice, basis, may_start, may_captain, _identity in sorted(
+        players, key=lambda row: (row[5] is None, row[5] or 0)
+    ):
         if may_start and position in starters:
             starters[position].append((choice, basis, may_captain))
     for rows in starters.values():

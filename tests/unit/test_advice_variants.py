@@ -18,6 +18,8 @@ from tests.unit.test_league_views import _Provider
 from tests.unit.test_member_windows import ENTRY, LEAGUE, SEASON
 from tests.unit.test_member_windows import _window_world as _base_world
 
+import squadopt.application.advice as advice_module
+import squadopt.application.advice_variants as variants
 import squadopt.application.league_views as views
 from squadopt.application.advice import (
     TOP100_LIMIT,
@@ -25,6 +27,10 @@ from squadopt.application.advice import (
     advise_entry,
     solve_member_control,
     solve_pricing_control,
+    solve_window_plan,
+    unproven_bench_allowance,
+    window_horizon,
+    window_payload,
 )
 from squadopt.application.advice_variants import (
     RIVAL_WINDOW_LIMIT,
@@ -36,6 +42,7 @@ from squadopt.application.advice_variants import (
 )
 from squadopt.application.entries import EntryError, EntryRegistration, held_squad_from_picks
 from squadopt.application.league_views import MemberStanding, build_league_views, variant_path
+from squadopt.application.lineup_publication import best_eleven_basis
 from squadopt.application.strategies.catalog import (
     FORBIDDEN_FIELD_PATTERN,
     FORBIDDEN_TEXT_PATTERN,
@@ -492,3 +499,178 @@ def test_the_site_holds_the_new_limit_sentences_verbatim() -> None:
     text = WEB_COPY.read_text(encoding="utf-8")
     for sentence in (TOP100_WINDOW_LIMIT, RIVAL_WINDOW_LIMIT):
         assert text.count(json.dumps(sentence)) == 3, sentence
+
+
+# -- the review's fixes -------------------------------------------------------------------
+
+
+def test_the_eleven_is_read_the_way_the_solver_breaks_a_tie() -> None:
+    """Two midfielders level on the points the plan is chosen on, once rounded the way the
+    solver rounds them: the lower id starts, whatever order the fifteen is handed in."""
+
+    def squad(order: list[int]) -> list[tuple[str, float, float, bool, bool, int]]:
+        rows: dict[int, tuple[str, float, float]] = {
+            1: ("GK", 4.0, 4.0),
+            2: ("GK", 1.0, 1.0),
+            **{10 + i: ("DEF", 3.0, 3.0) for i in range(5)},
+            **{20 + i: ("MID", 5.0, 5.0) for i in range(3)},
+            # 23 and 24 tie at 4.0 once rounded to thousandths; their base points differ.
+            23: ("MID", 4.0004, 3.2),
+            24: ("MID", 4.0, 4.0),
+            **{30 + i: ("FWD", 2.0, 2.0) for i in range(3)},
+        }
+        return [(*rows[i], True, True, i) for i in order]
+
+    ids = [1, 2, 10, 11, 12, 13, 14, 20, 21, 22, 23, 24, 30, 31, 32]
+    forwards = best_eleven_basis(squad(ids))
+    backwards = best_eleven_basis(squad(list(reversed(ids))))
+    assert forwards is not None
+    assert forwards == backwards
+
+
+def test_rows_that_do_not_land_on_the_published_total_are_not_published() -> None:
+    lookup: dict[int, tuple[str, float]] = {1: ("MID", 5.0), 2: ("MID", 4.0)}
+    lookup.update({100 + i: ("DEF", 3.0) for i in range(5)})
+    lookup.update({200 + i: ("MID", 3.0) for i in range(4)})
+    lookup.update({300 + i: ("FWD", 3.0) for i in range(3)})
+    lookup.update({400: ("GK", 3.0), 401: ("GK", 1.0)})
+    held = [400, 401, *range(100, 105), *range(200, 204), 2, *range(300, 303)]
+    choice = {player: points for player, (_position, points) in lookup.items()}
+    after = [1 if player == 2 else player for player in held]
+    walked = advice_module._attributed_gains([(2, 1)], held=held, lookup=lookup, choice=choice)
+    assert walked == [pytest.approx(2.0)]
+    total = best_eleven_basis((lookup[p][0], choice[p], lookup[p][1], True, True, p) for p in after)
+    assert total is not None
+    agrees = advice_module._attributed_gains(
+        [(2, 1)], held=held, lookup=lookup, choice=choice, expected_total=total
+    )
+    assert agrees == walked
+    assert (
+        advice_module._attributed_gains(
+            [(2, 1)], held=held, lookup=lookup, choice=choice, expected_total=total - 0.8
+        )
+        is None
+    )
+
+
+def test_an_unproven_ceiling_carries_the_bench_the_bound_leaves_out(
+    world: dict[str, Any],
+) -> None:
+    assert unproven_bench_allowance(0.0, 9.0) == 0.0
+    assert unproven_bench_allowance(2.5, 9.0) == pytest.approx(0.9)
+    mine = world["provider"].picks(ENTRY, SEASON, 1)
+    horizon = window_horizon(world["inputs"], 3, world["builder"])
+    plan = solve_window_plan(mine, world["inputs"], world["rules"], horizon, window=3)
+    payload = window_payload(mine, world["projection"], plan, league_id=LEAGUE, window=3)
+    bound = variants._control_bench_bound(payload, horizon)
+    assert bound >= float(plan.total_projected_bench_points or 0.0) - 1e-9
+    total = sum(r["expected_points"] - r["transfer_hit_points"] for r in payload["plan_weeks"])
+    # A found-not-proven control prices with the allowance; a proven one does not.
+    priced: dict[str, Any] = {}
+    variants._price(
+        priced,
+        control_payload={**payload, "solver_status": "FEASIBLE", "optimality_gap": 2.0},
+        selected_total=total,
+        base=horizon,
+    )
+    assert priced["expected_points_cost"] == 0.0
+    assert priced["expected_points_cost_ceiling"] == pytest.approx(2.0 + 0.1 * bound)
+    proven: dict[str, Any] = {}
+    variants._price(
+        proven,
+        control_payload={**payload, "solver_status": "OPTIMAL"},
+        selected_total=total,
+        base=horizon,
+    )
+    assert proven["expected_points_cost_ceiling"] == 0.0
+
+
+def test_a_window_that_already_holds_the_band_is_the_strategys_window(
+    world: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    control = _window_control(world, 3)
+    arguments = {**_common(world), "horizon_builder": world["builder"], "control_payload": control}
+    request = _request(strategy="ortak-koru", window=3, rival_entry_id=RIVAL)
+    solved = advise_rival_window(request, weight=0, counts=None, **arguments).payload
+
+    def refuse(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("the window must not be solved again")
+
+    monkeypatch.setattr(variants, "solve_window_plan", refuse)
+    reused = advise_rival_window(
+        request,
+        weight=0,
+        counts=None,
+        **arguments,
+        applied_level=solved["overlap_applied"],
+        pure_payload=control,
+    ).payload
+    assert reused["mode"] == "ortak-koru"
+    assert control["mode"] == "saf-puan"  # the pure document is untouched
+    assert reused["plan_weeks"] == control["plan_weeks"]
+    assert reused["starting_xi"] == control["starting_xi"]
+    assert reused["expected_points_cost"] == 0.0
+    assert reused["stated_limits"] == [*control["stated_limits"], RIVAL_WINDOW_LIMIT]
+    assert {m["reason_code"] for m in reused["moves"]} <= {"mode_tradeoff"}
+    for key in ("overlap_applied", "overlap_target", "transfer_cap", "plan_kind"):
+        assert reused[key] == solved[key], key
+    assert reused["overlap_count"] >= reused["overlap_applied"]
+    _publishable(reused)
+    # A window that does not hold the level asked for is solved, not reused.
+    with pytest.raises(AssertionError, match="must not be solved again"):
+        advise_rival_window(
+            request, weight=0, counts=None, **arguments, applied_level=12, pure_payload=control
+        )
+
+
+def test_the_batch_finds_each_band_level_and_the_pricing_control_once(
+    world: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(views, "TOP100_WEIGHTS", (0, 50))
+    calls = {"level": 0, "pricing": 0}
+    level, pricing = views.band_level_with_one_transfer, views.solve_pricing_control
+
+    def counted_level(*args: Any, **kwargs: Any) -> Any:
+        calls["level"] += 1
+        return level(*args, **kwargs)
+
+    def counted_pricing(*args: Any, **kwargs: Any) -> Any:
+        calls["pricing"] += 1
+        return pricing(*args, **kwargs)
+
+    def solved_again(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("the pricing control was solved again inside a document")
+
+    monkeypatch.setattr(views, "band_level_with_one_transfer", counted_level)
+    monkeypatch.setattr(views, "solve_pricing_control", counted_pricing)
+    monkeypatch.setattr(advice_module, "solve_pricing_control", solved_again)
+    report = _publish(world, tmp_path, counts=world["counts"])
+    assert all(member.rendered for member in report.members)
+    # Two members, two strategies each; one pricing control each.
+    assert calls == {"level": 4, "pricing": 2}
+
+
+def test_a_later_week_that_differs_only_in_its_total_is_a_changed_plan() -> None:
+    week = {"transfers_in": [], "transfers_out": [], "expected_points": 50.0}
+    same = {"plan_weeks": [week, week], "moves": [], "starting_xi": [], "captain": None}
+    other = {**same, "plan_weeks": [week, {**week, "expected_points": 53.7}]}
+    assert variants._signature(same) == variants._signature(dict(same))
+    assert variants._signature(same) != variants._signature(other)
+
+
+def test_a_row_the_base_model_scores_below_zero_is_the_settings() -> None:
+    payload: dict[str, Any] = {
+        "moves": [
+            {"expected_points_delta": -0.1, "reason_code": "points_gain"},
+            {"expected_points_delta": 0.4, "reason_code": "points_gain"},
+            {"expected_points_delta": -0.3, "reason_code": "manager_word"},
+            {"expected_points_delta": None, "reason_code": "window_value"},
+        ]
+    }
+    advice_module._setting_rows(payload)
+    assert [m["reason_code"] for m in payload["moves"]] == [
+        "top100_preference",
+        "points_gain",
+        "manager_word",
+        "window_value",
+    ]
