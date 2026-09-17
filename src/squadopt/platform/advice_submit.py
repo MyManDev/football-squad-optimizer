@@ -23,10 +23,13 @@ is the discipline around that one write:
 - **Rate limits are honest refusals.** Two buckets guard the POST — one per client
   address, one per (capture, entry) — because a solve costs seconds of CPU and a
   browser retry loop must not become a denial of service on the league's own worker.
+  The budget is for work: a request the cache already answers costs one small read and
+  spends no token, so opening a computed plan again never uses up a member's asks.
 """
 
 from __future__ import annotations
 
+import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -35,7 +38,11 @@ from typing import Final, Protocol
 from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecStore
 from squadopt.platform.advice_queue import JobQueue
 from squadopt.platform.advice_read import AdviceBackendNotReadyError, AdviceReadStore
-from squadopt.platform.api_contract import ApiCommandRequest
+from squadopt.platform.api_contract import (
+    ApiCommandRequest,
+    BackendApiContractError,
+    validate_idempotency_key,
+)
 from squadopt.platform.jobs_contract import AdviceJob
 
 _DEFAULT_IDEMPOTENCY_PREFIX: Final = "auto"
@@ -46,7 +53,19 @@ class IdempotencyConflictError(ValueError):
 
 
 class RateLimitedError(ValueError):
-    """The client or the entry has exhausted its request budget for the window."""
+    """The client or the entry has exhausted its request budget for the window.
+
+    ``retry_after_seconds`` is what the refusal tells the client to wait: the limiter's
+    own window, after which a fixed window has certainly started again.
+    """
+
+    def __init__(self, message: str, *, retry_after_seconds: int = 60) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = max(1, int(retry_after_seconds))
+
+
+class MalformedIdempotencyKeyError(ValueError):
+    """The ``Idempotency-Key`` header is not one the contract accepts."""
 
 
 class RateLimiter(Protocol):
@@ -70,6 +89,8 @@ class FixedWindowRateLimiter:
             raise ValueError("limit must be at least 1.")
         self._limit = limit
         self._window = float(window_seconds)
+        #: Read by the submit service for ``Retry-After``; not part of the protocol.
+        self.window_seconds = self._window
         self._clock = clock
         self._counts: dict[str, tuple[float, int]] = {}
 
@@ -148,13 +169,18 @@ class AdviceSubmitService:
         idempotency_key: str | None,
         client_bucket: str,
         at_utc: str,
+        top100_weight: int = 0,
+        managers_word: bool = False,
     ) -> SubmitOutcome:
-        """Validate, rate-limit, dedupe, and enqueue — in that order.
+        """Validate, answer from the cache, rate-limit, dedupe, and enqueue, in that order.
 
         Validation runs before the rate limit so a malformed request never spends a
-        token, and the rate limit runs before the cache read so a hammering client is
-        refused cheaply. Deduplication scans open jobs by fingerprint: at most one
-        open job exists per normalized request, however many keys or clients ask.
+        token, and so does the cache read: a hit is one small file read that starts no
+        work, and charging for it meant a member who opened an already computed plan a
+        few times was refused the one request that needed a solve. Only a miss, which
+        is a request for work, consults the limiter. Deduplication scans open jobs by
+        fingerprint: at most one open job exists per normalized request, however many
+        keys or clients ask.
         """
 
         if self._store_ready is not None and not self._store_ready():
@@ -164,22 +190,40 @@ class AdviceSubmitService:
             raise AdviceBackendNotReadyError(
                 "The advice store is not available; the backend cannot accept work."
             )
-        cache_key, context = self._reader.resolve_key(
+        if idempotency_key is not None:
+            # Part of validation, so it runs before a token is spent: a malformed key is
+            # the client's mistake, and it used to surface only when the command was
+            # built, after the budget had been charged and as an unhandled error.
+            try:
+                validate_idempotency_key(idempotency_key)
+            except BackendApiContractError as error:
+                raise MalformedIdempotencyKeyError(
+                    "The Idempotency-Key header is not a valid key."
+                ) from error
+        resolved = self._reader.resolve(
             league_id=league_id,
             entry_id=entry_id,
             strategy=strategy,
             window=window,
             rival_entry_id=rival_entry_id,
+            top100_weight=top100_weight,
+            managers_word=managers_word,
         )
+        cache_key, context = resolved.key, resolved.context
+        cached = self._reader.cached(cache_key)
+        if cached is not None:
+            return SubmitOutcome(kind="hit", payload=cached)
         if self._limiter is not None:
             entry_bucket = f"entry:{context.capture_snapshot_id}:{entry_id}"
             if not self._limiter.allow(f"ip:{client_bucket}") or not self._limiter.allow(
                 entry_bucket
             ):
-                raise RateLimitedError("Too many advice requests; try again shortly.")
-        cached = self._reader.cached(cache_key)
-        if cached is not None:
-            return SubmitOutcome(kind="hit", payload=cached)
+                raise RateLimitedError(
+                    "Too many advice requests; try again shortly.",
+                    retry_after_seconds=math.ceil(
+                        float(getattr(self._limiter, "window_seconds", 60.0))
+                    ),
+                )
 
         command = ApiCommandRequest(
             operation="league.advise",
@@ -194,6 +238,8 @@ class AdviceSubmitService:
             # Server-resolved: the same client fields on a newer capture become a
             # different fingerprint, so dedup cannot serve stale work (review, #288).
             capture_snapshot_id=context.capture_snapshot_id,
+            top100_weight=top100_weight,
+            managers_word=managers_word,
         )
         fingerprint = command.request_fingerprint
 
@@ -254,6 +300,9 @@ class AdviceSubmitService:
                     rival_entry_id=(
                         rival_entry_id if self._reader.strategy_uses_rival(strategy) else None
                     ),
+                    # Exactly what entered the key: the switch values and the identity
+                    # of the inputs they were accepted against.
+                    switches=resolved.switches,
                 ),
             )
         # Completion publishes cache bytes and removes the open reservation under the

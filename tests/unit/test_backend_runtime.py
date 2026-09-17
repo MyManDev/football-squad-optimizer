@@ -84,7 +84,7 @@ def _handoff(
     return write_projection_handoff(handoff_path_for(handoff_root, SEASON, gameweek), projection)
 
 
-def _publish_members(site_root: Path, *entry_ids: int) -> None:
+def _publish_members(site_root: Path, *entry_ids: int, gameweek: int = 2) -> None:
     members = (ENTRY_ID, *entry_ids)
     document = {
         "contract_version": "provisional_league_ui_v1",
@@ -92,7 +92,7 @@ def _publish_members(site_root: Path, *entry_ids: int) -> None:
             "league_id": LEAGUE_ID,
             "league_name": "Test League",
             "season": SEASON,
-            "gameweek": 2,
+            "gameweek": gameweek,
             "members": [{"member_kind": "human", "entry_id": one} for one in members],
         },
     }
@@ -316,7 +316,12 @@ def test_the_context_names_the_capture_and_its_handoff(deployment: dict[str, Any
     assert len(context.projection_handoff_fingerprint) == 64
     ready, checks = backend.readiness()
     assert ready is True
-    assert checks == {"capture_context": True, "league_tree": True, "cache_store": True}
+    assert checks == {
+        "capture_context": True,
+        "league_tree": True,
+        "cache_store": True,
+        "league_tree_matches_capture": True,
+    }
 
 
 def test_a_new_capture_replaces_the_context_without_a_restart(
@@ -350,6 +355,58 @@ def test_a_new_capture_replaces_the_context_without_a_restart(
     assert second.capture_snapshot_id == later.snapshot_id
     assert second.gameweek == 3
     assert second != first
+
+
+def test_a_capture_a_week_ahead_of_the_tree_is_not_ready_until_the_tree_catches_up(
+    deployment: dict[str, Any],
+) -> None:
+    """Both publications are readable; they are about different weeks, and /ready says so."""
+
+    backend = build_backend(deployment["config"])
+    client = TestClient(app_for_backend(backend))
+    assert client.get("/ready").status_code == 200
+
+    later = write_snapshot(
+        deployment["snapshot_root"],
+        source="fpl-live",
+        captured_at_utc="2026-09-12T10:00:00Z",
+        payloads={
+            BOOTSTRAP_PAYLOAD: world_module._bootstrap(
+                events=[
+                    dict(world_module.EVENTS[0], finished=True),
+                    dict(world_module.EVENTS[1], finished=True),
+                    *world_module.EVENTS[2:],
+                ],
+                elements=world_module._elements(event_points=3),
+            ),
+            FIXTURES_PAYLOAD: b"[]",
+        },
+    )
+    _handoff(deployment["handoff_root"], later.snapshot_id, gameweek=3)
+
+    behind = client.get("/ready")
+    assert behind.status_code == 503
+    assert behind.json()["checks"] == {
+        "capture_context": True,
+        "league_tree": True,
+        "cache_store": True,
+        "league_tree_matches_capture": False,
+    }
+    refused = client.post(
+        f"/api/v1/leagues/{LEAGUE_ID}/entries/{ENTRY_ID}/advice",
+        json={"strategy": COMPUTED_MODE, "window": COMPUTED_WINDOW},
+    )
+    assert refused.status_code == 503
+    error = refused.json()["error"]
+    assert error["code"] == "NOT_READY"
+    assert f"{SEASON} gameweek 2" in error["message"]
+    assert f"{SEASON} gameweek 3" in error["message"]
+    assert backend.queue.jobs() == ()
+    # Finding that out projected nothing: the api stays the reader it was.
+    assert backend.contexts._context is None
+
+    _publish_members(deployment["config"].site_data_root, gameweek=3)
+    assert client.get("/ready").status_code == 200
 
 
 def test_the_wired_app_accepts_a_real_request_instead_of_answering_503(

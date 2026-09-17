@@ -71,6 +71,13 @@
   color: var(--color-text);
 }
 
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .main {
   flex: 1;
   width: 100%;
@@ -96,6 +103,24 @@
 
 .footerLink {
   color: var(--color-text-muted);
+}
+
+/*
+ * Wide enough for a rail in each margin (features/fixtures/Fixtures.module.css switches at
+ * the same width): the column keeps its 1080px and the margins become grid tracks.
+ */
+@media (min-width: 1500px) {
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1080px) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .main {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+  }
 }
 
 @media (max-width: 640px) {

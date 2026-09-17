@@ -183,6 +183,71 @@ describe("a Top 100 weighted plan on the advice card", () => {
     expect(container.textContent).toContain(TOP100_COPY.en.moveReason);
   });
 
+  it("prices a strategy and the setting together, and reads the window's limits back", () => {
+    const base = mockEntryAdviceIndex(ENTRY).payload;
+    const rival = base.default_rival_entry_id!;
+    const target = { strategy: "ortak-koru", window: 3, rivalEntryId: rival };
+    const advice = mockEntryAdviceTop100Envelope(ENTRY, 20, false, target);
+    advice.payload = {
+      ...advice.payload,
+      expected_points_cost: 0.2,
+      expected_points_cost_ceiling: 12.5,
+      solver_status: "FEASIBLE",
+      optimality_gap: null,
+      control_solver_status: "FEASIBLE",
+      stated_limits: [
+        "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.",
+        "The plan was chosen with the Top 100 influence at 20; every expected-points number in this document is the base model's, without it.",
+        "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in.",
+      ],
+    };
+    const path = `advice/${ENTRY}/ortak-koru/3/vs-${rival}`;
+    const index: EntryAdviceIndex = {
+      ...INDEX,
+      windows: { ...base.windows, "ortak-koru": [1, 3] },
+      computed: [
+        ...base.computed,
+        { strategy: "ortak-koru", rival_entry_id: rival, path: `${path}.json` },
+      ],
+      top100: {
+        ...(INDEX.top100 as Extract<EntryAdviceIndex["top100"], { available: true }>),
+        documents: [
+          {
+            strategy: "ortak-koru",
+            window: 3,
+            rival_entry_id: rival,
+            weight: 20,
+            path: `${path}/top100-20.json`,
+          },
+        ],
+      },
+    };
+    const { container } = render(
+      <LanguageProvider initialLanguage="tr">
+        <MemoryRouter
+          initialEntries={[`/league/members/${ENTRY}?mode=ortak-koru&window=3&top100=20`]}
+        >
+          <LeagueMemberView
+            squad={mockEntrySquadEnvelopes[ENTRY]}
+            advice={advice}
+            members={mockLeagueMembersEnvelope.payload.members}
+            index={index}
+          />
+        </MemoryRouter>
+      </LanguageProvider>,
+    );
+    const page = container.textContent ?? "";
+    expect(page).toContain(TOP100_COPY.tr.strategyCostAtMost("12,5"));
+    expect(page).not.toContain("0,2 beklenen");
+    expect(page).toContain(TOP100_COPY.tr.limit(20));
+    for (const sentence of Object.values(TOP100_COPY.tr.variantLimits)) {
+      expect(page).toContain(sentence);
+    }
+    expect(page).not.toContain(MESSAGES.tr.leagueMembers.statedLimitUnknown);
+    expect(section(container)).toContain(TOP100_COPY.tr.weightLine(20));
+    expect(page).not.toMatch(AS_A_CHANCE);
+  });
+
   it("does not show a document for another setting as this one", () => {
     const { container } = renderPage("en", weighted(20), "mode=saf-puan&window=1&top100=30");
     expect(section(container)).toBe("");

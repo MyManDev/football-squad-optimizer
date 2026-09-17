@@ -146,6 +146,73 @@
             "freehit"
           ]
         },
+        "chip_choice": {
+          "properties": {
+            "basis": {
+              "const": "one_week_expected_points_v1"
+            },
+            "chip": {
+              "enum": [
+                "bboost",
+                "3xc",
+                "wildcard",
+                "freehit"
+              ]
+            },
+            "gain_vs_no_chip": {
+              "type": "number"
+            },
+            "windows_left": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "properties": {
+                      "gameweek": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "start_event": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "state": {
+                        "enum": [
+                          "used",
+                          "expired",
+                          "not_yet",
+                          "available",
+                          "unknown"
+                        ]
+                      },
+                      "stop_event": {
+                        "minimum": 1,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "start_event",
+                      "stop_event"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "chip",
+            "gain_vs_no_chip",
+            "basis"
+          ],
+          "type": "object"
+        },
         "control_optimality_gap": {
           "type": [
             "number",

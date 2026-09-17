@@ -47,5 +47,18 @@ export function checkedAdvice(
   ) {
     throw new AdviceContextError("Advice does not match the selected member, strategy or week.");
   }
+  // A request that states its switches is answered only by the plan solved under them: a
+  // weighted document names its weight and the plain one names none, and the plan with the
+  // manager's word carries its evidence and the plain one does not. A request that states
+  // neither (every request of a static build) is held to nothing here, as before.
+  const top100 = payload.top100;
+  if (
+    (request.top100Weight !== undefined &&
+      ((record(top100) ? top100.weight : 0) ?? 0) !== request.top100Weight) ||
+    (request.managersWord !== undefined &&
+      (payload.evidence !== undefined) !== request.managersWord)
+  ) {
+    throw new AdviceContextError("Advice does not match the selected switches.");
+  }
   return value as unknown as LeagueViewEnvelope<EntryAdvice>;
 }

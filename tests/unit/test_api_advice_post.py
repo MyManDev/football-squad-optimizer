@@ -61,12 +61,12 @@ class _Context:
         return CONTEXT
 
 
-def _publish_members(root: Path) -> None:
+def _publish_members(root: Path, *, gameweek: int = 3) -> None:
     payload = {
         "league_id": LEAGUE_ID,
         "league_name": "Test League",
         "season": "2026-27",
-        "gameweek": 3,
+        "gameweek": gameweek,
         "members": [
             {"member_kind": "human", "entry_id": 313686},
             {"member_kind": "human", "entry_id": 2199732},
@@ -78,7 +78,7 @@ def _publish_members(root: Path) -> None:
     path.write_text(json.dumps(document), encoding="utf-8", newline="\n")
 
 
-def _world(tmp_path: Path, **app_kwargs: object):
+def _world(tmp_path: Path, *, allowed_origins: tuple[str, ...] = (), **app_kwargs: object):
     _publish_members(tmp_path / "site")
     cache = FileAdviceCache(tmp_path / "cache")
     queue = FileJobQueue(tmp_path / "jobs")
@@ -93,6 +93,7 @@ def _world(tmp_path: Path, **app_kwargs: object):
         data_root=tmp_path / "site",
         advice_store=reader,
         advice_submit=submit,
+        allowed_origins=allowed_origins,
         utc_now=lambda: datetime(2026, 8, 27, 12, 0, tzinfo=UTC),
     )
     client = TestClient(application, raise_server_exceptions=False)
@@ -172,6 +173,55 @@ def test_rate_limits_answer_429(tmp_path: Path) -> None:
     assert third.json()["error"]["code"] == "RATE_LIMITED"
 
 
+def test_a_cache_hit_spends_no_rate_limit_token(tmp_path: Path) -> None:
+    """Opening a computed plan again is a read; the budget is for requests that need work."""
+
+    client, cache, queue = _world(
+        tmp_path, rate_limiter=FixedWindowRateLimiter(limit=2, window_seconds=60.0)
+    )
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202  # the first of two tokens
+    done = run_advice_worker_once(
+        queue, cache, lambda _job: _valid_advice_document(), at_utc="2026-08-27T18:00:00Z"
+    )
+    assert done is not None and done.status == "completed"
+
+    # More hits in a row than the whole budget, and none of them is refused.
+    for _ in range(3):
+        hit = client.post(ADVICE_URL, json=BODY)
+        assert hit.status_code == 200
+        assert hit.content == _valid_advice_document()
+
+    # A miss is still charged: the second token is there, and after it the limit holds.
+    assert client.post(ADVICE_URL, json={**BODY, "window": 3}).status_code == 202
+    refused = client.post(ADVICE_URL, json={**BODY, "window": 5})
+    assert refused.status_code == 429
+    assert refused.json()["error"]["code"] == "RATE_LIMITED"
+    # Even with the budget spent, the computed plan still opens.
+    assert client.post(ADVICE_URL, json=BODY).status_code == 200
+
+
+def test_a_tree_from_another_week_is_not_ready_and_queues_nothing(tmp_path: Path) -> None:
+    """Last week's members beside this week's capture: refused as readiness, both named."""
+
+    client, _cache, queue = _world(
+        tmp_path, rate_limiter=FixedWindowRateLimiter(limit=1, window_seconds=60.0)
+    )
+    _publish_members(tmp_path / "site", gameweek=2)
+
+    refused = client.post(ADVICE_URL, json=BODY)
+    assert refused.status_code == 503
+    error = refused.json()["error"]
+    assert error["code"] == "NOT_READY"
+    assert "2026-27 gameweek 2" in error["message"]
+    assert "2026-27 gameweek 3" in error["message"]
+    assert queue.jobs() == ()
+    assert client.get(f"{ADVICE_URL}?strategy=saf-puan&window=1").status_code == 503
+
+    # The week's tree lands; nothing restarts, and the refusal spent no token.
+    _publish_members(tmp_path / "site", gameweek=3)
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+
+
 def test_post_validation_and_the_unknown_entry_refusal(tmp_path: Path) -> None:
     client, _cache, _queue = _world(tmp_path)
 
@@ -213,6 +263,27 @@ def test_cors_is_an_allowlist_never_a_wildcard(tmp_path: Path) -> None:
         raise AssertionError("a wildcard allowlist must be refused")
     except ValueError:
         pass
+
+
+def test_an_allowed_origin_may_read_how_long_a_refusal_asked_it_to_wait(tmp_path: Path) -> None:
+    """A browser shows a page only the response headers the server exposes to it."""
+
+    origin = "https://squadopt.example"
+    client, _cache, _queue = _world(
+        tmp_path,
+        allowed_origins=(origin,),
+        rate_limiter=FixedWindowRateLimiter(limit=1, window_seconds=45.0),
+    )
+    assert client.post(ADVICE_URL, json=BODY, headers={"Origin": origin}).status_code == 202
+    refused = client.post(ADVICE_URL, json=BODY, headers={"Origin": origin})
+    assert refused.status_code == 429
+    assert refused.headers["Retry-After"] == "45"
+    assert refused.headers.get("access-control-allow-origin") == origin
+    exposed = refused.headers.get("access-control-expose-headers", "")
+    assert "retry-after" in [name.strip().lower() for name in exposed.split(",")]
+
+    elsewhere = client.post(ADVICE_URL, json=BODY, headers={"Origin": "https://elsewhere.example"})
+    assert elsewhere.headers.get("access-control-allow-origin") is None
 
 
 def test_the_strict_body_refuses_extras_and_bool_windows(tmp_path: Path) -> None:
@@ -417,3 +488,90 @@ def test_corrupt_job_is_unavailable_not_missing(tmp_path: Path) -> None:
     response = client.get(f"/api/v1/advice-jobs/{identifier}")
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "QUEUE_INTEGRITY_ERROR"
+
+
+# --- submit-path failures are the client's or the moment's, never a 500 -----------------
+
+
+def test_a_malformed_idempotency_key_is_refused_and_spends_no_token(tmp_path: Path) -> None:
+    client, _cache, queue = _world(
+        tmp_path, rate_limiter=FixedWindowRateLimiter(limit=1, window_seconds=60.0)
+    )
+
+    for bad in ("has spaces", "x" * 200, "-leading"):
+        refused = client.post(ADVICE_URL, json=BODY, headers={"Idempotency-Key": bad})
+        assert refused.status_code == 422, bad
+        assert refused.json()["error"]["code"] == "VALIDATION_FAILED"
+    assert queue.jobs() == ()
+    # The one token is still there for a request that can be accepted.
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+
+
+def test_a_rate_limited_client_is_told_when_to_come_back(tmp_path: Path) -> None:
+    client, _cache, _queue = _world(
+        tmp_path, rate_limiter=FixedWindowRateLimiter(limit=1, window_seconds=45.0)
+    )
+    assert client.post(ADVICE_URL, json=BODY).status_code == 202
+    refused = client.post(ADVICE_URL, json=BODY)
+    assert refused.status_code == 429
+    assert refused.headers["Retry-After"] == "45"
+
+
+def _failing_submit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error: Exception):
+    client, _cache, queue = _world(tmp_path)
+
+    def refuse(*_args: object, **_kwargs: object) -> None:
+        raise error
+
+    monkeypatch.setattr(FileJobQueue, "submit_unless_cached", refuse)
+    return client, queue
+
+
+def test_a_busy_queue_lock_is_not_ready_with_a_retry_after(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from squadopt.platform.queue_contracts import QueueLockTimeout
+
+    client, _queue = _failing_submit(tmp_path, monkeypatch, QueueLockTimeout("busy"))
+    response = client.post(ADVICE_URL, json=BODY)
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "NOT_READY"
+    assert int(response.headers["Retry-After"]) >= 1
+
+
+def test_a_refused_queue_write_is_unavailable_not_an_internal_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from squadopt.platform.queue_contracts import AdviceQueueError
+
+    client, _queue = _failing_submit(
+        tmp_path, monkeypatch, AdviceQueueError("Job 'advice-x-1' already exists at C:/store.")
+    )
+    response = client.post(ADVICE_URL, json=BODY)
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "QUEUE_UNAVAILABLE"
+    assert "C:/store" not in response.text  # the queue's own words stay in the log
+
+
+def test_two_meanings_under_one_address_is_a_conflict(tmp_path: Path) -> None:
+    from squadopt.platform.advice_job_spec import AdviceJobSpec, FileAdviceJobSpecStore
+
+    specs = FileAdviceJobSpecStore(tmp_path / "specs")
+    client, _cache, queue = _world(tmp_path, specs=specs)
+    accepted = client.post(ADVICE_URL, json=BODY)
+    assert accepted.status_code == 202
+    job = queue.load(accepted.json()["job_id"])
+    # The address already records another question: written by hand here, a defect if it
+    # ever happens for real, and either way the client's answer is a 409, not a 500.
+    path = tmp_path / "specs" / job.cache_key[:2] / f"{job.cache_key}.json"
+    other = AdviceJobSpec(
+        league_id=LEAGUE_ID, entry_id=2199732, strategy="saf-puan", window=1, context=CONTEXT
+    )
+    path.write_text(json.dumps(other.as_payload(), sort_keys=True), encoding="utf-8")
+    (tmp_path / "jobs" / f"{job.job_id}.json").unlink()
+    for index in (tmp_path / "jobs").glob("open-*.idx"):
+        index.unlink()
+
+    response = client.post(ADVICE_URL, json=BODY)
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "REQUEST_CONFLICT"

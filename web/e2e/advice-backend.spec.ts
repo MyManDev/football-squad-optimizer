@@ -25,6 +25,9 @@ test("a browser computes through the worker, then reads the same answer from cac
   await page.goto("/");
   const leagueRequests: string[] = [];
   page.on("request", (request) => {
+    // The shell reads the fixture list on every page, whenever its chunk lands; it is not
+    // a league lookup, and counting it made this assertion depend on timing.
+    if (request.url().endsWith("/data/fixtures.json")) return;
     if (["fetch", "xhr"].includes(request.resourceType())) leagueRequests.push(request.url());
   });
   const leagueField = page.getByLabel("Lig numarası");
@@ -38,7 +41,17 @@ test("a browser computes through the worker, then reads the same answer from cac
   await leagueField.fill(String(context.leagueId));
   await findLeague.click();
   await expect(page).toHaveURL("/league/members");
+  // The member page asks the service what it computes, once, and says about how long.
+  const capabilities = page.waitForResponse(
+    (response) =>
+      response.url() === `${context.apiOrigin}/api/v1/leagues/${context.leagueId}/capabilities`,
+  );
   await page.getByRole("button", { name: "Bu benim", exact: true }).click();
+  expect(await (await capabilities).json()).toMatchObject({
+    contract_version: "league_capabilities_v1",
+    capture_snapshot_id: context.snapshotId,
+  });
+  await expect(page.getByText("Bir haftalık planın hesabı birkaç saniye sürer.")).toBeVisible();
   await expect(page).toHaveURL(`/league/members/${context.entryId}`);
   expect(await page.evaluate(() => localStorage.getItem("squadopt.viewer"))).toBeNull();
   await expect(page.getByRole("button", { name: "Seçimi Kaldır" })).toBeVisible();
@@ -64,6 +77,9 @@ test("a browser computes through the worker, then reads the same answer from cac
     rival_entry_id: null,
   });
   expect(post.headers()["access-control-allow-origin"]).toBe(context.webOrigin);
+  expect(post.request().headers()["idempotency-key"]).toMatch(
+    /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/,
+  );
   const { job_id: jobId } = await post.json();
   expect(jobId).toBeTruthy();
   await expect(compute).toBeDisabled();
@@ -102,4 +118,29 @@ test("a browser computes through the worker, then reads the same answer from cac
   expect(cached.status()).toBe(200);
   expect(await cached.json()).toEqual(answer);
   await expect(page.getByText("Hesap sonucu", { exact: true })).toBeVisible();
+});
+
+test("a bundle built with an origin is the static page when the service is down", async ({
+  page,
+}) => {
+  await cp(context.siteRoot, `node_modules/.cache/${context.buildName}/data`, {
+    recursive: true,
+  });
+  // The service is unreachable for this page only: every call to its origin fails.
+  await page.route(`${context.apiOrigin}/**`, (route) => route.abort("connectionrefused"));
+  await page.goto(`/league/members/${context.entryId}`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Browser smoke team");
+  await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
+  await expect(
+    page.getByText(
+      "Hesaplama servisine şu an ulaşılamıyor. Yayınlanmış planlar her zamanki gibi aşağıda.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await page.getByRole("button", { name: "Hesapla", exact: true }).click();
+  await expect(
+    page.getByText(
+      "Hesaplama servisine ulaşılamadı. Yayınlanmış plan, varsa, geçerli olmaya devam ediyor.",
+    ),
+  ).toBeVisible();
 });

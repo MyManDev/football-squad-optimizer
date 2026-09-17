@@ -10,8 +10,11 @@ it until the process is told to stop.
 from the spec written beside it at submission. The capture that spec names must be the one
 this process can still answer from; if the deployment has moved to a newer capture, the job
 is refused with a stated reason rather than computed from inputs nobody asked about. The
-answer itself is not computed here — ``advise_entry`` is, and stays, the only place that
-decides what advice is.
+answer itself is not computed here: ``advise_menu_entry`` dispatches to the producers
+that decide what advice is, and a plain request is ``advise_entry`` byte for byte. A
+switched-on request is computed only against the very input it was accepted against: the
+spec records that input's identity, and a capture whose input has since changed refuses
+the job by name rather than filing one export's answer at another's address.
 
 **The loop.** One computation at a time per worker, because CP-SAT runs a single search
 worker by design and a replica scales by replication (ADR 0006). An empty queue waits
@@ -40,11 +43,16 @@ from datetime import UTC, datetime
 from types import FrameType
 from typing import Final
 
-from squadopt.application.advice import AdviseEntryRequest, advise_entry
+from squadopt.application.advice_capabilities import menu_capabilities
+from squadopt.application.advice_menu import (
+    ManagersWordNotSolved,
+    MenuRequest,
+    advise_menu_entry,
+)
 from squadopt.application.league_views import LEAGUE_VIEW_CONTRACT_VERSION
-from squadopt.platform.advice_cache import AdviceCacheRepository
-from squadopt.platform.advice_documents import validate_advice_document
-from squadopt.platform.advice_job_spec import AdviceJobSpecStore
+from squadopt.platform.advice_cache import AdviceCacheRepository, advice_cache_key
+from squadopt.platform.advice_documents import AdviceDocumentError, validate_advice_document
+from squadopt.platform.advice_job_spec import AdviceJobSpec, AdviceJobSpecError, AdviceJobSpecStore
 from squadopt.platform.advice_observability import (
     AdviceLog,
     AdviceMetrics,
@@ -56,12 +64,20 @@ from squadopt.platform.advice_queue import (
     JobQueue,
     run_advice_worker_once,
 )
+from squadopt.platform.advice_switches import (
+    MANAGERS_WORD_SWITCH,
+    TOP100_SWITCH,
+    SwitchInputUnavailable,
+    switch_identity,
+)
 from squadopt.platform.backend_runtime import (
     AdviceBackend,
     CaptureContextProvider,
     backend_from_environment,
 )
+from squadopt.platform.capture_context import AdviceCaptureContext
 from squadopt.platform.jobs_contract import AdviceJob
+from squadopt.platform.queue_contracts import QueueLockTimeout
 from squadopt.platform.worker_metrics import serve_worker_metrics
 
 __all__ = [
@@ -90,13 +106,101 @@ def _stamp(moment: datetime) -> str:
     return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+#: The switches this worker computes, and the code a job fails with when the capture has
+#: no input for one. A switch that needs no per-capture input is added to the first only.
+_KNOWN_SWITCHES: Final = frozenset({TOP100_SWITCH, MANAGERS_WORD_SWITCH})
+_SWITCH_REFUSAL_CODES: Final = {
+    TOP100_SWITCH: "TOP100_INPUTS_UNAVAILABLE",
+    MANAGERS_WORD_SWITCH: "MANAGERS_WORD_UNAVAILABLE",
+}
+
+
+def _menu_request(spec: AdviceJobSpec, capture: AdviceCaptureContext) -> MenuRequest:
+    """The spec as the menu's request, after proving its switch inputs are still these.
+
+    The identity recorded at submission is rebuilt from what this process holds and the
+    two must be equal, field for field. A different export (or none) means the key this
+    job would be filed under names an input the answer was not computed from.
+    """
+
+    top100 = spec.switch(TOP100_SWITCH).get("weight", 0)
+    weight = top100 if isinstance(top100, int) and not isinstance(top100, bool) else -1
+    word = MANAGERS_WORD_SWITCH in spec.switches
+    unknown = set(spec.switches) - _KNOWN_SWITCHES
+    if unknown or (TOP100_SWITCH in spec.switches and weight < 1):
+        raise AdviceComputeRefused(
+            "REQUEST_UNREADABLE",
+            "The recorded request names a switch this worker does not compute.",
+        )
+    try:
+        held = switch_identity(capture.switches, top100_weight=weight, managers_word=word)
+    except SwitchInputUnavailable as error:
+        raise AdviceComputeRefused(_SWITCH_REFUSAL_CODES[error.switch], str(error)) from error
+    if held != {name: dict(value) for name, value in spec.switches.items()}:
+        raise AdviceComputeRefused(
+            "SWITCH_INPUTS_CHANGED",
+            "The Top 100 counts or the club news this job was accepted against have been "
+            "replaced since; ask again to be answered from the current ones.",
+        )
+    return MenuRequest(
+        season=spec.context.season,
+        gameweek=spec.context.gameweek,
+        league_id=spec.league_id,
+        entry_id=spec.entry_id,
+        strategy=spec.strategy,
+        window=spec.window,
+        rival_entry_id=spec.rival_entry_id,
+        top100_weight=weight,
+        managers_word=word,
+    )
+
+
 def build_advice_compute(
     contexts: CaptureContextProvider,
     specs: AdviceJobSpecStore,
     *,
     max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+    cache: AdviceCacheRepository | None = None,
 ) -> Callable[[AdviceJob], bytes]:
-    """Return the callback that turns one claimed job into the bytes it will be served as."""
+    """Return the callback that turns one claimed job into the bytes it will be served as.
+
+    ``cache`` is optional and read-only here. A switched-on or windowed document is priced
+    and compared against the member's plain documents (the pure-points window, the
+    strategy at setting 0); when the cache already holds one under this same context it
+    is the very payload the computation would produce again, so it is read back instead
+    of solved a second time. A window solve is minutes, and this is most of what a
+    switched-on window costs.
+    """
+
+    uses_rival = {slug: value.requires_rival for slug, value in menu_capabilities().items()}
+
+    def cached_plain(spec: AdviceJobSpec, address: MenuRequest) -> dict[str, object] | None:
+        if cache is None or not address.is_plain or address.strategy not in uses_rival:
+            return None
+        key = advice_cache_key(
+            advice_contract_version=spec.context.advice_contract_version,
+            capture_snapshot_id=spec.context.capture_snapshot_id,
+            season=spec.context.season,
+            gameweek=spec.context.gameweek,
+            league_id=address.league_id,
+            entry_id=address.entry_id,
+            strategy=address.strategy,
+            window=address.window,
+            projection_handoff_fingerprint=spec.context.projection_handoff_fingerprint,
+            repository_commit=spec.context.repository_commit,
+            configuration_fingerprint=spec.context.configuration_fingerprint,
+            rival_entry_id=address.rival_entry_id,
+            strategy_uses_rival=uses_rival[address.strategy],
+        )
+        held = cache.get(key)
+        if held is None:
+            return None
+        try:
+            validate_advice_document(held)
+        except AdviceDocumentError:
+            return None  # an entry the read side would refuse is not a prerequisite
+        payload = json.loads(held).get("payload")
+        return payload if isinstance(payload, dict) else None
 
     def compute(job: AdviceJob) -> bytes:
         if job.attempt > max_attempts:
@@ -105,7 +209,17 @@ def build_advice_compute(
                 f"This job has been attempted {job.attempt} times; a job that cannot "
                 "finish is a fault to look at, not work to repeat.",
             )
-        spec = specs.get(job.cache_key)
+        try:
+            spec = specs.get(job.cache_key)
+        except AdviceJobSpecError as error:
+            # A spec that is there and cannot be read is the same fact as one that is
+            # not there: what to compute cannot be known. It used to be recorded as a
+            # failed computation, which it never was.
+            raise AdviceComputeRefused(
+                "REQUEST_UNREADABLE",
+                "The request recorded at this job's address cannot be read. Ask again "
+                "to file a fresh one.",
+            ) from error
         if spec is None:
             raise AdviceComputeRefused(
                 "REQUEST_UNREADABLE",
@@ -123,22 +237,33 @@ def build_advice_compute(
                 f"{spec.context.capture_snapshot_id}) is no longer the one this backend "
                 "answers from; ask again to be answered from the current one.",
             )
-        advice = advise_entry(
-            AdviseEntryRequest(
-                season=spec.context.season,
-                gameweek=spec.context.gameweek,
-                league_id=spec.league_id,
-                entry_id=spec.entry_id,
-                strategy=spec.strategy,
-                window=spec.window,
-                rival_entry_id=spec.rival_entry_id,
-            ),
-            provider=capture.provider,
-            inputs=capture.inputs,
-            projection=capture.projection,
-            rules=capture.rules,
-            horizon_builder=capture.horizon_builder,
-        )
+        request = _menu_request(spec, capture)
+        for label, entry in (("Entry", spec.entry_id), ("Rival", spec.rival_entry_id)):
+            if entry is not None and not capture.provider.holds(entry, spec.context.gameweek - 1):
+                # The member directory and the capture are published separately, so a
+                # member can be listed before a capture holds their squad.
+                raise AdviceComputeRefused(
+                    "ENTRY_NOT_IN_CAPTURE",
+                    f"{label} {entry} is not in the capture this backend answers from, so "
+                    "there is no squad to advise from yet.",
+                )
+        try:
+            advice = advise_menu_entry(
+                request,
+                provider=capture.provider,
+                inputs=capture.inputs,
+                projection=capture.projection,
+                rules=capture.rules,
+                horizon_builder=capture.horizon_builder,
+                top100_counts=capture.top100_counts,
+                manager_words=capture.manager_words,
+                prerequisite=lambda address: cached_plain(spec, address),
+            )
+        except ManagersWordNotSolved as error:
+            # One member's outcome, not a fault and not a missing input: the capture has
+            # the club news, and this member's plan under the word and the setting could
+            # not be produced. The same request without the word still answers.
+            raise AdviceComputeRefused("MANAGERS_WORD_NOT_SOLVED", str(error)) from error
         document = {
             "contract_version": LEAGUE_VIEW_CONTRACT_VERSION,
             # The capture's instant, not the clock's. These bytes live at a
@@ -208,21 +333,33 @@ def run_advice_worker(
             if log is not None:
                 log.event("advice_worker_store_recovered")
         elapsed = time.monotonic()
-        if elapsed - recovered_at >= recover_every_seconds:
-            recovered_at = elapsed
-            recovered = queue.recover(clock=lambda: _stamp(now()), lease_seconds=lease_seconds)
-            if recovered and log is not None:
-                log.event("advice_jobs_recovered", count=len(recovered))
-        job = run_advice_worker_once(
-            queue,
-            cache,
-            compute,
-            claim_at_utc=lambda: _stamp(now()),
-            terminal_at_utc=lambda: _stamp(now()),
-            heartbeat_seconds=heartbeat_seconds,
-            metrics=metrics,
-            log=log,
-        )
+        try:
+            if elapsed - recovered_at >= recover_every_seconds:
+                recovered = queue.recover(clock=lambda: _stamp(now()), lease_seconds=lease_seconds)
+                recovered_at = elapsed
+                if recovered and log is not None:
+                    log.event("advice_jobs_recovered", count=len(recovered))
+            job = run_advice_worker_once(
+                queue,
+                cache,
+                compute,
+                claim_at_utc=lambda: _stamp(now()),
+                terminal_at_utc=lambda: _stamp(now()),
+                heartbeat_seconds=heartbeat_seconds,
+                metrics=metrics,
+                log=log,
+            )
+        except QueueLockTimeout:
+            # Contention on the queue's lock is a busy moment, not a reason to stop
+            # being a worker: it used to end the process, and the deployment's only
+            # solver with it. Back off one idle and ask again. A recovery that could not
+            # run is retried on the next round rather than a whole interval later.
+            if metrics is not None:
+                metrics.increment("advice_worker_queue_busy_total")
+            if log is not None:
+                log.event("advice_worker_queue_busy")
+            _wait(sleep, should_stop, idle_seconds, poll_seconds)
+            continue
         if job is not None:
             processed += 1
             if max_jobs is not None and processed >= max_jobs:
@@ -333,7 +470,10 @@ def main(argv: Sequence[str] | None = None, *, backend: AdviceBackend | None = N
             running.queue,
             running.cache,
             build_advice_compute(
-                running.contexts, running.job_specs, max_attempts=arguments.max_attempts
+                running.contexts,
+                running.job_specs,
+                max_attempts=arguments.max_attempts,
+                cache=running.cache,
             ),
             should_stop=flag,
             # The same TTL'd gate the api submits behind, asked again before every round.

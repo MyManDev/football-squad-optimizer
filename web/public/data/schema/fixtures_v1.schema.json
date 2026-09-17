@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "fixtures_v1"
+    },
+    "generated_at_utc": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "payload": {
+      "additionalProperties": false,
+      "properties": {
+        "captured_at_utc": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "current_gameweek": {
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "gameweeks": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "deadline_utc": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "fixtures": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "away": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "short_name": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "team_id": {
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "team_id",
+                        "name",
+                        "short_name"
+                      ],
+                      "type": "object"
+                    },
+                    "away_score": {
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "finished": {
+                      "type": "boolean"
+                    },
+                    "fixture_id": {
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "home": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "name": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "short_name": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "team_id": {
+                          "minimum": 1,
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "team_id",
+                        "name",
+                        "short_name"
+                      ],
+                      "type": "object"
+                    },
+                    "home_score": {
+                      "minimum": 0,
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "kickoff_utc": {
+                      "format": "date-time",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "fixture_id",
+                    "kickoff_utc",
+                    "home",
+                    "away",
+                    "finished",
+                    "home_score",
+                    "away_score"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "gameweek": {
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "gameweek",
+              "deadline_utc",
+              "fixtures"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "season": {
+          "pattern": "^\\d{4}-\\d{2}$",
+          "type": "string"
+        },
+        "source_snapshot_id": {
+          "type": "string"
+        },
+        "unscheduled_count": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "season",
+        "source_snapshot_id",
+        "captured_at_utc",
+        "current_gameweek",
+        "unscheduled_count",
+        "gameweeks"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "contract_version",
+    "generated_at_utc",
+    "payload"
+  ],
+  "title": "fixtures_v1",
+  "type": "object"
+}

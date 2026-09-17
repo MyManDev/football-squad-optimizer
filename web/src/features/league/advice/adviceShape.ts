@@ -106,6 +106,17 @@ const top100: Predicate = (value) =>
     },
   );
 
+const chipChoice: Predicate = (value) =>
+  fields(
+    value,
+    {
+      chip: oneOf("bboost", "3xc", "wildcard", "freehit"),
+      gain_vs_no_chip: finite,
+      basis: text,
+    },
+    { windows_left: record },
+  );
+
 export function isAdvicePayload(value: unknown): boolean {
   return fields(
     value,
@@ -140,6 +151,7 @@ export function isAdvicePayload(value: unknown): boolean {
       control_optimality_gap: nullable(finite),
       evidence,
       top100,
+      chip_choice: chipChoice,
       expected_own_points: nullable(finite),
       captain: nullable(player),
       vice_captain: nullable(player),
