@@ -215,7 +215,9 @@ function LeagueMemberContent({
         <AdviceRequestPanel
           request={request}
           job={job}
-          selectionAvailable={selectionAvailable && !selection.evidence.on}
+          selectionAvailable={
+            selectionAvailable && !selection.evidence.on && selection.top100.weight === 0
+          }
         />
         {adviceLoading ? (
           <EmptyState title={copy.loadingAdvice} />
@@ -242,7 +244,12 @@ function LeagueMemberContent({
                   ? onRetryAdvice
                   : undefined
             }
-            canCompute={selectionAvailable && !selection.evidence.on && canComputeAdvice(request)}
+            canCompute={
+              selectionAvailable &&
+              !selection.evidence.on &&
+              selection.top100.weight === 0 &&
+              canComputeAdvice(request)
+            }
           />
         )}
       </section>

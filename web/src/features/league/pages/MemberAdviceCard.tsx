@@ -4,6 +4,7 @@ import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints, utcShort } from "../../../lib/format";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
+import { TOP100_COPY, top100LimitWeight } from "../advice/top100Copy";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
   AdviceMove,
@@ -133,8 +134,13 @@ export function AdviceCard({
   // The pure-points plan has no price of its own; switched on, the manager's word does,
   // and it is priced against the same pure-points control a rival band is.
   const wordPriced = view.mode === "saf-puan" && view.evidence !== undefined;
-  const showsPrice = (view.mode !== "saf-puan" || wordPriced) && finiteNumber(price) && price >= 0;
+  // A Top 100 weight is priced the same way, in base-model points against the plan at 0;
+  // with the word on as well, the one number is the pair's.
+  const top100Priced = view.mode === "saf-puan" && view.top100 !== undefined;
+  const showsPrice =
+    (view.mode !== "saf-puan" || wordPriced || top100Priced) && finiteNumber(price) && price >= 0;
   const evidenceCopy = EVIDENCE_COPY[language];
+  const top100Copy = TOP100_COPY[language];
   const alternative = view.alternative_plan;
   const alternativePrice = unproven
     ? alternative?.expected_points_cost_ceiling
@@ -179,19 +185,29 @@ export function AdviceCard({
             ? planWeeks > 1
               ? copy.unprovenPlanBodyWindow(points(view.optimality_gap, 1, locale), planWeeks)
               : copy.unprovenPlanBody(points(view.optimality_gap, 1, locale))
-            : copy.unprovenPlanGapUnknown}
+            : top100Priced
+              ? top100Copy.unproven
+              : copy.unprovenPlanGapUnknown}
         </p>
       ) : null}
       {showsPrice && price != null ? (
         <p className={styles.planCost}>
           <strong className="num">
-            {wordPriced
-              ? unproven
-                ? evidenceCopy.costAtMost(points(price, 1, locale))
-                : evidenceCopy.cost(points(price, 1, locale))
-              : unproven
-                ? copy.planCostAtMost(points(price, 1, locale))
-                : copy.planCost(points(price, 1, locale))}
+            {top100Priced
+              ? wordPriced
+                ? unproven
+                  ? top100Copy.combinedCostAtMost(points(price, 1, locale))
+                  : top100Copy.combinedCost(points(price, 1, locale))
+                : unproven
+                  ? top100Copy.costAtMost(points(price, 1, locale))
+                  : top100Copy.cost(points(price, 1, locale))
+              : wordPriced
+                ? unproven
+                  ? evidenceCopy.costAtMost(points(price, 1, locale))
+                  : evidenceCopy.cost(points(price, 1, locale))
+                : unproven
+                  ? copy.planCostAtMost(points(price, 1, locale))
+                  : copy.planCost(points(price, 1, locale))}
           </strong>
           {(rivalName ?? view.rival_label) ? (
             <span> · {copy.planRival(rivalName ?? String(view.rival_label))}</span>
@@ -281,6 +297,7 @@ export function AdviceCard({
       ) : null}
       <RivalPlayers advice={envelope} squad={squad} rivalSquad={rivalSquad} />
       <EvidenceSection view={view} />
+      <Top100Section view={view} />
       <LineupSection view={view} />
       <StatedLimits view={view} />
       <WindowSection view={view} />
@@ -331,7 +348,8 @@ function RivalPlayers({
  * weighed and turned down.
  */
 function StatedLimits({ view }: { view: EntryAdvice }) {
-  const copy = useLanguage().messages.leagueMembers;
+  const { language, messages } = useLanguage();
+  const copy = messages.leagueMembers;
   const limits = view.stated_limits ?? [];
   if (limits.length === 0) return null;
   const weeks = view.plan_weeks?.length ?? 1;
@@ -340,13 +358,18 @@ function StatedLimits({ view }: { view: EntryAdvice }) {
     <section className={styles.lineup} aria-label={label}>
       <h4 className={styles.lineupSub}>{label}</h4>
       <ul className={styles.limits}>
-        {limits.map((sentence) => (
-          <li key={sentence}>
-            {Object.hasOwn(copy.statedLimits, sentence)
-              ? copy.statedLimits[sentence]
-              : copy.statedLimitUnknown}
-          </li>
-        ))}
+        {limits.map((sentence) => {
+          const weight = top100LimitWeight(sentence);
+          return (
+            <li key={sentence}>
+              {weight !== null
+                ? TOP100_COPY[language].limit(weight)
+                : Object.hasOwn(copy.statedLimits, sentence)
+                  ? copy.statedLimits[sentence]
+                  : copy.statedLimitUnknown}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );
@@ -505,6 +528,28 @@ function EvidenceSection({ view }: { view: EntryAdvice }) {
   );
 }
 
+/**
+ * A Top 100 weighted plan: the setting the member chose, whether it moved their plan, and
+ * what it is and is not. Rendered only on a weighted document.
+ */
+function Top100Section({ view }: { view: EntryAdvice }) {
+  const { language } = useLanguage();
+  const copy = TOP100_COPY[language];
+  const top100 = view.top100;
+  if (!top100) return null;
+  return (
+    <section className={styles.adviceSection} data-testid="top100-influence">
+      <h3 className={styles.lineupTitle}>{copy.title}</h3>
+      <p className={styles.muted}>
+        {copy.weightLine(top100.weight)} {top100.changed ? copy.changed : copy.unchanged}
+      </p>
+      <p className={styles.honesty}>{copy.honesty}</p>
+      <p className={styles.muted}>{copy.notStart}</p>
+      <p className={styles.muted}>{copy.saturation}</p>
+    </section>
+  );
+}
+
 function LineupSection({ view }: { view: EntryAdvice }) {
   const { locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
@@ -611,7 +656,9 @@ function AdviceRow({ move, measured }: { move: AdviceMove; measured: boolean }) 
   const reason =
     move.reason_code === "manager_word"
       ? EVIDENCE_COPY[language].moveReason
-      : reasonFor(copy, move.reason_code);
+      : move.reason_code === "top100_preference"
+        ? TOP100_COPY[language].moveReason
+        : reasonFor(copy, move.reason_code);
   return (
     <article className={styles.move}>
       <div className={styles.movePlayers}>

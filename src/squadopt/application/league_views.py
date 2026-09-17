@@ -39,12 +39,15 @@ from squadopt.application.advice import (
     COMPUTED_MODE,
     COMPUTED_WINDOW,
     MEMBER_WINDOWS,
+    TOP100_SOLVE_ERRORS,
     AdviseEntryRequest,
     HorizonBuilder,
     advise_entry,
     advise_with_managers_word,
+    advise_with_top100,
     build_advice_payload,
     solve_member_control,
+    solve_word_control,
 )
 from squadopt.application.advice_record import (
     AdviceRecordConflictError,
@@ -72,6 +75,12 @@ from squadopt.application.mode_selection import (
 )
 from squadopt.application.strategies import STRATEGY_CATALOG
 from squadopt.application.strategies.rule import RIVAL_RULE_STRATEGIES, suggest_strategy
+from squadopt.application.top100_weight import (
+    NO_TOP100_THIS_RUN,
+    TOP100_WEIGHTS,
+    Top100Counts,
+    top100_file,
+)
 from squadopt.data.errors import DataError
 from squadopt.evaluation.promotion import ExperimentError
 from squadopt.live import (
@@ -119,6 +128,9 @@ class MemberRenderTask:
     rival_strategies: tuple[str, ...]
     #: The saf-puan windows beyond one week to solve; empty without a horizon builder.
     windows: tuple[int, ...] = ()
+    #: The Top 100 influence weights to solve beside the one-week plan; empty without the
+    #: week's counts. Zero is the published plan and never listed.
+    top100_weights: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +152,12 @@ class MemberRender:
     #: The one-week plan with the manager's word switched on, or why there is none.
     evidence_payload: dict[str, object] | None = None
     evidence_unavailable: str = ""
+    #: The Top 100 weights that solved, each with and without the manager's word
+    #: (``(weight, word, payload)``), the ones that did not (``(weight, word, reason)``),
+    #: and what the operator should hear about them.
+    top100_payloads: tuple[tuple[int, bool, dict[str, object]], ...] = ()
+    top100_unavailable: tuple[tuple[int, bool, str], ...] = ()
+    top100_notes: tuple[str, ...] = ()
 
 
 def render_member(
@@ -151,9 +169,10 @@ def render_member(
     rules: SeasonRules,
     horizon_builder: HorizonBuilder | None = None,
     manager_words: ManagerWords | None = None,
+    top100_counts: Top100Counts | None = None,
 ) -> MemberRender:
     """Solve one member's control once, then every (rival strategy, rival) from it, and
-    every saf-puan window the task names.
+    every saf-puan window and Top 100 weight the task names.
 
     The baseline is ``advise_entry`` byte for byte; the rival files are ``advise_entry``
     with the same control handed back in, so nothing here can drift from the on-demand
@@ -251,6 +270,51 @@ def render_member(
             )
         except (EntryError, DataError) as error:
             evidence_unavailable = str(error)
+    # The Top 100 menu: each weight's plan from the member's own picks, priced against the
+    # same control, with the manager's word on beside it whenever the word ran.
+    top100_payloads: list[tuple[int, bool, dict[str, object]]] = []
+    top100_unavailable: list[tuple[int, bool, str]] = []
+    top100_notes: list[str] = []
+    if top100_counts is not None:
+        word_control = None
+        if manager_words is not None:
+            try:
+                word_control = solve_word_control(control, manager_words, inputs, projection, rules)
+            except TOP100_SOLVE_ERRORS:
+                # Each weight then solves it again and records the same failure.
+                word_control = None
+        for weight in task.top100_weights:
+            try:
+                weighted = advise_with_top100(
+                    AdviseEntryRequest(
+                        season=task.season,
+                        gameweek=task.gameweek,
+                        league_id=task.league_id,
+                        entry_id=task.entry_id,
+                    ),
+                    weight=weight,
+                    counts=top100_counts,
+                    provider=provider,
+                    inputs=inputs,
+                    projection=projection,
+                    rules=rules,
+                    control=control,
+                    words=manager_words,
+                    word_control=word_control,
+                )
+            except TOP100_SOLVE_ERRORS as error:
+                # The menu is an addition to the member's week: a setting the planner could
+                # not solve or verify is recorded, and the member's other documents stand.
+                top100_unavailable.append((weight, False, str(error)))
+                if manager_words is not None:
+                    top100_unavailable.append((weight, True, str(error)))
+                continue
+            top100_payloads.append((weight, False, weighted.payload))
+            if weighted.word_payload is not None:
+                top100_payloads.append((weight, True, weighted.word_payload))
+            elif manager_words is not None:
+                top100_unavailable.append((weight, True, weighted.word_unavailable))
+            top100_notes.extend(weighted.notes)
     return MemberRender(
         task.entry_id,
         baseline,
@@ -262,6 +326,9 @@ def render_member(
         control.transfer_config.configuration_fingerprint,
         evidence_payload=evidence_payload,
         evidence_unavailable=evidence_unavailable,
+        top100_payloads=tuple(top100_payloads),
+        top100_unavailable=tuple(top100_unavailable),
+        top100_notes=tuple(top100_notes),
     )
 
 
@@ -786,6 +853,8 @@ def build_league_views(
     horizon_builder: HorizonBuilder | None = None,
     advice_record_root: Path | None = None,
     manager_words: ManagerWords | None = None,
+    top100_counts: Top100Counts | None = None,
+    top100_unavailable_reason: str | None = None,
 ) -> LeagueViewsReport:
     """Render every registered member's squad and advice under ``out_dir``.
 
@@ -820,6 +889,13 @@ def build_league_views(
     baseline saf-puan file stays byte-identical either way: it is always the
     deterministic planner's answer, never a scenario-scored re-pick. A member whose
     menu or selection fails keeps their baseline advice, with the reason recorded.
+
+    ``top100_counts`` turns on the Top 100 influence menu: for every weight above zero,
+    ``advice/{id}/saf-puan/1/top100-{w}.json``, and ``top100-{w}-hoca-sozu.json`` beside it
+    when the manager's word ran. The index's ``top100`` block names the files and the
+    source, or says why there are none (``top100_unavailable_reason``, or
+    ``no_top100_this_run``). A weighted file an earlier publish wrote and this one did not
+    is removed. ``saf-puan/1.json`` and ``hoca-sozu.json`` are the same bytes either way.
 
     ``advice_record_root`` turns on the immutable per-member, per-gameweek, per-capture
     advice record (``application/advice_record.py``). The published tree has no gameweek in
@@ -974,6 +1050,11 @@ def build_league_views(
             default_rival_id=_default_rival(int(registration.entry_id)) if rival_menu else None,
             rival_strategies=strategies if rival_menu else (),
             windows=windows,
+            top100_weights=(
+                tuple(weight for weight in TOP100_WEIGHTS if weight)
+                if top100_counts is not None
+                else ()
+            ),
         )
         for registration in registrations
     ]
@@ -988,6 +1069,7 @@ def build_league_views(
                 rules=rules,
                 horizon_builder=horizon_builder,
                 manager_words=manager_words,
+                top100_counts=top100_counts,
             ),
             tasks,
         )
@@ -1128,6 +1210,51 @@ def build_league_views(
                 if stale.parent.is_dir() and not any(stale.parent.iterdir()):
                     stale.parent.rmdir()
 
+        # The Top 100 menu, beside the manager's word in the one-week directory. The
+        # index names every file this run wrote and why a weight has none; a weighted
+        # file an earlier publish wrote and this one did not is removed.
+        top100_directory = f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}"
+        paths: dict[str, str] = {}
+        word_paths: dict[str, str] = {}
+        for weight, word, payload in render.top100_payloads:
+            relative = (
+                f"{top100_directory}/"
+                f"{top100_file(weight, word_file=MANAGERS_WORD_FILE if word else None)}"
+            )
+            _write(relative, payload)
+            (word_paths if word else paths)[str(weight)] = relative
+        kept_top100 = {*paths.values(), *word_paths.values()}
+        stale_directory = out / top100_directory
+        if stale_directory.is_dir():
+            for stale_file in sorted(stale_directory.glob("top100-*.json")):
+                relative = f"{top100_directory}/{stale_file.name}"
+                if relative not in kept_top100:
+                    stale_file.unlink()
+                    stale_removed.append(relative)
+            if not any(stale_directory.iterdir()):
+                stale_directory.rmdir()
+        top100_index: dict[str, object]
+        if top100_counts is None:
+            top100_index = {
+                "available": False,
+                "reason": top100_unavailable_reason or NO_TOP100_THIS_RUN,
+            }
+        elif not paths:
+            top100_index = {"available": False, "reason": "not_solved_for_member"}
+        else:
+            top100_index = {
+                "available": True,
+                "published_weight": 0,
+                "weights": list(TOP100_WEIGHTS),
+                "paths": paths,
+                "word_paths": word_paths,
+                "unavailable": [
+                    {"weight": weight, "word": word, "reason": "not_solved_for_member"}
+                    for weight, word, _reason in render.top100_unavailable
+                ],
+                "source": top100_counts.source_record(),
+            }
+
         # The rival menu: one file per (strategy, rival), the standings neighbour's copy
         # at the strategy's plain path, and an index that says what exists and why not.
         computed: list[dict[str, object]] = []
@@ -1184,6 +1311,7 @@ def build_league_views(
                     "entry_id": entry_id,
                     "window": COMPUTED_WINDOW,
                     "evidence": evidence_index,
+                    "top100": top100_index,
                     # Per strategy, the windows whose file exists: saf-puan's solved
                     # windows, every rival strategy at one week.
                     "windows": {
@@ -1304,8 +1432,20 @@ def build_league_views(
             if render.evidence_unavailable
             else ""
         )
+        top100_note = "; ".join(
+            (
+                *(
+                    f"Top 100 influence {weight}{' with the word' if word else ''} "
+                    f"not solved: {reason}"
+                    for weight, word, reason in render.top100_unavailable
+                ),
+                *render.top100_notes,
+            )
+        )
         note = "; ".join(
-            part for part in (*name_notes.get(entry_id, ()), mode_note, word_note) if part
+            part
+            for part in (*name_notes.get(entry_id, ()), mode_note, word_note, top100_note)
+            if part
         )
         results.append(MemberViewResult(entry_id, labels[entry_id], True, reason=note))
         member_rows.append(member_row)

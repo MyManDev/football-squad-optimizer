@@ -546,6 +546,14 @@ class WeeklyOperations:
                 Path(str(self.values["rotation"]["table"])) if "rotation" in self.values else None
             ),
             club_news_source=self._rotation_source() if "rotation" in self.values else None,
+            # The Top 100 menu rides on the evidence stage. The loader's own gate refuses a
+            # handoff that already carries the uplift (``--projection component``), and the
+            # index then says so; the published plans do not depend on the menu.
+            top100_evidence=(
+                Path(str(self.values["top100_evidence"]["table"]))
+                if "top100_evidence" in self.values
+                else None
+            ),
         )
         with league_mapper(request, self.request.workers) as mapper:
             result = publish_league(request, mapper=mapper)
@@ -564,6 +572,8 @@ class WeeklyOperations:
                     if member.reason
                 },
                 "removed": list(result.report.removed),
+                # Empty when the Top 100 menu was offered or never asked for.
+                "top100_note": result.top100_note,
             },
         )
 
@@ -771,13 +781,18 @@ class WeeklyOperations:
                 )
             self._seed_preview()
             common = [selected, held_handoff, p.registry, self._published_tree()]
+            top100_inputs = (
+                [Path(self.values["top100_evidence"][key]) for key in ("table", "manifest")]
+                if "top100_evidence" in self.values
+                else []
+            )
             # The history documents read every record of the season; the record this run
             # writes for its own capture is the stage's output, so a week whose records
             # moved between runs is visible as changed inputs rather than as changed bytes.
             self.values["league"] = dict(
                 self._stage(
                     "league",
-                    inputs=[*common, p.archive, *self.record_inputs],
+                    inputs=[*common, p.archive, *self.record_inputs, *top100_inputs],
                     operation=self._league,
                 ).value
             )

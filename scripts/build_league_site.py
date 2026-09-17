@@ -159,6 +159,14 @@ def main() -> int:
         help="what the evidence was coded from: the committed fixture file (example data, "
         "labelled as such) or a club-news capture directory under the snapshot root",
     )
+    parser.add_argument(
+        "--top100-evidence",
+        type=Path,
+        help="this week's Top 100 evidence export (player_evidence_v1 csv, its manifest "
+        "beside it); every member then gets the Top 100 influence menu, priced against "
+        "their own pure-points plan. Refused, with the reason in the index, when the "
+        "handoff already carries the uplift or the export fails the handoff's own gate",
+    )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
     arguments = parser.parse_args()
     if arguments.workers < 1:
@@ -182,6 +190,7 @@ def main() -> int:
             rival_menu=not arguments.no_rival_menu,
             rotation_evidence=arguments.rotation_evidence,
             club_news_source=arguments.club_news_source,
+            top100_evidence=arguments.top100_evidence,
         )
         prepared = prepare_league_publication(request)
         _capture_note(prepared)
@@ -207,6 +216,8 @@ def main() -> int:
         # would serve a finished gameweek's advice under this week's league.
         for path in report.removed:
             print(f"  removed       {path}  (not produced by this run)")
+        if result.top100_note:
+            print(f"  top100        {result.top100_note}")
         menu_files = sum(1 for name in report.files if "/vs-" in name)
         window_files = sum(1 for name in report.files if name.endswith(("/3.json", "/5.json")))
         print(
