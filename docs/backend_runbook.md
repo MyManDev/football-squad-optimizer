@@ -208,6 +208,10 @@ curl -fsS -X POST localhost:8000/api/v1/leagues/352490/entries/101/advice -H 'Co
 Poll `GET /api/v1/advice-jobs/{job_id}` until it is `completed`, then repeat the POST: the same
 request now returns the stored document instead of starting a second solve.
 
+On Windows the same run, with N workers, a pid file, logs and a `-Stop`, is
+`scripts\run_backend_local.ps1`; [backend_free_hosting.md](backend_free_hosting.md) covers it,
+the Cloudflare Tunnel that makes it reachable, and what it measured.
+
 Captures and the entry payloads inside them are local and personal; `data/snapshots/` and
 `data/entries/` are gitignored and stay that way.
 

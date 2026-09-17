@@ -1,0 +1,36 @@
+# A locally managed Cloudflare Tunnel for the advice api. Copy to
+# %USERPROFILE%\.cloudflared\config.yml (outside Git), replace the two placeholders, and
+# follow docs/backend_free_hosting.md, "The tunnel". Nothing in this file is a secret; the
+# credentials file it names is, and it never belongs in the repository.
+#
+# Validate before running:
+#   cloudflared tunnel ingress validate
+#   cloudflared tunnel ingress rule https://squadopt-api.mymandev.com/metrics
+#   cloudflared tunnel ingress rule https://squadopt-api.mymandev.com/ready
+
+# The hostname is one label under the zone on purpose. Universal SSL on the Free plan
+# covers mymandev.com and *.mymandev.com only, so api.squadopt.mymandev.com would be
+# served without a valid certificate.
+
+tunnel: <TUNNEL-UUID>
+credentials-file: C:\Users\<YOU>\.cloudflared\<TUNNEL-UUID>.json
+
+# Rules are tried from the top and the first match wins. `path` is a Go regular expression
+# matched against the request path.
+ingress:
+  # /metrics never leaves the machine. Every scrape lists the whole job store under the
+  # queue lock, so a stranger polling it would slow every member's request down, and the
+  # counters are nobody's business. scripts\run_backend_local.ps1 -Status reads it locally.
+  # FastAPI's generated pages ride along: no member's browser calls them.
+  - hostname: squadopt-api.mymandev.com
+    path: ^/(metrics|docs|redoc|openapi\.json)
+    service: http_status:404
+
+  # The api, and only the api. 127.0.0.1 rather than localhost: uvicorn listens on IPv4
+  # loopback and trusts forwarded headers from 127.0.0.1 only, and `localhost` may resolve
+  # to ::1 first. The port is the script's -Port. A worker's metrics port is never listed.
+  - hostname: squadopt-api.mymandev.com
+    service: http://127.0.0.1:8000
+
+  # Required by cloudflared: a final rule with no hostname and no path.
+  - service: http_status:404
