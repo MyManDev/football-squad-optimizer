@@ -1862,7 +1862,10 @@ def test_the_managers_word_is_published_beside_the_baseline_or_named_absent(
         (tmp_path / "without" / "advice" / "101" / "index.json").read_text(encoding="utf-8")
     )["payload"]
     assert index["evidence"] == {"available": False, "reason": "no_evidence_this_run"}
-    assert not (tmp_path / "without" / "advice" / "101" / "saf-puan" / "1").exists()
+    # The one-week directory holds the chips the member may choose, and nothing of the word.
+    assert not (
+        tmp_path / "without" / "advice" / "101" / "saf-puan" / "1" / "hoca-sozu.json"
+    ).exists()
 
     # The operational case: the next publish runs without evidence into the tree the
     # previous one wrote. The switched-on document goes, and the report says so.

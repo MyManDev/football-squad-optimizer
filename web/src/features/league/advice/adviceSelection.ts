@@ -10,6 +10,8 @@ import {
   type MemberStrategy,
 } from "../types";
 import type { AdviceRequest } from "./adviceClient";
+import { CHIP_NAMES } from "../chipShape";
+import { chipPath, parseChip, type MemberChip } from "./chipChoice";
 import {
   TOP100_WEIGHTS,
   parseTop100,
@@ -138,6 +140,24 @@ export interface PublishedAdviceSelection {
     notOffered: boolean;
     reason: string | null;
   };
+  /**
+   * A chip the member chooses to play: whether this publish solved any chip for the member
+   * (`available`), the chips the producer says they still hold (`held`), the chips whose
+   * file the index names at the one path it may name (`options`), the chip the page is
+   * showing (`chip`, null unless the selection is the plain one-week plan: manager's word
+   * off, Top 100 influence at 0), whether the link asked for a chip this member cannot be
+   * shown (`notOffered`), the producer's reason when there is none at all, and its reason
+   * for each chip it did not solve (`reasons`).
+   */
+  chip: {
+    available: boolean;
+    held: MemberChip[];
+    options: MemberChip[];
+    chip: MemberChip | null;
+    notOffered: boolean;
+    reason: string | null;
+    reasons: Partial<Record<MemberChip, string>>;
+  };
 }
 
 /** The URL parameter that switches the manager's word on: `llm=on`. */
@@ -158,6 +178,46 @@ const TOP100_OFF = {
   notOffered: false,
   reason: null,
 } as const satisfies PublishedAdviceSelection["top100"];
+
+const CHIP_OFF = {
+  available: false,
+  held: [],
+  options: [],
+  chip: null,
+  notOffered: false,
+  reason: null,
+  reasons: {},
+} as const satisfies PublishedAdviceSelection["chip"];
+
+/**
+ * What the index says about the member's chips. A chip is an option only when the index
+ * names its file at the one path a chip document may live at; a path anywhere else is
+ * not a file this page reads.
+ */
+function chipMenu(
+  index: EntryAdviceIndex,
+  entryId: number,
+): Pick<PublishedAdviceSelection["chip"], "available" | "held" | "options" | "reason" | "reasons"> {
+  const menu = index.chips;
+  if (!menu || typeof menu !== "object") return { ...CHIP_OFF, held: [], options: [] };
+  const paths = menu.available === true ? menu.paths : null;
+  const options = CHIP_NAMES.filter(
+    (chip) => !!paths && typeof paths === "object" && paths[chip] === chipPath(entryId, chip),
+  );
+  const held = CHIP_NAMES.filter((chip) => Array.isArray(menu.held) && menu.held.includes(chip));
+  const reasons: Partial<Record<MemberChip, string>> = {};
+  for (const row of Array.isArray(menu.unavailable) ? menu.unavailable : []) {
+    const chip = CHIP_NAMES.find((name) => name === row?.chip);
+    if (chip && typeof row.reason === "string") reasons[chip] = row.reason;
+  }
+  return {
+    available: options.length > 0,
+    held,
+    options,
+    reason: menu.available === false && typeof menu.reason === "string" ? menu.reason : null,
+    reasons,
+  };
+}
 
 /**
  * The weights whose file the index names at the one path it may name, for this member,
@@ -237,6 +297,7 @@ export function resolvePublishedAdvice(
     rivals: [],
     evidence: { ...EVIDENCE_OFF },
     top100: { ...TOP100_OFF, weights: [0], offered: [0] },
+    chip: { ...CHIP_OFF, held: [], options: [], reasons: {} },
   };
   if (!index) return result;
   if (
@@ -289,6 +350,14 @@ export function resolvePublishedAdvice(
     available: top100Index?.available === true && top100Weights(index, entryId, false).length > 1,
     notOffered: !top100Asked.offered,
     reason: top100Index && top100Index.available === false ? top100Index.reason : null,
+  };
+  const chipAsked = parseChip(searchParams);
+  const chips = chipMenu(index, entryId);
+  result.chip = {
+    ...chips,
+    chip: null,
+    notOffered:
+      !chipAsked.known || (chipAsked.chip !== null && !chips.options.includes(chipAsked.chip)),
   };
   result.strategies = [...new Set(index.strategies.filter(isMemberStrategy))];
   result.windows = availableWindows(index, request.strategy);
@@ -357,12 +426,28 @@ export function resolvePublishedAdvice(
       switched,
       top100Asked.weight,
     );
+    // A chosen chip is the plain one-week plan with that chip forced, and combines with
+    // nothing: with the word on or a setting above 0 the chip is left out and the
+    // controls say so.
+    const chip =
+      window === 1 &&
+      !switched &&
+      top100.weight === 0 &&
+      chipAsked.chip !== null &&
+      result.chip.options.includes(chipAsked.chip)
+        ? chipAsked.chip
+        : null;
     return {
       ...result,
       status: "ready",
-      path: weightedPath ?? (switched ? evidencePath : `advice/${entryId}/saf-puan/${window}.json`),
+      path:
+        chip !== null
+          ? chipPath(entryId, chip)
+          : (weightedPath ??
+            (switched ? evidencePath : `advice/${entryId}/saf-puan/${window}.json`)),
       evidence: { ...result.evidence, on: switched },
       top100,
+      chip: { ...result.chip, chip },
     };
   }
   const rival = result.rivals.find((row) => row.entryId === request.rivalEntryId);

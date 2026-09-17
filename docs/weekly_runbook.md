@@ -86,6 +86,22 @@ every rival is the on-demand path's work. A hand publish passes the export with
 which departs from `docs/phase_c_operational_elite_policy.md`'s default; that is the
 owner's call before `--decide` is passed, and the policy's rule itself is unchanged.
 
+**The chips a member may choose need no flag and no extra input.** The planner still decides
+no chip for anyone (a finite window counts nothing for holding one back). The league stage
+reads each member's own chip history from the capture and, for every chip they can still
+play this gameweek, solves their one-week pure-points plan with that chip forced:
+`advice/<id>/saf-puan/1/chip-<wildcard|freehit|bboost|3xc>.json`. The index's `chips` block
+names the files, the chips the member holds, and why any chip has none (`already_played`,
+`window_not_open`, `free_hit_played_last_gameweek`, `not_solved_for_member`), or says why
+there are none at all (`no_chip_left`, `chip_history_unknown`). Each document states what
+the chip week is expected to score above the member's own plan without it, this gameweek
+only, beside the sentence saying a later gameweek's value is not measured; it combines with
+neither the manager's word nor a Top 100 setting, and it is not in the advice record. A
+Wildcard or Free Hit solve is a whole-squad problem: on the GW5 capture one took 25 to 42
+seconds with three members solved side by side on a machine already running a league
+build, so budget about a minute and a half per member. A chip file an earlier publish wrote
+and this one did not is removed and printed with the other removals.
+
 An optional second live capture in the final 24 hours before the deadline can be
 compared with the earlier capture using `squadopt.platform.capture_measurement`
 ([commands and interpretation](operations/capture_measurement.md)). This offline

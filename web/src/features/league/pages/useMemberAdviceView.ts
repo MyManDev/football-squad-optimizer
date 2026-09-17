@@ -45,6 +45,7 @@ export function useMemberAdviceView(
     selection.status,
     selection.path,
     selection.top100.weight,
+    selection.chip.chip ?? "",
   ].join(":");
 
   // A new selection starts clean: an earlier request's answer, wait or failure must not
@@ -64,7 +65,8 @@ export function useMemberAdviceView(
   // switched-on plan, finished or while waiting.
   // The same holds for a Top 100 weight: the computed plan is the plain one.
   const evidenceOn = selection.evidence.on;
-  const plainOnly = !evidenceOn && selection.top100.weight === 0;
+  // Nor for a chip the member chose: the computed plan plays none.
+  const plainOnly = !evidenceOn && selection.top100.weight === 0 && selection.chip.chip === null;
   const computed = plainOnly && current?.phase === "done" ? current : null;
   const waiting = plainOnly && current?.phase === "waiting" ? current : null;
   let published: LeagueViewEnvelope<EntryAdvice> | null = null;
@@ -81,6 +83,15 @@ export function useMemberAdviceView(
       // A weighted document names its weight, and the plain one names none.
       if ((checked.payload.top100?.weight ?? 0) !== selection.top100.weight) {
         throw new Error("The advice document does not match the Top 100 setting.");
+      }
+      // A chip document names the chip the member chose, twice: as the choice and as the
+      // chip the plan plays. The plain one names none.
+      const chosen = selection.chip.chip;
+      if (
+        (checked.payload.chip_choice?.chip ?? null) !== chosen ||
+        (chosen !== null && checked.payload.chip !== chosen)
+      ) {
+        throw new Error("The advice document does not match the chosen chip.");
       }
       const snapshot = checked.payload.source_snapshot_id;
       rejectedContext =

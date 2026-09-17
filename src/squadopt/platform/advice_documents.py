@@ -150,6 +150,45 @@ def advice_read_schema() -> dict[str, Any]:
                 },
                 "required": ["weight", "changed", "price_basis"],
             },
+            # A chip the member chose to play: the chip, the chip week's expected points
+            # above the member's own no-chip plan net of hits, and the chip's windows as
+            # the member stands before this gameweek. One gameweek's difference, never a
+            # reading of when the chip is best played.
+            "chip_choice": {
+                "type": "object",
+                "properties": {
+                    "chip": {"enum": ["bboost", "3xc", "wildcard", "freehit"]},
+                    "gain_vs_no_chip": {"type": "number"},
+                    "basis": {"const": "one_week_expected_points_v1"},
+                    "windows_left": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "anyOf": [
+                                {"type": "null"},
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "state": {
+                                            "enum": [
+                                                "used",
+                                                "expired",
+                                                "not_yet",
+                                                "available",
+                                                "unknown",
+                                            ]
+                                        },
+                                        "gameweek": {"type": ["integer", "null"]},
+                                        "start_event": {"type": "integer", "minimum": 1},
+                                        "stop_event": {"type": "integer", "minimum": 1},
+                                    },
+                                    "required": ["state", "start_event", "stop_event"],
+                                },
+                            ]
+                        },
+                    },
+                },
+                "required": ["chip", "gain_vs_no_chip", "basis"],
+            },
             "expected_own_points": nullable_number,
             # Null where the comparison against holding could not be walked, which is
             # not the same fact as a plan that gains nothing.

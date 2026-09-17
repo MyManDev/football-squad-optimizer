@@ -683,6 +683,60 @@ export function mockEntryAdviceTop100Envelope(
   };
 }
 
+/** The sentence every chip document states, in the producer's own words. */
+export const CHIP_CHOICE_STATED_LIMIT =
+  "The chip is in this plan because the member chose it; the planner did not weigh it. The gain stated is this gameweek's only: what the chip would be worth in a later gameweek is not measured, so this is not advice to play it now.";
+
+/** What a Free Hit document states besides. */
+export const FREE_HIT_STATED_LIMIT =
+  "A Free Hit squad is held for this gameweek only; the squad held before it returns at the next deadline.";
+
+/**
+ * The example publish's plan with a chip the member chose: the published plan's decision
+ * with the chip played, the lineup total on the basis that chip week scores on, and the
+ * gain against the plan without it. The no-chip sentence would be false here and is gone.
+ */
+export function mockEntryAdviceChipEnvelope(
+  entryId: number,
+  chip: "wildcard" | "freehit" | "bboost" | "3xc",
+): LeagueViewEnvelope<EntryAdvice> {
+  const base = mockEntryAdviceEnvelope(entryId, "saf-puan", 1, null);
+  const own = base.payload.expected_own_points ?? 0;
+  const gain =
+    chip === "3xc"
+      ? (base.payload.captain?.expected_points ?? 0)
+      : chip === "bboost"
+        ? (base.payload.bench ?? []).reduce((sum, p) => sum + (p.expected_points ?? 0), 0)
+        : 0;
+  return {
+    ...base,
+    payload: {
+      ...base.payload,
+      chip,
+      expected_own_points: Number((own + gain).toFixed(2)),
+      solver_status: "OPTIMAL",
+      control_solver_status: "OPTIMAL",
+      control_optimality_gap: 0,
+      stated_limits: [
+        ...(base.payload.stated_limits ?? []).filter(
+          (sentence) => sentence !== NO_CHIP_STATED_LIMIT,
+        ),
+        CHIP_CHOICE_STATED_LIMIT,
+        ...(chip === "freehit" ? [FREE_HIT_STATED_LIMIT] : []),
+      ],
+      chip_choice: {
+        chip,
+        gain_vs_no_chip: Number(gain.toFixed(2)),
+        basis: "one_week_expected_points_v1",
+        windows_left: {
+          first_half: { state: "available", gameweek: null, start_event: 1, stop_event: 19 },
+          second_half: { state: "not_yet", gameweek: null, start_event: 20, stop_event: 38 },
+        },
+      },
+    },
+  };
+}
+
 function rivalFields(
   entryId: number,
   mode: AdviceStrategy,
