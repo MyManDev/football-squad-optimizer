@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import { AS_A_CHANCE } from "../testSupport/honesty";
 import { CHIP_COPY } from "../features/league/advice/chipCopy";
+import { COMPUTE_COPY } from "../features/league/advice/computeCopy";
 import { EVIDENCE_COPY } from "../features/league/advice/evidenceCopy";
 import { TOP100_COPY } from "../features/league/advice/top100Copy";
 import { FIXTURES_COPY } from "../features/fixtures/fixturesCopy";
@@ -80,6 +81,7 @@ for (const language of LANGUAGES) {
   collect(EVIDENCE_COPY[language], `${language}.evidenceCopy`, catalogue);
   collect(TOP100_COPY[language], `${language}.top100Copy`, catalogue);
   collect(CHIP_COPY[language], `${language}.chipCopy`, catalogue);
+  collect(COMPUTE_COPY[language], `${language}.computeCopy`, catalogue);
   collect(FIXTURES_COPY[language], `${language}.fixturesCopy`, catalogue);
 }
 

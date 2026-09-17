@@ -28,6 +28,12 @@
  * off, and while either of those is on the chips are; every note says which, and "none"
  * (like 0 and the unchecked word) is always one click away.
  *
+ * With a compute service answering (`capabilities`), an option the publish did not solve
+ * is still offered wherever the service computes it: any window the service lists, any
+ * other member as the rival, any Top 100 setting and the manager's word when the current
+ * capture has their inputs. The published file is shown where there is one and the compute
+ * panel takes over where there is none. Without capabilities nothing here changes.
+ *
  * Selection lives in the URL (`mode`, `rival`, `window`, `llm`, `top100`, `chip`), the same
  * parameters the templates set and the compute panel reads, so the whole state stays shareable.
  */
@@ -40,9 +46,11 @@ import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../moves/modePrices";
 import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
 import { CHIP_NAMES } from "../chipShape";
+import type { AdviceCapabilities } from "./adviceCapabilities";
 import { EVIDENCE_PARAMETER, resolvePublishedAdvice } from "./adviceSelection";
 import { CHIP_PARAMETER } from "./chipChoice";
 import { CHIP_COPY, chipReason, chipsUnavailable } from "./chipCopy";
+import { COMPUTE_COPY } from "./computeCopy";
 import { EVIDENCE_COPY, evidenceUnavailable } from "./evidenceCopy";
 import { TOP100_PARAMETER, TOP100_WEIGHTS } from "./top100";
 import { TOP100_COPY, top100Unavailable } from "./top100Copy";
@@ -57,40 +65,72 @@ export function MemberDecisionControls({
   entryId,
   members,
   index,
+  capabilities = null,
 }: {
   entryId: number;
   members: EntryView[];
   index: EntryAdviceIndex | null;
+  capabilities?: AdviceCapabilities | null;
 }) {
   const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const [searchParams, setSearchParams] = useSearchParams();
-  const selection = resolvePublishedAdvice(
-    searchParams,
-    index?.league_id ?? 0,
-    entryId,
-    members,
-    index,
-  );
+  const resolve = (params: URLSearchParams) =>
+    resolvePublishedAdvice(
+      params,
+      index?.league_id ?? 0,
+      entryId,
+      members,
+      index,
+      undefined,
+      capabilities,
+    );
+  const selection = resolve(searchParams);
+  // What the service adds to the published menu; nothing at all on a static build.
+  const computable = selection.computable;
+  const computeCopy = COMPUTE_COPY[language];
   const { strategy, window: windowSize, rivalEntryId: chosenRival } = selection.request;
   const candidates = members.filter(
     (member) => member.member_kind === "human" && member.entry_id !== entryId,
   );
-  const rivalIds = selection.rivals.map((rival) => rival.entryId);
+  const rivalIds = [
+    ...new Set([...selection.rivals.map((rival) => rival.entryId), ...(computable?.rivals ?? [])]),
+  ];
   const defaultRival = index?.default_rival_entry_id ?? null;
-  const windows = selection.windows;
+  const windows = [...new Set([...selection.windows, ...(computable?.windows ?? [])])];
+  const strategies = [...new Set([...selection.strategies, ...(computable?.strategies ?? [])])];
+  // A rival can be chosen where its file was published or, for a window the service
+  // computes, against any member it lists.
+  const rivalSelectable = (rivalId: number) =>
+    !!selection.rivals.find((rival) => rival.entryId === rivalId)?.path ||
+    (!!computable &&
+      computable.windows.includes(windowSize) &&
+      computable.rivals.includes(rivalId) &&
+      // A pair the producer declared impossible stays off: the service solves the same band.
+      !selection.rivals.find((rival) => rival.entryId === rivalId)?.reason);
 
   function strategySelection(slug: string) {
     const next = new URLSearchParams(searchParams);
     next.set("mode", slug);
-    const offered = resolvePublishedAdvice(next, index?.league_id ?? 0, entryId, members, index);
-    if (!offered.windows.includes(offered.request.window) && offered.windows[0]) {
-      next.set("window", String(offered.windows[0]));
+    const offered = resolve(next);
+    const offeredWindows = [...offered.windows, ...(offered.computable?.windows ?? [])];
+    if (!offeredWindows.includes(offered.request.window) && offeredWindows[0]) {
+      next.set("window", String(offeredWindows[0]));
     }
-    return {
-      next,
-      offered: resolvePublishedAdvice(next, index?.league_id ?? 0, entryId, members, index),
-    };
+    return { next, offered: resolve(next) };
+  }
+
+  /** A strategy is offered where the publish solved it or the service computes it. */
+  function strategyOffered(slug: string): boolean {
+    const { offered } = strategySelection(slug);
+    const publishedHere =
+      offered.windows.length > 0 &&
+      (!strategyNeedsRival(slug) || offered.rivals.some((rival) => rival.path));
+    const computedHere =
+      !!offered.computable &&
+      offered.computable.windows.length > 0 &&
+      (!strategyNeedsRival(slug) || offered.computable.rivals.length > 0);
+    return publishedHere || computedHere;
   }
 
   function update(changes: Record<string, string | null>): void {
@@ -111,6 +151,8 @@ export function MemberDecisionControls({
   // The word is solved for the one-week pure-points plan only.
   const evidenceApplies =
     selection.evidence.available && strategy === "saf-puan" && windowSize === 1;
+  // The service applies it to the same plan, from the capture's own club news.
+  const evidenceComputable = computable?.word === true;
   const evidenceCopy = EVIDENCE_COPY[language];
   // Only a read of registered club pages is real; anything else is example data.
   const evidenceIsReal = selection.evidence.sourceKind === "club_news_capture";
@@ -123,6 +165,10 @@ export function MemberDecisionControls({
   // A setting exists wherever the producer solved one: every pure-points window, and a
   // strategy's windows against the default rival.
   const top100Applies = top100.available && top100.offered.length > 1;
+  const top100Computable = (computable?.top100Weights.length ?? 0) > 1;
+  const weightSelectable = (weight: number) =>
+    (top100Applies && top100.weights.some((offered) => offered === weight)) ||
+    (top100Computable && computable!.top100Weights.some((offered) => offered === weight));
   // A chip the member chose is the plain one-week plan with that chip forced. It combines
   // with nothing, so the word and the settings above 0 are off while one is chosen, and
   // the chips are off while either of those is on.
@@ -151,15 +197,17 @@ export function MemberDecisionControls({
   );
   const top100Note = chipChosen
     ? chipCopy.switchesOff
-    : !top100.available
-      ? top100Unavailable(top100Copy, top100.reason)
-      : !top100Applies
-        ? top100Copy.notForSelection
-        : top100.notOffered
-          ? top100Copy.notOffered
-          : top100.weights.length < TOP100_WEIGHTS.length
-            ? top100Copy.notSolved
-            : top100Copy.published;
+    : top100Computable && TOP100_WEIGHTS.some((weight) => !top100.weights.includes(weight))
+      ? computeCopy.top100Computable
+      : !top100.available
+        ? top100Unavailable(top100Copy, top100.reason)
+        : !top100Applies
+          ? top100Copy.notForSelection
+          : top100.notOffered
+            ? top100Copy.notOffered
+            : top100.weights.length < TOP100_WEIGHTS.length
+              ? top100Copy.notSolved
+              : top100Copy.published;
 
   return (
     <Card
@@ -171,7 +219,7 @@ export function MemberDecisionControls({
         <fieldset className={styles.fieldset}>
           <legend>{copy.strategyLegend}</legend>
           <div className={styles.options}>
-            {selection.strategies.map((slug) => (
+            {strategies.map((slug) => (
               <label className={styles.option} key={slug}>
                 <input
                   type="radio"
@@ -181,11 +229,7 @@ export function MemberDecisionControls({
                     strategy === slug &&
                     (!searchParams.has("mode") || searchParams.get("mode") === slug)
                   }
-                  disabled={
-                    strategySelection(slug).offered.windows.length === 0 ||
-                    (strategyNeedsRival(slug) &&
-                      !strategySelection(slug).offered.rivals.some((rival) => rival.path))
-                  }
+                  disabled={!strategyOffered(slug)}
                   onChange={() => setSearchParams(strategySelection(slug).next)}
                 />
                 <span className={styles.body}>
@@ -234,16 +278,10 @@ export function MemberDecisionControls({
                     </option>
                   ) : null}
                   {rivalIds.map((rivalId) => (
-                    <option
-                      key={rivalId}
-                      value={rivalId}
-                      disabled={!selection.rivals.find((rival) => rival.entryId === rivalId)?.path}
-                    >
+                    <option key={rivalId} value={rivalId} disabled={!rivalSelectable(rivalId)}>
                       {nameOf(rivalId)}
                       {rivalId === defaultRival ? ` ${copy.rivalDefaultSuffix}` : ""}
-                      {selection.rivals.find((rival) => rival.entryId === rivalId)?.path
-                        ? ""
-                        : ` ${copy.rivalUnavailableSuffix}`}
+                      {rivalSelectable(rivalId) ? "" : ` ${copy.rivalUnavailableSuffix}`}
                     </option>
                   ))}
                 </select>
@@ -254,6 +292,9 @@ export function MemberDecisionControls({
             ) : null}
             <p className={styles.note}>{copy.rivalNote}</p>
             {windows.length > 1 ? <p className={styles.note}>{top100Copy.rivalWindows}</p> : null}
+            {(computable?.rivals.length ?? 0) > 0 ? (
+              <p className={styles.note}>{computeCopy.rivalComputable}</p>
+            ) : null}
           </fieldset>
         ) : null}
 
@@ -286,7 +327,7 @@ export function MemberDecisionControls({
               type="checkbox"
               name={EVIDENCE_PARAMETER}
               checked={selection.evidence.on}
-              disabled={!evidenceApplies || chipChosen}
+              disabled={(!evidenceApplies && !evidenceComputable) || chipChosen}
               onChange={(event) =>
                 update({ [EVIDENCE_PARAMETER]: event.target.checked ? "on" : null })
               }
@@ -299,13 +340,15 @@ export function MemberDecisionControls({
           <p className={styles.note}>
             {chipChosen
               ? chipCopy.switchesOff
-              : !selection.evidence.available
-                ? evidenceUnavailable(evidenceCopy, selection.evidence.reason)
-                : !evidenceApplies
-                  ? evidenceCopy.onlyBaseline
-                  : evidenceIsReal
-                    ? evidenceCopy.sourceCapture
-                    : evidenceCopy.sourceExample}
+              : !selection.evidence.available && evidenceComputable
+                ? computeCopy.wordComputable
+                : !selection.evidence.available
+                  ? evidenceUnavailable(evidenceCopy, selection.evidence.reason)
+                  : !evidenceApplies
+                    ? evidenceCopy.onlyBaseline
+                    : evidenceIsReal
+                      ? evidenceCopy.sourceCapture
+                      : evidenceCopy.sourceExample}
           </p>
         </fieldset>
 
@@ -319,11 +362,7 @@ export function MemberDecisionControls({
                   name={TOP100_PARAMETER}
                   value={weight}
                   checked={top100.weight === weight}
-                  disabled={
-                    !top100Applies ||
-                    !top100.weights.includes(weight) ||
-                    (chipChosen && weight !== 0)
-                  }
+                  disabled={!weightSelectable(weight) || (chipChosen && weight !== 0)}
                   onChange={() =>
                     update({ [TOP100_PARAMETER]: weight === 0 ? null : String(weight) })
                   }
@@ -340,7 +379,9 @@ export function MemberDecisionControls({
             ))}
           </div>
           <p className={styles.note}>{top100Note}</p>
-          {top100Applies ? <p className={styles.note}>{top100Copy.help}</p> : null}
+          {top100Applies || top100Computable ? (
+            <p className={styles.note}>{top100Copy.help}</p>
+          ) : null}
         </fieldset>
 
         <fieldset className={styles.fieldset}>
@@ -382,6 +423,9 @@ export function MemberDecisionControls({
           {chipApplies ? <p className={styles.note}>{chipCopy.help}</p> : null}
         </fieldset>
       </div>
+      {computable && computable.strategies.length > 0 ? (
+        <p className={styles.note}>{computeCopy.controlsNote}</p>
+      ) : null}
       <p className={styles.honesty}>{copy.honestyRule}</p>
     </Card>
   );

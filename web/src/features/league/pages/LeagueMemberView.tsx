@@ -5,7 +5,6 @@ import { EmptyState } from "../../../design/components/EmptyState";
 import { useLanguage } from "../../../i18n/context";
 import { points } from "../../../lib/format";
 import { AdviceRequestPanel } from "../advice/AdviceRequestPanel";
-import { canComputeAdvice } from "../advice/adviceSelection";
 import { MemberDecisionControls } from "../advice/MemberDecisionControls";
 import { useViewerEntry } from "../identity/useViewerEntry";
 import { TemplatePicker } from "../templates/TemplatePicker";
@@ -42,6 +41,8 @@ function LeagueMemberContent({
   members = [],
   index = null,
   client,
+  capabilities = null,
+  computeService = "static",
   rivalSquad = null,
 }: LeagueMemberViewProps) {
   const { locale, messages } = useLanguage();
@@ -56,15 +57,30 @@ function LeagueMemberContent({
     selection,
     indexReadable,
     selectionAvailable,
+    computeAvailable,
     job,
     request,
     shown,
     rejectedContext,
     rejectedUnreadable,
   } = useMemberAdviceView(
-    { squad, advice, adviceIssue, adviceLoading, members, index, client },
+    {
+      squad,
+      advice,
+      adviceIssue,
+      adviceLoading,
+      members,
+      index,
+      client,
+      capabilities,
+      computeService,
+    },
     searchParams,
   );
+  // With the service answering, a selection it computes and nobody published is not a
+  // dead end: the panel offers the computation and no "not listed" card stands beside it.
+  const computeOnly =
+    computeAvailable && selection.computable !== undefined && selection.status === "not-listed";
 
   return (
     <div className={styles.page}>
@@ -176,14 +192,20 @@ function LeagueMemberContent({
           </Card>
         ) : null}
         <TemplatePicker
-          canApply={(params) =>
-            !adviceLoading && indexReadable && resolve(params).status === "ready"
-          }
+          canApply={(params) => {
+            const offered = resolve(params);
+            return (
+              !adviceLoading &&
+              indexReadable &&
+              (offered.status === "ready" || offered.computable?.selection === true)
+            );
+          }}
         />
         <MemberDecisionControls
           entryId={entryId}
           members={members}
           index={selection.status === "index-error" ? null : index}
+          capabilities={capabilities}
         />
         <AdviceRequestPanel
           request={request}
@@ -194,12 +216,18 @@ function LeagueMemberContent({
             selection.top100.weight === 0 &&
             selection.chip.chip === null
           }
+          service={
+            selection.computable ? "ready" : computeService === "ready" ? "static" : computeService
+          }
+          computable={computeAvailable}
+          published={selection.status === "ready"}
+          chipChosen={selection.chip.chip !== null}
         />
         {adviceLoading ? (
           <EmptyState title={copy.loadingAdvice} />
         ) : shown ? (
           <AdviceCard shown={shown} members={members} squad={squad} rivalSquad={rivalSquad} />
-        ) : (
+        ) : computeOnly && !rejectedContext ? null : (
           <MissingAdviceCard
             issue={
               rejectedContext
@@ -220,13 +248,7 @@ function LeagueMemberContent({
                   ? onRetryAdvice
                   : undefined
             }
-            canCompute={
-              selectionAvailable &&
-              !selection.evidence.on &&
-              selection.top100.weight === 0 &&
-              selection.chip.chip === null &&
-              canComputeAdvice(request)
-            }
+            canCompute={computeAvailable}
           />
         )}
       </section>

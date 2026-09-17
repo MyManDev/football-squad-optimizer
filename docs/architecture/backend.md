@@ -258,13 +258,31 @@ contains expected-point trade-offs, not member-facing probability claims.
 
 The frontend's general pages still use `StaticDataClient`. The member advice client optionally
 uses `VITE_ADVICE_API_ORIGIN` and can fall back to the published static answer. The member page
-renders returned advice and retains compute controls when published advice is absent. Which
-selections may request a computation is decided in one place, `canComputeAdvice` in
-`web/src/features/league/advice/adviceSelection.ts`, and it mirrors `advise_entry`'s own
-refusals: window 1 only, and either `saf-puan` (rival-free) or a member strategy
-(`ortak-koru`, `fark-yarat`) with a rival named. Longer windows and the legacy play modes are
-displayed from the published tree only; the play modes are not aliases for the member
-strategies.
+renders returned advice and retains compute controls when published advice is absent.
+
+Which selections may request a computation is decided in one place, the selection resolver in
+`web/src/features/league/advice/adviceSelection.ts`, in one of two modes:
+
+- **No origin configured (the static site).** `canComputeAdvice` mirrors `advise_entry`'s own
+  refusals: pure points at any window, or a member strategy (`ortak-koru`, `fark-yarat`) at
+  window 1 with a rival named, and only for a combination the published index lists with both
+  switches off. The page makes no request to any service.
+- **An origin configured.** The page reads `GET /api/v1/leagues/{league_id}/capabilities` once
+  and the resolver adds a `computable` facet to the same selection: a strategy, window, rival,
+  Top 100 setting or manager's word the capabilities allow can be chosen and computed even
+  where the published tree has no file for it. A published file is still shown at once with no
+  request. The request names a switch only when it is on (`top100_weight`, `managers_word`),
+  so a plain request is byte for byte what it was. A chosen chip stays published-only. The
+  contract names no windows per switch, so the web applies the service's two rules itself: a
+  setting wherever the plan may be asked, the word on the one-week pure-points plan only.
+
+Capabilities that fail to load, fail validation, or name another league, season, gameweek or
+`capture_snapshot_id` than the squad on screen are no capabilities: the page is the static
+page with one notice in the compute panel. The client sends an `Idempotency-Key` per click,
+keeps the job id in `sessionStorage` so a reload resumes the wait, waits 3, 6 and 10 minutes
+for windows 1, 3 and 5, and turns the error codes below into sentences; a code it does not
+know gets a general sentence, and the service's `message` is never shown. The legacy play
+modes are displayed from the published tree only and are not aliases for the member strategies.
 
 Advice responses must match the selected league, member, mode, window and displayed season/week.
 A refreshed squad invalidates earlier jobs and results. Static answers are labelled published
