@@ -2,6 +2,7 @@
 
 import { isPlayMode, type WindowSize } from "../../moves/modePrices";
 import {
+  MEMBER_STRATEGIES,
   isMemberStrategy,
   strategyNeedsRival,
   type AdviceStrategy,
@@ -9,6 +10,7 @@ import {
   type EntryView,
   type MemberStrategy,
 } from "../types";
+import type { AdviceCapabilities } from "./adviceCapabilities";
 import type { AdviceRequest } from "./adviceClient";
 import { CHIP_NAMES } from "../chipShape";
 import { chipPath, parseChip, type MemberChip } from "./chipChoice";
@@ -158,6 +160,29 @@ export interface PublishedAdviceSelection {
     reason: string | null;
     reasons: Partial<Record<MemberChip, string>>;
   };
+  /**
+   * What the compute service can answer, present only when the page has its capabilities
+   * in hand; a static build never carries it. Everything above stays a statement about
+   * the published tree. With this facet the switches in `request`, `evidence.on` and
+   * `top100.weight` are the ones the link asks for wherever either side can honour them,
+   * and `status` is "ready" only when the published tree answers exactly that.
+   */
+  computable?: ComputableAdvice;
+}
+
+export interface ComputableAdvice {
+  /** This exact selection, switches included, can be asked of the service now. */
+  selection: boolean;
+  /** The strategies the service computes, in the catalogue's order. */
+  strategies: MemberStrategy[];
+  /** The windows it computes for the strategy on screen. */
+  windows: WindowSize[];
+  /** The rivals a rival strategy may name: the league's other members. */
+  rivals: number[];
+  /** The Top 100 settings it would accept for this strategy and window; zero always. */
+  top100Weights: Top100Weight[];
+  /** Whether it would apply the manager's word to this strategy and window. */
+  word: boolean;
 }
 
 /** The URL parameter that switches the manager's word on: `llm=on`. */
@@ -277,8 +302,171 @@ function top100For(
   };
 }
 
-/** One authority for controls, templates, static reads and the compute button. */
+/**
+ * One authority for controls, templates, static reads and the compute button.
+ *
+ * Without capabilities (every static build) this is the published tree's answer and
+ * nothing else. With them, the same answer gains the `computable` facet, and a selection
+ * the tree does not list but the service computes is no longer a dead end.
+ */
 export function resolvePublishedAdvice(
+  searchParams: URLSearchParams,
+  leagueId: number,
+  entryId: number,
+  members: EntryView[],
+  index: EntryAdviceIndex | null | undefined,
+  context?: { season: string; gameweek: number },
+  capabilities?: AdviceCapabilities | null,
+): PublishedAdviceSelection {
+  const published = resolveFromIndex(searchParams, leagueId, entryId, members, index, context);
+  if (
+    !capabilities ||
+    capabilities.leagueId !== leagueId ||
+    (context &&
+      (capabilities.season !== context.season || capabilities.gameweek !== context.gameweek))
+  ) {
+    return published;
+  }
+  return withComputable(published, searchParams, entryId, members, index, capabilities);
+}
+
+function notComputable(strategies: MemberStrategy[] = []): ComputableAdvice {
+  return { selection: false, strategies, windows: [], rivals: [], top100Weights: [0], word: false };
+}
+
+/**
+ * The published answer, widened by what the service computes.
+ *
+ * The index still has to be readable: it is where the member's rivals, default rival and
+ * declared failures come from. A combination the producer tried and declared impossible
+ * stays impossible; asking the same solver again would only make the member wait for the
+ * same answer. A chosen chip is not computed by the service yet, so it stays published-only.
+ */
+function withComputable(
+  published: PublishedAdviceSelection,
+  searchParams: URLSearchParams,
+  entryId: number,
+  members: EntryView[],
+  index: EntryAdviceIndex | null | undefined,
+  capabilities: AdviceCapabilities,
+): PublishedAdviceSelection {
+  if (!index || published.status === "index-missing" || published.status === "index-error") {
+    return { ...published, computable: notComputable() };
+  }
+  const strategies = MEMBER_STRATEGIES.filter(
+    (slug) => (capabilities.strategies[slug]?.windows.length ?? 0) > 0,
+  );
+  const { strategy, window } = published.request;
+  const mode = searchParams.get("mode");
+  const rawWindow = searchParams.get("window");
+  const capability = isMemberStrategy(strategy) ? capabilities.strategies[strategy] : undefined;
+  if (
+    !capability ||
+    (mode !== null && !isMemberStrategy(mode)) ||
+    (rawWindow !== null && !["1", "3", "5"].includes(rawWindow))
+  ) {
+    return { ...published, computable: notComputable(strategies) };
+  }
+  const declaredFor = (rivalEntryId: number | null, size: WindowSize) =>
+    index.unavailable.find(
+      (row) =>
+        row.strategy === strategy &&
+        (row.rival_entry_id ?? null) === rivalEntryId &&
+        (row.window ?? index.window) === size,
+    );
+  const windows = capability.windows.filter(
+    (size) => capability.requiresRival || !declaredFor(null, size),
+  );
+  // Any other member of the league may be named, whether or not the producer paired them.
+  const rivals: number[] = capability.requiresRival
+    ? [
+        ...new Set([
+          ...published.rivals.map((rival) => rival.entryId),
+          ...rivalCandidates(members, entryId)
+            .map((member) => member.entry_id)
+            .filter((id): id is number => typeof id === "number"),
+        ]),
+      ]
+    : [];
+  const rawRival = searchParams.get("rival");
+  const askedRival = rawRival === null ? index.default_rival_entry_id : Number(rawRival);
+  const rivalEntryId =
+    capability.requiresRival && askedRival !== null && rivals.includes(askedRival)
+      ? askedRival
+      : null;
+  const windowComputable = windows.includes(window);
+  const baseline = strategy === "saf-puan" && window === 1;
+  const word = capabilities.managersWord && baseline && windowComputable;
+  const settings: Top100Weight[] = windowComputable ? capabilities.top100Weights : [0];
+  const computable = { strategies, windows, rivals, top100Weights: settings, word };
+
+  // The switches as asked, wherever the published tree or the service can honour them.
+  const wordOn =
+    searchParams.get(EVIDENCE_PARAMETER) === "on" &&
+    baseline &&
+    (published.evidence.available || word);
+  const asked = parseTop100(searchParams).weight;
+  const target: Top100Target = { strategy, window, rivalEntryId };
+  const weight =
+    asked !== 0 &&
+    (settings.includes(asked) || top100Weights(index, entryId, wordOn, target).includes(asked))
+      ? asked
+      : 0;
+  const switched = wordOn || weight !== 0;
+  const request: AdviceRequest = {
+    ...published.request,
+    rivalEntryId,
+    top100Weight: weight,
+    managersWord: wordOn,
+  };
+  const declared = declaredFor(rivalEntryId, window);
+  if (declared) {
+    return {
+      ...published,
+      request,
+      status: "declared-unavailable",
+      reason: declared.reason,
+      path: null,
+      computable: { ...computable, selection: false },
+    };
+  }
+  const chip = switched ? null : published.chip.chip;
+  const sameAsPublished =
+    published.status === "ready" &&
+    (published.request.rivalEntryId ?? null) === rivalEntryId &&
+    published.evidence.on === wordOn &&
+    published.top100.weight === weight &&
+    published.chip.chip === chip;
+  const canAsk =
+    windowComputable &&
+    chip === null &&
+    (!capability.requiresRival || rivalEntryId !== null) &&
+    (weight === 0 || settings.includes(weight)) &&
+    (!wordOn || word);
+  if (sameAsPublished) {
+    return { ...published, request, computable: { ...computable, selection: canAsk } };
+  }
+  // Asked for, not in the tree: nothing published is shown in its place, and the page
+  // offers the computation when the service can do it.
+  return {
+    ...published,
+    request,
+    status: "not-listed",
+    path: null,
+    reason: null,
+    evidence: { ...published.evidence, on: wordOn },
+    top100: {
+      ...published.top100,
+      weight,
+      notOffered: weight === 0 && published.top100.notOffered,
+    },
+    chip: { ...published.chip, chip },
+    computable: { ...computable, selection: canAsk },
+  };
+}
+
+/** The published tree's own answer: what a static build shows, and all it shows. */
+function resolveFromIndex(
   searchParams: URLSearchParams,
   leagueId: number,
   entryId: number,

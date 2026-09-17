@@ -30,6 +30,9 @@ export function LeagueMemberPage() {
     adviceEnabled,
     advice,
     rival,
+    client,
+    capabilities,
+    computeService,
   } = useLeagueMemberData(entryParam, searchParams);
 
   if (entryParam === "squadopt") return <SystemLeagueMemberPage />;
@@ -86,6 +89,9 @@ export function LeagueMemberPage() {
       onRetryIndex={() => void indexQuery.refetch()}
       members={members}
       index={index}
+      client={client}
+      capabilities={capabilities}
+      computeService={computeService}
     />
   );
 }
