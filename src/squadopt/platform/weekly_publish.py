@@ -572,13 +572,27 @@ def main() -> int:
             league = LeaguePublish(
                 league_id=arguments.league,
                 snapshot_id=arguments.snapshot_id,
-                in_season_projection=arguments.in_season_projection,
+                # Resolved here: the build runs with its working directory inside the
+                # publication worktree, where a relative path names nothing.
+                in_season_projection=(
+                    arguments.in_season_projection.resolve()
+                    if arguments.in_season_projection is not None
+                    else None
+                ),
                 workers=arguments.workers,
                 cohort_snapshot=arguments.cohort_snapshot,
                 elite_snapshot=arguments.elite_snapshot,
                 record_advice=not arguments.no_advice_record,
-                rotation_evidence=arguments.rotation_evidence,
-                club_news_source=arguments.club_news_source,
+                rotation_evidence=(
+                    arguments.rotation_evidence.resolve()
+                    if arguments.rotation_evidence is not None
+                    else None
+                ),
+                club_news_source=(
+                    arguments.club_news_source.resolve()
+                    if arguments.club_news_source is not None
+                    else None
+                ),
             )
         return publish(
             names,

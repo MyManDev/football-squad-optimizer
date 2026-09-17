@@ -1839,6 +1839,7 @@ def test_the_managers_word_is_published_beside_the_baseline_or_named_absent(
     assert index["evidence"]["path"] == "advice/101/saf-puan/1/hoca-sozu.json"
     assert index["evidence"]["applied_count"] == 1
     assert index["evidence"]["source_kind"] == "synthetic_fixture"
+    assert index["evidence"]["binding"] in (True, False)
     published = json.loads(
         (tmp_path / "with" / "advice" / "101" / "saf-puan" / "1" / "hoca-sozu.json").read_text(
             encoding="utf-8"
@@ -1862,3 +1863,22 @@ def test_the_managers_word_is_published_beside_the_baseline_or_named_absent(
     )["payload"]
     assert index["evidence"] == {"available": False, "reason": "no_evidence_this_run"}
     assert not (tmp_path / "without" / "advice" / "101" / "saf-puan" / "1").exists()
+
+    # The operational case: the next publish runs without evidence into the tree the
+    # previous one wrote. The switched-on document goes, and the report says so.
+    report = build_league_views(
+        provider,
+        registrations,
+        inputs,
+        projection,
+        rules,
+        league_id=352490,
+        league_name="Test League",
+        out_dir=tmp_path / "with",
+    )
+    assert not (tmp_path / "with" / "advice" / "101" / "saf-puan" / "1" / "hoca-sozu.json").exists()
+    assert "advice/101/saf-puan/1/hoca-sozu.json" in report.removed
+    index = json.loads(
+        (tmp_path / "with" / "advice" / "101" / "index.json").read_text(encoding="utf-8")
+    )["payload"]
+    assert index["evidence"]["available"] is False

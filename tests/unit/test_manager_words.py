@@ -19,6 +19,8 @@ from squadopt.application.league_publication import (
 )
 from squadopt.application.manager_words import (
     SOURCE_SYNTHETIC_FIXTURE,
+    WORDS_UNRESOLVED,
+    WORDS_WITHHELD_FIGURE,
     ManagerWord,
     ManagerWords,
     ManagerWordsError,
@@ -137,6 +139,7 @@ def test_the_words_are_cut_from_the_bytes_that_hash_to_the_citation(
         columns=list(ROTATION_EVIDENCE_COLUMNS),
     )
     table.attrs["clubs_covered"] = ("Arsenal",)
+    table.attrs["document_sha256s"] = (digest,)
     monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
 
     words = manager_words_from_artifact(
@@ -187,6 +190,7 @@ def test_covered_is_what_the_capture_recorded_and_not_what_was_read(
         columns=list(ROTATION_EVIDENCE_COLUMNS),
     )
     table.attrs["clubs_covered"] = ("Arsenal",)
+    table.attrs["document_sha256s"] = ()
     monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
 
     words = manager_words_from_artifact(
@@ -258,3 +262,140 @@ def test_evidence_and_its_source_travel_together_or_not_at_all(tmp_path: Path) -
                 **base, rotation_evidence=tmp_path / "table.csv", club_news_source=FIXTURE
             )
         )
+
+
+def _cited_table(documents: tuple[Any, ...], sentence: bytes, disposition: str) -> pd.DataFrame:
+    """A one-row verified-looking table citing ``sentence`` in the Arsenal page."""
+
+    arsenal = next(document for document in documents if document.club == "Arsenal")
+    start = arsenal.readable.index(sentence)
+    digest = hashlib.sha256(arsenal.readable).hexdigest()
+    record: dict[str, Any] = dict.fromkeys(ROTATION_EVIDENCE_COLUMNS, pd.NA)
+    record.update(season="2026-27", target_gameweek=5, player_id=11)
+    record["rotation_disposition"] = disposition
+    record["rotation_claim_source_sha256"] = digest
+    record["rotation_claim_span_start"] = start
+    record["rotation_claim_span_end"] = start + len(sentence)
+    record["rotation_claim_speaker"] = "manager"
+    table = pd.DataFrame([record], columns=list(ROTATION_EVIDENCE_COLUMNS))
+    table.attrs["clubs_covered"] = ("Arsenal",)
+    table.attrs["document_sha256s"] = (digest,)
+    return table
+
+
+def test_a_quote_with_a_figure_the_site_never_publishes_is_withheld_with_its_reason(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fixture's captain line carries a per cent sign. The source said it, but the rule
+    about what a member page shows covers every sentence on it, so the words are withheld
+    and the status says why; the constraint itself still stands."""
+
+    documents, kind, label = documents_from_source(FIXTURE)
+    sentence = b'Asked about the captain, he said: "Odegaard is at 80% and we will see."'
+    table = _cited_table(documents, sentence, "stated_rotation_risk")
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
+
+    words = manager_words_from_artifact(
+        Path("table.csv"),
+        Path("table.manifest.json"),
+        documents=documents,
+        source_kind=kind,
+        source_label=label,
+    )
+
+    (word,) = words.words
+    assert word.words is None
+    assert word.words_status == WORDS_WITHHELD_FIGURE
+    assert word.role == "not_captain"
+    assert word.source_url is not None
+    exclusion = words.exclusion()
+    assert exclusion is not None and exclusion.not_captain == frozenset({11})
+
+
+def test_a_quote_that_cannot_be_cut_is_unresolved_not_withheld() -> None:
+    word = ManagerWord(
+        player_id=1,
+        disposition="stated_expected_absent",
+        speaker="manager",
+        published_at_utc=None,
+        published_precision=None,
+        club=None,
+        source_url=None,
+        fetched_at_utc=None,
+        words=None,
+    )
+    assert word.words_status == WORDS_UNRESOLVED
+    with pytest.raises(ManagerWordsError, match="shown or withheld"):
+        ManagerWord(
+            player_id=1,
+            disposition="stated_expected_absent",
+            speaker="manager",
+            published_at_utc=None,
+            published_precision=None,
+            club=None,
+            source_url=None,
+            fetched_at_utc=None,
+            words="He will not travel.",
+            words_status=WORDS_WITHHELD_FIGURE,
+        )
+
+
+def test_a_source_that_does_not_hold_the_cited_documents_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A different week's fixture or capture would put its label and links beside claims it
+    never made; the manifest's digests say which documents the claims cite."""
+
+    documents, kind, label = documents_from_source(FIXTURE)
+    table = _cited_table(documents, b"Havertz will not travel.", "stated_expected_absent")
+    table.attrs["document_sha256s"] = ("f" * 64,)
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
+
+    with pytest.raises(ManagerWordsError, match="not the source this table was coded from"):
+        manager_words_from_artifact(
+            Path("table.csv"),
+            Path("table.manifest.json"),
+            documents=documents,
+            source_kind=kind,
+            source_label=label,
+        )
+
+    del table.attrs["document_sha256s"]
+    with pytest.raises(ManagerWordsError, match="document digests"):
+        manager_words_from_artifact(
+            Path("table.csv"),
+            Path("table.manifest.json"),
+            documents=documents,
+            source_kind=kind,
+            source_label=label,
+        )
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "He is at 80% and we will see.",
+        "He is eighty per cent fit.",
+        "Ninety percent of the squad trained.",
+        "It is a 50-50 call for Saturday.",
+        "It is fifty-fifty whether he starts.",
+        "The chance he plays is small.",
+        "There is a good percentage of doubt.",
+        "Başlama ihtimali düşük.",
+        "Oynama şansı yüzde elli.",  # noqa: RUF001
+    ],
+)
+def test_the_quote_screen_withholds_every_form_the_pages_may_not_show(quote: str) -> None:
+    assert module.QUOTE_WITHHELD_PATTERN.search(quote)
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "Havertz will not travel.",
+        "Bu yüzden rotasyon yapacağız.",  # noqa: RUF001
+        "Martinez has trained all week and will start.",
+    ],
+)
+def test_the_quote_screen_leaves_plain_statements_alone(quote: str) -> None:
+    assert not module.QUOTE_WITHHELD_PATTERN.search(quote)

@@ -266,6 +266,15 @@ def publish_prepared_league(
             )
     out_dir = request.out_dir / "data" / "league"
     manager_words = load_publication_manager_words(request)
+    if manager_words is not None and (manager_words.season, manager_words.gameweek) != (
+        season,
+        int(inputs.deadline.gameweek),
+    ):
+        raise DataError(
+            f"The rotation evidence is for {manager_words.season} gameweek "
+            f"{manager_words.gameweek}; this publication is {season} gameweek "
+            f"{int(inputs.deadline.gameweek)}. Refused before any member is solved."
+        )
     report = build_league_views(
         CapturePicksProvider(snapshot, request.snapshot_id),
         prepared.registrations,

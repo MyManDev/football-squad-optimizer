@@ -25,6 +25,7 @@ from squadopt.application.entries import EntryError, EntryRegistration
 from squadopt.application.league_views import build_league_views
 from squadopt.application.manager_words import ManagerWord, ManagerWords
 from squadopt.optimization import SolverStatus
+from squadopt.planning import FirstWeekExclusion
 
 world = league_views_tests.world  # re-register the fixture in this module
 
@@ -1309,8 +1310,22 @@ def test_the_managers_word_keeps_the_named_player_out_and_prices_it(
     assert applied[0]["role"] == "not_starting"
     assert applied[0]["words"] == "He will not travel."
     assert applied[0]["source_url"] == "https://club.example/club-1/news"
+    # A swap the pure-points control makes too keeps its own reason; the rest is there
+    # because of what the page said, and at least one such swap exists here.
+    control_swaps = {
+        (move["player_out"]["player_id"], move["player_in"]["player_id"])  # type: ignore[index]
+        for move in baseline["moves"]  # type: ignore[union-attr]
+    }
+    reasons = set()
     for move in payload["moves"]:  # type: ignore[union-attr]
-        assert move["reason_code"] == "manager_word"
+        swap = (move["player_out"]["player_id"], move["player_in"]["player_id"])
+        expected = "points_gain" if swap in control_swaps else "manager_word"
+        assert move["reason_code"] == expected
+        reasons.add(move["reason_code"])
+    # In this world the repair transfers are the same with the rule on or off: the
+    # difference is the lineup (the named player sits out and loses the armband).
+    assert reasons <= {"points_gain", "manager_word"}
+    assert evidence["binding"] is True
 
 
 def test_a_word_that_binds_nobody_changes_nothing_and_says_so(world: dict[str, Any]) -> None:
@@ -1330,6 +1345,11 @@ def test_a_word_that_binds_nobody_changes_nothing_and_says_so(world: dict[str, A
     )
 
     evidence = payload.pop("evidence")
+    assert evidence["binding"] is False
+    # Not binding: the control is also the best plan under the rule, so the price is zero
+    # and so is its ceiling under the control's proof.
+    assert payload.pop("expected_points_cost_ceiling") == 0.0
+    assert payload["expected_points_cost"] == 0.0
     assert isinstance(evidence, dict) and evidence["applied"] == []
     assert payload == baseline
 
@@ -1356,3 +1376,115 @@ def test_the_managers_word_is_one_week_pure_points_only(world: dict[str, Any]) -
             projection=projection,
             rules=rules,
         )
+
+
+def test_a_word_about_a_held_player_the_control_benches_does_not_bind(
+    world: dict[str, Any],
+) -> None:
+    """A held player the pure-points plan already leaves on the bench is shown to the
+    member, but the plan and the price do not move."""
+
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    baseline = advise_entry(
+        _request(), provider=provider, inputs=inputs, projection=projection, rules=rules
+    )
+    bench = [int(str(player["player_id"])) for player in baseline["bench"]]  # type: ignore[union-attr]
+    held = set(_legal_squad(world))
+    benched_and_held = next(player for player in bench if player in held)
+
+    payload = advise_with_managers_word(
+        _request(),
+        words=_managers_word(benched_and_held, "stated_expected_absent"),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+    evidence = payload.pop("evidence")
+    assert evidence["binding"] is False
+    assert [item["player_id"] for item in evidence["applied"]] == [benched_and_held]
+    payload.pop("expected_points_cost_ceiling")
+    assert payload == baseline
+
+
+def test_the_rows_of_a_switched_on_plan_are_measured_under_the_rule() -> None:
+    """The hold walk benches a ruled-out starter, so selling him for a lesser player is a
+    gain under the rule, as the member switched it on, not a loss."""
+
+    held = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    positions = ["GK", "GK"] + ["DEF"] * 5 + ["MID"] * 5 + ["FWD"] * 3
+    lookup: dict[int, tuple[str, float]] = {
+        player: (position, 2.0) for player, position in zip(held, positions, strict=True)
+    }
+    lookup[8] = ("MID", 7.0)  # the ruled-out starter
+    lookup[99] = ("MID", 6.0)  # the replacement
+    exclusion = FirstWeekExclusion(not_starting=frozenset({8}))
+
+    unconstrained = advice_service._attributed_gains([(8, 99)], held=held, lookup=lookup)
+    constrained = advice_service._attributed_gains(
+        [(8, 99)], held=held, lookup=lookup, exclusion=exclusion
+    )
+
+    assert unconstrained is not None and unconstrained[0] < 0
+    assert constrained is not None and constrained[0] > 0
+
+
+def test_a_player_barred_from_the_armband_is_not_the_vice_captain(world: dict[str, Any]) -> None:
+    """The vice-captain wears the armband when the captain does not play, so the rule that
+    bars a player from the armband bars him from the vice-captaincy too; the rest of the
+    plan stays the control's when the rule binds nothing else."""
+
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    baseline = advise_entry(
+        _request(), provider=provider, inputs=inputs, projection=projection, rules=rules
+    )
+    vice = int(str(baseline["vice_captain"]["player_id"]))  # type: ignore[index]
+
+    payload = advise_with_managers_word(
+        _request(),
+        words=_managers_word(vice, "stated_rotation_risk"),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+    )
+
+    assert payload["evidence"]["binding"] is False  # type: ignore[index]
+    new_vice = payload["vice_captain"]
+    assert isinstance(new_vice, dict) and int(str(new_vice["player_id"])) != vice
+    assert int(str(new_vice["player_id"])) != int(str(baseline["captain"]["player_id"]))  # type: ignore[index]
+    assert payload["starting_xi"] == baseline["starting_xi"]
+    assert payload["captain"] == baseline["captain"]
+
+
+def test_a_binding_word_is_priced_against_the_control_under_one_policy(
+    world: dict[str, Any],
+) -> None:
+    """The tag is the control's net minus the constrained plan's net, both solved under the
+    member planning policy, floored at zero, and the ceiling is never below it."""
+
+    inputs, projection, rules = _world_context(world)
+    provider = _Provider({101: _member_picks(world, 101, _legal_squad(world))})
+    control = advice_service.solve_member_control(
+        _member_picks(world, 101, _legal_squad(world)), inputs, projection, rules
+    )
+    captain = int(str(control.plan.weeks[0].captain["player_id"]))
+
+    payload = advise_with_managers_word(
+        _request(),
+        words=_managers_word(captain, "stated_expected_absent"),
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+        control=control,
+    )
+
+    assert payload["evidence"]["binding"] is True  # type: ignore[index]
+    cost = float(str(payload["expected_points_cost"]))
+    ceiling = float(str(payload["expected_points_cost_ceiling"]))
+    assert cost >= 0.0 and ceiling >= cost
+    assert payload["control_solver_status"] == control.plan.solver_status.name

@@ -993,6 +993,8 @@ def build_league_views(
         )
     }
 
+    stale_removed: list[str] = []
+
     def _write(relative: str, payload: Mapping[str, object]) -> bytes:
         """Write one published file and return the exact bytes that landed at that path."""
 
@@ -1100,12 +1102,31 @@ def build_league_views(
                 "source_label": source.get("source_label"),
                 "clubs_covered": source.get("clubs_covered", []),
                 "rule_version": source.get("rule_version"),
+                "binding": bool(source.get("binding", False)),
             }
         else:
+            # A code the page can translate; the operator reads the raw reason in the
+            # member's note below.
             evidence_index = {
                 "available": False,
-                "reason": render.evidence_unavailable or "no_evidence_this_run",
+                "reason": (
+                    "not_solved_for_member"
+                    if render.evidence_unavailable
+                    else "no_evidence_this_run"
+                ),
             }
+            # A switched-on document an earlier publish wrote would otherwise stay in the
+            # committed tree beside an index that says there is none.
+            stale = (
+                out / f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}/{MANAGERS_WORD_FILE}"
+            )
+            if stale.is_file():
+                stale.unlink()
+                stale_removed.append(
+                    f"advice/{entry_id}/{COMPUTED_MODE}/{COMPUTED_WINDOW}/{MANAGERS_WORD_FILE}"
+                )
+                if stale.parent.is_dir() and not any(stale.parent.iterdir()):
+                    stale.parent.rmdir()
 
         # The rival menu: one file per (strategy, rival), the standings neighbour's copy
         # at the strategy's plain path, and an index that says what exists and why not.
@@ -1278,7 +1299,14 @@ def build_league_views(
         # What was changed about this member's own name before it was published travels
         # on their row of the report, so the operator running the publish sees it. A name
         # we altered and never mentioned would be the quiet half of this fix.
-        note = "; ".join(part for part in (*name_notes.get(entry_id, ()), mode_note) if part)
+        word_note = (
+            f"manager's word not solved: {render.evidence_unavailable}"
+            if render.evidence_unavailable
+            else ""
+        )
+        note = "; ".join(
+            part for part in (*name_notes.get(entry_id, ()), mode_note, word_note) if part
+        )
         results.append(MemberViewResult(entry_id, labels[entry_id], True, reason=note))
         member_rows.append(member_row)
     # The standings order is the league's order; registry order is arbitrary.
@@ -1360,5 +1388,5 @@ def build_league_views(
         gameweek=gameweek,
         members=tuple(results),
         files=tuple(sorted(written)),
-        removed=removed,
+        removed=(*removed, *stale_removed),
     )

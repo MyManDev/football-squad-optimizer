@@ -30,6 +30,7 @@ import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../moves/modePrices";
 import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
 import { EVIDENCE_PARAMETER, resolvePublishedAdvice } from "./adviceSelection";
+import { EVIDENCE_COPY, evidenceUnavailable } from "./evidenceCopy";
 import styles from "./MemberDecisionControls.module.css";
 
 /** The gap as the rule read it: signed, so behind and ahead are visibly different. */
@@ -46,7 +47,7 @@ export function MemberDecisionControls({
   members: EntryView[];
   index: EntryAdviceIndex | null;
 }) {
-  const { messages } = useLanguage();
+  const { language, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const [searchParams, setSearchParams] = useSearchParams();
   const selection = resolvePublishedAdvice(
@@ -95,6 +96,9 @@ export function MemberDecisionControls({
   // The word is solved for the one-week pure-points plan only.
   const evidenceApplies =
     selection.evidence.available && strategy === "saf-puan" && windowSize === 1;
+  const evidenceCopy = EVIDENCE_COPY[language];
+  // Only a read of registered club pages is real; anything else is example data.
+  const evidenceIsReal = selection.evidence.sourceKind === "club_news_capture";
   // The producer's declared rule marks one of the three from the member's points gap
   // and the weeks left. It is a label on an option the member may ignore, never a
   // preselection: the checked strategy is still whatever the URL says.
@@ -218,7 +222,7 @@ export function MemberDecisionControls({
         </fieldset>
 
         <fieldset className={styles.fieldset}>
-          <legend>{copy.evidenceLegend}</legend>
+          <legend>{evidenceCopy.legend}</legend>
           <label className={styles.windowOption}>
             <input
               type="checkbox"
@@ -229,19 +233,19 @@ export function MemberDecisionControls({
                 update({ [EVIDENCE_PARAMETER]: event.target.checked ? "on" : null })
               }
             />
-            <span>{copy.evidenceSwitch}</span>
-            {selection.evidence.sourceKind === "synthetic_fixture" ? (
+            <span>{evidenceCopy.switchLabel}</span>
+            {selection.evidence.available && !evidenceIsReal ? (
               <Badge tone="warn">{copy.exampleData}</Badge>
             ) : null}
           </label>
           <p className={styles.note}>
             {!selection.evidence.available
-              ? copy.evidenceUnavailable(selection.evidence.reason)
+              ? evidenceUnavailable(evidenceCopy, selection.evidence.reason)
               : !evidenceApplies
-                ? copy.evidenceOnlyBaseline
-                : selection.evidence.sourceKind === "synthetic_fixture"
-                  ? copy.evidenceSourceSynthetic
-                  : copy.evidenceSourceCapture}
+                ? evidenceCopy.onlyBaseline
+                : evidenceIsReal
+                  ? evidenceCopy.sourceCapture
+                  : evidenceCopy.sourceExample}
           </p>
         </fieldset>
       </div>

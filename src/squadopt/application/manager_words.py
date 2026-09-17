@@ -17,13 +17,15 @@ The rule is declared here, not measured anywhere:
 
 The exclusion names every player the club's page spoke about, held or not: a player the
 manager said will not travel must not be bought and started either. What the member is
-shown is the subset that touches their own plan (the fifteen they hold, and the fifteen the
-switched-on plan ends with). What the constraint costs is the difference between two of the
-member's own solves, published by ``advice.advise_with_managers_word``.
+shown is the subset that touches their own plan (the fifteen they hold, the fifteen their
+pure-points control ends with, and the fifteen the switched-on plan ends with). What the
+constraint costs is the difference between two of the member's own solves, published by
+``advice.advise_with_managers_word``.
 """
 
 import hashlib
 import json
+import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +33,7 @@ from typing import Final
 
 import pandas as pd
 
+from squadopt.application.strategies.catalog import FORBIDDEN_TEXT_PATTERN
 from squadopt.data.errors import DataError
 from squadopt.data.snapshots import read_snapshot
 from squadopt.data.sources.club_news import FixtureClubNewsProvider, RawDocument
@@ -46,6 +49,47 @@ NOT_CAPTAIN_DISPOSITIONS: Final[frozenset[str]] = frozenset(
     {"stated_expected_absent", "stated_rotation_risk", "stated_minutes_limited"}
 )
 SOURCE_SYNTHETIC_FIXTURE: Final = "synthetic_fixture"
+#: What a quote may not carry onto a member page. The Python copy guard
+#: (``FORBIDDEN_TEXT_PATTERN``) was written for the site's own words; a quote is a third
+#: party's sentence and can say anything, so this is the wider list the web guard applies to
+#: rendered pages (``web/src/testSupport/honesty.ts``, ``AS_A_CHANCE``) plus the spelled-out
+#: forms a manager says aloud. No ownership exception: a quote is never an ownership share.
+#: Over-withholding costs a member one quote, which stays one link away; under-withholding
+#: publishes a claim the site has promised never to make.
+QUOTE_WITHHELD_PATTERN: Final = re.compile(
+    "|".join(
+        (
+            FORBIDDEN_TEXT_PATTERN.pattern,
+            r"per\s?cent",
+            r"percentage",
+            r"probabilit",
+            "olas\u0131l",
+            r"chance",
+            r"likelihood",
+            r"odds",
+            r"quantile",
+            r"spread",
+            r"\btail\b",
+            r"ihtimal",
+            "\u015fans",
+            "y\u00fczde(?!n\\b)",
+            r"kantil",
+            "yay\u0131l\u0131m",
+            r"\bkuyruk\b",
+            r"\b50\s*[-/]\s*50\b",
+            r"fifty[\s-]fifty",
+        )
+    ),
+    re.IGNORECASE,
+)
+
+WORDS_SHOWN: Final = "shown"
+WORDS_UNRESOLVED: Final = "unresolved"
+WORDS_WITHHELD_FIGURE: Final = "withheld_figure"
+"""A quote that carries wording the site never publishes (a per cent sign, a chance, odds):
+the source's own words, but the rule about what a member page may show applies to every
+sentence on it, whoever wrote the sentence. The page says the words were withheld and why,
+and links the source."""
 SOURCE_FIXTURE_FILE: Final = "fixture_file"
 SOURCE_CLUB_NEWS_CAPTURE: Final = "club_news_capture"
 
@@ -67,7 +111,14 @@ class ManagerWord:
     source_url: str | None
     fetched_at_utc: str | None
     words: str | None
-    """The cited span, decoded; ``None`` when no held document hashes to the citation."""
+    """The cited span, decoded; ``None`` when unresolved or withheld (``words_status``)."""
+    words_status: str = WORDS_SHOWN
+
+    def __post_init__(self) -> None:
+        if self.words is None and self.words_status == WORDS_SHOWN:
+            object.__setattr__(self, "words_status", WORDS_UNRESOLVED)
+        if self.words is not None and self.words_status != WORDS_SHOWN:
+            raise ManagerWordsError("Words are either shown or withheld, never both.")
 
     @property
     def role(self) -> str | None:
@@ -185,6 +236,36 @@ def _covered(table: pd.DataFrame, table_path: Path) -> tuple[str, ...]:
     return tuple(str(club) for club in covered)
 
 
+def _require_the_coded_documents(
+    table: pd.DataFrame, table_path: Path, documents: Sequence[RawDocument]
+) -> None:
+    """Refuse documents that are not the ones this table's claims were coded from.
+
+    The manifest lists the digest of every document a claim cites (``document_sha256s``,
+    taken over the readable bytes the parser indexed). A source that holds none of them is a
+    different week or a different source, and joining it would publish that source's label
+    and link beside claims it never made.
+    """
+
+    declared = table.attrs.get("document_sha256s")
+    if declared is None:
+        raise ManagerWordsError(
+            f"{Path(table_path).name} arrived without its manifest's document digests, so "
+            "which documents its claims cite is not known."
+        )
+    held: set[str] = set()
+    for document in documents:
+        held.add(hashlib.sha256(document.readable).hexdigest())
+        held.add(hashlib.sha256(document.content).hexdigest())
+    missing = sorted(str(digest) for digest in declared if str(digest) not in held)
+    if missing:
+        raise ManagerWordsError(
+            f"The club-news source supplied does not hold {len(missing)} of the documents "
+            f"{Path(table_path).name} cites (first: {missing[0][:12]}); it is not the "
+            "source this table was coded from."
+        )
+
+
 def manager_words_from_artifact(
     table_path: Path,
     manifest_path: Path,
@@ -204,6 +285,7 @@ def manager_words_from_artifact(
             f"{sorted(gameweeks)}; one artifact is one decision week."
         )
     clubs = _covered(table, table_path)
+    _require_the_coded_documents(table, table_path, documents)
     words: list[ManagerWord] = []
     for row in table.to_dict(orient="records"):
         disposition = _text(row.get("rotation_disposition"))
@@ -215,6 +297,9 @@ def manager_words_from_artifact(
             row.get("rotation_claim_span_start"),
             row.get("rotation_claim_span_end"),
         )
+        status = WORDS_SHOWN if cited is not None else WORDS_UNRESOLVED
+        if cited is not None and QUOTE_WITHHELD_PATTERN.search(cited):
+            cited, status = None, WORDS_WITHHELD_FIGURE
         words.append(
             ManagerWord(
                 player_id=int(str(row["player_id"])),
@@ -226,6 +311,7 @@ def manager_words_from_artifact(
                 source_url=None if document is None else document.final_url,
                 fetched_at_utc=None if document is None else document.fetched_at_utc,
                 words=cited,
+                words_status=status,
             )
         )
     return ManagerWords(
@@ -282,9 +368,13 @@ __all__ = [
     "MANAGERS_WORD_RULE_VERSION",
     "NOT_CAPTAIN_DISPOSITIONS",
     "NOT_STARTING_DISPOSITIONS",
+    "QUOTE_WITHHELD_PATTERN",
     "SOURCE_CLUB_NEWS_CAPTURE",
     "SOURCE_FIXTURE_FILE",
     "SOURCE_SYNTHETIC_FIXTURE",
+    "WORDS_SHOWN",
+    "WORDS_UNRESOLVED",
+    "WORDS_WITHHELD_FIGURE",
     "ManagerWord",
     "ManagerWords",
     "ManagerWordsError",
