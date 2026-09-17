@@ -21,6 +21,11 @@ export interface Top100Copy {
   notOffered: string;
   unavailableReasons: Record<string, string> & { unknown: string };
   notSolved: string;
+  notForSelection: string;
+  rivalWindows: string;
+  strategyCost: (points: string) => string;
+  strategyCostAtMost: (points: string) => string;
+  variantLimits: Record<string, string>;
   title: string;
   weightLine: (weight: number) => string;
   notStart: string;
@@ -57,6 +62,19 @@ const en: Top100Copy = {
   },
   notSolved:
     "Settings with no plan solved for this member, with the switches as they stand, are off.",
+  notForSelection:
+    "No setting was solved for this selection. Settings exist on the pure-points plans and, for a strategy, against the default rival.",
+  rivalWindows: "A strategy's 3- and 5-week plans are solved against the default rival only.",
+  strategyCost: (points) =>
+    `This strategy and this setting together give up ~${points} expected points in the base model against the pure-points plan at 0, hits included.`,
+  strategyCostAtMost: (points) =>
+    `This strategy and this setting together give up at most ${points} expected points in the base model against the pure-points plan at 0, hits included.`,
+  variantLimits: {
+    "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in.":
+      "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in.",
+    "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.":
+      "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.",
+  },
   title: "Top 100 influence",
   weightLine: (weight) => `Setting: ${weight} (your choice).`,
   notStart:
@@ -97,6 +115,19 @@ const tr: Top100Copy = {
     unknown: "Bu yayından bu üye için Top 100 ayarı gösterilemiyor; yalnız 0 var.",
   },
   notSolved: "Bu üye için mevcut seçimlerle çözülmüş planı olmayan ayarlar kapalı.",
+  notForSelection:
+    "Bu seçim için ayar çözülmedi. Ayarlar saf puan planlarında ve bir stratejide varsayılan rakibe karşı var.",
+  rivalWindows: "Bir stratejinin 3 ve 5 haftalık planları yalnız varsayılan rakibe karşı çözülür.",
+  strategyCost: (points) =>
+    `Bu strateji ve bu ayar birlikte, 0 ayarlı saf puan planına göre temel modelde ~${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
+  strategyCostAtMost: (points) =>
+    `Bu strateji ve bu ayar birlikte, 0 ayarlı saf puan planına göre temel modelde en fazla ${points} beklenen puandan vazgeçmek demek, cezalar dahil.`,
+  variantLimits: {
+    "The Top 100 counts are the previous gameweek's and are repeated over every week of the window; they are read again when the next gameweek's selections are in.":
+      "Top 100 sayıları önceki haftanındır ve pencerenin her haftasında aynen tekrarlanır; sonraki haftanın seçimleri okununca yeniden hesaplanır.",
+    "The band against the rival, the overlap and the expected gap are the first week's, reached with one transfer; the later weeks are planned for points alone, because the rival's later squads are not known.":
+      "Rakibe karşı bant, örtüşme ve beklenen fark ilk haftaya aittir ve tek transferle ulaşılan düzeydir; sonraki haftalar yalnız puan için planlanır, çünkü rakibin sonraki kadroları bilinmiyor.",
+  },
   title: "Top 100 etkisi",
   weightLine: (weight) => `Ayar: ${weight} (senin seçimin).`,
   notStart:
@@ -138,6 +169,11 @@ export function top100Unavailable(copy: Top100Copy, reason: string | null): stri
  */
 const TOP100_LIMIT =
   /^The plan was chosen with the Top 100 influence at (5|10|20|30|40|50); every expected-points number in this document is the base model's, without it\.$/;
+
+/** A producer sentence this menu added, in the member's language; null for any other. */
+export function variantLimit(copy: Top100Copy, sentence: string): string | null {
+  return Object.hasOwn(copy.variantLimits, sentence) ? copy.variantLimits[sentence]! : null;
+}
 
 export function top100LimitWeight(sentence: string): number | null {
   const match = TOP100_LIMIT.exec(sentence);

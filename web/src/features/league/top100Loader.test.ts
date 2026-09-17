@@ -27,6 +27,41 @@ describe("loadEntryAdviceTop100", () => {
     }
   });
 
+  it("reads a window's or a rival strategy's setting only at its own path", async () => {
+    const window = { strategy: "saf-puan", window: 3, rivalEntryId: null };
+    const plan = await loadEntryAdviceTop100(
+      101,
+      "advice/101/saf-puan/3/top100-20.json",
+      20,
+      false,
+      undefined,
+      window,
+    );
+    expect(plan.payload.window).toBe(3);
+    expect(plan.payload.top100?.weight).toBe(20);
+    const rival = { strategy: "ortak-koru", window: 5, rivalEntryId: 202 };
+    const against = await loadEntryAdviceTop100(
+      101,
+      "advice/101/ortak-koru/5/vs-202/top100-40.json",
+      40,
+      false,
+      undefined,
+      rival,
+    );
+    expect(against.payload.mode).toBe("ortak-koru");
+    for (const [path, word, target] of [
+      ["advice/101/saf-puan/3/top100-20.json", true, window],
+      ["advice/101/saf-puan/5/top100-20.json", false, window],
+      ["advice/101/ortak-koru/5/vs-303/top100-40.json", false, rival],
+      ["advice/101/ortak-koru/5/vs-202/top100-40.json", false, { ...rival, window: 7 }],
+      ["advice/101/../x/5/vs-202/top100-40.json", false, { ...rival, strategy: "../x" }],
+    ] as const) {
+      await expect(
+        loadEntryAdviceTop100(101, path, path.includes("-40") ? 40 : 20, word, undefined, target),
+      ).rejects.toBeInstanceOf(LeagueDataError);
+    }
+  });
+
   it("reads the member's own weighted plan, with and without the word", async () => {
     const plain = await loadEntryAdviceTop100(
       101,

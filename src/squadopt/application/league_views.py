@@ -42,11 +42,13 @@ from squadopt.application.advice import (
     TOP100_SOLVE_ERRORS,
     AdviseEntryRequest,
     HorizonBuilder,
+    MemberControl,
     advise_entry,
     advise_with_managers_word,
     advise_with_top100,
     build_advice_payload,
     solve_member_control,
+    solve_pricing_control,
     solve_word_control,
 )
 from squadopt.application.advice_record import (
@@ -57,6 +59,11 @@ from squadopt.application.advice_record import (
     build_member_advice_record,
     record_member_advice,
     repository_commit,
+)
+from squadopt.application.advice_variants import (
+    advise_rival_window,
+    advise_rival_with_top100,
+    advise_window_with_top100,
 )
 from squadopt.application.entries import (
     EntryError,
@@ -158,6 +165,12 @@ class MemberRender:
     top100_payloads: tuple[tuple[int, bool, dict[str, object]], ...] = ()
     top100_unavailable: tuple[tuple[int, bool, str], ...] = ()
     top100_notes: tuple[str, ...] = ()
+    #: The menu beyond the one-week pure-points plan, against the default rival only:
+    #: ``(strategy, window, rival or None, setting, payload)`` for every document that
+    #: solved, and the same address with the reason for every one that did not. Setting 0
+    #: appears here only for a rival strategy over a window, which has no other home.
+    variant_payloads: tuple[tuple[str, int, int | None, int, dict[str, object]], ...] = ()
+    variant_unavailable: tuple[tuple[str, int, int | None, int, str], ...] = ()
 
 
 def render_member(
@@ -315,6 +328,19 @@ def render_member(
             elif manager_words is not None:
                 top100_unavailable.append((weight, True, weighted.word_unavailable))
             top100_notes.extend(weighted.notes)
+    variant_payloads, variant_unavailable, variant_notes = _render_variants(
+        task,
+        provider=provider,
+        inputs=inputs,
+        projection=projection,
+        rules=rules,
+        horizon_builder=horizon_builder,
+        top100_counts=top100_counts,
+        control=control,
+        windows=dict(window_payloads),
+        rival_payloads=payloads,
+    )
+    top100_notes.extend(variant_notes)
     return MemberRender(
         task.entry_id,
         baseline,
@@ -329,7 +355,166 @@ def render_member(
         top100_payloads=tuple(top100_payloads),
         top100_unavailable=tuple(top100_unavailable),
         top100_notes=tuple(top100_notes),
+        variant_payloads=tuple(variant_payloads),
+        variant_unavailable=tuple(variant_unavailable),
     )
+
+
+def _render_variants(
+    task: MemberRenderTask,
+    *,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+    horizon_builder: HorizonBuilder | None,
+    top100_counts: Top100Counts | None,
+    control: MemberControl,
+    windows: Mapping[int, dict[str, object]],
+    rival_payloads: list[tuple[str, int, dict[str, object]]],
+) -> tuple[
+    list[tuple[str, int, int | None, int, dict[str, object]]],
+    list[tuple[str, int, int | None, int, str]],
+    list[str],
+]:
+    """The menu beyond the one-week pure-points plan, from the member's own picks.
+
+    Pure-points windows under each Top 100 setting; and, against the default rival only,
+    each rival strategy under each setting at one week, and over each window at setting 0
+    and under each setting. The whole menu against every rival is the on-demand path's
+    work: a window solve is minutes, and the pairs grow with the square of the league.
+    Every failure is recorded at its address; none stops the member's other documents.
+    """
+
+    solved: list[tuple[str, int, int | None, int, dict[str, object]]] = []
+    failed: list[tuple[str, int, int | None, int, str]] = []
+    notes: list[str] = []
+    weights = task.top100_weights if top100_counts is not None else ()
+    rival = task.default_rival_id
+
+    def request(strategy: str, window: int, rival_id: int | None) -> AdviseEntryRequest:
+        return AdviseEntryRequest(
+            season=task.season,
+            gameweek=task.gameweek,
+            league_id=task.league_id,
+            entry_id=task.entry_id,
+            strategy=strategy,
+            window=window,
+            rival_entry_id=rival_id,
+        )
+
+    for window, control_payload in windows.items():
+        for weight in weights:
+            assert top100_counts is not None
+            try:
+                advice = advise_window_with_top100(
+                    request(COMPUTED_MODE, window, None),
+                    weight=weight,
+                    counts=top100_counts,
+                    provider=provider,
+                    inputs=inputs,
+                    projection=projection,
+                    rules=rules,
+                    horizon_builder=horizon_builder,
+                    control_payload=control_payload,
+                )
+            except TOP100_SOLVE_ERRORS as error:
+                failed.append((COMPUTED_MODE, window, None, weight, str(error)))
+                continue
+            solved.append((COMPUTED_MODE, window, None, weight, advice.payload))
+            notes.extend(advice.notes)
+    if rival is None:
+        return solved, failed, notes
+    references = {
+        strategy: payload for strategy, rival_id, payload in rival_payloads if rival_id == rival
+    }
+    if weights and references:
+        try:
+            prices = {
+                int(str(row["player_id"])): int(str(row["price_tenths"]))
+                for _, row in inputs.players.iterrows()
+            }
+            pricing = solve_pricing_control(
+                inputs,
+                projection,
+                held_squad_from_picks(control.picks, current_prices=prices),
+                rules,
+                control,
+            )
+        except TOP100_SOLVE_ERRORS as error:
+            pricing = None
+            failed.extend(
+                (strategy, COMPUTED_WINDOW, rival, weight, str(error))
+                for strategy in references
+                for weight in weights
+            )
+        for strategy, reference in (references if pricing is not None else {}).items():
+            for weight in weights:
+                assert top100_counts is not None and pricing is not None
+                try:
+                    advice = advise_rival_with_top100(
+                        request(strategy, COMPUTED_WINDOW, rival),
+                        weight=weight,
+                        counts=top100_counts,
+                        provider=provider,
+                        inputs=inputs,
+                        projection=projection,
+                        rules=rules,
+                        control=control,
+                        pricing=pricing,
+                        reference_payload=reference,
+                    )
+                except TOP100_SOLVE_ERRORS as error:
+                    failed.append((strategy, COMPUTED_WINDOW, rival, weight, str(error)))
+                    continue
+                solved.append((strategy, COMPUTED_WINDOW, rival, weight, advice.payload))
+    for strategy in task.rival_strategies:
+        for window, control_payload in windows.items():
+            at_zero: dict[str, object] | None = None
+            for weight in (0, *weights):
+                if weight and at_zero is None:
+                    failed.append(
+                        (
+                            strategy,
+                            window,
+                            rival,
+                            weight,
+                            "The strategy's window at 0 did not solve.",
+                        )
+                    )
+                    continue
+                try:
+                    advice = advise_rival_window(
+                        request(strategy, window, rival),
+                        weight=weight,
+                        counts=top100_counts,
+                        provider=provider,
+                        inputs=inputs,
+                        projection=projection,
+                        rules=rules,
+                        horizon_builder=horizon_builder,
+                        control_payload=control_payload,
+                        reference_payload=at_zero,
+                    )
+                except TOP100_SOLVE_ERRORS as error:
+                    failed.append((strategy, window, rival, weight, str(error)))
+                    continue
+                if weight == 0:
+                    at_zero = advice.payload
+                solved.append((strategy, window, rival, weight, advice.payload))
+                notes.extend(advice.notes)
+    return solved, failed, notes
+
+
+def variant_path(
+    entry_id: int, strategy: str, window: int, rival_id: int | None, weight: int
+) -> str:
+    """Where one variant document is published, relative to the league tree."""
+
+    directory = f"advice/{entry_id}/{strategy}/{window}"
+    if rival_id is not None:
+        directory = f"{directory}/vs-{rival_id}"
+    return f"{directory}/{top100_file(weight)}" if weight else f"{directory}.json"
 
 
 #: How a caller runs the member tasks: ``map`` in-process, or a process pool's ``map``.
@@ -1223,16 +1408,66 @@ def build_league_views(
             )
             _write(relative, payload)
             (word_paths if word else paths)[str(weight)] = relative
-        kept_top100 = {*paths.values(), *word_paths.values()}
-        stale_directory = out / top100_directory
-        if stale_directory.is_dir():
-            for stale_file in sorted(stale_directory.glob("top100-*.json")):
-                relative = f"{top100_directory}/{stale_file.name}"
-                if relative not in kept_top100:
+        # The menu beyond the one-week pure-points plan, each document at its own address.
+        documents: list[dict[str, object]] = []
+        variant_windows: dict[str, list[int]] = {}
+        variant_computed: list[dict[str, object]] = []
+        for strategy, window, rival_id, weight, payload in render.variant_payloads:
+            relative = variant_path(entry_id, strategy, window, rival_id, weight)
+            _write(relative, payload)
+            if weight:
+                documents.append(
+                    {
+                        "strategy": strategy,
+                        "window": window,
+                        "rival_entry_id": rival_id,
+                        "weight": weight,
+                        "path": relative,
+                    }
+                )
+            else:
+                variant_windows.setdefault(strategy, []).append(window)
+                variant_computed.append(
+                    {
+                        "strategy": strategy,
+                        "rival_entry_id": rival_id,
+                        "window": window,
+                        "path": relative,
+                    }
+                )
+        kept_variants = {
+            *paths.values(),
+            *word_paths.values(),
+            *(
+                variant_path(entry_id, strategy, window, rival_id, weight)
+                for strategy, window, rival_id, weight, _payload in render.variant_payloads
+            ),
+        }
+        member_directory = out / f"advice/{entry_id}"
+        if member_directory.is_dir():
+            # A setting's document, or a rival strategy's window, that an earlier publish
+            # wrote and this one did not would otherwise stay beside an index that does
+            # not name it.
+            candidates = {
+                *member_directory.rglob("top100-*.json"),
+                *(
+                    path
+                    for path in member_directory.glob("*/[35]/vs-*.json")
+                    if path.parent.parent.name != COMPUTED_MODE
+                ),
+            }
+            for stale_file in sorted(candidates):
+                relative = stale_file.relative_to(out).as_posix()
+                if relative not in kept_variants:
                     stale_file.unlink()
                     stale_removed.append(relative)
-            if not any(stale_directory.iterdir()):
-                stale_directory.rmdir()
+            for directory in sorted(
+                (path for path in member_directory.rglob("*") if path.is_dir()),
+                key=lambda path: len(path.parts),
+                reverse=True,
+            ):
+                if not any(directory.iterdir()):
+                    directory.rmdir()
         top100_index: dict[str, object]
         if top100_counts is None:
             top100_index = {
@@ -1252,6 +1487,9 @@ def build_league_views(
                     {"weight": weight, "word": word, "reason": "not_solved_for_member"}
                     for weight, word, _reason in render.top100_unavailable
                 ],
+                # The settings beyond the one-week pure-points plan: pure-points windows,
+                # and the rival strategies against the default rival at every window.
+                "documents": documents,
                 "source": top100_counts.source_record(),
             }
 
@@ -1302,6 +1540,17 @@ def build_league_views(
                 }
                 for window, reason in render.window_unavailable
             )
+            # A rival strategy's window that did not solve, at the same address.
+            unavailable.extend(
+                {
+                    "strategy": strategy,
+                    "rival_entry_id": rival_id,
+                    "window": window,
+                    "reason": reason,
+                }
+                for strategy, window, rival_id, weight, reason in render.variant_unavailable
+                if weight == 0
+            )
             _write(
                 f"advice/{entry_id}/index.json",
                 {
@@ -1319,7 +1568,12 @@ def build_league_views(
                             COMPUTED_WINDOW,
                             *(window for window, _payload in render.window_payloads),
                         ],
-                        **{strategy: [COMPUTED_WINDOW] for strategy in task.rival_strategies},
+                        # A rival strategy's longer windows exist against the default
+                        # rival only; ``computed`` names the files.
+                        **{
+                            strategy: [COMPUTED_WINDOW, *variant_windows.get(strategy, [])]
+                            for strategy in task.rival_strategies
+                        },
                     },
                     "strategies": [COMPUTED_MODE, *task.rival_strategies],
                     "rival_entry_ids": list(task.rival_ids),
@@ -1327,7 +1581,7 @@ def build_league_views(
                     # The declared rule's pick among the three, with the gap and the
                     # weeks remaining it read; null when either input is unproven.
                     "suggested_strategy": suggested,
-                    "computed": computed,
+                    "computed": [*computed, *variant_computed],
                     "unavailable": unavailable,
                 },
             )
@@ -1438,6 +1692,12 @@ def build_league_views(
                     f"Top 100 influence {weight}{' with the word' if word else ''} "
                     f"not solved: {reason}"
                     for weight, word, reason in render.top100_unavailable
+                ),
+                *(
+                    f"{strategy} {window} weeks"
+                    f"{'' if rival_id is None else f' vs {rival_id}'}, Top 100 influence "
+                    f"{weight} not solved: {reason}"
+                    for strategy, window, rival_id, weight, reason in render.variant_unavailable
                 ),
                 *render.top100_notes,
             )

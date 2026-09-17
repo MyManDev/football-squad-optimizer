@@ -77,6 +77,11 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
             selection.top100.weight,
             selection.evidence.on,
             { signal },
+            {
+              strategy: request.strategy,
+              window: request.window,
+              rivalEntryId: request.rivalEntryId ?? null,
+            },
           )
         : selection.evidence.on && selection.path
           ? loadEntryAdviceEvidence(entryId, selection.path, { signal })

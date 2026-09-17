@@ -4,7 +4,7 @@ import { useLanguage } from "../../../i18n/context";
 import { points, signedPoints, utcShort } from "../../../lib/format";
 import { EVIDENCE_COPY, QUOTE_WITHHELD } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
-import { TOP100_COPY, top100LimitWeight } from "../advice/top100Copy";
+import { TOP100_COPY, top100LimitWeight, variantLimit } from "../advice/top100Copy";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
   AdviceMove,
@@ -136,7 +136,8 @@ export function AdviceCard({
   const wordPriced = view.mode === "saf-puan" && view.evidence !== undefined;
   // A Top 100 weight is priced the same way, in base-model points against the plan at 0;
   // with the word on as well, the one number is the pair's.
-  const top100Priced = view.mode === "saf-puan" && view.top100 !== undefined;
+  const top100Priced = view.top100 !== undefined;
+  const strategyPriced = top100Priced && view.mode !== "saf-puan";
   const showsPrice =
     (view.mode !== "saf-puan" || wordPriced || top100Priced) && finiteNumber(price) && price >= 0;
   const evidenceCopy = EVIDENCE_COPY[language];
@@ -193,21 +194,25 @@ export function AdviceCard({
       {showsPrice && price != null ? (
         <p className={styles.planCost}>
           <strong className="num">
-            {top100Priced
-              ? wordPriced
-                ? unproven
-                  ? top100Copy.combinedCostAtMost(points(price, 1, locale))
-                  : top100Copy.combinedCost(points(price, 1, locale))
-                : unproven
-                  ? top100Copy.costAtMost(points(price, 1, locale))
-                  : top100Copy.cost(points(price, 1, locale))
-              : wordPriced
-                ? unproven
-                  ? evidenceCopy.costAtMost(points(price, 1, locale))
-                  : evidenceCopy.cost(points(price, 1, locale))
-                : unproven
-                  ? copy.planCostAtMost(points(price, 1, locale))
-                  : copy.planCost(points(price, 1, locale))}
+            {strategyPriced
+              ? unproven
+                ? top100Copy.strategyCostAtMost(points(price, 1, locale))
+                : top100Copy.strategyCost(points(price, 1, locale))
+              : top100Priced
+                ? wordPriced
+                  ? unproven
+                    ? top100Copy.combinedCostAtMost(points(price, 1, locale))
+                    : top100Copy.combinedCost(points(price, 1, locale))
+                  : unproven
+                    ? top100Copy.costAtMost(points(price, 1, locale))
+                    : top100Copy.cost(points(price, 1, locale))
+                : wordPriced
+                  ? unproven
+                    ? evidenceCopy.costAtMost(points(price, 1, locale))
+                    : evidenceCopy.cost(points(price, 1, locale))
+                  : unproven
+                    ? copy.planCostAtMost(points(price, 1, locale))
+                    : copy.planCost(points(price, 1, locale))}
           </strong>
           {(rivalName ?? view.rival_label) ? (
             <span> · {copy.planRival(rivalName ?? String(view.rival_label))}</span>
@@ -364,9 +369,11 @@ function StatedLimits({ view }: { view: EntryAdvice }) {
             <li key={sentence}>
               {weight !== null
                 ? TOP100_COPY[language].limit(weight)
-                : Object.hasOwn(copy.statedLimits, sentence)
-                  ? copy.statedLimits[sentence]
-                  : copy.statedLimitUnknown}
+                : variantLimit(TOP100_COPY[language], sentence) !== null
+                  ? variantLimit(TOP100_COPY[language], sentence)
+                  : Object.hasOwn(copy.statedLimits, sentence)
+                    ? copy.statedLimits[sentence]
+                    : copy.statedLimitUnknown}
             </li>
           );
         })}

@@ -274,6 +274,17 @@ export type IndexTop100 =
       paths: Record<string, string>;
       word_paths: Record<string, string>;
       unavailable: { weight: number; word: boolean; reason: string }[];
+      /**
+       * The settings beyond the one-week pure-points plan: pure-points windows, and the
+       * rival strategies against the default rival at every window. Absent before they existed.
+       */
+      documents?: {
+        strategy: string;
+        window: number;
+        rival_entry_id: number | null;
+        weight: number;
+        path: string;
+      }[];
       source?: Record<string, unknown>;
     }
   | { available: false; reason: string };

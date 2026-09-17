@@ -158,6 +158,93 @@ describe("the Top 100 selection", () => {
     expect(selection.path).toBe(`advice/${ENTRY}/saf-puan/1.json`);
   });
 
+  it("reads a pure-points window's setting from the documents the index names", () => {
+    const documents = [
+      {
+        strategy: "saf-puan",
+        window: 3,
+        rival_entry_id: null,
+        weight: 20,
+        path: `advice/${ENTRY}/saf-puan/3/top100-20.json`,
+      },
+    ];
+    const selection = resolve("mode=saf-puan&window=3&top100=20", menu({ documents }));
+    expect(selection.path).toBe(`advice/${ENTRY}/saf-puan/3/top100-20.json`);
+    expect(selection.top100).toMatchObject({ weight: 20, notOffered: false });
+    expect(selection.top100.weights).toEqual([0, 20]);
+    // The manager's word never combines with a window: the switch stays off.
+    const word = resolve("mode=saf-puan&window=3&top100=20&llm=on", menu({ documents }));
+    expect(word.evidence.on).toBe(false);
+    expect(word.path).toBe(`advice/${ENTRY}/saf-puan/3/top100-20.json`);
+    // A window with no document keeps the plan at 0.
+    const five = resolve("mode=saf-puan&window=5&top100=20", menu({ documents }));
+    expect(five.path).toBe(`advice/${ENTRY}/saf-puan/5.json`);
+    expect(five.top100.notOffered).toBe(true);
+  });
+
+  it("reads a rival strategy's setting only against the rival the document names", () => {
+    const base = mockEntryAdviceIndex(ENTRY).payload;
+    const rival = base.default_rival_entry_id!;
+    const other = base.rival_entry_ids.find((id) => id !== rival)!;
+    const documents = [
+      {
+        strategy: "ortak-koru",
+        window: 1,
+        rival_entry_id: rival,
+        weight: 30,
+        path: `advice/${ENTRY}/ortak-koru/1/vs-${rival}/top100-30.json`,
+      },
+    ];
+    const selection = resolve("mode=ortak-koru&window=1&top100=30", menu({ documents }));
+    expect(selection.status).toBe("ready");
+    expect(selection.path).toBe(`advice/${ENTRY}/ortak-koru/1/vs-${rival}/top100-30.json`);
+    expect(selection.top100.weight).toBe(30);
+
+    const against = resolve(
+      `mode=ortak-koru&window=1&rival=${other}&top100=30`,
+      menu({ documents }),
+    );
+    expect(against.path).toBe(`advice/${ENTRY}/ortak-koru/1/vs-${other}.json`);
+    expect(against.top100.weight).toBe(0);
+    expect(against.top100.offered).toEqual([0]);
+
+    const foreign = menu({
+      documents: [{ ...documents[0]!, path: `advice/999/ortak-koru/1/vs-${rival}/top100-30.json` }],
+    });
+    expect(resolve("mode=ortak-koru&window=1&top100=30", foreign).top100.weight).toBe(0);
+  });
+
+  it("offers a rival strategy's longer window where the index computed it", () => {
+    const base = mockEntryAdviceIndex(ENTRY).payload;
+    const rival = base.default_rival_entry_id!;
+    const path = `advice/${ENTRY}/ortak-koru/3/vs-${rival}.json`;
+    const index = {
+      ...base,
+      windows: { ...base.windows, "ortak-koru": [1, 3] as (1 | 3 | 5)[] },
+      computed: [...base.computed, { strategy: "ortak-koru", rival_entry_id: rival, path }],
+    };
+    const selection = resolvePublishedAdvice(
+      new URLSearchParams("mode=ortak-koru&window=3"),
+      LEAGUE,
+      ENTRY,
+      MEMBERS,
+      index,
+    );
+    expect(selection.status).toBe("ready");
+    expect(selection.path).toBe(path);
+    expect(selection.windows).toEqual([1, 3]);
+    // Against another rival the window was not computed, and the page says so.
+    const other = base.rival_entry_ids.find((id) => id !== rival)!;
+    const against = resolvePublishedAdvice(
+      new URLSearchParams(`mode=ortak-koru&window=3&rival=${other}`),
+      LEAGUE,
+      ENTRY,
+      MEMBERS,
+      index,
+    );
+    expect(against.status).not.toBe("ready");
+  });
+
   it("reports a value the menu does not offer", () => {
     const selection = resolve("mode=saf-puan&window=1&top100=15", menu());
     expect(selection.top100.notOffered).toBe(true);
