@@ -1,8 +1,8 @@
 """The member menu beyond the one-week pure-points plan: windows and rival strategies, each
 with the Top 100 influence.
 
-Three kinds of document, all batch-only (the on-demand request path still answers what
-``advice_capabilities`` lists):
+Three kinds of document. The batch publishes them against the default rival only; a
+request reaches each of them, against any rival, through ``advice_menu.advise_menu_entry``:
 
 - a **pure-points window** (three or five weeks) chosen on Top 100 weighted points;
 - a **rival strategy at one week** chosen on Top 100 weighted points;

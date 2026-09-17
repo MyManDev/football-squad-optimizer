@@ -77,7 +77,26 @@ SQUADOPT_REPOSITORY_COMMIT=<40 hex>
 SQUADOPT_BACKEND_SEASON=              # otherwise inferred from the capture
 SQUADOPT_BACKEND_RATE_LIMIT=30        # per window, per client address and per (capture, entry)
 SQUADOPT_BACKEND_RATE_WINDOW_SECONDS=60
+
+# Optional, and together they switch the member menu's two switches on. Unset, the backend
+# answers plain requests exactly as before and refuses a switch by name.
+# The repository's artifacts/ directory. The Top 100 settings read the week's export from
+# phase_b/player_evidence_v1_<season>_gw<NN>_top100_<hash12>.csv (newest generated one that
+# passes the handoff's own gate for the current capture); the manager's word reads
+# rotation/rotation_evidence_v2_<season>_gw<NN>_<capture hash12>.csv, each with its manifest.
+SQUADOPT_BACKEND_ARTIFACT_ROOT=<path to artifacts/>
+# What the rotation table was coded from: the committed fixture file, or a club-news capture
+# directory under the snapshot root. Needed for the manager's word only.
+SQUADOPT_BACKEND_CLUB_NEWS_SOURCE=<path to data/sample/club_news_v1.fixture.json>
 ```
+
+Both processes need the same two values: the api uses them to refuse early and to address the
+cache, the worker to compute. With an artifact root set, the api projects the capture once per
+context, the first time a request or `GET /api/v1/leagues/{id}/capabilities` asks about a
+switch, because the Top 100 gate needs the projected table. An export or rotation table that
+lands later is picked up by both without a restart. The Top 100 menu needs a handoff built
+without the uplift (`--projection component-only`), as the weekly runbook says; otherwise the
+gate refuses every export and the setting stays off.
 
 The ops process does not move. Captures, decisions, settles and site builds stay on the machine
 that owns the ledger; the backend **reads** what ops publishes and never writes it.
@@ -433,5 +452,9 @@ the command above, a bad data release is the `metadata.json` deletion under
 | POST answers `503 NOT_READY` | the store probe is failing; `/ready` names the check, and a missing volume shows up as `cache_store` |
 | job `failed` with `CONTEXT_UNAVAILABLE` | the capture moved on between accepting and computing; asking again is the fix |
 | job `failed` with `REQUEST_UNREADABLE` | the spec beside the job's key is missing — the store lost a write, so check the probe |
+| job `failed` with `ENTRY_NOT_IN_CAPTURE` | `members.json` lists the member or the rival, but the current capture holds no picks for them; re-capture with `--entries` |
+| job `failed` with `SWITCH_INPUTS_CHANGED` | the Top 100 export or the rotation table was replaced between accepting and computing; asking again is the fix |
+| `422 TOP100_INPUTS_UNAVAILABLE` or `422 MANAGERS_WORD_UNAVAILABLE` | `SQUADOPT_BACKEND_ARTIFACT_ROOT` (and, for the word, `SQUADOPT_BACKEND_CLUB_NEWS_SOURCE`) unset, or no artifact for the current capture; the worker and api log `advice_switch_inputs_loaded` with the reason in `notes` |
+| POST answers `503 NOT_READY` with `Retry-After` | the queue lock stayed busy for five seconds; the client retries. The worker logs `advice_worker_queue_busy` for the same thing and carries on |
 | job `failed` with `TOO_MANY_ATTEMPTS` | a job that cannot finish; read the worker log rather than raising the limit |
 | job `failed` with `DETERMINISM_DEFECT` | two different answers under one complete key. This is a real bug in the compute path, never a retry |

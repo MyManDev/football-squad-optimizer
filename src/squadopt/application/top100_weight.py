@@ -34,6 +34,7 @@ from typing import Any, Final
 
 import pandas as pd
 
+from squadopt.application.advice_capabilities import TOP100_WEIGHTS as _CAPABILITY_WEIGHTS
 from squadopt.application.entries import EntryError
 from squadopt.data.errors import DataError
 from squadopt.features.evidence_artifact import read_player_evidence_artifact
@@ -44,7 +45,9 @@ from squadopt.prediction.config import PredictionConfigurationError
 from squadopt.prediction.elite_evidence import ELITE_COHORT_SIZE, apply_elite_evidence
 
 #: The weights a member may choose. Zero is the published plan and has no file of its own.
-TOP100_WEIGHTS: Final[tuple[int, ...]] = (0, 5, 10, 20, 30, 40, 50)
+#: Defined beside the other request capabilities, which a transport reads without this
+#: module's solver-side imports, and named here because this is where the rule lives.
+TOP100_WEIGHTS: Final[tuple[int, ...]] = _CAPABILITY_WEIGHTS
 
 #: How a weighted document's price is measured: base-model expected points of the eleven
 #: with the captain doubled, net of the game's hit charge, against the member's own
