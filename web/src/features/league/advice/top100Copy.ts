@@ -30,6 +30,7 @@ export interface Top100Copy {
   weightLine: (weight: number) => string;
   notStart: string;
   saturation: string;
+  negativeRow: string;
   honesty: string;
   unchanged: string;
   changed: string;
@@ -80,6 +81,8 @@ const en: Top100Copy = {
   notStart:
     "This is the Top 100 teams' previous-week choice of eleven, not a measurement of whether a player will start.",
   saturation: "A higher setting can return the same plan.",
+  negativeRow:
+    "The eleven is chosen with the setting, so a row can read below zero on the base model's points.",
   honesty:
     "This is the price of a preference; no points gain from this setting has been measured. The points on the card are the base model's, without the setting.",
   unchanged: "This setting did not change your plan this week.",
@@ -133,6 +136,8 @@ const tr: Top100Copy = {
   notStart:
     "Bu, Top 100 takımlarının önceki haftaki ilk 11 tercihidir; oyuncunun maçta başlayıp başlamayacağının ölçümü değildir.",
   saturation: "Daha yüksek bir ayar aynı planı verebilir.",
+  negativeRow:
+    "İlk 11 bu ayarla seçilir; bu yüzden bir satır temel modelin puanlarında sıfırın altında görünebilir.",
   honesty:
     "Bu bir tercihin bedelidir; bu ayarın puan kazandırdığı ölçülmedi. Karttaki puanlar ayarsız temel modelin puanlarıdır.",
   unchanged: "Bu ayar bu hafta planını değiştirmedi.",

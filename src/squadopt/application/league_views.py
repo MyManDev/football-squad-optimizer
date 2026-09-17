@@ -64,6 +64,7 @@ from squadopt.application.advice_variants import (
     advise_rival_window,
     advise_rival_with_top100,
     advise_window_with_top100,
+    band_level_with_one_transfer,
 )
 from squadopt.application.entries import (
     EntryError,
@@ -96,6 +97,7 @@ from squadopt.live import (
     SeasonRules,
 )
 from squadopt.live.transfers import plan_transfer_menu
+from squadopt.planning import TransferPlanResult
 from squadopt.scenarios import RivalSquad
 from squadopt.scenarios.paths import ScenarioPathSet
 
@@ -217,6 +219,26 @@ def render_member(
         return MemberRender(task.entry_id, None, str(error), (), ())
     payloads: list[tuple[str, int, dict[str, object]]] = []
     unavailable: list[tuple[str, int, str]] = []
+    # The rival price tag's anchor depends on the member alone, so it is solved once for
+    # the whole menu. A failure here is left to each document to meet and record itself.
+    pricing: TransferPlanResult | None = None
+    if task.rival_strategies and task.rival_ids:
+        try:
+            pricing = solve_pricing_control(
+                inputs,
+                projection,
+                held_squad_from_picks(
+                    picks,
+                    current_prices={
+                        int(str(row["player_id"])): int(str(row["price_tenths"]))
+                        for _, row in inputs.players.iterrows()
+                    },
+                ),
+                rules,
+                control,
+            )
+        except TOP100_SOLVE_ERRORS:
+            pricing = None
     for strategy in task.rival_strategies:
         for rival_id in task.rival_ids:
             try:
@@ -234,6 +256,7 @@ def render_member(
                     projection=projection,
                     rules=rules,
                     control=control,
+                    pricing=pricing,
                 )
             except (EntryError, DataError) as error:
                 unavailable.append((strategy, rival_id, str(error)))
@@ -339,6 +362,7 @@ def render_member(
         control=control,
         windows=dict(window_payloads),
         rival_payloads=payloads,
+        pricing=pricing,
     )
     top100_notes.extend(variant_notes)
     return MemberRender(
@@ -372,6 +396,7 @@ def _render_variants(
     control: MemberControl,
     windows: Mapping[int, dict[str, object]],
     rival_payloads: list[tuple[str, int, dict[str, object]]],
+    pricing: TransferPlanResult | None = None,
 ) -> tuple[
     list[tuple[str, int, int | None, int, dict[str, object]]],
     list[tuple[str, int, int | None, int, str]],
@@ -430,17 +455,18 @@ def _render_variants(
     }
     if weights and references:
         try:
-            prices = {
-                int(str(row["player_id"])): int(str(row["price_tenths"]))
-                for _, row in inputs.players.iterrows()
-            }
-            pricing = solve_pricing_control(
-                inputs,
-                projection,
-                held_squad_from_picks(control.picks, current_prices=prices),
-                rules,
-                control,
-            )
+            if pricing is None:
+                prices = {
+                    int(str(row["player_id"])): int(str(row["price_tenths"]))
+                    for _, row in inputs.players.iterrows()
+                }
+                pricing = solve_pricing_control(
+                    inputs,
+                    projection,
+                    held_squad_from_picks(control.picks, current_prices=prices),
+                    rules,
+                    control,
+                )
         except TOP100_SOLVE_ERRORS as error:
             pricing = None
             failed.extend(
@@ -468,7 +494,27 @@ def _render_variants(
                     failed.append((strategy, COMPUTED_WINDOW, rival, weight, str(error)))
                     continue
                 solved.append((strategy, COMPUTED_WINDOW, rival, weight, advice.payload))
-    for strategy in task.rival_strategies:
+    pure = {
+        (window, weight): payload
+        for mode, window, _rival, weight, payload in solved
+        if mode == COMPUTED_MODE
+    }
+    for strategy in task.rival_strategies if windows else ():
+        try:
+            level: int | None = band_level_with_one_transfer(
+                request(strategy, COMPUTED_WINDOW, rival),
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+            )
+        except TOP100_SOLVE_ERRORS as error:
+            failed.extend(
+                (strategy, window, rival, weight, str(error))
+                for window in windows
+                for weight in (0, *weights)
+            )
+            continue
         for window, control_payload in windows.items():
             at_zero: dict[str, object] | None = None
             for weight in (0, *weights):
@@ -495,6 +541,8 @@ def _render_variants(
                         horizon_builder=horizon_builder,
                         control_payload=control_payload,
                         reference_payload=at_zero,
+                        applied_level=level,
+                        pure_payload=control_payload if weight == 0 else pure.get((window, weight)),
                     )
                 except TOP100_SOLVE_ERRORS as error:
                     failed.append((strategy, window, rival, weight, str(error)))

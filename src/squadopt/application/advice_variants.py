@@ -25,6 +25,7 @@ and the later weeks are planned for points alone, because nothing about the riva
 squads is known.
 """
 
+import copy
 import math
 from collections.abc import Mapping
 from dataclasses import replace
@@ -40,10 +41,13 @@ from squadopt.application.advice import (
     Top100Advice,
     _advise_against_rival,
     _requested_picks,
+    _setting_rows,
     _solve_within_free_transfers,
     solve_window_plan,
+    unproven_bench_allowance,
     window_horizon,
     window_payload,
+    window_stated_limits,
 )
 from squadopt.application.entries import EntryError, EntryPicksProvider, held_squad_from_picks
 from squadopt.application.strategies import STRATEGY_CATALOG
@@ -102,6 +106,11 @@ def weighted_horizon(
     return replace(horizon, table=table)
 
 
+def _players(payload: Mapping[str, object], key: str) -> list[Mapping[str, object]]:
+    rows = payload.get(key)
+    return [row for row in rows if isinstance(row, Mapping)] if isinstance(rows, list) else []
+
+
 def _points_by_week(horizon: ProjectionHorizon) -> dict[int, dict[int, float]]:
     points: dict[int, dict[int, float]] = {}
     for gameweek, player, value in zip(
@@ -128,6 +137,36 @@ def _window_total(weeks: tuple[PlanningWeekResult, ...]) -> float:
     if not math.isfinite(total):
         raise EntryError("A window must score to finite base points.")
     return total
+
+
+def _control_bench_bound(control_payload: Mapping[str, object], base: ProjectionHorizon) -> float:
+    """No less than the bench points the pure-points window carries, from what it published.
+
+    The payload names the first week's fifteen and every week's transfers, so each week's
+    fifteen is known; its eleven is not, beyond the first. A week's bench is the fifteen
+    less the eleven, and the eleven scores its published total less the captain's double,
+    who is at most the fifteen's best player: so the fifteen's points, less that total,
+    plus the best player's, is never below the bench. A bound, used only to keep an
+    unproven ceiling honest.
+    """
+
+    by_week = _points_by_week(base)
+    squad = {
+        int(str(player["player_id"]))
+        for key in ("starting_xi", "bench")
+        for player in _players(control_payload, key)
+    }
+    bound = 0.0
+    rows = control_payload.get("plan_weeks")
+    for index, row in enumerate(rows if isinstance(rows, list) else []):
+        if index:
+            squad -= {int(str(p["player_id"])) for p in row.get("transfers_out", [])}
+            squad |= {int(str(p["player_id"])) for p in row.get("transfers_in", [])}
+        points = by_week.get(int(str(row["gameweek"])), {})
+        held = [points.get(player, 0.0) for player in squad]
+        if held:
+            bound += max(0.0, math.fsum(held) - float(str(row["expected_points"])) + max(held))
+    return bound
 
 
 def _control_reading(control_payload: Mapping[str, object]) -> tuple[float, float]:
@@ -167,8 +206,14 @@ def _signature(payload: Mapping[str, object]) -> tuple[object, ...]:
         )
 
     rows = payload.get("plan_weeks")
+    # A later week can differ in its eleven or armband alone (a double gameweek under a
+    # setting), and only its total shows it, so the total is part of what a week is.
     weeks = tuple(
-        (ids(row.get("transfers_out")), ids(row.get("transfers_in")))
+        (
+            ids(row.get("transfers_out")),
+            ids(row.get("transfers_in")),
+            round(float(str(row.get("expected_points", 0.0))), 6),
+        )
         for row in (rows if isinstance(rows, list) else [])
         if isinstance(row, Mapping)
     )
@@ -204,13 +249,17 @@ def _price(
     *,
     control_payload: Mapping[str, object],
     selected_total: float,
+    base: ProjectionHorizon,
 ) -> str:
     """Price a window document against the pure-points window; returns an operator note."""
 
     control_total, slack = _control_reading(control_payload)
+    allowance = unproven_bench_allowance(slack, _control_bench_bound(control_payload, base))
     cost = max(control_total, selected_total) - selected_total
     payload["expected_points_cost"] = cost
-    payload["expected_points_cost_ceiling"] = max(cost, control_total + slack - selected_total)
+    payload["expected_points_cost_ceiling"] = max(
+        cost, control_total + slack + allowance - selected_total
+    )
     payload["control_solver_status"] = control_payload.get("solver_status")
     payload["control_optimality_gap"] = control_payload.get("optimality_gap")
     if selected_total > control_total:
@@ -232,16 +281,16 @@ def _relabel_moves(
 ) -> None:
     """A move the setting-0 document also makes keeps its reason; the rest are the setting's."""
 
-    if reference is None:
-        return
-    shared = _first_week_moves(reference)
-    moves = payload.get("moves")
-    for move in moves if isinstance(moves, list) else []:
-        out, into = move.get("player_out"), move.get("player_in")
-        if not isinstance(out, Mapping) or not isinstance(into, Mapping):
-            continue
-        pair = (int(str(out["player_id"])), int(str(into["player_id"])))
-        move["reason_code"] = kept if pair in shared else "top100_preference"
+    if reference is not None:
+        shared = _first_week_moves(reference)
+        moves = payload.get("moves")
+        for move in moves if isinstance(moves, list) else []:
+            out, into = move.get("player_out"), move.get("player_in")
+            if not isinstance(out, Mapping) or not isinstance(into, Mapping):
+                continue
+            pair = (int(str(out["player_id"])), int(str(into["player_id"])))
+            move["reason_code"] = kept if pair in shared else "top100_preference"
+    _setting_rows(payload)
 
 
 def _limits(payload: dict[str, object], *sentences: str) -> None:
@@ -290,7 +339,9 @@ def advise_window_with_top100(
         choice_points=base_points(weighted_projection(projection, counts.counts, weight)),
     )
     _limits(payload, TOP100_LIMIT.format(weight=weight), TOP100_WINDOW_LIMIT)
-    note = _price(payload, control_payload=control_payload, selected_total=_window_total(weeks))
+    note = _price(
+        payload, control_payload=control_payload, selected_total=_window_total(weeks), base=base
+    )
     _relabel_moves(payload, control_payload, kept="window_value")
     payload["top100"] = _top100_block(
         weight, _signature(payload) != _signature(control_payload), counts
@@ -364,6 +415,57 @@ def advise_rival_with_top100(
     return Top100Advice(weight, payload)
 
 
+def band_level_with_one_transfer(
+    request: AdviseEntryRequest,
+    *,
+    provider: EntryPicksProvider,
+    inputs: RecommendationInputs,
+    projection: Projection,
+    rules: SeasonRules,
+) -> int:
+    """The strictest level of the strategy's band one transfer reaches against the rival.
+
+    The band constrains which fifteen is held and carries no points, so the level depends
+    on the member, the rival and the strategy only: not on the window, and not on a Top 100
+    setting. A caller rendering a member's whole menu finds it once.
+    """
+
+    floor, ceiling, rival = _band(request)
+    picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
+    rival_picks = _requested_picks(request, rival, provider=provider, inputs=inputs)
+    prices = {
+        int(str(row["player_id"])): int(str(row["price_tenths"]))
+        for _, row in inputs.players.iterrows()
+    }
+    # A window plans one transfer a week, the first week included, so the band is relaxed
+    # to what one transfer reaches. The decided week's feasible set is the same in the
+    # one-week problem, which answers in seconds what a window solve answers in minutes.
+    reached = _solve_within_free_transfers(
+        inputs,
+        projection,
+        held_squad_from_picks(picks, current_prices=prices),
+        rules,
+        rival_eleven=frozenset(int(value) for value in rival_picks.starting_xi),
+        floor=floor,
+        ceiling=ceiling,
+        transfer_cap=1,
+    )
+    if reached is None:
+        raise EntryError(
+            f"The {request.strategy!r} band cannot be reached with one transfer against "
+            f"entry {rival}; a window plans one transfer a week."
+        )
+    return reached[2]
+
+
+def _fifteen(payload: Mapping[str, object]) -> set[int]:
+    return {
+        int(str(player["player_id"]))
+        for key in ("starting_xi", "bench")
+        for player in _players(payload, key)
+    }
+
+
 def advise_rival_window(
     request: AdviseEntryRequest,
     *,
@@ -376,13 +478,21 @@ def advise_rival_window(
     horizon_builder: HorizonBuilder | None,
     control_payload: Mapping[str, object],
     reference_payload: Mapping[str, object] | None = None,
+    applied_level: int | None = None,
+    pure_payload: Mapping[str, object] | None = None,
 ) -> Top100Advice:
     """A rival strategy over a three- or five-week window, at setting 0 or under a setting.
 
-    The band holds the decided week only, at the strictest level one transfer reaches,
-    found with one-week solves so the window itself is solved once. The price is against
-    the member's pure-points window at setting 0 (``control_payload``). Under a setting,
-    ``reference_payload`` is this same document at 0.
+    The band holds the decided week only, at the strictest level one transfer reaches
+    (``band_level_with_one_transfer``; ``applied_level`` hands in one already found). The
+    price is against the member's pure-points window at setting 0 (``control_payload``).
+    Under a setting, ``reference_payload`` is this same document at 0.
+
+    ``pure_payload`` is the pure-points window at this same setting. When its first week
+    already holds the band it is the banded plan too, exactly as the manager's word reads
+    whether it binds off the control: the best plan without the band, holding the band, is
+    a best plan with it. It is then restated as the strategy's document and no window is
+    solved again. It is used only when it holds the band; otherwise the window is solved.
     """
 
     if request.window == COMPUTED_WINDOW:
@@ -402,78 +512,87 @@ def advise_rival_window(
             f"Rival entry {rival} cannot be scored from this projection "
             f"(captain outside the eleven, or players missing: {missing[:5]!r})."
         )
-    chosen_on = (
-        projection
-        if not weight or counts is None
-        else weighted_projection(projection, counts.counts, weight)
-    )
-    prices = {
-        int(str(row["player_id"])): int(str(row["price_tenths"]))
-        for _, row in inputs.players.iterrows()
-    }
-    held = held_squad_from_picks(picks, current_prices=prices)
-    # A window plans one transfer a week, the first week included, so the band is relaxed
-    # to what one transfer reaches. The decided week's feasible set is the same in the
-    # one-week problem, which answers in seconds what a window solve answers in minutes.
-    reached = _solve_within_free_transfers(
-        inputs,
-        chosen_on,
-        held,
-        rules,
-        rival_eleven=rival_eleven,
-        floor=floor,
-        ceiling=ceiling,
-        transfer_cap=1,
-    )
-    if reached is None:
-        raise EntryError(
-            f"The {request.strategy!r} band cannot be reached with one transfer against "
-            f"entry {rival}; a window plans one transfer a week."
+    applied = (
+        applied_level
+        if applied_level is not None
+        else band_level_with_one_transfer(
+            request, provider=provider, inputs=inputs, projection=projection, rules=rules
         )
-    applied = reached[2]
-    band = FirstWeekOverlap(
-        player_ids=rival_eleven,
-        minimum=applied if floor is not None else None,
-        maximum=applied if floor is None else None,
     )
     base = window_horizon(inputs, request.window, horizon_builder)
-    horizon = (
-        base if not weight or counts is None else weighted_horizon(base, counts.counts, weight)
+    holds = pure_payload is not None and (
+        len(_fifteen(pure_payload) & rival_eleven) >= applied
+        if floor is not None
+        else len(_fifteen(pure_payload) & rival_eleven) <= applied
     )
-    plan = solve_window_plan(
-        picks, inputs, rules, horizon, window=request.window, first_week_overlap=band
-    )
-    weeks = _rebased_weeks(plan, base) if weight else tuple(plan.weeks)
-    payload = window_payload(
-        picks,
-        projection,
-        plan,
-        league_id=request.league_id,
-        window=request.window,
-        mode=request.strategy,
-        weeks=weeks if weight else None,
-        optimality_gap_published=not weight,
-        choice_points=base_points(chosen_on) if weight else None,
-    )
+    if pure_payload is not None and holds:
+        payload = copy.deepcopy(dict(pure_payload))
+        payload["mode"] = request.strategy
+        moves = payload.get("moves")
+        for move in moves if isinstance(moves, list) else []:
+            if move.get("reason_code") == "window_value":
+                move["reason_code"] = "mode_tradeoff"
+        payload["stated_limits"] = window_stated_limits(projection)
+        payload.pop("top100", None)
+        rows = payload.get("plan_weeks")
+        selected_total = math.fsum(
+            float(str(row["expected_points"])) - float(str(row["transfer_hit_points"]))
+            for row in (rows if isinstance(rows, list) else [])
+        )
+    else:
+        chosen_on = (
+            projection
+            if not weight or counts is None
+            else weighted_projection(projection, counts.counts, weight)
+        )
+        band = FirstWeekOverlap(
+            player_ids=rival_eleven,
+            minimum=applied if floor is not None else None,
+            maximum=applied if floor is None else None,
+        )
+        horizon = (
+            base if not weight or counts is None else weighted_horizon(base, counts.counts, weight)
+        )
+        plan = solve_window_plan(
+            picks, inputs, rules, horizon, window=request.window, first_week_overlap=band
+        )
+        weeks = _rebased_weeks(plan, base) if weight else tuple(plan.weeks)
+        payload = window_payload(
+            picks,
+            projection,
+            plan,
+            league_id=request.league_id,
+            window=request.window,
+            mode=request.strategy,
+            weeks=weeks if weight else None,
+            optimality_gap_published=not weight,
+            choice_points=base_points(chosen_on) if weight else None,
+        )
+        selected_total = _window_total(weeks)
     _limits(payload, RIVAL_WINDOW_LIMIT)
-    note = _price(payload, control_payload=control_payload, selected_total=_window_total(weeks))
-    first = weeks[0]
-    squad = {int(str(value)) for value in first.selected_squad["player_id"]}
-    eleven = [int(str(value)) for value in first.starting_xi["player_id"]]
-    captain = int(str(first.captain["player_id"]))
+    note = _price(
+        payload, control_payload=control_payload, selected_total=selected_total, base=base
+    )
+    eleven = sorted(int(str(player["player_id"])) for player in _players(payload, "starting_xi"))
+    captain_row = payload.get("captain")
+    if len(eleven) != 11 or not isinstance(captain_row, Mapping):
+        raise EntryError("The window's first week publishes no eleven to compare with the rival.")
+    captain = int(str(captain_row["player_id"]))
     mine = math.fsum(expected[player] for player in eleven) + expected[captain]
     theirs = (
         math.fsum(expected[player] for player in sorted(rival_eleven)) + expected[rival_captain]
     )
     payload["rival_label"] = f"entry-{rival}"
     payload["rival_entry_id"] = rival
-    payload["overlap_count"] = len(squad & rival_eleven)
+    payload["overlap_count"] = len(_fifteen(payload) & rival_eleven)
     payload["transfer_cap"] = 1
     payload["overlap_target"] = floor if floor is not None else ceiling
     payload["overlap_applied"] = applied
     payload["plan_kind"] = "within_free_transfers"
     payload["alternative_plan"] = None
-    payload["expected_gap_vs_rival"] = (mine - float(first.transfer_hit_points)) - theirs
+    payload["expected_gap_vs_rival"] = (
+        mine - float(str(payload.get("transfer_hit_points", 0.0)))
+    ) - theirs
     payload["captain_agreement"] = captain == rival_captain
     label = f"{request.strategy} vs {rival}, {request.window} weeks, Top 100 influence {weight}"
     notes = [f"{label}: {note}"] if note else []
