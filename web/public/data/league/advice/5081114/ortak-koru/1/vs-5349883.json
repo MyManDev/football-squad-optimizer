@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,10 +9,29 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
+        "player_out": {
+          "player_id": 106760,
+          "name": "Luke Shaw",
+          "short_name": "Shaw",
+          "position": "DEF",
+          "team": "Man Utd"
+        },
+        "player_in": {
+          "player_id": 191866,
+          "name": "Kristoffer Ajer",
+          "short_name": "Ajer",
+          "position": "DEF",
+          "team": "Brentford"
+        },
+        "expected_points_delta": 0.7168737794242404,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw05-2",
         "player_out": {
           "player_id": 247348,
           "name": "Daniel Mu\u00f1oz Mej\u00eda",
@@ -27,36 +46,17 @@
           "position": "DEF",
           "team": "Spurs"
         },
-        "expected_points_delta": 1.1528798652818821,
-        "reason_code": "mode_tradeoff"
-      },
-      {
-        "move_id": "gw05-2",
-        "player_out": {
-          "player_id": 502500,
-          "name": "Igor Thiago Nascimento Rodrigues",
-          "short_name": "Rodrigues",
-          "position": "FWD",
-          "team": "Brentford"
-        },
-        "player_in": {
-          "player_id": 475168,
-          "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-          "short_name": "Jesus",
-          "position": "FWD",
-          "team": "Chelsea"
-        },
-        "expected_points_delta": 0.7887122734144612,
+        "expected_points_delta": 1.1026409575092728,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.9415921386963433,
-    "expected_points_cost": 0.9397780973556635,
+    "expected_gain_vs_hold": 1.8195147369335132,
+    "expected_points_cost": 1.1052883461714416,
     "rival_label": "entry-5349883",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 55.2446709281323,
+    "expected_own_points": 55.12259352636947,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -91,20 +91,20 @@
         "expected_points": 3.2165249991138887
       },
       {
+        "player_id": 191866,
+        "name": "Kristoffer Ajer",
+        "short_name": "Ajer",
+        "position": "DEF",
+        "team": "Brentford",
+        "expected_points": 2.780518913256247
+      },
+      {
         "player_id": 463726,
         "name": "Amar Dedic",
         "short_name": "Dedic",
         "position": "DEF",
         "team": "Newcastle",
         "expected_points": 2.679647630609125
-      },
-      {
-        "player_id": 219924,
-        "name": "Issa Diop",
-        "short_name": "Diop",
-        "position": "DEF",
-        "team": "Ipswich Town",
-        "expected_points": 2.1138840416046176
       },
       {
         "player_id": 141746,
@@ -147,12 +147,12 @@
         "expected_points": 8.37533371727625
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
+        "player_id": 502500,
+        "name": "Igor Thiago Nascimento Rodrigues",
+        "short_name": "Rodrigues",
         "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "team": "Brentford",
+        "expected_points": 3.93101668263493
       },
       {
         "player_id": 177815,
@@ -173,20 +173,20 @@
         "expected_points": 0.10027015579447286
       },
       {
+        "player_id": 219924,
+        "name": "Issa Diop",
+        "short_name": "Diop",
+        "position": "DEF",
+        "team": "Ipswich Town",
+        "expected_points": 2.1138840416046176
+      },
+      {
         "player_id": 199798,
         "name": "Ezri Konsa Ngoyo",
         "short_name": "Ngoyo",
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 2.0636451338320074
-      },
-      {
-        "player_id": 106760,
-        "name": "Luke Shaw",
-        "short_name": "Shaw",
-        "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 1.0851965732879876
       },
       {
         "player_id": 153366,
@@ -207,7 +207,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 5349883,
-    "expected_points_cost_ceiling": 0.9397780973556635,
+    "expected_points_cost_ceiling": 1.1052883461714416,
     "overlap_count": 3,
     "transfer_cap": 2,
     "overlap_target": 9,
@@ -217,10 +217,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 24.0,
-      "expected_points_cost": 24.69652354020819,
-      "expected_points_cost_ceiling": 24.69652354020819
+      "expected_points_cost": 24.782887685367264,
+      "expected_points_cost_ceiling": 24.782887685367264
     },
-    "expected_gap_vs_rival": 4.557903765351554,
+    "expected_gap_vs_rival": 6.795690841613421,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

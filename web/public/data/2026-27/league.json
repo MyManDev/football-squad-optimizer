@@ -1,8 +1,8 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-09-17T07:09:08Z",
+  "generated_at_utc": "2026-09-17T11:18:34Z",
   "payload": {
-    "captured_at_utc": "2026-09-15T17:52:25.802810Z",
+    "captured_at_utc": "2026-09-17T10:33:11.704498Z",
     "league_total_average_score": 119.0,
     "our_total_realized_net_score": 94.0,
     "ownership": {
@@ -14,27 +14,27 @@
         503139,
         484420
       ],
-      "effective_ownership": 286.6,
+      "effective_ownership": 287.6,
       "gameweek": 4,
-      "least_owned_starter": 226182,
-      "mean_starter_ownership": 19.472727272727273,
+      "least_owned_starter": 484420,
+      "mean_starter_ownership": 19.536363636363635,
       "most_owned_starter": 223094,
       "ownership_percent": {
-        "204936": 7.6,
+        "204936": 7.7,
         "216616": 2.9,
-        "219168": 22.1,
-        "223094": 72.4,
-        "226182": 3.1,
-        "244723": 6.4,
-        "244850": 37.7,
-        "437730": 15.5,
-        "446008": 22.8,
-        "484420": 4.0,
-        "490145": 1.3,
+        "219168": 21.9,
+        "223094": 72.7,
+        "226182": 4.1,
+        "244723": 6.3,
+        "244850": 38.3,
+        "437730": 15.2,
+        "446008": 22.5,
+        "484420": 3.8,
+        "490145": 1.2,
         "494521": 3.2,
-        "503139": 5.9,
+        "503139": 5.8,
         "67089": 17.6,
-        "97032": 16.7
+        "97032": 16.6
       },
       "squad": [
         {
@@ -236,9 +236,9 @@
     },
     "scored_gameweeks": 2,
     "season": "2026-27",
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "total_difference_to_average": -25.0,
-    "verdict": "-25 points against the game's average over 2 scored gameweeks — one gameweek is noise, not evidence; the starting eleven averages 19% ownership.",
+    "verdict": "-25 points against the game's average over 2 scored gameweeks — one gameweek is noise, not evidence; the starting eleven averages 20% ownership.",
     "verdict_code": "standing",
     "verdict_params": {
       "caveat": "noise",

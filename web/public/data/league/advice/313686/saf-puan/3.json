@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "saf-puan",
     "window": 3,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,17 +27,17 @@
           "position": "MID",
           "team": "Bournemouth"
         },
-        "expected_points_delta": 1.0709054511959692,
+        "expected_points_delta": 1.0709054511959764,
         "reason_code": "window_value"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.0709054511959692,
+    "expected_gain_vs_hold": 1.0709054511959764,
     "expected_points_cost": 0.0,
     "rival_label": null,
     "solver_status": "FEASIBLE",
-    "optimality_gap": 13.15100000000001,
-    "expected_own_points": 57.950382127295754,
+    "optimality_gap": 17.709000000000003,
+    "expected_own_points": 56.85676316596662,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -64,20 +64,20 @@
         "expected_points": 2.9398808352076324
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 3.54054506392718
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 108416,
@@ -109,7 +109,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.163808898150183
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 503139,
@@ -141,7 +141,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -204,59 +204,59 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.95038212729575
+        "expected_points": 56.85676316596661
       },
       {
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
+            "player_id": 473284,
+            "name": "Konstantinos Tzolakis",
+            "short_name": "Tzolakis",
+            "position": "GK",
+            "team": "Hull City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 551210,
-            "name": "Jorrel Hato",
-            "short_name": "Hato",
-            "position": "DEF",
-            "team": "Chelsea"
+            "player_id": 489639,
+            "name": "Bart Verbruggen",
+            "short_name": "Verbruggen",
+            "position": "GK",
+            "team": "Brighton"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 58.68225580985445
+        "expected_points": 57.05272568757402
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
-            "position": "DEF",
-            "team": "Everton"
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
+            "position": "MID",
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 466075,
-            "name": "Riccardo Calafiori",
-            "short_name": "Calafiori",
-            "position": "DEF",
-            "team": "Arsenal"
+            "player_id": 424876,
+            "name": "Dominik Szoboszlai",
+            "short_name": "Szoboszlai",
+            "position": "MID",
+            "team": "Liverpool"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 59.300758477263635
+        "expected_points": 57.52942681360644
       }
     ],
     "stated_limits": [

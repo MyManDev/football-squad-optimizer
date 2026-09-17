@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -65,7 +65,7 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 0.20995502117549592,
+        "expected_points_delta": 0.2528354518057654,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -84,17 +84,17 @@
           "position": "DEF",
           "team": "Brighton"
         },
-        "expected_points_delta": 1.509490559266986,
+        "expected_points_delta": 1.552923406319934,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 10.088551155409675,
+    "expected_gain_vs_hold": 10.174864433092893,
     "expected_points_cost": 0.0,
     "rival_label": "entry-2281624",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.0954112611477,
+    "expected_own_points": 54.18172453883092,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -121,20 +121,20 @@
         "expected_points": 3.8238320826783507
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
         "player_id": 226182,
         "name": "Jayden Bogle",
         "short_name": "Bogle",
         "position": "DEF",
         "team": "Leeds",
         "expected_points": 3.5483370784121617
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 231416,
@@ -166,7 +166,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.163808898150183
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 424876,
@@ -258,7 +258,7 @@
       "expected_points_cost": 0.0,
       "expected_points_cost_ceiling": 0.0
     },
-    "expected_gap_vs_rival": 2.811583064424596,
+    "expected_gap_vs_rival": 5.257760820132511,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
