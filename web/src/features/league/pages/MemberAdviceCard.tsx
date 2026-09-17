@@ -1,7 +1,8 @@
 import { Badge } from "../../../design/components/Badge";
 import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
-import { points, signedPoints } from "../../../lib/format";
+import { points, signedPoints, utcShort } from "../../../lib/format";
+import { EVIDENCE_COPY } from "../advice/evidenceCopy";
 import { comparedRivalPlayers } from "../advice/rivalPlayers";
 import { ExampleDataBadge } from "../components/ExampleDataBadge";
 import type {
@@ -107,7 +108,7 @@ export function AdviceCard({
   squad: LeagueViewEnvelope<EntrySquad>;
   rivalSquad: LeagueViewEnvelope<EntrySquad> | null;
 }) {
-  const { locale, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
   const { envelope, origin } = shown;
   const view = envelope.payload;
@@ -131,8 +132,9 @@ export function AdviceCard({
   const price = unproven ? priceCeiling : (priceCeiling ?? view.expected_points_cost);
   // The pure-points plan has no price of its own; switched on, the manager's word does,
   // and it is priced against the same pure-points control a rival band is.
-  const wordApplied = (view.evidence?.applied.length ?? 0) > 0;
-  const showsPrice = (view.mode !== "saf-puan" || wordApplied) && finiteNumber(price) && price >= 0;
+  const wordPriced = view.mode === "saf-puan" && view.evidence !== undefined;
+  const showsPrice = (view.mode !== "saf-puan" || wordPriced) && finiteNumber(price) && price >= 0;
+  const evidenceCopy = EVIDENCE_COPY[language];
   const alternative = view.alternative_plan;
   const alternativePrice = unproven
     ? alternative?.expected_points_cost_ceiling
@@ -183,9 +185,13 @@ export function AdviceCard({
       {showsPrice && price != null ? (
         <p className={styles.planCost}>
           <strong className="num">
-            {unproven
-              ? copy.planCostAtMost(points(price, 1, locale))
-              : copy.planCost(points(price, 1, locale))}
+            {wordPriced
+              ? unproven
+                ? evidenceCopy.costAtMost(points(price, 1, locale))
+                : evidenceCopy.cost(points(price, 1, locale))
+              : unproven
+                ? copy.planCostAtMost(points(price, 1, locale))
+                : copy.planCost(points(price, 1, locale))}
           </strong>
           {(rivalName ?? view.rival_label) ? (
             <span> · {copy.planRival(rivalName ?? String(view.rival_label))}</span>
@@ -413,48 +419,82 @@ function WindowSection({ view }: { view: EntryAdvice }) {
  * cut from the captured bytes; the category is the model's; the role is the declared
  * rule's. Example data says so on the section itself, not only in a badge elsewhere.
  */
+/** A source link only for a web address: a capture's final URL is data, not markup. */
+function webAddress(url: string | null): string | null {
+  return url && /^https?:\/\//i.test(url) ? url : null;
+}
+
+/** The source's own dateline, to the day when that is all the source said. */
+function dateline(iso: string | null, precision: string | null, locale: string): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  if (precision === "day") {
+    return date.toLocaleDateString(locale, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  return utcShort(iso, locale);
+}
+
 function EvidenceSection({ view }: { view: EntryAdvice }) {
-  const { messages } = useLanguage();
-  const copy = messages.leagueMembers;
+  const { language, locale, messages } = useLanguage();
+  const copy = EVIDENCE_COPY[language];
   const evidence = view.evidence;
   if (!evidence) return null;
-  const synthetic = evidence.source_kind === "synthetic_fixture";
+  const real = evidence.source_kind === "club_news_capture";
   return (
     <section className={styles.adviceSection} data-testid="managers-word">
-      <h3 className={styles.lineupTitle}>{copy.evidenceTitle}</h3>
-      {synthetic ? (
+      <h3 className={styles.lineupTitle}>{copy.title}</h3>
+      {real ? (
+        <p className={styles.honesty}>{copy.sourceCapture}</p>
+      ) : (
         <p className={styles.honesty}>
-          <Badge tone="warn">{copy.exampleData}</Badge> {copy.evidenceSourceSynthetic}
+          <Badge tone="warn">{messages.leagueMembers.exampleData}</Badge> {copy.sourceExample}
         </p>
-      ) : (
-        <p className={styles.honesty}>{copy.evidenceSourceCapture}</p>
       )}
-      <p className={styles.muted}>{copy.evidenceIntro(evidence.clubs_covered.length)}</p>
-      {evidence.applied.length === 0 ? (
-        <p className={styles.muted}>{copy.evidenceNone}</p>
-      ) : (
+      <p className={styles.muted}>{copy.intro(evidence.clubs_covered.length)}</p>
+      <p className={styles.muted}>{evidence.binding ? copy.changed : copy.unchanged}</p>
+      {evidence.applied.length > 0 ? (
         <ul className={styles.assumptionList}>
-          {evidence.applied.map((item) => (
-            <li key={item.player_id}>
-              <strong>{item.name ?? `#${item.player_id}`}</strong>{" "}
-              {item.role ? <Badge tone="neutral">{copy.evidenceRoles[item.role]}</Badge> : null}{" "}
-              {item.words ? (
-                <blockquote>{item.words}</blockquote>
-              ) : (
-                <p className={styles.muted}>{copy.evidenceWordsUnresolved}</p>
-              )}
-              <p className={styles.muted}>
-                {copy.evidenceSaid(item.speaker, item.published_at_utc)}{" "}
-                {item.source_url ? (
-                  <a href={item.source_url} rel="noopener noreferrer">
-                    {copy.evidenceReadSource}
-                  </a>
+          {evidence.applied.map((item) => {
+            const status = item.words_status ?? (item.words ? "shown" : "unresolved");
+            const href = webAddress(item.source_url);
+            const speaker = item.speaker
+              ? (copy.speakers[item.speaker] ?? copy.speakerUnknown)
+              : copy.speakerUnknown;
+            return (
+              <li key={item.player_id}>
+                <strong>{item.name ?? `#${item.player_id}`}</strong>{" "}
+                {item.role && copy.roles[item.role] ? (
+                  <Badge tone="neutral">{copy.roles[item.role]}</Badge>
                 ) : null}
-              </p>
-            </li>
-          ))}
+                {status === "shown" && item.words ? (
+                  <blockquote>{item.words}</blockquote>
+                ) : (
+                  <p className={styles.muted}>
+                    {status === "withheld_figure" ? copy.wordsWithheld : copy.wordsUnresolved}
+                  </p>
+                )}
+                <p className={styles.muted}>
+                  {copy.said(
+                    speaker,
+                    dateline(item.published_at_utc, item.published_precision, locale),
+                  )}{" "}
+                  {href ? (
+                    <a href={href} rel="noopener noreferrer">
+                      {copy.source}
+                    </a>
+                  ) : null}
+                </p>
+              </li>
+            );
+          })}
         </ul>
-      )}
+      ) : null}
     </section>
   );
 }
@@ -555,14 +595,17 @@ type MemberCopy = ReturnType<typeof useLanguage>["messages"]["leagueMembers"];
 /** The caption under a move, keyed on the reason the producer stated for it. */
 function reasonFor(copy: MemberCopy, code: AdviceMove["reason_code"]): string {
   if (code === "window_value") return copy.windowValueReason;
-  if (code === "manager_word") return copy.managerWordReason;
   if (code === "points_gain") return copy.pointsGainReason;
   return copy.modeTradeoffReason;
 }
 
 function AdviceRow({ move, measured }: { move: AdviceMove; measured: boolean }) {
-  const { locale, messages } = useLanguage();
+  const { language, locale, messages } = useLanguage();
   const copy = messages.leagueMembers;
+  const reason =
+    move.reason_code === "manager_word"
+      ? EVIDENCE_COPY[language].moveReason
+      : reasonFor(copy, move.reason_code);
   return (
     <article className={styles.move}>
       <div className={styles.movePlayers}>
@@ -580,7 +623,7 @@ function AdviceRow({ move, measured }: { move: AdviceMove; measured: boolean }) 
             : copy.projectedGainUnknown}
         </span>
       </div>
-      <p className={styles.muted}>{reasonFor(copy, move.reason_code)}</p>
+      <p className={styles.muted}>{reason}</p>
     </article>
   );
 }

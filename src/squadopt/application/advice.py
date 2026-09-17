@@ -42,6 +42,7 @@ from squadopt.application.entries import (
 )
 from squadopt.application.lineup_publication import advice_player as _advice_player
 from squadopt.application.lineup_publication import best_eleven_points as best_eleven_points
+from squadopt.application.lineup_publication import best_eleven_points_under
 from squadopt.application.lineup_publication import lineup_fields as lineup_fields
 from squadopt.application.manager_words import ManagerWord, ManagerWords
 from squadopt.application.phase_e import TransferAdviceDiagnostic, run_transfer_advice_diagnostic
@@ -67,6 +68,7 @@ from squadopt.optimization import (
     wall_clock_stopped_the_search,
 )
 from squadopt.planning import (
+    FirstWeekExclusion,
     FirstWeekOverlap,
     PlanningWeekResult,
     ProjectionHorizon,
@@ -204,6 +206,7 @@ def _attributed_gains(
     *,
     held: Sequence[int],
     lookup: dict[int, tuple[str, float]],
+    exclusion: FirstWeekExclusion | None = None,
 ) -> list[float] | None:
     """Each swap's share of what the plan is worth against holding the squad.
 
@@ -228,7 +231,20 @@ def _attributed_gains(
     squad = list(held)
     if any(player not in lookup for player in squad):
         return None
-    previous = best_eleven_points(lookup[player] for player in squad)
+
+    def value_of(players: Sequence[int]) -> float | None:
+        if exclusion is None:
+            return best_eleven_points(lookup[player] for player in players)
+        return best_eleven_points_under(
+            (
+                *lookup[player],
+                player not in exclusion.not_starting,
+                player not in exclusion.not_captain,
+            )
+            for player in players
+        )
+
+    previous = value_of(squad)
     if previous is None:
         return None
     gains: list[float] = []
@@ -238,7 +254,7 @@ def _attributed_gains(
         if player_out not in squad or player_in in squad or player_in not in lookup:
             return None
         squad[squad.index(player_out)] = player_in
-        value = best_eleven_points(lookup[player] for player in squad)
+        value = value_of(squad)
         if value is None:
             return None
         gains.append(value - previous)
@@ -255,6 +271,8 @@ def _moves(
     held: Sequence[int],
     gameweek: int,
     reason_code: str,
+    exclusion: FirstWeekExclusion | None = None,
+    move_reason: Callable[[int | None, int | None], str] | None = None,
 ) -> tuple[list[dict[str, object]], float | None]:
     """The published moves and what the whole set is worth against holding the squad.
 
@@ -282,7 +300,7 @@ def _moves(
         for table in (pool_by_id, by_id)
         for player, row in table.items()
     }
-    gains = _attributed_gains(pairs, held=held, lookup=lookup)
+    gains = _attributed_gains(pairs, held=held, lookup=lookup, exclusion=exclusion)
     moves: list[dict[str, object]] = []
     for index, (player_out, player_in) in enumerate(pairs):
         moves.append(
@@ -299,7 +317,9 @@ def _moves(
                     else None
                 ),
                 "expected_points_delta": None if gains is None else gains[index],
-                "reason_code": reason_code,
+                "reason_code": (
+                    reason_code if move_reason is None else move_reason(player_out, player_in)
+                ),
             }
         )
     return moves, (None if gains is None else math.fsum(gains))
@@ -487,6 +507,8 @@ def build_advice_payload(
     control: MemberControl | None = None,
     phase_e_diagnostic: TransferAdviceDiagnostic | None = None,
     reason_code: str | None = None,
+    exclusion: FirstWeekExclusion | None = None,
+    move_reason: Callable[[int | None, int | None], str] | None = None,
 ) -> dict[str, object]:
     """One member's advice payload — from their squad and the shared projection only.
 
@@ -556,6 +578,8 @@ def build_advice_payload(
             held=picks.squad,
             gameweek=picks.gameweek + 1,
             reason_code=reason_code,
+            exclusion=exclusion,
+            move_reason=move_reason,
         )
     missing = _missing_fields(picks)
     return {
@@ -916,6 +940,18 @@ def _solve_within_free_transfers(
     return None
 
 
+def _player_ids(frame: "pd.DataFrame") -> set[int]:
+    return {int(str(value)) for value in frame["player_id"]}
+
+
+def _breaks(week: PlanningWeekResult, exclusion: FirstWeekExclusion) -> bool:
+    """Whether a solved week starts a player the exclusion benches or captains one it bars."""
+
+    if _player_ids(week.starting_xi) & set(exclusion.not_starting):
+        return True
+    return int(str(week.captain["player_id"])) in exclusion.not_captain
+
+
 def advise_with_managers_word(
     request: AdviseEntryRequest,
     *,
@@ -929,18 +965,23 @@ def advise_with_managers_word(
     """The one-week pure-points plan with the manager's word switched on, priced.
 
     The member's own squad is still the only starting point; the club's own page
-    contributes a constraint (``manager_words``' declared rule: an absence keeps a
-    player out of the eleven, a stated doubt keeps him from the armband) and nothing
-    else. No projection number moves. The plan is solved under that exclusion and priced
-    exactly as a rival band is: against the member's own control at the game's charge,
-    net of hits, with the ceiling published beside the tag whenever a proof is missing,
-    so a reader is never told the constraint hands them points.
+    contributes a constraint (``manager_words``' declared rule: an absence keeps a player
+    out of the eleven, a stated doubt keeps him from the armband) and nothing else. No
+    projection number moves.
 
-    The payload carries the statements the rule acted on, with the manager's own words
-    as captured, the speaker, the source's dateline and the page, so the member reads the
-    source. When the manager said nothing that binds this fifteen, the payload is the
-    baseline plan with an empty ``applied`` list and a zero price: switching the word on
-    changed nothing, and the document says so rather than hiding the switch.
+    **Whether the word binds** is read off the member's own control, the pure-points plan
+    solved under the same planning policy: if that plan already starts nobody the rule
+    benches and captains nobody it bars, it is also the best plan under the rule, so the
+    document is the control itself at a price of zero (and a ceiling of the control's own
+    bound slack, zero under a proof). Only when the control breaks the rule is a second
+    plan solved under it, and priced exactly as a rival band is: against the control at the
+    game's charge, net of hits, with the ceiling beside the tag when a proof is missing.
+
+    **What the member reads** is every statement about a player in the fifteen they hold,
+    the fifteen the control would end with, or the fifteen this plan ends with, so a word
+    about a player the control would have bought is shown whenever it moved the plan.
+    ``binding`` says whether it did. A move carries ``manager_word`` only when it is not
+    one the control makes too; the gain each row publishes is measured under the rule.
     """
 
     if request.strategy != COMPUTED_MODE or request.window != COMPUTED_WINDOW:
@@ -952,17 +993,18 @@ def advise_with_managers_word(
         )
     picks = _requested_picks(request, request.entry_id, provider=provider, inputs=inputs)
     solved = _control_for(picks, control, inputs, projection, rules)
+    if not solved.plan.has_solution or not solved.plan.weeks:
+        raise EntryError("The pure-points control has no solution; nothing can be priced.")
     pool_by_id = {int(str(row["player_id"])): row for _, row in projection.table.iterrows()}
 
     def _name(player_id: int) -> str | None:
         row = pool_by_id.get(player_id)
         return None if row is None or "name" not in row else str(row["name"])
 
-    exclusion = words.exclusion()
-
-    def _evidence(applied: tuple[ManagerWord, ...]) -> dict[str, object]:
+    def _evidence(applied: tuple[ManagerWord, ...], *, binding: bool) -> dict[str, object]:
         return {
             **words.as_source_record(),
+            "binding": binding,
             "applied": [
                 {
                     "player_id": word.player_id,
@@ -976,17 +1018,24 @@ def advise_with_managers_word(
                     "source_url": word.source_url,
                     "fetched_at_utc": word.fetched_at_utc,
                     "words": word.words,
+                    "words_status": word.words_status,
                 }
                 for word in applied
             ],
         }
 
-    if exclusion is None:
+    exclusion = words.exclusion()
+    control_week = solved.plan.weeks[0]
+    control_squad = _player_ids(control_week.selected_squad)
+    if exclusion is None or not _breaks(control_week, exclusion):
         payload = build_advice_payload(
             picks, inputs, projection, rules, league_id=request.league_id, control=solved
         )
-        payload["evidence"] = _evidence(())
+        payload["expected_points_cost"] = 0.0
+        payload["expected_points_cost_ceiling"] = bound_slack(solved.plan)
+        payload["evidence"] = _evidence(words.about({*picks.squad, *control_squad}), binding=False)
         return payload
+
     prices = {
         int(str(row["player_id"])): int(str(row["price_tenths"]))
         for _, row in inputs.players.iterrows()
@@ -1007,11 +1056,24 @@ def advise_with_managers_word(
     )
     constrained_net = net_expected_points(plan)
     pricing_net = net_expected_points(pricing_plan)
-    control_net = max(pricing_net, constrained_net)
+    control_net = max(pricing_net, constrained_net, net_expected_points(solved.plan))
     control_ceiling = max(control_net, pricing_net + bound_slack(pricing_plan))
     raw_gap = plan.diagnostics.get("absolute_optimality_gap")
     raw_control_gap = pricing_plan.diagnostics.get("absolute_optimality_gap")
     cost = control_net - constrained_net
+    record = solved.decision.as_record()
+    outs_raw = record.get("transfers_out", [])
+    ins_raw = record.get("transfers_in", [])
+    control_outs = {int(str(v)) for v in outs_raw} if isinstance(outs_raw, list | tuple) else set()
+    control_ins = {int(str(v)) for v in ins_raw} if isinstance(ins_raw, list | tuple) else set()
+
+    def move_reason(player_out: int | None, player_in: int | None) -> str:
+        # A swap the control makes too is the pure-points plan's own; only the rest is
+        # there because of what the page said.
+        if player_out in control_outs and player_in in control_ins:
+            return "points_gain"
+        return "manager_word"
+
     payload = build_advice_payload(
         picks,
         inputs,
@@ -1023,19 +1085,18 @@ def advise_with_managers_word(
         solver_status=plan.solver_status.name,
         optimality_gap=float(str(raw_gap)) if raw_gap is not None else None,
         week=plan.weeks[0],
-        reason_code="manager_word",
+        exclusion=exclusion,
+        move_reason=move_reason,
     )
     payload["expected_points_cost_ceiling"] = max(cost, control_ceiling - constrained_net)
     payload["control_solver_status"] = pricing_plan.solver_status.name
     payload["control_optimality_gap"] = (
         float(str(raw_control_gap)) if raw_control_gap is not None else None
     )
-    # What the member reads: the statements that touch their own plan, the fifteen they
-    # hold and the fifteen this plan ends with. A word about a player neither holds nor
-    # buys still constrained the solve (he could not be bought and started), but it is
-    # not this member's news to weigh.
-    plan_squad = {int(str(value)) for value in plan.weeks[0].selected_squad["player_id"]}
-    payload["evidence"] = _evidence(words.about({*picks.squad, *plan_squad}))
+    plan_squad = _player_ids(plan.weeks[0].selected_squad)
+    payload["evidence"] = _evidence(
+        words.about({*picks.squad, *control_squad, *plan_squad}), binding=True
+    )
     return payload
 
 

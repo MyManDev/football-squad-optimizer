@@ -14,6 +14,7 @@ import { LanguageProvider } from "../../../i18n/LanguageProvider";
 import { MESSAGES } from "../../../i18n/messages";
 import { AS_A_CHANCE } from "../../../testSupport/honesty";
 import type { EntryAdviceIndex } from "../types";
+import { EVIDENCE_COPY } from "./evidenceCopy";
 import { MemberDecisionControls } from "./MemberDecisionControls";
 
 afterEach(cleanup);
@@ -55,7 +56,7 @@ describe("the manager's word switch", () => {
     const box = screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ });
     expect(box).toBeDisabled();
     expect(box).not.toBeChecked();
-    expect(screen.getByText(MESSAGES.tr.leagueMembers.evidenceUnavailable(null))).toBeTruthy();
+    expect(screen.getByText(EVIDENCE_COPY.tr.unavailable(null))).toBeTruthy();
   });
 
   it("switches the URL on and off where the producer solved it, and says it is example data", () => {
@@ -64,7 +65,7 @@ describe("the manager's word switch", () => {
     expect(box).toBeEnabled();
     expect(box).not.toBeChecked();
     expect(container.textContent).toContain(MESSAGES.tr.leagueMembers.exampleData);
-    expect(container.textContent).toContain(MESSAGES.tr.leagueMembers.evidenceSourceSynthetic);
+    expect(container.textContent).toContain(EVIDENCE_COPY.tr.sourceExample);
 
     fireEvent.click(box);
     expect(screen.getByRole("checkbox", { name: /Kulübün sayfasının dediğini/ })).toBeChecked();
@@ -81,7 +82,7 @@ describe("the manager's word switch", () => {
     const box = screen.getByRole("checkbox", { name: /Apply what the club's page said/ });
     expect(box).toBeDisabled();
     expect(box).not.toBeChecked();
-    expect(container.textContent).toContain(MESSAGES.en.leagueMembers.evidenceOnlyBaseline);
+    expect(container.textContent).toContain(EVIDENCE_COPY.en.onlyBaseline);
   });
 
   it("carries no probability wording in either language", () => {
@@ -94,5 +95,32 @@ describe("the manager's word switch", () => {
       expect(container.textContent ?? "").not.toMatch(AS_A_CHANCE);
       unmount();
     }
+  });
+});
+
+describe("the manager's word switch, source and reason", () => {
+  it("translates a member-level failure instead of printing the producer's text", () => {
+    const { container } = renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, {
+      available: false,
+      reason: "not_solved_for_member",
+    });
+    expect(container.textContent).toContain(EVIDENCE_COPY.tr.unavailable("not_solved_for_member"));
+    expect(container.textContent).not.toContain("not_solved_for_member");
+  });
+
+  it("labels any source other than a club-news capture as example data", () => {
+    const fixtureFile = { ...SOLVED, source_kind: "fixture_file" } as EntryAdviceIndex["evidence"];
+    const { container, unmount } = renderControls(
+      `/league/members/${ENTRY}?mode=saf-puan&window=1`,
+      fixtureFile,
+    );
+    expect(container.textContent).toContain(MESSAGES.tr.leagueMembers.exampleData);
+    expect(container.textContent).toContain(EVIDENCE_COPY.tr.sourceExample);
+    unmount();
+
+    const capture = { ...SOLVED, source_kind: "club_news_capture" } as EntryAdviceIndex["evidence"];
+    const real = renderControls(`/league/members/${ENTRY}?mode=saf-puan&window=1`, capture);
+    expect(real.container.textContent).not.toContain(MESSAGES.tr.leagueMembers.exampleData);
+    expect(real.container.textContent).toContain(EVIDENCE_COPY.tr.sourceCapture);
   });
 });

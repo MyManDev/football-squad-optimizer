@@ -235,6 +235,13 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "words_status": {
+                    "enum": [
+                      "shown",
+                      "unresolved",
+                      "withheld_figure"
+                    ]
                   }
                 },
                 "required": [
@@ -246,6 +253,9 @@
                 "type": "object"
               },
               "type": "array"
+            },
+            "binding": {
+              "type": "boolean"
             },
             "clubs_covered": {
               "items": {

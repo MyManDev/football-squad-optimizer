@@ -122,6 +122,27 @@ export async function loadEntryAdvice(
   );
 }
 
+/**
+ * The manager's-word plan, read only at the path an index may name for this member: the
+ * one-week pure-points plan with the club's word switched on. Any other path is refused
+ * rather than fetched, so a malformed index cannot point the page at another document.
+ */
+export async function loadEntryAdviceEvidence(
+  entryId: number,
+  path: string,
+  options?: RequestOptions,
+): Promise<LeagueViewEnvelope<EntryAdvice>> {
+  const expected = `advice/${entryId}/saf-puan/1/hoca-sozu.json`;
+  if (path !== expected) {
+    throw new LeagueDataError(`The manager's-word plan for ${entryId} is not at ${path}.`);
+  }
+  return readOrExample<EntryAdvice>(
+    expected,
+    async () => (await mockModule()).mockEntryAdviceEvidenceEnvelope(entryId),
+    options,
+  );
+}
+
 export async function loadEntryAdviceIndex(
   entryId: number,
 ): Promise<LeagueViewEnvelope<EntryAdviceIndex>> {

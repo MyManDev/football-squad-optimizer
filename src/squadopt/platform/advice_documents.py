@@ -107,6 +107,7 @@ def advice_read_schema() -> dict[str, Any]:
                     "source_label": {"type": "string"},
                     "evidence_table": {"type": "string"},
                     "clubs_covered": {"type": "array", "items": {"type": "string"}},
+                    "binding": {"type": "boolean"},
                     "applied": {
                         "type": "array",
                         "items": {
@@ -123,6 +124,9 @@ def advice_read_schema() -> dict[str, Any]:
                                 "source_url": {"type": ["string", "null"]},
                                 "fetched_at_utc": {"type": ["string", "null"]},
                                 "words": {"type": ["string", "null"]},
+                                "words_status": {
+                                    "enum": ["shown", "unresolved", "withheld_figure"]
+                                },
                             },
                             "required": ["player_id", "disposition", "role", "words"],
                         },

@@ -217,6 +217,8 @@ export interface AdviceEvidenceItem {
   source_url: string | null;
   fetched_at_utc: string | null;
   words: string | null;
+  /** `shown`, or why no words are: `unresolved`, or `withheld_figure` (wording the site never publishes). */
+  words_status?: "shown" | "unresolved" | "withheld_figure";
 }
 
 /** The manager's word as it entered a plan: a declared, priced constraint, never a projection input. */
@@ -228,6 +230,8 @@ export interface AdviceEvidence {
   source_label: string;
   evidence_table: string;
   clubs_covered: string[];
+  /** Whether the word changed the member's pure-points plan; false means the plan is the control itself. */
+  binding?: boolean;
   applied: AdviceEvidenceItem[];
 }
 
@@ -241,6 +245,7 @@ export type IndexEvidence =
       source_label: string | null;
       clubs_covered: string[];
       rule_version: string | null;
+      binding?: boolean;
     }
   | { available: false; reason: string };
 

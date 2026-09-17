@@ -67,6 +67,11 @@ export function useMemberAdviceView(
   if (advice && selectionAvailable) {
     try {
       const checked = checkedAdvice(advice, request);
+      // The switched-on plan carries its evidence and the plain one does not. A document
+      // that disagrees with the switch is not the plan the page is about to describe.
+      if ((checked.payload.evidence !== undefined) !== selection.evidence.on) {
+        throw new Error("The advice document does not match the manager's-word switch.");
+      }
       const snapshot = checked.payload.source_snapshot_id;
       rejectedContext =
         snapshot != null && view.source_snapshot_id != null && snapshot !== view.source_snapshot_id;

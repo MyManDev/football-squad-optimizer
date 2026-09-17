@@ -610,6 +610,29 @@ export function mockEntryAdviceIndex(entryId: number): LeagueViewEnvelope<EntryA
   });
 }
 
+/** The switched-on manager's-word plan for the example publish (synthetic words). */
+export function mockEntryAdviceEvidenceEnvelope(entryId: number): LeagueViewEnvelope<EntryAdvice> {
+  const base = mockEntryAdviceEnvelope(entryId, "saf-puan", 1);
+  return {
+    ...base,
+    payload: {
+      ...base.payload,
+      expected_points_cost: 0,
+      expected_points_cost_ceiling: 0,
+      evidence: {
+        kind: "managers_word",
+        rule_version: "managers_word_rule_v1",
+        source_kind: "synthetic_fixture",
+        source_label: "club_news_v1.fixture.json",
+        evidence_table: "rotation_evidence_v2_example.csv",
+        clubs_covered: [],
+        binding: false,
+        applied: [],
+      },
+    },
+  };
+}
+
 function rivalFields(
   entryId: number,
   mode: AdviceStrategy,
