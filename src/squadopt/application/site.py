@@ -1,6 +1,7 @@
 """Write the static JSON tree a frontend renders.
 
     data/index.json                              SiteIndex
+    data/fixtures.json                           fixtures_v1 (when a capture is supplied)
     data/schema/ui_view_v1.schema.json           the contract
     data/<season>/status.json                    StatusView (when a plan is supplied)
     data/<season>/league.json                    LeagueView (when a capture is supplied)
@@ -12,8 +13,8 @@
 An explicitly supplied horizon batch may add sanitized solver evidence to the matching
 recommendation's metadata. The ledger decision remains the rendered action.
 
-Views use ``ui_view_v1`` except the separate ``live_score_v1`` envelope. The tree is
-deterministic for a given ledger, capture and clock
+Views use ``ui_view_v1`` except the separate ``live_score_v1`` and ``fixtures_v1``
+envelopes. The tree is deterministic for a given ledger, capture and clock
 (sorted keys, fixed indent, LF line ends) and each file lands through a temporary file
 and one rename, so a reader never sees a half-written JSON.
 """
@@ -33,6 +34,12 @@ from squadopt.application.build import (
     status_view,
 )
 from squadopt.application.contract import UI_VIEW_CONTRACT_VERSION, ui_view_schema
+from squadopt.application.fixtures_view import (
+    FIXTURES_CONTRACT_VERSION,
+    FIXTURES_RELATIVE_PATH,
+    fixtures_schema,
+    fixtures_view,
+)
 from squadopt.application.horizon_publish import load_public_horizon_evidence
 from squadopt.application.league import league_view, ownership_view
 from squadopt.application.live_score import (
@@ -72,6 +79,7 @@ class SiteBuildReport:
     ledger_kept_from_published: bool = False
     """The ledger root held no entry while ``ledger.json`` in the output tree already held
     decisions, so that file was left as it was rather than overwritten with zero rows."""
+    fixtures_written: bool = False
 
 
 def _write_json(path: Path, payload: dict[str, JsonValue]) -> None:
@@ -226,6 +234,29 @@ def build_site(
         emit(f"{season}/league.json", league_view(snapshot, ledger, ownership=ownership).to_dict())
         league_written = True
 
+    fixtures_written = False
+    if snapshot is not None:
+        # The schedule is a convenience beside the decision, so a capture whose fixture
+        # list cannot be read publishes none and the week's views are still written.
+        try:
+            fixtures = fixtures_view(snapshot)
+        except DataError as error:
+            fixtures = None
+            print(f"No {FIXTURES_RELATIVE_PATH} from {snapshot.metadata.snapshot_id}: {error}")
+        # A capture of another season would put that season's week numbers beside this
+        # one's pages, so it publishes no fixture list here either.
+        if fixtures is not None and fixtures.season == season:
+            _write_json(
+                data_dir / FIXTURES_RELATIVE_PATH,
+                {
+                    "contract_version": FIXTURES_CONTRACT_VERSION,
+                    "generated_at_utc": generated,
+                    "payload": fixtures.to_dict(),
+                },
+            )
+            written.append(FIXTURES_RELATIVE_PATH)
+            fixtures_written = True
+
     status_written = False
     if plan is not None:
         state = LedgerState(
@@ -242,6 +273,9 @@ def build_site(
     live_schema_path = f"schema/{LIVE_SCORE_CONTRACT_VERSION}.schema.json"
     _write_json(data_dir / live_schema_path, live_score_schema())
     written.append(live_schema_path)
+    fixtures_schema_path = f"schema/{FIXTURES_CONTRACT_VERSION}.schema.json"
+    _write_json(data_dir / fixtures_schema_path, fixtures_schema())
+    written.append(fixtures_schema_path)
 
     gameweeks = tuple(row.gameweek for row in ledger.rows)
     latest: dict[str, JsonValue] | None = None
@@ -272,4 +306,5 @@ def build_site(
         league_written=league_written,
         horizon_evidence_gameweek=(evidence.gameweek if evidence is not None else None),
         ledger_kept_from_published=kept is not None,
+        fixtures_written=fixtures_written,
     )

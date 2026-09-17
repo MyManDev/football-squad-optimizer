@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fixtures_v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "generated_at_utc",
+    "payload"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "fixtures_v1"
+    },
+    "generated_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "season",
+        "source_snapshot_id",
+        "captured_at_utc",
+        "current_gameweek",
+        "unscheduled_count",
+        "gameweeks"
+      ],
+      "properties": {
+        "season": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}$"
+        },
+        "source_snapshot_id": {
+          "type": "string"
+        },
+        "captured_at_utc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "current_gameweek": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "unscheduled_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gameweeks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "gameweek",
+              "deadline_utc",
+              "fixtures"
+            ],
+            "properties": {
+              "gameweek": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "deadline_utc": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "fixtures": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "fixture_id",
+                    "kickoff_utc",
+                    "home",
+                    "away",
+                    "finished",
+                    "home_score",
+                    "away_score"
+                  ],
+                  "properties": {
+                    "fixture_id": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "kickoff_utc": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "home": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "team_id",
+                        "name",
+                        "short_name"
+                      ],
+                      "properties": {
+                        "team_id": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "short_name": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "away": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "team_id",
+                        "name",
+                        "short_name"
+                      ],
+                      "properties": {
+                        "team_id": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "short_name": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      }
+                    },
+                    "finished": {
+                      "type": "boolean"
+                    },
+                    "home_score": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
+                    },
+                    "away_score": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

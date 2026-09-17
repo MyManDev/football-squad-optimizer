@@ -773,17 +773,6 @@ const en = {
     publicDataBody:
       "These records are public FPL data after the gameweek deadline. SquadOpt never asks for an FPL password, session or private account access.",
     backToMembers: "← League members",
-    incompleteTitle: "Incomplete Source Record",
-    missingFieldLabels: {
-      free_transfers: "free-transfer allowance",
-      purchase_prices: "purchase prices",
-    } as Record<string, string>,
-    missingFieldUnknown: "other missing data",
-    incompleteBody: (fields: string) =>
-      `The source did not provide: ${fields}. Nothing is invented to fill it.`,
-    entryAssumptionsTitle: "Public-data limits",
-    currentPriceFallback:
-      "Purchase prices are not public, so what each player alone would sell for is unknown. What the whole squad sells for is published, and the plan spends that and the bank, never more.",
     memberSquad: "Member Squad",
     heldViceCaptainUnavailable: "The published squad does not name the vice-captain.",
     starterCount: (count: number) => `${count} starters`,
@@ -1720,17 +1709,6 @@ const tr: MessageSchema<typeof en> = {
     publicDataBody:
       "Bu kayıtlar oyun haftası son tarihinden sonra herkese açık FPL verisidir. SquadOpt hiçbir zaman FPL şifresi, oturumu veya özel hesap erişimi istemez.",
     backToMembers: "← Lig üyeleri",
-    incompleteTitle: "Eksik Kaynak Kaydı",
-    missingFieldLabels: {
-      free_transfers: "ücretsiz transfer hakkı",
-      purchase_prices: "satın alma fiyatları",
-    },
-    missingFieldUnknown: "diğer eksik veri",
-    incompleteBody: (fields) =>
-      `Kaynak şu alanları sağlamadı: ${fields}. Boşlukları doldurmak için veri uydurulmaz.`,
-    entryAssumptionsTitle: "Herkese Açık Veri Sınırları",
-    currentPriceFallback:
-      "Satın alma fiyatları herkese açık değil, yani tek bir oyuncunun kaça satılacağı bilinmiyor. Kadronun tamamının satış değeri ise yayımlanıyor; plan onu ve bankayı harcar, fazlasını değil.",
     memberSquad: "Üye kadrosu",
     heldViceCaptainUnavailable: "Yayımlanan kadroda yedek kaptan belirtilmiyor.",
     starterCount: (count) => `${count} ilk 11 oyuncusu`,

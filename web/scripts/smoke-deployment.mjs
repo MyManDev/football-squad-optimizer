@@ -14,6 +14,7 @@ export const SMOKE_CHECKS = [
   { path: "/league/members/0", kind: "html" },
   { path: "/analysis", kind: "html" },
   { path: "/status", kind: "html" },
+  { path: "/fixtures", kind: "html" },
   { path: "/data/index.json", kind: "json", revalidates: true },
   {
     path: "/data/league/members.json",

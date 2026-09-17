@@ -10,8 +10,10 @@ for (const language of ["tr", "en"] as const) {
     let response: "published" | "missing" | "failed" = "published";
     const requests: string[] = [];
     page.on("request", (request) => {
-      if (["fetch", "xhr"].includes(request.resourceType())) {
-        requests.push(new URL(request.url()).pathname);
+      // The shell's fixture list is site-level and read on every page, whatever is typed here.
+      const path = new URL(request.url()).pathname;
+      if (["fetch", "xhr"].includes(request.resourceType()) && path !== "/data/fixtures.json") {
+        requests.push(path);
       }
     });
     await page.route("**/data/league/members.json", (route) => {

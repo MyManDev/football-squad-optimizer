@@ -89,10 +89,6 @@ function LeagueMemberContent({
         <ExampleDataBadge sourceKind={squad.source_kind} />
       </header>
 
-      <Card tone="muted" title={copy.publicDataTitle}>
-        <p className={styles.notice}>{copy.publicDataBody}</p>
-      </Card>
-
       {viewer ? (
         <Card tone="muted" title={copy.viewerTitle}>
           <p className={styles.notice}>{copy.viewerBody}</p>
@@ -119,30 +115,7 @@ function LeagueMemberContent({
         </Card>
       ) : null}
 
-      {view.data_quality !== "complete" ? (
-        <Card tone="muted" title={copy.incompleteTitle}>
-          <p className={styles.notice}>
-            {copy.incompleteBody(
-              view.missing_fields
-                .map((field) =>
-                  Object.hasOwn(copy.missingFieldLabels, field)
-                    ? copy.missingFieldLabels[field]
-                    : copy.missingFieldUnknown,
-                )
-                .join(", ") || copy.unknown,
-            )}
-          </p>
-        </Card>
-      ) : null}
-
       <MemberResourceCards squad={view} />
-      {!view.purchase_prices_known ? (
-        <Card tone="muted" title={copy.entryAssumptionsTitle}>
-          <ul className={styles.assumptionList}>
-            <li>{copy.currentPriceFallback}</li>
-          </ul>
-        </Card>
-      ) : null}
 
       {view.starting_xi.length > 0 ? (
         <>
