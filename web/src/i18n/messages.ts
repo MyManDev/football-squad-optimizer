@@ -853,7 +853,7 @@ const en = {
     } as Record<string, string>,
     linkTitle: "Classic league 352490",
     linkBody:
-      "The member surface is prepared mock-first; every row will link to that entry's public post-deadline squad and suggested moves.",
+      "Every member row opens that member's public post-deadline squad and the moves suggested from it.",
     linkLabel: "Open league members →",
   },
   reasonCodes: {
@@ -1794,7 +1794,7 @@ const tr: MessageSchema<typeof en> = {
     },
     linkTitle: "Klasik lig 352490",
     linkBody:
-      "Üye yüzeyi mock-first hazırlandı; her satır üyenin son tarih sonrası public kadrosuna ve önerilen hamlelerine bağlanacak.",
+      "Her üye satırı o üyenin son tarih sonrası public kadrosunu ve o kadrodan önerilen hamleleri açar.",
     linkLabel: "Lig üyelerini aç →",
   },
   reasonCodes: {

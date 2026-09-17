@@ -539,6 +539,13 @@ class WeeklyOperations:
             handoff_path=Path(self.values["handoff"]["path"]),
             record_root=self.paths.records if record else None,
             history_record_root=self.paths.records,
+            # The manager's word rides on the rotation stage: when it ran, its table and
+            # the source the claims came from reach every member's menu as a switchable,
+            # priced constraint; when it did not, the index says there is none.
+            rotation_evidence=(
+                Path(str(self.values["rotation"]["table"])) if "rotation" in self.values else None
+            ),
+            club_news_source=self._rotation_source() if "rotation" in self.values else None,
         )
         with league_mapper(request, self.request.workers) as mapper:
             result = publish_league(request, mapper=mapper)
@@ -548,6 +555,15 @@ class WeeklyOperations:
                 "snapshot_id": result.snapshot_id,
                 "gameweek": result.gameweek,
                 "advice_recorded": record,
+                # What the build told the operator about individual members (a name it
+                # changed, a mode or the manager's word it could not solve) and the files
+                # it removed from the tree, so a run is not "completed" in silence.
+                "member_notes": {
+                    str(member.entry_id): member.reason
+                    for member in result.report.members
+                    if member.reason
+                },
+                "removed": list(result.report.removed),
             },
         )
 

@@ -61,7 +61,7 @@ Date is the file's last commit (`git log -1 --format=%as -- scripts/<name>.py`).
 | `measure_mode_plan_selection.py` | measurement runner | `docs/mode_plan_selection.json` | 2026-09-10 |
 | `measure_opening_prior_exposure.py` | measurement runner | `docs/opening_prior_exposure.json` | 2026-08-28 |
 | `measure_overlap_calibration.py` | measurement runner | `docs/overlap_calibration.json` | 2026-08-23 |
-| `measure_participation_calibration.py` | measurement runner | `docs/participation_calibration.json`, `docs/participation_calibration.md` | 2026-09-14 |
+| `measure_participation_calibration.py` | measurement runner | `docs/participation_calibration.json`, `docs/participation_calibration.md` | 2026-09-16 |
 | `measure_rival_calibration.py` | measurement runner | `docs/rival_calibration.json` | 2026-08-23 |
 | `measure_rotation_ceiling.py` | measurement runner | `docs/rotation_oracle_ceiling.json` | 2026-09-09 |
 | `measure_scenario_path_dependence.py` | measurement runner | `docs/scenario_path_dependence.json` | 2026-08-19 |

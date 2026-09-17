@@ -1,7 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { resolvePublishedAdvice } from "../advice/adviceSelection";
-import { loadEntryAdvice, loadEntryAdviceIndex, loadEntrySquad, loadLeagueMembers } from "../data";
+import {
+  loadEntryAdvice,
+  loadEntryAdviceEvidence,
+  loadEntryAdviceIndex,
+  loadEntrySquad,
+  loadLeagueMembers,
+} from "../data";
 
 /** Read only the publication authorized by the current member index and URL. */
 export function useLeagueMemberData(entryParam: string | undefined, searchParams: URLSearchParams) {
@@ -53,14 +59,19 @@ export function useLeagueMemberData(entryParam: string | undefined, searchParams
       request.window,
       request.rivalEntryId,
       selection.path,
+      selection.evidence.on,
       request.season,
       request.gameweek,
       squad.data?.payload.source_snapshot_id,
     ],
+    // With the manager's word switched on, the document is the one the index names; the
+    // plain paths below would serve the plan solved without it under the same request.
     queryFn: ({ signal }) =>
-      loadEntryAdvice(entryId, request.strategy, request.window, request.rivalEntryId ?? null, {
-        signal,
-      }),
+      selection.evidence.on && selection.path
+        ? loadEntryAdviceEvidence(entryId, selection.path, { signal })
+        : loadEntryAdvice(entryId, request.strategy, request.window, request.rivalEntryId ?? null, {
+            signal,
+          }),
     enabled: adviceEnabled,
     staleTime: 60_000,
   });

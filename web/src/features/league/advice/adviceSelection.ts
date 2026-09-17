@@ -102,7 +102,30 @@ export interface PublishedAdviceSelection {
   strategies: MemberStrategy[];
   windows: WindowSize[];
   rivals: { entryId: number; path: string | null; reason: string | null }[];
+  /**
+   * The manager's word: whether this publish solved the switched-on plan for the member
+   * (`available`), whether the URL asked for it and the selection can honour it (`on`,
+   * true only on the one-week pure-points plan), and what the words came from. A switch
+   * the index cannot honour is reported with the producer's reason, never flipped silently.
+   */
+  evidence: {
+    available: boolean;
+    on: boolean;
+    reason: string | null;
+    sourceKind: string | null;
+    appliedCount: number | null;
+  };
 }
+
+/** The URL parameter that switches the manager's word on: `llm=on`. */
+export const EVIDENCE_PARAMETER = "llm";
+const EVIDENCE_OFF = {
+  available: false,
+  on: false,
+  reason: null,
+  sourceKind: null,
+  appliedCount: null,
+} as const;
 
 /** One authority for controls, templates, static reads and the compute button. */
 export function resolvePublishedAdvice(
@@ -122,6 +145,7 @@ export function resolvePublishedAdvice(
     strategies: [],
     windows: [],
     rivals: [],
+    evidence: { ...EVIDENCE_OFF },
   };
   if (!index) return result;
   if (
@@ -146,6 +170,25 @@ export function resolvePublishedAdvice(
     return { ...result, status: "index-error" };
   }
   result.status = "not-listed";
+  const evidenceIndex = index.evidence;
+  const evidencePath =
+    evidenceIndex && evidenceIndex.available === true && typeof evidenceIndex.path === "string"
+      ? evidenceIndex.path
+      : null;
+  const evidenceAsked = searchParams.get(EVIDENCE_PARAMETER) === "on";
+  result.evidence =
+    evidencePath !== null && evidenceIndex && evidenceIndex.available === true
+      ? {
+          available: true,
+          on: false,
+          reason: null,
+          sourceKind: evidenceIndex.source_kind ?? null,
+          appliedCount: evidenceIndex.applied_count ?? null,
+        }
+      : {
+          ...EVIDENCE_OFF,
+          reason: evidenceIndex && evidenceIndex.available === false ? evidenceIndex.reason : null,
+        };
   result.strategies = [...new Set(index.strategies.filter(isMemberStrategy))];
   result.windows = availableWindows(index, request.strategy);
   const { strategy, window } = request;
@@ -200,7 +243,15 @@ export function resolvePublishedAdvice(
   if (declared) return { ...result, status: "declared-unavailable", reason: declared.reason };
   if (!result.windows.includes(window)) return result;
   if (strategy === "saf-puan") {
-    return { ...result, status: "ready", path: `advice/${entryId}/saf-puan/${window}.json` };
+    // The word is solved for the one-week pure-points plan only; asked for anywhere
+    // else, the switch stays off and the controls say why.
+    const switched = evidenceAsked && evidencePath !== null && window === 1;
+    return {
+      ...result,
+      status: "ready",
+      path: switched ? evidencePath : `advice/${entryId}/saf-puan/${window}.json`,
+      evidence: { ...result.evidence, on: switched },
+    };
   }
   const rival = result.rivals.find((row) => row.entryId === request.rivalEntryId);
   if (!rival?.path) return result;

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import indexFixture from "../public/data/index.json" with { type: "json" };
 import { installLeagueMocks } from "./leagueMocks";
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 
@@ -169,8 +170,12 @@ test("long Turkish content does not overflow a 390px viewport", async ({ page })
   for (const destination of [
     { heading: "Lig Üyeleri", path: "/league/members" },
     { heading: "North Stand Notes", path: "/league/members/35249001?mode=agresif&window=3" },
-    { heading: "Oyun haftası 1", path: "/league/members/squadopt" },
-  ] as const) {
+    // The virtual member shows the week the shipped index names.
+    {
+      heading: `Oyun haftası ${indexFixture.payload.latest.gameweek}`,
+      path: "/league/members/squadopt",
+    },
+  ]) {
     await page.goto(destination.path);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(destination.heading);
     const dimensions = await page.evaluate(() => ({

@@ -53,7 +53,7 @@ from squadopt.prediction.participation import (
     start_feature_columns,
 )
 
-PARTICIPATION_CALIBRATION_CONTRACT_VERSION: Final = "participation_calibration_v1"
+PARTICIPATION_CALIBRATION_CONTRACT_VERSION: Final = "participation_calibration_v2"
 
 #: Fitted on the first, scored on the second. Both are declared development seasons.
 TRAINING_SEASON: Final = "2023-24"
@@ -61,6 +61,23 @@ SCORING_SEASON: Final = "2024-25"
 
 #: Ten fixed-width bins, the same shape `evaluation/appearance.py` reports.
 RELIABILITY_BINS: Final = 10
+
+#: The reference forecast every Brier here is read against, declared rather than assumed.
+#:
+#: A proper score with nothing to beat can neither support nor refuse a claim: 0.0365 is a
+#: good Brier for a coin and a terrible one for an event that happens 98.6 per cent of the
+#: time. The reference is a **constant forecast at the scored rows' own event rate**, so the
+#: skill score is ``1 - brier / (rate * (1 - rate))``: zero means the estimator did no better
+#: than knowing how often the thing happens, and negative means it did worse than that.
+#:
+#: The rate comes from the rows being scored rather than from the fitting season, which makes
+#: this the stricter of the two readings: it is the best constant a forecaster could have
+#: named *in hindsight*, and no estimator is owed a win against it. An ex-ante alternative --
+#: the training season's rate, which a forecaster could have named in advance -- would score
+#: every slice slightly more kindly. It is not reported here because one declared reference
+#: that cannot be chosen after seeing the answer is worth more than two a reader must pick
+#: between.
+REFERENCE_FORECAST: Final = "constant_at_scored_event_rate"
 
 DEFAULT_RECORD: Final = Path("docs/participation_calibration.json")
 DEFAULT_SUMMARY: Final = Path("docs/participation_calibration.md")
@@ -100,12 +117,21 @@ def _binary_metrics(probability: pd.Series, label: pd.Series) -> dict[str, objec
 
     mean_probability = float(values.mean())
     event_rate = float(outcomes.mean())
+    brier = float(np.mean((values - outcomes) ** 2))
+    # The reference forecast's own Brier. A constant `c` scored against outcomes whose mean is
+    # `r` has mean squared error `(c - r)**2 + r*(1 - r)`, so at `c = r` it is `r*(1 - r)`.
+    reference_brier = event_rate * (1.0 - event_rate)
     return {
         "scored_rows": int(values.size),
         "mean_probability": mean_probability,
         "event_rate": event_rate,
         "mean_calibration_bias": mean_probability - event_rate,
-        "brier_score": float(np.mean((values - outcomes) ** 2)),
+        "brier_score": brier,
+        "reference_forecast": REFERENCE_FORECAST,
+        "reference_brier_score": reference_brier,
+        # A slice where the outcome never varies has a reference that is exactly right, so
+        # there is no skill to measure rather than infinite skill. Absent, not zero.
+        "brier_skill_score": None if reference_brier == 0.0 else 1.0 - brier / reference_brier,
         "log_loss": float(
             -np.mean(outcomes * np.log(clipped) + (1.0 - outcomes) * np.log(1.0 - clipped))
         ),
@@ -249,6 +275,19 @@ def _bin_rows(metrics: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _skill(metrics: dict[str, object]) -> str:
+    """The Brier beside what it had to beat, because alone it settles nothing."""
+
+    skill = metrics.get("brier_skill_score")
+    reference = metrics.get("reference_brier_score")
+    if skill is None or reference is None:
+        return f"Brier {float(metrics['brier_score']):.4f} (the outcome never varies; no skill)"
+    return (
+        f"Brier {float(metrics['brier_score']):.4f} against a reference of "
+        f"{float(reference):.4f}, skill {float(skill):+.4f}"
+    )
+
+
 def _headline(metrics: dict[str, object]) -> str:
     if not metrics.get("scored_rows"):
         return "No row was scored."
@@ -256,8 +295,36 @@ def _headline(metrics: dict[str, object]) -> str:
         f"{metrics['scored_rows']} rows, mean probability {float(metrics['mean_probability']):.4f} "
         f"against an observed rate of {float(metrics['event_rate']):.4f} "
         f"(bias {float(metrics['mean_calibration_bias']):+.4f}), "
-        f"Brier {float(metrics['brier_score']):.4f}, log loss {float(metrics['log_loss']):.4f}."
+        f"{_skill(metrics)}, log loss {float(metrics['log_loss']):.4f}."
     )
+
+
+def _position_rows(slices: object) -> str:
+    """Every position beside its own reference, which is where the reading bites.
+
+    A pooled skill can be comfortable while a slice is worse than knowing nothing, and the
+    slice that does that here is the one the pre-registration predicted would.
+    """
+
+    if not isinstance(slices, dict):
+        return ""
+    lines = [
+        "| Position | Rows | Mean probability | Observed rate | Brier | Reference | Skill |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for position, metrics in slices.items():
+        if not isinstance(metrics, dict) or not metrics.get("scored_rows"):
+            continue
+        skill = metrics.get("brier_skill_score")
+        lines.append(
+            f"| {position} | {metrics['scored_rows']} | "
+            f"{float(metrics['mean_probability']):.4f} | "
+            f"{float(metrics['event_rate']):.4f} | "
+            f"{float(metrics['brier_score']):.4f} | "
+            f"{float(metrics['reference_brier_score']):.4f} | "
+            f"{'-' if skill is None else f'{float(skill):+.4f}'} |"
+        )
+    return "\n".join(lines)
 
 
 def summary(record: dict[str, object]) -> str:
@@ -284,17 +351,32 @@ def summary(record: dict[str, object]) -> str:
                 f" {record['scoring_season']} ({record['scoring_rows']} rows,"
                 f" {record['scoring_appeared_rows']} of them appearances).",
                 "",
+                "Every Brier below is read against a declared reference forecast: a constant"
+                f" at the scored rows' own event rate (`{REFERENCE_FORECAST}`). Skill is"
+                " `1 - brier / reference`, so zero means the estimator did no better than"
+                " knowing how often the thing happens and a negative number means it did"
+                " worse. The rate is taken from the rows being scored, which is the strict"
+                " reading: it is the best constant a forecaster could have named in hindsight.",
+                "",
                 "## `q_start_given_appearance`, on appeared rows",
                 "",
                 _headline(conditional_pooled),
                 "",
                 _bin_rows(conditional_pooled),
                 "",
+                "### By position",
+                "",
+                _position_rows(conditional.get("by_position")),
+                "",
                 "## `p_start = p_appearance * q`",
                 "",
                 _headline(composed_pooled),
                 "",
                 _bin_rows(composed_pooled),
+                "",
+                "### By position",
+                "",
+                _position_rows(composed.get("by_position")),
                 "",
                 "`p_appearance` is not re-measured here."
                 " `docs/phase_c_component_evaluation.json` reports it on its own population,"

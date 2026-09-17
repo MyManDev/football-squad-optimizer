@@ -603,9 +603,34 @@ export function mockEntryAdviceIndex(entryId: number): LeagueViewEnvelope<EntryA
     rival_entry_ids: rivals,
     default_rival_entry_id: mockDefaultRival(entryId),
     suggested_strategy: mockSuggestedStrategy(entryId),
+    // The mock publish read no club news; a test that wants the word switches this.
+    evidence: { available: false, reason: "no_evidence_this_run" },
     computed,
     unavailable,
   });
+}
+
+/** The switched-on manager's-word plan for the example publish (synthetic words). */
+export function mockEntryAdviceEvidenceEnvelope(entryId: number): LeagueViewEnvelope<EntryAdvice> {
+  const base = mockEntryAdviceEnvelope(entryId, "saf-puan", 1);
+  return {
+    ...base,
+    payload: {
+      ...base.payload,
+      expected_points_cost: 0,
+      expected_points_cost_ceiling: 0,
+      evidence: {
+        kind: "managers_word",
+        rule_version: "managers_word_rule_v1",
+        source_kind: "synthetic_fixture",
+        source_label: "club_news_v1.fixture.json",
+        evidence_table: "rotation_evidence_v2_example.csv",
+        clubs_covered: [],
+        binding: false,
+        applied: [],
+      },
+    },
+  };
 }
 
 function rivalFields(

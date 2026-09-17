@@ -31,6 +31,7 @@ from squadopt.optimization import OptimizationConfig, SolverStatus
 from squadopt.planning import (
     CHIP_NAMES,
     ChipAvailability,
+    FirstWeekExclusion,
     FirstWeekOverlap,
     InitialSquadState,
     PlanningHorizon,
@@ -714,6 +715,57 @@ def plan_transfers_with_overlap(
     return plan, decision, prepared.transfer_config
 
 
+def plan_transfers_with_exclusion(
+    inputs: RecommendationInputs,
+    projection: Projection,
+    held: HeldSquad,
+    rules: SeasonRules,
+    first_week_exclusion: FirstWeekExclusion,
+    *,
+    optimization: OptimizationConfig | None = None,
+) -> tuple[TransferPlanResult, TransferDecision, TransferPlanningConfig]:
+    """``plan_transfers`` with named players kept out of the week's eleven or captaincy.
+
+    Same preparation, same solver, same decision packaging; the only difference is the
+    exclusion handed to ``optimize_transfer_plan``. Its own entry point for the same
+    reason ``plan_transfers_with_overlap`` is one: the saf-puan baseline call sites stay
+    byte-identical by construction. As there, an unproven plan is returned with its
+    status rather than raised on; only no solution at all is an error.
+    """
+
+    prepared = _prepare_planning(
+        inputs,
+        projection,
+        held,
+        rules,
+        optimization=optimization,
+        chip=None,
+    )
+    plan = optimize_transfer_plan(
+        prepared.horizon,
+        prepared.state,
+        prepared.settings,
+        prepared.transfer_config,
+        chips=prepared.availability,
+        first_week_exclusion=first_week_exclusion,
+    )
+    if not plan.has_solution or not plan.weeks:
+        raise DataSourceError(
+            f"The transfer planner returned {plan.solver_status.name} with no plan under the "
+            f"exclusion for {inputs.season} gameweek {prepared.gameweek}."
+        )
+    decision = _package_decision(
+        plan,
+        held,
+        prepared.availability,
+        prepared.transfer_config,
+        prepared.sell_prices,
+        prepared.current,
+        prepared.fee,
+    )
+    return plan, decision, prepared.transfer_config
+
+
 def plan_transfer_horizon(
     inputs: RecommendationInputs,
     projection_horizon: ProjectionHorizon,
@@ -725,6 +777,7 @@ def plan_transfer_horizon(
     chips: ChipAvailability | None = None,
     first_week_overlap: FirstWeekOverlap | None = None,
     first_week_transfer_cap: int | None = None,
+    first_week_exclusion: FirstWeekExclusion | None = None,
 ) -> tuple[TransferPlanResult, TransferPlanningConfig]:
     """Plan several gameweeks from the held squad and one projection horizon.
 
@@ -849,6 +902,7 @@ def plan_transfer_horizon(
         chips=chips,
         first_week_overlap=first_week_overlap,
         first_week_transfer_cap=first_week_transfer_cap,
+        first_week_exclusion=first_week_exclusion,
     )
     if not plan.has_solution or not plan.weeks:
         used = plan.diagnostics.get("deterministic_time_used")
