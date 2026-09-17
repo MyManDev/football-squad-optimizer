@@ -25,6 +25,9 @@ test("a browser computes through the worker, then reads the same answer from cac
   await page.goto("/");
   const leagueRequests: string[] = [];
   page.on("request", (request) => {
+    // The shell reads the fixture list on every page, whenever its chunk lands; it is not
+    // a league lookup, and counting it made this assertion depend on timing.
+    if (request.url().endsWith("/data/fixtures.json")) return;
     if (["fetch", "xhr"].includes(request.resourceType())) leagueRequests.push(request.url());
   });
   const leagueField = page.getByLabel("Lig numarası");
