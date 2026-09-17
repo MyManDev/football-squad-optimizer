@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 34.48722601526089,
+    "expected_points_cost_ceiling": 36.86139587498451,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 32.547000000000025,
     "rival_entry_id": 2281624,

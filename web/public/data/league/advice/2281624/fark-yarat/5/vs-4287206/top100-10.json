@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.4257954845919798,
-    "expected_points_cost": 2.230927696386118,
+    "expected_points_cost": 0.5822065460172894,
     "rival_label": "entry-4287206",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -236,27 +236,27 @@
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
-            "position": "DEF",
-            "team": "Everton"
+            "player_id": 222531,
+            "name": "Morgan Gibbs-White",
+            "short_name": "Gibbs-White",
+            "position": "MID",
+            "team": "Nott'm Forest"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 477424,
-            "name": "Jo\u0161ko Gvardiol",
-            "short_name": "Gvardiol",
-            "position": "DEF",
-            "team": "Man City"
+            "player_id": 243298,
+            "name": "Cody Gakpo",
+            "short_name": "Gakpo",
+            "position": "MID",
+            "team": "Liverpool"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.13865016950002
+        "expected_points": 57.014348776196925
       },
       {
         "gameweek": 8,
@@ -282,33 +282,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.627684000886475
+        "expected_points": 57.50338260758337
       },
       {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 222531,
-            "name": "Morgan Gibbs-White",
-            "short_name": "Gibbs-White",
-            "position": "MID",
-            "team": "Nott'm Forest"
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
+            "position": "DEF",
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 243298,
-            "name": "Cody Gakpo",
-            "short_name": "Gakpo",
-            "position": "MID",
-            "team": "Liverpool"
+            "player_id": 244723,
+            "name": "Tyrick Mitchell",
+            "short_name": "Mitchell",
+            "position": "DEF",
+            "team": "Crystal Palace"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.60605867060832
+        "expected_points": 57.50338260758337
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 33.67692769638609,
+    "expected_points_cost_ceiling": 37.58624195579597,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 31.44599999999997,
     "rival_entry_id": 4287206,

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -210,58 +210,6 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 154561,
-            "name": "David Raya Mart\u00edn",
-            "short_name": "Mart\u00edn",
-            "position": "GK",
-            "team": "Arsenal"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 204936,
-            "name": "Gianluigi Donnarumma",
-            "short_name": "Donnarumma",
-            "position": "GK",
-            "team": "Man City"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 52.57253375957595
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 222531,
-            "name": "Morgan Gibbs-White",
-            "short_name": "Gibbs-White",
-            "position": "MID",
-            "team": "Nott'm Forest"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 446008,
-            "name": "Bryan Mbeumo",
-            "short_name": "Mbeumo",
-            "position": "MID",
-            "team": "Man Utd"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 53.044218240709526
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
             "player_id": 477424,
             "name": "Jo\u0161ko Gvardiol",
             "short_name": "Gvardiol",
@@ -282,33 +230,85 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 53.545041232361925
+        "expected_points": 52.65443135466175
       },
       {
-        "gameweek": 9,
+        "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 513418,
-            "name": "Kevin Schade",
-            "short_name": "Schade",
-            "position": "MID",
-            "team": "Brentford"
+            "player_id": 209036,
+            "name": "Marc Gu\u00e9hi",
+            "short_name": "Gu\u00e9hi",
+            "position": "DEF",
+            "team": "Man City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 184029,
-            "name": "Martin \u00d8degaard",
-            "short_name": "\u00d8degaard",
-            "position": "MID",
-            "team": "Arsenal"
+            "player_id": 95658,
+            "name": "Harry Maguire",
+            "short_name": "Maguire",
+            "position": "DEF",
+            "team": "Man Utd"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 53.98690465760928
+        "expected_points": 53.034891721991556
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 586309,
+            "name": "Thierno Barry",
+            "short_name": "Barry",
+            "position": "FWD",
+            "team": "Everton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 441264,
+            "name": "Brian Brobbey",
+            "short_name": "Brobbey",
+            "position": "FWD",
+            "team": "Sunderland"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 53.034891721991556
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 154561,
+            "name": "David Raya Mart\u00edn",
+            "short_name": "Mart\u00edn",
+            "position": "GK",
+            "team": "Arsenal"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 204936,
+            "name": "Gianluigi Donnarumma",
+            "short_name": "Donnarumma",
+            "position": "GK",
+            "team": "Man City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 53.45381711855816
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 46.60818023250391,
+    "expected_points_cost_ceiling": 53.02460966401134,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 47.714999999999975,
     "rival_entry_id": 6654210,

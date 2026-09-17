@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -394,6 +394,25 @@
         "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
         "picks_gameweek": 4
       }
+    },
+    "chips": {
+      "available": true,
+      "paths": {
+        "wildcard": "advice/5662073/saf-puan/1/chip-wildcard.json",
+        "bboost": "advice/5662073/saf-puan/1/chip-bboost.json",
+        "3xc": "advice/5662073/saf-puan/1/chip-3xc.json"
+      },
+      "unavailable": [
+        {
+          "chip": "freehit",
+          "reason": "already_played"
+        }
+      ],
+      "held": [
+        "wildcard",
+        "bboost",
+        "3xc"
+      ]
     },
     "windows": {
       "saf-puan": [

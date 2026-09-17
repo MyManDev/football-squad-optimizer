@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -210,6 +210,32 @@
         "gameweek": 6,
         "transfers_in": [
           {
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
+            "position": "DEF",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 445087,
+            "name": "Ronald Araujo",
+            "short_name": "Araujo",
+            "position": "DEF",
+            "team": "Liverpool"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.669691311885856
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
             "player_id": 177815,
             "name": "Dominic Calvert-Lewin",
             "short_name": "Calvert-Lewin",
@@ -230,17 +256,17 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 55.75121552908186
+        "expected_points": 55.79173505152055
       },
       {
-        "gameweek": 7,
+        "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
             "position": "DEF",
-            "team": "Brighton"
+            "team": "Everton"
           }
         ],
         "transfers_out": [
@@ -256,10 +282,10 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 55.749662032552266
+        "expected_points": 56.39523410619789
       },
       {
-        "gameweek": 8,
+        "gameweek": 9,
         "transfers_in": [
           {
             "player_id": 244850,
@@ -267,32 +293,6 @@
             "short_name": "Rogers",
             "position": "MID",
             "team": "Chelsea"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 577725,
-            "name": "Josh King",
-            "short_name": "King",
-            "position": "MID",
-            "team": "Fulham"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 56.6510921638785
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 513418,
-            "name": "Kevin Schade",
-            "short_name": "Schade",
-            "position": "MID",
-            "team": "Brentford"
           }
         ],
         "transfers_out": [
@@ -308,7 +308,7 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.09295558912586
+        "expected_points": 57.029246051026405
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 34.28043585636624,
+    "expected_points_cost_ceiling": 37.80533332659826,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 35.91699999999997,
     "rival_entry_id": 313686,

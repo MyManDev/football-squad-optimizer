@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 3.316137754827139,
-    "expected_points_cost": 0.0,
+    "expected_points_cost": 0.328216515367842,
     "rival_label": "entry-313686",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -210,6 +210,32 @@
         "gameweek": 6,
         "transfers_in": [
           {
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
+            "position": "DEF",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 572584,
+            "name": "Abdoul Ouattara",
+            "short_name": "Ouattara",
+            "position": "DEF",
+            "team": "Ipswich Town"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 55.669691311885856
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
             "player_id": 177815,
             "name": "Dominic Calvert-Lewin",
             "short_name": "Calvert-Lewin",
@@ -230,77 +256,25 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 55.75121552908186
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
-            "position": "DEF",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 445087,
-            "name": "Ronald Araujo",
-            "short_name": "Araujo",
-            "position": "DEF",
-            "team": "Liverpool"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
         "expected_points": 55.79173505152055
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
             "position": "DEF",
-            "team": "Leeds"
+            "team": "Everton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 97032,
-            "name": "Virgil van Dijk",
-            "short_name": "Dijk",
+            "player_id": 226597,
+            "name": "Gabriel dos Santos Magalh\u00e3es",
+            "short_name": "Magalh\u00e3es",
             "position": "DEF",
-            "team": "Liverpool"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 55.78452345327369
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 244851,
-            "name": "Cole Palmer",
-            "short_name": "Palmer",
-            "position": "MID",
-            "team": "Chelsea"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 184029,
-            "name": "Martin \u00d8degaard",
-            "short_name": "\u00d8degaard",
-            "position": "MID",
             "team": "Arsenal"
           }
         ],
@@ -308,7 +282,33 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.20352169251903
+        "expected_points": 55.47825439772588
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 223340,
+            "name": "Bukayo Saka",
+            "short_name": "Saka",
+            "position": "MID",
+            "team": "Arsenal"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "short_name": "Mbeumo",
+            "position": "MID",
+            "team": "Man Utd"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 56.340463894504666
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 34.99436544460963,
+    "expected_points_cost_ceiling": 39.41109519159204,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 35.91699999999997,
     "rival_entry_id": 313686,

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -14,11 +14,11 @@
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 449434,
-          "name": "Anthony Elanga",
-          "short_name": "Elanga",
+          "player_id": 466052,
+          "name": "Rayan Cherki",
+          "short_name": "Cherki",
           "position": "MID",
-          "team": "Newcastle"
+          "team": "Man City"
         },
         "player_in": {
           "player_id": 60307,
@@ -27,17 +27,17 @@
           "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 1.4575636336035984,
-        "reason_code": "mode_tradeoff"
+        "expected_points_delta": -0.09483890324607813,
+        "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.4575636336035984,
+    "expected_gain_vs_hold": -0.09483890324607813,
     "expected_points_cost": 0.0,
     "rival_label": "entry-2199732",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
-    "expected_own_points": 49.153599564286075,
+    "expected_own_points": 47.6011970274364,
     "captain": {
       "player_id": 244851,
       "name": "Cole Palmer",
@@ -96,14 +96,6 @@
         "expected_points": 5.199892083433812
       },
       {
-        "player_id": 466052,
-        "name": "Rayan Cherki",
-        "short_name": "Cherki",
-        "position": "MID",
-        "team": "Man City",
-        "expected_points": 4.301528232026531
-      },
-      {
         "player_id": 60307,
         "name": "Pascal Gro\u00df",
         "short_name": "Gro\u00df",
@@ -118,6 +110,14 @@
         "position": "MID",
         "team": "Brentford",
         "expected_points": 3.247252023463506
+      },
+      {
+        "player_id": 195546,
+        "name": "Emiliano Buend\u00eda Stati",
+        "short_name": "Stati",
+        "position": "MID",
+        "team": "Aston Villa",
+        "expected_points": 2.7491256951768515
       },
       {
         "player_id": 219168,
@@ -154,14 +154,6 @@
         "expected_points": 3.354651247440729
       },
       {
-        "player_id": 195546,
-        "name": "Emiliano Buend\u00eda Stati",
-        "short_name": "Stati",
-        "position": "MID",
-        "team": "Aston Villa",
-        "expected_points": 2.7491256951768515
-      },
-      {
         "player_id": 437499,
         "name": "Maxence Lacroix",
         "short_name": "Lacroix",
@@ -176,6 +168,14 @@
         "position": "DEF",
         "team": "Aston Villa",
         "expected_points": 0.5764566869383193
+      },
+      {
+        "player_id": 449434,
+        "name": "Anthony Elanga",
+        "short_name": "Elanga",
+        "position": "MID",
+        "team": "Newcastle",
+        "expected_points": 0.0
       }
     ],
     "chip": null,
@@ -193,73 +193,21 @@
         ],
         "transfers_out": [
           {
-            "player_id": 449434,
-            "name": "Anthony Elanga",
-            "short_name": "Elanga",
+            "player_id": 466052,
+            "name": "Rayan Cherki",
+            "short_name": "Cherki",
             "position": "MID",
-            "team": "Newcastle"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 49.15359956428608
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 661313,
-            "name": "Juan Angulo",
-            "short_name": "Angulo",
-            "position": "FWD",
-            "team": "Sunderland"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 475168,
-            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-            "short_name": "Jesus",
-            "position": "FWD",
-            "team": "Chelsea"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 48.36292854242588
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 223094,
-            "name": "Erling Haaland",
-            "short_name": "Haaland",
-            "position": "FWD",
             "team": "Man City"
           }
         ],
-        "transfers_out": [
-          {
-            "player_id": 219168,
-            "name": "Alexander Isak",
-            "short_name": "Isak",
-            "position": "FWD",
-            "team": "Liverpool"
-          }
-        ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.01665845524266
+        "expected_points": 47.6011970274364
       },
       {
-        "gameweek": 8,
+        "gameweek": 6,
         "transfers_in": [
           {
             "player_id": 465730,
@@ -282,17 +230,69 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 54.09812525024104
+        "expected_points": 46.682663822434776
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 223094,
+            "name": "Erling Haaland",
+            "short_name": "Haaland",
+            "position": "FWD",
+            "team": "Man City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 475168,
+            "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+            "short_name": "Jesus",
+            "position": "FWD",
+            "team": "Chelsea"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 54.693642456516415
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 201658,
+            "name": "Marcus Tavernier",
+            "short_name": "Tavernier",
+            "position": "MID",
+            "team": "Bournemouth"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 449434,
+            "name": "Anthony Elanga",
+            "short_name": "Elanga",
+            "position": "MID",
+            "team": "Newcastle"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 56.010752073912045
       },
       {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 244850,
-            "name": "Morgan Rogers",
-            "short_name": "Rogers",
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
             "position": "MID",
-            "team": "Chelsea"
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
@@ -308,7 +308,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.76390534408117
+        "expected_points": 56.986257319884366
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 49.39002474580991,
+    "expected_points_cost_ceiling": 54.33863827072736,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 51.85899999999998,
     "rival_entry_id": 2199732,
@@ -336,7 +336,7 @@
     "overlap_applied": 5,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": -2.4454393061218624,
+    "expected_gap_vs_rival": -3.997841842971539,
     "captain_agreement": true,
     "top100": {
       "weight": 30,

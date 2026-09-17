@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,9 +33,9 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.4575636336035984,
-    "expected_points_cost": 2.0981899606698278,
+    "expected_points_cost": 2.775374162682567,
     "rival_label": "entry-2199732",
-    "solver_status": "OPTIMAL",
+    "solver_status": "FEASIBLE",
     "optimality_gap": null,
     "expected_own_points": 49.153599564286075,
     "captain": {
@@ -210,53 +210,53 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
             "position": "DEF",
-            "team": "Leeds"
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 226597,
-            "name": "Gabriel dos Santos Magalh\u00e3es",
-            "short_name": "Magalh\u00e3es",
+            "player_id": 437499,
+            "name": "Maxence Lacroix",
+            "short_name": "Lacroix",
             "position": "DEF",
-            "team": "Arsenal"
+            "team": "Chelsea"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 48.2294082575672
+        "expected_points": 49.54669661963452
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 223094,
-            "name": "Erling Haaland",
-            "short_name": "Haaland",
-            "position": "FWD",
-            "team": "Man City"
+            "player_id": 141746,
+            "name": "Bruno Borges Fernandes",
+            "short_name": "Fernandes",
+            "position": "MID",
+            "team": "Man Utd"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 219168,
-            "name": "Alexander Isak",
-            "short_name": "Isak",
-            "position": "FWD",
-            "team": "Liverpool"
+            "player_id": 466052,
+            "name": "Rayan Cherki",
+            "short_name": "Cherki",
+            "position": "MID",
+            "team": "Man City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 54.88313817038397
+        "expected_points": 52.8886656063039
       }
     ],
     "stated_limits": [
@@ -274,7 +274,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 29.294189960669826,
+    "expected_points_cost_ceiling": 32.53709653836273,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 27.195999999999998,
     "rival_entry_id": 2199732,

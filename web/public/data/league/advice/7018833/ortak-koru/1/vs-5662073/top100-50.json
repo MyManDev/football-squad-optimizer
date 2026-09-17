@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -28,7 +28,7 @@
           "team": "Arsenal"
         },
         "expected_points_delta": -0.015003612731845806,
-        "reason_code": "mode_tradeoff"
+        "reason_code": "top100_preference"
       },
       {
         "move_id": "gw05-2",
@@ -47,7 +47,7 @@
           "team": "Aston Villa"
         },
         "expected_points_delta": -0.13069345625087436,
-        "reason_code": "mode_tradeoff"
+        "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,

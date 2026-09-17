@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,9 +33,9 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.3740207607157728,
-    "expected_points_cost": 0.0,
+    "expected_points_cost": 0.4032111946172563,
     "rival_label": "entry-7252721",
-    "solver_status": "OPTIMAL",
+    "solver_status": "FEASIBLE",
     "optimality_gap": null,
     "expected_own_points": 54.575638891585605,
     "captain": {
@@ -210,32 +210,6 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 222531,
-            "name": "Morgan Gibbs-White",
-            "short_name": "Gibbs-White",
-            "position": "MID",
-            "team": "Nott'm Forest"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 430871,
-            "name": "Matheus Santos Carneiro da Cunha",
-            "short_name": "Cunha",
-            "position": "MID",
-            "team": "Man Utd"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.509361832471875
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
             "player_id": 465730,
             "name": "Maxim De Cuyper",
             "short_name": "Cuyper",
@@ -256,7 +230,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.306703907883765
+        "expected_points": 55.372980966997495
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
+            "position": "MID",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 513545,
+            "name": "Mamadou Sangar\u00e9",
+            "short_name": "Sangar\u00e9",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 56.0398735787409
       }
     ],
     "stated_limits": [
@@ -274,7 +274,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 20.727000000000004,
+    "expected_points_cost_ceiling": 24.323779799479667,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 20.727000000000004,
     "rival_entry_id": 7252721,
@@ -288,7 +288,7 @@
     "captain_agreement": true,
     "top100": {
       "weight": 5,
-      "changed": false,
+      "changed": true,
       "price_basis": "base_model_pure_points_v1",
       "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
       "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
