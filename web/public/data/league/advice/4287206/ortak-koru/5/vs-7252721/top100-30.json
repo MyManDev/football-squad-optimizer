@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -14,30 +14,30 @@
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 500040,
-          "name": "Cristhian Mosquera",
-          "short_name": "Mosquera",
-          "position": "DEF",
-          "team": "Arsenal"
+          "player_id": 430871,
+          "name": "Matheus Santos Carneiro da Cunha",
+          "short_name": "Cunha",
+          "position": "MID",
+          "team": "Man Utd"
         },
         "player_in": {
-          "player_id": 465730,
-          "name": "Maxim De Cuyper",
-          "short_name": "Cuyper",
-          "position": "DEF",
+          "player_id": 60307,
+          "name": "Pascal Gro\u00df",
+          "short_name": "Gro\u00df",
+          "position": "MID",
           "team": "Brighton"
         },
-        "expected_points_delta": 0.8716442725337714,
+        "expected_points_delta": 0.2528354518057654,
         "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.8716442725337714,
-    "expected_points_cost": 1.1097949711528372,
+    "expected_gain_vs_hold": 0.2528354518057654,
+    "expected_points_cost": 2.2978349087176753,
     "rival_label": "entry-7252721",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
-    "expected_own_points": 54.073262403403604,
+    "expected_own_points": 53.4544535826756,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -64,14 +64,6 @@
         "expected_points": 2.9465399121005427
       },
       {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5539951801294207
-      },
-      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
@@ -86,6 +78,14 @@
         "position": "DEF",
         "team": "Ipswich Town",
         "expected_points": 2.7566531047175307
+      },
+      {
+        "player_id": 223827,
+        "name": "Daniel Ballard",
+        "short_name": "Ballard",
+        "position": "DEF",
+        "team": "Sunderland",
+        "expected_points": 2.682350907595655
       },
       {
         "player_id": 244851,
@@ -104,12 +104,12 @@
         "expected_points": 4.414905789016978
       },
       {
-        "player_id": 430871,
-        "name": "Matheus Santos Carneiro da Cunha",
-        "short_name": "Cunha",
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
         "position": "MID",
-        "team": "Man Utd",
-        "expected_points": 3.9538538769746867
+        "team": "Brighton",
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 184029,
@@ -162,78 +162,26 @@
         "expected_points": 3.3442643683372464
       },
       {
-        "player_id": 223827,
-        "name": "Daniel Ballard",
-        "short_name": "Ballard",
-        "position": "DEF",
-        "team": "Sunderland",
-        "expected_points": 2.682350907595655
-      },
-      {
         "player_id": 451284,
         "name": "Milan van Ewijk",
         "short_name": "Ewijk",
         "position": "DEF",
         "team": "Coventry City",
         "expected_points": 2.040792632135852
+      },
+      {
+        "player_id": 500040,
+        "name": "Cristhian Mosquera",
+        "short_name": "Mosquera",
+        "position": "DEF",
+        "team": "Arsenal",
+        "expected_points": 0.45078541972265246
       }
     ],
     "chip": null,
     "plan_weeks": [
       {
         "gameweek": 5,
-        "transfers_in": [
-          {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
-            "position": "DEF",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 500040,
-            "name": "Cristhian Mosquera",
-            "short_name": "Mosquera",
-            "position": "DEF",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 54.0732624034036
-      },
-      {
-        "gameweek": 6,
-        "transfers_in": [
-          {
-            "player_id": 477424,
-            "name": "Jo\u0161ko Gvardiol",
-            "short_name": "Gvardiol",
-            "position": "DEF",
-            "team": "Man City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 223827,
-            "name": "Daniel Ballard",
-            "short_name": "Ballard",
-            "position": "DEF",
-            "team": "Sunderland"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.372980966997495
-      },
-      {
-        "gameweek": 7,
         "transfers_in": [
           {
             "player_id": 60307,
@@ -256,36 +204,62 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.62581641880326
+        "expected_points": 53.454453582675605
       },
       {
-        "gameweek": 8,
+        "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 154561,
-            "name": "David Raya Mart\u00edn",
-            "short_name": "Mart\u00edn",
-            "position": "GK",
-            "team": "Arsenal"
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
+            "position": "DEF",
+            "team": "Everton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 457569,
-            "name": "\u0110or\u0111e Petrovi\u0107",
-            "short_name": "Petrovi\u0107",
-            "position": "GK",
-            "team": "Bournemouth"
+            "player_id": 500040,
+            "name": "Cristhian Mosquera",
+            "short_name": "Mosquera",
+            "position": "DEF",
+            "team": "Arsenal"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.50310858938107
+        "expected_points": 54.931150406416315
       },
       {
-        "gameweek": 9,
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
+            "position": "DEF",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 223827,
+            "name": "Daniel Ballard",
+            "short_name": "Ballard",
+            "position": "DEF",
+            "team": "Sunderland"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 55.728492481828205
+      },
+      {
+        "gameweek": 8,
         "transfers_in": [
           {
             "player_id": 513418,
@@ -308,7 +282,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.944972014628426
+        "expected_points": 56.17035590707555
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 154561,
+            "name": "David Raya Mart\u00edn",
+            "short_name": "Mart\u00edn",
+            "position": "GK",
+            "team": "Arsenal"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 457569,
+            "name": "\u0110or\u0111e Petrovi\u0107",
+            "short_name": "Petrovi\u0107",
+            "position": "GK",
+            "team": "Bournemouth"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 57.04764807765337
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 37.164794971152844,
+    "expected_points_cost_ceiling": 43.75613892953902,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 36.05500000000001,
     "rival_entry_id": 7252721,
@@ -336,7 +336,7 @@
     "overlap_applied": 3,
     "plan_kind": "within_free_transfers",
     "alternative_plan": null,
-    "expected_gap_vs_rival": -1.2265246609428715,
+    "expected_gap_vs_rival": -1.8453334816708775,
     "captain_agreement": true,
     "top100": {
       "weight": 30,

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.3740207607157728,
-    "expected_points_cost": 1.228496968274385,
+    "expected_points_cost": 1.863083009878494,
     "rival_label": "entry-7252721",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -236,11 +236,37 @@
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 154561,
-            "name": "David Raya Mart\u00edn",
-            "short_name": "Mart\u00edn",
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
+            "position": "DEF",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 451284,
+            "name": "Milan van Ewijk",
+            "short_name": "Ewijk",
+            "position": "DEF",
+            "team": "Coventry City"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 55.62581641880326
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 473284,
+            "name": "Konstantinos Tzolakis",
+            "short_name": "Tzolakis",
             "position": "GK",
-            "team": "Arsenal"
+            "team": "Hull City"
           }
         ],
         "transfers_out": [
@@ -256,59 +282,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 55.70576651396918
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
-            "position": "DEF",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 223827,
-            "name": "Daniel Ballard",
-            "short_name": "Ballard",
-            "position": "DEF",
-            "team": "Sunderland"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.50310858938107
+        "expected_points": 55.81511986351775
       },
       {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 201658,
-            "name": "Marcus Tavernier",
-            "short_name": "Tavernier",
+            "player_id": 222531,
+            "name": "Morgan Gibbs-White",
+            "short_name": "Gibbs-White",
             "position": "MID",
-            "team": "Bournemouth"
+            "team": "Nott'm Forest"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 513545,
-            "name": "Mamadou Sangar\u00e9",
-            "short_name": "Sangar\u00e9",
+            "player_id": 184029,
+            "name": "Martin \u00d8degaard",
+            "short_name": "\u00d8degaard",
             "position": "MID",
-            "team": "Brentford"
+            "team": "Arsenal"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.788450057765104
+        "expected_points": 56.92180283719024
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 37.28349696827439,
+    "expected_points_cost_ceiling": 43.32138703069984,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 36.05500000000001,
     "rival_entry_id": 7252721,

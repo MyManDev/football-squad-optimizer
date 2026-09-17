@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.3740207607157728,
-    "expected_points_cost": 0.0,
+    "expected_points_cost": 0.6559230487812897,
     "rival_label": "entry-7252721",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -210,37 +210,11 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
-            "position": "DEF",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 223827,
-            "name": "Daniel Ballard",
-            "short_name": "Ballard",
-            "position": "DEF",
-            "team": "Sunderland"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 55.372980966997495
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 222531,
-            "name": "Morgan Gibbs-White",
-            "short_name": "Gibbs-White",
+            "player_id": 60307,
+            "name": "Pascal Gro\u00df",
+            "short_name": "Gro\u00df",
             "position": "MID",
-            "team": "Nott'm Forest"
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
@@ -256,43 +230,69 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.306703907883765
+        "expected_points": 54.82847434339137
       },
       {
-        "gameweek": 8,
+        "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
-            "position": "MID",
-            "team": "Brighton"
+            "player_id": 17761,
+            "name": "James Tarkowski",
+            "short_name": "Tarkowski",
+            "position": "DEF",
+            "team": "Everton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 184029,
-            "name": "Martin \u00d8degaard",
-            "short_name": "\u00d8degaard",
-            "position": "MID",
-            "team": "Arsenal"
+            "player_id": 223827,
+            "name": "Daniel Ballard",
+            "short_name": "Ballard",
+            "position": "DEF",
+            "team": "Sunderland"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.73249939247575
+        "expected_points": 56.230868970010214
+      },
+      {
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 226944,
+            "name": "Boubacar Kamara",
+            "short_name": "Kamara",
+            "position": "MID",
+            "team": "Aston Villa"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 513545,
+            "name": "Mamadou Sangar\u00e9",
+            "short_name": "Sangar\u00e9",
+            "position": "MID",
+            "team": "Brentford"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 56.230868970010214
       },
       {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 204936,
-            "name": "Gianluigi Donnarumma",
-            "short_name": "Donnarumma",
+            "player_id": 154561,
+            "name": "David Raya Mart\u00edn",
+            "short_name": "Mart\u00edn",
             "position": "GK",
-            "team": "Man City"
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
@@ -308,7 +308,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.190866166486956
+        "expected_points": 57.108161140588024
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 35.50624603893715,
+    "expected_points_cost_ceiling": 42.114227069602634,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 36.05500000000001,
     "rival_entry_id": 7252721,

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,9 +33,9 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": -0.0150036127318387,
-    "expected_points_cost": 2.6183072391443716,
+    "expected_points_cost": 1.9606341627032293,
     "rival_label": "entry-5349883",
-    "solver_status": "OPTIMAL",
+    "solver_status": "FEASIBLE",
     "optimality_gap": null,
     "expected_own_points": 54.47646452022535,
     "captain": {
@@ -210,37 +210,11 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 465730,
-            "name": "Maxim De Cuyper",
-            "short_name": "Cuyper",
-            "position": "DEF",
-            "team": "Brighton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 95658,
-            "name": "Harry Maguire",
-            "short_name": "Maguire",
-            "position": "DEF",
-            "team": "Man Utd"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 55.448072957871574
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 424876,
-            "name": "Dominik Szoboszlai",
-            "short_name": "Szoboszlai",
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
             "position": "MID",
-            "team": "Liverpool"
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
@@ -256,7 +230,33 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 56.12395221989411
+        "expected_points": 55.6290449082803
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
+            "position": "DEF",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 449429,
+            "name": "Jacob Greaves",
+            "short_name": "Greaves",
+            "position": "DEF",
+            "team": "Ipswich Town"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 56.600653345926524
       }
     ],
     "stated_limits": [
@@ -274,7 +274,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 25.849307239144366,
+    "expected_points_cost_ceiling": 26.644742832976306,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 23.230999999999995,
     "rival_entry_id": 5349883,

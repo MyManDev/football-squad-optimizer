@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.8839512474707121,
-    "expected_points_cost": 1.4528153850172885,
+    "expected_points_cost": 2.68724029575867,
     "rival_label": "entry-6879786",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -210,37 +210,11 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 219924,
-            "name": "Issa Diop",
-            "short_name": "Diop",
-            "position": "DEF",
-            "team": "Ipswich Town"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 57.14968864774616
-      },
-      {
-        "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 244850,
-            "name": "Morgan Rogers",
-            "short_name": "Rogers",
+            "player_id": 503139,
+            "name": "Alex Scott",
+            "short_name": "Scott",
             "position": "MID",
-            "team": "Chelsea"
+            "team": "Bournemouth"
           }
         ],
         "transfers_out": [
@@ -256,43 +230,43 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.81853829335972
+        "expected_points": 56.79323257880132
       },
       {
-        "gameweek": 8,
+        "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 513418,
-            "name": "Kevin Schade",
-            "short_name": "Schade",
-            "position": "MID",
-            "team": "Brentford"
+            "player_id": 466075,
+            "name": "Riccardo Calafiori",
+            "short_name": "Calafiori",
+            "position": "DEF",
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 60307,
-            "name": "Pascal Gro\u00df",
-            "short_name": "Gro\u00df",
-            "position": "MID",
-            "team": "Brighton"
+            "player_id": 219924,
+            "name": "Issa Diop",
+            "short_name": "Diop",
+            "position": "DEF",
+            "team": "Ipswich Town"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.834606234015105
+        "expected_points": 57.53692282243462
       },
       {
-        "gameweek": 9,
+        "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 224967,
-            "name": "Vitalii Mykolenko",
-            "short_name": "Mykolenko",
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
             "position": "DEF",
-            "team": "Everton"
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
@@ -308,7 +282,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.834606234015105
+        "expected_points": 57.53692282243462
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 244850,
+            "name": "Morgan Rogers",
+            "short_name": "Rogers",
+            "position": "MID",
+            "team": "Chelsea"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 446008,
+            "name": "Bryan Mbeumo",
+            "short_name": "Mbeumo",
+            "position": "MID",
+            "team": "Man Utd"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 57.53593627472421
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 32.957815385017284,
+    "expected_points_cost_ceiling": 39.01054532642104,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 31.504999999999995,
     "rival_entry_id": 6879786,

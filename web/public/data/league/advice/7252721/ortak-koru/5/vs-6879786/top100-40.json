@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.8839512474707121,
-    "expected_points_cost": 4.139372473616902,
+    "expected_points_cost": 4.677494646414175,
     "rival_label": "entry-6879786",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -210,6 +210,32 @@
         "gameweek": 6,
         "transfers_in": [
           {
+            "player_id": 557012,
+            "name": "Sindre Walle Egeli",
+            "short_name": "Egeli",
+            "position": "FWD",
+            "team": "Ipswich Town"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 661313,
+            "name": "Juan Angulo",
+            "short_name": "Angulo",
+            "position": "FWD",
+            "team": "Sunderland"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 56.39820638962787
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
             "player_id": 466075,
             "name": "Riccardo Calafiori",
             "short_name": "Calafiori",
@@ -233,7 +259,7 @@
         "expected_points": 57.14189663326118
       },
       {
-        "gameweek": 7,
+        "gameweek": 8,
         "transfers_in": [
           {
             "player_id": 244850,
@@ -259,49 +285,23 @@
         "expected_points": 56.9363285624251
       },
       {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 219924,
-            "name": "Issa Diop",
-            "short_name": "Diop",
-            "position": "DEF",
-            "team": "Ipswich Town"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.9363285624251
-      },
-      {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 224967,
-            "name": "Vitalii Mykolenko",
-            "short_name": "Mykolenko",
-            "position": "DEF",
+            "player_id": 586309,
+            "name": "Thierno Barry",
+            "short_name": "Barry",
+            "position": "FWD",
             "team": "Everton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 146426,
-            "name": "Semi Ajayi",
-            "short_name": "Ajayi",
-            "position": "DEF",
-            "team": "Hull City"
+            "player_id": 557012,
+            "name": "Sindre Walle Egeli",
+            "short_name": "Egeli",
+            "position": "FWD",
+            "team": "Ipswich Town"
           }
         ],
         "transfer_hit_points": 0.0,
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 35.6443724736169,
+    "expected_points_cost_ceiling": 41.00079967707654,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 31.504999999999995,
     "rival_entry_id": 6879786,

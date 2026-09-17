@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.4575636336035984,
-    "expected_points_cost": 0.5867942741340357,
+    "expected_points_cost": 1.169022497718629,
     "rival_label": "entry-6654210",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -210,6 +210,32 @@
         "gameweek": 6,
         "transfers_in": [
           {
+            "player_id": 489639,
+            "name": "Bart Verbruggen",
+            "short_name": "Verbruggen",
+            "position": "GK",
+            "team": "Brighton"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 485055,
+            "name": "Anton\u00edn Kinsk\u00fd",
+            "short_name": "Kinsk\u00fd",
+            "position": "GK",
+            "team": "Spurs"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 52.15360836300934
+      },
+      {
+        "gameweek": 7,
+        "transfers_in": [
+          {
             "player_id": 154561,
             "name": "David Raya Mart\u00edn",
             "short_name": "Mart\u00edn",
@@ -233,7 +259,33 @@
         "expected_points": 52.57253375957595
       },
       {
-        "gameweek": 7,
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 477424,
+            "name": "Jo\u0161ko Gvardiol",
+            "short_name": "Gvardiol",
+            "position": "DEF",
+            "team": "Man City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 97032,
+            "name": "Virgil van Dijk",
+            "short_name": "Dijk",
+            "position": "DEF",
+            "team": "Liverpool"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 53.07335675122836
+      },
+      {
+        "gameweek": 9,
         "transfers_in": [
           {
             "player_id": 226182,
@@ -256,59 +308,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 52.56532216132909
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
-            "position": "DEF",
-            "team": "Everton"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 97032,
-            "name": "Virgil van Dijk",
-            "short_name": "Dijk",
-            "position": "DEF",
-            "team": "Liverpool"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 53.176032814253304
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 424876,
-            "name": "Dominik Szoboszlai",
-            "short_name": "Szoboszlai",
-            "position": "MID",
-            "team": "Liverpool"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 184029,
-            "name": "Martin \u00d8degaard",
-            "short_name": "\u00d8degaard",
-            "position": "MID",
-            "team": "Arsenal"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 53.14119511346823
+        "expected_points": 53.07335675122836
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 48.30179427413401,
+    "expected_points_cost_ceiling": 54.32978595617237,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 47.714999999999975,
     "rival_entry_id": 6654210,

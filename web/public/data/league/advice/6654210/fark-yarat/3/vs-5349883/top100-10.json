@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -27,12 +27,12 @@
           "position": "DEF",
           "team": "Brighton"
         },
-        "expected_points_delta": 0.9716084376462177,
+        "expected_points_delta": null,
         "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.9716084376462177,
+    "expected_gain_vs_hold": null,
     "expected_points_cost": 1.244724646642851,
     "rival_label": "entry-5349883",
     "solver_status": "FEASIBLE",
@@ -274,7 +274,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 24.475724646642846,
+    "expected_points_cost_ceiling": 25.928833316915927,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 23.230999999999995,
     "rival_entry_id": 5349883,

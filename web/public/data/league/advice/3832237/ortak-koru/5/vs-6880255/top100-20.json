@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -27,12 +27,12 @@
           "position": "FWD",
           "team": "Fulham"
         },
-        "expected_points_delta": 0.4587102481577716,
+        "expected_points_delta": null,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.4587102481577716,
+    "expected_gain_vs_hold": null,
     "expected_points_cost": 0.0,
     "rival_label": "entry-6880255",
     "solver_status": "FEASIBLE",
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 68.48104260258,
+    "expected_points_cost_ceiling": 73.81038761422846,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 68.83899999999997,
     "rival_entry_id": 6880255,

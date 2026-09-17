@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.09572268028838948,
-    "expected_points_cost": 1.1978299535739438,
+    "expected_points_cost": 0.0452495655189864,
     "rival_label": "entry-2281624",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -234,23 +234,39 @@
       },
       {
         "gameweek": 7,
-        "transfers_in": [],
-        "transfers_out": [],
+        "transfers_in": [
+          {
+            "player_id": 97846,
+            "name": "Alex Cairns",
+            "short_name": "Cairns",
+            "position": "GK",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 112520,
+            "name": "Alex Palmer",
+            "short_name": "Palmer",
+            "position": "GK",
+            "team": "Ipswich Town"
+          }
+        ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
-        "free_transfers_after": 3,
+        "free_transfers_after": 2,
         "expected_points": 57.121488667517
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 607464,
-            "name": "Michael Kayode",
-            "short_name": "Kayode",
+            "player_id": 226182,
+            "name": "Jayden Bogle",
+            "short_name": "Bogle",
             "position": "DEF",
-            "team": "Brentford"
+            "team": "Leeds"
           }
         ],
         "transfers_out": [
@@ -264,35 +280,35 @@
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 3,
-        "free_transfers_after": 3,
-        "expected_points": 57.121488667517
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 57.599648864548286
       },
       {
         "gameweek": 9,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
+            "player_id": 513418,
+            "name": "Kevin Schade",
+            "short_name": "Schade",
+            "position": "MID",
+            "team": "Brentford"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 607464,
-            "name": "Michael Kayode",
-            "short_name": "Kayode",
-            "position": "DEF",
-            "team": "Brentford"
+            "player_id": 439509,
+            "name": "Christos Tzolis",
+            "short_name": "Tzolis",
+            "position": "MID",
+            "team": "Arsenal"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
-        "free_transfers_before": 3,
-        "free_transfers_after": 3,
-        "expected_points": 57.599648864548286
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 58.27406905557195
       }
     ],
     "stated_limits": [
@@ -310,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 33.74482995357397,
+    "expected_points_cost_ceiling": 34.966419425242634,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 32.547000000000025,
     "rival_entry_id": 2281624,

@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.09572268028838948,
-    "expected_points_cost": 4.365663188934718,
+    "expected_points_cost": 3.043744944478874,
     "rival_label": "entry-2281624",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -210,19 +210,19 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 200834,
-            "name": "Nordi Mukiele",
-            "short_name": "Mukiele",
-            "position": "DEF",
-            "team": "Sunderland"
+            "player_id": 540324,
+            "name": "Mohamed Belloumi",
+            "short_name": "Belloumi",
+            "position": "MID",
+            "team": "Hull City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 199798,
-            "name": "Ezri Konsa Ngoyo",
-            "short_name": "Ngoyo",
-            "position": "DEF",
+            "player_id": 439509,
+            "name": "Christos Tzolis",
+            "short_name": "Tzolis",
+            "position": "MID",
             "team": "Arsenal"
           }
         ],
@@ -230,43 +230,17 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 55.94926032199237
+        "expected_points": 55.98276909823479
       },
       {
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 551210,
-            "name": "Jorrel Hato",
-            "short_name": "Hato",
-            "position": "DEF",
-            "team": "Chelsea"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 56.61345407761773
-      },
-      {
-        "gameweek": 8,
-        "transfers_in": [
-          {
-            "player_id": 485055,
-            "name": "Anton\u00edn Kinsk\u00fd",
-            "short_name": "Kinsk\u00fd",
+            "player_id": 154561,
+            "name": "David Raya Mart\u00edn",
+            "short_name": "Mart\u00edn",
             "position": "GK",
-            "team": "Spurs"
+            "team": "Arsenal"
           }
         ],
         "transfers_out": [
@@ -282,17 +256,59 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 56.62011315451064
+        "expected_points": 56.86672034570551
       },
       {
-        "gameweek": 9,
-        "transfers_in": [],
-        "transfers_out": [],
+        "gameweek": 8,
+        "transfers_in": [
+          {
+            "player_id": 166477,
+            "name": "Timothy Castagne",
+            "short_name": "Castagne",
+            "position": "DEF",
+            "team": "Fulham"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 551210,
+            "name": "Jorrel Hato",
+            "short_name": "Hato",
+            "position": "DEF",
+            "team": "Chelsea"
+          }
+        ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
-        "free_transfers_after": 3,
-        "expected_points": 56.61345407761773
+        "free_transfers_after": 2,
+        "expected_points": 56.88781660980923
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 522047,
+            "name": "Tarik Muharemovi\u0107",
+            "short_name": "Muharemovi\u0107",
+            "position": "DEF",
+            "team": "Leeds"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 199798,
+            "name": "Ezri Konsa Ngoyo",
+            "short_name": "Ngoyo",
+            "position": "DEF",
+            "team": "Arsenal"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 57.3808938224448
       }
     ],
     "stated_limits": [
@@ -310,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 36.912663188934744,
+    "expected_points_cost_ceiling": 37.96491480420252,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 32.547000000000025,
     "rival_entry_id": 2281624,

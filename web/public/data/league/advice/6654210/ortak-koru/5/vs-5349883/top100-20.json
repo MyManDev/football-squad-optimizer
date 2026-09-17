@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -28,7 +28,7 @@
           "team": "Arsenal"
         },
         "expected_points_delta": -0.0150036127318387,
-        "reason_code": "mode_tradeoff"
+        "reason_code": "top100_preference"
       }
     ],
     "transfer_hit_points": 0.0,
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 42.85895253365038,
+    "expected_points_cost_ceiling": 45.2301678100489,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 39.25799999999998,
     "rival_entry_id": 5349883,
