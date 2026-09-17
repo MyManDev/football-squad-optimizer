@@ -181,7 +181,11 @@ export function assertAdviceIndex(
         record(item) &&
         typeof item.strategy === "string" &&
         positive(item.rival_entry_id) &&
-        item.path === `advice/${entryId}/${item.strategy}/1/vs-${item.rival_entry_id}.json`,
+        // A rival strategy's longer windows name their window; a row without one is the
+        // one-week file, as every row was before the windows existed.
+        (item.window === undefined || window(item.window)) &&
+        item.path ===
+          `advice/${entryId}/${item.strategy}/${item.window ?? 1}/vs-${item.rival_entry_id}.json`,
     ) ||
     !Array.isArray(index.unavailable) ||
     !index.unavailable.every(

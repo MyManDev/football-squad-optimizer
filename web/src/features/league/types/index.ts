@@ -363,7 +363,8 @@ export interface EntryAdviceIndex {
     gameweeks_remaining: number;
     band_edge_points: number;
   } | null;
-  computed: { strategy: string; rival_entry_id: number; path: string }[];
+  /** A row without `window` is the one-week file; a rival strategy's longer windows name theirs. */
+  computed: { strategy: string; rival_entry_id: number; window?: WindowSize; path: string }[];
   /**
    * A (strategy, rival) pair with no plan, or — with `rival_entry_id` null and the
    * `window` named — a pure-points window that did not solve, each with its reason.
