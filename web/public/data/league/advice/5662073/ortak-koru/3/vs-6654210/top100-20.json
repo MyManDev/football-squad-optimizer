@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,9 +33,9 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.4575636336035984,
-    "expected_points_cost": 0.0,
+    "expected_points_cost": 0.548089260348803,
     "rival_label": "entry-6654210",
-    "solver_status": "OPTIMAL",
+    "solver_status": "FEASIBLE",
     "optimality_gap": null,
     "expected_own_points": 52.15360836300934,
     "captain": {
@@ -210,27 +210,27 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 154561,
-            "name": "David Raya Mart\u00edn",
-            "short_name": "Mart\u00edn",
-            "position": "GK",
-            "team": "Arsenal"
+            "player_id": 610799,
+            "name": "Luka Vu\u0161kovi\u0107",
+            "short_name": "Vu\u0161kovi\u0107",
+            "position": "DEF",
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 204936,
-            "name": "Gianluigi Donnarumma",
-            "short_name": "Donnarumma",
-            "position": "GK",
-            "team": "Man City"
+            "player_id": 441302,
+            "name": "Ian Maatsen",
+            "short_name": "Maatsen",
+            "position": "DEF",
+            "team": "Aston Villa"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 52.57253375957595
+        "expected_points": 52.15360836300934
       },
       {
         "gameweek": 7,
@@ -256,7 +256,7 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 53.176032814253304
+        "expected_points": 52.75710741768668
       }
     ],
     "stated_limits": [
@@ -274,7 +274,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 26.70223846721555,
+    "expected_points_cost_ceiling": 30.14864862828705,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 26.99199999999999,
     "rival_entry_id": 6654210,

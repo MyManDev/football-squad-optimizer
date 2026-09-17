@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.09572268028838948,
-    "expected_points_cost": 2.7416363727078874,
+    "expected_points_cost": 0.0,
     "rival_label": "entry-2281624",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -210,56 +210,30 @@
         "gameweek": 6,
         "transfers_in": [
           {
-            "player_id": 444102,
-            "name": "Francisco Evanilson de Lima Barbosa",
-            "short_name": "Barbosa",
-            "position": "FWD",
-            "team": "Bournemouth"
+            "player_id": 477424,
+            "name": "Jo\u0161ko Gvardiol",
+            "short_name": "Gvardiol",
+            "position": "DEF",
+            "team": "Man City"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 631786,
-            "name": "Jonah Kusi-Asare",
-            "short_name": "Kusi-Asare",
-            "position": "FWD",
-            "team": "Fulham"
+            "player_id": 551210,
+            "name": "Jorrel Hato",
+            "short_name": "Hato",
+            "position": "DEF",
+            "team": "Chelsea"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 56.310056599589316
+        "expected_points": 57.121488667517
       },
       {
         "gameweek": 7,
-        "transfers_in": [
-          {
-            "player_id": 155465,
-            "name": "Michael Zetterer",
-            "short_name": "Zetterer",
-            "position": "GK",
-            "team": "Leeds"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 112520,
-            "name": "Alex Palmer",
-            "short_name": "Palmer",
-            "position": "GK",
-            "team": "Ipswich Town"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 2,
-        "free_transfers_after": 2,
-        "expected_points": 56.310056599589316
-      },
-      {
-        "gameweek": 8,
         "transfers_in": [
           {
             "player_id": 513418,
@@ -282,33 +256,59 @@
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.03416078311398
+        "expected_points": 58.27406905557195
       },
       {
-        "gameweek": 9,
+        "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 226182,
-            "name": "Jayden Bogle",
-            "short_name": "Bogle",
-            "position": "DEF",
-            "team": "Leeds"
+            "player_id": 485055,
+            "name": "Anton\u00edn Kinsk\u00fd",
+            "short_name": "Kinsk\u00fd",
+            "position": "GK",
+            "team": "Spurs"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 551210,
-            "name": "Jorrel Hato",
-            "short_name": "Hato",
-            "position": "DEF",
-            "team": "Chelsea"
+            "player_id": 112520,
+            "name": "Alex Palmer",
+            "short_name": "Palmer",
+            "position": "GK",
+            "team": "Ipswich Town"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 2,
         "free_transfers_after": 2,
-        "expected_points": 57.76603446567268
+        "expected_points": 58.27406905557195
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 146426,
+            "name": "Semi Ajayi",
+            "short_name": "Ajayi",
+            "position": "DEF",
+            "team": "Hull City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 199798,
+            "name": "Ezri Konsa Ngoyo",
+            "short_name": "Ngoyo",
+            "position": "DEF",
+            "team": "Arsenal"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 2,
+        "free_transfers_after": 2,
+        "expected_points": 58.27406905557195
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 35.28863637270791,
+    "expected_points_cost_ceiling": 33.139418846164006,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 32.547000000000025,
     "rival_entry_id": 2281624,

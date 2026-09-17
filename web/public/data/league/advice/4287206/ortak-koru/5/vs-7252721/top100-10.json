@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T19:07:08Z",
+  "generated_at_utc": "2026-09-17T21:15:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -33,7 +33,7 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 1.3740207607157728,
-    "expected_points_cost": 0.17461824608932375,
+    "expected_points_cost": 0.9457034809204856,
     "rival_label": "entry-7252721",
     "solver_status": "FEASIBLE",
     "optimality_gap": null,
@@ -236,63 +236,37 @@
         "gameweek": 7,
         "transfers_in": [
           {
-            "player_id": 17761,
-            "name": "James Tarkowski",
-            "short_name": "Tarkowski",
+            "player_id": 465730,
+            "name": "Maxim De Cuyper",
+            "short_name": "Cuyper",
             "position": "DEF",
-            "team": "Everton"
+            "team": "Brighton"
           }
         ],
         "transfers_out": [
           {
-            "player_id": 223827,
-            "name": "Daniel Ballard",
-            "short_name": "Ballard",
+            "player_id": 451284,
+            "name": "Milan van Ewijk",
+            "short_name": "Ewijk",
             "position": "DEF",
-            "team": "Sunderland"
+            "team": "Coventry City"
           }
         ],
         "transfer_hit_points": 0.0,
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 56.230868970010214
+        "expected_points": 55.62581641880326
       },
       {
         "gameweek": 8,
         "transfers_in": [
           {
-            "player_id": 204936,
-            "name": "Gianluigi Donnarumma",
-            "short_name": "Donnarumma",
-            "position": "GK",
-            "team": "Man City"
-          }
-        ],
-        "transfers_out": [
-          {
-            "player_id": 457569,
-            "name": "\u0110or\u0111e Petrovi\u0107",
-            "short_name": "Petrovi\u0107",
-            "position": "GK",
-            "team": "Bournemouth"
-          }
-        ],
-        "transfer_hit_points": 0.0,
-        "chip": null,
-        "free_transfers_before": 1,
-        "free_transfers_after": 1,
-        "expected_points": 56.68923574402142
-      },
-      {
-        "gameweek": 9,
-        "transfers_in": [
-          {
-            "player_id": 513418,
-            "name": "Kevin Schade",
-            "short_name": "Schade",
+            "player_id": 222531,
+            "name": "Morgan Gibbs-White",
+            "short_name": "Gibbs-White",
             "position": "MID",
-            "team": "Brentford"
+            "team": "Nott'm Forest"
           }
         ],
         "transfers_out": [
@@ -308,7 +282,33 @@
         "chip": null,
         "free_transfers_before": 1,
         "free_transfers_after": 1,
-        "expected_points": 57.13109916926876
+        "expected_points": 56.73249939247575
+      },
+      {
+        "gameweek": 9,
+        "transfers_in": [
+          {
+            "player_id": 473284,
+            "name": "Konstantinos Tzolakis",
+            "short_name": "Tzolakis",
+            "position": "GK",
+            "team": "Hull City"
+          }
+        ],
+        "transfers_out": [
+          {
+            "player_id": 457569,
+            "name": "\u0110or\u0111e Petrovi\u0107",
+            "short_name": "Petrovi\u0107",
+            "position": "GK",
+            "team": "Bournemouth"
+          }
+        ],
+        "transfer_hit_points": 0.0,
+        "chip": null,
+        "free_transfers_before": 1,
+        "free_transfers_after": 1,
+        "expected_points": 56.92180283719024
       }
     ],
     "stated_limits": [
@@ -326,7 +326,7 @@
       "purchase_prices"
     ],
     "squad_basis": "captured",
-    "expected_points_cost_ceiling": 36.22961824608933,
+    "expected_points_cost_ceiling": 42.40400750174183,
     "control_solver_status": "FEASIBLE",
     "control_optimality_gap": 36.05500000000001,
     "rival_entry_id": 7252721,
