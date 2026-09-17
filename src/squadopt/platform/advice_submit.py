@@ -23,6 +23,8 @@ is the discipline around that one write:
 - **Rate limits are honest refusals.** Two buckets guard the POST — one per client
   address, one per (capture, entry) — because a solve costs seconds of CPU and a
   browser retry loop must not become a denial of service on the league's own worker.
+  The budget is for work: a request the cache already answers costs one small read and
+  spends no token, so opening a computed plan again never uses up a member's asks.
 """
 
 from __future__ import annotations
@@ -170,12 +172,15 @@ class AdviceSubmitService:
         top100_weight: int = 0,
         managers_word: bool = False,
     ) -> SubmitOutcome:
-        """Validate, rate-limit, dedupe, and enqueue — in that order.
+        """Validate, answer from the cache, rate-limit, dedupe, and enqueue, in that order.
 
         Validation runs before the rate limit so a malformed request never spends a
-        token, and the rate limit runs before the cache read so a hammering client is
-        refused cheaply. Deduplication scans open jobs by fingerprint: at most one
-        open job exists per normalized request, however many keys or clients ask.
+        token, and so does the cache read: a hit is one small file read that starts no
+        work, and charging for it meant a member who opened an already computed plan a
+        few times was refused the one request that needed a solve. Only a miss, which
+        is a request for work, consults the limiter. Deduplication scans open jobs by
+        fingerprint: at most one open job exists per normalized request, however many
+        keys or clients ask.
         """
 
         if self._store_ready is not None and not self._store_ready():
@@ -205,6 +210,9 @@ class AdviceSubmitService:
             managers_word=managers_word,
         )
         cache_key, context = resolved.key, resolved.context
+        cached = self._reader.cached(cache_key)
+        if cached is not None:
+            return SubmitOutcome(kind="hit", payload=cached)
         if self._limiter is not None:
             entry_bucket = f"entry:{context.capture_snapshot_id}:{entry_id}"
             if not self._limiter.allow(f"ip:{client_bucket}") or not self._limiter.allow(
@@ -216,9 +224,6 @@ class AdviceSubmitService:
                         float(getattr(self._limiter, "window_seconds", 60.0))
                     ),
                 )
-        cached = self._reader.cached(cache_key)
-        if cached is not None:
-            return SubmitOutcome(kind="hit", payload=cached)
 
         command = ApiCommandRequest(
             operation="league.advise",

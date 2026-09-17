@@ -564,10 +564,14 @@ class AdviceBackend:
     def readiness(self) -> tuple[bool, Mapping[str, bool]]:
         """Ready means this process can actually answer, checked rather than assumed."""
 
+        context = self.contexts.current()
+        directory = FileLeagueDirectory(self.config.site_data_root)
         return readiness_report(
-            context_loaded=self.contexts.current() is not None,
-            league_tree_readable=FileLeagueDirectory(self.config.site_data_root).readable(),
+            context_loaded=context is not None,
+            league_tree_readable=directory.readable(),
             cache_writable=self.probe.passed(),
+            # Season and gameweek are already in the context; nothing is projected for it.
+            league_tree_matches_capture=directory.matches(context),
         )
 
 

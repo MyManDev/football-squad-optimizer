@@ -127,6 +127,19 @@ def test_readiness_is_separate_from_liveness(tmp_path: Path) -> None:
     assert not_ready.status_code == 503
     assert not_ready.json()["checks"]["cache_store"] is False
 
+    # A check nobody made is absent rather than passed; one that was made decides too.
+    assert "league_tree_matches_capture" not in not_ready.json()["checks"]
+    ok, checks = readiness_report(
+        context_loaded=True,
+        league_tree_readable=True,
+        cache_writable=True,
+        league_tree_matches_capture=False,
+    )
+    assert ok is False and checks["league_tree_matches_capture"] is False
+    assert [name for name, passed in checks.items() if not passed] == [
+        "league_tree_matches_capture"
+    ]
+
     served = tmp_path / "site"
     served.mkdir(parents=True, exist_ok=True)
     static_app = create_app(data_root=served)

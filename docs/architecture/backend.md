@@ -381,17 +381,24 @@ The advice routes add their own codes:
 | 422 | `UNSUPPORTED_ADVICE_REQUEST` | A strategy, window, rival or switch combination the menu does not offer |
 | 422 | `TOP100_INPUTS_UNAVAILABLE` | A Top 100 setting was asked for and the current capture has no usable export |
 | 422 | `MANAGERS_WORD_UNAVAILABLE` | The manager's word was asked for and the current capture has no coded club news |
-| 429 | `RATE_LIMITED` | Request budget exhausted; `Retry-After` carries the limiter's window in seconds |
-| 503 | `NOT_READY` | No capture context, the store probe is failing, or the queue lock stayed busy (then with `Retry-After`) |
+| 429 | `RATE_LIMITED` | Request budget exhausted; `Retry-After` carries the limiter's window in seconds. Only a request that needs work is charged: a POST the cache already answers spends no token |
+| 503 | `NOT_READY` | No capture context, the published league tree is for another week than the capture (the message names both), the store probe is failing, or the queue lock stayed busy (then with `Retry-After`) |
 | 503 | `QUEUE_UNAVAILABLE` | A queue write was refused; nothing was accepted, with `Retry-After` |
 | 503 | `QUEUE_INTEGRITY_ERROR` | A stored job record cannot be trusted |
 | 503 | `ADVICE_BACKEND_DISABLED` | The app was built without the advice services |
+
+`Retry-After` is listed in `Access-Control-Expose-Headers` for the allowed origins, so a
+page on another origin can read how long a 429 or a 503 asked it to wait.
 
 A failed job carries one of these codes in the public job view: `TOO_MANY_ATTEMPTS`,
 `REQUEST_UNREADABLE` (the spec is missing or malformed), `CONTEXT_UNAVAILABLE`,
 `ENTRY_NOT_IN_CAPTURE` (the member or the rival is listed but the capture holds no squad for
 them), `TOP100_INPUTS_UNAVAILABLE`, `MANAGERS_WORD_UNAVAILABLE`, `SWITCH_INPUTS_CHANGED`,
-`DETERMINISM_DEFECT`, or `ADVICE_FAILED` for anything else.
+`MANAGERS_WORD_NOT_SOLVED`, `DETERMINISM_DEFECT`, or `ADVICE_FAILED` for anything else.
+
+| Job error code | Use |
+| --- | --- |
+| `MANAGERS_WORD_NOT_SOLVED` | The word was asked for together with a Top 100 setting, the capture has the club news, and this one member's plan under both could not be produced. A member-level outcome, distinct from `MANAGERS_WORD_UNAVAILABLE` (no input at all, refused before a job exists); the same request without the word still answers |
 
 An error before a run starts uses `ApiErrorResponse`. A failure after a run starts uses a failed
 `ApiRunResponse`, and the nested error must carry the same `run_id`. A solver reporting no

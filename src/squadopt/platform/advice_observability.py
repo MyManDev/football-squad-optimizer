@@ -20,6 +20,8 @@ requests by reason.
 touches no dependency; ``/ready`` answers "can this deployment serve" — is the cache
 store writable, is a capture context loaded, is the league tree readable. Folded into
 one endpoint, a full disk looks healthy; that is the failure this split exists for.
+A fourth check asks whether the tree and the capture are for the same week: each is
+published on its own, and both being readable says nothing about that.
 
 The structured log needs somewhere to go, which is why ``configure_advice_logging`` is
 here. Nothing under ``squadopt.api`` or ``squadopt.platform`` attached a handler, and
@@ -187,12 +189,20 @@ def readiness_report(
     context_loaded: bool,
     league_tree_readable: bool,
     cache_writable: bool,
+    league_tree_matches_capture: bool | None = None,
 ) -> tuple[bool, Mapping[str, bool]]:
-    """One place decides what "ready" means, so the endpoint cannot drift from it."""
+    """One place decides what "ready" means, so the endpoint cannot drift from it.
+
+    ``league_tree_matches_capture`` is whether the published tree is for the week the
+    capture targets. A caller that does not ask leaves it out and the report is the three
+    checks it always was: a check nobody made is absent, not passed.
+    """
 
     checks = {
         "capture_context": context_loaded,
         "league_tree": league_tree_readable,
         "cache_store": cache_writable,
     }
+    if league_tree_matches_capture is not None:
+        checks["league_tree_matches_capture"] = league_tree_matches_capture
     return all(checks.values()), checks

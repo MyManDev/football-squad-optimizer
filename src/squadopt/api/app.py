@@ -161,6 +161,10 @@ def create_app(
             allow_origins=list(allowed_origins),
             allow_methods=["GET", "POST"],
             allow_headers=["Content-Type", "Idempotency-Key"],
+            # A browser hides every response header it was not told it may read, so
+            # without this the page sees the 429 or the 503 and cannot see how long the
+            # refusal asked it to wait.
+            expose_headers=["Retry-After"],
         )
 
     @application.exception_handler(PublishedViewNotFoundError)
