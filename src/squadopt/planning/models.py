@@ -275,6 +275,36 @@ class InitialSquadState:
 
 
 @dataclass(frozen=True, slots=True)
+class FirstWeekExclusion:
+    """Keep named players out of the decided week's eleven, or out of its captaincy.
+
+    ``not_starting`` names players who may be held but must not start the first week;
+    ``not_captain`` names players who must not captain it. A starter exclusion is also a
+    captain exclusion, because a captain starts. Ids are in the horizon's own vocabulary,
+    and a player the horizon does not carry is ignored as ``FirstWeekOverlap`` ignores
+    one: he cannot start or captain anyway. Naming nobody is refused, because an
+    exclusion that excludes nothing is a call that meant something else.
+
+    This is the solver's half of a declared constraint: the caller says who is out and
+    why, the solver keeps them out and reports what that costs. It moves no projection
+    number.
+    """
+
+    not_starting: frozenset[object] = frozenset()
+    not_captain: frozenset[object] = frozenset()
+
+    def __post_init__(self) -> None:
+        starting = frozenset(self.not_starting)
+        captain = frozenset(self.not_captain) | starting
+        if not captain:
+            raise TransferPlanningValidationError(
+                "FirstWeekExclusion must name at least one player to keep out."
+            )
+        object.__setattr__(self, "not_starting", starting)
+        object.__setattr__(self, "not_captain", captain)
+
+
+@dataclass(frozen=True, slots=True)
 class FirstWeekOverlap:
     """Bound the decided week's squad overlap with a rival's known players.
 

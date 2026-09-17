@@ -37,7 +37,7 @@ results, and `--expected-at <UTC instant>` additionally evaluates missed complet
 | top100 | `scripts.capture_top100_cohort`, `scripts.capture_elite_picks`, `scripts.export_player_evidence` | before the deadline; target gameweek ≥ 2 | `fpl-top100-*` and `fpl-elite-picks-*` snapshots; `artifacts/phase_b/player_evidence_v1_<season>_gw<NN>_top100.{csv,manifest.json}` |
 | capture | `squadopt.platform.fpl_capture.capture` with the entry registry and the league id | `data/entries/registry.json` (`scripts.seed_entry_registry`) | `data/snapshots/fpl-live-<utc>-<hash>/` with bootstrap, fixtures, the last five event-live documents, every member's three documents and the standings page |
 | settled outcomes | `application.settled_outcomes.export_settled_outcomes` | stored captures no newer than the selected capture; an earlier week with both pre-deadline and finished/checked captures | immutable table/manifest pairs under `artifacts/rotation`, plus per-run reports; unavailable pairs are stated, never filled with zero outcomes |
-| rotation | `scripts.export_rotation_evidence --snapshot <capture> --deadline-utc …` (only with `--rotation`) | the capture above, and a club-news source — **today that source is the committed synthetic fixture** | `artifacts/rotation/rotation_evidence_v2_<season>_gw<NN>_<capture hash>.{csv,manifest.json}` — one row per roster player in that capture, one categorical claim field, and the citation carried as a document digest plus a byte span rather than as text. Written exactly once per capture; a pair already on disk for it is reused rather than remade |
+| rotation | `scripts.export_rotation_evidence --snapshot <capture> --deadline-utc …` (only with `--rotation`) | the capture above, and a club-news source — **today that source is the committed synthetic fixture** | `artifacts/rotation/rotation_evidence_v2_<season>_gw<NN>_<capture hash>.{csv,manifest.json}` — one row per roster player in that capture, one categorical claim field, and the citation carried as a document digest plus a byte span rather than as text. Written exactly once per capture; a pair already on disk for it is reused rather than remade. With `--rotation`, the league stage also receives this table and its source, and solves every member one-week pure-points plan with the manager word switched on: `advice/<id>/saf-puan/1/hoca-sozu.json` beside the baseline, the index saying `evidence.available` and where the words came from, the site showing the switch, and an example-data label on every surface while the source is the fixture. Without `--rotation` the index says `no_evidence_this_run`, the switch is disabled with that reason, and a `hoca-sozu.json` an earlier publish left is removed (printed by `scripts.build_league_site`, and recorded under the league stage's `removed` in the run's receipt, with every member note under `member_notes`). **So a publish that should keep the switch must pass `--rotation`** (the fixture; not `--rotation-capture` until a real host is registered). A quote whose words carry wording the site never publishes is withheld and the page says so; the constraint still applies |
 | handoff | `scripts.build_projection_handoff --snapshot-id <capture> --evidence-table … --evidence-manifest …` | the capture above and the evidence | `data/handoffs/<season>-gw<NN>.json` — the Phase C component projection with the bounded Top-100 uplift on top (`phase-c-component-elite-top100-v1`); `--projection component-only` leaves the uplift out; without settled live history the producer falls back to the legacy blend and says so |
 | decide | `squadopt.application.commands.decide`, in-process (only with `--decide`; `--chip` as `squadopt gameweek decide` takes it) | the capture and the handoff, each verified at its own stage; a ledger that holds the previous gameweek, and — with `--chip` — an open, unspent chip window, both checked **before** the first capture, so a week the ledger cannot start refuses without spending one. The mode is derived, never asserted: `live` only when this run took the capture and the clock is still before its deadline; a reused `--snapshot-id`, or a run past the deadline, is recorded `replay`. A gameweek the ledger already holds is skipped rather than refused, so a run that died after the decision can rebuild the rest of the week | `data/ledger/<season>/gw<NN>/` — decision, projections, report, manifest; the report is printed |
 | league | `scripts.build_league_site --workers N` | the capture and the handoff | `<preview>/data/league/**`: `members.json`, `entries/<id>.json`, `advice/<id>/saf-puan/1.json`, `advice/<id>/saf-puan/3.json` and `5.json` (the week-1 projection repeated over the calendar, published with its stated limits), `advice/<id>/<strategy>/1.json` (the standings neighbour), `advice/<id>/<strategy>/1/vs-<rival>.json`, `advice/<id>/index.json` (`windows` names what solved per strategy; a window that did not is in `unavailable` with its reason). Without `--publish` this is a local preview and writes no advice record. With `--publish` the preview is the tree that ships, so this step writes this checkout's `data/advice_records/<season>/gw<NN>/entry-<id>/<snapshot id>/` from the same solve, before `history/<id>.json` reads it; the records the season already held are declared as this stage's inputs, so a week whose records moved between two runs shows in the journal |
@@ -126,16 +126,12 @@ net columns beside it.
   32 min and 49.5 min, so treat half an hour as the floor and not the estimate. This
   figure is the run **without** `--publish`; the publish stage was rewritten since the
   last run that used it and its cost is not currently measured.
-- `--decide` needs the ledger to hold the previous gameweek. A week that was skipped
-  must be recorded first (below); the pre-flight says so before anything is captured.
-  **This is currently blocking and will not clear on its own.** `held_squad_from_ledger`
-  (`src/squadopt/live/ledger.py`) refuses when no decision exists for the previous week,
-  and the ledger holds `[1]`. So deciding GW4 needs GW3, GW3 needs a pre-deadline capture
-  that no longer exists, and every later week inherits the same break. Note that
-  `--dry-run` prints `decide run` regardless: it prints the plan and does not reach this
-  check, so the refusal appears only in a real run. The error names the way out itself —
-  record the missing weeks as a no-transfer roll — but that is a decision about what our
-  paper record claims, not a command to run without deciding it first.
+- `--decide` needs the ledger to hold the previous gameweek. A week nothing was decided
+  for is recorded first as a roll (`squadopt gameweek roll`, below); the pre-flight says
+  so before anything is captured. `held_squad_from_ledger` (`src/squadopt/live/ledger.py`)
+  refuses when the ledger holds nothing for the previous week, and the error names the
+  way out. Note that `--dry-run` prints `decide run` regardless: it prints the plan and
+  does not reach this check, so the refusal appears only in a real run.
 
 ## Our own squad: catching the ledger up, then deciding, then settling
 
@@ -154,6 +150,31 @@ each player's status, news and chance of playing *as they stood at that moment* 
 API only ever serves the present. Earlier revisions of this section listed three capture
 ids and two handoff files for these commands; none of the five is on disk, so every
 command in that block would have refused. They are removed rather than corrected.
+
+### Rolling a week that was not decided
+
+A roll records what the game did with a week no decision was made for: the squad, the
+picks and the purchase prices carried over unchanged, the bank where it was, one free
+transfer accrued up to the season's cap. It names no capture, no projection and no
+solver, so it claims nothing about points. The season ledger shows it as `roll` with
+dashes where a decision has numbers; the scoreboard, the site and the calibration never
+see it (`load_ledger` hides rolls unless asked); an outcome can never be attached to it.
+It is recorded only from the entry of the week before, so the ledger stays a chain, and
+like every entry it is written once.
+
+```bash
+squadopt gameweek roll --season 2026-27 --gameweek 2 --snapshot-id fpl-live-20260912T100000Z-24613792ef57 --reason "no run happened; the pre-deadline capture was destroyed on 2026-09-10"
+squadopt gameweek roll --season 2026-27 --gameweek 3 --snapshot-id fpl-live-20260912T100000Z-24613792ef57 --reason "no run happened; the pre-deadline capture was destroyed on 2026-09-10"
+```
+
+The capture named supplies the season's rules (the free-transfer cap, the budget) and the
+deadline being rolled through, and is refused if it was taken before that deadline: a
+roll can only describe a week that is over. Rolling GW2 and GW3 from the 12 September
+capture, deciding GW4 from that same capture with its handoff (recorded `replay`), then
+settling GW4 from a capture in which it is finished and checked, gives the ledger
+`[1, 2, 3, 4]` with GW4 its first settled row. Each command regenerates
+`docs/season_ledger_2026-27.md`, which is tracked, so commit it before the next weekly
+run or the pre-flight refuses the modified tree.
 
 The check that tells you where the season actually stands, before spending anything:
 

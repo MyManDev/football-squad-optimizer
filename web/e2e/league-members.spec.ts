@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { installLeagueMocks } from "./leagueMocks";
+import indexFixture from "../public/data/index.json" with { type: "json" };
 import { mockLeagueMembersEnvelope } from "../src/fixtures/league";
 import { MESSAGES } from "../src/i18n/messages";
 
@@ -55,7 +56,11 @@ test("the virtual SquadOpt member remains available by direct URL without probab
   await expect(page).toHaveURL(/\/league\/members\/squadopt$/);
   await expect(page.getByText("SquadOpt da oynuyor")).toBeVisible();
   await expect(page.getByText(/aynı karar kurallarıyla değerlendirilir/)).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/Oyun haftası 1/);
+  // The virtual member shows the latest decided week from the index the site ships, which
+  // moves with every publish; the spec reads that index rather than pinning the week.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+    new RegExp(`Oyun haftası ${indexFixture.payload.latest.gameweek}`),
+  );
   await expect(page.getByRole("list", { name: "Pozisyona göre ilk on bir" })).toBeVisible();
   await expect(page.getByText("SquadOpt da oynuyor").locator("..")).not.toContainText("%");
 });

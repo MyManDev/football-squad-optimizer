@@ -16,7 +16,6 @@ is not in the season list this run loads.
 """
 
 import argparse
-import hashlib
 import json
 import sys
 import time
@@ -30,6 +29,7 @@ import pandas as pd
 from scripts._experiment_cli import (
     DEFAULT_ARCHIVE_ROOT,
     REPOSITORY_ROOT,
+    _sha256,
     artifact_metadata,
     write_text,
 )
@@ -228,14 +228,6 @@ def _evaluate(folds: Sequence[EvaluationFold], *, arm: str) -> EvaluationResult:
         run_metadata={"study": ROTATION_CEILING_CONTRACT_VERSION, "arm": arm},
     )
     return evaluate_prepared_folds(folds, config)
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1 << 20):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _write_evidence(

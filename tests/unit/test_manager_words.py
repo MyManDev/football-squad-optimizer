@@ -1,0 +1,401 @@
+"""The manager's word: a declared rule over coded club news, with the words themselves.
+
+What has to hold: the rule maps each disposition to a role and nothing else; only the
+member's own fifteen is constrained; the cited words are cut from the bytes that hash to the
+citation and from nothing else; a source without its evidence (or the reverse) is refused.
+"""
+
+import hashlib
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+import pytest
+
+from squadopt.application import manager_words as module
+from squadopt.application.league_publication import (
+    LeaguePublicationRequest,
+    load_publication_manager_words,
+)
+from squadopt.application.manager_words import (
+    SOURCE_SYNTHETIC_FIXTURE,
+    WORDS_UNRESOLVED,
+    WORDS_WITHHELD_FIGURE,
+    ManagerWord,
+    ManagerWords,
+    ManagerWordsError,
+    documents_from_source,
+    manager_words_from_artifact,
+)
+from squadopt.data.errors import DataError
+from squadopt.data.sources.club_news import ROTATION_DISPOSITIONS
+from squadopt.features.rotation_evidence import ROTATION_EVIDENCE_COLUMNS
+
+FIXTURE = Path(__file__).resolve().parents[2] / "data" / "sample" / "club_news_v1.fixture.json"
+
+
+def _word(player_id: int, disposition: str) -> ManagerWord:
+    return ManagerWord(
+        player_id=player_id,
+        disposition=disposition,
+        speaker="the manager",
+        published_at_utc="2026-09-11T14:00:00Z",
+        published_precision="instant",
+        club="Arsenal",
+        source_url="https://club.example/arsenal/news",
+        fetched_at_utc="2026-09-12T14:05:00Z",
+        words="He will not travel.",
+    )
+
+
+def _words(*words: ManagerWord) -> ManagerWords:
+    return ManagerWords(
+        season="2026-27",
+        gameweek=5,
+        source_kind=SOURCE_SYNTHETIC_FIXTURE,
+        source_label=FIXTURE.name,
+        evidence_table="rotation_evidence_v2_2026-27_gw05.csv",
+        clubs_covered=("Arsenal",),
+        words=tuple(words),
+    )
+
+
+def test_the_rule_is_declared_over_the_whole_vocabulary() -> None:
+    """Every disposition the vocabulary allows maps to exactly one of three outcomes."""
+
+    roles = {disposition: _word(1, disposition).role for disposition in ROTATION_DISPOSITIONS}
+    assert roles == {
+        "not_addressed": None,
+        "no_statement": None,
+        "stated_expected_to_start": None,
+        "stated_expected_absent": "not_starting",
+        "stated_rotation_risk": "not_captain",
+        "stated_returning_from_injury": None,
+        "stated_minutes_limited": "not_captain",
+        "ambiguous": None,
+    }
+
+
+def test_every_named_player_is_excluded_and_only_the_members_own_are_shown() -> None:
+    """The solver keeps out everyone the page spoke about, held or not: a player the
+    manager ruled out must not be bought and started either. The member reads only the
+    statements that touch the players they hold or end up with."""
+
+    words = _words(
+        _word(1, "stated_expected_absent"),
+        _word(2, "stated_rotation_risk"),
+        _word(3, "stated_expected_to_start"),
+        _word(4, "stated_expected_absent"),
+    )
+
+    exclusion = words.exclusion()
+    assert exclusion is not None
+    assert exclusion.not_starting == frozenset({1, 4})
+    assert exclusion.not_captain == frozenset({1, 2, 4})
+    assert [(w.player_id, w.role) for w in words.about((1, 2, 3, 99))] == [
+        (1, "not_starting"),
+        (2, "not_captain"),
+    ]
+    assert words.about((3, 99)) == ()
+    # A page that spoke about nobody the rule acts on binds nothing: no exclusion, not an
+    # empty one.
+    assert _words(_word(3, "stated_expected_to_start")).exclusion() is None
+
+
+def test_the_words_are_cut_from_the_bytes_that_hash_to_the_citation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The span is resolved against the document whose digest the claim cites; a digest
+    no held document produces resolves to no words rather than to different ones."""
+
+    documents, kind, label = documents_from_source(FIXTURE)
+    assert kind == SOURCE_SYNTHETIC_FIXTURE and label == FIXTURE.name
+    arsenal = next(document for document in documents if document.club == "Arsenal")
+    sentence = b"Havertz will not travel."
+    start = arsenal.readable.index(sentence)
+    end = start + len(sentence)
+    digest = hashlib.sha256(arsenal.readable).hexdigest()
+
+    def row(
+        player_id: int, disposition: str | None, sha: str | None, span: tuple[int, int] | None
+    ) -> dict[str, Any]:
+        record: dict[str, Any] = dict.fromkeys(ROTATION_EVIDENCE_COLUMNS, pd.NA)
+        record.update(season="2026-27", target_gameweek=5, player_id=player_id)
+        record["rotation_disposition"] = pd.NA if disposition is None else disposition
+        record["rotation_claim_source_sha256"] = pd.NA if sha is None else sha
+        if span is not None:
+            record["rotation_claim_span_start"], record["rotation_claim_span_end"] = span
+        record["rotation_claim_speaker"] = "the manager"
+        record["rotation_claim_published_at_utc"] = "2026-09-11T14:00:00Z"
+        record["rotation_claim_published_precision"] = "instant"
+        return record
+
+    table = pd.DataFrame(
+        [
+            row(7, "stated_expected_absent", digest, (start, end)),
+            row(8, "stated_rotation_risk", "0" * 64, (0, 5)),
+            row(9, None, None, None),
+        ],
+        columns=list(ROTATION_EVIDENCE_COLUMNS),
+    )
+    table.attrs["clubs_covered"] = ("Arsenal",)
+    table.attrs["document_sha256s"] = (digest,)
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
+
+    words = manager_words_from_artifact(
+        Path("table.csv"),
+        Path("table.manifest.json"),
+        documents=documents,
+        source_kind=kind,
+        source_label=label,
+    )
+
+    assert words.season == "2026-27" and words.gameweek == 5
+    assert "Arsenal" in words.clubs_covered
+    assert [w.player_id for w in words.words] == [7, 8]
+    resolved = words.words[0]
+    assert resolved.words == "Havertz will not travel."
+    assert resolved.club == "Arsenal"
+    assert resolved.source_url == arsenal.final_url
+    assert resolved.speaker == "the manager"
+    unresolved = words.words[1]
+    assert unresolved.words is None and unresolved.club is None and unresolved.source_url is None
+    assert unresolved.role == "not_captain"
+
+
+def test_covered_is_what_the_capture_recorded_and_not_what_was_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A club read but not coded is not covered, and the documents alone cannot say so.
+
+    The fixture holds pages for two clubs, so a set derived from the documents in hand names
+    both. Covered means read **and** coded, and ``rotation_export`` narrows it again when a
+    club's claims lose their citations, so the manifest's list is the only one that carries
+    those two facts. Publishing the derived set would tell a member they are reading a club's
+    news when that club's coding failed and nothing it said survived.
+    """
+
+    documents, kind, label = documents_from_source(FIXTURE)
+    assert {document.club for document in documents} == {"Arsenal", "Man Utd"}
+    table = pd.DataFrame(
+        [
+            {
+                **dict.fromkeys(ROTATION_EVIDENCE_COLUMNS, pd.NA),
+                "season": "2026-27",
+                "target_gameweek": 5,
+                "player_id": 7,
+                "rotation_disposition": "stated_expected_absent",
+            }
+        ],
+        columns=list(ROTATION_EVIDENCE_COLUMNS),
+    )
+    table.attrs["clubs_covered"] = ("Arsenal",)
+    table.attrs["document_sha256s"] = ()
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
+
+    words = manager_words_from_artifact(
+        Path("table.csv"),
+        Path("table.manifest.json"),
+        documents=documents,
+        source_kind=kind,
+        source_label=label,
+    )
+
+    assert words.clubs_covered == ("Arsenal",)
+    assert "Man Utd" not in words.as_source_record()["clubs_covered"]
+
+
+def test_a_table_that_arrives_without_its_coverage_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Not guessed from the documents, which is the mistake this refusal replaces."""
+
+    documents, kind, label = documents_from_source(FIXTURE)
+    table = pd.DataFrame(
+        [
+            {
+                **dict.fromkeys(ROTATION_EVIDENCE_COLUMNS, pd.NA),
+                "season": "2026-27",
+                "target_gameweek": 5,
+                "player_id": 7,
+                "rotation_disposition": "stated_expected_absent",
+            }
+        ],
+        columns=list(ROTATION_EVIDENCE_COLUMNS),
+    )
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
+
+    with pytest.raises(ManagerWordsError, match="cannot be recomputed"):
+        manager_words_from_artifact(
+            Path("table.csv"),
+            Path("table.manifest.json"),
+            documents=documents,
+            source_kind=kind,
+            source_label=label,
+        )
+
+
+def test_a_source_that_is_neither_fixture_nor_capture_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ManagerWordsError, match="No club-news source"):
+        documents_from_source(tmp_path / "nowhere")
+
+
+def test_evidence_and_its_source_travel_together_or_not_at_all(tmp_path: Path) -> None:
+    base = dict(
+        snapshot_root=tmp_path,
+        snapshot_id="fpl-live-x",
+        archive_root=tmp_path,
+        registry_path=tmp_path / "registry.json",
+        out_dir=tmp_path / "out",
+        league_id=352490,
+    )
+    assert load_publication_manager_words(LeaguePublicationRequest(**base)) is None
+    with pytest.raises(DataError, match="one without the other"):
+        load_publication_manager_words(
+            LeaguePublicationRequest(**base, rotation_evidence=tmp_path / "table.csv")
+        )
+    with pytest.raises(DataError, match="one without the other"):
+        load_publication_manager_words(LeaguePublicationRequest(**base, club_news_source=FIXTURE))
+    with pytest.raises(ManagerWordsError, match="No manifest beside"):
+        load_publication_manager_words(
+            LeaguePublicationRequest(
+                **base, rotation_evidence=tmp_path / "table.csv", club_news_source=FIXTURE
+            )
+        )
+
+
+def _cited_table(documents: tuple[Any, ...], sentence: bytes, disposition: str) -> pd.DataFrame:
+    """A one-row verified-looking table citing ``sentence`` in the Arsenal page."""
+
+    arsenal = next(document for document in documents if document.club == "Arsenal")
+    start = arsenal.readable.index(sentence)
+    digest = hashlib.sha256(arsenal.readable).hexdigest()
+    record: dict[str, Any] = dict.fromkeys(ROTATION_EVIDENCE_COLUMNS, pd.NA)
+    record.update(season="2026-27", target_gameweek=5, player_id=11)
+    record["rotation_disposition"] = disposition
+    record["rotation_claim_source_sha256"] = digest
+    record["rotation_claim_span_start"] = start
+    record["rotation_claim_span_end"] = start + len(sentence)
+    record["rotation_claim_speaker"] = "manager"
+    table = pd.DataFrame([record], columns=list(ROTATION_EVIDENCE_COLUMNS))
+    table.attrs["clubs_covered"] = ("Arsenal",)
+    table.attrs["document_sha256s"] = (digest,)
+    return table
+
+
+def test_a_quote_with_a_figure_the_site_never_publishes_is_withheld_with_its_reason(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The fixture's captain line carries a per cent sign. The source said it, but the rule
+    about what a member page shows covers every sentence on it, so the words are withheld
+    and the status says why; the constraint itself still stands."""
+
+    documents, kind, label = documents_from_source(FIXTURE)
+    sentence = b'Asked about the captain, he said: "Odegaard is at 80% and we will see."'
+    table = _cited_table(documents, sentence, "stated_rotation_risk")
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
+
+    words = manager_words_from_artifact(
+        Path("table.csv"),
+        Path("table.manifest.json"),
+        documents=documents,
+        source_kind=kind,
+        source_label=label,
+    )
+
+    (word,) = words.words
+    assert word.words is None
+    assert word.words_status == WORDS_WITHHELD_FIGURE
+    assert word.role == "not_captain"
+    assert word.source_url is not None
+    exclusion = words.exclusion()
+    assert exclusion is not None and exclusion.not_captain == frozenset({11})
+
+
+def test_a_quote_that_cannot_be_cut_is_unresolved_not_withheld() -> None:
+    word = ManagerWord(
+        player_id=1,
+        disposition="stated_expected_absent",
+        speaker="manager",
+        published_at_utc=None,
+        published_precision=None,
+        club=None,
+        source_url=None,
+        fetched_at_utc=None,
+        words=None,
+    )
+    assert word.words_status == WORDS_UNRESOLVED
+    with pytest.raises(ManagerWordsError, match="shown or withheld"):
+        ManagerWord(
+            player_id=1,
+            disposition="stated_expected_absent",
+            speaker="manager",
+            published_at_utc=None,
+            published_precision=None,
+            club=None,
+            source_url=None,
+            fetched_at_utc=None,
+            words="He will not travel.",
+            words_status=WORDS_WITHHELD_FIGURE,
+        )
+
+
+def test_a_source_that_does_not_hold_the_cited_documents_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A different week's fixture or capture would put its label and links beside claims it
+    never made; the manifest's digests say which documents the claims cite."""
+
+    documents, kind, label = documents_from_source(FIXTURE)
+    table = _cited_table(documents, b"Havertz will not travel.", "stated_expected_absent")
+    table.attrs["document_sha256s"] = ("f" * 64,)
+    monkeypatch.setattr(module, "read_rotation_evidence_artifact", lambda *_: table)
+
+    with pytest.raises(ManagerWordsError, match="not the source this table was coded from"):
+        manager_words_from_artifact(
+            Path("table.csv"),
+            Path("table.manifest.json"),
+            documents=documents,
+            source_kind=kind,
+            source_label=label,
+        )
+
+    del table.attrs["document_sha256s"]
+    with pytest.raises(ManagerWordsError, match="document digests"):
+        manager_words_from_artifact(
+            Path("table.csv"),
+            Path("table.manifest.json"),
+            documents=documents,
+            source_kind=kind,
+            source_label=label,
+        )
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "He is at 80% and we will see.",
+        "He is eighty per cent fit.",
+        "Ninety percent of the squad trained.",
+        "It is a 50-50 call for Saturday.",
+        "It is fifty-fifty whether he starts.",
+        "The chance he plays is small.",
+        "There is a good percentage of doubt.",
+        "Başlama ihtimali düşük.",
+        "Oynama şansı yüzde elli.",  # noqa: RUF001
+    ],
+)
+def test_the_quote_screen_withholds_every_form_the_pages_may_not_show(quote: str) -> None:
+    assert module.QUOTE_WITHHELD_PATTERN.search(quote)
+
+
+@pytest.mark.parametrize(
+    "quote",
+    [
+        "Havertz will not travel.",
+        "Bu yüzden rotasyon yapacağız.",  # noqa: RUF001
+        "Martinez has trained all week and will start.",
+    ],
+)
+def test_the_quote_screen_leaves_plain_statements_alone(quote: str) -> None:
+    assert not module.QUOTE_WITHHELD_PATTERN.search(quote)

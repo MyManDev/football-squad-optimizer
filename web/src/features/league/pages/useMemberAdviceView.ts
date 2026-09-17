@@ -59,14 +59,22 @@ export function useMemberAdviceView(
     sameAdviceRequest(job.state.request, request)
       ? job.state
       : null;
-  const computed = current?.phase === "done" ? current : null;
-  const waiting = current?.phase === "waiting" ? current : null;
+  // A computed plan is solved without the club's word, so it never stands in for the
+  // switched-on plan, finished or while waiting.
+  const evidenceOn = selection.evidence.on;
+  const computed = !evidenceOn && current?.phase === "done" ? current : null;
+  const waiting = !evidenceOn && current?.phase === "waiting" ? current : null;
   let published: LeagueViewEnvelope<EntryAdvice> | null = null;
   let rejectedContext = false;
   let rejectedUnreadable = false;
   if (advice && selectionAvailable) {
     try {
       const checked = checkedAdvice(advice, request);
+      // The switched-on plan carries its evidence and the plain one does not. A document
+      // that disagrees with the switch is not the plan the page is about to describe.
+      if ((checked.payload.evidence !== undefined) !== selection.evidence.on) {
+        throw new Error("The advice document does not match the manager's-word switch.");
+      }
       const snapshot = checked.payload.source_snapshot_id;
       rejectedContext =
         snapshot != null && view.source_snapshot_id != null && snapshot !== view.source_snapshot_id;

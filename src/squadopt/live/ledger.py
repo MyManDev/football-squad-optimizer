@@ -51,7 +51,7 @@ import math
 import os
 import secrets
 import shutil
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -69,10 +69,16 @@ from squadopt.live.errors import LedgerError as LedgerError
 from squadopt.live.free_hit import FREE_HIT_CHIP, free_hit_basis_gameweek
 from squadopt.live.recommendation import Projection
 from squadopt.live.report import Recommendation
-from squadopt.live.transfers import FREE_TRANSFERS_AFTER_OPENING, HeldSquad
+from squadopt.live.transfers import (
+    FREE_TRANSFERS_AFTER_OPENING,
+    LEDGER_TRANSFERS_CONTRACT_VERSION,
+    HeldSquad,
+)
 from squadopt.optimization import OptimizationResult, SolverStatus
 
 SEASON_LEDGER_CONTRACT_VERSION: Final = "season_ledger_v1"
+ROLL_MODE: Final = "roll"
+"""The ``metadata.mode`` of an entry that records the squad standing still, not a decision."""
 LOGGER = logging.getLogger(__name__)
 _DECISION_FILE: Final = "decision.json"
 _PROJECTIONS_FILE: Final = "projections.csv"
@@ -347,23 +353,45 @@ def record_decision(
     }
     if recommendation.transfers is not None:
         decision["transfers"] = recommendation.transfers.as_record()
+
+    def populate(staging: Path) -> None:
+        (staging / _DECISION_FILE).write_text(
+            json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        projection.table.to_csv(staging / _PROJECTIONS_FILE, index=False, lineterminator="\n")
+        (staging / _REPORT_FILE).write_text(report_text, encoding="utf-8")
+
+    _land_entry(root, recommendation.season, directory, populate)
+    LOGGER.info(
+        "ledger.decision.recorded",
+        extra={
+            "fields": {
+                "season": recommendation.season,
+                "gameweek": recommendation.gameweek,
+                "snapshot_id": recommendation.snapshot_id,
+                "directory": directory.as_posix(),
+            }
+        },
+    )
+    return directory
+
+
+def _land_entry(root: Path, season: str, directory: Path, populate: Callable[[Path], None]) -> None:
+    """Assemble a new entry in staging and land it with one rename, under the gameweek lock."""
+
     with _gameweek_lock(directory):
         # Re-check under the lock: another writer may have landed the entry between
-        # the check above and the lock.
+        # the caller's check and the lock.
         if directory.exists():
             raise LedgerError(
                 f"Ledger entry {directory} already exists; recorded decisions are "
                 "immutable. A revised decision needs an explicit, separate record."
             )
-        prune_stale_staging(root, recommendation.season)
+        prune_stale_staging(root, season)
         staging = _staging_directory(directory)
         staging.mkdir(parents=True)
         try:
-            (staging / _DECISION_FILE).write_text(
-                json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
-            projection.table.to_csv(staging / _PROJECTIONS_FILE, index=False, lineterminator="\n")
-            (staging / _REPORT_FILE).write_text(report_text, encoding="utf-8")
+            populate(staging)
             _write_manifest(staging)
             _verify_manifest(staging)
             # One rename: the entry exists complete or not at all. The check above
@@ -373,13 +401,221 @@ def record_decision(
         except BaseException:
             shutil.rmtree(staging, ignore_errors=True)
             raise
+
+
+@dataclass(frozen=True, slots=True)
+class _Carried:
+    """What the week before hands to a roll: the state the game carried unchanged."""
+
+    squad: tuple[int, ...]
+    purchase_prices: dict[int, int]
+    bank_tenths: int
+    free_transfers: int
+    chips_available: list[str] | None
+
+
+def _player_id_list(
+    decision: Mapping[str, object], key: str, *, required: bool = True
+) -> list[int] | None:
+    """A player-id list as the entry recorded it; ``None`` when an optional one is absent.
+
+    An entry recorded before the bench order and the vice-captain were frozen has neither.
+    A roll carries that absence forward as it is: inventing an order the entry never held
+    would be a claim, and absent is not zero.
+    """
+
+    value = decision.get(key)
+    if value is None:
+        if required:
+            raise LedgerError(f"Ledger decision {key} is missing.")
+        return None
+    if not isinstance(value, list):
+        raise LedgerError(f"Ledger decision {key} is not a list.")
+    return [int(str(item)) for item in value]
+
+
+def _carried_state(previous: "LedgerEntry", *, budget_tenths: int) -> _Carried:
+    decision = previous.decision
+    squad_ids = decision.get("squad_player_ids")
+    if not isinstance(squad_ids, list) or not squad_ids:
+        raise LedgerError(
+            f"Ledger entry for {previous.season} GW{previous.gameweek} records no squad to carry."
+        )
+    squad = tuple(int(value) for value in squad_ids)
+    block = decision.get("transfers")
+    if isinstance(block, Mapping):
+        if block.get("chip") == FREE_HIT_CHIP:
+            raise LedgerError(
+                f"{previous.season} GW{previous.gameweek} played a free hit: the squad it "
+                "recorded was temporary and the one the game restored is the entry before "
+                "it. A roll carries only what the week before held; decide the next week "
+                "from its capture instead."
+            )
+        purchase = {
+            int(player): int(price) for player, price in dict(block["purchase_prices"]).items()
+        }
+        bank = int(str(block["bank_after_tenths"]))
+        free = int(str(block["free_transfers_after"]))
+        listed = block.get("chips_available")
+        chips = [str(chip) for chip in listed] if isinstance(listed, list) else None
+    else:
+        purchase = _purchase_prices_from_entry(previous, squad)
+        bank = int(budget_tenths) - int(str(decision["total_cost_tenths"]))
+        free = FREE_TRANSFERS_AFTER_OPENING
+        chips = None
+    return _Carried(squad, purchase, bank, free, chips)
+
+
+def record_roll(
+    root: Path,
+    season: str,
+    gameweek: int,
+    *,
+    max_free_transfers: int,
+    budget_tenths: int,
+    recorded_at_utc: str,
+    reason: str,
+    deadline_utc: str | None = None,
+    rules_snapshot_id: str | None = None,
+    metadata: Mapping[str, object] | None = None,
+) -> Path:
+    """Record that the squad stood still through one deadline. An entry is never overwritten.
+
+    A roll is not a decision. It states what the game did with a week nothing was decided
+    for: the squad, the picks and the purchase prices carried over unchanged, the bank
+    stayed where it was, and one free transfer accrued up to the season's cap. It names
+    no capture, no projection and no solver, because there were none, so it claims
+    nothing about points. The readers that publish decisions do not see it
+    (``load_ledger``); the chain the next decision starts from does
+    (``held_squad_from_ledger``).
+
+    It is recorded only from the entry of the week before, so the ledger stays a chain:
+    a roll for GW3 needs GW2 recorded, as a decision or as a roll of its own.
+    """
+
+    if not isinstance(reason, str) or not reason.strip():
+        raise LedgerError("reason must be non-empty text: say why the week was not decided.")
+    if not isinstance(recorded_at_utc, str) or not recorded_at_utc.strip():
+        raise LedgerError("recorded_at_utc must be non-empty text.")
+    if (
+        isinstance(max_free_transfers, bool)
+        or not isinstance(max_free_transfers, int)
+        or max_free_transfers < 1
+    ):
+        raise LedgerError("max_free_transfers must be a positive integer.")
+    if isinstance(budget_tenths, bool) or not isinstance(budget_tenths, int) or budget_tenths < 1:
+        raise LedgerError("budget_tenths must be a positive integer.")
+    directory = _entry_directory(root, season, gameweek)
+    if directory.exists():
+        raise LedgerError(
+            f"Ledger entry {directory} already exists; recorded decisions are "
+            "immutable. A revised decision needs an explicit, separate record."
+        )
+    if gameweek < 2:
+        raise LedgerError(
+            "The opening gameweek is decided from its capture, never rolled: there is no "
+            "earlier squad to carry."
+        )
+    if not _entry_directory(root, season, gameweek - 1).is_dir():
+        raise LedgerError(
+            f"No entry for {season} GW{gameweek - 1}; a roll carries the squad the ledger "
+            f"holds for the week before, so record GW{gameweek - 1} first (a decision, or a "
+            "roll of its own)."
+        )
+    previous = load_entry(root, season, gameweek - 1)
+    carried = _carried_state(previous, budget_tenths=budget_tenths)
+    # The game's own accrual, the same arithmetic ``live.banking`` applies to members:
+    # one more free transfer per week not played on a transfer chip, up to the cap.
+    free_after = min(int(max_free_transfers), carried.free_transfers + 1)
+
+    # No sell prices and no squad sell value: both need the prices of the week, and no
+    # capture of that week exists. Absent is not zero, so the keys are absent.
+    transfers: dict[str, object] = {
+        "contract_version": LEDGER_TRANSFERS_CONTRACT_VERSION,
+        "previous_gameweek": gameweek - 1,
+        "transfers_in": [],
+        "transfers_out": [],
+        "transfer_count": 0,
+        "paid_transfer_count": 0,
+        "transfer_hit_points": 0.0,
+        "free_transfers_before": carried.free_transfers,
+        "free_transfers_after": free_after,
+        "bank_before_tenths": carried.bank_tenths,
+        "bank_after_tenths": carried.bank_tenths,
+        "purchase_prices": {
+            str(player): int(price) for player, price in sorted(carried.purchase_prices.items())
+        },
+        "chip": None,
+        "max_free_transfers": int(max_free_transfers),
+    }
+    if carried.chips_available is not None:
+        transfers["chips_available"] = list(carried.chips_available)
+    before = previous.decision
+    decision: dict[str, object] = {
+        "contract_version": SEASON_LEDGER_CONTRACT_VERSION,
+        "snapshot_id": None,
+        "captured_at_utc": None,
+        "season": season,
+        "gameweek": gameweek,
+        "deadline_utc": deadline_utc,
+        "model_name": None,
+        "model_version": None,
+        "feature_contract_version": None,
+        "prediction_fingerprint": None,
+        "report_contract_version": None,
+        "solver_status": None,
+        # The game carries last week's picks forward untouched, captaincy included.
+        "squad_player_ids": list(carried.squad),
+        "starting_xi_player_ids": _player_id_list(before, "starting_xi_player_ids"),
+        "bench_player_ids": _player_id_list(before, "bench_player_ids"),
+        "captain_player_id": before.get("captain_player_id"),
+        "vice_captain_player_id": before.get("vice_captain_player_id"),
+        "ordered_bench_player_ids": _player_id_list(
+            before, "ordered_bench_player_ids", required=False
+        ),
+        "completion_policy": before.get("completion_policy"),
+        "total_cost_tenths": int(str(before["total_cost_tenths"])),
+        "projected_score": None,
+        "unavailable_player_count": None,
+        "risk_status": None,
+        "metadata": {
+            **dict(metadata or {}),
+            "mode": ROLL_MODE,
+            "rolled_from_gameweek": gameweek - 1,
+            "recorded_at_utc": recorded_at_utc.strip(),
+            "reason": reason.strip(),
+            "rules_snapshot_id": rules_snapshot_id,
+        },
+        "transfers": transfers,
+    }
+    report = "\n".join(
+        [
+            f"Season {season}, gameweek {gameweek}: no-transfer roll.",
+            f"Recorded {recorded_at_utc.strip()}. Reason: {reason.strip()}",
+            f"Deadline: {deadline_utc or 'not stated'}.",
+            f"Squad carried unchanged from GW{gameweek - 1}: {len(carried.squad)} players, "
+            f"purchase value {sum(carried.purchase_prices.values())} tenths.",
+            f"Free transfers: {carried.free_transfers} before, {free_after} after "
+            f"(cap {max_free_transfers}). Bank: {carried.bank_tenths} tenths, unchanged.",
+            "No capture, no projection, no solver: this entry claims nothing about points.",
+            "",
+        ]
+    )
+
+    def populate(staging: Path) -> None:
+        (staging / _DECISION_FILE).write_text(
+            json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (staging / _REPORT_FILE).write_text(report, encoding="utf-8")
+
+    _land_entry(root, season, directory, populate)
     LOGGER.info(
-        "ledger.decision.recorded",
+        "ledger.roll.recorded",
         extra={
             "fields": {
-                "season": recommendation.season,
-                "gameweek": recommendation.gameweek,
-                "snapshot_id": recommendation.snapshot_id,
+                "season": season,
+                "gameweek": gameweek,
+                "rolled_from_gameweek": gameweek - 1,
                 "directory": directory.as_posix(),
             }
         },
@@ -517,6 +753,11 @@ def record_outcome(
         raise LedgerError("source_snapshot_id must be non-empty text.")
     _verify_manifest(directory)
     decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    if is_roll(decision):
+        raise LedgerError(
+            f"{season} GW{gameweek} is a roll: the squad stood still and nothing was "
+            "projected, so there is no decision to settle. Outcomes attach to decisions."
+        )
     selected = [int(value) for value in decision["squad_player_ids"]]
     chip = _decision_chip(decision)
     hit_points = _decision_hit_points(decision)
@@ -656,8 +897,15 @@ def load_entry(root: Path, season: str, gameweek: int) -> LedgerEntry:
     )
 
 
-def load_ledger(root: Path, season: str) -> tuple[LedgerEntry, ...]:
-    """Load every recorded gameweek of one season in chronological order."""
+def load_ledger(root: Path, season: str, *, include_rolls: bool = False) -> tuple[LedgerEntry, ...]:
+    """Load every recorded decision of one season in chronological order.
+
+    A roll (``record_roll``) is a record of the squad standing still, not a decision: it
+    names no capture and no projection, so every reader that publishes or scores
+    decisions would have nothing to publish or score. Those readers keep seeing what
+    they saw before rolls existed. The chain the next decision starts from and the
+    committed season summary ask for rolls explicitly.
+    """
 
     season_directory = Path(root) / season
     if not season_directory.is_dir():
@@ -669,7 +917,10 @@ def load_ledger(root: Path, season: str) -> tuple[LedgerEntry, ...]:
         for path in season_directory.iterdir()
         if path.is_dir() and path.name.startswith("gw") and path.name[2:].isdigit()
     )
-    return tuple(load_entry(root, season, gameweek) for gameweek in gameweeks)
+    entries = tuple(load_entry(root, season, gameweek) for gameweek in gameweeks)
+    if include_rolls:
+        return entries
+    return tuple(entry for entry in entries if not is_roll(entry.decision))
 
 
 def _purchase_prices_from_entry(entry: LedgerEntry, squad: tuple[int, ...]) -> dict[int, int]:
@@ -712,7 +963,7 @@ def held_squad_from_ledger(
     a skipped week is the honest way to catch up.
     """
 
-    entries = load_ledger(root, season)
+    entries = load_ledger(root, season, include_rolls=True)
     if not entries:
         raise LedgerError(
             f"No decisions recorded for {season}; a mid-season deadline needs the held "
@@ -799,33 +1050,45 @@ def held_squad_from_ledger(
 
 def decision_mode(decision: Mapping[str, object]) -> str | None:
     """The mode a decision was made in: ``live`` before the deadline, ``replay`` from a
-    pre-deadline capture afterwards; ``None`` on an entry recorded before it was stamped."""
+    pre-deadline capture afterwards, ``roll`` when the squad stood still and nothing was
+    decided; ``None`` on an entry recorded before it was stamped."""
 
     metadata = decision.get("metadata")
     mode = metadata.get("mode") if isinstance(metadata, Mapping) else None
     return None if mode is None else str(mode)
 
 
+def is_roll(decision: Mapping[str, object]) -> bool:
+    """Whether an entry records the squad standing still rather than a decision."""
+
+    return decision_mode(decision) == ROLL_MODE
+
+
 def ledger_summary(root: Path, season: str) -> pd.DataFrame:
     """Return one row per recorded gameweek: mode, projected, realized, hits, and the gap."""
 
     rows: list[dict[str, object]] = []
-    for entry in load_ledger(root, season):
+    for entry in load_ledger(root, season, include_rolls=True):
         realized = float(str(entry.outcome["realized_xi_score"])) if entry.outcome else None
-        projected = float(str(entry.decision["projected_score"]))
+        stated = entry.decision.get("projected_score")
+        projected = None if stated is None else float(str(stated))
         transfers = entry.decision.get("transfers")
         block = transfers if isinstance(transfers, Mapping) else {}
         hits = float(str(block.get("transfer_hit_points", 0.0)))
         rows.append(
             {
                 "gameweek": entry.gameweek,
-                "snapshot_id": entry.decision["snapshot_id"],
+                "snapshot_id": entry.decision.get("snapshot_id"),
                 "mode": decision_mode(entry.decision),
-                "solver_status": entry.decision["solver_status"],
+                "solver_status": entry.decision.get("solver_status"),
                 "projected_score": projected,
                 "realized_score": realized,
-                "projection_error": (realized - projected) if realized is not None else None,
-                "unavailable_players": entry.decision["unavailable_player_count"],
+                "projection_error": (
+                    (realized - projected)
+                    if realized is not None and projected is not None
+                    else None
+                ),
+                "unavailable_players": entry.decision.get("unavailable_player_count"),
                 "transfers": int(str(block.get("transfer_count", 0))),
                 "transfer_hit_points": hits,
                 "realized_net_score": (realized - hits) if realized is not None else None,
@@ -853,6 +1116,12 @@ def ledger_summary(root: Path, season: str) -> pd.DataFrame:
     )
 
 
+def _absent(value: object) -> bool:
+    """``None`` as recorded, or the NaN pandas turns it into inside a numeric column."""
+
+    return value is None or (isinstance(value, float) and math.isnan(value))
+
+
 def summary_markdown(root: Path, season: str) -> str:
     """Render the committed season summary; raw entries stay local."""
 
@@ -865,7 +1134,9 @@ def summary_markdown(root: Path, season: str) -> str:
         "outcome) live locally under `data/ledger/` with per-file checksums.",
         "- Mode: `live` was decided before its deadline, from a capture that run took; "
         "`replay` was recorded after that deadline, or from a capture the run did not "
-        "take but named.",
+        "take but named; `roll` records that the squad stood still through a deadline "
+        "nothing was decided for, with no capture, no projection and no solver, the "
+        "free transfer carried by the game's own accrual.",
         "",
         "| GW | Snapshot | Mode | Solver | Projected | Realized | Error | Transfers | Hits "
         "| Chip | Net | Unavailable |",
@@ -875,17 +1146,22 @@ def summary_markdown(root: Path, season: str) -> str:
         realized_value = record["realized_score"]
         error_value = record["projection_error"]
         net_value = record["realized_net_score"]
-        realized = "-" if realized_value is None else f"{float(str(realized_value)):.0f}"
-        error = "-" if error_value is None else f"{float(str(error_value)):+.1f}"
-        net = "-" if net_value is None else f"{float(str(net_value)):.0f}"
-        chip = record["chip"] if record["chip"] is not None else "-"
-        mode = record["mode"] if record["mode"] is not None else "-"
+        projected_value = record["projected_score"]
+        unavailable_value = record["unavailable_players"]
+        realized = "-" if _absent(realized_value) else f"{float(str(realized_value)):.0f}"
+        error = "-" if _absent(error_value) else f"{float(str(error_value)):+.1f}"
+        net = "-" if _absent(net_value) else f"{float(str(net_value)):.0f}"
+        projected = "-" if _absent(projected_value) else f"{float(str(projected_value)):.1f}"
+        unavailable = "-" if _absent(unavailable_value) else f"{int(float(str(unavailable_value)))}"
+        snapshot = "-" if _absent(record["snapshot_id"]) else f"`{record['snapshot_id']}`"
+        solver = "-" if _absent(record["solver_status"]) else str(record["solver_status"])
+        chip = record["chip"] if not _absent(record["chip"]) else "-"
+        mode = record["mode"] if not _absent(record["mode"]) else "-"
         lines.append(
-            f"| {record['gameweek']} | `{record['snapshot_id']}` | {mode} "
-            f"| {record['solver_status']} "
-            f"| {float(str(record['projected_score'])):.1f} | {realized} | {error} "
+            f"| {record['gameweek']} | {snapshot} | {mode} | {solver} "
+            f"| {projected} | {realized} | {error} "
             f"| {record['transfers']} | {float(str(record['transfer_hit_points'])):.0f} "
-            f"| {chip} | {net} | {record['unavailable_players']} |"
+            f"| {chip} | {net} | {unavailable} |"
         )
     settled = table.loc[table["settled"]]
     if not settled.empty:

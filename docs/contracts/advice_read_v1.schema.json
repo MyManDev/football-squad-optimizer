@@ -169,6 +169,124 @@
           "minimum": 1,
           "type": "integer"
         },
+        "evidence": {
+          "properties": {
+            "applied": {
+              "items": {
+                "properties": {
+                  "club": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "disposition": {
+                    "type": "string"
+                  },
+                  "fetched_at_utc": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "player_id": {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "published_at_utc": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "published_precision": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "role": {
+                    "enum": [
+                      "not_starting",
+                      "not_captain",
+                      null
+                    ]
+                  },
+                  "source_url": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "speaker": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "words": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "words_status": {
+                    "enum": [
+                      "shown",
+                      "unresolved",
+                      "withheld_figure"
+                    ]
+                  }
+                },
+                "required": [
+                  "player_id",
+                  "disposition",
+                  "role",
+                  "words"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "binding": {
+              "type": "boolean"
+            },
+            "clubs_covered": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "evidence_table": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "managers_word"
+            },
+            "rule_version": {
+              "type": "string"
+            },
+            "source_kind": {
+              "type": "string"
+            },
+            "source_label": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "source_kind",
+            "clubs_covered",
+            "applied"
+          ],
+          "type": "object"
+        },
         "expected_gain_vs_hold": {
           "type": [
             "number",
@@ -309,7 +427,8 @@
                 "enum": [
                   "window_value",
                   "mode_tradeoff",
-                  "points_gain"
+                  "points_gain",
+                  "manager_word"
                 ]
               }
             },

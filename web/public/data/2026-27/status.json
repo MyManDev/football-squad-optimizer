@@ -1,61 +1,42 @@
 {
   "contract_version": "ui_view_v1",
-  "generated_at_utc": "2026-09-16T06:50:48Z",
+  "generated_at_utc": "2026-09-17T07:09:08Z",
   "payload": {
     "actions": [
-      {
-        "gameweek": 4,
-        "handoff_path": null,
-        "kind": "wait",
-        "reason": "gameweek 4 deadline 2026-09-12T12:30:00Z closed with no decision recorded (missed); nothing can be decided for it now",
-        "reason_code": "deadline_missed",
-        "reason_params": {
-          "deadline_utc": "2026-09-12T12:30:00Z",
-          "gameweek": 4
-        },
-        "snapshot_id": null
-      },
       {
         "gameweek": 5,
         "handoff_path": null,
         "kind": "wait",
-        "reason": "gameweek 5 deadline in 58.7 h; capture opens 3 h before it",
+        "reason": "gameweek 5 deadline in 34.3 h; capture opens 3 h before it",
         "reason_code": "before_window",
         "reason_params": {
           "gameweek": 5,
-          "hours_left": 58.7,
+          "hours_left": 34.3,
           "window_hours": 3.0
         },
         "snapshot_id": null
       }
     ],
     "decided_gameweeks": [
-      1
+      1,
+      4
     ],
-    "hours_to_deadline": 58.65,
+    "hours_to_deadline": 34.35,
     "is_idle": true,
     "latest_capture": "fpl-live-20260915T175225Z-382941835994",
     "next_deadline_utc": "2026-09-18T17:30:00Z",
     "next_gameweek": 5,
-    "now_utc": "2026-09-16T06:50:48Z",
+    "now_utc": "2026-09-17T07:09:08Z",
     "recent_events": [
       {
         "fields": {
-          "stage": "site"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:50:48.351+00:00"
-      },
-      {
-        "fields": {
+          "error": "An advice record already exists at .../entry-313686/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-2199732/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-2281624/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-3832237/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-4287206/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-5081114/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-5349883/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-5662073/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-6654210/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-6879786/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-6880255/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-7018833/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-7252721/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-8548384/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'\nAn advice record already exists at .../entry-8883467/fpl-live-20260915T175225Z-382941835994 and this build of the same capture advises something different. Recorded advice is immutable: it is the only evidence of what the member was told, so it is refused rather than rewritten. The capture is the whole input, so a difference here is a difference our own code produced. The publication's own clock is not listed; a re-publish that moved only that is a replay and would not have been refused.\n  provenance.repository_commit: recorded '89e11dd5334062d93f18208adbcd4f2cf0ad035b', now 'f3cf098d69bcbb34de9e8bdeb0b80eed28da2330'",
           "stage": "league"
         },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:50:48.351+00:00"
+        "level": "ERROR",
+        "message": "tick.week.stage.failed",
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T16:01:06.669+00:00"
       },
       {
         "fields": {
@@ -63,8 +44,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:21:02.945+00:00"
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T15:32:01.199+00:00"
       },
       {
         "fields": {
@@ -72,8 +53,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:21:02.693+00:00"
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T15:32:00.952+00:00"
       },
       {
         "fields": {
@@ -81,8 +62,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:20:38.615+00:00"
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T15:31:37.558+00:00"
       },
       {
         "fields": {
@@ -90,8 +71,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:20:38.615+00:00"
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T15:31:37.558+00:00"
       },
       {
         "fields": {
@@ -99,8 +80,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:20:36.155+00:00"
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T15:31:36.196+00:00"
       },
       {
         "fields": {
@@ -108,8 +89,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:20:36.155+00:00"
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T15:31:36.196+00:00"
       },
       {
         "fields": {
@@ -117,8 +98,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:20:35.966+00:00"
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T15:31:35.979+00:00"
       },
       {
         "fields": {
@@ -126,8 +107,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:20:35.966+00:00"
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T15:31:35.979+00:00"
       },
       {
         "fields": {
@@ -135,8 +116,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:20:34.940+00:00"
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T15:31:34.895+00:00"
       },
       {
         "fields": {
@@ -157,75 +138,17 @@
         },
         "level": "INFO",
         "message": "tick.week.plan",
-        "run_id": "rehearsal-publish-20260916",
-        "ts": "2026-09-16T06:20:34.936+00:00"
+        "run_id": "publish-gw04-settled-2-20260916",
+        "ts": "2026-09-16T15:31:34.892+00:00"
       },
       {
         "fields": {
-          "error": "Capture is open for gameweek 5, not 4.",
-          "stage": "capture"
-        },
-        "level": "ERROR",
-        "message": "tick.week.stage.failed",
-        "run_id": "settled-20260916-gw04",
-        "ts": "2026-09-16T06:19:03.691+00:00"
-      },
-      {
-        "fields": {
-          "stage": "capture"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "settled-20260916-gw04",
-        "ts": "2026-09-16T06:19:03.616+00:00"
-      },
-      {
-        "fields": {
-          "stage": "preflight"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.done",
-        "run_id": "settled-20260916-gw04",
-        "ts": "2026-09-16T06:19:03.616+00:00"
-      },
-      {
-        "fields": {
-          "stage": "preflight"
-        },
-        "level": "INFO",
-        "message": "tick.week.stage.start",
-        "run_id": "settled-20260916-gw04",
-        "ts": "2026-09-16T06:19:03.216+00:00"
-      },
-      {
-        "fields": {
-          "gameweek": 4,
-          "league": 352490,
-          "resume": false,
-          "season": "2026-27",
-          "stages": [
-            "preflight",
-            "capture",
-            "settled_outcomes",
-            "handoff",
-            "league",
-            "site",
-            "scoreboard"
-          ]
-        },
-        "level": "INFO",
-        "message": "tick.week.plan",
-        "run_id": "settled-20260916-gw04",
-        "ts": "2026-09-16T06:19:03.213+00:00"
-      },
-      {
-        "fields": {
-          "receipt": ".../rehearsal-20260914-gw04/run.json"
+          "receipt": ".../rehearsal-roll-20260916/run.json"
         },
         "level": "INFO",
         "message": "tick.week.done",
-        "run_id": "rehearsal-20260914-gw04",
-        "ts": "2026-09-14T11:40:38.817+00:00"
+        "run_id": "rehearsal-roll-20260916",
+        "ts": "2026-09-16T14:34:09.174+00:00"
       },
       {
         "fields": {
@@ -233,8 +156,8 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.done",
-        "run_id": "rehearsal-20260914-gw04",
-        "ts": "2026-09-14T11:40:37.976+00:00"
+        "run_id": "rehearsal-roll-20260916",
+        "ts": "2026-09-16T14:34:08.364+00:00"
       },
       {
         "fields": {
@@ -242,13 +165,68 @@
         },
         "level": "INFO",
         "message": "tick.week.stage.start",
-        "run_id": "rehearsal-20260914-gw04",
-        "ts": "2026-09-14T11:40:35.352+00:00"
+        "run_id": "rehearsal-roll-20260916",
+        "ts": "2026-09-16T14:34:05.426+00:00"
+      },
+      {
+        "fields": {
+          "stage": "site"
+        },
+        "level": "INFO",
+        "message": "tick.week.stage.done",
+        "run_id": "rehearsal-roll-20260916",
+        "ts": "2026-09-16T14:34:05.426+00:00"
+      },
+      {
+        "fields": {
+          "stage": "site"
+        },
+        "level": "INFO",
+        "message": "tick.week.stage.start",
+        "run_id": "rehearsal-roll-20260916",
+        "ts": "2026-09-16T14:34:03.822+00:00"
+      },
+      {
+        "fields": {
+          "stage": "league"
+        },
+        "level": "INFO",
+        "message": "tick.week.stage.done",
+        "run_id": "rehearsal-roll-20260916",
+        "ts": "2026-09-16T14:34:03.822+00:00"
+      },
+      {
+        "fields": {
+          "stage": "league"
+        },
+        "level": "INFO",
+        "message": "tick.week.stage.start",
+        "run_id": "rehearsal-roll-20260916",
+        "ts": "2026-09-16T14:04:53.451+00:00"
+      },
+      {
+        "fields": {
+          "stage": "handoff"
+        },
+        "level": "INFO",
+        "message": "tick.week.stage.done",
+        "run_id": "rehearsal-roll-20260916",
+        "ts": "2026-09-16T14:04:53.199+00:00"
+      },
+      {
+        "fields": {
+          "stage": "handoff"
+        },
+        "level": "INFO",
+        "message": "tick.week.stage.start",
+        "run_id": "rehearsal-roll-20260916",
+        "ts": "2026-09-16T14:04:29.557+00:00"
       }
     ],
     "season": "2026-27",
     "settled_gameweeks": [
-      1
+      1,
+      4
     ],
     "tick_contract_version": "season_tick_v1"
   }

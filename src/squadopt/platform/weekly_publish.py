@@ -97,6 +97,10 @@ class LeaguePublish:
     #: capture differs from that capture's record and the deadline will not wait for the
     #: difference to be reconciled. The first record is kept; this publish adds none.
     record_advice: bool = True
+    #: The week's rotation evidence and the club-news source it was coded from, both or
+    #: neither, passed through to the league build as the manager's word.
+    rotation_evidence: Path | None = None
+    club_news_source: Path | None = None
 
     def __post_init__(self) -> None:
         if self.league_id < 1:
@@ -183,6 +187,10 @@ class LeaguePublish:
             arguments += ["--in-season-projection", str(self.in_season_projection)]
         if not self.record_advice:
             arguments.append("--no-advice-record")
+        if self.rotation_evidence is not None:
+            arguments += ["--rotation-evidence", str(self.rotation_evidence)]
+        if self.club_news_source is not None:
+            arguments += ["--club-news-source", str(self.club_news_source)]
         return arguments
 
 
@@ -528,6 +536,17 @@ def main() -> int:
         "Top-100 mean is published gross of transfer costs and labelled gross",
     )
     parser.add_argument(
+        "--rotation-evidence",
+        type=Path,
+        help="the week's rotation evidence table; with --club-news-source, the "
+        "manager's word is built for every member",
+    )
+    parser.add_argument(
+        "--club-news-source",
+        type=Path,
+        help="the fixture file or club-news capture the evidence was coded from",
+    )
+    parser.add_argument(
         "--no-advice-record",
         action="store_true",
         help="publish without recording what was published; the escape when a rebuild of "
@@ -553,11 +572,27 @@ def main() -> int:
             league = LeaguePublish(
                 league_id=arguments.league,
                 snapshot_id=arguments.snapshot_id,
-                in_season_projection=arguments.in_season_projection,
+                # Resolved here: the build runs with its working directory inside the
+                # publication worktree, where a relative path names nothing.
+                in_season_projection=(
+                    arguments.in_season_projection.resolve()
+                    if arguments.in_season_projection is not None
+                    else None
+                ),
                 workers=arguments.workers,
                 cohort_snapshot=arguments.cohort_snapshot,
                 elite_snapshot=arguments.elite_snapshot,
                 record_advice=not arguments.no_advice_record,
+                rotation_evidence=(
+                    arguments.rotation_evidence.resolve()
+                    if arguments.rotation_evidence is not None
+                    else None
+                ),
+                club_news_source=(
+                    arguments.club_news_source.resolve()
+                    if arguments.club_news_source is not None
+                    else None
+                ),
             )
         return publish(
             names,

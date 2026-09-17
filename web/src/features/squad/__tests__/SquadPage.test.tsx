@@ -25,6 +25,8 @@ import { SquadPage } from "../pages/SquadPage";
 
 afterEach(cleanup);
 
+const LATEST_GAMEWEEK = Number(indexFixture.payload.latest.gameweek);
+
 function loaded<T>(payload: T): Loaded<T> {
   return { payload, generatedAtUtc: "2026-08-19T10:00:00Z" };
 }
@@ -37,7 +39,10 @@ function makeClient(
   return {
     getIndex: async () => loaded(indexFixture.payload as SiteIndex),
     getRecommendation: async (season, gameweek) => {
-      if (season === "2026-27" && gameweek === 1) {
+      // The index is the live one the site ships, so the week it names moves with every
+      // publish; the fixture is served at that week (and at one, where a test asks for
+      // it by path), or the page would read a real index and find no document behind it.
+      if (season === "2026-27" && (gameweek === LATEST_GAMEWEEK || gameweek === 1)) {
         const payload = viewOverride ?? unsettledRecommendationFixture;
         return loaded({ ...payload, deadline_utc: deadlineUtc ?? payload.deadline_utc });
       }
