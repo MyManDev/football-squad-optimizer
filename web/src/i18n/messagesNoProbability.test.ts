@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import { AS_A_CHANCE } from "../testSupport/honesty";
 import { EVIDENCE_COPY } from "../features/league/advice/evidenceCopy";
 import { TOP100_COPY } from "../features/league/advice/top100Copy";
+import { FIXTURES_COPY } from "../features/fixtures/fixturesCopy";
 import { MESSAGES, type Language } from "./messages";
 
 const LANGUAGES: readonly Language[] = ["en", "tr"];
@@ -77,6 +78,7 @@ for (const language of LANGUAGES) collect(MESSAGES[language], language, catalogu
 for (const language of LANGUAGES) {
   collect(EVIDENCE_COPY[language], `${language}.evidenceCopy`, catalogue);
   collect(TOP100_COPY[language], `${language}.top100Copy`, catalogue);
+  collect(FIXTURES_COPY[language], `${language}.fixturesCopy`, catalogue);
 }
 
 describe("every string in both message catalogues", () => {
