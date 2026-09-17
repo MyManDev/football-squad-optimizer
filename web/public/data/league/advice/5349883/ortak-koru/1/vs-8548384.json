@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -33,11 +33,11 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.616132367086891,
-    "expected_points_cost": 0.6663092147212026,
+    "expected_points_cost": 0.7092816117450909,
     "rival_label": "entry-8548384",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 54.95850429109449,
+    "expected_own_points": 53.77857205208214,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -141,7 +141,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -188,7 +188,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 8548384,
-    "expected_points_cost_ceiling": 0.6663092147212026,
+    "expected_points_cost_ceiling": 0.7092816117450909,
     "overlap_count": 4,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -198,8 +198,8 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 20.0,
-      "expected_points_cost": 20.77251888434153,
-      "expected_points_cost_ceiling": 20.77251888434153
+      "expected_points_cost": 20.815491281365418,
+      "expected_points_cost_ceiling": 20.815491281365418
     },
     "expected_gap_vs_rival": 3.365372641447763,
     "captain_agreement": true,

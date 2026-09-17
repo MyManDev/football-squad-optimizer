@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "fark-yarat",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -27,7 +27,7 @@
           "position": "MID",
           "team": "Bournemouth"
         },
-        "expected_points_delta": 0.3950261891734357,
+        "expected_points_delta": 0.3950261891734428,
         "reason_code": "mode_tradeoff"
       },
       {
@@ -46,17 +46,17 @@
           "position": "MID",
           "team": "Brentford"
         },
-        "expected_points_delta": 1.1096079910310692,
+        "expected_points_delta": 1.1525803880549503,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 1.504634180204505,
+    "expected_gain_vs_hold": 1.5476065772283931,
     "expected_points_cost": 0.3368474933852639,
     "rival_label": "entry-7252721",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 58.38411085630429,
+    "expected_own_points": 57.333464291999036,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -83,20 +83,20 @@
         "expected_points": 2.9398808352076324
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 3.54054506392718
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 108416,
@@ -128,7 +128,7 @@
         "short_name": "Schade",
         "position": "MID",
         "team": "Brentford",
-        "expected_points": 4.179784872411939
+        "expected_points": 4.222757269435823
       },
       {
         "player_id": 60307,
@@ -136,7 +136,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.163808898150183
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 503139,
@@ -160,7 +160,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -220,7 +220,7 @@
       "expected_points_cost": 0.3368474933852639,
       "expected_points_cost_ceiling": 0.3368474933852639
     },
-    "expected_gap_vs_rival": 2.0336682490841227,
+    "expected_gap_vs_rival": 2.0336772276525608,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

@@ -51,7 +51,13 @@ const move: Predicate = (value) =>
     player_out: nullable(player),
     player_in: nullable(player),
     expected_points_delta: nullable(finite),
-    reason_code: oneOf("window_value", "mode_tradeoff", "points_gain", "manager_word"),
+    reason_code: oneOf(
+      "window_value",
+      "mode_tradeoff",
+      "points_gain",
+      "manager_word",
+      "top100_preference",
+    ),
   });
 const planWeek: Predicate = (value) =>
   fields(value, {
@@ -83,6 +89,22 @@ const evidence: Predicate = (value) =>
     clubs_covered: array(text),
     applied: array(record),
   });
+
+const top100: Predicate = (value) =>
+  fields(
+    value,
+    {
+      weight: oneOf(5, 10, 20, 30, 40, 50),
+      changed: oneOf(true, false),
+      price_basis: text,
+    },
+    {
+      cohort_snapshot_id: text,
+      picks_snapshot_id: text,
+      table_sha256: text,
+      picks_gameweek: identity,
+    },
+  );
 
 export function isAdvicePayload(value: unknown): boolean {
   return fields(
@@ -117,6 +139,7 @@ export function isAdvicePayload(value: unknown): boolean {
       optimality_gap: nullable(finite),
       control_optimality_gap: nullable(finite),
       evidence,
+      top100,
       expected_own_points: nullable(finite),
       captain: nullable(player),
       vice_captain: nullable(player),

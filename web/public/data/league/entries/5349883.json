@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "league_id": 352490,
@@ -154,7 +154,7 @@
         "position": "FWD",
         "team": "Chelsea",
         "price_tenths": 78,
-        "expected_points": 4.719728956049396,
+        "expected_points": 3.539796717037047,
         "event_points": null,
         "is_captain": true,
         "is_vice_captain": false,
@@ -312,7 +312,7 @@
     "purchase_prices_known": false,
     "squad_sell_value_tenths": 992,
     "spendable_budget_tenths": 1000,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "squadopt_comparison": null,
     "data_quality": "partial",
     "missing_fields": [

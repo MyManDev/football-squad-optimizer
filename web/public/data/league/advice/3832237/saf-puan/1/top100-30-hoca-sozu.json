@@ -1,0 +1,274 @@
+{
+  "contract_version": "provisional_league_ui_v1",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
+  "source_kind": "live",
+  "payload": {
+    "season": "2026-27",
+    "gameweek": 5,
+    "entry_id": 3832237,
+    "league_id": 352490,
+    "mode": "saf-puan",
+    "window": 1,
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
+    "moves": [
+      {
+        "move_id": "gw05-1",
+        "player_out": {
+          "player_id": 178301,
+          "name": "Ollie Watkins",
+          "short_name": "Watkins",
+          "position": "FWD",
+          "team": "Aston Villa"
+        },
+        "player_in": {
+          "player_id": 223094,
+          "name": "Erling Haaland",
+          "short_name": "Haaland",
+          "position": "FWD",
+          "team": "Man City"
+        },
+        "expected_points_delta": 9.44124235640809,
+        "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw05-2",
+        "player_out": {
+          "player_id": 226597,
+          "name": "Gabriel dos Santos Magalh\u00e3es",
+          "short_name": "Magalh\u00e3es",
+          "position": "DEF",
+          "team": "Arsenal"
+        },
+        "player_in": {
+          "player_id": 226182,
+          "name": "Jayden Bogle",
+          "short_name": "Bogle",
+          "position": "DEF",
+          "team": "Leeds"
+        },
+        "expected_points_delta": -0.9241913067188818,
+        "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw05-3",
+        "player_out": {
+          "player_id": 430871,
+          "name": "Matheus Santos Carneiro da Cunha",
+          "short_name": "Cunha",
+          "position": "MID",
+          "team": "Man Utd"
+        },
+        "player_in": {
+          "player_id": 60307,
+          "name": "Pascal Gro\u00df",
+          "short_name": "Gro\u00df",
+          "position": "MID",
+          "team": "Brighton"
+        },
+        "expected_points_delta": 0.2528354518057654,
+        "reason_code": "points_gain"
+      },
+      {
+        "move_id": "gw05-4",
+        "player_out": {
+          "player_id": 472769,
+          "name": "Nico O'Reilly",
+          "short_name": "O'Reilly",
+          "position": "DEF",
+          "team": "Man City"
+        },
+        "player_in": {
+          "player_id": 465730,
+          "name": "Maxim De Cuyper",
+          "short_name": "Cuyper",
+          "position": "DEF",
+          "team": "Brighton"
+        },
+        "expected_points_delta": 1.552923406319934,
+        "reason_code": "points_gain"
+      }
+    ],
+    "transfer_hit_points": 0.0,
+    "expected_gain_vs_hold": 10.322809907814907,
+    "expected_points_cost": 0.0,
+    "rival_label": null,
+    "solver_status": "OPTIMAL",
+    "optimality_gap": null,
+    "expected_own_points": 54.18172453883092,
+    "captain": {
+      "player_id": 223094,
+      "name": "Erling Haaland",
+      "short_name": "Haaland",
+      "position": "FWD",
+      "team": "Man City",
+      "expected_points": 8.37533371727625
+    },
+    "vice_captain": {
+      "player_id": 437730,
+      "name": "Antoine Semenyo",
+      "short_name": "Semenyo",
+      "position": "MID",
+      "team": "Man City",
+      "expected_points": 4.620473859853053
+    },
+    "starting_xi": [
+      {
+        "player_id": 154561,
+        "name": "David Raya Mart\u00edn",
+        "short_name": "Mart\u00edn",
+        "position": "GK",
+        "team": "Arsenal",
+        "expected_points": 3.8238320826783507
+      },
+      {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
+        "player_id": 226182,
+        "name": "Jayden Bogle",
+        "short_name": "Bogle",
+        "position": "DEF",
+        "team": "Leeds",
+        "expected_points": 3.5483370784121617
+      },
+      {
+        "player_id": 231416,
+        "name": "Ferdi Kad\u0131o\u011flu",
+        "short_name": "Kad\u0131o\u011flu",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 2.4492708555664957
+      },
+      {
+        "player_id": 437730,
+        "name": "Antoine Semenyo",
+        "short_name": "Semenyo",
+        "position": "MID",
+        "team": "Man City",
+        "expected_points": 4.620473859853053
+      },
+      {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.415892336727386
+      },
+      {
+        "player_id": 60307,
+        "name": "Pascal Gro\u00df",
+        "short_name": "Gro\u00df",
+        "position": "MID",
+        "team": "Brighton",
+        "expected_points": 4.206689328780451
+      },
+      {
+        "player_id": 424876,
+        "name": "Dominik Szoboszlai",
+        "short_name": "Szoboszlai",
+        "position": "MID",
+        "team": "Liverpool",
+        "expected_points": 3.7460561434034036
+      },
+      {
+        "player_id": 84450,
+        "name": "Granit Xhaka",
+        "short_name": "Xhaka",
+        "position": "MID",
+        "team": "Sunderland",
+        "expected_points": 3.1354935560927677
+      },
+      {
+        "player_id": 223094,
+        "name": "Erling Haaland",
+        "short_name": "Haaland",
+        "position": "FWD",
+        "team": "Man City",
+        "expected_points": 8.37533371727625
+      },
+      {
+        "player_id": 502500,
+        "name": "Igor Thiago Nascimento Rodrigues",
+        "short_name": "Rodrigues",
+        "position": "FWD",
+        "team": "Brentford",
+        "expected_points": 3.93101668263493
+      }
+    ],
+    "bench": [
+      {
+        "player_id": 204936,
+        "name": "Gianluigi Donnarumma",
+        "short_name": "Donnarumma",
+        "position": "GK",
+        "team": "Man City",
+        "expected_points": 3.404906686111741
+      },
+      {
+        "player_id": 169432,
+        "name": "Oli McBurnie",
+        "short_name": "McBurnie",
+        "position": "FWD",
+        "team": "Hull City",
+        "expected_points": 2.836896693013364
+      },
+      {
+        "player_id": 441164,
+        "name": "Pedro Porro Sauceda",
+        "short_name": "Sauceda",
+        "position": "DEF",
+        "team": "Spurs",
+        "expected_points": 1.5182138705784642
+      },
+      {
+        "player_id": 106611,
+        "name": "Michael Keane",
+        "short_name": "Keane",
+        "position": "DEF",
+        "team": "Everton",
+        "expected_points": 0.13980101442937173
+      }
+    ],
+    "chip": null,
+    "stated_limits": [
+      "No chip is offered inside the window. A finite window counts nothing for holding a chip back, so a planner that could reach one would spend it; chip timing is a season-long decision this window cannot price.",
+      "The plan was chosen with the Top 100 influence at 30; every expected-points number in this document is the base model's, without it."
+    ],
+    "data_quality": "partial",
+    "missing_fields": [
+      "purchase_prices"
+    ],
+    "squad_basis": "captured",
+    "expected_points_cost_ceiling": 0.0,
+    "control_solver_status": "OPTIMAL",
+    "control_optimality_gap": 0.0,
+    "top100": {
+      "weight": 30,
+      "changed": false,
+      "price_basis": "base_model_pure_points_v1",
+      "cohort_snapshot_id": "fpl-top100-20260917T093424Z-273ef2f9ab2b",
+      "picks_snapshot_id": "fpl-elite-picks-20260917T093454Z-efa7e3bfa351",
+      "table_sha256": "68b3ddb4193c16cbaa45c99d920dce780aa79bb32d14a701901b26bf5b6e45fb",
+      "picks_gameweek": 4
+    },
+    "evidence": {
+      "kind": "managers_word",
+      "rule_version": "managers_word_rule_v1",
+      "source_kind": "synthetic_fixture",
+      "source_label": "club_news_v1.fixture.json",
+      "evidence_table": "rotation_evidence_v2_2026-27_gw05_d0bb92785d5c.csv",
+      "clubs_covered": [
+        "Arsenal",
+        "Man Utd"
+      ],
+      "binding": false,
+      "applied": []
+    }
+  }
+}

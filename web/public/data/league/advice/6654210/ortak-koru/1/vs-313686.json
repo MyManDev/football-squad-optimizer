@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,16 +9,16 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 97032,
-          "name": "Virgil van Dijk",
-          "short_name": "Dijk",
+          "player_id": 95658,
+          "name": "Harry Maguire",
+          "short_name": "Maguire",
           "position": "DEF",
-          "team": "Liverpool"
+          "team": "Man Utd"
         },
         "player_in": {
           "player_id": 465730,
@@ -27,17 +27,17 @@
           "position": "DEF",
           "team": "Brighton"
         },
-        "expected_points_delta": -0.0449863435825435,
+        "expected_points_delta": 0.9716084376462177,
         "reason_code": "mode_tradeoff"
       },
       {
         "move_id": "gw05-2",
         "player_out": {
-          "player_id": 449429,
-          "name": "Jacob Greaves",
-          "short_name": "Greaves",
+          "player_id": 97032,
+          "name": "Virgil van Dijk",
+          "short_name": "Dijk",
           "position": "DEF",
-          "team": "Ipswich Town"
+          "team": "Liverpool"
         },
         "player_in": {
           "player_id": 466075,
@@ -46,17 +46,17 @@
           "position": "DEF",
           "team": "Arsenal"
         },
-        "expected_points_delta": 0.9581583214439746,
+        "expected_points_delta": -0.0150036127318387,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.9131719778614311,
-    "expected_points_cost": 1.1623863490985897,
+    "expected_gain_vs_hold": 0.956604824914379,
+    "expected_points_cost": 1.167584000786789,
     "rival_label": "entry-313686",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 56.5416919192007,
+    "expected_own_points": 55.44807295787157,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -83,20 +83,20 @@
         "expected_points": 3.8238320826783507
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 3.54054506392718
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 191866,
@@ -128,7 +128,7 @@
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.163808898150183
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 513545,
@@ -160,7 +160,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -181,12 +181,12 @@
         "expected_points": 2.582386742483201
       },
       {
-        "player_id": 95658,
-        "name": "Harry Maguire",
-        "short_name": "Maguire",
+        "player_id": 449429,
+        "name": "Jacob Greaves",
+        "short_name": "Greaves",
         "position": "DEF",
-        "team": "Man Utd",
-        "expected_points": 2.4986285568677755
+        "team": "Ipswich Town",
+        "expected_points": 1.8900683591077632
       },
       {
         "player_id": 631786,
@@ -207,7 +207,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 313686,
-    "expected_points_cost_ceiling": 1.1623863490985897,
+    "expected_points_cost_ceiling": 1.167584000786789,
     "overlap_count": 6,
     "transfer_cap": 2,
     "overlap_target": 9,
@@ -217,10 +217,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 12.0,
-      "expected_points_cost": 12.586458587840347,
-      "expected_points_cost_ceiling": 12.586458587840347
+      "expected_points_cost": 13.449863060208244,
+      "expected_points_cost_ceiling": 13.449863060208244
     },
-    "expected_gap_vs_rival": 4.688651820470774,
+    "expected_gap_vs_rival": 4.688651820470781,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

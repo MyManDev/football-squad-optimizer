@@ -18,7 +18,11 @@
  * It marks, it does not choose — the checked option is still whatever the URL says — and
  * the note beside it says the rule is written down rather than measured.
  *
- * Selection lives in the URL (`mode`, `rival`, `window`), the same parameters the
+ * The Top 100 influence is a row of weights beside the manager's word. Each one is a
+ * file the producer solved for this member on the one-week pure-points plan; a weight
+ * without a file is shown disabled, and zero switches the influence off.
+ *
+ * Selection lives in the URL (`mode`, `rival`, `window`, `llm`, `top100`), the same parameters the
  * templates set and the compute panel reads, so the whole state stays shareable.
  */
 
@@ -31,6 +35,8 @@ import { WINDOWS } from "../../moves/modePrices";
 import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
 import { EVIDENCE_PARAMETER, resolvePublishedAdvice } from "./adviceSelection";
 import { EVIDENCE_COPY, evidenceUnavailable } from "./evidenceCopy";
+import { TOP100_PARAMETER, TOP100_WEIGHTS } from "./top100";
+import { TOP100_COPY, top100Unavailable } from "./top100Copy";
 import styles from "./MemberDecisionControls.module.css";
 
 /** The gap as the rule read it: signed, so behind and ahead are visibly different. */
@@ -103,6 +109,18 @@ export function MemberDecisionControls({
   // and the weeks left. It is a label on an option the member may ignore, never a
   // preselection: the checked strategy is still whatever the URL says.
   const suggested = index?.suggested_strategy ?? null;
+  const top100Copy = TOP100_COPY[language];
+  const top100 = selection.top100;
+  const top100Applies = top100.available && strategy === "saf-puan" && windowSize === 1;
+  const top100Note = !top100.available
+    ? top100Unavailable(top100Copy, top100.reason)
+    : !top100Applies
+      ? top100Copy.onlyBaseline
+      : top100.notOffered
+        ? top100Copy.notOffered
+        : top100.weights.length < TOP100_WEIGHTS.length
+          ? top100Copy.notSolved
+          : top100Copy.published;
 
   return (
     <Card
@@ -247,6 +265,36 @@ export function MemberDecisionControls({
                   ? evidenceCopy.sourceCapture
                   : evidenceCopy.sourceExample}
           </p>
+        </fieldset>
+
+        <fieldset className={styles.fieldset}>
+          <legend>{top100Copy.legend}</legend>
+          <div className={styles.windows}>
+            {TOP100_WEIGHTS.map((weight) => (
+              <label className={styles.windowOption} key={weight}>
+                <input
+                  type="radio"
+                  name={TOP100_PARAMETER}
+                  value={weight}
+                  checked={top100.weight === weight}
+                  disabled={!top100Applies || !top100.weights.includes(weight)}
+                  onChange={() =>
+                    update({ [TOP100_PARAMETER]: weight === 0 ? null : String(weight) })
+                  }
+                  // Zero reads as checked while the link carries a setting the page cannot
+                  // show; a click on it still has to clear that setting from the link.
+                  onClick={() => {
+                    if (weight === 0 && searchParams.has(TOP100_PARAMETER)) {
+                      update({ [TOP100_PARAMETER]: null });
+                    }
+                  }}
+                />
+                <span>{weight === 0 ? top100Copy.zero : weight}</span>
+              </label>
+            ))}
+          </div>
+          <p className={styles.note}>{top100Note}</p>
+          {top100Applies ? <p className={styles.note}>{top100Copy.help}</p> : null}
         </fieldset>
       </div>
       <p className={styles.honesty}>{copy.honestyRule}</p>

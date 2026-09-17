@@ -359,10 +359,13 @@ def test_the_preview_records_advice_only_when_it_is_the_publication(
             snapshot_id=request.snapshot_id,
             gameweek=2,
             report=SimpleNamespace(members=(), removed=()),
+            top100_note="",
         )
 
     monkeypatch.setattr(weekly, "publish_league", publish)
     assert operation._league().value["advice_recorded"] is False
+    # No evidence stage ran, so no Top 100 table reaches the league build.
+    assert calls[0].top100_evidence is None
     publishing = weekly.WeeklyOperations(
         replace(operation.request, publish=True),
         operation.paths,
@@ -377,6 +380,13 @@ def test_the_preview_records_advice_only_when_it_is_the_publication(
     assert calls[1].out_dir == operation.paths.out
     assert operation.record_inputs == publishing.record_inputs == [earlier]
     assert "rotation" not in operation.stages
+
+    # When the evidence stage ran, its table reaches the league build; the loader's own
+    # gate decides whether the menu is offered.
+    table = tmp_path / "player_evidence_v1_2026-27_gw02_top100_111111111111.csv"
+    publishing.values["top100_evidence"] = {"table": str(table), "manifest": str(table)}
+    assert publishing._league().value["top100_note"] == ""
+    assert calls[2].top100_evidence == table
 
 
 def _origin_develop_at_head(checkout: Path) -> Path:

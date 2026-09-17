@@ -44,6 +44,7 @@ export function useMemberAdviceView(
     request.rivalEntryId ?? "",
     selection.status,
     selection.path,
+    selection.top100.weight,
   ].join(":");
 
   // A new selection starts clean: an earlier request's answer, wait or failure must not
@@ -61,9 +62,11 @@ export function useMemberAdviceView(
       : null;
   // A computed plan is solved without the club's word, so it never stands in for the
   // switched-on plan, finished or while waiting.
+  // The same holds for a Top 100 weight: the computed plan is the plain one.
   const evidenceOn = selection.evidence.on;
-  const computed = !evidenceOn && current?.phase === "done" ? current : null;
-  const waiting = !evidenceOn && current?.phase === "waiting" ? current : null;
+  const plainOnly = !evidenceOn && selection.top100.weight === 0;
+  const computed = plainOnly && current?.phase === "done" ? current : null;
+  const waiting = plainOnly && current?.phase === "waiting" ? current : null;
   let published: LeagueViewEnvelope<EntryAdvice> | null = null;
   let rejectedContext = false;
   let rejectedUnreadable = false;
@@ -74,6 +77,10 @@ export function useMemberAdviceView(
       // that disagrees with the switch is not the plan the page is about to describe.
       if ((checked.payload.evidence !== undefined) !== selection.evidence.on) {
         throw new Error("The advice document does not match the manager's-word switch.");
+      }
+      // A weighted document names its weight, and the plain one names none.
+      if ((checked.payload.top100?.weight ?? 0) !== selection.top100.weight) {
+        throw new Error("The advice document does not match the Top 100 setting.");
       }
       const snapshot = checked.payload.source_snapshot_id;
       rejectedContext =

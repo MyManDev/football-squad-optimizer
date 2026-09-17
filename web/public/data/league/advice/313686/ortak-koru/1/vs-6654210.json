@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,14 +9,33 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
         "player_out": {
-          "player_id": 199798,
-          "name": "Ezri Konsa Ngoyo",
-          "short_name": "Ngoyo",
+          "player_id": 424876,
+          "name": "Dominik Szoboszlai",
+          "short_name": "Szoboszlai",
+          "position": "MID",
+          "team": "Liverpool"
+        },
+        "player_in": {
+          "player_id": 446008,
+          "name": "Bryan Mbeumo",
+          "short_name": "Mbeumo",
+          "position": "MID",
+          "team": "Man Utd"
+        },
+        "expected_points_delta": 0.669836193323988,
+        "reason_code": "mode_tradeoff"
+      },
+      {
+        "move_id": "gw05-2",
+        "player_out": {
+          "player_id": 466075,
+          "name": "Riccardo Calafiori",
+          "short_name": "Calafiori",
           "position": "DEF",
           "team": "Arsenal"
         },
@@ -27,36 +46,17 @@
           "position": "DEF",
           "team": "Brentford"
         },
-        "expected_points_delta": 0.0,
-        "reason_code": "mode_tradeoff"
-      },
-      {
-        "move_id": "gw05-2",
-        "player_out": {
-          "player_id": 551210,
-          "name": "Jorrel Hato",
-          "short_name": "Hato",
-          "position": "DEF",
-          "team": "Chelsea"
-        },
-        "player_in": {
-          "player_id": 244723,
-          "name": "Tyrick Mitchell",
-          "short_name": "Mitchell",
-          "position": "DEF",
-          "team": "Crystal Palace"
-        },
-        "expected_points_delta": 0.0,
+        "expected_points_delta": -0.7600261506709387,
         "reason_code": "mode_tradeoff"
       }
     ],
     "transfer_hit_points": 0.0,
-    "expected_gain_vs_hold": 0.0,
-    "expected_points_cost": 1.8414816735897617,
+    "expected_gain_vs_hold": -0.09018995734695068,
+    "expected_points_cost": 1.9746440279606077,
     "rival_label": "entry-6654210",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 56.879476676099785,
+    "expected_own_points": 55.69566775742369,
     "captain": {
       "player_id": 223094,
       "name": "Erling Haaland",
@@ -83,20 +83,12 @@
         "expected_points": 2.9398808352076324
       },
       {
-        "player_id": 466075,
-        "name": "Riccardo Calafiori",
-        "short_name": "Calafiori",
-        "position": "DEF",
-        "team": "Arsenal",
-        "expected_points": 3.54054506392718
-      },
-      {
         "player_id": 465730,
         "name": "Maxim De Cuyper",
         "short_name": "Cuyper",
         "position": "DEF",
         "team": "Brighton",
-        "expected_points": 3.5105623330764755
+        "expected_points": 3.5539951801294207
       },
       {
         "player_id": 108416,
@@ -105,6 +97,14 @@
         "position": "DEF",
         "team": "Hull City",
         "expected_points": 2.8164633958534613
+      },
+      {
+        "player_id": 191866,
+        "name": "Kristoffer Ajer",
+        "short_name": "Ajer",
+        "position": "DEF",
+        "team": "Brentford",
+        "expected_points": 2.780518913256247
       },
       {
         "player_id": 141746,
@@ -123,20 +123,20 @@
         "expected_points": 5.199892083433812
       },
       {
+        "player_id": 446008,
+        "name": "Bryan Mbeumo",
+        "short_name": "Mbeumo",
+        "position": "MID",
+        "team": "Man Utd",
+        "expected_points": 4.415892336727386
+      },
+      {
         "player_id": 60307,
         "name": "Pascal Gro\u00df",
         "short_name": "Gro\u00df",
         "position": "MID",
         "team": "Brighton",
-        "expected_points": 4.163808898150183
-      },
-      {
-        "player_id": 424876,
-        "name": "Dominik Szoboszlai",
-        "short_name": "Szoboszlai",
-        "position": "MID",
-        "team": "Liverpool",
-        "expected_points": 3.7460561434034036
+        "expected_points": 4.206689328780451
       },
       {
         "player_id": 439509,
@@ -160,7 +160,7 @@
         "short_name": "Jesus",
         "position": "FWD",
         "team": "Chelsea",
-        "expected_points": 4.719728956049396
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -173,20 +173,20 @@
         "expected_points": 0.08206076680465356
       },
       {
-        "player_id": 191866,
-        "name": "Kristoffer Ajer",
-        "short_name": "Ajer",
+        "player_id": 199798,
+        "name": "Ezri Konsa Ngoyo",
+        "short_name": "Ngoyo",
         "position": "DEF",
-        "team": "Brentford",
-        "expected_points": 2.780518913256247
+        "team": "Arsenal",
+        "expected_points": 2.0636451338320074
       },
       {
-        "player_id": 244723,
-        "name": "Tyrick Mitchell",
-        "short_name": "Mitchell",
+        "player_id": 551210,
+        "name": "Jorrel Hato",
+        "short_name": "Hato",
         "position": "DEF",
-        "team": "Crystal Palace",
-        "expected_points": 2.582386742483201
+        "team": "Chelsea",
+        "expected_points": 1.9720001998749073
       },
       {
         "player_id": 631786,
@@ -207,7 +207,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 6654210,
-    "expected_points_cost_ceiling": 1.8414816735897617,
+    "expected_points_cost_ceiling": 1.9746440279606077,
     "overlap_count": 7,
     "transfer_cap": 2,
     "overlap_target": 9,
@@ -217,10 +217,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 8.0,
-      "expected_points_cost": 9.74153017282547,
-      "expected_points_cost_ceiling": 9.74153017282547
+      "expected_points_cost": 10.16232074888002,
+      "expected_points_cost_ceiling": 10.16232074888002
     },
-    "expected_gap_vs_rival": 1.2509567347605142,
+    "expected_gap_vs_rival": 1.2041996244665043,
     "captain_agreement": true,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0

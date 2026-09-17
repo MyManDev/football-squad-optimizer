@@ -1,6 +1,6 @@
 {
   "contract_version": "provisional_league_ui_v1",
-  "generated_at_utc": "2026-09-17T07:09:13Z",
+  "generated_at_utc": "2026-09-17T10:40:43Z",
   "source_kind": "live",
   "payload": {
     "season": "2026-27",
@@ -9,7 +9,7 @@
     "league_id": 352490,
     "mode": "ortak-koru",
     "window": 1,
-    "source_snapshot_id": "fpl-live-20260915T175225Z-382941835994",
+    "source_snapshot_id": "fpl-live-20260917T103311Z-d0bb92785d5c",
     "moves": [
       {
         "move_id": "gw05-1",
@@ -33,11 +33,11 @@
     ],
     "transfer_hit_points": 0.0,
     "expected_gain_vs_hold": 0.8145743061145936,
-    "expected_points_cost": 0.6160848711204849,
+    "expected_points_cost": 0.6590572681443874,
     "rival_label": "entry-2281624",
     "solver_status": "OPTIMAL",
     "optimality_gap": 0.0,
-    "expected_own_points": 52.64711842747974,
+    "expected_own_points": 51.510619035520335,
     "captain": {
       "player_id": 141746,
       "name": "Bruno Borges Fernandes",
@@ -72,20 +72,20 @@
         "expected_points": 3.555548676659022
       },
       {
+        "player_id": 465730,
+        "name": "Maxim De Cuyper",
+        "short_name": "Cuyper",
+        "position": "DEF",
+        "team": "Brighton",
+        "expected_points": 3.5539951801294207
+      },
+      {
         "player_id": 466075,
         "name": "Riccardo Calafiori",
         "short_name": "Calafiori",
         "position": "DEF",
         "team": "Arsenal",
         "expected_points": 3.54054506392718
-      },
-      {
-        "player_id": 465730,
-        "name": "Maxim De Cuyper",
-        "short_name": "Cuyper",
-        "position": "DEF",
-        "team": "Brighton",
-        "expected_points": 3.5105623330764755
       },
       {
         "player_id": 141746,
@@ -128,20 +128,20 @@
         "expected_points": 4.897045438301909
       },
       {
-        "player_id": 475168,
-        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
-        "short_name": "Jesus",
-        "position": "FWD",
-        "team": "Chelsea",
-        "expected_points": 4.719728956049396
-      },
-      {
         "player_id": 216646,
         "name": "Yoane Wissa",
         "short_name": "Wissa",
         "position": "FWD",
         "team": "Newcastle",
         "expected_points": 3.5637000012914486
+      },
+      {
+        "player_id": 475168,
+        "name": "Jo\u00e3o Pedro Junqueira de Jesus",
+        "short_name": "Jesus",
+        "position": "FWD",
+        "team": "Chelsea",
+        "expected_points": 3.539796717037047
       }
     ],
     "bench": [
@@ -188,7 +188,7 @@
     ],
     "squad_basis": "captured",
     "rival_entry_id": 2281624,
-    "expected_points_cost_ceiling": 0.6160848711204849,
+    "expected_points_cost_ceiling": 0.6590572681443874,
     "overlap_count": 5,
     "transfer_cap": 1,
     "overlap_target": 9,
@@ -198,10 +198,10 @@
       "kind": "with_hits",
       "overlap_applied": 9,
       "transfer_hit_points": 16.0,
-      "expected_points_cost": 13.654193811219315,
-      "expected_points_cost_ceiling": 13.654193811219315
+      "expected_points_cost": 13.697166208243218,
+      "expected_points_cost_ceiling": 13.697166208243218
     },
-    "expected_gap_vs_rival": 1.3632902307566326,
+    "expected_gap_vs_rival": 2.5866553168219255,
     "captain_agreement": false,
     "control_solver_status": "OPTIMAL",
     "control_optimality_gap": 0.0
