@@ -96,6 +96,7 @@ _PUBLISHED_ENVELOPE = frozenset(
         "movement_places",
         "evidence",
         "top100",
+        "chip_choice",
         "transfer_hit_points",
         "expected_own_points",
         "expected_gain_vs_hold",

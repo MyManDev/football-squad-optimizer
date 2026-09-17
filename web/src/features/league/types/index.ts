@@ -289,6 +289,37 @@ export type IndexTop100 =
     }
   | { available: false; reason: string };
 
+/**
+ * A chip the member chose to play: which one, what the chip week is expected to score
+ * above the member's own no-chip plan net of hits, how that was measured, and the chip's
+ * windows as the member stands. One gameweek's difference; what the chip would be worth
+ * in a later gameweek is not measured.
+ */
+export interface AdviceChipChoice {
+  chip: AdviceChip;
+  gain_vs_no_chip: number;
+  basis: string;
+  windows_left?: Partial<Record<ChipHalf, ChipWindowState | null>>;
+}
+
+/**
+ * Which chips the producer solved for a member, and where; every chip with no document
+ * and why; and the chips the member can still play this gameweek. Or why there are none.
+ */
+export type IndexChips =
+  | {
+      available: true;
+      paths: Record<string, string>;
+      unavailable: { chip: string; reason: string }[];
+      held: string[];
+    }
+  | {
+      available: false;
+      reason: string;
+      unavailable?: { chip: string; reason: string }[];
+      held?: string[];
+    };
+
 /** What the producer computed for one member, and what it could not, with the reason. */
 export interface EntryAdviceIndex {
   league_id: number;
@@ -309,6 +340,8 @@ export interface EntryAdviceIndex {
   evidence?: IndexEvidence;
   /** The Top 100 influence menu for this member. Absent before it existed. */
   top100?: IndexTop100;
+  /** The chips the member may choose to play this gameweek. Absent before they existed. */
+  chips?: IndexChips;
   /**
    * The declared rule's pick among the three strategies, and the two numbers it read:
    * the member's league points against their default rival (signed, negative when
@@ -419,6 +452,8 @@ export interface EntryAdvice {
   evidence?: AdviceEvidence;
   /** Present on a Top 100 weighted document only. */
   top100?: AdviceTop100;
+  /** Present only on a document solved with a chip the member chose. */
+  chip_choice?: AdviceChipChoice;
   /**
    * The transfer rule the strategy played under: the free transfers it could spend
    * without hits, the overlap it asked for, the overlap it applied, and which of the

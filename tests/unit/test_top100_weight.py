@@ -703,6 +703,8 @@ def test_the_menu_is_published_beside_the_baseline_and_named_in_the_index(
     assert names == sorted(
         [
             "hoca-sozu.json",
+            # The chips the member may choose are solved on every run, beside the menu.
+            *(f"chip-{chip}.json" for chip in ("wildcard", "freehit", "bboost")),
             *(f"top100-{w}.json" for w in TOP100_WEIGHTS if w),
             *(f"top100-{w}-hoca-sozu.json" for w in TOP100_WEIGHTS if w),
         ]
@@ -743,7 +745,7 @@ def test_without_counts_the_index_says_why_and_old_files_go(
     report = _publish(world, out, counts=None, reason=TOP100_INPUTS_REFUSED)
     index = _read(out / "advice/101/index.json")
     assert index["top100"] == {"available": False, "reason": TOP100_INPUTS_REFUSED}
-    assert not (out / "advice/101/saf-puan/1").exists()
+    assert not list((out / "advice/101/saf-puan/1").glob("top100-*.json"))
     assert "advice/101/saf-puan/1/top100-20.json" in report.removed
 
     _publish(world, out, counts=None)

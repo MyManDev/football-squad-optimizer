@@ -200,6 +200,49 @@ def best_eleven_points_under(
     )
 
 
+def best_lineup_points_with_chip(squad: Iterable[tuple[str, float]], chip: str) -> float | None:
+    """What a fifteen is worth in a week the named chip is played.
+
+    A Wildcard and a Free Hit change which fifteen is held and nothing about how it
+    scores, so their basis is ``best_eleven_points``. A Triple Captain counts the captain
+    three times: the shape is chosen as the planner chooses it under that chip, on the
+    eleven with the captain tripled plus ``bench_weight`` of the bench, and what comes
+    back is the eleven with the captain tripled. A Bench Boost scores all fifteen, so the
+    eleven stops mattering: every legal shape fields each position's best player, the
+    armband goes to the best of the fifteen, and the basis is the fifteen's total with
+    him counted twice.
+
+    ``None`` when the players hold no legal eleven, as ``best_eleven_points`` answers.
+    """
+
+    players = [(str(position), float(points)) for position, points in squad]
+    if chip not in {"3xc", "bboost"}:
+        return best_eleven_points(players)
+    by_position: dict[str, list[float]] = {str(position): [] for position in _POSITION_ORDER}
+    for position, expected_points in players:
+        if position in by_position:
+            by_position[position].append(expected_points)
+    for scores in by_position.values():
+        scores.sort(reverse=True)
+    total = sum(expected_points for _position, expected_points in players)
+    best_objective: float | None = None
+    best_basis: float | None = None
+    for shape in _LEGAL_SHAPES:
+        if any(len(by_position[position]) < count for position, count in shape):
+            continue
+        chosen = [score for position, count in shape for score in by_position[position][:count]]
+        if not chosen:
+            continue
+        if chip == "bboost":
+            return total + max(chosen)
+        basis = sum(chosen) + 2.0 * max(chosen)
+        objective = basis + _LINEUP_DEFAULTS.bench_weight * (total - sum(chosen))
+        if best_objective is None or objective > best_objective:
+            best_objective = objective
+            best_basis = basis
+    return best_basis
+
+
 def advice_player(row: "pd.Series[Any]") -> dict[str, object]:
     name = str(row["name"])
     return {

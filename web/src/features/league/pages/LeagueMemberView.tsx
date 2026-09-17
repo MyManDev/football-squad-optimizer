@@ -189,7 +189,10 @@ function LeagueMemberContent({
           request={request}
           job={job}
           selectionAvailable={
-            selectionAvailable && !selection.evidence.on && selection.top100.weight === 0
+            selectionAvailable &&
+            !selection.evidence.on &&
+            selection.top100.weight === 0 &&
+            selection.chip.chip === null
           }
         />
         {adviceLoading ? (
@@ -221,6 +224,7 @@ function LeagueMemberContent({
               selectionAvailable &&
               !selection.evidence.on &&
               selection.top100.weight === 0 &&
+              selection.chip.chip === null &&
               canComputeAdvice(request)
             }
           />

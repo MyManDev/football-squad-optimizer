@@ -22,8 +22,14 @@
  * file the producer solved for this member on the one-week pure-points plan; a weight
  * without a file is shown disabled, and zero switches the influence off.
  *
- * Selection lives in the URL (`mode`, `rival`, `window`, `llm`, `top100`), the same parameters the
- * templates set and the compute panel reads, so the whole state stays shareable.
+ * The chip row is the member's own declaration, "play this chip this gameweek": one radio
+ * per chip the producer solved on the plain one-week plan, and "none". A chip combines with
+ * nothing, so while one is chosen the manager's word and the Top 100 settings above 0 are
+ * off, and while either of those is on the chips are; every note says which, and "none"
+ * (like 0 and the unchecked word) is always one click away.
+ *
+ * Selection lives in the URL (`mode`, `rival`, `window`, `llm`, `top100`, `chip`), the same
+ * parameters the templates set and the compute panel reads, so the whole state stays shareable.
  */
 
 import { useSearchParams } from "react-router";
@@ -33,7 +39,10 @@ import { Card } from "../../../design/components/Card";
 import { useLanguage } from "../../../i18n/context";
 import { WINDOWS } from "../../moves/modePrices";
 import { strategyNeedsRival, type EntryAdviceIndex, type EntryView } from "../types";
+import { CHIP_NAMES } from "../chipShape";
 import { EVIDENCE_PARAMETER, resolvePublishedAdvice } from "./adviceSelection";
+import { CHIP_PARAMETER } from "./chipChoice";
+import { CHIP_COPY, chipReason, chipsUnavailable } from "./chipCopy";
 import { EVIDENCE_COPY, evidenceUnavailable } from "./evidenceCopy";
 import { TOP100_PARAMETER, TOP100_WEIGHTS } from "./top100";
 import { TOP100_COPY, top100Unavailable } from "./top100Copy";
@@ -114,15 +123,43 @@ export function MemberDecisionControls({
   // A setting exists wherever the producer solved one: every pure-points window, and a
   // strategy's windows against the default rival.
   const top100Applies = top100.available && top100.offered.length > 1;
-  const top100Note = !top100.available
-    ? top100Unavailable(top100Copy, top100.reason)
-    : !top100Applies
-      ? top100Copy.notForSelection
-      : top100.notOffered
-        ? top100Copy.notOffered
-        : top100.weights.length < TOP100_WEIGHTS.length
-          ? top100Copy.notSolved
-          : top100Copy.published;
+  // A chip the member chose is the plain one-week plan with that chip forced. It combines
+  // with nothing, so the word and the settings above 0 are off while one is chosen, and
+  // the chips are off while either of those is on.
+  const chipCopy = CHIP_COPY[language];
+  const chip = selection.chip;
+  const chipChosen = chip.chip !== null;
+  const chipApplies = chip.available && strategy === "saf-puan" && windowSize === 1;
+  const chipBlocked = selection.evidence.on || top100.weight !== 0;
+  const chipNote = !chip.available
+    ? chipsUnavailable(chipCopy, chip.reason)
+    : !chipApplies
+      ? chipCopy.onlyBaseline
+      : chipBlocked
+        ? chipCopy.blockedBySwitches
+        : chip.chip !== null
+          ? chipCopy.chosen(copy.chipNames[chip.chip] ?? chip.chip)
+          : chip.notOffered
+            ? chipCopy.notOffered
+            : chipCopy.plain;
+  // Why a chip the member cannot choose is off: already played, its window not open, a
+  // Free Hit last gameweek, or no plan solved. Said per chip, in the producer's codes.
+  const chipReasons = CHIP_NAMES.filter(
+    (name) => !chip.options.includes(name) && (chip.available || chip.reasons[name] !== undefined),
+  ).map((name) =>
+    chipCopy.chipReasonLine(copy.chipNames[name] ?? name, chipReason(chipCopy, chip.reasons[name])),
+  );
+  const top100Note = chipChosen
+    ? chipCopy.switchesOff
+    : !top100.available
+      ? top100Unavailable(top100Copy, top100.reason)
+      : !top100Applies
+        ? top100Copy.notForSelection
+        : top100.notOffered
+          ? top100Copy.notOffered
+          : top100.weights.length < TOP100_WEIGHTS.length
+            ? top100Copy.notSolved
+            : top100Copy.published;
 
   return (
     <Card
@@ -249,7 +286,7 @@ export function MemberDecisionControls({
               type="checkbox"
               name={EVIDENCE_PARAMETER}
               checked={selection.evidence.on}
-              disabled={!evidenceApplies}
+              disabled={!evidenceApplies || chipChosen}
               onChange={(event) =>
                 update({ [EVIDENCE_PARAMETER]: event.target.checked ? "on" : null })
               }
@@ -260,13 +297,15 @@ export function MemberDecisionControls({
             ) : null}
           </label>
           <p className={styles.note}>
-            {!selection.evidence.available
-              ? evidenceUnavailable(evidenceCopy, selection.evidence.reason)
-              : !evidenceApplies
-                ? evidenceCopy.onlyBaseline
-                : evidenceIsReal
-                  ? evidenceCopy.sourceCapture
-                  : evidenceCopy.sourceExample}
+            {chipChosen
+              ? chipCopy.switchesOff
+              : !selection.evidence.available
+                ? evidenceUnavailable(evidenceCopy, selection.evidence.reason)
+                : !evidenceApplies
+                  ? evidenceCopy.onlyBaseline
+                  : evidenceIsReal
+                    ? evidenceCopy.sourceCapture
+                    : evidenceCopy.sourceExample}
           </p>
         </fieldset>
 
@@ -280,7 +319,11 @@ export function MemberDecisionControls({
                   name={TOP100_PARAMETER}
                   value={weight}
                   checked={top100.weight === weight}
-                  disabled={!top100Applies || !top100.weights.includes(weight)}
+                  disabled={
+                    !top100Applies ||
+                    !top100.weights.includes(weight) ||
+                    (chipChosen && weight !== 0)
+                  }
                   onChange={() =>
                     update({ [TOP100_PARAMETER]: weight === 0 ? null : String(weight) })
                   }
@@ -298,6 +341,45 @@ export function MemberDecisionControls({
           </div>
           <p className={styles.note}>{top100Note}</p>
           {top100Applies ? <p className={styles.note}>{top100Copy.help}</p> : null}
+        </fieldset>
+
+        <fieldset className={styles.fieldset}>
+          <legend>{chipCopy.legend}</legend>
+          <div className={styles.windows}>
+            <label className={styles.windowOption}>
+              <input
+                type="radio"
+                name={CHIP_PARAMETER}
+                value=""
+                checked={!chipChosen}
+                // Nothing to choose from and nothing in the link to clear: the row is inert.
+                disabled={!chip.available && !searchParams.has(CHIP_PARAMETER)}
+                onChange={() => update({ [CHIP_PARAMETER]: null })}
+                // "None" reads as checked while the link carries a chip the page cannot
+                // show; a click on it still has to clear that chip from the link.
+                onClick={() => {
+                  if (searchParams.has(CHIP_PARAMETER)) update({ [CHIP_PARAMETER]: null });
+                }}
+              />
+              <span>{chipCopy.none}</span>
+            </label>
+            {CHIP_NAMES.map((name) => (
+              <label className={styles.windowOption} key={name}>
+                <input
+                  type="radio"
+                  name={CHIP_PARAMETER}
+                  value={name}
+                  checked={chip.chip === name}
+                  disabled={!chipApplies || chipBlocked || !chip.options.includes(name)}
+                  onChange={() => update({ [CHIP_PARAMETER]: name })}
+                />
+                <span>{copy.chipNames[name] ?? name}</span>
+              </label>
+            ))}
+          </div>
+          <p className={styles.note}>{chipNote}</p>
+          {chipReasons.length > 0 ? <p className={styles.note}>{chipReasons.join(" ")}</p> : null}
+          {chipApplies ? <p className={styles.note}>{chipCopy.help}</p> : null}
         </fieldset>
       </div>
       <p className={styles.honesty}>{copy.honestyRule}</p>

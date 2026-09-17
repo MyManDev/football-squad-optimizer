@@ -51,6 +51,15 @@ from squadopt.application.advice import (
     solve_pricing_control,
     solve_word_control,
 )
+from squadopt.application.advice_chips import (
+    CHIP_HISTORY_UNKNOWN,
+    CHIP_NOT_SOLVED,
+    CHIP_SOLVE_ERRORS,
+    NO_CHIP_LEFT,
+    MemberChipMenu,
+    advise_with_chip,
+    member_chip_menu,
+)
 from squadopt.application.advice_record import (
     AdviceRecordConflictError,
     AdviceRecordNotLandedError,
@@ -140,6 +149,10 @@ class MemberRenderTask:
     #: The Top 100 influence weights to solve beside the one-week plan; empty without the
     #: week's counts. Zero is the published plan and never listed.
     top100_weights: tuple[int, ...] = ()
+    #: Whether to solve the chips the member may choose. False only where the batch writes
+    #: no index for the member: a chip document is read through the index that names it,
+    #: so without one it would be a file no page can reach.
+    chips: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,6 +186,16 @@ class MemberRender:
     #: appears here only for a rival strategy over a window, which has no other home.
     variant_payloads: tuple[tuple[str, int, int | None, int, dict[str, object]], ...] = ()
     variant_unavailable: tuple[tuple[str, int, int | None, int, str], ...] = ()
+    #: The chips the member may choose this gameweek: whether their chip history was
+    #: captured at all, the chips they still hold, each held chip's document
+    #: (``(chip, payload)``), every chip with none (``(chip, reason code, detail)``; the
+    #: detail is for the operator's note and empty where the code says it all), and what
+    #: the operator should hear about the solves.
+    chips_known: bool = False
+    chips_held: tuple[str, ...] = ()
+    chip_payloads: tuple[tuple[str, dict[str, object]], ...] = ()
+    chip_unavailable: tuple[tuple[str, str, str], ...] = ()
+    chip_notes: tuple[str, ...] = ()
 
 
 def render_member(
@@ -365,6 +388,43 @@ def render_member(
         pricing=pricing,
     )
     top100_notes.extend(variant_notes)
+    # The chips the member may choose: each one they still hold, forced on the one-week
+    # plan and compared with the same control. They need no input beyond the capture, so
+    # they are solved on every run; a chip that cannot be solved is recorded for that
+    # member and chip, and every other document stands.
+    chip_notes: list[str] = []
+    try:
+        chip_menu = member_chip_menu(rules, task.gameweek, picks.chips_used)
+    except EntryError as error:
+        # A history the published windows cannot place is not a history to offer chips
+        # from; the member is told their history is unknown and the operator is told why.
+        chip_menu = MemberChipMenu(False, (), (), {})
+        chip_notes.append(f"chip history not usable: {error}")
+    chip_payloads: list[tuple[str, dict[str, object]]] = []
+    chip_unavailable: list[tuple[str, str, str]] = [
+        (chip, reason, "") for chip, reason in chip_menu.unavailable
+    ]
+    for chip in chip_menu.held if task.chips else ():
+        try:
+            chosen = advise_with_chip(
+                AdviseEntryRequest(
+                    season=task.season,
+                    gameweek=task.gameweek,
+                    league_id=task.league_id,
+                    entry_id=task.entry_id,
+                ),
+                chip=chip,
+                provider=provider,
+                inputs=inputs,
+                projection=projection,
+                rules=rules,
+                control=control,
+            )
+        except CHIP_SOLVE_ERRORS as error:
+            chip_unavailable.append((chip, CHIP_NOT_SOLVED, str(error)))
+            continue
+        chip_payloads.append((chip, chosen.payload))
+        chip_notes.extend(chosen.notes)
     return MemberRender(
         task.entry_id,
         baseline,
@@ -381,6 +441,11 @@ def render_member(
         top100_notes=tuple(top100_notes),
         variant_payloads=tuple(variant_payloads),
         variant_unavailable=tuple(variant_unavailable),
+        chips_known=chip_menu.known,
+        chips_held=chip_menu.held,
+        chip_payloads=tuple(chip_payloads),
+        chip_unavailable=tuple(chip_unavailable),
+        chip_notes=tuple(chip_notes),
     )
 
 
@@ -563,6 +628,12 @@ def variant_path(
     if rival_id is not None:
         directory = f"{directory}/vs-{rival_id}"
     return f"{directory}/{top100_file(weight)}" if weight else f"{directory}.json"
+
+
+def chip_file(chip: str) -> str:
+    """The file a chosen chip's document is published under, in the one-week directory."""
+
+    return f"chip-{chip}.json"
 
 
 #: How a caller runs the member tasks: ``map`` in-process, or a process pool's ``map``.
@@ -1288,6 +1359,8 @@ def build_league_views(
                 if top100_counts is not None
                 else ()
             ),
+            # The index below is written on the same condition, and it is what names them.
+            chips=rival_menu or bool(windows),
         )
         for registration in registrations
     ]
@@ -1483,9 +1556,17 @@ def build_league_views(
                         "path": relative,
                     }
                 )
+        # The chips the member may choose, beside the other switches in the one-week
+        # directory; the index names every file and why a chip has none.
+        chip_paths: dict[str, str] = {}
+        for chip, payload in render.chip_payloads:
+            relative = f"{top100_directory}/{chip_file(chip)}"
+            _write(relative, payload)
+            chip_paths[chip] = relative
         kept_variants = {
             *paths.values(),
             *word_paths.values(),
+            *chip_paths.values(),
             *(
                 variant_path(entry_id, strategy, window, rival_id, weight)
                 for strategy, window, rival_id, weight, _payload in render.variant_payloads
@@ -1493,11 +1574,12 @@ def build_league_views(
         }
         member_directory = out / f"advice/{entry_id}"
         if member_directory.is_dir():
-            # A setting's document, or a rival strategy's window, that an earlier publish
-            # wrote and this one did not would otherwise stay beside an index that does
-            # not name it.
+            # A setting's document, a chosen chip's, or a rival strategy's window, that an
+            # earlier publish wrote and this one did not would otherwise stay beside an
+            # index that does not name it.
             candidates = {
                 *member_directory.rglob("top100-*.json"),
+                *member_directory.rglob("chip-*.json"),
                 *(
                     path
                     for path in member_directory.glob("*/[35]/vs-*.json")
@@ -1539,6 +1621,27 @@ def build_league_views(
                 # and the rival strategies against the default rival at every window.
                 "documents": documents,
                 "source": top100_counts.source_record(),
+            }
+        chips_index: dict[str, object]
+        if not render.chips_known:
+            chips_index = {"available": False, "reason": CHIP_HISTORY_UNKNOWN}
+        else:
+            chips_index = {
+                **(
+                    {"available": True, "paths": chip_paths}
+                    if chip_paths
+                    else {
+                        "available": False,
+                        "reason": CHIP_NOT_SOLVED if render.chips_held else NO_CHIP_LEFT,
+                    }
+                ),
+                # Every chip with no document, and why: already played, its window not
+                # open, a Free Hit played last gameweek, or a solve that did not finish.
+                "unavailable": [
+                    {"chip": chip, "reason": reason}
+                    for chip, reason, _detail in render.chip_unavailable
+                ],
+                "held": list(render.chips_held),
             }
 
         # The rival menu: one file per (strategy, rival), the standings neighbour's copy
@@ -1609,6 +1712,7 @@ def build_league_views(
                     "window": COMPUTED_WINDOW,
                     "evidence": evidence_index,
                     "top100": top100_index,
+                    "chips": chips_index,
                     # Per strategy, the windows whose file exists: saf-puan's solved
                     # windows, every rival strategy at one week.
                     "windows": {
@@ -1750,9 +1854,25 @@ def build_league_views(
                 *render.top100_notes,
             )
         )
+        chip_note = "; ".join(
+            (
+                *(
+                    f"chip {chip} not solved: {detail}"
+                    for chip, _reason, detail in render.chip_unavailable
+                    if detail
+                ),
+                *render.chip_notes,
+            )
+        )
         note = "; ".join(
             part
-            for part in (*name_notes.get(entry_id, ()), mode_note, word_note, top100_note)
+            for part in (
+                *name_notes.get(entry_id, ()),
+                mode_note,
+                word_note,
+                top100_note,
+                chip_note,
+            )
             if part
         )
         results.append(MemberViewResult(entry_id, labels[entry_id], True, reason=note))

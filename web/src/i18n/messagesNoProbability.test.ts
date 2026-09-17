@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 
 import { AS_A_CHANCE } from "../testSupport/honesty";
+import { CHIP_COPY } from "../features/league/advice/chipCopy";
 import { EVIDENCE_COPY } from "../features/league/advice/evidenceCopy";
 import { TOP100_COPY } from "../features/league/advice/top100Copy";
 import { FIXTURES_COPY } from "../features/fixtures/fixturesCopy";
@@ -78,6 +79,7 @@ for (const language of LANGUAGES) collect(MESSAGES[language], language, catalogu
 for (const language of LANGUAGES) {
   collect(EVIDENCE_COPY[language], `${language}.evidenceCopy`, catalogue);
   collect(TOP100_COPY[language], `${language}.top100Copy`, catalogue);
+  collect(CHIP_COPY[language], `${language}.chipCopy`, catalogue);
   collect(FIXTURES_COPY[language], `${language}.fixturesCopy`, catalogue);
 }
 
@@ -114,6 +116,22 @@ describe("every string in both message catalogues", () => {
       )
       .map(([path, text]) => `${path}: ${text}`);
     expect(offenders).toEqual([]);
+  });
+
+  it("never words a chosen chip's gain as a recommendation or names a week to play it", () => {
+    const chip = [...catalogue].filter(([path]) => path.includes(".chipCopy."));
+    expect(chip.length).toBeGreaterThan(60);
+    const offenders = chip
+      .filter(([, text]) =>
+        /recommend|\bbest\b|optimal|likely|should play|right week|öner|en iyi|en uygun|oynamalısın/i.test(
+          text,
+        ),
+      )
+      .map(([path, text]) => `${path}: ${text}`);
+    expect(offenders).toEqual([]);
+    // The one sentence about advice is the denial, in both languages.
+    expect(catalogue.get("en.chipCopy.honesty")).toMatch(/not advice to play it now/);
+    expect(catalogue.get("tr.chipCopy.honesty")).toMatch(/tavsiyesi değildir/);
   });
 
   it.each(DENIALS)("%s is exempt only because it denies a probability", (path) => {

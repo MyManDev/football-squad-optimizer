@@ -110,6 +110,12 @@ PUBLISHABLE_FIELDS: Final[frozenset[str]] = frozenset(
         # it changed the plan, how the price was measured and which captures the counts
         # came from. A setting and its provenance; every number beside it is base-model.
         "top100",
+        # A chip the member chose to play this gameweek: which chip, what the chip week
+        # is expected to score above the member's own no-chip plan, how that was measured
+        # and the chip's windows as the member stands. A difference between two
+        # expected-points totals for one gameweek; what the chip would be worth in a
+        # later one is not measured, and the document says so beside it.
+        "chip_choice",
     }
 )
 
